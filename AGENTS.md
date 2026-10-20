@@ -2,7 +2,7 @@
 
 Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M5（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
-总体设计已确认，M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2 正在细化规格。
+总体设计与 M2 访谈已确认，M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成。
 
 ## 开始前必读
 
@@ -15,7 +15,7 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 
 M1 已合并进 main。下一个里程碑是 M2：先复现并验证长时间运行问题，发现故障先修复，未复现时按 Q78 留证验收（见 [长期运行验收](docs/product-direction.md#m2-长期运行验收)）；然后做暂存与取消暂存、丢弃与回收区、diff 指纹校验、审阅标记和文件监视，范围见 [产品方向](docs/product-direction.md#实施顺序)。
 
-按下面“工作流程”的第 1 步开始：规划方先与用户进行 grill-with-docs。在 M2 的规格和任务单写好之前，不要开始实现。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
+M2 访谈已完成（Q78–Q97），接下来按 [M2 规格](docs/milestones/m2/spec.md)和[任务单](docs/milestones/m2/issues/)交接实施；只有依赖全部完成的任务才能开始，首先通过长期运行基线验收。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
 ## 工作流程
 
@@ -66,7 +66,7 @@ M1 已合并进 main。下一个里程碑是 M2：先复现并验证长时间运
   完整列表见 [产品方向](docs/product-direction.md#安全边界)。
 - **不写死 macOS 假设**：从 M2 起，平台相关的代码（登录 shell 环境解析、窗口外观、快捷键修饰键等）集中放在少数模块中，其他代码保持平台无关（Q55）。
 - **Git 调用只放在 Rust 层**：前端只调用固定、带类型的操作，不拼接 Git 参数或 shell 命令。
-- **推送和 PR**：除非用户明确要求，不推送，不开 PR。
+- **推送和 PR**：除非用户明确要求，不推送，不开 PR。M2 的唯一例外是 Q97：为编译验收按需正常推送 `m2` 到现有 `origin` 并运行仅编译的 CI；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包。
 - **语言**：文档和界面文案使用简体中文。
 
 ## 文档维护
