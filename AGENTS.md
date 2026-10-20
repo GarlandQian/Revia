@@ -6,7 +6,7 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 
 ## 开始前必读
 
-1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q70）和决策树。
+1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q74）和决策树。
 2. [GLOSSARY.md](GLOSSARY.md)：领域术语。文档、代码命名和界面文案都使用这里的术语，不使用 _Avoid_ 中列出的说法。
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
@@ -20,17 +20,32 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 3. **技术选择**：语法高亮使用 Rust 侧 syntect（[ADR-0006](docs/adr/0006-syntect-for-highlighting.md)）；shadcn/ui 基座用 Base UI（Q51）；应用标识为 `io.github.garlandqian.revia`（Q49）；界面从 M1 起跟随系统浅色 / 深色（Q50）。计划与评审见 [M1 计划](docs/milestones/m1/plan.md)、[M1 评审](docs/milestones/m1/review.md)，必须按评审意见执行。
 4. **参考代码**：`prototypes/m0/` 中的原型代码可以参考移植，Shiki 实现不带入正式工程。不要修改原型目录。
 
-M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。完成后停下，不要开始 M2。
+M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。M1 的需求规格和任务单见 [docs/milestones/m1/spec.md](docs/milestones/m1/spec.md) 与 `docs/milestones/m1/issues/`；还没完成的是 `08`（用户在真实桌面上验收）和 `09`（并排视图的已缓存跳转压到 1 帧内）。完成后停下，不要开始 M2。
 
-## 文件交接
+## 工作流程
 
-不同会话和工具之间通过仓库中的文件交接，不依赖用户转述。计划、评审意见、报告等文件的位置和命名见 [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)。
+不同会话和工具之间通过仓库中的文件交接，不依赖用户转述。需求规格、任务单和报告的位置与写法见 [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)。
 
-- 实施方写好计划后停下。评审文件标明“用户已同意”后才能开始。
-- 评审意见与计划冲突时，以评审意见为准；与已确认的决策冲突时，停下来询问用户。
-- 实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m1 -b m1 main`），不要在主目录里切换分支。
+从 M2 起，每个里程碑按下面的顺序进行。“规划方”是负责写文档、做规划和审查的 Claude 或 Codex；“实施方”是负责写代码的 Pi。
+
+| 步骤 | 谁 | 做什么 |
+| --- | --- | --- |
+| 1 | 规划方 | 用 grill-with-docs 追问这个里程碑还没定的细节，更新决策、术语表和 ADR |
+| 2 | 规划方 | 用 to-spec 写 `spec.md`；测试接缝经用户确认 |
+| 3 | 规划方 | 用 to-tickets 拆成 `issues/`，标好依赖；拆分方式经用户确认 |
+| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement |
+| 5 | 规划方 | 用 code-review 审查 `m<N>` 相对 main 的改动，对照 `spec.md`；意见写进对应任务文件的 `## Comments` |
+| 6 | 实施方 | 按 `## Comments` 修改，回到第 5 步 |
+| 7 | 实施方 | 写 `report.md`：实测数据、验收结论、遗留问题 |
+| 8 | 用户 | 完成 `ready-for-human` 的任务，例如在真实桌面上验收 |
+| 9 | 规划方 | 用户验收后，把 `m<N>` 压成一个提交合并进 main，删除 worktree |
+
+- 规格和任务单经用户同意后才能开始实现。
+- 任务单与已确认的决策冲突时，停下来询问用户。
+- 实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m2 -b m2 main`），不要在主目录里切换分支。
 - 交接文件只记录工作过程，不产生新的决策；新的决策仍以 [docs/README.md](docs/README.md) 为准。
-- **合并方式**：里程碑分支合并进 main 时压成一个提交，提交说明写成“M<N>：<内容>”（例如“M1：只读界面与 diff 流式取数”），中间过程的提交只留在里程碑分支上；设计决策每轮一个提交。实施方只提交到自己的里程碑分支，合并由评审方在用户验收后进行。
+- **合并方式**：里程碑分支合并进 main 时压成一个提交，提交说明写成“M<N>：<内容>”（例如“M1：只读界面与 diff 流式取数”），中间过程的提交只留在里程碑分支上；设计决策每轮一个提交。实施方只提交到里程碑分支，合并由规划方在用户验收后进行。
+- M0、M1 当时用的是“实施方写计划 + 规划方写评审意见”的方式，它们的 `plan.md`、`review.md` 保留作记录。
 
 ## Agent skills
 

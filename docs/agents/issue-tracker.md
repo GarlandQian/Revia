@@ -1,6 +1,6 @@
 # 任务记录：本地 Markdown
 
-需求规格、任务和里程碑交接文件都以 markdown 形式放在 `docs/milestones/` 下，并提交进仓库，供不同会话和工具读取。
+需求规格、任务和里程碑报告都以 markdown 形式放在 `docs/milestones/` 下，并提交进仓库，供不同会话和工具读取。
 
 ## 约定
 
@@ -8,15 +8,16 @@
 
 | 文件 | 内容 | 写入方 |
 | --- | --- | --- |
-| `spec.md` | 需求规格 | 评审方，经用户同意 |
-| `plan.md` | 实施计划 | 实施方 |
-| `review.md` | 评审意见；标明“用户已同意”后才能开工 | 评审方，经用户同意 |
-| `report.md` | 实施报告 | 实施方 |
-| `issues/NN-<slug>.md` | 任务，一个文件一个，从 `01` 编号 | 拆分任务时生成 |
+| `spec.md` | 需求规格（to-spec 的产出） | 规划方，经用户同意 |
+| `issues/NN-<slug>.md` | 任务单（to-tickets 的产出），一个文件一个，按依赖顺序从 `01` 编号 | 规划方，经用户同意 |
+| `report.md` | 里程碑报告：实测数据、验收结论、遗留问题 | 实施方 |
+| `plan.md`、`review.md` | 只在 M0、M1 使用：当时的实施计划与评审意见，保留作记录 | — |
 
-- 任务文件顶部用 `Status:` 行记录状态：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。
-- 依赖写成 `Blocked by: NN, NN`；列出的任务全部完成后才能开始。
-- 讨论和补充追加在文件底部的 `## Comments` 下。
+- 规格和任务单顶部用 `Status:` 行记录状态：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`、`done`。
+  - `ready-for-human`：需要用户亲自完成，例如在真实桌面上验收。
+  - 完成一个任务：勾选它的验收项，`Status:` 改为 `done`。
+- 依赖写成 `Blocked by: NN, NN`；列出的任务全部 `done` 后才能开始。
+- 审查意见和讨论追加在任务文件底部的 `## Comments` 下，注明来源和日期；实施方据此修改。
 
 ## 技能要求“发布到任务记录”时
 
@@ -25,3 +26,7 @@
 ## 技能要求“读取相关任务”时
 
 读取对应路径的文件。用户通常会直接给出路径或里程碑编号。
+
+## 技能要求“关闭任务”时
+
+勾选验收项，把 `Status:` 改为 `done`，随实现代码一起提交到里程碑分支。
