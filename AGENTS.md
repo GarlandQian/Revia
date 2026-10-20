@@ -6,7 +6,7 @@ Revia 是一个轻量的 macOS Git 客户端，只支持 Apple Silicon（arm64�
 
 ## 开始前必读
 
-1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q47）和决策树。
+1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q53）和决策树。
 2. [GLOSSARY.md](GLOSSARY.md)：领域术语。文档、代码命名和界面文案都使用这里的术语，不使用 _Avoid_ 中列出的说法。
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
@@ -17,7 +17,7 @@ Revia 是一个轻量的 macOS Git 客户端，只支持 Apple Silicon（arm64�
 
 1. **先做**：改造 diff 传输，按可见范围分批获取数据，并消除快速滚动时的空白（Q46）。验收标准见技术方向。
 2. **再做**：在仓库根目录初始化正式工程（Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS），实现添加仓库、读取状态、文件列表、显示 diff。
-3. **技术选择**：语法高亮使用 Rust 侧 syntect（[ADR-0006](docs/adr/0006-syntect-for-highlighting.md)）。shadcn/ui 组件基座和正式工程的目录结构写进计划，由评审确认。
+3. **技术选择**：语法高亮使用 Rust 侧 syntect（[ADR-0006](docs/adr/0006-syntect-for-highlighting.md)）；shadcn/ui 基座用 Base UI（Q51）；应用标识为 `io.github.garlandqian.revia`（Q49）；界面从 M1 起跟随系统浅色 / 深色（Q50）。计划与评审见 [m1-plan.md](docs/milestones/m1-plan.md)、[m1-review.md](docs/milestones/m1-review.md)，必须按评审意见执行。
 4. **参考代码**：`prototypes/m0/` 中的原型代码可以参考移植，Shiki 实现不带入正式工程。不要修改原型目录。
 
 M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。完成后停下，不要开始 M2。
