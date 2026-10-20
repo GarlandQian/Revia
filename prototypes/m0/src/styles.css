@@ -1,0 +1,282 @@
+:root {
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  height: 100%;
+  background: #ffffff;
+  color: #1f2328;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e5e7eb;
+  background: #fafbfc;
+  min-height: 0;
+}
+
+.sidebar-head {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-head input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.file-list {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.file.current {
+  background: #eef4ff;
+}
+
+.file-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  width: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.status-added {
+  color: #1a7f37;
+}
+
+.status-deleted {
+  color: #cf222e;
+}
+
+.status-modified {
+  color: #9a6700;
+}
+
+.status-renamed {
+  color: #0969da;
+}
+
+.badge {
+  font-size: 11px;
+  color: #57606a;
+  background: #eaeef2;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.file-toggle {
+  border: 0;
+  background: transparent;
+  color: #0969da;
+  font: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.sidebar-foot {
+  padding: 6px 8px;
+  border-top: 1px solid #e5e7eb;
+  color: #57606a;
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f6f8fa;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.label {
+  color: #57606a;
+  font-size: 11px;
+  margin-right: 2px;
+}
+
+button {
+  font: inherit;
+  padding: 3px 8px;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+button.active {
+  background: #0969da;
+  border-color: #0969da;
+  color: #ffffff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.status-text {
+  color: #57606a;
+  font-size: 11px;
+}
+
+.error {
+  padding: 6px 10px;
+  background: #ffebe9;
+  color: #cf222e;
+  border-bottom: 1px solid #ffcecb;
+}
+
+.empty {
+  padding: 10px;
+  color: #57606a;
+}
+
+.empty.large {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diff-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  border-top: 1px solid #e5e7eb;
+  background: #fbfcfd;
+  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.panel .muted {
+  color: #57606a;
+  font-size: 11px;
+}
+
+.panel-body {
+  overflow: auto;
+  padding: 8px 10px;
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 4px 0 8px;
+}
+
+.metric {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.metric-label {
+  color: #57606a;
+  font-size: 11px;
+}
+
+.metric-value {
+  font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, monospace;
+  font-size: 12px;
+}
+
+.raw {
+  margin: 0;
+  padding: 8px;
+  background: #0d1117;
+  color: #c9d1d9;
+  border-radius: 6px;
+  font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  max-height: 200px;
+  overflow: auto;
+}

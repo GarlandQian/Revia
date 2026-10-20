@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "M0 原型只需要调用 Rust 层自定义命令，不开放任何命令执行能力。",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

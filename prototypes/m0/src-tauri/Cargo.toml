@@ -1,0 +1,30 @@
+[package]
+name = "revia-m0"
+version = "0.1.0"
+description = "Revia M0 原型：diff 渲染与运行环境验证"
+authors = ["Revia"]
+edition = "2024"
+
+[lib]
+name = "revia_m0_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["custom-protocol"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syntect = "5.3"
+two-face = { version = "0.5", features = ["syntect-default-onig"] }
+sha2 = "0.11"
+wait-timeout = "0.2"
+tempfile = "3"
+
+# 只构建 Apple Silicon（Q44）。原型保持 release 可用，不做体积优化取舍。
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
+strip = true
