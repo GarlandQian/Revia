@@ -1,12 +1,12 @@
 # Revia 协作指南
 
-Revia 是一个轻量的 macOS Git 客户端，只支持 Apple Silicon（arm64），核心工作流是“审阅 diff → 选择变更 → 提交”。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
+Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M5（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
 设计已全部确认，M0 原型已完成（[M0 报告](docs/prototypes/m0-report.md)），当前进行 M1。
 
 ## 开始前必读
 
-1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q53）和决策树。
+1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q67）和决策树。
 2. [GLOSSARY.md](GLOSSARY.md)：领域术语。文档、代码命名和界面文案都使用这里的术语，不使用 _Avoid_ 中列出的说法。
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
@@ -37,6 +37,7 @@ M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。完
 - 实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m1 -b m1 main`），不要在主目录里切换分支。
 - 交接文件只记录工作过程，不产生新的决策；新的决策仍以 [docs/README.md](docs/README.md) 为准。
 - 之后的里程碑沿用同样的命名，例如 `docs/milestones/m2-plan.md`。
+- **合并方式**：里程碑分支合并进 main 时压成一个提交，提交说明写成“M<N>：<内容>”（例如“M1：只读界面与 diff 流式取数”），中间过程的提交只留在里程碑分支上；设计决策每轮一个提交。实施方只提交到自己的里程碑分支，合并由评审方在用户验收后进行。
 
 ## 规则
 
@@ -50,6 +51,7 @@ M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。完
   - 丢弃改动前先存入回收区。
 
   完整列表见 [产品方向](docs/product-direction.md#安全边界)。
+- **不写死 macOS 假设**：从 M2 起，平台相关的代码（登录 shell 环境解析、窗口外观、快捷键修饰键等）集中放在少数模块中，其他代码保持平台无关（Q55）。
 - **Git 调用只放在 Rust 层**：前端只调用固定、带类型的操作，不拼接 Git 参数或 shell 命令。
 - **推送和 PR**：除非用户明确要求，不推送，不开 PR。
 - **语言**：文档和界面文案使用简体中文。
