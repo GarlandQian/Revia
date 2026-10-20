@@ -88,6 +88,9 @@ Revia 借鉴 JetBrains 的 Git 操作体验，做一个更聚焦的独立 macOS 
 | Q65 | 安装包文件名参考 PiPilot：`Revia-<版本>-macos-arm64.dmg`、`Revia-<版本>-windows-x64-setup.exe`、`Revia-<版本>-windows-x64-portable.zip` / `.exe`；每个平台一份 SHA256 校验文件；标签 `v<版本>`，标题 `Revia <版本>` | 用户于 2026-10-20 确认（“按推荐”） |
 | Q66 | 便携版同时提供单个 exe 和 zip（zip 内为 `Revia` 文件夹） | 同一轮确认 |
 | Q67 | 应用标识保持 `io.github.garlandqian.revia`，不改为 `com.revia.desktop` | 同一轮确认 |
+| Q68 | diff 区域由程序接管滚动（自绘滚动条、键盘滚动），不用浏览器原生滚动，见 [ADR-0008](./adr/0008-diff-view-owns-scrolling.md) | 用户于 2026-10-20 根据实测（快速滑动整块变白）确认（“按推荐”） |
+| Q69 | 2 万显示行以内的文件，首屏之后在后台预取全部行数据；更大的文件仍按可见范围分批获取 | 同一轮确认 |
+| Q70 | 由设计评审会话接着在 m1 分支上完成以上修改，用户验收后压成一个提交合并 | 同一轮确认 |
 
 各项的完整说明见对应的方向文档。
 

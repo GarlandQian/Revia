@@ -6,7 +6,7 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 
 ## 开始前必读
 
-1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q67）和决策树。
+1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q70）和决策树。
 2. [GLOSSARY.md](GLOSSARY.md)：领域术语。文档、代码命名和界面文案都使用这里的术语，不使用 _Avoid_ 中列出的说法。
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
