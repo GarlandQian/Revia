@@ -8,14 +8,15 @@
 
 | 文件 | 内容 | 写入方 |
 | --- | --- | --- |
-| `spec.md` | 需求规格（to-spec 的产出） | 规划方，经用户同意 |
-| `issues/NN-<slug>.md` | 任务单（to-tickets 的产出），一个文件一个，按依赖顺序从 `01` 编号 | 规划方，经用户同意 |
+| `spec.md` | 需求规格（to-spec 的产出） | 规划方，整理已确认的追问结论（Q76） |
+| `issues/NN-<slug>.md` | 任务单（to-tickets 的产出），一个文件一个，按依赖顺序从 `01` 编号 | 规划方，按规格拆分（Q76） |
 | `report.md` | 里程碑报告：实测数据、验收结论、遗留问题 | 实施方 |
 | `plan.md`、`review.md` | 只在 M0、M1 使用：当时的实施计划与评审意见，保留作记录 | — |
 
 - 规格和任务单顶部用 `Status:` 行记录状态：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`、`done`。
-  - `ready-for-human`：需要用户亲自完成，例如在真实桌面上验收。
+  - `ready-for-human`：需要真实桌面等交互式验收，由规划方使用电脑操控完成（Q77）。
   - 完成一个任务：勾选它的验收项，`Status:` 改为 `done`。
+- 规格与任务单不再单独请用户确认；发现追问未覆盖的取舍时，回到 grill-with-docs 补问（Q76）。
 - 依赖写成 `Blocked by: NN, NN`；列出的任务全部 `done` 后才能开始。
 - 审查意见和讨论追加在任务文件底部的 `## Comments` 下，注明来源和日期；实施方据此修改。
 

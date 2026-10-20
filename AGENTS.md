@@ -2,18 +2,18 @@
 
 Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M5（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
-设计已全部确认，M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成。
+总体设计已确认，M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2 正在细化规格。
 
 ## 开始前必读
 
-1. [docs/README.md](docs/README.md)：已确认的决策（Q1–Q77）和决策树。
+1. [docs/README.md](docs/README.md)：已确认的决策和当前决策树。
 2. [GLOSSARY.md](GLOSSARY.md)：领域术语。文档、代码命名和界面文案都使用这里的术语，不使用 _Avoid_ 中列出的说法。
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
 ## 当前阶段：M2 准备中
 
-M1 已合并进 main。下一个里程碑是 M2：先复现并修复长时间运行后卡住的问题（Q53），然后做暂存与取消暂存、丢弃与回收区、diff 指纹校验、审阅标记和文件监视，范围见 [产品方向](docs/product-direction.md#实施顺序)。
+M1 已合并进 main。下一个里程碑是 M2：先复现并验证长时间运行问题，发现故障先修复，未复现时按 Q78 留证验收（见 [长期运行验收](docs/product-direction.md#m2-长期运行验收)）；然后做暂存与取消暂存、丢弃与回收区、diff 指纹校验、审阅标记和文件监视，范围见 [产品方向](docs/product-direction.md#实施顺序)。
 
 按下面“工作流程”的第 1 步开始：规划方先与用户进行 grill-with-docs。在 M2 的规格和任务单写好之前，不要开始实现。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
