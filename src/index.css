@@ -1,0 +1,432 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* 跟随系统深浅色（Q50）；也保留 .dark 类以便以后加手动覆盖。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+  }
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    }
+
+  body {
+    overflow: hidden;
+    }
+
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+/* ---------- diff 视图与语法配色（浅色 / 深色两套，Q50） ---------- */
+
+:root {
+  --diff-bg: var(--background);
+  --diff-row-height: 18px;
+  --diff-gutter-fg: #9aa0a6;
+  --diff-gutter-border: color-mix(in oklab, var(--border) 70%, transparent);
+  --diff-add-bg: #e6ffec;
+  --diff-del-bg: #ffebe9;
+  --diff-hunk-bg: #f6f8fa;
+  --diff-hunk-fg: #57606a;
+  /* 并排视图里一侧没有对应行。 */
+  --diff-empty-bg: #fafbfc;
+  /* 数据还没到的行：要和白底明显区分，快速滚动时不能看起来像“空白”（Q46）。 */
+  --diff-placeholder-bg: #eef1f4;
+  --diff-placeholder-gutter: #e4e8ec;
+  --diff-placeholder-line: #dde1e6;
+  --diff-marker-fg: #8b949e;
+  --diff-scrollbar-thumb: rgb(0 0 0 / 0.28);
+  --diff-scrollbar-thumb-hover: rgb(0 0 0 / 0.45);
+  --diff-selection: color-mix(in oklab, var(--primary) 12%, transparent);
+
+  --syntax-plain: #24292f;
+  --syntax-comment: #6a737d;
+  --syntax-string: #0a3069;
+  --syntax-number: #0550ae;
+  --syntax-constant: #0550ae;
+  --syntax-keyword: #cf222e;
+  --syntax-function: #8250df;
+  --syntax-type: #953800;
+  --syntax-variable: #953800;
+  --syntax-parameter: #24292f;
+  --syntax-tag: #116329;
+  --syntax-attribute: #0550ae;
+  --syntax-punctuation: #57606a;
+  --syntax-operator: #cf222e;
+  --syntax-invalid: #82071e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --diff-add-bg: color-mix(in oklab, #2ea043 18%, transparent);
+    --diff-del-bg: color-mix(in oklab, #f85149 16%, transparent);
+    --diff-hunk-bg: color-mix(in oklab, var(--foreground) 8%, transparent);
+    --diff-hunk-fg: #8b949e;
+    --diff-empty-bg: color-mix(in oklab, var(--foreground) 4%, transparent);
+    --diff-placeholder-bg: color-mix(in oklab, var(--foreground) 7%, var(--background));
+    --diff-placeholder-gutter: color-mix(in oklab, var(--foreground) 10%, var(--background));
+    --diff-placeholder-line: color-mix(in oklab, var(--foreground) 13%, var(--background));
+    --diff-marker-fg: #8b949e;
+    --diff-scrollbar-thumb: rgb(255 255 255 / 0.3);
+    --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.5);
+
+    --syntax-plain: #e6edf3;
+    --syntax-comment: #8b949e;
+    --syntax-string: #a5d6ff;
+    --syntax-number: #79c0ff;
+    --syntax-constant: #79c0ff;
+    --syntax-keyword: #ff7b72;
+    --syntax-function: #d2a8ff;
+    --syntax-type: #ffa657;
+    --syntax-variable: #ffa657;
+    --syntax-parameter: #e6edf3;
+    --syntax-tag: #7ee787;
+    --syntax-attribute: #79c0ff;
+    --syntax-punctuation: #c9d1d9;
+    --syntax-operator: #ff7b72;
+    --syntax-invalid: #ffa198;
+  }
+}
+
+.dark {
+  --diff-add-bg: color-mix(in oklab, #2ea043 18%, transparent);
+  --diff-del-bg: color-mix(in oklab, #f85149 16%, transparent);
+  --diff-hunk-bg: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --diff-empty-bg: color-mix(in oklab, var(--foreground) 4%, transparent);
+  --diff-placeholder-bg: color-mix(in oklab, var(--foreground) 7%, var(--background));
+  --diff-placeholder-gutter: color-mix(in oklab, var(--foreground) 10%, var(--background));
+  --diff-placeholder-line: color-mix(in oklab, var(--foreground) 13%, var(--background));
+  --diff-scrollbar-thumb: rgb(255 255 255 / 0.3);
+  --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.5);
+}
+
+.diff-scroll {
+  overflow-anchor: none;
+  contain: layout paint style;
+}
+
+/*
+ * 行区域底图：还没渲染进 DOM 的位置画成“加载中的行”（行号栏 + 每行一条分隔线）。
+ * 触控板快速滑动时，系统会先滚动画面，行组件稍后才补上；这段时间露出的是行的轮廓，
+ * 而不是白底（Q46）。真实的行自带不透明背景，会盖住底图。
+ */
+.diff-canvas {
+  position: relative;
+  background-color: var(--diff-placeholder-bg);
+  /* 两层渐变都只画一行高，再纵向平铺：渐变按整个内容高度（十几万像素）绘制会让每帧重绘变得极慢。 */
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent calc(var(--diff-row-height) - 1px),
+      var(--diff-placeholder-line) calc(var(--diff-row-height) - 1px)
+    ),
+    var(--diff-canvas-gutters);
+  background-size: 100% var(--diff-row-height);
+  background-repeat: repeat-y;
+}
+
+/* 自绘滚动条（ADR-0008）：覆盖在内容右侧，样式接近 macOS 的叠加式滚动条。 */
+.diff-scrollbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 2;
+  cursor: default;
+}
+
+.diff-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  left: 3px;
+  right: 3px;
+  border-radius: 4px;
+  background: var(--diff-scrollbar-thumb);
+}
+
+.diff-scrollbar:hover .diff-scrollbar-thumb {
+  background: var(--diff-scrollbar-thumb-hover);
+}
+
+/* 底图的行号栏与真实行的列宽一致：统一视图两栏共 112px，并排视图左右各 56px。 */
+.diff-canvas-unified {
+  --diff-canvas-gutters: linear-gradient(to right, var(--diff-placeholder-gutter) 0 112px, transparent 112px);
+}
+
+.diff-canvas-split {
+  --diff-canvas-gutters: linear-gradient(
+    to right,
+    var(--diff-placeholder-gutter) 0 56px,
+    transparent 56px 50%,
+    var(--diff-placeholder-gutter) 50% calc(50% + 56px),
+    transparent calc(50% + 56px)
+  );
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  display: grid;
+  align-items: center;
+  white-space: pre;
+  overflow: hidden;
+  /* 不透明，盖住 .diff-canvas 的“加载中”底图。 */
+  background-color: var(--diff-bg);
+}
+
+.row-unified {
+  grid-template-columns: 56px 56px minmax(0, 1fr);
+}
+
+.row-split {
+  grid-template-columns: 56px minmax(0, 1fr) 56px minmax(0, 1fr);
+}
+
+.row-hunk {
+  display: block;
+  padding-left: 8px;
+  color: var(--diff-hunk-fg);
+  /* 深色模式下 hunk 底色是半透明的，叠在行的不透明底色上，不能直接透出底图。 */
+  background-image: linear-gradient(var(--diff-hunk-bg), var(--diff-hunk-bg));
+  border-top: 1px solid var(--diff-gutter-border);
+  border-bottom: 1px solid var(--diff-gutter-border);
+}
+
+.gutter {
+  color: var(--diff-gutter-fg);
+  text-align: right;
+  padding-right: 8px;
+  border-right: 1px solid var(--diff-gutter-border);
+  user-select: none;
+}
+
+.cell {
+  padding-left: 4px;
+  overflow: hidden;
+}
+
+.cell.empty {
+  background: var(--diff-empty-bg);
+}
+
+.cell-addition {
+  background: var(--diff-add-bg);
+}
+
+.cell-deletion {
+  background: var(--diff-del-bg);
+}
+
+.marker {
+  display: inline-block;
+  width: 10px;
+  color: var(--diff-marker-fg);
+}
+
+.tok-plain { color: var(--syntax-plain); }
+.tok-comment { color: var(--syntax-comment); font-style: italic; }
+.tok-string { color: var(--syntax-string); }
+.tok-number { color: var(--syntax-number); }
+.tok-constant { color: var(--syntax-constant); }
+.tok-keyword { color: var(--syntax-keyword); }
+.tok-function { color: var(--syntax-function); }
+.tok-type { color: var(--syntax-type); }
+.tok-variable { color: var(--syntax-variable); }
+.tok-parameter { color: var(--syntax-parameter); }
+.tok-tag { color: var(--syntax-tag); }
+.tok-attribute { color: var(--syntax-attribute); }
+.tok-punctuation { color: var(--syntax-punctuation); }
+.tok-operator { color: var(--syntax-operator); }
+.tok-invalid { color: var(--syntax-invalid); }
+
+/* Git 状态色（Q31：只有状态字母上色，文件名保持正常颜色） */
+.status-M { color: var(--status-modified); }
+.status-A { color: var(--status-added); }
+.status-D { color: var(--status-deleted); }
+.status-R { color: var(--status-renamed); }
+.status-U { color: var(--status-conflict); }
+.status-T { color: var(--status-modified); }
+.status-untracked { color: var(--status-untracked); }
+
+:root {
+  --status-modified: #9a6700;
+  --status-added: #1a7f37;
+  --status-deleted: #cf222e;
+  --status-renamed: #0969da;
+  --status-conflict: #bf3989;
+  --status-untracked: #57606a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --status-modified: #d29922;
+    --status-added: #3fb950;
+    --status-deleted: #f85149;
+    --status-renamed: #58a6ff;
+    --status-conflict: #db61a2;
+    --status-untracked: #8b949e;
+  }
+}

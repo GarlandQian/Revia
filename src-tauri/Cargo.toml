@@ -1,0 +1,34 @@
+[package]
+name = "revia"
+version = "0.1.0"
+description = "Revia：轻量的 macOS Git 客户端"
+authors = ["Garland Qian"]
+edition = "2024"
+
+[lib]
+name = "revia_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["custom-protocol"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syntect = "5.3"
+two-face = { version = "0.5", features = ["syntect-default-onig"] }
+sha2 = "0.11"
+wait-timeout = "0.2"
+ts-rs = { version = "12", features = ["serde-compat", "no-serde-warnings"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+# 只构建 Apple Silicon（Q44）
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
+strip = true

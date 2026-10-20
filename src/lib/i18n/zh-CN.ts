@@ -1,0 +1,76 @@
+/**
+ * 界面文案集中管理（Q40：首版只提供简体中文，文案不写死在组件里）。
+ * 以后增加英文时，只需要新增一个同样形状的字典。
+ */
+
+export const zhCN = {
+  app: {
+    name: "Revia",
+  },
+  firstRun: {
+    title: "添加仓库",
+    description: "选择本机文件系统中的一个 Git 仓库目录，或把文件夹拖进窗口。",
+    addButton: "选择文件夹…",
+    dragHint: "也可以把文件夹拖到窗口里",
+    notARepo: "这个目录不是 Git 仓库",
+    failed: "添加失败",
+  },
+  changes: {
+    unstaged: "未暂存",
+    staged: "已暂存",
+    untracked: "未跟踪",
+    empty: "没有未提交改动",
+    refresh: "刷新",
+    loading: "读取状态…",
+    binary: "二进制文件，不显示内容",
+    emptyFile: "没有可显示的 hunk",
+    conflict: "冲突文件：M1 不显示 diff",
+    collapsed: "默认收起",
+    expand: "展开",
+    collapse: "收起",
+    noSelection: "选择左侧文件查看 diff",
+    hunks: "hunk",
+    linesAdded: "新增",
+    linesDeleted: "删除",
+  },
+  diff: {
+    split: "并排",
+    unified: "统一",
+    viewLabel: "视图",
+    previousHunk: "上一处差异",
+    nextHunk: "下一处差异",
+    fontSmaller: "缩小字号",
+    fontLarger: "放大字号",
+  },
+  environment: {
+    title: "环境问题",
+    gitMissing: "找不到可用的 Git",
+    versionTooLow: "Git 版本过低",
+    shellFallback: "登录 shell 环境解析回退到了最小环境",
+    reload: "重新加载环境",
+  },
+  errors: {
+    gitFailed: "Git 命令失败",
+    rejected: "操作被拒绝",
+    internal: "内部错误",
+    copy: "复制",
+    dismiss: "关闭",
+  },
+  measure: {
+    title: "测量",
+    run: "运行测量",
+    running: "测量中…",
+    clear: "清空",
+    export: "导出 JSON",
+    firstScreen: "首屏（含读取状态）",
+    listChanges: "读取状态与解析",
+    firstRows: "首次取行",
+    render: "界面渲染",
+    jump: "跳转后内容出现",
+    uncovered: "滚动中未覆盖行数",
+    frames: "帧间隔 p50 / p95",
+  },
+} as const;
+
+export type Messages = typeof zhCN;
+export const messages = zhCN;

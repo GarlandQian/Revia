@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：设计已全部确认，M0 原型已完成（见 [M0 报告](./milestones/m0/report.md)），下一步是 M1。更新日期：2026-10-20。
+状态：设计已全部确认，M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)），下一步是 M2。更新日期：2026-10-20。
 
 Revia 借鉴 JetBrains 的 Git 操作体验，做一个更聚焦的独立 macOS Git 客户端，而不是完整复刻 Rebased。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 

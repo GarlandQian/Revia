@@ -2,7 +2,7 @@
 
 Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M5（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
-设计已全部确认，M0 原型已完成（[M0 报告](docs/milestones/m0/report.md)），当前进行 M1。
+设计已全部确认，M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成。
 
 ## 开始前必读
 
@@ -11,16 +11,11 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M1 只读
+## 当前阶段：M2 准备中
 
-只做 M1，内容见 [产品方向](docs/product-direction.md#实施顺序) 中的实施顺序，以及 [技术方向](docs/technical-direction.md) 中的“diff 传输与渲染（M1）”一节：
+M1 已合并进 main。下一个里程碑是 M2：先复现并修复长时间运行后卡住的问题（Q53），然后做暂存与取消暂存、丢弃与回收区、diff 指纹校验、审阅标记和文件监视，范围见 [产品方向](docs/product-direction.md#实施顺序)。
 
-1. **先做**：改造 diff 传输，按可见范围分批获取数据，并消除快速滚动时的空白（Q46）。验收标准见技术方向。
-2. **再做**：在仓库根目录初始化正式工程（Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS），实现添加仓库、读取状态、文件列表、显示 diff。
-3. **技术选择**：语法高亮使用 Rust 侧 syntect（[ADR-0006](docs/adr/0006-syntect-for-highlighting.md)）；shadcn/ui 基座用 Base UI（Q51）；应用标识为 `io.github.garlandqian.revia`（Q49）；界面从 M1 起跟随系统浅色 / 深色（Q50）。计划与评审见 [M1 计划](docs/milestones/m1/plan.md)、[M1 评审](docs/milestones/m1/review.md)，必须按评审意见执行。
-4. **参考代码**：`prototypes/m0/` 中的原型代码可以参考移植，Shiki 实现不带入正式工程。不要修改原型目录。
-
-M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。M1 的需求规格和任务单见 [docs/milestones/m1/spec.md](docs/milestones/m1/spec.md) 与 `docs/milestones/m1/issues/`；还没完成的是 `08`（用户在真实桌面上验收）和 `09`（并排视图的已缓存跳转压到 1 帧内）。完成后停下，不要开始 M2。
+按下面“工作流程”的第 1 步开始：规划方先与用户进行 grill-with-docs。在 M2 的规格和任务单写好之前，不要开始实现。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
 ## 工作流程
 
@@ -33,7 +28,7 @@ M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。M1 
 | 1 | 规划方与用户 | 用 grill-with-docs 追问这个里程碑还没定的细节（包括测试接缝），更新决策、术语表和 ADR |
 | 2 | 规划方 | 用 to-spec 写 `spec.md` |
 | 3 | 规划方 | 用 to-tickets 拆成 `issues/`，标好依赖 |
-| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `pi -p --provider magpie --model cpa/deepseek-v4.1-flash` 在后台运行 |
+| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型用 `cpa/deepseek-v4.1-flash`，该渠道不可用时临时换成 `cpa/gemini-3.8-flash` |
 | 5 | 规划方 | 用 code-review 审查 `m<N>` 相对 main 的改动，对照 `spec.md`；意见写进对应任务文件的 `## Comments` |
 | 6 | 实施方 | 按 `## Comments` 修改，回到第 5 步 |
 | 7 | 实施方 | 写 `report.md`：实测数据、验收结论、遗留问题 |
@@ -80,9 +75,52 @@ M1 只读，不做任何写操作：暂存、丢弃、提交属于 M2、M3。M1 
 - 只有迁移成本高、需要背景解释且确有取舍的决定才写 ADR，编号在 `docs/adr/` 现有最大编号上递增。
 - 工程初始化后，在本文件中补充开发、构建和测试命令。
 
+## 开发与构建命令（正式工程）
+
+正式工程位于仓库根目录。
+
+```bash
+# 1. 准备测试 fixture（生成测试仓库到指定目录，生成物不进版本库）
+tools/fixtures/setup.sh /tmp/revia-m1-fixtures
+
+# 2. 依赖安装
+pnpm install
+
+# 3. 前端检查
+pnpm exec tsc -b      # 类型检查（含 ts-rs 绑定）
+pnpm lint             # oxlint
+pnpm build            # 前端构建
+
+# 4. 运行开发环境（如需编辑、构建、测试、运行完整应用；Tauri 前端产物在编译期嵌入二进制）
+pnpm tauri dev
+
+# 5. Rust 检查与测试
+/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml
+
+# 6. 构建 .app 与 .dmg（构建前先 pnpm build，脚本会重新编译以嵌入最新前端）
+tools/build-app.sh release
+open "src-tauri/target/release/bundle/macos/Revia.app"
+
+# 7. 自动测量（首屏、跳转、滚动；每个视图一个进程）
+REVIA_MEASURE=1 REVIA_MEASURE_ONLY=split \
+REVIA_MEASURE_REPO=/tmp/revia-m1-fixtures/diffs REVIA_MEASURE_PATH=src/generated.ts \
+REVIA_MEASURE_LOG=/tmp/split.json src-tauri/target/release/revia
+
+# 8. 只读界面冒烟检查（添加仓库 → 文件列表 → 逐个打开 → 切换视图）
+REVIA_SMOKE=1 REVIA_MEASURE_REPO=/tmp/revia-m1-fixtures/diffs \
+REVIA_MEASURE_LOG=/tmp/smoke.json src-tauri/target/release/revia
+```
+
+注意：
+
+- 打包好的 `Revia.app` 直接双击运行时，前端资源已嵌入二进制，无需开发服务器；
+  但改了前端代码必须重新 `pnpm build` 并重新编译 crate，否则跑的是旧界面。
+- Rust 依赖来自 Homebrew，`cargo` 在非交互 shell 里不一定在 PATH，必要时用绝对路径 `/opt/homebrew/bin/cargo`。
+- Git 调用只能在 Rust 层，前端不拼 Git 参数或 shell。
+
 ## 开发与构建命令（M0 原型，仅供参考）
 
-M0 原型工程位于 `prototypes/m0/`。正式工程初始化后，在本节之前补充正式工程的命令。
+M0 原型工程位于 `prototypes/m0/`。
 
 ```bash
 # 1. 准备测试 fixture（生成 4 个测试仓库，生成物不进版本库）

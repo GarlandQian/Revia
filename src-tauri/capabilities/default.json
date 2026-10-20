@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "M1 只读界面：只开放打开文件夹对话框，以及核心 API；不开放任何命令执行能力。",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}

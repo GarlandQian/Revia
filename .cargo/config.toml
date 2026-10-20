@@ -1,0 +1,4 @@
+# ts-rs 生成的 TypeScript 类型直接写进前端目录，生成物提交进仓库。
+[env]
+TS_RS_EXPORT_DIR = { value = "src/types/bindings", relative = true }
+TS_RS_LARGE_INT = "number"
