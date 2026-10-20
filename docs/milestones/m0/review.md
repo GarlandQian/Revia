@@ -7,7 +7,7 @@
 ## 环境
 
 - **Rust**：已装好，是 Homebrew 版的 rustc / cargo 1.99.1。M0 直接使用，不要再装 rustup。
-- **平台**：只支持 Apple Silicon（arm64），见 [docs/README.md](../README.md) 的 Q44。只构建 arm64，不需要 x86_64 或 universal 目标。
+- **平台**：只支持 Apple Silicon（arm64），见 [docs/README.md](../../README.md) 的 Q44。只构建 arm64，不需要 x86_64 或 universal 目标。
 - **旧分支**：`docs/design-direction` 已经合并进 main，只是没删，不用管。
 - **工作位置**：主目录还有其他会话在用，不要在主目录里切换分支。从最新的 main（包含本文所在的提交）新建独立 worktree，在其中工作：
 
@@ -18,7 +18,7 @@
 ## 对两个问题的答复
 
 1. **安装 rustup**：不需要，见上文。
-2. **引入 tauri-plugin-shell**：不要引入。这个插件主要用于给前端开放执行命令的能力，和 [ADR-0002](../adr/0002-git-cli-only.md) 冲突；只在 Rust 里用的话，和直接启动进程没有区别，也不会减少开销。Rust 里直接用 `std::process::Command`（需要异步时用 `tokio::process`）调用 git，不经过 shell。前端不能有任何执行命令的入口。
+2. **引入 tauri-plugin-shell**：不要引入。这个插件主要用于给前端开放执行命令的能力，和 [ADR-0002](../../adr/0002-git-cli-only.md) 冲突；只在 Rust 里用的话，和直接启动进程没有区别，也不会减少开销。Rust 里直接用 `std::process::Command`（需要异步时用 `tokio::process`）调用 git，不经过 shell。前端不能有任何执行命令的入口。
 
 ## 需要调整的地方
 
@@ -38,7 +38,7 @@
 
 ## 交付
 
-- 报告写入 `docs/prototypes/m0-report.md`，提交到 `m0-prototype` 分支。
+- 报告写入 `docs/milestones/m0/report.md`，提交到 `m0-prototype` 分支。
 - 在 `AGENTS.md` 中补充开发、构建和运行命令。
 - 完成 M0 后停下：不推送，不开 PR，不开始 M1。
 - 报告完成后告诉用户“M0 报告已就绪”。

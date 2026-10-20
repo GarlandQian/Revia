@@ -2,7 +2,7 @@
 
 更新日期：2026-10-20。状态：**用户已同意**（2026-10-20 确认 Q48–Q51）。按本文调整后即可开始 M1。
 
-本文回应 [m1-plan.md](./m1-plan.md)。计划整体同意：范围、执行顺序和验收方式都符合已确认的决策。下文没有提到的部分，按原计划执行。
+本文回应 [m1-plan.md](./plan.md)。计划整体同意：范围、执行顺序和验收方式都符合已确认的决策。下文没有提到的部分，按原计划执行。
 
 ## 已核实的事实
 
@@ -25,10 +25,10 @@
 ## 需要调整的地方
 
 1. **命令不接收任意路径**：除 `add_repo` 外，所有命令都用 Rust 层登记过的仓库或 worktree 的 ID，不接收前端传来的任意目录路径；文件路径必须是当前 `list_changes` 结果中的条目，否则拒绝。`add_repo` 收到路径后，由 Rust 层确认它是 Git 仓库或 worktree，再登记。这样即使 WebView 出了问题，也读不到用户没有添加过的目录。
-2. **未跟踪文件的 hunk 也来自 Git**：用 `git diff --no-index -- /dev/null <路径>` 生成 diff，走同一个解析器，不在 Rust 里自己拼新增 hunk（[ADR-0004](../adr/0004-hunks-come-from-git.md)）。注意这个命令在有差异时退出码为 1，不能当作失败处理。
+2. **未跟踪文件的 hunk 也来自 Git**：用 `git diff --no-index -- /dev/null <路径>` 生成 diff，走同一个解析器，不在 Rust 里自己拼新增 hunk（[ADR-0004](../../adr/0004-hunks-come-from-git.md)）。注意这个命令在有差异时退出码为 1，不能当作失败处理。
 3. **T1 的计时要包含 `list_changes`**：从打开仓库（或刷新）开始，到第一个文件的可见行提交到 DOM 为止。M0 的首屏包含了整份 diff 的解析，只从“选中文件”开始计时，会把解析成本挪出统计范围，两次结果就没法比较。
 4. **命名与术语表一致**：
-   - 不用 `Workspace` / `open_workspace`：中文里“工作区”在[术语表](../../GLOSSARY.md)中指 worktree 中文件的实际内容，容易混淆。改用 `WorktreeSession`、`open_worktree` 这类名字。
+   - 不用 `Workspace` / `open_workspace`：中文里“工作区”在[术语表](../../../GLOSSARY.md)中指 worktree 中文件的实际内容，容易混淆。改用 `WorktreeSession`、`open_worktree` 这类名字。
    - `git_log` 改名为 `command_log`：它对应术语表中的“Git 命令日志”，不要和提交历史（`git log`）混淆。
    - “侧”只用于并排视图的左侧、右侧。区分未暂存改动和已暂存改动的参数，用 `changes: unstaged | staged` 这类按术语表命名的值，不叫“侧”。
 5. **深浅色**：界面从 M1 起跟随系统的浅色、深色模式（Q50）。语法高亮按语法类别返回，由前端用 CSS 映射到浅色、深色两套配色，切换深浅色时不需要重新高亮。计划中“主题暂定 Solarized (light)、深浅色留到 M4”的安排作废。
@@ -45,4 +45,4 @@
 
 ## 交付
 
-按计划第八节执行：在 `../Revia-m1`（分支 `m1`）中实施，报告写入 `docs/milestones/m1-report.md`，在 `AGENTS.md` 补充正式工程的命令；只提交到 `m1` 分支，不推送、不开 PR、不开始 M2。完成后告诉用户“M1 报告已就绪”。
+按计划第八节执行：在 `../Revia-m1`（分支 `m1`）中实施，报告写入 `docs/milestones/m1/report.md`，在 `AGENTS.md` 补充正式工程的命令；只提交到 `m1` 分支，不推送、不开 PR、不开始 M2。完成后告诉用户“M1 报告已就绪”。

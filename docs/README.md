@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：设计已全部确认，M0 原型已完成（见 [M0 报告](./prototypes/m0-report.md)），下一步是 M1。更新日期：2026-10-20。
+状态：设计已全部确认，M0 原型已完成（见 [M0 报告](./milestones/m0/report.md)），下一步是 M1。更新日期：2026-10-20。
 
 Revia 借鉴 JetBrains 的 Git 操作体验，做一个更聚焦的独立 macOS Git 客户端，而不是完整复刻 Rebased。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -10,8 +10,10 @@ Revia 借鉴 JetBrains 的 Git 操作体验，做一个更聚焦的独立 macOS 
 - [UI 方向](./ui-direction.md)：视觉风格、主界面布局、diff 显示和快捷键。
 - [技术方向](./technical-direction.md)：技术栈、Git 执行边界和仍待验证的配套方案。
 - [调研与初始方案](./research.md)：已核实的调研事实、初始方案的建议和已识别的难点；建议部分未经确认。
-- [M0 报告](./prototypes/m0-report.md)：diff 渲染和运行环境原型的测量结果与结论。
+- [M0 报告](./milestones/m0/report.md)：diff 渲染和运行环境原型的测量结果与结论。
 - [术语表](../GLOSSARY.md)：已确认的领域术语和应避免的说法。
+- [里程碑](./milestones/)：每个里程碑的计划、评审意见与报告（`m<N>/`）。
+- [Agent 配置](./agents/)：任务记录与领域文档的约定，供工程类技能读取。
 - [架构决策记录](./adr/)：迁移成本高、需要背景解释且确有取舍的决定。
 
 ## 已确认
@@ -64,10 +66,10 @@ Revia 借鉴 JetBrains 的 Git 操作体验，做一个更聚焦的独立 macOS 
 | Q42 | 不收集遥测；诊断信息由用户手动导出 | 同一轮确认 |
 | Q43 | 按 M0–M4 实施，M3 完成后开始自用，M4 完成后开始试用 | 同一轮确认 |
 | Q44 | 只支持 Apple Silicon Mac（arm64），不提供 Intel 版或通用包 | 用户于 2026-10-19 补充说明 |
-| Q45 | 语法高亮采用 Rust 侧 syntect，不用 Shiki，见 [ADR-0006](./adr/0006-syntect-for-highlighting.md) | 用户于 2026-10-20 根据 [M0 报告](./prototypes/m0-report.md) 回复“按推荐” |
+| Q45 | 语法高亮采用 Rust 侧 syntect，不用 Shiki，见 [ADR-0006](./adr/0006-syntect-for-highlighting.md) | 用户于 2026-10-20 根据 [M0 报告](./milestones/m0/report.md) 回复“按推荐” |
 | Q46 | M1 第一项任务是改造 diff 传输：按可见范围分批获取；首屏 150 毫秒以内，快速滚动不出现空白 | 同一轮确认 |
 | Q47 | M0 原型合并进 main，保留在 `prototypes/m0/` 作为参考；M1 起交接文件放在 `docs/milestones/` | 同一轮确认 |
-| Q48 | 审阅标记放在 M2 实现，M3 开始自用前必须可用 | 用户于 2026-10-20 在 [M1 计划评审](./milestones/m1-review.md) 中确认 |
+| Q48 | 审阅标记放在 M2 实现，M3 开始自用前必须可用 | 用户于 2026-10-20 在 [M1 计划评审](./milestones/m1/review.md) 中确认 |
 | Q49 | 应用标识为 `io.github.garlandqian.revia` | 同一轮确认 |
 | Q50 | 从 M1 起界面跟随系统浅色 / 深色；语法高亮按语法类别返回，由前端映射两套配色 | 同一轮确认 |
 | Q51 | shadcn/ui 组件基座选 Base UI，不与 Radix 混用 | 同一轮确认 |

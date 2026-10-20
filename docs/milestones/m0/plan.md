@@ -1,6 +1,6 @@
 # M0 实施计划
 
-更新日期：2026-10-19。状态：按 [m0-review.md](./m0-review.md)（用户已同意）执行。
+更新日期：2026-10-19。状态：按 [m0-review.md](./review.md)（用户已同意）执行。
 
 本文记录 M0 的实施计划：原计划、评审调整后的执行方式，以及验收与交付方式。本文不产生新的设计决策。
 
@@ -49,10 +49,10 @@
 3. 前端：hunk 类型定义、窗口化虚拟列表、并排 / 统一视图、按行号映射高亮、lock / 二进制 / 超大文件默认收起、测量面板。
 4. fixture 生成脚本与验证场景（两种 Node 场景、mergetool、10,000 行 diff、Vue/Swift 高亮样例）。
 5. release 构建后在 Tauri WebView 中测量，采集测量面板数据与截图。
-6. 写 `docs/prototypes/m0-report.md`，在 `AGENTS.md` 补开发 / 构建 / 运行命令，提交到 `m0-prototype`。
+6. 写 `docs/milestones/m0/report.md`，在 `AGENTS.md` 补开发 / 构建 / 运行命令，提交到 `m0-prototype`。
 
 ## 验收与交付
 
-- 按 [技术方向](../technical-direction.md#diff-渲染原型) 的验收标准在 Tauri 实际 WebView 中测量并记录原始数据。
+- 按 [技术方向](../../technical-direction.md#diff-渲染原型) 的验收标准在 Tauri 实际 WebView 中测量并记录原始数据。
 - 两套高亮的对比包含：正确性（多行注释、模板字符串、Vue SFC、Swift）、首屏影响、全量耗时、滚动表现。
-- 报告写入 `docs/prototypes/m0-report.md`；完成后提交到 `m0-prototype`，不推送、不开 PR、不开始 M1。
+- 报告写入 `docs/milestones/m0/report.md`；完成后提交到 `m0-prototype`，不推送、不开 PR、不开始 M1。

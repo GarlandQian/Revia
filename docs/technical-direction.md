@@ -1,6 +1,6 @@
 # 技术方向
 
-更新日期：2026-10-20。状态：已确认（T1、Q1、Q6、Q7、Q18、Q21、Q26、Q27、Q32、Q34、Q36、Q38、Q40–Q42、Q44–Q46、Q49–Q52、Q55–Q67）；M0 原型已完成，见 [M0 报告](./prototypes/m0-report.md)。
+更新日期：2026-10-20。状态：已确认（T1、Q1、Q6、Q7、Q18、Q21、Q26、Q27、Q32、Q34、Q36、Q38、Q40–Q42、Q44–Q46、Q49–Q52、Q55–Q67）；M0 原型已完成，见 [M0 报告](./milestones/m0/report.md)。
 
 ## 已确认的选择
 
@@ -52,7 +52,7 @@ Git 执行：Rust 层调用系统 Git CLI
 
 - **Git 程序**：使用登录 shell `PATH` 中的第一个 `git`，设置中可以手动指定路径；Revia 不自带 Git（Q27）。最低版本在实现时按实际用到的命令参数确定，启动时检查并提示。
 - **环境变量**：每个 worktree 在自己的目录下启动一次用户的交互式登录 shell，读取环境变量；结果缓存，可以手动“重新加载环境”（Q21）。目标是让 hooks 的行为和在终端里进入该 worktree 后执行 `git commit` 一致。
-- **原型验证场景**：开发者本机用 fnm 按目录切换 Node 版本（`.zshrc` 中为 `fnm env --use-on-cd`），node 的路径是每个 shell 会话临时生成的；VS Code 的命令行工具 `code` 位于 `/opt/homebrew/bin`。M0 已验证通过：按 worktree 解析后，husky hook 拿到了项目指定的 `node` 版本，没有 `.node-version` 时拿到默认版本，`git mergetool --tool=vscode` 能找到 `code`；从 Finder 启动时同样通过，解析耗时 116–204 毫秒（见 [M0 报告](./prototypes/m0-report.md#五运行环境验证)）。
+- **原型验证场景**：开发者本机用 fnm 按目录切换 Node 版本（`.zshrc` 中为 `fnm env --use-on-cd`），node 的路径是每个 shell 会话临时生成的；VS Code 的命令行工具 `code` 位于 `/opt/homebrew/bin`。M0 已验证通过：按 worktree 解析后，husky hook 拿到了项目指定的 `node` 版本，没有 `.node-version` 时拿到默认版本，`git mergetool --tool=vscode` 能找到 `code`；从 Finder 启动时同样通过，解析耗时 116–204 毫秒（见 [M0 报告](./milestones/m0/report.md#五运行环境验证)）。
 - 只在应用启动时解析一次环境（VS Code 的做法）更简单，但项目各自的 Node 版本不会生效，因此不采用。
 
 ## diff 渲染原型
@@ -68,7 +68,7 @@ Git 执行：Rust 层调用系统 Git CLI
   - 并排和统一视图来回切换时停在同一位置。
 - lock 文件、二进制文件和超大文件默认收起，点开才渲染。
 
-M0 结果（详见 [M0 报告](./prototypes/m0-report.md)）：
+M0 结果（详见 [M0 报告](./milestones/m0/report.md)）：
 
 - 首屏 207–228 毫秒，达标；其中 Rust 和界面之间的数据传输占 164–187 毫秒，是主要瓶颈。
 - 并排和统一视图切换后停在同一行，达标。
