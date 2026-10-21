@@ -11,6 +11,25 @@ export interface JumpDomProbe {
   colorsMatched: boolean;
   coloredCells: number;
   expectedColoredCells: number;
+  canvasAligned: boolean;
+  canvasReady: boolean;
+  placeholderRows: number;
+  placeholderExposed: boolean;
+}
+
+export interface JumpCanvasStyle {
+  ready: boolean;
+  viewportWidth: number;
+  viewportHeight: number;
+  backgroundColor: string | null;
+  backgroundImage: string | null;
+  backgroundSize: string | null;
+  backgroundRepeat: string | null;
+}
+
+export interface JumpDomPreparation {
+  style: JumpCanvasStyle;
+  matches: (root: HTMLElement | null, canvas: HTMLElement | null) => boolean;
 }
 
 interface ProbeOptions {
@@ -21,12 +40,82 @@ interface ProbeOptions {
   rowHeight: number;
   getRow: (index: number) => RenderRow | null;
   highlights: Pick<HighlightStore, "get" | "categoryClass">;
+  preparation?: JumpDomPreparation;
 }
 
 interface ExpectedCell {
   text: string;
   kind: LineKind;
   tokens: ReturnType<HighlightStore["get"]>;
+}
+
+function findCanvas(root: HTMLElement | null, view: ViewMode): HTMLElement | null {
+  const canvases = root?.matches(".diff-scroll") && root.isConnected
+    ? Array.from(root.children).filter((child) => child.matches(`.diff-canvas.diff-canvas-${view}`))
+    : [];
+  return canvases.length === 1 && canvases[0] instanceof HTMLElement ? canvases[0] : null;
+}
+
+function opaqueColor(color: string): boolean {
+  if (!color || color === "transparent") return false;
+  const alpha = color.match(/\/\s*([\d.]+)(%)?\s*\)$/)
+    ?? color.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)(%)?\s*\)$/);
+  return alpha == null || Number(alpha[1]) >= (alpha[2] ? 100 : 1);
+}
+
+function nonScrollStyle(canvas: HTMLElement): string {
+  return Array.from(canvas.style).filter((name) => name !== "transform")
+    .map((name) => `${name}:${canvas.style.getPropertyValue(name)}`).join(";");
+}
+
+/** 样式与几何只在计时前读取；计时内只核对同一 canvas、位移和实际缺席的行节点。 */
+export function prepareJumpDom(root: HTMLElement | null, view: ViewMode, rowHeight: number): JumpDomPreparation {
+  const canvas = findCanvas(root, view);
+  const style: JumpCanvasStyle = {
+    ready: false, viewportWidth: 0, viewportHeight: 0,
+    backgroundColor: null, backgroundImage: null, backgroundSize: null, backgroundRepeat: null,
+  };
+  if (!root || !canvas) return { style, matches: () => false };
+
+  const bounds = root.getBoundingClientRect();
+  const canvasStyle = getComputedStyle(canvas);
+  const rootStyle = getComputedStyle(root);
+  const row = canvas.querySelector<HTMLElement>(".row");
+  const rowStyle = row ? getComputedStyle(row) : null;
+  const ancestors: Array<{ element: HTMLElement; classes: string; style: string | null }> = [];
+  let visible = true;
+  for (let element: HTMLElement | null = canvas; element; element = element.parentElement) {
+    const computed = getComputedStyle(element);
+    visible &&= computed.display !== "none" && computed.visibility === "visible"
+      && Number(computed.opacity) > 0 && computed.contentVisibility !== "hidden";
+    if (element !== canvas) {
+      ancestors.push({ element, classes: element.className, style: element.getAttribute("style") });
+    }
+  }
+  style.viewportWidth = bounds.width;
+  style.viewportHeight = bounds.height;
+  style.backgroundColor = canvasStyle.backgroundColor;
+  style.backgroundImage = canvasStyle.backgroundImage;
+  style.backgroundSize = canvasStyle.backgroundSize;
+  style.backgroundRepeat = canvasStyle.backgroundRepeat;
+  style.ready = visible && bounds.width > 0 && bounds.height > 0
+    && bounds.top < window.innerHeight && bounds.left < window.innerWidth && bounds.bottom > 0 && bounds.right > 0
+    && canvasStyle.position === "relative" && rootStyle.overflowY === "hidden"
+    && rowStyle?.position === "absolute" && parseFloat(rowStyle.height) === rowHeight
+    && rowStyle.transform === "none" && rowStyle.visibility === "visible" && rowStyle.display !== "none"
+    && opaqueColor(canvasStyle.backgroundColor) && canvasStyle.backgroundColor !== rootStyle.backgroundColor
+    && (canvasStyle.backgroundImage.match(/linear-gradient\(/g)?.length ?? 0) >= 2
+    && canvasStyle.backgroundSize.split(",").every((size) => size.trim() === `100% ${rowHeight}px`)
+    && canvasStyle.backgroundRepeat.split(",").every((repeat) => ["repeat-y", "no-repeat repeat"].includes(repeat.trim()));
+  const classes = canvas.className;
+  const fixedStyle = nonScrollStyle(canvas);
+  return {
+    style,
+    matches: (currentRoot, currentCanvas) => style.ready && currentRoot === root && currentCanvas === canvas
+      && canvas.isConnected && canvas.className === classes && nonScrollStyle(canvas) === fixedStyle
+      && ancestors.every((entry) => entry.element.isConnected && entry.element.className === entry.classes
+        && entry.element.getAttribute("style") === entry.style),
+  };
 }
 
 function markerFor(kind: LineKind): string {
@@ -90,29 +179,35 @@ export function inspectJumpDom(options: ProbeOptions): JumpDomProbe {
   const result: JumpDomProbe = {
     textMatched: false, matchedRows: 0, requiredRows: validRange ? to - from : 0,
     colorsCached: false, colorsMatched: false, coloredCells: 0, expectedColoredCells: 0,
+    canvasAligned: false, canvasReady: false, placeholderRows: 0, placeholderExposed: false,
   };
   if (!validRange) return result;
 
-  const canvases = root?.matches(".diff-scroll") && root.isConnected
-    ? Array.from(root.children).filter((child) => child.matches(`.diff-canvas.diff-canvas-${view}`))
-    : [];
-  const canvas = canvases.length === 1 && canvases[0] instanceof HTMLElement ? canvases[0] : null;
+  const canvas = findCanvas(root, view);
   const translation = canvas?.style.transform.match(/^translateY\((-?(?:\d+(?:\.\d+)?|\.\d+))px\)$/);
   const aligned = Number.isFinite(rowHeight) && rowHeight > 0 && translation != null
     && Number(translation[1]) === -from * rowHeight;
+  result.canvasAligned = aligned;
   const nodes = new Map<number, Element | null>();
+  let validNodes = true;
   if (canvas && aligned) {
     for (const child of canvas.children) {
-      if (!(child instanceof HTMLElement) || !child.classList.contains("row")) continue;
+      if (!(child instanceof HTMLElement) || !child.classList.contains("row")) { validNodes = false; continue; }
       const top = child.style.top.match(/^(-?(?:\d+(?:\.\d+)?|\.\d+))px$/);
-      if (!top) continue;
+      if (!top) { validNodes = false; continue; }
       const index = Number(top[1]) / rowHeight;
-      if (Number.isSafeInteger(index)) nodes.set(index, nodes.has(index) ? null : child);
+      if (!Number.isSafeInteger(index) || index < 0) { validNodes = false; continue; }
+      if (nodes.has(index) || child.style.transform || child.style.height || child.style.display === "none"
+        || child.style.visibility === "hidden" || child.style.opacity === "0") validNodes = false;
+      nodes.set(index, nodes.has(index) ? null : child);
     }
   }
+  result.canvasReady = aligned && validNodes && canvas != null
+    && parseFloat(canvas.style.height) >= to * rowHeight && !!options.preparation?.matches(root, canvas);
 
   let allCached = true;
   for (let index = from; index < to; index += 1) {
+    if (result.canvasReady && !nodes.has(index)) result.placeholderRows += 1;
     const row = getRow(index);
     if (!row) { allCached = false; continue; }
     const expected = expectedCells(row, options);
@@ -148,5 +243,7 @@ export function inspectJumpDom(options: ProbeOptions): JumpDomProbe {
   result.colorsCached = allCached && result.expectedColoredCells > 0;
   result.colorsMatched = result.textMatched && result.colorsCached
     && result.coloredCells === result.expectedColoredCells;
+  result.placeholderExposed = result.canvasReady && result.placeholderRows > 0
+    && result.matchedRows + result.placeholderRows === result.requiredRows;
   return result;
 }

@@ -276,12 +276,27 @@ def analyze_memory(samples, start, warmup=180):
     return result
 
 
-def completion_errors(frontend, samples, seconds, returncode):
+def completion_errors(frontend, samples, seconds, returncode, diagnostic=None):
     errors = []
     if returncode != 0 or frontend.get("ok") is not True:
         errors.append("应用未成功完成：" + str(frontend.get("error", returncode)))
-    if frontend.get("actualDurationSeconds", 0) < seconds:
-        errors.append("前端连续操作时长不足")
+    if diagnostic is None and frontend.get("diagnostic") is not None:
+        errors.append("诊断结果不能作为长期运行基线")
+    if diagnostic is None or diagnostic.get("cycles") is None:
+        if frontend.get("actualDurationSeconds", 0) < seconds:
+            errors.append("前端连续操作时长不足")
+    if diagnostic is not None:
+        if frontend.get("diagnostic") != diagnostic:
+            errors.append("前端诊断配置不匹配")
+        cycles = diagnostic.get("cycles")
+        if cycles is not None and (frontend.get("totalCycles") != cycles
+                or frontend.get("totalFileSwitches") != cycles * len(frontend.get("files", []))):
+            errors.append("固定循环诊断负载未完成")
+        if not isinstance(frontend.get("ipcFinal"), dict):
+            errors.append("缺少 IPC 诊断结果")
+        idle = frontend.get("idle", {})
+        if idle.get("actualSeconds", -1) < diagnostic["idleSeconds"]:
+            errors.append("诊断静置时长不足")
     if not samples or any(not s.get("webContentPids") for s in samples):
         errors.append("缺少已归属的 WebContent 内存数据")
     if any(frontend.get(key, 0) <= 0 for key in ("totalFileSwitches", "totalViewSwitches", "totalScrolls", "totalJumps")):
@@ -308,8 +323,19 @@ def main():
     parser.add_argument("--repo", default="/tmp/revia-m1-fixtures/diffs")
     parser.add_argument("--output", default=f"/tmp/revia-soak-{datetime.datetime.now():%Y%m%d-%H%M%S}.json")
     parser.add_argument("--interval", type=int, default=10)
+    parser.add_argument("--diagnostic-logging", choices=("verbose", "minimal"),
+                        help="显式启用 IPC/内存短诊断；结果不算长期运行验收")
+    parser.add_argument("--idle-seconds", type=int, default=90)
+    parser.add_argument("--diagnostic-cycles", type=int,
+                        help="诊断固定完整循环数；seconds/minutes 此时只作为主动操作安全上限")
     args = parser.parse_args()
     seconds = args.seconds if args.seconds is not None else args.minutes * 60
+    diagnostic = ({"loggingMode": args.diagnostic_logging, "idleSeconds": args.idle_seconds,
+                   "cycles": args.diagnostic_cycles} if args.diagnostic_logging else None)
+    if args.idle_seconds < 0 or (args.diagnostic_cycles is not None and args.diagnostic_cycles <= 0):
+        parser.error("静置时长不能为负，固定循环数必须为正")
+    if not diagnostic and (args.diagnostic_cycles is not None or args.idle_seconds != 90):
+        parser.error("循环数和静置参数仅适用于显式诊断模式")
     app, repo, output = Path(args.app).resolve(), Path(args.repo).resolve(), Path(args.output).resolve()
     binary = app / "Contents/MacOS/revia"
     frontend_path, log_path, samples_path, phase_samples_path = (Path(str(output) + suffix) for suffix in (
@@ -325,6 +351,10 @@ def main():
     data_dir = tempfile.mkdtemp(prefix="revia-soak-data-")
     env.update(REVIA_SOAK_SECONDS=str(seconds), REVIA_MEASURE_DATA_DIR=data_dir,
                REVIA_MEASURE_REPO=str(repo), REVIA_MEASURE_LOG=str(frontend_path))
+    if diagnostic:
+        env.update(REVIA_SOAK_DIAG_LOGS=diagnostic["loggingMode"], REVIA_SOAK_IDLE_SECONDS=str(args.idle_seconds))
+        if args.diagnostic_cycles is not None:
+            env["REVIA_SOAK_DIAG_CYCLES"] = str(args.diagnostic_cycles)
     binary_sha256 = binary_fingerprint(binary)
     started = time.monotonic()
     started_at = datetime.datetime.now().astimezone().isoformat()
@@ -333,7 +363,8 @@ def main():
     initial_services = None
     with log_path.open("x") as log, samples_path.open("x") as journal, phase_samples_path.open("x") as phase_journal:
         proc = subprocess.Popen([str(binary)], env=env, stdout=log, stderr=subprocess.STDOUT)
-        print(f"Revia PID={proc.pid}，等待可见窗口后连续操作 {seconds} 秒；报告 {output}", flush=True)
+        load = f"固定 {args.diagnostic_cycles} 循环（{seconds}s 安全上限）" if args.diagnostic_cycles else f"连续操作 {seconds} 秒"
+        print(f"Revia PID={proc.pid}，等待可见窗口后{load}；诊断={diagnostic}；报告 {output}", flush=True)
         next_sample = started + 2
         try:
             while proc.poll() is None:
@@ -341,9 +372,10 @@ def main():
                 record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
                 now = time.monotonic()
                 # Allow 120s visibility setup, about 120s phase holds and an exit margin.
-                if now - started > seconds + 420:
+                if now - started > seconds + 420 + (args.idle_seconds if diagnostic else 0):
                     raise TimeoutError("等待可见窗口或操作硬超时")
                 if now >= next_sample:
+                    sampling_started_at = datetime.datetime.now().astimezone().isoformat()
                     try:
                         sample = sample_memory(proc.pid)
                     except (subprocess.SubprocessError, RuntimeError) as error:
@@ -357,15 +389,22 @@ def main():
                     if initial_services is not None and services != initial_services:
                         raise RuntimeError("WebKit 进程改变，本次不算同一 WebView 连续运行")
                     initial_services = services
-                    if len(samples) % 3 == 0:
+                    if diagnostic or len(samples) % 3 == 0:
                         try:
                             sample["rustFootprintMb"] = physical_footprint(proc.pid)
-                            sample["webContentFootprintMb"] = sum(physical_footprint(child) for child in services["WebContent"])
+                            if diagnostic:
+                                sample["webContentVmmap"] = [webcontent_memory(child) for child in services["WebContent"]]
+                                sample["webContentFootprintMb"] = sum(item["footprintMb"] for item in sample["webContentVmmap"])
+                                sample["webContentMallocAllocatedMb"] = sum(item["webkitMallocAllocatedMb"] for item in sample["webContentVmmap"])
+                                sample["networkingFootprintMb"] = sum(physical_footprint(child) for child in services["Networking"])
+                            else:
+                                sample["webContentFootprintMb"] = sum(physical_footprint(child) for child in services["WebContent"])
                         except subprocess.SubprocessError:
                             if proc.poll() is not None:
                                 break
                             raise
-                    sample.update(elapsedSec=round(now - started, 2), timestamp=datetime.datetime.now().astimezone().isoformat())
+                    sample.update(elapsedSec=round(now - started, 2), timestamp=datetime.datetime.now().astimezone().isoformat(),
+                                  samplingStartedAt=sampling_started_at)
                     samples.append(sample)
                     journal.write(json.dumps(sample) + "\n")
                     journal.flush()
@@ -395,19 +434,21 @@ def main():
     finalize_phase_samples(phase_samples, checkpoints, frontend)
     # The live journal is explicitly provisional; publish the same final validity as the report.
     phase_samples_path.write_text("".join(json.dumps(sample) + "\n" for sample in phase_samples))
-    errors.extend(completion_errors(frontend, samples, seconds, proc.returncode))
+    errors.extend(completion_errors(frontend, samples, seconds, proc.returncode, diagnostic))
     if not binary_unchanged(binary, binary_sha256):
         errors.append("受测二进制在运行期间被替换或移除，构建证据无效")
     report = {
-        "test": "long_running_baseline", "runCompleted": not errors,
-        "acceptance": "pending desktop evidence, performance regression and memory trend review",
+        "test": "ipc_memory_diagnostic" if diagnostic else "long_running_baseline", "runCompleted": not errors,
+        "acceptance": ("diagnostic only; not baseline acceptance" if diagnostic
+                       else "pending desktop evidence, performance regression and memory trend review"),
+        "diagnostic": diagnostic,
         "startedAt": started_at, "endedAt": datetime.datetime.now().astimezone().isoformat(),
         "targetDurationSeconds": seconds, "actualDurationSeconds": round(time.monotonic() - started, 2),
         "reviaPid": proc.pid, "webkitAttribution": "launchctl print pid/<exact child PID>: services table",
         "binarySha256": binary_sha256,
         "platform": platform.platform(), "isolatedDataDir": data_dir, "repo": str(repo),
         "errors": errors, "frontend": frontend, "memoryTimeSeries": samples,
-        "memoryAnalysis": analyze_memory(samples, frontend.get("setupSeconds", 0)),
+        "memoryAnalysis": (None if diagnostic else analyze_memory(samples, frontend.get("setupSeconds", 0))),
         "phaseMemoryTimeSeries": phase_samples,
         "phaseMemorySummary": {
             "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),

@@ -177,6 +177,9 @@ pub fn log_measure(message: &str) {
     let Some(path) = std::env::var("REVIA_MEASURE_LOG").ok().map(std::path::PathBuf::from) else {
         return;
     };
+    if is_soak_run() && std::env::var("REVIA_SOAK_DIAG_LOGS").as_deref() == Ok("minimal") {
+        return;
+    }
     let log = path.with_extension("log");
     use std::io::Write;
     if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&log) {
@@ -288,6 +291,30 @@ pub struct MeasureConfig {
     pub smoke: bool,
     /// 长期运行长测时长（秒）。设置了时长即进入连续循环长测模式（Q53、Q78）。
     pub soak_seconds: Option<u64>,
+    pub soak_diagnostic: Option<SoakDiagnosticConfig>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SoakDiagnosticConfig {
+    pub logging_mode: String,
+    pub idle_seconds: u64,
+    pub cycles: Option<u64>,
+}
+
+fn soak_diagnostic() -> Option<SoakDiagnosticConfig> {
+    soak_seconds()?;
+    let logging_mode = std::env::var("REVIA_SOAK_DIAG_LOGS").ok()?;
+    if !matches!(logging_mode.as_str(), "verbose" | "minimal") {
+        return None;
+    }
+    Some(SoakDiagnosticConfig {
+        logging_mode,
+        idle_seconds: std::env::var("REVIA_SOAK_IDLE_SECONDS")
+            .ok().and_then(|value| value.parse().ok()).unwrap_or(90),
+        cycles: std::env::var("REVIA_SOAK_DIAG_CYCLES")
+            .ok().and_then(|value| value.parse::<u64>().ok()).filter(|value| *value > 0),
+    })
 }
 
 pub(crate) fn is_measure_auto_run() -> bool {
@@ -326,6 +353,7 @@ pub async fn measure_config() -> Result<MeasureConfig> {
         target_path: std::env::var("REVIA_MEASURE_PATH").ok(),
         smoke: std::env::var("REVIA_SMOKE").is_ok(),
         soak_seconds: soak_seconds(),
+        soak_diagnostic: soak_diagnostic(),
     })
 }
 

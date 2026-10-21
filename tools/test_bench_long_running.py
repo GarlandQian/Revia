@@ -58,6 +58,21 @@ class BenchmarkSafetyTests(unittest.TestCase):
         self.assertTrue(bench.completion_errors(frontend, samples, 1800, 0))
         self.assertTrue(bench.completion_errors(frontend, samples, 1800, -15))
 
+    def test_diagnostic_cannot_pass_as_baseline_or_with_wrong_load(self):
+        config = {"loggingMode": "minimal", "idleSeconds": 90, "cycles": 120}
+        frontend = {"ok": True, "actualDurationSeconds": 360, "diagnostic": config,
+                    "totalCycles": 120, "totalFileSwitches": 840, "totalViewSwitches": 1440,
+                    "totalScrolls": 3960, "totalJumps": 720, "files": [{}] * 7,
+                    "ipcFinal": {}, "idle": {"actualSeconds": 90}}
+        samples = [{"webContentPids": [45]}]
+        self.assertEqual(bench.completion_errors(frontend, samples, 900, 0, config), [])
+        self.assertTrue(bench.completion_errors(frontend, samples, 1800, 0))
+        self.assertTrue(bench.completion_errors({**frontend, "actualDurationSeconds": 1800}, samples, 1800, 0))
+        for key, value in (("totalCycles", 119), ("totalFileSwitches", 839), ("ipcFinal", None),
+                           ("diagnostic", None), ("idle", {"actualSeconds": 89})):
+            with self.subTest(key=key):
+                self.assertTrue(bench.completion_errors({**frontend, key: value}, samples, 900, 0, config))
+
     def test_rebuilt_or_removed_binary_invalidates_run(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "revia"

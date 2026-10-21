@@ -23,6 +23,7 @@ import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { ipc } from "@/lib/ipc";
+import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import {
@@ -47,7 +48,10 @@ interface MeasureConfig {
   repoPath: string | null;
   targetPath: string | null;
   soakSeconds: number | null;
+  soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null } | null;
 }
+
+type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
 
 interface AppErrorInfo {
   kind: "rejected" | "git" | "environment" | "internal";
@@ -287,7 +291,7 @@ export function App() {
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
-        setLoggingEnabled(config.logging);
+        setLoggingEnabled(config.logging && config.soakDiagnostic?.loggingMode !== "minimal");
         if (!config.logging) {
           setPanelOpen(false);
         }
@@ -774,8 +778,11 @@ export function App() {
         `长期运行基线启动：目标时长 ${soakSeconds} 秒（${(soakSeconds / 60).toFixed(1)} 分钟） repo=${config.repoPath}`,
       );
       const invokedAt = performance.now();
-      const report: Record<string, unknown> = { targetDurationSeconds: soakSeconds };
+      const diagnostic = config.soakDiagnostic;
+      const report: Record<string, unknown> = { targetDurationSeconds: soakSeconds,
+        diagnostic, acceptance: diagnostic ? "diagnostic only; not baseline acceptance" : "pending review" };
       const monitor = monitorSoakVisibility();
+      let diagnostics: ReturnType<typeof startIpcDiagnostics> | null = null;
       const samples: Array<{
         elapsedSec: number;
         cycle: number;
@@ -784,6 +791,7 @@ export function App() {
         visibility: SoakVisibility;
         loadedChunks: number;
         highlightLines: number;
+        ipc?: IpcDiagnosticSample;
       }> = [];
 
       try {
@@ -823,6 +831,10 @@ export function App() {
         if (!ready) throw new Error("120 秒内未获得可见合成窗口");
         monitor.reset();
         setStatus("长测进行中，请保持窗口可见");
+        if (diagnostic) {
+          diagnostics = startIpcDiagnostics();
+          report.ipcInitial = diagnostics.snapshot();
+        }
         const startedAt = performance.now();
         report.setupSeconds = (startedAt - invokedAt) / 1000;
         report.operationsStartedAt = new Date().toISOString();
@@ -835,7 +847,8 @@ export function App() {
         let lastHeartbeat = performance.now();
         let lastCheckpoint = startedAt;
         let checkpointPauseMs = 0;
-        const checkpoints: Array<{ cycle: number; file: string; view: string; startedAt: string; endedAt?: string }> = [];
+        const checkpoints: Array<{ cycle: number; file: string; view: string; startedAt: string; endedAt?: string;
+          ipcBefore?: IpcDiagnosticSample; ipcAfter?: IpcDiagnosticSample }> = [];
         report.phaseCheckpoints = checkpoints;
 
         const isTimeUp = () => (performance.now() - startedAt - checkpointPauseMs) / 1000 >= soakSeconds;
@@ -844,7 +857,7 @@ export function App() {
           await sleep(ms);
         };
 
-        while (!isTimeUp()) {
+        while (!isTimeUp() && (diagnostic?.cycles == null || cycle < diagnostic.cycles)) {
           cycle += 1;
           for (const entry of entries) {
             if (isTimeUp()) break;
@@ -956,8 +969,10 @@ export function App() {
                 visibility: vis,
                 loadedChunks: rowStore.getSnapshot().loadedChunks,
                 highlightLines: highlightStore.getSnapshot().loadedLines,
+                ...(diagnostics ? { ipc: diagnostics.snapshot() } : {}),
               };
               samples.push(sample);
+              if (diagnostics) await ipc.debugLog(`[SOAK_HEARTBEAT] ${JSON.stringify(sample)}`);
               if (vis.hidden || vis.rafPerSecond <= 5 || vis.hiddenTransitions > 0 || vis.maxFrameGapMs > 2000) {
                 throw new Error(`可见连续合成中断：${JSON.stringify(vis)}`);
               }
@@ -975,20 +990,24 @@ export function App() {
                 && highlightStore.getSnapshot().pending === 0, 1000);
               if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
                 || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
-              const checkpoint = { cycle, file: entry.path, view: currentView, startedAt: new Date().toISOString(), endedAt: "" };
+              const checkpoint = { cycle, file: entry.path, view: currentView, startedAt: new Date().toISOString(), endedAt: "",
+                ...(diagnostics ? { ipcBefore: diagnostics.snapshot(), ipcAfter: undefined as IpcDiagnosticSample | undefined } : {}) };
               checkpoints.push(checkpoint);
               await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}`);
               // Hold one known phase briefly; compositor monitoring remains active throughout.
               await sleep(3500);
               await ipc.debugLog(`[SOAK_CHECKPOINT_END] ${cycle}`);
               checkpoint.endedAt = new Date().toISOString();
+              if (diagnostics) checkpoint.ipcAfter = diagnostics.snapshot();
               checkpointPauseMs += performance.now() - pauseStarted;
               lastCheckpoint = performance.now();
             }
           }
         }
 
+        if (diagnostic?.cycles != null && isTimeUp()) throw new Error("固定循环诊断达到主动操作安全时限");
         const wallDurationSeconds = (performance.now() - startedAt) / 1000;
+        report.operationsEndedAt = new Date().toISOString();
         const totalElapsed = wallDurationSeconds - checkpointPauseMs / 1000;
         report.wallDurationSeconds = wallDurationSeconds;
         report.checkpointPauseSeconds = checkpointPauseMs / 1000;
@@ -1006,14 +1025,52 @@ export function App() {
         report.finalVisibility = finalVisibility;
         report.samplesCount = samples.length;
         report.samples = samples;
-        debugLog(
-          `长期运行基线完成：总耗时 ${report.actualDurationSeconds}s 循环 ${cycle} 次 切换文件 ${fileSwitches} 次 切换视图 ${viewSwitches} 次 滚动 ${scrolls} 次 跳转 ${jumps} 次`,
-        );
+        if (diagnostics && diagnostic) {
+          report.ipcAfterOperations = diagnostics.snapshot();
+          const prepareStarted = performance.now();
+          const fixedEntry = entries.find((entry) => entry.path === "src/staged.ts" && entry.changes === "staged");
+          if (!fixedEntry) throw new Error("诊断静置缺少固定 staged 文件");
+          await openEntry(fixedEntry, { view: "split", worktreeId: worktree.id, expand: true });
+          diffRef.current?.scrollToRow(0);
+          if (!await waitForSoak(() => rowStore.getSnapshot().pendingChunks === 0
+            && highlightStore.getSnapshot().pending === 0, 2000)
+            || !diffRef.current || diffRef.current.getScrollTop() !== 0
+            || !rowStore.isCovered(0, fixedEntry.rowCountSplit)) throw new Error("诊断静置准备失败");
+          setStatus("诊断静置中，请保持窗口可见");
+          const idleStarted = performance.now();
+          const idle = { file: fixedEntry.path, view: "split", preparationSeconds: (idleStarted - prepareStarted) / 1000,
+            startedAt: new Date().toISOString(), endedAt: "", targetSeconds: diagnostic.idleSeconds,
+            actualSeconds: 0, initial: diagnostics.snapshot(), samples: [] as Array<{
+              elapsedSec: number; timestamp: string; visibility: SoakVisibility; ipc: IpcDiagnosticSample }> };
+          report.idle = idle;
+          await ipc.debugLog(`[SOAK_IDLE_BEGIN] ${JSON.stringify(idle.initial)}`);
+          while (performance.now() - idleStarted < diagnostic.idleSeconds * 1000) {
+            const next = Math.min(diagnostic.idleSeconds * 1000, (idle.samples.length + 1) * 10_000);
+            await sleep(Math.max(0, idleStarted + next - performance.now() - 1000));
+            const visibility = await monitor.sample();
+            const sample = { elapsedSec: (performance.now() - idleStarted) / 1000,
+              timestamp: new Date().toISOString(), visibility, ipc: diagnostics.snapshot() };
+            idle.samples.push(sample);
+            await ipc.debugLog(`[SOAK_IDLE_SAMPLE] ${JSON.stringify(sample)}`);
+            if (visibility.hidden || visibility.rafPerSecond <= 5 || visibility.hiddenTransitions > 0
+              || visibility.maxFrameGapMs > 2000) throw new Error("诊断静置期间窗口不可见或合成中断");
+          }
+          idle.actualSeconds = (performance.now() - idleStarted) / 1000;
+          idle.endedAt = new Date().toISOString();
+          await ipc.debugLog(`[SOAK_IDLE_END] ${JSON.stringify(diagnostics.snapshot())}`);
+        }
+        const completionMessage = `长期运行基线完成：总耗时 ${report.actualDurationSeconds}s 循环 ${cycle} 次 切换文件 ${fileSwitches} 次 切换视图 ${viewSwitches} 次 滚动 ${scrolls} 次 跳转 ${jumps} 次`;
+        if (diagnostics) await ipc.debugLog(completionMessage);
+        else debugLog(completionMessage);
       } catch (caught) {
         report.ok = false;
         report.error = String(caught);
         report.samples = samples;
         debugLog(`长期运行基线异常中断：${String(caught)}`);
+      }
+      if (diagnostics) {
+        report.ipcFinal = diagnostics.snapshot();
+        diagnostics.stop();
       }
       monitor.stop();
       await ipc.writeMeasurement(report);

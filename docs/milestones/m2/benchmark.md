@@ -81,3 +81,25 @@ python3 tools/fixtures/setup-cold-jump.py /tmp/revia-cold-jump-new
 ```
 
 `cold.ts` 有 30,000 行全部修改，两种视图都超过 20,000 显示行，沿用正常生产缓存策略；不能把更大负载的首屏结果混入普通 fixture 的 150ms 首屏验收。仍要核验每次跳转前确实存在缺失行，而不是按文件大小推定冷跳。
+
+
+## IPC 与内存短诊断（不算长期运行验收）
+
+先在同一 Release bundle 上运行以下对照，各使用新的应用数据目录。固定完整循环数保证文件、视图、滚动、跳转次数相同；实际 Git/IPC 请求量仍要根据报告核对，不能从循环数推定字节量相同。这里的 900 秒只是安全上限，不是目标主动时长。
+
+```bash
+caffeinate -di python3 tools/bench-long-running.py --seconds 900 \
+  --diagnostic-cycles 120 --diagnostic-logging verbose --idle-seconds 90 \
+  --output /tmp/revia-ipc-verbose-new.json
+# 前一次退出后运行；不要并行争用可见窗口。
+caffeinate -di python3 tools/bench-long-running.py --seconds 900 \
+  --diagnostic-cycles 120 --diagnostic-logging minimal --idle-seconds 90 \
+  --output /tmp/revia-ipc-minimal-new.json
+```
+
+- `minimal` 只关闭前端逐步骤日志 IPC 与 Rust 逐请求落盘；关键心跳、检查点、静置与最终报告照常保留。日志面板与布局保持一致。它比较的是整组日志行为，不能单独区分 IPC 开销和磁盘 I/O。
+- 最后固定在已暂存 `src/staged.ts`、并排视图、顶部静置 90 秒；静置与准备时间不计主动操作。无清缓存、无强制 GC，持续监视可见性。
+- 仅显式诊断模式包装 `fetch`；返回原 Promise/Response，不读取 body。`active` 只到响应头，不能表示 Tauri body 解析或 callback 已完成；同时只读真实 callback Map，包含持久事件回调，不能用其大小直接换算请求数。基线/观测 ID 集合各上限 512，溢出会显示；年龄是连续观测下界。
+- 心跳与固定阶段记录 IPC 分类计数、callback 状态、DOM/行数、Resource Timing 数。静置中继续采样。自定义协议失败可能使 Tauri 回退到 postMessage，因此 `failed` 必须一起检查。
+- 诊断每个常规样本都采 Rust/WebContent/Networking footprint，WebContent 同次 `vmmap` 还解析 malloc allocated；采样比普通长测更密，会影响负载，两组使用相同配置。保留 RSS、footprint、allocated 三种口径及采样起止，不混为 JS heap。
+- 驱动标记 `ipc_memory_diagnostic`，没有长期运行通过结论，且不把静置混入原来的热身后趋势统计。完整循环或静置未完成、前后端配置不一致、缺 IPC 报告均失败。固定负载完成后仍须单独完成 30 分钟验收。

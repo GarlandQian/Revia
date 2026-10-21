@@ -2,23 +2,18 @@ import type { DiffViewHandle } from "@/features/diff/DiffView";
 import type { HighlightStore } from "@/features/diff/highlightStore";
 import type { RowWindowStore } from "@/features/diff/rowWindowStore";
 import type { ViewMode } from "@/types/bindings/ViewMode";
-import { inspectJumpDom, type JumpDomProbe } from "./jumpDomProbe";
+import { inspectJumpDom, prepareJumpDom, type JumpCanvasStyle } from "./jumpDomProbe";
+import { probeJumpFrame, type JumpFrameResult } from "./jumpFrameProbe";
 import { nextTask } from "./measure";
 import { waitForSoak } from "./soak";
 
-interface DomJumpSample {
+interface DomJumpSample extends JumpFrameResult {
   fromRow: number;
   toRow: number;
   targetWasCached: boolean;
   missingRowsBefore: number;
   colorsCachedBefore: boolean;
-  scrollCallMs: number;
-  /** Elapsed from jump start through the synchronous DOM check, including scrollCallMs. */
-  immediateDomMs: number;
-  immediate: JumpDomProbe;
-  textDomMs: number | null;
-  colorDomMs: number | null;
-  final: JumpDomProbe;
+  placeholderStyle: JumpCanvasStyle;
 }
 
 export interface JumpDomDiagnostics {
@@ -29,7 +24,7 @@ export interface JumpDomDiagnostics {
   return: DomJumpSample;
 }
 
-/** Separate probes leave the original M1 timing sequence intact; DOM readiness is not paint time. */
+/** 独立诊断保留原 M1 计时；同次跳转核对 DOM 与首个渲染机会，不声称硬件上屏时间。 */
 export async function diagnoseJumpDom(options: {
   view: ViewMode;
   rowHeight: number;
@@ -93,30 +88,27 @@ export async function diagnoseJumpDom(options: {
     const end = Math.min(rows.rowCountValue, to + Math.ceil(handle.getViewportHeight() / rowHeight));
     const missingRowsBefore = rows.uncovered(to, end);
     const colorsCachedBefore = inspect(to).colorsCached;
-    const started = performance.now();
-    handle.scrollToRow(to);
-    const returnedAt = performance.now();
-    const immediate = inspect(to);
-    const immediateAt = performance.now();
-    const textReady = immediate.textMatched || await until(() => inspect(to).textMatched, 4000);
-    const textDomMs = textReady ? performance.now() - started : null;
-    let colorDomMs: number | null = null;
-    if (checkColors && colorsCachedBefore) {
-      const restored = await until(() => inspect(to).colorsMatched && !scroller().isCompact(), 2000);
-      if (restored) colorDomMs = performance.now() - started;
-    }
+    const root = document.querySelector<HTMLElement>(".diff-scroll");
+    if (!root) throw new Error("跳转诊断缺少 diff 视口");
+    const preparation = prepareJumpDom(root, view, rowHeight);
+    const result = await probeJumpFrame({
+      root,
+      jump: () => handle.scrollToRow(to),
+      inspect: () => inspectJumpDom({
+        root, view, from: to, to: end, rowHeight, getRow: (index) => rows.getRow(index), highlights, preparation,
+      }),
+      colorsRestored: () => !scroller().isCompact(),
+      targetWasCached: missingRowsBefore === 0,
+      checkColors: checkColors && colorsCachedBefore,
+    });
     return {
       fromRow,
       toRow: to,
       targetWasCached: missingRowsBefore === 0,
       missingRowsBefore,
       colorsCachedBefore,
-      scrollCallMs: returnedAt - started,
-      immediateDomMs: immediateAt - started,
-      immediate,
-      textDomMs,
-      colorDomMs,
-      final: inspect(to),
+      placeholderStyle: preparation.style,
+      ...result,
     };
   };
 
