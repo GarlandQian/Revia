@@ -290,7 +290,7 @@ pub struct MeasureConfig {
     pub soak_seconds: Option<u64>,
 }
 
-fn is_measure_auto_run() -> bool {
+pub(crate) fn is_measure_auto_run() -> bool {
     matches!(
         std::env::var("REVIA_MEASURE").as_deref(),
         Ok("1") | Ok("true") | Ok("yes")

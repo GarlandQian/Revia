@@ -49,18 +49,32 @@ def sample_memory(pid):
     return values
 
 
+def physical_footprint(pid):
+    output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
+    return parse_footprint(output)
+
+
+def parse_footprint(output):
+    match = re.search(r"^Physical footprint:\s+([0-9.]+)([KMGT]?)\s*$", output, re.M)
+    if not match:
+        raise RuntimeError("vmmap 缺少 Physical footprint，不能以 RSS 代替")
+    scale = {"": 1 / 1048576, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1048576}
+    return float(match[1]) * scale[match[2]]
+
+
 def analyze_memory(samples, start, warmup=180):
     steady = [s for s in samples if s["elapsedSec"] >= start + warmup]
     result = {"warmupSeconds": warmup, "steadySampleCount": len(steady), "series": {}}
-    for key in ("rustRssMb", "webContentRssMb", "networkingRssMb", "gpuRssMb", "totalRssMb"):
-        if len(steady) < 2:
+    for key in ("rustRssMb", "webContentRssMb", "networkingRssMb", "gpuRssMb", "totalRssMb", "rustFootprintMb", "webContentFootprintMb"):
+        selected = [s for s in steady if key in s]
+        if len(selected) < 2:
             continue
-        xs, ys = [s["elapsedSec"] / 60 for s in steady], [s[key] for s in steady]
+        xs, ys = [s["elapsedSec"] / 60 for s in selected], [s[key] for s in selected]
         mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
         denominator = sum((x - mx) ** 2 for x in xs)
         bins = []
-        for begin in range(0, len(steady), max(1, len(steady) // 6)):
-            group = steady[begin:begin + max(1, len(steady) // 6)]
+        for begin in range(0, len(selected), max(1, len(selected) // 6)):
+            group = selected[begin:begin + max(1, len(selected) // 6)]
             bins.append({"fromSec": group[0]["elapsedSec"], "toSec": group[-1]["elapsedSec"],
                          "meanMb": round(sum(s[key] for s in group) / len(group), 2)})
         result["series"][key] = {"firstMb": ys[0], "lastMb": ys[-1], "minMb": min(ys), "maxMb": max(ys),
@@ -80,6 +94,17 @@ def completion_errors(frontend, samples, seconds, returncode):
     if any(frontend.get(key, 0) <= 0 for key in ("totalFileSwitches", "totalViewSwitches", "totalScrolls", "totalJumps")):
         errors.append("缺少必需的操作负载")
     return errors
+
+
+def binary_fingerprint(binary):
+    return hashlib.sha256(binary.read_bytes()).hexdigest()
+
+
+def binary_unchanged(binary, expected):
+    try:
+        return binary_fingerprint(binary) == expected
+    except OSError:
+        return False
 
 
 def main():
@@ -104,8 +129,9 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     env = {key: value for key, value in os.environ.items() if not key.startswith("REVIA_")}
     data_dir = tempfile.mkdtemp(prefix="revia-soak-data-")
-    env.update(REVIA_SOAK_SECONDS=str(seconds), REVIA_SOAK_DATA_DIR=data_dir,
+    env.update(REVIA_SOAK_SECONDS=str(seconds), REVIA_MEASURE_DATA_DIR=data_dir,
                REVIA_MEASURE_REPO=str(repo), REVIA_MEASURE_LOG=str(frontend_path))
+    binary_sha256 = binary_fingerprint(binary)
     started = time.monotonic()
     started_at = datetime.datetime.now().astimezone().isoformat()
     samples, errors, frontend = [], [], {}
@@ -133,6 +159,14 @@ def main():
                     if initial_services is not None and services != initial_services:
                         raise RuntimeError("WebKit 进程改变，本次不算同一 WebView 连续运行")
                     initial_services = services
+                    if len(samples) % 3 == 0:
+                        try:
+                            sample["rustFootprintMb"] = physical_footprint(proc.pid)
+                            sample["webContentFootprintMb"] = sum(physical_footprint(child) for child in services["WebContent"])
+                        except subprocess.SubprocessError:
+                            if proc.poll() is not None:
+                                break
+                            raise
                     sample.update(elapsedSec=round(now - started, 2), timestamp=datetime.datetime.now().astimezone().isoformat())
                     samples.append(sample)
                     journal.write(json.dumps(sample) + "\n")
@@ -156,13 +190,15 @@ def main():
         except (OSError, ValueError) as error:
             errors.append(f"前端报告无效：{error}")
     errors.extend(completion_errors(frontend, samples, seconds, proc.returncode))
+    if not binary_unchanged(binary, binary_sha256):
+        errors.append("受测二进制在运行期间被替换或移除，构建证据无效")
     report = {
         "test": "long_running_baseline", "runCompleted": not errors,
         "acceptance": "pending desktop evidence, performance regression and memory trend review",
         "startedAt": started_at, "endedAt": datetime.datetime.now().astimezone().isoformat(),
         "targetDurationSeconds": seconds, "actualDurationSeconds": round(time.monotonic() - started, 2),
         "reviaPid": proc.pid, "webkitAttribution": "launchctl print pid/<exact child PID>: services table",
-        "binarySha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+        "binarySha256": binary_sha256,
         "platform": platform.platform(), "isolatedDataDir": data_dir, "repo": str(repo),
         "errors": errors, "frontend": frontend, "memoryTimeSeries": samples,
         "memoryAnalysis": analyze_memory(samples, frontend.get("setupSeconds", 0)),

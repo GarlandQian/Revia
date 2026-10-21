@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
 
 spec = importlib.util.spec_from_file_location("bench", Path(__file__).with_name("bench-long-running.py"))
 bench = importlib.util.module_from_spec(spec)
@@ -38,6 +39,23 @@ class BenchmarkSafetyTests(unittest.TestCase):
         frontend["totalScrolls"] = 0
         self.assertTrue(bench.completion_errors(frontend, samples, 1800, 0))
         self.assertTrue(bench.completion_errors(frontend, samples, 1800, -15))
+
+    def test_rebuilt_or_removed_binary_invalidates_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "revia"
+            binary.write_bytes(b"original build")
+            digest = bench.binary_fingerprint(binary)
+            self.assertTrue(bench.binary_unchanged(binary, digest))
+            binary.write_bytes(b"different build")
+            self.assertFalse(bench.binary_unchanged(binary, digest))
+            binary.unlink()
+            self.assertFalse(bench.binary_unchanged(binary, digest))
+
+    def test_physical_footprint_is_not_rss_or_peak(self):
+        self.assertEqual(bench.parse_footprint("Physical footprint: 291.0M\nPhysical footprint (peak): 347.4M\n"), 291)
+        self.assertEqual(bench.parse_footprint("Physical footprint: 1.5G\n"), 1536)
+        with self.assertRaises(RuntimeError):
+            bench.parse_footprint("RSS: 500M\nPhysical footprint (peak): 347.4M\n")
 
     def test_short_run_cannot_claim_steady_memory(self):
         self.assertEqual(bench.analyze_memory([{"elapsedSec": 10}], 0)["steadySampleCount"], 0)

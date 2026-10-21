@@ -21,11 +21,17 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("找不到数据目录：{error}"))?;
-            // Only the explicit soak harness may isolate persistent application settings.
-            let data_dir = if commands::soak_seconds().is_some() {
-                std::env::var_os("REVIA_SOAK_DATA_DIR")
-                    .map(std::path::PathBuf::from)
-                    .ok_or("长测必须指定独立数据目录")?
+            // Explicit diagnostic runs can isolate settings without affecting normal launches.
+            let measuring = commands::soak_seconds().is_some()
+                || commands::is_measure_auto_run()
+                || std::env::var_os("REVIA_SMOKE").is_some();
+            let data_dir = if measuring {
+                match std::env::var_os("REVIA_MEASURE_DATA_DIR").map(std::path::PathBuf::from) {
+                    Some(path) if path.is_absolute() => path,
+                    Some(_) => return Err("测量数据目录必须是绝对路径".into()),
+                    None if commands::soak_seconds().is_some() => return Err("长测必须指定独立数据目录".into()),
+                    None => data_dir,
+                }
             } else {
                 data_dir
             };
@@ -36,7 +42,7 @@ pub fn run() {
             ));
             if commands::soak_seconds().is_some() {
                 if let Some(window) = app.get_webview_window("main") {
-                    window.set_title(&format!("Revia - long test PID {}", std::process::id()))?;
+                    window.set_title(&format!("Revia - 长测 PID {}", std::process::id()))?;
                 }
             }
             app.manage(AppState::new(data_dir));

@@ -501,8 +501,9 @@ export function App() {
       const total = targetView === "split" ? entry.rowCountSplit : entry.rowCountUnified;
       const element = document.querySelector<HTMLElement>(".diff-scroll");
       const viewportRows = element ? Math.ceil(element.clientHeight / ROW_HEIGHT) : DEFAULT_VIEWPORT_ROWS;
-      const hasCompositor = (await probeRaf(1)) > 5;
-      const visibility = visibilitySample(hasCompositor ? 60 : 0);
+      const rafPerSecond = await probeRaf(1);
+      const hasCompositor = rafPerSecond > 5;
+      const visibility = visibilitySample(rafPerSecond);
 
       // T2：大幅跳转
       let jump: JumpSample | null = null;
@@ -871,10 +872,6 @@ export function App() {
                 viewSwitches += 1;
                 currentView = "unified";
                 debugLog(`[SOAK] 已切换到统一视图 ${entry.path}`);
-                if (!await waitForSoak(
-                  () => rowStore.rowCountValue === entry.rowCountUnified && rowStore.getSnapshot().loadedChunks > 0,
-                  2000,
-                )) throw new Error("统一视图数据超时");
                 await yieldStep();
 
                 const unifiedRows = entry.rowCountUnified;
@@ -960,14 +957,25 @@ export function App() {
   const runAutoMeasurement = useCallback(
     async (config: MeasureConfig) => {
       debugLog(`自动测量启动：only=${config.only?.join(",") ?? "(全部)"} repo=${config.repoPath}`);
+      const monitor = monitorSoakVisibility();
       try {
-        if (config.repoPath) await ipc.addRepo(config.repoPath);
+        setStatus("性能测量等待可见窗口，请将此窗口置于前台");
+        const deadline = performance.now() + 120_000;
+        let ready = false;
+        while (performance.now() < deadline) {
+          const sample = await monitor.sample();
+          if (!sample.hidden && sample.rafPerSecond > 5) { ready = true; break; }
+        }
+        if (!ready) throw new Error("性能测量未获得可见合成窗口");
+        monitor.reset();
+        const added = config.repoPath ? await ipc.addRepo(config.repoPath) : null;
         const list = await ipc.listRepos();
-        const repo = list[0];
+        const repo = added ?? list[0];
+        if (!repo) throw new Error("没有可测量的仓库");
         setRepos(list);
         setActiveRepo(repo);
         const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
-        if (!worktree) return;
+        if (!worktree) throw new Error("没有可测量的 worktree");
         setWorktreeId(worktree.id);
         const results: Measurement[] = [];
         const views = (config.only?.length ? config.only : ["split", "unified"]) as ViewMode[];
@@ -985,10 +993,18 @@ export function App() {
               `滚动未覆盖帧 ${measurement?.scroll?.uncoveredFrames ?? "?"}`,
           );
         }
-        await ipc.writeMeasurement({ combos: results, visibility: visibilitySample() });
+        const visibility = await monitor.sample();
+        if (visibility.hidden || visibility.rafPerSecond <= 5 || visibility.hiddenTransitions > 0 || visibility.maxFrameGapMs > 2000) {
+          throw new Error(`性能测量可见性无效：${JSON.stringify(visibility)}`);
+        }
+        if (results.length !== views.length) throw new Error("性能测量结果缺失");
+        await ipc.writeMeasurement({ ok: true, combos: results, visibility });
         debugLog(`测量完成，共 ${results.length} 组`);
       } catch (caught) {
         debugLog(`自动测量失败：${String(caught)}`);
+        await ipc.writeMeasurement({ ok: false, error: String(caught) });
+      } finally {
+        monitor.stop();
       }
     },
     [runMeasurement],
