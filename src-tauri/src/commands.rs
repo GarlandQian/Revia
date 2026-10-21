@@ -286,6 +286,8 @@ pub struct MeasureConfig {
     pub target_path: Option<String>,
     /// 只读界面的冒烟检查（打开仓库、切换文件、切换视图）。
     pub smoke: bool,
+    /// 长期运行长测时长（秒）。设置了时长即进入连续循环长测模式（Q53、Q78）。
+    pub soak_seconds: Option<u64>,
 }
 
 fn is_measure_auto_run() -> bool {
@@ -293,6 +295,18 @@ fn is_measure_auto_run() -> bool {
         std::env::var("REVIA_MEASURE").as_deref(),
         Ok("1") | Ok("true") | Ok("yes")
     )
+}
+
+pub(crate) fn soak_seconds() -> Option<u64> {
+    std::env::var("REVIA_SOAK_SECONDS")
+        .ok()?
+        .parse::<u64>()
+        .ok()
+        .filter(|seconds| *seconds > 0)
+}
+
+fn is_soak_run() -> bool {
+    soak_seconds().is_some()
 }
 
 #[tauri::command]
@@ -311,6 +325,7 @@ pub async fn measure_config() -> Result<MeasureConfig> {
         repo_path: std::env::var("REVIA_MEASURE_REPO").ok(),
         target_path: std::env::var("REVIA_MEASURE_PATH").ok(),
         smoke: std::env::var("REVIA_SMOKE").is_ok(),
+        soak_seconds: soak_seconds(),
     })
 }
 
@@ -327,10 +342,10 @@ pub async fn write_measurement(payload: serde_json::Value) -> Result<Option<Stri
     let text = serde_json::to_string_pretty(&payload)?;
     std::fs::write(&path, text)
         .map_err(|error| AppError::internal(format!("写入测量结果失败：{error}")))?;
-    // 自动测量与冒烟检查模式下，写完结果后退出应用进程，使 `open -n -W` 能正常阻塞并返回。
-    if is_measure_auto_run() || std::env::var("REVIA_SMOKE").is_ok() {
+    // 自动测量、冒烟检查或长测结束写入结果后退出应用进程，使 `open -n -W` 能正常阻塞并返回。
+    if is_measure_auto_run() || is_soak_run() || std::env::var("REVIA_SMOKE").is_ok() {
         std::thread::spawn(|| {
-            std::thread::sleep(std::time::Duration::from_millis(300));
+            std::thread::sleep(std::time::Duration::from_millis(500));
             std::process::exit(0);
         });
     }

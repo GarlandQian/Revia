@@ -101,6 +101,7 @@ export const ipc = {
       repoPath: string | null;
       targetPath: string | null;
       smoke: boolean;
+      soakSeconds: number | null;
     }>("measure_config"),
   writeMeasurement: (payload: unknown) => invoke<string | null>("write_measurement", { payload }),
   debugLog: (message: string) => invoke<void>("debug_log", { message }),

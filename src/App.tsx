@@ -21,6 +21,7 @@ import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
 import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
+import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { ipc } from "@/lib/ipc";
 import { messages } from "@/lib/i18n/zh-CN";
 import {
@@ -44,6 +45,7 @@ interface MeasureConfig {
   outputPath: string | null;
   repoPath: string | null;
   targetPath: string | null;
+  soakSeconds: number | null;
 }
 
 interface AppErrorInfo {
@@ -290,6 +292,11 @@ export function App() {
         }
         // 先让界面进入可交互状态，再跑自动测量：测量需要真正的 diff 视图存在。
         setBootstrapDone(true);
+        if (config.soakSeconds && config.soakSeconds > 0) {
+          autoRan.current = true;
+          await runSoak(config);
+          return;
+        }
         if (config.smoke) {
           autoRan.current = true;
           await runSmoke(config);
@@ -715,6 +722,239 @@ export function App() {
       await ipc.writeMeasurement(report);
     },
     [openEntry, rowStore, switchView],
+  );
+
+  /** 长期运行基线（M2 任务 01，Q53/Q78）：同进程连续循环切换文件、视图并滚动指定时长（默认 30 分钟）。 */
+  const runSoak = useCallback(
+    async (config: MeasureConfig) => {
+      const soakSeconds = config.soakSeconds ?? 1800;
+      debugLog(
+        `长期运行基线启动：目标时长 ${soakSeconds} 秒（${(soakSeconds / 60).toFixed(1)} 分钟） repo=${config.repoPath}`,
+      );
+      const invokedAt = performance.now();
+      const report: Record<string, unknown> = { targetDurationSeconds: soakSeconds };
+      const monitor = monitorSoakVisibility();
+      const samples: Array<{
+        elapsedSec: number;
+        cycle: number;
+        file: string;
+        view: string;
+        visibility: SoakVisibility;
+        loadedChunks: number;
+        highlightLines: number;
+      }> = [];
+
+      try {
+        if (!config.repoPath) throw new Error("长测必须指定 fixture 仓库");
+        const repo = await ipc.addRepo(config.repoPath);
+        const list = await ipc.listRepos();
+        setRepos(list);
+        setActiveRepo(repo);
+        const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
+        if (!worktree) throw new Error("没有找到可用 worktree");
+        report.worktree = worktree;
+        setWorktreeId(worktree.id);
+        const opened = await ipc.openWorktree(worktree.id);
+        report.session = {
+          gitPath: opened.gitPath,
+          gitVersion: opened.gitVersion,
+          shell: opened.shell,
+          shellElapsedMs: opened.shellElapsedMs,
+          checks: opened.checks,
+        };
+        const snapshot = await ipc.listChanges(worktree.id);
+        setSnapshot(snapshot);
+        const entries = snapshot.entries;
+        if (entries.length === 0) throw new Error("改动列表为空");
+
+        report.files = entries.map(({ path, changes, rowCountSplit, rowCountUnified }) => ({ path, changes, rowCountSplit, rowCountUnified }));
+        setStatus("长测等待可见窗口，请将此窗口置于前台");
+        const readiness: SoakVisibility[] = [];
+        report.readiness = readiness;
+        const readyDeadline = performance.now() + 120_000;
+        let ready = false;
+        while (performance.now() < readyDeadline) {
+          const vis = await monitor.sample();
+          readiness.push(vis);
+          if (!vis.hidden && vis.rafPerSecond > 5) { ready = true; break; }
+        }
+        if (!ready) throw new Error("120 秒内未获得可见合成窗口");
+        monitor.reset();
+        setStatus("长测进行中，请保持窗口可见");
+        const startedAt = performance.now();
+        report.setupSeconds = (startedAt - invokedAt) / 1000;
+        report.operationsStartedAt = new Date().toISOString();
+        let cycle = 0;
+        let fileSwitches = 0;
+        let viewSwitches = 0;
+        let scrolls = 0;
+        let jumps = 0;
+        let currentView: ViewMode = "split";
+        let lastHeartbeat = performance.now();
+
+        const isTimeUp = () => (performance.now() - startedAt) / 1000 >= soakSeconds;
+        // 模拟真实用户操作节奏：每步让出 30ms，避免 0ms 忙循环打满 JS 线程与事件循环。
+        const yieldStep = async (ms = 30) => {
+          await sleep(ms);
+        };
+
+        while (!isTimeUp()) {
+          cycle += 1;
+          for (const entry of entries) {
+            if (isTimeUp()) break;
+
+            const stepStarted = performance.now();
+            fileSwitches += 1;
+            const expand = !entry.binary;
+            debugLog(`[SOAK] 打开 ${entry.path}（${currentView}）`);
+            await openEntry(entry, { view: currentView, worktreeId: worktree.id, expand });
+            await yieldStep();
+            debugLog(`[SOAK] 已打开 ${entry.path}`);
+
+            let handle = diffRef.current;
+            // 只有可展开且有行数的文件才等待行数据；二进制或 0 行文件无需等行，直接推进
+            if (expand && entry.rowCountSplit > 0) {
+              const coveredOk = await waitForSoak(() => !rowStore.getSnapshot().error && rowStore.rowCountValue > 0
+                ? rowStore.isCovered(0, 1) || rowStore.getSnapshot().loadedChunks > 0
+                : false, 2000);
+              if (!coveredOk) {
+                throw new Error(`等待行数据超时：${entry.path} ${currentView}`);
+              }
+            }
+
+            handle = diffRef.current;
+            if (expand && entry.rowCountSplit > 0 && !handle) throw new Error(`diff 未挂载：${entry.path}`);
+            const totalRows = currentView === "split" ? entry.rowCountSplit : entry.rowCountUnified;
+            if (expand && totalRows > 0 && handle && !isTimeUp()) {
+              const step = 40;
+              const maxScroll = Math.min(totalRows, 240);
+              for (let r = 0; r < maxScroll; r += step) {
+                if (isTimeUp()) break;
+                handle.scrollToRow(r);
+                scrolls += 1;
+                debugLog(`[SOAK] step scroll ${entry.path} row=${r}`);
+                await yieldStep();
+              }
+
+              if (totalRows > 100 && !isTimeUp()) {
+                const target = Math.floor(totalRows * 0.5);
+                rowStore.prioritize(target, target + 40);
+                handle.scrollToRow(target);
+                jumps += 1;
+                debugLog(`[SOAK] jump to ${target}`);
+                const jumped = await waitForSoak(() => rowStore.isCovered(target, target + 40), 2000);
+                if (!jumped) throw new Error(`跳转数据超时：${entry.path}`);
+                await yieldStep();
+
+                handle.scrollToRow(0);
+                jumps += 1;
+                debugLog(`[SOAK] jump back 0`);
+                await yieldStep();
+              }
+
+              // 通过工具栏事件调用最新渲染闭包，避免长期任务持有旧的选中项。
+              const clickView = async (label: string, rowCount: number) => {
+                const buttons = Array.from(
+                  document.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
+                );
+                const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
+                if (!button) throw new Error(`找不到视图按钮：${label}`);
+                button.click();
+                if (!await waitForSoak(() => button.getAttribute("aria-pressed") === "true"
+                  && rowStore.rowCountValue === rowCount && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
+                  throw new Error(`视图切换未完成：${label}`);
+                }
+              };
+
+              if (!isTimeUp()) {
+                await clickView("统一", entry.rowCountUnified);
+                viewSwitches += 1;
+                currentView = "unified";
+                debugLog(`[SOAK] 已切换到统一视图 ${entry.path}`);
+                if (!await waitForSoak(
+                  () => rowStore.rowCountValue === entry.rowCountUnified && rowStore.getSnapshot().loadedChunks > 0,
+                  2000,
+                )) throw new Error("统一视图数据超时");
+                await yieldStep();
+
+                const unifiedRows = entry.rowCountUnified;
+                for (let r = 0; r < Math.min(unifiedRows, 120); r += step) {
+                  if (isTimeUp()) break;
+                  const live = diffRef.current;
+                  if (!live) break;
+                  live.scrollToRow(r);
+                  scrolls += 1;
+                  await yieldStep();
+                }
+              }
+
+              if (!isTimeUp()) {
+                await clickView("并排", entry.rowCountSplit);
+                viewSwitches += 1;
+                currentView = "split";
+                debugLog(`[SOAK] 已切回并排视图 ${entry.path}`);
+                await yieldStep();
+              }
+            }
+
+            const now = performance.now();
+            debugLog(
+              `[SOAK] 循环 ${cycle} ${entry.path} 用时 ${Math.round(now - stepStarted)} ms ` +
+                `（chunks=${rowStore.getSnapshot().loadedChunks} tokens=${highlightStore.getSnapshot().loadedLines}）`,
+            );
+            if (now - lastHeartbeat >= 10_000 || isTimeUp()) {
+              lastHeartbeat = now;
+              const vis = await monitor.sample();
+              const elapsedSec = Math.round((now - startedAt) / 1000);
+              const sample = {
+                elapsedSec,
+                cycle,
+                file: entry.path,
+                view: currentView,
+                visibility: vis,
+                loadedChunks: rowStore.getSnapshot().loadedChunks,
+                highlightLines: highlightStore.getSnapshot().loadedLines,
+              };
+              samples.push(sample);
+              if (vis.hidden || vis.rafPerSecond <= 5 || vis.hiddenTransitions > 0 || vis.maxFrameGapMs > 2000) {
+                throw new Error(`可见连续合成中断：${JSON.stringify(vis)}`);
+              }
+              debugLog(
+                `[SOAK] ${elapsedSec}s/${soakSeconds}s cycle=${cycle} file=${entry.path} view=${currentView} ` +
+                  `vis=${vis.state} rAF=${vis.rafPerSecond.toFixed(1)} chunks=${sample.loadedChunks} tokens=${sample.highlightLines}`,
+              );
+            }
+          }
+        }
+
+        const totalElapsed = (performance.now() - startedAt) / 1000;
+        const finalVisibility = await monitor.sample();
+        report.finalVisibility = finalVisibility;
+        if (finalVisibility.hidden || finalVisibility.rafPerSecond <= 5 || finalVisibility.hiddenTransitions > 0 || finalVisibility.maxFrameGapMs > 2000) throw new Error("结束时窗口不可见，长测无效");
+        report.ok = true;
+        report.targetDurationSeconds = soakSeconds;
+        report.actualDurationSeconds = totalElapsed;
+        report.totalCycles = cycle;
+        report.totalFileSwitches = fileSwitches;
+        report.totalViewSwitches = viewSwitches;
+        report.totalScrolls = scrolls;
+        report.totalJumps = jumps;
+        report.finalVisibility = finalVisibility;
+        report.samplesCount = samples.length;
+        report.samples = samples;
+        debugLog(
+          `长期运行基线完成：总耗时 ${report.actualDurationSeconds}s 循环 ${cycle} 次 切换文件 ${fileSwitches} 次 切换视图 ${viewSwitches} 次 滚动 ${scrolls} 次 跳转 ${jumps} 次`,
+        );
+      } catch (caught) {
+        report.ok = false;
+        report.error = String(caught);
+        report.samples = samples;
+        debugLog(`长期运行基线异常中断：${String(caught)}`);
+      }
+      monitor.stop();
+      await ipc.writeMeasurement(report);
+    },
+    [highlightStore, openEntry, rowStore],
   );
 
   const runAutoMeasurement = useCallback(

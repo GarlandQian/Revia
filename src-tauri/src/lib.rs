@@ -21,11 +21,24 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("找不到数据目录：{error}"))?;
+            // Only the explicit soak harness may isolate persistent application settings.
+            let data_dir = if commands::soak_seconds().is_some() {
+                std::env::var_os("REVIA_SOAK_DATA_DIR")
+                    .map(std::path::PathBuf::from)
+                    .ok_or("长测必须指定独立数据目录")?
+            } else {
+                data_dir
+            };
             commands::log_measure(&format!(
                 "Rust 启动：data_dir={} autoRun={:?}",
                 data_dir.display(),
                 std::env::var("REVIA_MEASURE").ok()
             ));
+            if commands::soak_seconds().is_some() {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&format!("Revia - long test PID {}", std::process::id()))?;
+                }
+            }
             app.manage(AppState::new(data_dir));
             Ok(())
         })
