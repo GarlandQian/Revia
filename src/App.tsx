@@ -833,8 +833,12 @@ export function App() {
         let jumps = 0;
         let currentView: ViewMode = "split";
         let lastHeartbeat = performance.now();
+        let lastCheckpoint = startedAt;
+        let checkpointPauseMs = 0;
+        const checkpoints: Array<{ cycle: number; file: string; view: string; startedAt: string; endedAt?: string }> = [];
+        report.phaseCheckpoints = checkpoints;
 
-        const isTimeUp = () => (performance.now() - startedAt) / 1000 >= soakSeconds;
+        const isTimeUp = () => (performance.now() - startedAt - checkpointPauseMs) / 1000 >= soakSeconds;
         // 模拟真实用户操作节奏：每步让出 30ms，避免 0ms 忙循环打满 JS 线程与事件循环。
         const yieldStep = async (ms = 30) => {
           await sleep(ms);
@@ -962,10 +966,32 @@ export function App() {
                   `vis=${vis.state} rAF=${vis.rafPerSecond.toFixed(1)} chunks=${sample.loadedChunks} tokens=${sample.highlightLines}`,
               );
             }
+            if (entry.path === "src/staged.ts" && entry.changes === "staged" && currentView === "split"
+              && performance.now() - lastCheckpoint >= 60_000
+              && startedAt + soakSeconds * 1000 + checkpointPauseMs - performance.now() > 5000) {
+              const pauseStarted = performance.now();
+              await sleep(500);
+              const settled = await waitForSoak(() => rowStore.getSnapshot().pendingChunks === 0
+                && highlightStore.getSnapshot().pending === 0, 1000);
+              if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
+                || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
+              const checkpoint = { cycle, file: entry.path, view: currentView, startedAt: new Date().toISOString(), endedAt: "" };
+              checkpoints.push(checkpoint);
+              await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}`);
+              // Hold one known phase briefly; compositor monitoring remains active throughout.
+              await sleep(3500);
+              await ipc.debugLog(`[SOAK_CHECKPOINT_END] ${cycle}`);
+              checkpoint.endedAt = new Date().toISOString();
+              checkpointPauseMs += performance.now() - pauseStarted;
+              lastCheckpoint = performance.now();
+            }
           }
         }
 
-        const totalElapsed = (performance.now() - startedAt) / 1000;
+        const wallDurationSeconds = (performance.now() - startedAt) / 1000;
+        const totalElapsed = wallDurationSeconds - checkpointPauseMs / 1000;
+        report.wallDurationSeconds = wallDurationSeconds;
+        report.checkpointPauseSeconds = checkpointPauseMs / 1000;
         const finalVisibility = await monitor.sample();
         report.finalVisibility = finalVisibility;
         if (finalVisibility.hidden || finalVisibility.rafPerSecond <= 5 || finalVisibility.hiddenTransitions > 0 || finalVisibility.maxFrameGapMs > 2000) throw new Error("结束时窗口不可见，长测无效");

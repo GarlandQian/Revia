@@ -52,7 +52,8 @@ function expectedCells(row: RenderRow, options: ProbeOptions): Array<ExpectedCel
 }
 
 function hasCachedTokens(cell: ExpectedCell): boolean {
-  return cell.tokens != null && cell.tokens.map((token) => token.text).join("") === cell.text;
+  if (cell.tokens === null) return cell.text === "";
+  return cell.tokens !== undefined && cell.tokens.map((token) => token.text).join("") === cell.text;
 }
 
 function cellTextMatches(element: Element | undefined, expected: ExpectedCell | null): boolean {
@@ -70,7 +71,10 @@ function cellTextMatches(element: Element | undefined, expected: ExpectedCell | 
 
 function cellColorsMatch(element: Element, expected: ExpectedCell, options: ProbeOptions): boolean {
   const tokens = expected.tokens;
-  if (!hasCachedTokens(expected) || !tokens || element.childNodes.length !== tokens.length + 1) return false;
+  if (!hasCachedTokens(expected)) return false;
+  // Rust returns null for a cached empty line; the renderer keeps only its marker.
+  if (tokens === null) return element.childNodes.length === 1;
+  if (!tokens || element.childNodes.length !== tokens.length + 1) return false;
   return tokens.every((token, index) => {
     const span = element.childNodes[index + 1];
     return span instanceof Element && span.tagName === "SPAN"

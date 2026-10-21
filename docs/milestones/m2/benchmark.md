@@ -26,12 +26,15 @@ caffeinate -di python3 tools/bench-long-running.py \
 - 固定 `diffs` 的一个主 worktree、7 个改动条目：二进制 PNG、日志、lock 文件、Vue、Swift、大 TypeScript 文件、已暂存 TypeScript 文件。该任务不修改工作区、暂存区或 Git 配置。
 - 同一应用进程循环打开全部条目；文本文件实际展开、切换并排/统一视图、滚动及中部跳转。等待加载失败、视图按钮未切换成功都会中断。
 - 每约 10 秒记录真实 rAF 频率、可见性、最长合成帧间隔、操作位置和缓存计数；隐藏事件或超过 2 秒的合成中断使本次无效。2 秒是检测长时间停绘的工具保护，不是取代 Q84 的滚动性能指标。
+- 约每分钟在已暂存的 `src/staged.ts`、并排视图、顶部停留约 4 秒，记录 BEGIN/END 检查点；准备和采样停顿从主动操作时长中扣除，因此 30 分钟主动操作需要更长的实际运行时间。检查点不清缓存、不强制 GC，rAF 监视持续运行；当前追踪请求计数归零不等于所有旧 IPC 均已结束。
 - 系统侧按应用 PID 的 launchd `services` 表识别 WebContent、GPU、Networking；不使用系统新增 PID 差集。每个样本记录进程归属与 RSS，另每 3 次采样记录 Rust 和 WebContent 的 physical footprint。两种口径分别保留，不用一种替代另一种。进程改变或采样缺失不能作为同一 WebView 的长测通过。
 - 使用新建的独立应用数据目录，避免把 fixture 添加到真实用户的仓库列表。路径记录在报告中；不自动删除原始现场。
 - 驱动只控制自己启动的进程，不按应用名/路径批量终止；超时、没有前端结果或操作时长不足以非零状态退出。
 - 启动前固定二进制 SHA-256；结束核对未被替换或移除。测试中途重建应用会使构建证据无效。
 
-输出包括汇总 `.json`、前端原始 `.json.frontend.json`、逐条落盘的 `.json.samples.jsonl`、标准输出 `.json.log` 和前端/Rust 步骤 `.json.frontend.log`。输出已存在时拒绝覆盖。日志仅含本地测试信息，不上传。
+检查点内额外采集 RSS、Rust/WebContent footprint 和 `vmmap MALLOC ZONE / WebKit Malloc_* / BYTES ALLOCATED`。实时阶段样本的 `samplingChecksPassed` 只代表采样过程有效；`valid` 在结束前始终为 false，最终须匹配已落盘 END、前端同一文件/视图及完整时间区间才有效。超过 3500ms、进程归属改变、日志截断或缺失均保留无效原因。没有有效阶段样本不表示内存通过；保留并分析全部阶段样本与常规时序，不挑选最小值。
+
+输出包括汇总 `.json`、前端原始 `.json.frontend.json`、逐条落盘的 `.json.samples.jsonl`、阶段采样 `.json.phase-samples.jsonl`、标准输出 `.json.log` 和前端/Rust 步骤 `.json.frontend.log`。输出已存在时拒绝覆盖。日志仅含本地测试信息，不上传。
 
 内存分析保留完整时序，另列操作开始后 180 秒的热身分界、稳态分段均值和线性趋势；短测不产生稳态结论。不能仅凭进程退出码、一个峰值或斜率自动宣布通过。还需结合真实桌面截图和时序判定是否持续增长，必要时定位、修复后重新长测。
 
@@ -56,7 +59,7 @@ src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia
 PYTHONDONTWRITEBYTECODE=1 python3 tools/test_bench_long_running.py
 ```
 
-标准库测试覆盖无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论，以及受测二进制替换/删除时仍保留报告并判无效。不引入新的测试框架。
+15 项标准库测试覆盖无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。不引入新的测试框架。
 
 ## 跳转与颜色诊断的口径
 

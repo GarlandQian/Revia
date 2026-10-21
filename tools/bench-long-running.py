@@ -2,6 +2,7 @@
 """macOS release soak driver. A completed run still requires desktop/trend review."""
 
 import argparse
+from collections import deque
 import datetime
 import hashlib
 import json
@@ -16,6 +17,7 @@ import time
 
 
 ROLES = {"WebContent": "webContent", "Networking": "networking", "GPU": "gpu"}
+PHASE_HOLD_SECONDS = 3.5
 
 
 def webkit_services(domain):
@@ -60,6 +62,197 @@ def parse_footprint(output):
         raise RuntimeError("vmmap 缺少 Physical footprint，不能以 RSS 代替")
     scale = {"": 1 / 1048576, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1048576}
     return float(match[1]) * scale[match[2]]
+
+
+def parse_webkit_allocated(output):
+    lines = output.splitlines()
+    headers = [i for i, line in enumerate(lines) if line.lstrip().startswith("MALLOC ZONE")]
+    if len(headers) != 1:
+        raise RuntimeError("vmmap 缺少唯一的 MALLOC ZONE 表")
+    index = headers[0]
+    upper = "VIRTUAL RESIDENT DIRTY SWAPPED ALLOCATION BYTES DIRTY+SWAP REGION"
+    lower = "MALLOC ZONE SIZE SIZE SIZE SIZE COUNT ALLOCATED FRAG SIZE % FRAG COUNT"
+    if index == 0 or " ".join(lines[index - 1].split()) != upper or " ".join(lines[index].split()) != lower:
+        raise RuntimeError("vmmap MALLOC ZONE 列定义改变，不能猜测 BYTES ALLOCATED")
+
+    def megabytes(value):
+        match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([KMGT]?)", value)
+        if not match:
+            raise RuntimeError(f"vmmap 内存单位无效：{value}")
+        scale = {"": 1 / 1048576, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1048576}
+        return float(match[1]) * scale[match[2]]
+
+    zones = {}
+    for line in lines[index + 2:]:
+        if line.strip().startswith(("===", "TOTAL")):
+            break
+        if not line.lstrip().startswith("WebKit Malloc_"):
+            continue
+        match = re.fullmatch(r"\s*(WebKit Malloc_0x[0-9a-fA-F]+)\s+(.+?)\s*", line)
+        fields = match[2].split() if match else []
+        if (len(fields) != 9 or not fields[4].isdigit() or not fields[8].isdigit()
+                or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?%", fields[7])):
+            raise RuntimeError("vmmap WebKit Malloc_ 行列数或格式无效")
+        for column in (0, 1, 2, 3, 5, 6):
+            megabytes(fields[column])
+        if match[1] in zones:
+            raise RuntimeError("vmmap 出现重复 WebKit Malloc_ 区域")
+        zones[match[1]] = megabytes(fields[5])
+    if not zones:
+        raise RuntimeError("vmmap MALLOC ZONE 缺少 WebKit Malloc_ 的 BYTES ALLOCATED")
+    return sum(zones.values())
+
+
+def webcontent_memory(pid):
+    output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
+    return {"pid": pid, "footprintMb": parse_footprint(output),
+            "webkitMallocAllocatedMb": parse_webkit_allocated(output)}
+
+
+class CheckpointLog:
+    """Follow complete log lines by byte offset; never resample a checkpoint ID."""
+
+    def __init__(self, path):
+        self.path = path
+        self.pending = deque()
+        self._offset = 0
+        self._tail = b""
+        self._identity = None
+        self._seen = set()
+        self._ended = set()
+        self._generation = 0
+        self._active = None
+
+    def poll(self):
+        try:
+            with self.path.open("rb") as log:
+                stat = os.fstat(log.fileno())
+                identity = (stat.st_dev, stat.st_ino)
+                if self._identity is not None and (identity != self._identity or stat.st_size < self._offset):
+                    raise RuntimeError("阶段日志被替换或截断，不能继续使用旧边界")
+                self._identity = identity
+                log.seek(self._offset)
+                content = log.read(stat.st_size - self._offset)
+                self._offset += len(content)
+        except FileNotFoundError:
+            if self._identity is not None:
+                raise RuntimeError("已读取的阶段日志消失") from None
+            return
+        lines = (self._tail + content).split(b"\n")
+        self._tail = lines.pop()
+        for line in lines:
+            match = re.fullmatch(rb"(?:\S+\s+)?\[SOAK_CHECKPOINT_(BEGIN|END)\]\s+(\d+)\s*", line)
+            if not match:
+                continue
+            checkpoint_id = int(match[2])
+            if match[1] == b"END":
+                self._ended.add(checkpoint_id)
+                if self._active and self._active[0] == checkpoint_id:
+                    self._active = None
+                continue
+            self._generation += 1
+            self._active = (checkpoint_id, self._generation)
+            if checkpoint_id not in self._seen:
+                self._seen.add(checkpoint_id)
+                self.pending.append({"checkpointId": checkpoint_id, "generation": self._generation,
+                                     "observedAt": time.monotonic()})
+
+    def invalid_reasons(self, checkpoint):
+        reasons = []
+        if checkpoint["checkpointId"] in self._ended:
+            reasons.append("checkpoint END 已出现")
+        if self._active != (checkpoint["checkpointId"], checkpoint["generation"]):
+            reasons.append("checkpoint 已结束或出现新 BEGIN")
+        if b"[SOAK_CHECKPOINT_" in self._tail:
+            reasons.append("阶段边界日志尚未完整写入")
+        return reasons
+
+    def has_ended(self, checkpoint_id):
+        return checkpoint_id in self._ended
+
+
+def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, started):
+    beginning = time.monotonic()
+    sample = {"checkpointId": checkpoint["checkpointId"], "phase": "staged/split/settled",
+              "checkpointObservedElapsedSec": round(checkpoint["observedAt"] - started, 3),
+              "samplingStartedElapsedSec": round(beginning - started, 3),
+              "timestamp": datetime.datetime.now().astimezone().isoformat(), "valid": False}
+    errors = checkpoints.invalid_reasons(checkpoint)
+    try:
+        if proc.poll() is not None:
+            errors.append("采样前应用已退出")
+        if not errors:
+            sample.update(sample_memory(proc.pid))
+            services = {role: sample[ROLES[role] + "Pids"] for role in ROLES}
+            if expected_services is not None and services != expected_services:
+                raise RuntimeError("WebKit 进程与常规采样归属不一致")
+            sample["rustFootprintMb"] = physical_footprint(proc.pid)
+            sample["webContentVmmap"] = [webcontent_memory(pid) for pid in services["WebContent"]]
+            sample["webContentFootprintMb"] = sum(item["footprintMb"] for item in sample["webContentVmmap"])
+            sample["webContentMallocAllocatedMb"] = sum(item["webkitMallocAllocatedMb"] for item in sample["webContentVmmap"])
+            after = sample_memory(proc.pid)
+            sample["servicesAfterSampling"] = {role: after[ROLES[role] + "Pids"] for role in ROLES}
+            if sample["servicesAfterSampling"] != services:
+                raise RuntimeError("阶段采样期间 WebKit 进程归属改变")
+    except Exception as error:
+        errors.append(f"{type(error).__name__}: {error}")
+    finally:
+        ended = time.monotonic()
+        sample.update(samplingEndedElapsedSec=round(ended - started, 3),
+                      samplingDurationSeconds=round(ended - beginning, 3),
+                      samplingEndedAt=datetime.datetime.now().astimezone().isoformat())
+        try:
+            checkpoints.poll()
+            errors.extend(checkpoints.invalid_reasons(checkpoint))
+        except (OSError, RuntimeError) as error:
+            errors.append(f"阶段结束边界不可核验：{error}")
+        if proc.poll() is not None:
+            errors.append("阶段采样结束时应用已退出")
+        if ended - checkpoint["observedAt"] >= PHASE_HOLD_SECONDS:
+            errors.append("阶段采样超过固定 3500ms 窗口")
+        sample["errors"] = list(dict.fromkeys(errors))
+        sample["samplingChecksPassed"] = not errors
+        sample["validation"] = "pending checkpoint closure and frontend interval review"
+    return sample
+
+
+def finalize_phase_samples(samples, checkpoints, frontend):
+    def instant(value):
+        result = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if result.tzinfo is None:
+            raise ValueError("阶段时间缺少时区")
+        return result
+
+    for sample in samples:
+        errors = sample["errors"]
+        sample["checkpointEndConfirmed"] = checkpoints.has_ended(sample["checkpointId"])
+        if not sample["checkpointEndConfirmed"]:
+            errors.append("缺少匹配的 checkpoint END，不能确认静置窗口闭合")
+        reported = frontend.get("phaseCheckpoints")
+        matches = [item for item in reported if isinstance(item, dict) and item.get("cycle") == sample["checkpointId"]] \
+            if isinstance(reported, list) else []
+        if len(matches) != 1 or matches[0].get("file") != "src/staged.ts" or matches[0].get("view") != "split":
+            errors.append("前端报告缺少唯一的 staged/split checkpoint")
+        else:
+            try:
+                if not (instant(matches[0]["startedAt"]) <= instant(sample["timestamp"])
+                        <= instant(sample["samplingEndedAt"]) <= instant(matches[0]["endedAt"])):
+                    errors.append("采样墙钟区间不在前端 checkpoint 起止区间内")
+            except (KeyError, TypeError, ValueError, AttributeError) as error:
+                errors.append(f"前端 checkpoint 起止时间不可核验：{error}")
+        sample["errors"] = list(dict.fromkeys(errors))
+        sample["valid"] = not sample["errors"]
+        sample["validation"] = "final"
+
+
+def record_phase_samples(checkpoints, proc, services, started, samples, journal):
+    while checkpoints.pending:
+        sample = sample_phase_memory(proc, checkpoints, checkpoints.pending.popleft(), services, started)
+        samples.append(sample)
+        journal.write(json.dumps(sample) + "\n")
+        journal.flush()
+        print(f"[phase {sample['checkpointId']}] samplingChecksPassed={sample['samplingChecksPassed']} "
+              f"duration={sample['samplingDurationSeconds']:.3f}s; pending closure", flush=True)
 
 
 def analyze_memory(samples, start, warmup=180):
@@ -119,12 +312,13 @@ def main():
     seconds = args.seconds if args.seconds is not None else args.minutes * 60
     app, repo, output = Path(args.app).resolve(), Path(args.repo).resolve(), Path(args.output).resolve()
     binary = app / "Contents/MacOS/revia"
-    frontend_path, log_path, samples_path = (Path(str(output) + suffix) for suffix in (".frontend.json", ".log", ".samples.jsonl"))
+    frontend_path, log_path, samples_path, phase_samples_path = (Path(str(output) + suffix) for suffix in (
+        ".frontend.json", ".log", ".samples.jsonl", ".phase-samples.jsonl"))
     if platform.system() != "Darwin" or seconds <= 0 or args.interval <= 0:
         parser.error("此驱动仅适用于 macOS；时长与采样间隔必须为正")
     if not binary.is_file() or not repo.is_dir():
         parser.error("应用或 fixture 不存在，请先构建当前源码并准备 fixture")
-    if any(p.exists() for p in (output, frontend_path, frontend_path.with_suffix(".log"), log_path, samples_path)):
+    if any(p.exists() for p in (output, frontend_path, frontend_path.with_suffix(".log"), log_path, samples_path, phase_samples_path)):
         parser.error("输出已存在，请指定新的 --output，保留旧证据")
     output.parent.mkdir(parents=True, exist_ok=True)
     env = {key: value for key, value in os.environ.items() if not key.startswith("REVIA_")}
@@ -134,16 +328,20 @@ def main():
     binary_sha256 = binary_fingerprint(binary)
     started = time.monotonic()
     started_at = datetime.datetime.now().astimezone().isoformat()
-    samples, errors, frontend = [], [], {}
+    samples, phase_samples, errors, frontend = [], [], [], {}
+    checkpoints = CheckpointLog(frontend_path.with_suffix(".log"))
     initial_services = None
-    with log_path.open("x") as log, samples_path.open("x") as journal:
+    with log_path.open("x") as log, samples_path.open("x") as journal, phase_samples_path.open("x") as phase_journal:
         proc = subprocess.Popen([str(binary)], env=env, stdout=log, stderr=subprocess.STDOUT)
         print(f"Revia PID={proc.pid}，等待可见窗口后连续操作 {seconds} 秒；报告 {output}", flush=True)
         next_sample = started + 2
         try:
             while proc.poll() is None:
+                checkpoints.poll()
+                record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
                 now = time.monotonic()
-                if now - started > seconds + 240:
+                # Allow 120s visibility setup, about 120s phase holds and an exit margin.
+                if now - started > seconds + 420:
                     raise TimeoutError("等待可见窗口或操作硬超时")
                 if now >= next_sample:
                     try:
@@ -184,11 +382,19 @@ def main():
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait()
+            try:
+                checkpoints.poll()
+                record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
+            except (OSError, RuntimeError) as error:
+                errors.append(f"最终阶段日志不可核验：{error}")
     if frontend_path.exists():
         try:
             frontend = json.loads(frontend_path.read_text())
         except (OSError, ValueError) as error:
             errors.append(f"前端报告无效：{error}")
+    finalize_phase_samples(phase_samples, checkpoints, frontend)
+    # The live journal is explicitly provisional; publish the same final validity as the report.
+    phase_samples_path.write_text("".join(json.dumps(sample) + "\n" for sample in phase_samples))
     errors.extend(completion_errors(frontend, samples, seconds, proc.returncode))
     if not binary_unchanged(binary, binary_sha256):
         errors.append("受测二进制在运行期间被替换或移除，构建证据无效")
@@ -202,6 +408,14 @@ def main():
         "platform": platform.platform(), "isolatedDataDir": data_dir, "repo": str(repo),
         "errors": errors, "frontend": frontend, "memoryTimeSeries": samples,
         "memoryAnalysis": analyze_memory(samples, frontend.get("setupSeconds", 0)),
+        "phaseMemoryTimeSeries": phase_samples,
+        "phaseMemorySummary": {
+            "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),
+            "invalidSampleCount": sum(not s["valid"] for s in phase_samples),
+            "allocationSource": "vmmap MALLOC ZONE / WebKit Malloc_* / BYTES ALLOCATED",
+            "acceptance": ("pending manual same-phase sample sufficiency and trend review"
+                           if any(s["valid"] for s in phase_samples) else "missing valid phase evidence; not accepted"),
+        },
     }
     output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
     print(f"运行{'完成，待验收' if not errors else '失败'}：{errors}；报告 {output}", flush=True)
