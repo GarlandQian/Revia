@@ -1,0 +1,4 @@
+[rust 1792566105333] Rust 启动：data_dir=/tmp/revia-perf.6TMIVZ autoRun=Some("1")
+2026-10-21T07:01:45.520Z 前端模块已载入
+2026-10-21T07:01:45.534Z 自动测量启动：only=unified repo=/tmp/revia-m1-fixtures/diffs
+2026-10-21T07:03:46.016Z 自动测量失败：Error: 性能测量未获得可见合成窗口

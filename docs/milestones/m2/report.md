@@ -132,6 +132,7 @@
 - [长测 03 原始报告](evidence/revia-m2-baseline-03-20261021.json)、[操作日志](evidence/baseline-03-operations.log.gz)、[全部最终阶段样本](evidence/baseline-03-phase-samples.jsonl)。
 - [三轮统计](evidence/memory-analysis-123.json)、[复算脚本](evidence/analyze-runs.py)、[第三批证据校验清单](evidence/archive-03-manifest.json)。
 - [性能样本及步骤日志](evidence/performance/)、[首个无效短测](evidence/invalid/)、[第二批证据校验清单](evidence/archive-02-manifest.json)。
+- 原始 `vmmap` 文本保留工具输出的尾随空格及末尾空行，不为格式检查改写取证内容；普通代码与文档单独进行空白检查。步骤 `.log` 已显式加入版本库，不受项目默认忽略规则遗漏。
 - `/tmp/revia-m2-before-takeover.patch` 等接手现场仍保留；没有将未经检查的系统环境转储归档进仓库。
 
 任务 01 保持 `ready-for-agent`，不是要求用户再手动跑一遍。后续先定位内存上移，区分真实保留、在途请求及测量影响，对有证据的原因做最小修复；另补同次缓存跳转的呈现证据。必要修复完成后再用同负载重测，不能靠移动热身分界、强制 GC 或清缓存获得通过。任务 02–11 继续等待任务 01；本轮不合并、不推送。

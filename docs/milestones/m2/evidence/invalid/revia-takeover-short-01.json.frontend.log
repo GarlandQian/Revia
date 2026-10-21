@@ -1,0 +1,182 @@
+[rust 1792563099632] Rust 启动：data_dir=/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-soak-data-lx1jqjc8 autoRun=None
+2026-10-21T06:11:39.770Z 前端模块已载入
+2026-10-21T06:11:39.784Z 长期运行基线启动：目标时长 60 秒（1.0 分钟） repo=/tmp/revia-m1-fixtures/diffs
+[rust 1792563099959] open_worktree 收到：id=565996f4230d980e
+[rust 1792563100099] open_worktree 完成：git version 2.56.0
+[rust 1792563100100] list_changes 收到
+[rust 1792563100100] list_changes 会话就绪，开始读取
+[rust 1792563100141] list_changes 完成：7 个文件，40 ms
+2026-10-21T06:11:40.142Z [SOAK] 打开 assets/icon.png（split）
+2026-10-21T06:11:40.150Z 渲染决策：entry=assets/icon.png 区域=collapsed 行数=0/0 hunks=0
+2026-10-21T06:11:40.203Z [SOAK] 已打开 assets/icon.png
+2026-10-21T06:11:40.204Z [SOAK] 循环 1 assets/icon.png 用时 62 ms （chunks=0 tokens=0）
+2026-10-21T06:11:40.204Z [SOAK] 打开 logs/app.log（split）
+2026-10-21T06:11:40.208Z DiffView 已挂载：logs/app.log/split clientHeight=718
+[rust 1792563100208] get_rows 收到：logs/app.log 0..18
+[rust 1792563100209] get_rows 收到：logs/app.log 0..500
+[rust 1792563100209] get_rows 收到：logs/app.log 500..1000
+2026-10-21T06:11:40.209Z 窗口：target=logs/app.log/split/unstaged rowCount=5001 已加载块=0 在途=2
+2026-10-21T06:11:40.209Z 渲染决策：entry=logs/app.log 区域=diff 行数=5001/10001 hunks=1
+2026-10-21T06:11:40.211Z 取块 0（0-500）完成：500 行
+2026-10-21T06:11:40.211Z 取块 1（500-1000）完成：500 行
+[rust 1792563100218] get_rows 收到：logs/app.log 1000..1500
+[rust 1792563100219] get_rows 收到：logs/app.log 1500..2000
+[rust 1792563100219] highlight_range 收到：logs/app.log Unstaged New 1..400
+2026-10-21T06:11:40.225Z 取块 2（1000-1500）完成：500 行
+2026-10-21T06:11:40.225Z 取块 3（1500-2000）完成：500 行
+[rust 1792563100226] get_rows 收到：logs/app.log 2000..2500
+[rust 1792563100226] get_rows 收到：logs/app.log 2500..3000
+2026-10-21T06:11:40.229Z 取块 4（2000-2500）完成：500 行
+2026-10-21T06:11:40.230Z 取块 5（2500-3000）完成：500 行
+[rust 1792563100230] get_rows 收到：logs/app.log 3000..3500
+[rust 1792563100230] get_rows 收到：logs/app.log 3500..4000
+2026-10-21T06:11:40.231Z 取块 6（3000-3500）完成：500 行
+2026-10-21T06:11:40.231Z 取块 7（3500-4000）完成：500 行
+[rust 1792563100232] get_rows 收到：logs/app.log 4000..4500
+[rust 1792563100232] get_rows 收到：logs/app.log 4500..5000
+2026-10-21T06:11:40.233Z 取块 8（4000-4500）完成：500 行
+2026-10-21T06:11:40.233Z 取块 9（4500-5000）完成：500 行
+[rust 1792563100234] get_rows 收到：logs/app.log 5000..5001
+2026-10-21T06:11:40.234Z 取块 10（5000-5001）完成：1 行
+2026-10-21T06:11:40.276Z [SOAK] 已打开 logs/app.log
+2026-10-21T06:11:40.277Z [SOAK] step scroll logs/app.log row=0
+2026-10-21T06:11:40.309Z [SOAK] step scroll logs/app.log row=40
+2026-10-21T06:11:40.342Z [SOAK] step scroll logs/app.log row=80
+2026-10-21T06:11:40.374Z [SOAK] step scroll logs/app.log row=120
+2026-10-21T06:11:40.407Z [SOAK] step scroll logs/app.log row=160
+2026-10-21T06:11:40.439Z [SOAK] step scroll logs/app.log row=200
+2026-10-21T06:11:40.472Z [SOAK] jump to 2500
+2026-10-21T06:11:40.505Z [SOAK] jump back 0
+2026-10-21T06:11:40.536Z [SOAK] 已切换到统一视图 logs/app.log
+2026-10-21T06:11:40.538Z DiffView 卸载：logs/app.log/split
+2026-10-21T06:11:40.538Z DiffView 已挂载：logs/app.log/unified clientHeight=718
+[rust 1792563100539] get_rows 收到：logs/app.log 0..57
+[rust 1792563100539] get_rows 收到：logs/app.log 0..500
+[rust 1792563100539] get_rows 收到：logs/app.log 500..1000
+2026-10-21T06:11:40.540Z 取块 0（0-500）完成：500 行
+2026-10-21T06:11:40.542Z 取块 1（500-1000）完成：500 行
+[rust 1792563100544] get_rows 收到：logs/app.log 1000..1500
+[rust 1792563100544] get_rows 收到：logs/app.log 1500..2000
+2026-10-21T06:11:40.545Z 取块 2（1000-1500）完成：500 行
+2026-10-21T06:11:40.545Z 取块 3（1500-2000）完成：500 行
+[rust 1792563100545] get_rows 收到：logs/app.log 2000..2500
+[rust 1792563100545] get_rows 收到：logs/app.log 2500..3000
+2026-10-21T06:11:40.546Z 取块 4（2000-2500）完成：500 行
+2026-10-21T06:11:40.546Z 取块 5（2500-3000）完成：500 行
+[rust 1792563100547] get_rows 收到：logs/app.log 3000..3500
+[rust 1792563100547] get_rows 收到：logs/app.log 3500..4000
+2026-10-21T06:11:40.547Z 取块 6（3000-3500）完成：500 行
+2026-10-21T06:11:40.547Z 取块 7（3500-4000）完成：500 行
+[rust 1792563100548] get_rows 收到：logs/app.log 4000..4500
+[rust 1792563100548] get_rows 收到：logs/app.log 4500..5000
+2026-10-21T06:11:40.548Z 取块 8（4000-4500）完成：500 行
+2026-10-21T06:11:40.549Z 取块 9（4500-5000）完成：500 行
+[rust 1792563100549] get_rows 收到：logs/app.log 5000..5500
+[rust 1792563100549] get_rows 收到：logs/app.log 5500..6000
+2026-10-21T06:11:40.550Z 取块 10（5000-5500）完成：500 行
+2026-10-21T06:11:40.550Z 取块 11（5500-6000）完成：500 行
+[rust 1792563100551] get_rows 收到：logs/app.log 6000..6500
+[rust 1792563100551] get_rows 收到：logs/app.log 6500..7000
+2026-10-21T06:11:40.552Z 取块 12（6000-6500）完成：500 行
+2026-10-21T06:11:40.553Z 取块 13（6500-7000）完成：500 行
+[rust 1792563100553] get_rows 收到：logs/app.log 7000..7500
+[rust 1792563100553] get_rows 收到：logs/app.log 7500..8000
+2026-10-21T06:11:40.554Z 取块 14（7000-7500）完成：500 行
+2026-10-21T06:11:40.554Z 取块 15（7500-8000）完成：500 行
+[rust 1792563100555] get_rows 收到：logs/app.log 8000..8500
+[rust 1792563100555] get_rows 收到：logs/app.log 8500..9000
+2026-10-21T06:11:40.555Z 取块 17（8500-9000）完成：500 行
+2026-10-21T06:11:40.555Z 取块 16（8000-8500）完成：500 行
+[rust 1792563100556] get_rows 收到：logs/app.log 9000..9500
+[rust 1792563100556] get_rows 收到：logs/app.log 9500..10000
+2026-10-21T06:11:40.556Z 取块 18（9000-9500）完成：500 行
+2026-10-21T06:11:40.557Z 取块 19（9500-10000）完成：500 行
+[rust 1792563100557] get_rows 收到：logs/app.log 10000..10001
+2026-10-21T06:11:40.557Z 取块 20（10000-10001）完成：1 行
+2026-10-21T06:11:43.659Z [SOAK] 已切回并排视图 logs/app.log
+2026-10-21T06:11:43.675Z DiffView 卸载：logs/app.log/unified
+2026-10-21T06:11:43.678Z DiffView 已挂载：logs/app.log/split clientHeight=718
+[rust 1792563103679] get_rows 收到：logs/app.log 64..137
+[rust 1792563103680] get_rows 收到：logs/app.log 0..500
+[rust 1792563103680] get_rows 收到：logs/app.log 500..1000
+2026-10-21T06:11:43.688Z 取块 0（0-500）完成：500 行
+2026-10-21T06:11:43.689Z 取块 1（500-1000）完成：500 行
+[rust 1792563103707] get_rows 收到：logs/app.log 1000..1500
+[rust 1792563103707] get_rows 收到：logs/app.log 1500..2000
+2026-10-21T06:11:43.775Z 取块 2（1000-1500）完成：500 行
+2026-10-21T06:11:43.778Z 取块 3（1500-2000）完成：500 行
+[rust 1792563103781] get_rows 收到：logs/app.log 2000..2500
+[rust 1792563103781] get_rows 收到：logs/app.log 2500..3000
+2026-10-21T06:11:43.783Z 取块 4（2000-2500）完成：500 行
+2026-10-21T06:11:43.785Z 取块 5（2500-3000）完成：500 行
+[rust 1792563103786] get_rows 收到：logs/app.log 3000..3500
+[rust 1792563103787] get_rows 收到：logs/app.log 3500..4000
+2026-10-21T06:11:43.789Z 取块 6（3000-3500）完成：500 行
+2026-10-21T06:11:43.790Z 取块 7（3500-4000）完成：500 行
+[rust 1792563103792] get_rows 收到：logs/app.log 4000..4500
+[rust 1792563103792] get_rows 收到：logs/app.log 4500..5000
+2026-10-21T06:11:43.795Z 取块 9（4500-5000）完成：500 行2026-10-21T06:11:43.795Z 取块 8（4000-4500）完成：500 行
+
+[rust 1792563103797] get_rows 收到：logs/app.log 5000..5001
+2026-10-21T06:11:43.798Z 取块 10（5000-5001）完成：1 行
+2026-10-21T06:11:44.694Z [SOAK] 循环 1 logs/app.log 用时 4490 ms （chunks=11 tokens=0）
+2026-10-21T06:11:44.695Z [SOAK] 打开 pnpm-lock.yaml（split）
+2026-10-21T06:11:44.736Z DiffView 卸载：logs/app.log/split
+2026-10-21T06:11:44.741Z DiffView 已挂载：pnpm-lock.yaml/split clientHeight=718
+[rust 1792563104744] get_rows 收到：pnpm-lock.yaml 64..137
+[rust 1792563104746][rust 1792563104746] get_rows 收到：pnpm-lock.yaml 0..500 
+get_rows 收到：pnpm-lock.yaml 500..1000
+2026-10-21T06:11:44.745Z 渲染决策：entry=pnpm-lock.yaml 区域=diff 行数=2404/3004 hunks=1
+2026-10-21T06:11:44.753Z 取块 0（0-500）完成：500 行
+2026-10-21T06:11:44.754Z 取块 1（500-1000）完成：500 行
+[rust 1792563104762] get_rows 收到：pnpm-lock.yaml 1000..1500[rust 1792563104762]
+ get_rows 收到：pnpm-lock.yaml 1500..2000
+[rust 1792563104763] highlight_range 收到：pnpm-lock.yaml Unstaged New 1..400
+2026-10-21T06:11:44.843Z 取块 2（1000-1500）完成：500 行
+2026-10-21T06:11:44.845Z 取块 3（1500-2000）完成：500 行
+[rust 1792563104848] get_rows 收到：pnpm-lock.yaml 2000..2404
+[rust 1792563104848] highlight_range 收到：pnpm-lock.yaml Unstaged Old 1..400
+2026-10-21T06:11:44.851Z 取块 4（2000-2404）完成：404 行
+2026-10-21T06:11:44.973Z [SOAK] 已打开 pnpm-lock.yaml
+2026-10-21T06:11:44.984Z [SOAK] step scroll pnpm-lock.yaml row=0
+2026-10-21T06:11:45.112Z [SOAK] step scroll pnpm-lock.yaml row=40
+2026-10-21T06:11:45.279Z [SOAK] step scroll pnpm-lock.yaml row=80
+2026-10-21T06:11:45.391Z [SOAK] step scroll pnpm-lock.yaml row=120
+2026-10-21T06:11:45.442Z [SOAK] step scroll pnpm-lock.yaml row=160
+2026-10-21T06:11:45.491Z [SOAK] step scroll pnpm-lock.yaml row=200
+2026-10-21T06:11:45.544Z [SOAK] jump to 1202
+2026-10-21T06:11:45.677Z [SOAK] jump back 0
+2026-10-21T06:11:45.806Z [SOAK] 已切换到统一视图 pnpm-lock.yaml
+2026-10-21T06:11:45.811Z DiffView 卸载：pnpm-lock.yaml/split
+2026-10-21T06:11:45.812Z DiffView 已挂载：pnpm-lock.yaml/unified clientHeight=718
+[rust 1792563105812] get_rows 收到：pnpm-lock.yaml 0..57
+[rust 1792563105812] get_rows 收到：pnpm-lock.yaml 0..500
+[rust 1792563105812] get_rows 收到：pnpm-lock.yaml 500..1000
+2026-10-21T06:11:45.813Z 取块 0（0-500）完成：500 行
+[rust 1792563105814] get_rows 收到：pnpm-lock.yaml 1000..1500
+2026-10-21T06:11:45.816Z 取块 1（500-1000）完成：500 行
+2026-10-21T06:11:45.828Z 取块 2（1000-1500）完成：500 行
+[rust 1792563105829] get_rows 收到：pnpm-lock.yaml 1500..2000
+[rust 1792563105829] get_rows 收到：pnpm-lock.yaml 2000..2500
+2026-10-21T06:11:45.830Z 取块 3（1500-2000）完成：500 行
+2026-10-21T06:11:45.830Z 取块 4（2000-2500）完成：500 行
+[rust 1792563105831] get_rows 收到：pnpm-lock.yaml 2500..3000
+[rust 1792563105831] get_rows 收到：pnpm-lock.yaml 3000..3004
+2026-10-21T06:11:45.831Z 取块 6（3000-3004）完成：4 行
+2026-10-21T06:11:45.831Z 取块 5（2500-3000）完成：500 行
+2026-10-21T06:11:49.720Z [SOAK] 已切回并排视图 pnpm-lock.yaml
+2026-10-21T06:11:49.728Z DiffView 卸载：pnpm-lock.yaml/unified
+2026-10-21T06:11:49.729Z DiffView 已挂载：pnpm-lock.yaml/split clientHeight=718
+[rust 1792563109729] get_rows 收到：pnpm-lock.yaml 64..137
+[rust 1792563109730] get_rows 收到：pnpm-lock.yaml 0..500
+[rust 1792563109730] get_rows 收到：pnpm-lock.yaml 500..1000
+2026-10-21T06:11:49.731Z 取块 0（0-500）完成：500 行
+2026-10-21T06:11:49.742Z 取块 1（500-1000）完成：500 行
+[rust 1792563109743] get_rows 收到：pnpm-lock.yaml 1000..1500
+[rust 1792563109743] get_rows 收到：pnpm-lock.yaml 1500..2000
+2026-10-21T06:11:49.774Z 取块 2（1000-1500）完成：500 行
+2026-10-21T06:11:49.776Z 取块 3（1500-2000）完成：500 行
+[rust 1792563109823] get_rows 收到：pnpm-lock.yaml 2000..2404
+2026-10-21T06:11:49.824Z 取块 4（2000-2404）完成：404 行
+2026-10-21T06:11:50.719Z [SOAK] 循环 1 pnpm-lock.yaml 用时 6024 ms （chunks=5 tokens=800）
+2026-10-21T06:11:52.723Z 长期运行基线异常中断：Error: 窗口不可见或合成帧不足，长测无效
