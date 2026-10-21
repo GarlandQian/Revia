@@ -332,6 +332,8 @@ def main():
     parser.add_argument("--diagnostic-logging", choices=("verbose", "minimal"),
                         help="显式启用 IPC/内存短诊断；结果不算长期运行验收")
     parser.add_argument("--idle-seconds", type=int, default=90)
+    parser.add_argument("--keep-on-top", action="store_true",
+                        help="受测窗口保持在最前并出现在所有桌面空间（仅诊断用，避免被遮挡中断）")
     parser.add_argument("--diagnostic-cycles", type=int,
                         help="诊断固定完整循环数；seconds/minutes 此时只作为主动操作安全上限")
     args = parser.parse_args()
@@ -362,6 +364,8 @@ def main():
                REVIA_MEASURE_REPO=str(repo), REVIA_MEASURE_LOG=str(frontend_path))
     if args.baseline_minimal_logging:
         env["REVIA_SOAK_MINIMAL_LOGGING"] = "1"
+    if args.keep_on_top:
+        env["REVIA_SOAK_ON_TOP"] = "1"
     if diagnostic:
         env.update(REVIA_SOAK_DIAG_LOGS=diagnostic["loggingMode"], REVIA_SOAK_IDLE_SECONDS=str(args.idle_seconds))
         if args.diagnostic_cycles is not None:
