@@ -21,6 +21,7 @@ import { ipc } from "@/lib/ipc";
 import { logToBackend } from "./log";
 import type { HighlightStore } from "./highlightStore";
 import type { RowWindowStore } from "./rowWindowStore";
+import { visibleHighlightLines } from "./visibleHighlightLines";
 
 export const ROW_HEIGHT = 18;
 /** 滚动停止多久之后才请求新高亮（毫秒）。 */
@@ -327,12 +328,12 @@ export function DiffView(props: DiffViewProps) {
     // 高亮等可见行文本就绪之后再请求，且滚动期间不请求：两者共用同一条 IPC 与 JS 主线程，
     // 首屏和滚动时优先保证文本（ADR-0006：先纯文本、再异步着色）。滚动停下后再补齐颜色。
     // 请求结束的快照会再次触发 effect，继续补齐被单请求背压跳过的块和旧版本。
-    const range = lineRange(rows, visibleFrom, visibleTo);
-    if (range) {
-      highlights.ensure("new", range.from, range.to);
-      highlights.ensure("old", range.from, range.to);
+    // 只请求实际呈现的行，不把两版本或离散 hunk 之间的空洞扩成连续区间。
+    const lines = visibleHighlightLines((index) => rows.getRow(index), visibleFrom, visibleTo, view);
+    for (const fileVersion of ["new", "old"] as const) {
+      for (const line of lines[fileVersion]) highlights.ensure(fileVersion, line, line);
     }
-  }, [highlights, highlightSnapshot, rows, scrollIdle, version, visibleFrom, visibleTo]);
+  }, [highlights, highlightSnapshot, rows, scrollIdle, version, view, visibleFrom, visibleTo]);
 
   useImperativeHandle(
     handleRef,
@@ -432,22 +433,6 @@ function useRowVersion(rows: RowWindowStore): number {
   const [version, setVersion] = useState(0);
   useEffect(() => rows.subscribe(() => setVersion(rows.getSnapshot().version)), [rows]);
   return version;
-}
-
-/** 可见范围内的文件行号区间（旧、新版本取并集，便于两个版本一起请求高亮）。 */
-function lineRange(rows: RowWindowStore, from: number, to: number): { from: number; to: number } | null {
-  let min: number | null = null;
-  let max: number | null = null;
-  for (let index = from; index < to; index += 1) {
-    const row = rows.getRow(index);
-    if (!row || row.kind === "hunk") continue;
-    for (const line of [row.oldLine, row.newLine, row.left?.line, row.right?.line]) {
-      if (line == null) continue;
-      min = min == null ? line : Math.min(min, line);
-      max = max == null ? line : Math.max(max, line);
-    }
-  }
-  return min != null && max != null ? { from: min, to: max } : null;
 }
 
 const RowView = memo(function RowView({
