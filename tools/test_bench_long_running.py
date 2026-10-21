@@ -3,10 +3,14 @@ import importlib.util
 from pathlib import Path
 import unittest
 import tempfile
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location("bench", Path(__file__).with_name("bench-long-running.py"))
 bench = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bench)
+fixture_spec = importlib.util.spec_from_file_location("cold_fixture", Path(__file__).parent / "fixtures/setup-cold-jump.py")
+cold_fixture = importlib.util.module_from_spec(fixture_spec)
+fixture_spec.loader.exec_module(cold_fixture)
 
 
 class BenchmarkSafetyTests(unittest.TestCase):
@@ -56,6 +60,30 @@ class BenchmarkSafetyTests(unittest.TestCase):
         self.assertEqual(bench.parse_footprint("Physical footprint: 1.5G\n"), 1536)
         with self.assertRaises(RuntimeError):
             bench.parse_footprint("RSS: 500M\nPhysical footprint (peak): 347.4M\n")
+
+    def test_cold_fixture_ignores_inherited_git_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "fixture"
+            inherited = {"GIT_DIR": "/unrelated/.git", "GIT_WORK_TREE": "/unrelated",
+                         "GIT_INDEX_FILE": "/unrelated/index", "GIT_CONFIG_COUNT": "1"}
+            with mock.patch.dict(cold_fixture.os.environ, inherited), \
+                    mock.patch("sys.argv", ["setup-cold-jump.py", str(root)]), \
+                    mock.patch.object(cold_fixture.subprocess, "run") as run, \
+                    mock.patch("builtins.print"):
+                cold_fixture.main()
+            self.assertEqual(len(run.call_args_list), 3)
+            for call in run.call_args_list:
+                self.assertEqual(call.args[0][1:3], ["-C", str(root.resolve())])
+                self.assertFalse(set(inherited).intersection(call.kwargs["env"]))
+            self.assertEqual(len((root / "cold.ts").read_text().splitlines()), 30_000)
+
+    def test_cold_fixture_refuses_existing_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch("sys.argv", ["setup-cold-jump.py", directory]), \
+                    mock.patch.object(cold_fixture.subprocess, "run") as run:
+                with self.assertRaises(FileExistsError):
+                    cold_fixture.main()
+            run.assert_not_called()
 
     def test_short_run_cannot_claim_steady_memory(self):
         self.assertEqual(bench.analyze_memory([{"elapsedSec": 10}], 0)["steadySampleCount"], 0)

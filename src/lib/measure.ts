@@ -1,3 +1,5 @@
+import type { JumpDomDiagnostics } from "./jumpDiagnostics";
+
 /**
  * 测量工具：首屏、跳转、滚动期间的覆盖情况与帧间隔。
  *
@@ -25,12 +27,26 @@ export interface FirstScreenSample {
   devicePixelRatio: number | null;
 }
 
+export interface JumpTiming {
+  prioritizeMs: number;
+  scrollCallMs: number;
+  dataWaitMs: number;
+  taskQueueMs: number;
+}
+
 export interface JumpSample {
   fromRow: number;
   toRow: number;
-  /** 跳转到目标窗口内容提交的耗时。 */
+  /** 跳转前的真实缓存状态；不能把后台预取过的目标称为冷跳。 */
+  targetWasCached: boolean;
+  warmTargetWasCached: boolean;
+  targetCovered: boolean;
+  warmCovered: boolean;
+  timing: JumpTiming;
+  warmTiming: JumpTiming;
+  /** 原 M1 口径：调用、数据等待及一次消息任务等待的总耗时，不等于上屏时间。 */
   appearMs: number;
-  /** 其中取数据（Rust + IPC）的耗时。 */
+  /** 原 M1 字段：从发起跳转到数据齐备，含同步渲染调用，不是纯 IPC 耗时。 */
   fetchMs: number;
   /** 目标窗口是否在 1 帧内齐备（16.7ms）。 */
   withinOneFrame: boolean;
@@ -38,15 +54,18 @@ export interface JumpSample {
   warmAppearMs: number | null;
   /** 热态跳转是否在 1 帧内提交。 */
   warmWithinOneFrame: boolean | null;
-  /** 热态跳转后，已缓存的语法颜色恢复完毕的耗时（毫秒）。 */
+  /** 原 M1 字段：compact 退出耗时；不单独证明高亮 token 已进入 DOM。 */
   colorRestoreMs: number | null;
 }
 
 export interface ScrollSample {
   mode: "frame" | "step";
   screens: number;
-  /** 采样帧数。 */
+  /** 原 M1 字段：滚动步数，不代表全部都由 rAF 驱动。 */
   frames: number;
+  requestedScreens: number;
+  rafFrames: number;
+  fallbackFrames: number;
   /** 可见区域里没有数据的行数统计。 */
   uncoveredFrames: number;
   uncoveredMax: number;
@@ -78,6 +97,8 @@ export interface Measurement {
   firstScreen: FirstScreenSample;
   jump: JumpSample | null;
   scroll: ScrollSample | null;
+  jumpDom: JumpDomDiagnostics | null;
+  jumpDomError: string | null;
   highlight: { roundTrips: number; lastRoundTripMs: number | null; loadedLines: number } | null;
 }
 
@@ -177,19 +198,24 @@ export async function measureScroll(options: {
   const started = performance.now();
   let index = 0;
   let last = started;
+  let rafFrames = 0;
+  let fallbackFrames = 0;
 
   const waitFrame = async (): Promise<void> => {
     if (!hasCompositor) {
+      fallbackFrames += 1;
       await nextTask();
       return;
     }
     // 有合成帧时等真正的下一帧，帧间隔才是 T4 要的数据；100ms 兜底，防止窗口中途被遮住。
     await new Promise<void>((resolve) => {
       const frame = requestAnimationFrame(() => {
+        rafFrames += 1;
         window.clearTimeout(timer);
         resolve();
       });
       const timer = window.setTimeout(() => {
+        fallbackFrames += 1;
         cancelAnimationFrame(frame);
         resolve();
       }, 100);
@@ -215,6 +241,9 @@ export async function measureScroll(options: {
     mode: hasCompositor ? "frame" : "step",
     screens: index,
     frames: index,
+    requestedScreens: screens,
+    rafFrames,
+    fallbackFrames,
     uncoveredFrames: uncoveredCounts.filter((value) => value > 0).length,
     uncoveredMax: uncoveredCounts.length > 0 ? Math.max(...uncoveredCounts) : 0,
     uncoveredP95: percentile(uncoveredCounts, 0.95),

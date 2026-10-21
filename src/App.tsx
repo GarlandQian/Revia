@@ -23,6 +23,7 @@ import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { ipc } from "@/lib/ipc";
+import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import {
   formatMs,
@@ -510,26 +511,34 @@ export function App() {
       if (element && total > viewportRows * 4) {
         const from = Math.floor((diffRef.current?.getScrollTop() ?? 0) / ROW_HEIGHT);
         const to = Math.floor(total * 0.6);
+        const targetWasCached = rowStore.isCovered(to, to + viewportRows);
         const started = performance.now();
         rowStore.prioritize(to, to + viewportRows);
+        const prioritizedAt = performance.now();
         diffRef.current?.scrollToRow(to);
+        const scrollReturnedAt = performance.now();
         const coveredTarget = await waitUntil(() => rowStore.isCovered(to, to + viewportRows), 4000);
         const dataAt = performance.now();
         await nextTask();
-        const appearMs = performance.now() - started;
+        const taskAt = performance.now();
+        const appearMs = taskAt - started;
         debugLog(
           `跳转目标齐备：${coveredTarget}（取数 ${Math.round(dataAt - started)} ms，提交 ${Math.round(appearMs)} ms）`,
         );
-        // 热态跳转：跳回跳转前的位置（对应的块还在缓存里），衡量纯渲染提交成本。
+        // 保留 M1 总计时；分段记录同步调用与消息任务等待，不能混称纯渲染。
         let warmAppearMs: number | null = null;
         let colorRestoreMs: number | null = null;
+        const warmTargetWasCached = rowStore.isCovered(from, from + viewportRows);
         const warmStart = performance.now();
         diffRef.current?.scrollToRow(from);
+        const warmScrollReturnedAt = performance.now();
         const warmCovered = await waitUntil(() => rowStore.isCovered(from, from + viewportRows), 4000);
+        const warmDataAt = performance.now();
         await nextTask();
-        if (warmCovered) warmAppearMs = performance.now() - warmStart;
+        const warmTaskAt = performance.now();
+        if (warmCovered) warmAppearMs = warmTaskAt - warmStart;
         // 等待颜色与余量恢复（compact 复位到 false，约 2 帧内恢复）
-        const colorRestored = await waitUntil(() => !(diffRef.current?.isCompact() ?? false), 2000);
+        const colorRestored = await waitUntil(() => diffRef.current != null && !diffRef.current.isCompact(), 2000);
         if (colorRestored) colorRestoreMs = performance.now() - warmStart;
         debugLog(
           `热态跳转：齐备 ${warmCovered}，文字提交 ${warmAppearMs == null ? "?" : Math.round(warmAppearMs)} ms，颜色恢复 ${colorRestoreMs == null ? "?" : Math.round(colorRestoreMs)} ms`,
@@ -537,6 +546,22 @@ export function App() {
         jump = {
           fromRow: from,
           toRow: to,
+          targetWasCached,
+          warmTargetWasCached,
+          targetCovered: coveredTarget,
+          warmCovered,
+          timing: {
+            prioritizeMs: prioritizedAt - started,
+            scrollCallMs: scrollReturnedAt - prioritizedAt,
+            dataWaitMs: dataAt - scrollReturnedAt,
+            taskQueueMs: taskAt - dataAt,
+          },
+          warmTiming: {
+            prioritizeMs: 0,
+            scrollCallMs: warmScrollReturnedAt - warmStart,
+            dataWaitMs: warmDataAt - warmScrollReturnedAt,
+            taskQueueMs: warmTaskAt - warmDataAt,
+          },
           appearMs,
           fetchMs: dataAt - started,
           withinOneFrame: appearMs <= 16.7,
@@ -550,13 +575,13 @@ export function App() {
       let scroll: ScrollSample | null = null;
       const scroller = diffRef.current;
       if (scroller) {
-        const range = { from: 0, to: 0 };
         scroll = await measureScroll({
           scroller,
           screens: 60,
           hasCompositor,
           uncovered: () => {
-            const visible = diffRef.current?.getVisibleRange() ?? range;
+            const visible = diffRef.current?.getVisibleRange();
+            if (!visible || visible.to <= visible.from) throw new Error("滚动测量缺少有效行窗口");
             return rowStore.uncovered(visible.from, visible.to);
           },
         });
@@ -565,6 +590,20 @@ export function App() {
       }
 
       const highlight = highlightStore.getSnapshot();
+      let jumpDom: Measurement["jumpDom"] = null;
+      let jumpDomError: string | null = null;
+      try {
+        if (jump) jumpDom = await diagnoseJumpDom({
+          view: targetView,
+          rowHeight: ROW_HEIGHT,
+          rows: rowStore,
+          highlights: highlightStore,
+          getScroller: () => diffRef.current,
+        });
+      } catch (caught) {
+        // Keep the original samples even when the separate diagnostic fails.
+        jumpDomError = String(caught);
+      }
       const measurement: Measurement = {
         id: measurements.length + 1,
         label: `${targetView} / ${entry.path}`,
@@ -575,6 +614,8 @@ export function App() {
         firstScreen: firstScreenRef.current,
         jump,
         scroll,
+        jumpDom,
+        jumpDomError,
         highlight: {
           roundTrips: highlight.loadedLines,
           lastRoundTripMs: highlight.lastRoundTripMs,

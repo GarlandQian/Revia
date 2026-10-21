@@ -37,7 +37,7 @@ caffeinate -di python3 tools/bench-long-running.py \
 
 ## 性能回归
 
-M1 的首屏、跳转、滚动指标计算保持原口径，自动测量先等待可见窗口。可使用 `REVIA_MEASURE_DATA_DIR` 隔离其设置：
+M1 的首屏、跳转、滚动指标保留原计时边界，自动测量先等待可见窗口。`ok: true` 只表示测量流程完成，不自动表示 D06 达标。可使用 `REVIA_MEASURE_DATA_DIR` 隔离其设置：
 
 ```bash
 REVIA_MEASURE=1 REVIA_MEASURE_ONLY=split \
@@ -57,3 +57,24 @@ PYTHONDONTWRITEBYTECODE=1 python3 tools/test_bench_long_running.py
 ```
 
 标准库测试覆盖无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论，以及受测二进制替换/删除时仍保留报告并判无效。不引入新的测试框架。
+
+## 跳转与颜色诊断的口径
+
+- 原 `appearMs`、`warmAppearMs` 保留；新 `timing` / `warmTiming` 分别记录优先取数、同步滚动调用、数据等待及消息任务等待。原总值不是纯渲染或上屏时间，不用较短分段替换旧值。
+- `targetWasCached` / `warmTargetWasCached` 记录发起前的真实数据状态。已被后台预取的目标不能称为冷跳；`targetCovered` / `warmCovered` 为 false 时不能用一个耗时数字宣称成功。
+- 原 `colorRestoreMs` 实际只记录 compact 退出；不证明旧、新双侧颜色都已缓存或显示。
+- 原测量和滚动全部结束后才执行独立 `jumpDom` 诊断。准备阶段显式补齐源位置的旧、新高亮缓存，再正常滚动离开、返回，核对行号、文字和 token DOM。准备失败保留 `preparationError`，不生成颜色恢复耗时；异常保留 `jumpDomError`，不抹掉先前样本。
+- `textDomMs`、`colorDomMs` 和 `immediateDomMs` 都包含探针开销，表示从跳转开始到语义 DOM 核对完成的上界，不是屏幕上屏时间。`immediateDomMs` 包含 `scrollCallMs`。真实桌面检查仍不可省略。
+- 滚动报告区分完成屏数、`rafFrames` 和 `fallbackFrames`。检查完整 60 屏及无定时器兜底；`uncoveredFrames` 只说明行数据覆盖，不能独自证明最终画面不露白。
+
+真正未缓存的跳转使用另一个临时仓库，保留普通 fixture 用于同负载首屏与热跳对照：
+
+```bash
+# 输出目录必须尚不存在；不覆盖任何已有目录，不继承外部 GIT_* 目标变量。
+python3 tools/fixtures/setup-cold-jump.py /tmp/revia-cold-jump-new
+# 按前面的性能命令运行，每种视图独立进程；只替换以下两项：
+# REVIA_MEASURE_REPO=/tmp/revia-cold-jump-new
+# REVIA_MEASURE_PATH=cold.ts
+```
+
+`cold.ts` 有 30,000 行全部修改，两种视图都超过 20,000 显示行，沿用正常生产缓存策略；不能把更大负载的首屏结果混入普通 fixture 的 150ms 首屏验收。仍要核验每次跳转前确实存在缺失行，而不是按文件大小推定冷跳。
