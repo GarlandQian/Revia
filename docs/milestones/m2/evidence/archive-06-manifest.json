@@ -1,0 +1,108 @@
+{
+  "sourceCommit": "c6cdf70",
+  "binarySha256": "bfd46392e9786b4c2f3fefee9477dad8bced349ddc64d19aed63a5de72d8482f",
+  "note": "Final performance reports and desktop03 used this unchanged bundle; its SHA was checked again after the retry. Original report fields are not backfilled. UI screenshots remain in the conversation. Ordinary desktop03 used the normal application data directory, not the measurement-only override.",
+  "validPerformanceSamples": [
+    "frame-split-01.json",
+    "frame-unified-01.json",
+    "frame-cold-split-01.json",
+    "frame-cold-unified-02.json"
+  ],
+  "invalidPerformanceSamples": [
+    {
+      "path": "frame-cold-unified-01.json",
+      "reason": "No visible composited window; no performance combo was produced. Retained unchanged alongside its log and the successful second attempt."
+    }
+  ],
+  "formalLongRunOnThisBuild": false,
+  "files": [
+    {
+      "source": "/tmp/revia-final-frame-split-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-split-01.json",
+      "sourceSha256": "14b256be325a82e221f282e2ca5fac249c581e631ae052997512492017237374",
+      "storedSha256": "14b256be325a82e221f282e2ca5fac249c581e631ae052997512492017237374",
+      "sourceBytes": 7900,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-final-frame-split-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-split-01.log.gz",
+      "sourceSha256": "21a538ff837af20fa40038e8f9c79519cb2349dc29bcf8e83a0a64e2071ce5e7",
+      "storedSha256": "ac452146f4e5f65805596775e24fbd650332da04fbd38c8a737846517c577874",
+      "sourceBytes": 4076,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-final-frame-unified-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-unified-01.json",
+      "sourceSha256": "351796523c248e9ac57d3eb933fab8ee1530b74105c0dae29d6e81c4d426da19",
+      "storedSha256": "351796523c248e9ac57d3eb933fab8ee1530b74105c0dae29d6e81c4d426da19",
+      "sourceBytes": 7680,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-final-frame-unified-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-unified-01.log.gz",
+      "sourceSha256": "d07f1b1403bbc7841a22691bc8c828cdbadcaaec18309a83138faf73f2f240ca",
+      "storedSha256": "51c8993d6cc189b54daa2d586d821244beb577a71a2c219f9dbd8e462b415bdb",
+      "sourceBytes": 5447,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-final-frame-cold-split-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-cold-split-01.json",
+      "sourceSha256": "3eb88f4dc4ba779a51fcc4657cdb8cd1c37ee6b0cb3f4aa8b542cb09f7e9fb45",
+      "storedSha256": "3eb88f4dc4ba779a51fcc4657cdb8cd1c37ee6b0cb3f4aa8b542cb09f7e9fb45",
+      "sourceBytes": 7882,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-final-frame-cold-split-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-cold-split-01.log.gz",
+      "sourceSha256": "e26cc41b6dba64a37570a4b10abd5f85e14b8843b4fa90e783afdd390b20d6fc",
+      "storedSha256": "edb3b1def5d23310b258f5434571fb7fe535cc0993fd51c2f2b5e9bc74499d68",
+      "sourceBytes": 3510,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-final-frame-cold-unified-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-cold-unified-01.json",
+      "sourceSha256": "7498ded2428b87455c5428b0c43dd64a6e364d7b05e97a83bc33d32d0dc0139a",
+      "storedSha256": "7498ded2428b87455c5428b0c43dd64a6e364d7b05e97a83bc33d32d0dc0139a",
+      "sourceBytes": 78,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-final-frame-cold-unified-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-cold-unified-01.log.gz",
+      "sourceSha256": "daa309e74cf0a49355158c185815cf3d6439122329cd6eab74a2fdf13cf6d9a2",
+      "storedSha256": "b5e1c709faef1f3eada674abaf3e2ab8664c2fafe779c30ac5bd1292dd847629",
+      "sourceBytes": 333,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-final-frame-cold-unified-02-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-cold-unified-02.json",
+      "sourceSha256": "e7ea104653da5e93a770a48a8d71e43f849e21e6664c68dbedead4713daf3d56",
+      "storedSha256": "e7ea104653da5e93a770a48a8d71e43f849e21e6664c68dbedead4713daf3d56",
+      "sourceBytes": 7663,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-final-frame-cold-unified-02-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-final/frame-cold-unified-02.log.gz",
+      "sourceSha256": "d6779cb5f182a9d78f0ec33a4b9adb2a4c1de308a4ef73ede48706e075702d64",
+      "storedSha256": "b5f068f443934b19e334a22ae7ef0f4dcd292203c8250f3c0498f10ce17b18fb",
+      "sourceBytes": 3454,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-desktop-03-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-final/desktop-final.log.gz",
+      "sourceSha256": "b527e863351a2b419c50809be569e33983dac253911c5ab3938328a80cefe2b4",
+      "storedSha256": "e5bfbb40a032e0e4601901bb944ef905310f7cb5f666bb953a617320297cfa21",
+      "sourceBytes": 10012,
+      "gzip": true
+    }
+  ]
+}

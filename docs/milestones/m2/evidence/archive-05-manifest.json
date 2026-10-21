@@ -1,0 +1,144 @@
+{
+  "sourceCommit": "6f07f1a",
+  "binarySha256": "368eab41e47bfcf48c0a501c9163b136462fcbcb2aa9b08c64fe15e167c2d4bd",
+  "note": "Baseline identity is recorded by its driver. Four performance reports and desktop checks used the same unchanged bundle; SHA checked before and after them. No original report fields are backfilled. UI screenshots remain in the conversation.",
+  "baselineCompleted": true,
+  "files": [
+    {
+      "source": "/tmp/revia-m2-baseline-04-20261021.json",
+      "path": "docs/milestones/m2/evidence/baseline-04/report.json",
+      "sourceSha256": "48d6d0d865aa01a0ac0b483a53d771fdc7b30f9c0a6917c643f5d4aa06a20987",
+      "storedSha256": "48d6d0d865aa01a0ac0b483a53d771fdc7b30f9c0a6917c643f5d4aa06a20987",
+      "sourceBytes": 956919,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-m2-baseline-04-20261021.json.frontend.json",
+      "path": "docs/milestones/m2/evidence/baseline-04/report.json.frontend.json",
+      "sourceSha256": "0e582287a13df7309b7d8f9d080069d82198862c34885f4e326197c427e1be34",
+      "storedSha256": "0e582287a13df7309b7d8f9d080069d82198862c34885f4e326197c427e1be34",
+      "sourceBytes": 764273,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-m2-baseline-04-20261021.json.samples.jsonl",
+      "path": "docs/milestones/m2/evidence/baseline-04/report.json.samples.jsonl",
+      "sourceSha256": "26c60392064cdf1596fef21cb3e5ca2d089fdfdc9c31bad718c7b1b548d0d5e7",
+      "storedSha256": "26c60392064cdf1596fef21cb3e5ca2d089fdfdc9c31bad718c7b1b548d0d5e7",
+      "sourceBytes": 71180,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-m2-baseline-04-20261021.json.phase-samples.jsonl",
+      "path": "docs/milestones/m2/evidence/baseline-04/report.json.phase-samples.jsonl",
+      "sourceSha256": "7906006f0e02d07613647a2ac389031e9588989f2ae1360e75a72e0ac89dbe63",
+      "storedSha256": "7906006f0e02d07613647a2ac389031e9588989f2ae1360e75a72e0ac89dbe63",
+      "sourceBytes": 26646,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-m2-baseline-04-20261021.json.log",
+      "path": "docs/milestones/m2/evidence/baseline-04/report.json.log.gz",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceBytes": 0,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-m2-baseline-04-20261021.json.frontend.log",
+      "path": "docs/milestones/m2/evidence/baseline-04/report.json.frontend.log.gz",
+      "sourceSha256": "ec8a9110218e959c2a13460c59bbe071afba62c0857f8b3f669273aa6f949cd2",
+      "storedSha256": "b22471352ad37442b60c2660b946fadfc04c1c063e72f6b6c81a18244577a38a",
+      "sourceBytes": 354405,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-split-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-split-01.json",
+      "sourceSha256": "3c8a2889a2d3a393776a3254ceb636b3836f4c7284009c18760b2fbe1e93cd75",
+      "storedSha256": "3c8a2889a2d3a393776a3254ceb636b3836f4c7284009c18760b2fbe1e93cd75",
+      "sourceBytes": 7899,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-split-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-split-01.log.gz",
+      "sourceSha256": "247f50479fb443427d6819d3868215bf6801e74686e0118685de7b41ace30d2d",
+      "storedSha256": "dc642be883fabbcafe5cc1863a3b9d1b5e04e1f79c03d0738d8f85e2e012ded4",
+      "sourceBytes": 4075,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-unified-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-unified-01.json",
+      "sourceSha256": "8e4e559559d644099079b3a2484fd74aaa2dcdbaa408a207f104e0d0f58a6d2b",
+      "storedSha256": "8e4e559559d644099079b3a2484fd74aaa2dcdbaa408a207f104e0d0f58a6d2b",
+      "sourceBytes": 7677,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-unified-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-unified-01.log.gz",
+      "sourceSha256": "df4e624d81b1efc21fc2d5aa8eac7e7af402415240e87f66f14b0c9b4d88e2b5",
+      "storedSha256": "739529c1e709c5bd1d627ced508cf076d5bd31708201f790ceb3e693403075be",
+      "sourceBytes": 5447,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-cold-split-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-cold-split-01.json",
+      "sourceSha256": "cfad8e320cb95793fde0af1093e2d543ce58f83c3e18bb751c54d276a9300072",
+      "storedSha256": "cfad8e320cb95793fde0af1093e2d543ce58f83c3e18bb751c54d276a9300072",
+      "sourceBytes": 7882,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-cold-split-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-cold-split-01.log.gz",
+      "sourceSha256": "ac78ed1ec3d918d6f761bd5dfd851d8b9cd96700e92fe8d3c19d7ea6903eb7e4",
+      "storedSha256": "8f9228514fdda9f243f458f19e346e55e169b631278b1dbb5951acf64394c393",
+      "sourceBytes": 3509,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-cold-unified-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-cold-unified-01.json",
+      "sourceSha256": "5ade7a759177a9946236f7edd42cba92db69c57056ab820adda0a112a7565d1b",
+      "storedSha256": "5ade7a759177a9946236f7edd42cba92db69c57056ab820adda0a112a7565d1b",
+      "sourceBytes": 7661,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-fixed-frame-cold-unified-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-fixed/frame-cold-unified-01.log.gz",
+      "sourceSha256": "bfc8b860c7fd7af46b72b42a48c311365ea95bc5764c561b122d788c6bd11d44",
+      "storedSha256": "78d8124d293723e6f15ae4ba6bb9b74575821dc5b1cb6b118d14b5b73610abcb",
+      "sourceBytes": 3520,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-desktop-02-20261021.log",
+      "path": "docs/milestones/m2/evidence/performance-fixed/desktop-after-highlight-fix.log.gz",
+      "sourceSha256": "1adbe5d6dd97eea0735a5974688a5143b7d12ce708c1d794a9274cc7881e346e",
+      "storedSha256": "2ba4dba0ac2560a1f0bf1311d06f7406dcb54c2340ec3480c6984cc8e6a3a6e4",
+      "sourceBytes": 9838,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-analyze-baseline4.py",
+      "path": "docs/milestones/m2/evidence/baseline-04/analyze.py",
+      "sourceSha256": "039ccc67b819a282a266831292da0b8599f511d0af24be7a76c4a80bda84a4bf",
+      "storedSha256": "039ccc67b819a282a266831292da0b8599f511d0af24be7a76c4a80bda84a4bf",
+      "sourceBytes": 28772,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-baseline4-analysis.json",
+      "path": "docs/milestones/m2/evidence/baseline-04/analysis.json",
+      "sourceSha256": "d8ef159f966a8ccb2f96335f203c1d01b3a3c033972779bd26f4f656d154ddcf",
+      "storedSha256": "d8ef159f966a8ccb2f96335f203c1d01b3a3c033972779bd26f4f656d154ddcf",
+      "sourceBytes": 700096,
+      "gzip": false
+    }
+  ]
+}

@@ -1,0 +1,1662 @@
+[
+  {
+    "path": "/tmp/revia-ipc-verbose-01-20261021.json",
+    "runCompleted": true,
+    "errors": [],
+    "binarySha256": "ce01397a75ecd615254b3271ade6e9169d3b0ea4123cbbf2e7f182cc58b6a2df",
+    "diagnostic": {
+      "loggingMode": "verbose",
+      "idleSeconds": 90,
+      "cycles": 120
+    },
+    "startedAt": "2026-10-21T17:39:25.923682+08:00",
+    "endedAt": "2026-10-21T17:48:41.830620+08:00",
+    "reviaPid": 18064,
+    "servicePids": {
+      "webContentPids": [
+        18067
+      ],
+      "networkingPids": [
+        18068
+      ],
+      "gpuPids": [
+        18066
+      ]
+    },
+    "activeSeconds": 416.83,
+    "operationsWallSeconds": 441.775,
+    "checkpointPauseSeconds": 24.945,
+    "idleSeconds": 90.01,
+    "counts": {
+      "totalCycles": 120,
+      "totalFileSwitches": 840,
+      "totalViewSwitches": 1440,
+      "totalScrolls": 3960,
+      "totalJumps": 720
+    },
+    "ipcAfterOperations": {
+      "commandOverflowRequests": 0,
+      "commands": {
+        "debug_log": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 28121,
+          "maxActive": 11,
+          "maxHeaderLatencyMs": 812,
+          "started": 28121,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 245947
+        },
+        "get_rows": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 17715,
+          "maxActive": 5,
+          "maxHeaderLatencyMs": 815,
+          "started": 17715,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 131191
+        },
+        "highlight_range": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1321,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 744,
+          "started": 1321,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 15612
+        },
+        "row_index_for_line": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1440,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 734,
+          "started": 1440,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 25345
+        }
+      },
+      "completionBoundary": "response headers, not body/callback completion",
+      "namedCommandLimit": 32,
+      "stringIpcUrlsOnly": true,
+      "total": {
+        "active": 0,
+        "failed": 0,
+        "headersSettled": 48597,
+        "maxActive": 17,
+        "maxHeaderLatencyMs": 815,
+        "started": 48597,
+        "synchronousThrows": 0,
+        "totalHeaderLatencyMs": 418095
+      }
+    },
+    "ipcFinal": {
+      "commandOverflowRequests": 0,
+      "commands": {
+        "debug_log": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 28133,
+          "maxActive": 11,
+          "maxHeaderLatencyMs": 812,
+          "started": 28133,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 245974
+        },
+        "get_rows": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 17715,
+          "maxActive": 5,
+          "maxHeaderLatencyMs": 815,
+          "started": 17715,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 131191
+        },
+        "highlight_range": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1321,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 744,
+          "started": 1321,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 15612
+        },
+        "row_index_for_line": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1440,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 734,
+          "started": 1440,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 25345
+        }
+      },
+      "completionBoundary": "response headers, not body/callback completion",
+      "namedCommandLimit": 32,
+      "stringIpcUrlsOnly": true,
+      "total": {
+        "active": 0,
+        "failed": 0,
+        "headersSettled": 48609,
+        "maxActive": 17,
+        "maxHeaderLatencyMs": 815,
+        "started": 48609,
+        "synchronousThrows": 0,
+        "totalHeaderLatencyMs": 418122
+      }
+    },
+    "observations": 66,
+    "initialCallbacks": {
+      "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+      "available": true,
+      "baselineOverflow": 0,
+      "baselineRegistrySize": 4,
+      "baselineStillRegistered": 4,
+      "baselineStillRegisteredIsLowerBound": false,
+      "baselineTrackedIds": 4,
+      "countsAreNotRequestCounts": true,
+      "idLimit": 512,
+      "newIdCount": 0,
+      "nonBaselineRegistryCount": 0,
+      "observationOverflow": 0,
+      "oldestObservedAgeMs": 0,
+      "registrySize": 4,
+      "trackedObservedIds": 0
+    },
+    "callbackMin": 4,
+    "callbackMax": 4,
+    "finalCallbacks": {
+      "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+      "available": true,
+      "baselineOverflow": 0,
+      "baselineRegistrySize": 4,
+      "baselineStillRegistered": 4,
+      "baselineStillRegisteredIsLowerBound": false,
+      "baselineTrackedIds": 4,
+      "countsAreNotRequestCounts": true,
+      "idLimit": 512,
+      "newIdCount": 0,
+      "nonBaselineRegistryCount": 0,
+      "observationOverflow": 0,
+      "oldestObservedAgeMs": 0,
+      "registrySize": 4,
+      "trackedObservedIds": 0
+    },
+    "maxObservedCallbackAgeMs": 0,
+    "maxObservedNewIdCount": 0,
+    "observationErrors": 0,
+    "activeMemory": {
+      "count": 43,
+      "rustFootprintMb": {
+        "first": 59.9,
+        "last": 50.0,
+        "min": 46.9,
+        "max": 60.9,
+        "mean": 51.2233,
+        "sampleCount": 43,
+        "slopeMbPerMinute": -0.9583
+      },
+      "webContentRssMb": {
+        "first": 198.48,
+        "last": 537.53,
+        "min": 198.48,
+        "max": 537.53,
+        "mean": 352.2879,
+        "sampleCount": 43,
+        "slopeMbPerMinute": 48.8793
+      },
+      "webContentFootprintMb": {
+        "first": 121.0,
+        "last": 199.5,
+        "min": 121.0,
+        "max": 314.9,
+        "mean": 181.9535,
+        "sampleCount": 43,
+        "slopeMbPerMinute": 8.8803
+      },
+      "webContentMallocAllocatedMb": {
+        "first": 57.8,
+        "last": 140.9,
+        "min": 57.5,
+        "max": 292.1,
+        "mean": 110.4395,
+        "sampleCount": 43,
+        "slopeMbPerMinute": 11.4972
+      },
+      "networkingRssMb": {
+        "first": 12.06,
+        "last": 55.39,
+        "min": 11.97,
+        "max": 55.39,
+        "mean": 44.2767,
+        "sampleCount": 43,
+        "slopeMbPerMinute": 5.155
+      },
+      "networkingFootprintMb": {
+        "first": 5.828125,
+        "last": 22.2,
+        "min": 5.828125,
+        "max": 24.2,
+        "mean": 18.1193,
+        "sampleCount": 43,
+        "slopeMbPerMinute": 2.0555
+      },
+      "gpuRssMb": {
+        "first": 44.95,
+        "last": 46.52,
+        "min": 44.84,
+        "max": 46.59,
+        "mean": 45.843,
+        "sampleCount": 43,
+        "slopeMbPerMinute": 0.1867
+      }
+    },
+    "post180sActiveMemory": {
+      "count": 26,
+      "rustFootprintMb": {
+        "first": 50.3,
+        "last": 50.0,
+        "min": 47.0,
+        "max": 50.4,
+        "mean": 49.7962,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 0.2465
+      },
+      "webContentRssMb": {
+        "first": 289.83,
+        "last": 537.53,
+        "min": 289.83,
+        "max": 537.53,
+        "mean": 411.5185,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 79.3067
+      },
+      "webContentFootprintMb": {
+        "first": 193.9,
+        "last": 199.5,
+        "min": 140.1,
+        "max": 314.9,
+        "mean": 195.9808,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 5.5251
+      },
+      "webContentMallocAllocatedMb": {
+        "first": 98.1,
+        "last": 140.9,
+        "min": 89.0,
+        "max": 292.1,
+        "mean": 130.1346,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 6.8675
+      },
+      "networkingRssMb": {
+        "first": 37.25,
+        "last": 55.39,
+        "min": 37.25,
+        "max": 55.39,
+        "mean": 52.3577,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 2.9032
+      },
+      "networkingFootprintMb": {
+        "first": 14.5,
+        "last": 22.2,
+        "min": 14.5,
+        "max": 24.2,
+        "mean": 21.5154,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 1.0121
+      },
+      "gpuRssMb": {
+        "first": 45.89,
+        "last": 46.52,
+        "min": 45.44,
+        "max": 46.59,
+        "mean": 46.0996,
+        "sampleCount": 26,
+        "slopeMbPerMinute": 0.2194
+      }
+    },
+    "idleMemory": {
+      "count": 9,
+      "rustFootprintMb": {
+        "first": 50.0,
+        "last": 49.9,
+        "min": 49.9,
+        "max": 50.0,
+        "mean": 49.9111,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0396
+      },
+      "webContentRssMb": {
+        "first": 537.53,
+        "last": 537.31,
+        "min": 537.28,
+        "max": 537.53,
+        "mean": 537.3389,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0822
+      },
+      "webContentFootprintMb": {
+        "first": 159.3,
+        "last": 159.1,
+        "min": 158.9,
+        "max": 159.3,
+        "mean": 159.0889,
+        "sampleCount": 9,
+        "slopeMbPerMinute": 0.01
+      },
+      "webContentMallocAllocatedMb": {
+        "first": 109.5,
+        "last": 108.6,
+        "min": 108.3,
+        "max": 109.5,
+        "mean": 108.5778,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.307
+      },
+      "networkingRssMb": {
+        "first": 55.39,
+        "last": 55.38,
+        "min": 55.38,
+        "max": 55.39,
+        "mean": 55.3811,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.004
+      },
+      "networkingFootprintMb": {
+        "first": 22.2,
+        "last": 22.2,
+        "min": 22.2,
+        "max": 22.2,
+        "mean": 22.2,
+        "sampleCount": 9,
+        "slopeMbPerMinute": 0.0
+      },
+      "gpuRssMb": {
+        "first": 44.11,
+        "last": 44.0,
+        "min": 44.0,
+        "max": 44.11,
+        "mean": 44.0122,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0436
+      }
+    },
+    "idleMemoryTimeSeries": [
+      {
+        "rustFootprintMb": 50.0,
+        "webContentRssMb": 537.53,
+        "webContentFootprintMb": 159.3,
+        "webContentMallocAllocatedMb": 109.5,
+        "networkingRssMb": 55.39,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.11,
+        "timestamp": "2026-10-21T17:47:19.766724+08:00",
+        "samplingStartedAt": "2026-10-21T17:47:17.150063+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.28,
+        "webContentFootprintMb": 158.9,
+        "webContentMallocAllocatedMb": 108.4,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:47:29.875028+08:00",
+        "samplingStartedAt": "2026-10-21T17:47:27.238555+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.28,
+        "webContentFootprintMb": 158.9,
+        "webContentMallocAllocatedMb": 108.5,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:47:39.931531+08:00",
+        "samplingStartedAt": "2026-10-21T17:47:37.322565+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.41,
+        "webContentFootprintMb": 159.2,
+        "webContentMallocAllocatedMb": 108.3,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:47:50.067049+08:00",
+        "samplingStartedAt": "2026-10-21T17:47:47.372035+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.31,
+        "webContentFootprintMb": 159.1,
+        "webContentMallocAllocatedMb": 108.4,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:48:00.168049+08:00",
+        "samplingStartedAt": "2026-10-21T17:47:57.542623+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.31,
+        "webContentFootprintMb": 159.1,
+        "webContentMallocAllocatedMb": 108.5,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:48:10.377517+08:00",
+        "samplingStartedAt": "2026-10-21T17:48:07.580020+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.31,
+        "webContentFootprintMb": 159.1,
+        "webContentMallocAllocatedMb": 108.5,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:48:20.275771+08:00",
+        "samplingStartedAt": "2026-10-21T17:48:17.647689+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.31,
+        "webContentFootprintMb": 159.1,
+        "webContentMallocAllocatedMb": 108.5,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:48:30.421578+08:00",
+        "samplingStartedAt": "2026-10-21T17:48:27.775997+08:00"
+      },
+      {
+        "rustFootprintMb": 49.9,
+        "webContentRssMb": 537.31,
+        "webContentFootprintMb": 159.1,
+        "webContentMallocAllocatedMb": 108.6,
+        "networkingRssMb": 55.38,
+        "networkingFootprintMb": 22.2,
+        "gpuRssMb": 44.0,
+        "timestamp": "2026-10-21T17:48:40.577818+08:00",
+        "samplingStartedAt": "2026-10-21T17:48:37.896546+08:00"
+      }
+    ],
+    "idleProbeSamples": [
+      {
+        "elapsedSec": 10.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48598,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48598,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418097
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 20.002,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48599,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48599,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418100
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 30.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48600,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48600,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418103
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 40.005,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48601,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48601,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418105
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 50.005,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48602,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48602,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418107
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 60.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48603,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48603,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418112
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 70.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48604,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48604,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418114
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 80.004,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48605,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48605,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418116
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 90.005,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 48606,
+          "maxActive": 17,
+          "maxHeaderLatencyMs": 815,
+          "started": 48606,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 418118
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      }
+    ],
+    "phaseSamples": 6,
+    "validPhaseSamples": 5,
+    "invalidPhaseErrors": [
+      [
+        "checkpoint END 已出现",
+        "checkpoint 已结束或出现新 BEGIN",
+        "采样墙钟区间不在前端 checkpoint 起止区间内"
+      ]
+    ],
+    "visibility": {
+      "devicePixelRatio": 2,
+      "focused": false,
+      "hidden": false,
+      "hiddenTransitions": 0,
+      "maxFrameGapMs": 831,
+      "rafPerSecond": 61,
+      "state": "visible",
+      "viewportHeight": 800,
+      "viewportWidth": 1280
+    },
+    "operationLogBytes": 3247209,
+    "acceptance": "diagnostic only; neither memory-leak proof nor baseline acceptance"
+  },
+  {
+    "path": "/tmp/revia-ipc-minimal-01-20261021.json",
+    "runCompleted": true,
+    "errors": [],
+    "binarySha256": "ce01397a75ecd615254b3271ade6e9169d3b0ea4123cbbf2e7f182cc58b6a2df",
+    "diagnostic": {
+      "loggingMode": "minimal",
+      "idleSeconds": 90,
+      "cycles": 120
+    },
+    "startedAt": "2026-10-21T17:48:58.478000+08:00",
+    "endedAt": "2026-10-21T17:57:32.840137+08:00",
+    "reviaPid": 19326,
+    "servicePids": {
+      "webContentPids": [
+        19329
+      ],
+      "networkingPids": [
+        19330
+      ],
+      "gpuPids": [
+        19328
+      ]
+    },
+    "activeSeconds": 376.873,
+    "operationsWallSeconds": 401.76,
+    "checkpointPauseSeconds": 24.887,
+    "idleSeconds": 90.007,
+    "counts": {
+      "totalCycles": 120,
+      "totalFileSwitches": 840,
+      "totalViewSwitches": 1440,
+      "totalScrolls": 3960,
+      "totalJumps": 720
+    },
+    "ipcAfterOperations": {
+      "commandOverflowRequests": 0,
+      "commands": {
+        "debug_log": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 50,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 386,
+          "started": 50,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 3229
+        },
+        "get_rows": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 17721,
+          "maxActive": 5,
+          "maxHeaderLatencyMs": 777,
+          "started": 17721,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 89466
+        },
+        "highlight_range": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1301,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 808,
+          "started": 1301,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 15239
+        },
+        "row_index_for_line": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1440,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 716,
+          "started": 1440,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 15695
+        }
+      },
+      "completionBoundary": "response headers, not body/callback completion",
+      "namedCommandLimit": 32,
+      "stringIpcUrlsOnly": true,
+      "total": {
+        "active": 0,
+        "failed": 0,
+        "headersSettled": 20512,
+        "maxActive": 6,
+        "maxHeaderLatencyMs": 808,
+        "started": 20512,
+        "synchronousThrows": 0,
+        "totalHeaderLatencyMs": 123629
+      }
+    },
+    "ipcFinal": {
+      "commandOverflowRequests": 0,
+      "commands": {
+        "debug_log": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 62,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 386,
+          "started": 62,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 3261
+        },
+        "get_rows": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 17721,
+          "maxActive": 5,
+          "maxHeaderLatencyMs": 777,
+          "started": 17721,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 89466
+        },
+        "highlight_range": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1301,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 808,
+          "started": 1301,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 15239
+        },
+        "row_index_for_line": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 1440,
+          "maxActive": 1,
+          "maxHeaderLatencyMs": 716,
+          "started": 1440,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 15695
+        }
+      },
+      "completionBoundary": "response headers, not body/callback completion",
+      "namedCommandLimit": 32,
+      "stringIpcUrlsOnly": true,
+      "total": {
+        "active": 0,
+        "failed": 0,
+        "headersSettled": 20524,
+        "maxActive": 6,
+        "maxHeaderLatencyMs": 808,
+        "started": 20524,
+        "synchronousThrows": 0,
+        "totalHeaderLatencyMs": 123661
+      }
+    },
+    "observations": 62,
+    "initialCallbacks": {
+      "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+      "available": true,
+      "baselineOverflow": 0,
+      "baselineRegistrySize": 4,
+      "baselineStillRegistered": 4,
+      "baselineStillRegisteredIsLowerBound": false,
+      "baselineTrackedIds": 4,
+      "countsAreNotRequestCounts": true,
+      "idLimit": 512,
+      "newIdCount": 0,
+      "nonBaselineRegistryCount": 0,
+      "observationOverflow": 0,
+      "oldestObservedAgeMs": 0,
+      "registrySize": 4,
+      "trackedObservedIds": 0
+    },
+    "callbackMin": 4,
+    "callbackMax": 4,
+    "finalCallbacks": {
+      "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+      "available": true,
+      "baselineOverflow": 0,
+      "baselineRegistrySize": 4,
+      "baselineStillRegistered": 4,
+      "baselineStillRegisteredIsLowerBound": false,
+      "baselineTrackedIds": 4,
+      "countsAreNotRequestCounts": true,
+      "idLimit": 512,
+      "newIdCount": 0,
+      "nonBaselineRegistryCount": 0,
+      "observationOverflow": 0,
+      "oldestObservedAgeMs": 0,
+      "registrySize": 4,
+      "trackedObservedIds": 0
+    },
+    "maxObservedCallbackAgeMs": 0,
+    "maxObservedNewIdCount": 0,
+    "observationErrors": 0,
+    "activeMemory": {
+      "count": 40,
+      "rustFootprintMb": {
+        "first": 48.5,
+        "last": 51.3,
+        "min": 48.5,
+        "max": 63.6,
+        "mean": 55.2025,
+        "sampleCount": 40,
+        "slopeMbPerMinute": -1.9364
+      },
+      "webContentRssMb": {
+        "first": 177.8,
+        "last": 362.75,
+        "min": 177.8,
+        "max": 362.75,
+        "mean": 270.4558,
+        "sampleCount": 40,
+        "slopeMbPerMinute": 25.0988
+      },
+      "webContentFootprintMb": {
+        "first": 147.4,
+        "last": 193.6,
+        "min": 98.7,
+        "max": 222.8,
+        "mean": 153.375,
+        "sampleCount": 40,
+        "slopeMbPerMinute": 13.7729
+      },
+      "webContentMallocAllocatedMb": {
+        "first": 70.4,
+        "last": 147.1,
+        "min": 64.7,
+        "max": 156.7,
+        "mean": 107.2825,
+        "sampleCount": 40,
+        "slopeMbPerMinute": 8.1451
+      },
+      "networkingRssMb": {
+        "first": 12.22,
+        "last": 37.39,
+        "min": 12.22,
+        "max": 37.39,
+        "mean": 19.2057,
+        "sampleCount": 40,
+        "slopeMbPerMinute": 3.8251
+      },
+      "networkingFootprintMb": {
+        "first": 5.75,
+        "last": 14.1,
+        "min": 5.71875,
+        "max": 14.1,
+        "mean": 8.4512,
+        "sampleCount": 40,
+        "slopeMbPerMinute": 1.3469
+      },
+      "gpuRssMb": {
+        "first": 41.69,
+        "last": 45.45,
+        "min": 41.69,
+        "max": 46.06,
+        "mean": 45.604,
+        "sampleCount": 40,
+        "slopeMbPerMinute": 0.1522
+      }
+    },
+    "post180sActiveMemory": {
+      "count": 22,
+      "rustFootprintMb": {
+        "first": 54.6,
+        "last": 51.3,
+        "min": 50.2,
+        "max": 54.6,
+        "mean": 51.9455,
+        "sampleCount": 22,
+        "slopeMbPerMinute": -0.8081
+      },
+      "webContentRssMb": {
+        "first": 249.95,
+        "last": 362.75,
+        "min": 249.95,
+        "max": 362.75,
+        "mean": 306.8818,
+        "sampleCount": 22,
+        "slopeMbPerMinute": 34.9688
+      },
+      "webContentFootprintMb": {
+        "first": 132.8,
+        "last": 193.6,
+        "min": 98.7,
+        "max": 222.8,
+        "mean": 175.6227,
+        "sampleCount": 22,
+        "slopeMbPerMinute": 19.1841
+      },
+      "webContentMallocAllocatedMb": {
+        "first": 86.6,
+        "last": 147.1,
+        "min": 86.6,
+        "max": 156.7,
+        "mean": 118.9727,
+        "sampleCount": 22,
+        "slopeMbPerMinute": 9.902
+      },
+      "networkingRssMb": {
+        "first": 13.2,
+        "last": 37.39,
+        "min": 13.2,
+        "max": 37.39,
+        "mean": 24.6127,
+        "sampleCount": 22,
+        "slopeMbPerMinute": 6.9816
+      },
+      "networkingFootprintMb": {
+        "first": 6.359375,
+        "last": 14.1,
+        "min": 6.359375,
+        "max": 14.1,
+        "mean": 10.4632,
+        "sampleCount": 22,
+        "slopeMbPerMinute": 2.0853
+      },
+      "gpuRssMb": {
+        "first": 45.86,
+        "last": 45.45,
+        "min": 45.09,
+        "max": 46.06,
+        "mean": 45.8086,
+        "sampleCount": 22,
+        "slopeMbPerMinute": 0.0373
+      }
+    },
+    "idleMemory": {
+      "count": 9,
+      "rustFootprintMb": {
+        "first": 51.3,
+        "last": 51.3,
+        "min": 51.3,
+        "max": 51.3,
+        "mean": 51.3,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0
+      },
+      "webContentRssMb": {
+        "first": 362.77,
+        "last": 362.62,
+        "min": 362.52,
+        "max": 362.77,
+        "mean": 362.5733,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0731
+      },
+      "webContentFootprintMb": {
+        "first": 146.1,
+        "last": 146.1,
+        "min": 145.7,
+        "max": 146.1,
+        "mean": 145.9222,
+        "sampleCount": 9,
+        "slopeMbPerMinute": 0.0986
+      },
+      "webContentMallocAllocatedMb": {
+        "first": 133.7,
+        "last": 132.7,
+        "min": 132.5,
+        "max": 133.7,
+        "mean": 132.8,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.2962
+      },
+      "networkingRssMb": {
+        "first": 37.38,
+        "last": 37.36,
+        "min": 37.36,
+        "max": 37.38,
+        "mean": 37.3622,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0079
+      },
+      "networkingFootprintMb": {
+        "first": 14.1,
+        "last": 14.0,
+        "min": 14.0,
+        "max": 14.1,
+        "mean": 14.0111,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.0395
+      },
+      "gpuRssMb": {
+        "first": 45.11,
+        "last": 43.3,
+        "min": 43.3,
+        "max": 45.11,
+        "mean": 43.5011,
+        "sampleCount": 9,
+        "slopeMbPerMinute": -0.7147
+      }
+    },
+    "idleMemoryTimeSeries": [
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.77,
+        "webContentFootprintMb": 146.1,
+        "webContentMallocAllocatedMb": 133.7,
+        "networkingRssMb": 37.38,
+        "networkingFootprintMb": 14.1,
+        "gpuRssMb": 45.11,
+        "timestamp": "2026-10-21T17:56:10.338590+08:00",
+        "samplingStartedAt": "2026-10-21T17:56:07.708759+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.52,
+        "webContentFootprintMb": 145.7,
+        "webContentMallocAllocatedMb": 132.7,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:56:20.480846+08:00",
+        "samplingStartedAt": "2026-10-21T17:56:17.881622+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.62,
+        "webContentFootprintMb": 145.9,
+        "webContentMallocAllocatedMb": 132.5,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:56:30.629555+08:00",
+        "samplingStartedAt": "2026-10-21T17:56:28.028483+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.52,
+        "webContentFootprintMb": 145.8,
+        "webContentMallocAllocatedMb": 132.6,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:56:40.767166+08:00",
+        "samplingStartedAt": "2026-10-21T17:56:38.169193+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.52,
+        "webContentFootprintMb": 145.9,
+        "webContentMallocAllocatedMb": 132.7,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:56:50.908952+08:00",
+        "samplingStartedAt": "2026-10-21T17:56:48.319335+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.53,
+        "webContentFootprintMb": 145.9,
+        "webContentMallocAllocatedMb": 132.7,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:57:01.039689+08:00",
+        "samplingStartedAt": "2026-10-21T17:56:58.458748+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.53,
+        "webContentFootprintMb": 145.9,
+        "webContentMallocAllocatedMb": 132.8,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:57:11.168319+08:00",
+        "samplingStartedAt": "2026-10-21T17:57:08.594784+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.53,
+        "webContentFootprintMb": 146.0,
+        "webContentMallocAllocatedMb": 132.8,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:57:21.291914+08:00",
+        "samplingStartedAt": "2026-10-21T17:57:18.712614+08:00"
+      },
+      {
+        "rustFootprintMb": 51.3,
+        "webContentRssMb": 362.62,
+        "webContentFootprintMb": 146.1,
+        "webContentMallocAllocatedMb": 132.7,
+        "networkingRssMb": 37.36,
+        "networkingFootprintMb": 14.0,
+        "gpuRssMb": 43.3,
+        "timestamp": "2026-10-21T17:57:31.402689+08:00",
+        "samplingStartedAt": "2026-10-21T17:57:28.834999+08:00"
+      }
+    ],
+    "idleProbeSamples": [
+      {
+        "elapsedSec": 10.001,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20513,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20513,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123631
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 20.001,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20514,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20514,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123633
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 30.001,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20515,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20515,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123635
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 40.002,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20516,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20516,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123637
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 50.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20517,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20517,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123640
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 60.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20518,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20518,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123643
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 70.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20519,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20519,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123647
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 80.003,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20520,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20520,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123651
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      },
+      {
+        "elapsedSec": 90.002,
+        "callbacks": {
+          "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+          "available": true,
+          "baselineOverflow": 0,
+          "baselineRegistrySize": 4,
+          "baselineStillRegistered": 4,
+          "baselineStillRegisteredIsLowerBound": false,
+          "baselineTrackedIds": 4,
+          "countsAreNotRequestCounts": true,
+          "idLimit": 512,
+          "newIdCount": 0,
+          "nonBaselineRegistryCount": 0,
+          "observationOverflow": 0,
+          "oldestObservedAgeMs": 0,
+          "registrySize": 4,
+          "trackedObservedIds": 0
+        },
+        "fetch": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 20521,
+          "maxActive": 6,
+          "maxHeaderLatencyMs": 808,
+          "started": 20521,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 123654
+        },
+        "dom": {
+          "diffRows": 2,
+          "elements": 105
+        },
+        "resourceTimingEntries": 0
+      }
+    ],
+    "phaseSamples": 6,
+    "validPhaseSamples": 5,
+    "invalidPhaseErrors": [
+      [
+        "checkpoint END 已出现",
+        "checkpoint 已结束或出现新 BEGIN",
+        "采样墙钟区间不在前端 checkpoint 起止区间内"
+      ]
+    ],
+    "visibility": {
+      "devicePixelRatio": 2,
+      "focused": true,
+      "hidden": false,
+      "hiddenTransitions": 0,
+      "maxFrameGapMs": 831,
+      "rafPerSecond": 59.94005994005994,
+      "state": "visible",
+      "viewportHeight": 800,
+      "viewportWidth": 1280
+    },
+    "operationLogBytes": 92875,
+    "acceptance": "diagnostic only; neither memory-leak proof nor baseline acceptance"
+  }
+]

@@ -40,7 +40,7 @@ caffeinate -di python3 tools/bench-long-running.py \
 
 ## 性能回归
 
-M1 的首屏、跳转、滚动指标保留原计时边界，自动测量先等待可见窗口。`ok: true` 只表示测量流程完成，不自动表示 D06 达标。可使用 `REVIA_MEASURE_DATA_DIR` 隔离其设置：
+M1 的首屏、跳转、滚动指标保留原计时边界，自动测量先等待可见窗口。`ok: true` 只表示测量流程完成，不自动表示 D06 达标。自动测量可使用 `REVIA_MEASURE_DATA_DIR` 隔离其设置：
 
 ```bash
 REVIA_MEASURE=1 REVIA_MEASURE_ONLY=split \
@@ -51,15 +51,19 @@ REVIA_MEASURE_LOG=/tmp/revia-perf-split-new.json \
 src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia
 ```
 
-每个视图独立进程，启动后置前窗口；统一视图用 `REVIA_MEASURE_ONLY=unified`。前端结束报告的 `ok` 和可见性必须有效，再检查首屏、跳转、颜色恢复与未覆盖帧，不接受隐藏窗口的计时数据。
+每个视图独立进程，启动后置前窗口；统一视图用 `REVIA_MEASURE_ONLY=unified`。前端结束报告的 `ok` 和可见性必须有效，再检查首屏、跳转、颜色恢复与未覆盖帧，不接受隐藏窗口的计时数据。失败尝试的 JSON 和日志原样保留，补测使用新输出名，不覆盖无效样本。
+
+`REVIA_MEASURE_DATA_DIR` 仅在自动测量、长测或 `REVIA_SMOKE` 模式生效。只设置该变量和日志路径再普通启动，仍使用正常应用数据目录，不能称为隔离运行；核对启动日志的实际 `data_dir`。普通桌面核验只浏览已有 fixture，不执行 Git 写入。
 
 ## 工具回归检查
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 tools/test_bench_long_running.py
+node tools/test-ipc-diagnostics.mjs
+node tools/test-visible-highlight-lines.mjs
 ```
 
-15 项标准库测试覆盖无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。不引入新的测试框架。
+17 项 Python 标准库测试覆盖无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。不引入新的测试框架。另有 11 项 Node 原生 IPC 诊断回归和 13 项可见高亮行回归，后者覆盖两视图、旧/新行号偏移、离散 hunk、纯增删及半开可见窗口。
 
 ## 跳转与颜色诊断的口径
 
@@ -68,6 +72,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 tools/test_bench_long_running.py
 - 原 `colorRestoreMs` 实际只记录 compact 退出；不证明旧、新双侧颜色都已缓存或显示。
 - 原测量和滚动全部结束后才执行独立 `jumpDom` 诊断。准备阶段显式补齐源位置的旧、新高亮缓存，再正常滚动离开、返回，核对行号、文字和 token DOM。准备失败保留 `preparationError`，不生成颜色恢复耗时；异常保留 `jumpDomError`，不抹掉先前样本。
 - `textDomMs`、`colorDomMs` 和 `immediateDomMs` 都包含探针开销，表示从跳转开始到语义 DOM 核对完成的上界，不是屏幕上屏时间。`immediateDomMs` 包含 `scrollCallMs`。真实桌面检查仍不可省略。
+- 同次跳转前登记 MutationObserver 与首个 rAF，实际滚动后核验目标完整文字、行位置、画布几何和占位底图。`firstFrame.checkedMs` 与 `frameReady` 表示正常首渲染机会前 DOM 就绪，不是 GPU 扫描时间；它和原 appear/warm 来自不同目标的操作，不能倒填替换旧值。保留所有超帧、失败及占位观察；0ms 只代表毫秒计时精度。
+- 首帧先有底图或已到齐的文字均如实记录；同步观察到占位不表示它已显示过一帧。缓存返回颜色的预热测试不能替代首次打开静置自动补色，需在普通桌面分别核对两视图。
 - 滚动报告区分完成屏数、`rafFrames` 和 `fallbackFrames`。检查完整 60 屏及无定时器兜底；`uncoveredFrames` 只说明行数据覆盖，不能独自证明最终画面不露白。
 
 真正未缓存的跳转使用另一个临时仓库，保留普通 fixture 用于同负载首屏与热跳对照：
@@ -99,7 +105,7 @@ caffeinate -di python3 tools/bench-long-running.py --seconds 900 \
 
 - `minimal` 只关闭前端逐步骤日志 IPC 与 Rust 逐请求落盘；关键心跳、检查点、静置与最终报告照常保留。日志面板与布局保持一致。它比较的是整组日志行为，不能单独区分 IPC 开销和磁盘 I/O。
 - 最后固定在已暂存 `src/staged.ts`、并排视图、顶部静置 90 秒；静置与准备时间不计主动操作。无清缓存、无强制 GC，持续监视可见性。
-- 仅显式诊断模式包装 `fetch`；返回原 Promise/Response，不读取 body。`active` 只到响应头，不能表示 Tauri body 解析或 callback 已完成；同时只读真实 callback Map，包含持久事件回调，不能用其大小直接换算请求数。基线/观测 ID 集合各上限 512，溢出会显示；年龄是连续观测下界。
+- 仅显式 IPC 短诊断或 `--baseline-minimal-logging` 正式基线包装 `fetch`；普通启动不启用。返回原 Promise/Response，不读取 body。`active` 只到响应头，不能表示 Tauri body 解析或 callback 已完成；同时只读真实 callback Map，包含持久事件回调，不能用其大小直接换算请求数。基线/观测 ID 集合各上限 512，溢出会显示；年龄是连续观测下界。
 - 心跳与固定阶段记录 IPC 分类计数、callback 状态、DOM/行数、Resource Timing 数。静置中继续采样。自定义协议失败可能使 Tauri 回退到 postMessage，因此 `failed` 必须一起检查。
 - 诊断每个常规样本都采 Rust/WebContent/Networking footprint，WebContent 同次 `vmmap` 还解析 malloc allocated；采样比普通长测更密，会影响负载，两组使用相同配置。保留 RSS、footprint、allocated 三种口径及采样起止，不混为 JS heap。
 - 驱动标记 `ipc_memory_diagnostic`，没有长期运行通过结论，且不把静置混入原来的热身后趋势统计。完整循环或静置未完成、前后端配置不一致、缺 IPC 报告均失败。固定负载完成后仍须单独完成 30 分钟验收。
