@@ -102,6 +102,7 @@ export const ipc = {
       targetPath: string | null;
       smoke: boolean;
       soakSeconds: number | null;
+      minimalSoakLogging: boolean;
       soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null } | null;
     }>("measure_config"),
   writeMeasurement: (payload: unknown) => invoke<string | null>("write_measurement", { payload }),

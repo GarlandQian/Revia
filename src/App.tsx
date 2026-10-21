@@ -48,6 +48,7 @@ interface MeasureConfig {
   repoPath: string | null;
   targetPath: string | null;
   soakSeconds: number | null;
+  minimalSoakLogging: boolean;
   soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null } | null;
 }
 
@@ -291,7 +292,7 @@ export function App() {
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
-        setLoggingEnabled(config.logging && config.soakDiagnostic?.loggingMode !== "minimal");
+        setLoggingEnabled(config.logging && !config.minimalSoakLogging);
         if (!config.logging) {
           setPanelOpen(false);
         }
@@ -780,7 +781,8 @@ export function App() {
       const invokedAt = performance.now();
       const diagnostic = config.soakDiagnostic;
       const report: Record<string, unknown> = { targetDurationSeconds: soakSeconds,
-        diagnostic, acceptance: diagnostic ? "diagnostic only; not baseline acceptance" : "pending review" };
+        diagnostic, minimalSoakLogging: config.minimalSoakLogging,
+        acceptance: diagnostic ? "diagnostic only; not baseline acceptance" : "pending review" };
       const monitor = monitorSoakVisibility();
       let diagnostics: ReturnType<typeof startIpcDiagnostics> | null = null;
       const samples: Array<{
@@ -831,7 +833,7 @@ export function App() {
         if (!ready) throw new Error("120 秒内未获得可见合成窗口");
         monitor.reset();
         setStatus("长测进行中，请保持窗口可见");
-        if (diagnostic) {
+        if (diagnostic || config.minimalSoakLogging) {
           diagnostics = startIpcDiagnostics();
           report.ipcInitial = diagnostics.snapshot();
         }

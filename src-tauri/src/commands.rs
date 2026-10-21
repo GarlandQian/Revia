@@ -177,7 +177,7 @@ pub fn log_measure(message: &str) {
     let Some(path) = std::env::var("REVIA_MEASURE_LOG").ok().map(std::path::PathBuf::from) else {
         return;
     };
-    if is_soak_run() && std::env::var("REVIA_SOAK_DIAG_LOGS").as_deref() == Ok("minimal") {
+    if minimal_soak_logging() {
         return;
     }
     let log = path.with_extension("log");
@@ -292,6 +292,7 @@ pub struct MeasureConfig {
     /// 长期运行长测时长（秒）。设置了时长即进入连续循环长测模式（Q53、Q78）。
     pub soak_seconds: Option<u64>,
     pub soak_diagnostic: Option<SoakDiagnosticConfig>,
+    pub minimal_soak_logging: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -336,6 +337,11 @@ fn is_soak_run() -> bool {
     soak_seconds().is_some()
 }
 
+fn minimal_soak_logging() -> bool {
+    is_soak_run() && (std::env::var("REVIA_SOAK_MINIMAL_LOGGING").as_deref() == Ok("1")
+        || std::env::var("REVIA_SOAK_DIAG_LOGS").as_deref() == Ok("minimal"))
+}
+
 #[tauri::command]
 pub async fn measure_config() -> Result<MeasureConfig> {
     Ok(MeasureConfig {
@@ -354,6 +360,7 @@ pub async fn measure_config() -> Result<MeasureConfig> {
         smoke: std::env::var("REVIA_SMOKE").is_ok(),
         soak_seconds: soak_seconds(),
         soak_diagnostic: soak_diagnostic(),
+        minimal_soak_logging: minimal_soak_logging(),
     })
 }
 

@@ -73,6 +73,17 @@ class BenchmarkSafetyTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertTrue(bench.completion_errors({**frontend, key: value}, samples, 900, 0, config))
 
+    def test_minimal_logging_baseline_still_requires_full_duration_and_mode_match(self):
+        frontend = {"ok": True, "actualDurationSeconds": 1800, "diagnostic": None,
+                    "minimalSoakLogging": True, "ipcFinal": {},
+                    "totalFileSwitches": 7, "totalViewSwitches": 12,
+                    "totalScrolls": 33, "totalJumps": 6}
+        samples = [{"webContentPids": [45]}]
+        self.assertEqual(bench.completion_errors(frontend, samples, 1800, 0, None, True), [])
+        for key, value in (("actualDurationSeconds", 1799), ("minimalSoakLogging", False), ("ipcFinal", None)):
+            with self.subTest(key=key):
+                self.assertTrue(bench.completion_errors({**frontend, key: value}, samples, 1800, 0, None, True))
+
     def test_rebuilt_or_removed_binary_invalidates_run(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "revia"

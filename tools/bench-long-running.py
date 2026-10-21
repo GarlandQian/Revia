@@ -276,10 +276,14 @@ def analyze_memory(samples, start, warmup=180):
     return result
 
 
-def completion_errors(frontend, samples, seconds, returncode, diagnostic=None):
+def completion_errors(frontend, samples, seconds, returncode, diagnostic=None, minimal_logging=None):
     errors = []
     if returncode != 0 or frontend.get("ok") is not True:
         errors.append("应用未成功完成：" + str(frontend.get("error", returncode)))
+    if minimal_logging is not None and frontend.get("minimalSoakLogging") is not minimal_logging:
+        errors.append("前端日志模式不匹配")
+    if minimal_logging and not isinstance(frontend.get("ipcFinal"), dict):
+        errors.append("最小日志基线缺少 IPC 观察证据")
     if diagnostic is None and frontend.get("diagnostic") is not None:
         errors.append("诊断结果不能作为长期运行基线")
     if diagnostic is None or diagnostic.get("cycles") is None:
@@ -323,6 +327,8 @@ def main():
     parser.add_argument("--repo", default="/tmp/revia-m1-fixtures/diffs")
     parser.add_argument("--output", default=f"/tmp/revia-soak-{datetime.datetime.now():%Y%m%d-%H%M%S}.json")
     parser.add_argument("--interval", type=int, default=10)
+    parser.add_argument("--baseline-minimal-logging", action="store_true",
+                        help="正式持续时长基线只保留关键日志，同时观察 IPC；不启用固定循环或静置")
     parser.add_argument("--diagnostic-logging", choices=("verbose", "minimal"),
                         help="显式启用 IPC/内存短诊断；结果不算长期运行验收")
     parser.add_argument("--idle-seconds", type=int, default=90)
@@ -332,6 +338,9 @@ def main():
     seconds = args.seconds if args.seconds is not None else args.minutes * 60
     diagnostic = ({"loggingMode": args.diagnostic_logging, "idleSeconds": args.idle_seconds,
                    "cycles": args.diagnostic_cycles} if args.diagnostic_logging else None)
+    if args.baseline_minimal_logging and diagnostic:
+        parser.error("正式基线和短诊断模式不能同时选择")
+    minimal_logging = args.baseline_minimal_logging or args.diagnostic_logging == "minimal"
     if args.idle_seconds < 0 or (args.diagnostic_cycles is not None and args.diagnostic_cycles <= 0):
         parser.error("静置时长不能为负，固定循环数必须为正")
     if not diagnostic and (args.diagnostic_cycles is not None or args.idle_seconds != 90):
@@ -351,6 +360,8 @@ def main():
     data_dir = tempfile.mkdtemp(prefix="revia-soak-data-")
     env.update(REVIA_SOAK_SECONDS=str(seconds), REVIA_MEASURE_DATA_DIR=data_dir,
                REVIA_MEASURE_REPO=str(repo), REVIA_MEASURE_LOG=str(frontend_path))
+    if args.baseline_minimal_logging:
+        env["REVIA_SOAK_MINIMAL_LOGGING"] = "1"
     if diagnostic:
         env.update(REVIA_SOAK_DIAG_LOGS=diagnostic["loggingMode"], REVIA_SOAK_IDLE_SECONDS=str(args.idle_seconds))
         if args.diagnostic_cycles is not None:
@@ -434,14 +445,14 @@ def main():
     finalize_phase_samples(phase_samples, checkpoints, frontend)
     # The live journal is explicitly provisional; publish the same final validity as the report.
     phase_samples_path.write_text("".join(json.dumps(sample) + "\n" for sample in phase_samples))
-    errors.extend(completion_errors(frontend, samples, seconds, proc.returncode, diagnostic))
+    errors.extend(completion_errors(frontend, samples, seconds, proc.returncode, diagnostic, minimal_logging))
     if not binary_unchanged(binary, binary_sha256):
         errors.append("受测二进制在运行期间被替换或移除，构建证据无效")
     report = {
         "test": "ipc_memory_diagnostic" if diagnostic else "long_running_baseline", "runCompleted": not errors,
         "acceptance": ("diagnostic only; not baseline acceptance" if diagnostic
                        else "pending desktop evidence, performance regression and memory trend review"),
-        "diagnostic": diagnostic,
+        "diagnostic": diagnostic, "minimalSoakLogging": minimal_logging,
         "startedAt": started_at, "endedAt": datetime.datetime.now().astimezone().isoformat(),
         "targetDurationSeconds": seconds, "actualDurationSeconds": round(time.monotonic() - started, 2),
         "reviaPid": proc.pid, "webkitAttribution": "launchctl print pid/<exact child PID>: services table",

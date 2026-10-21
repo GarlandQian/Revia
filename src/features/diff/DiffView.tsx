@@ -10,7 +10,7 @@
  * `.diff-canvas` 底图里“加载中的行”。
  */
 
-import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { FileVersion } from "@/types/bindings/FileVersion";
@@ -83,6 +83,7 @@ export function DiffView(props: DiffViewProps) {
   const jumpRestoreTimer = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const version = useRowVersion(rows);
+  const highlightSnapshot = useSyncExternalStore(highlights.subscribe, highlights.getSnapshot);
 
   const rowCount = rows.rowCountValue;
   const contentHeight = rowCount * ROW_HEIGHT;
@@ -317,15 +318,21 @@ export function DiffView(props: DiffViewProps) {
     if (version === 0) {
       rows.logWindow?.();
     }
+    onSample?.({ from: visibleFrom, to: visibleTo, uncovered: rows.uncovered(visibleFrom, visibleTo) });
+  }, [onSample, rows, scrollIdle, version, visibleFrom, visibleTo]);
+
+  useEffect(() => {
+    if (!scrollIdle || !highlightSnapshot.supported || highlightSnapshot.pending > 0
+      || !rows.isCovered(visibleFrom, visibleTo)) return;
     // 高亮等可见行文本就绪之后再请求，且滚动期间不请求：两者共用同一条 IPC 与 JS 主线程，
     // 首屏和滚动时优先保证文本（ADR-0006：先纯文本、再异步着色）。滚动停下后再补齐颜色。
+    // 请求结束的快照会再次触发 effect，继续补齐被单请求背压跳过的块和旧版本。
     const range = lineRange(rows, visibleFrom, visibleTo);
-    if (range && scrollIdle && rows.isCovered(visibleFrom, visibleTo)) {
+    if (range) {
       highlights.ensure("new", range.from, range.to);
       highlights.ensure("old", range.from, range.to);
     }
-    onSample?.({ from: visibleFrom, to: visibleTo, uncovered: rows.uncovered(visibleFrom, visibleTo) });
-  }, [highlights, onSample, rows, scrollIdle, version, visibleFrom, visibleTo]);
+  }, [highlights, highlightSnapshot, rows, scrollIdle, version, visibleFrom, visibleTo]);
 
   useImperativeHandle(
     handleRef,
@@ -395,6 +402,7 @@ export function DiffView(props: DiffViewProps) {
               top={index * ROW_HEIGHT}
               view={view}
               highlights={highlights}
+              highlightVersion={compact ? 0 : highlightSnapshot.version}
               plainTextOnly={compact}
             />
           ) : null;
@@ -453,6 +461,8 @@ const RowView = memo(function RowView({
   top: number;
   view: ViewMode;
   highlights: HighlightStore;
+  /** 缓存对象保持不变时，让 memo 行在 token 到达后仍能补绘。 */
+  highlightVersion: number;
   plainTextOnly: boolean;
 }) {
   const style: React.CSSProperties = { top, contain: "strict" };

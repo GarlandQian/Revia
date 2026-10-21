@@ -103,3 +103,15 @@ caffeinate -di python3 tools/bench-long-running.py --seconds 900 \
 - 心跳与固定阶段记录 IPC 分类计数、callback 状态、DOM/行数、Resource Timing 数。静置中继续采样。自定义协议失败可能使 Tauri 回退到 postMessage，因此 `failed` 必须一起检查。
 - 诊断每个常规样本都采 Rust/WebContent/Networking footprint，WebContent 同次 `vmmap` 还解析 malloc allocated；采样比普通长测更密，会影响负载，两组使用相同配置。保留 RSS、footprint、allocated 三种口径及采样起止，不混为 JS heap。
 - 驱动标记 `ipc_memory_diagnostic`，没有长期运行通过结论，且不把静置混入原来的热身后趋势统计。完整循环或静置未完成、前后端配置不一致、缺 IPC 报告均失败。固定负载完成后仍须单独完成 30 分钟验收。
+
+
+### 使用关键日志复核正式基线
+
+固定循环对照发现详细日志会增加大量 IPC，但没有证明它是内存增长根因。需要正式复核时使用独立开关，不把短诊断报告改称通过：
+
+```bash
+caffeinate -di python3 tools/bench-long-running.py --minutes 30 \
+  --baseline-minimal-logging --output /tmp/revia-baseline-minimal-new.json
+```
+
+它仍运行同进程 30 分钟主动负载、既定检查点和 180 秒热身分界；不启用固定循环或结束静置。关键心跳、阶段边界、最终报告与只读 IPC 观察仍保存，逐步骤日志不发送，面板布局不变。驱动核对前端日志模式并要求完整时长与 IPC 报告；`runCompleted` 仍不表示内存趋势或 D06 已通过。
