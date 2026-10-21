@@ -1,0 +1,72 @@
+{
+  "combos": [
+    {
+      "firstScreen": {
+        "devicePixelRatio": 2,
+        "fileCount": 7,
+        "firstRowsMs": 40,
+        "fromListChangesMs": 88,
+        "fromOpenWorktreeMs": 282,
+        "listChangesMs": 47,
+        "rafPainted": true,
+        "renderMs": 40,
+        "rowCount": 13435,
+        "viewportHeight": 718
+      },
+      "highlight": {
+        "lastRoundTripMs": 52,
+        "loadedLines": 400,
+        "roundTrips": 400
+      },
+      "id": 1,
+      "jump": {
+        "appearMs": 17,
+        "colorRestoreMs": 27,
+        "fetchMs": 9,
+        "fromRow": 0,
+        "toRow": 8061,
+        "warmAppearMs": 7,
+        "warmWithinOneFrame": true,
+        "withinOneFrame": false
+      },
+      "label": "unified / src/generated.ts",
+      "path": "src/generated.ts",
+      "scroll": {
+        "droppedFrames": 0,
+        "frameMaxMs": 18,
+        "frameP50Ms": 17,
+        "frameP95Ms": 17,
+        "frames": 60,
+        "mode": "frame",
+        "screens": 60,
+        "scrollDistancePx": 43080,
+        "seconds": 0.989,
+        "uncoveredFrames": 0,
+        "uncoveredMax": 0,
+        "uncoveredP95": 0
+      },
+      "startedAt": "15:06:51.290",
+      "view": "unified",
+      "visibility": {
+        "devicePixelRatio": 2,
+        "hidden": false,
+        "rafPerSecond": 61,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    }
+  ],
+  "ok": true,
+  "visibility": {
+    "devicePixelRatio": 2,
+    "focused": true,
+    "hidden": false,
+    "hiddenTransitions": 0,
+    "maxFrameGapMs": 26,
+    "rafPerSecond": 59.94005994005994,
+    "state": "visible",
+    "viewportHeight": 800,
+    "viewportWidth": 1280
+  }
+}

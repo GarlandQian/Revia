@@ -1,0 +1,1448 @@
+{
+  "method": {
+    "unit": "MiB",
+    "warmupSeconds": 180,
+    "timeAxis": "wall seconds since driver elapsedSec minus frontend setupSeconds; not active time",
+    "phasePolicy": "all finalized valid checkpoints; invalid samples remain in source report",
+    "bins": "fixed [left,right) five-minute wall-clock buckets, including warmup and tail"
+  },
+  "runs": [
+    {
+      "source": "revia-m2-baseline-20261021.json",
+      "runCompleted": true,
+      "errors": [],
+      "startedAt": "2026-10-21T14:25:47.153602+08:00",
+      "endedAt": "2026-10-21T14:56:13.576617+08:00",
+      "activeSeconds": 1801.017,
+      "operationWallSeconds": null,
+      "checkpointPauseSeconds": null,
+      "reviaPid": 91139,
+      "visibility": {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": false,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 827,
+        "rafPerSecond": 59.82053838484546,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      "phaseSummary": null,
+      "regular": {
+        "rustRssMb": {
+          "sampleCount": 161,
+          "firstMiB": 141.91,
+          "lastMiB": 130.39,
+          "minMiB": 129.06,
+          "maxMiB": 142.94,
+          "slopeMiBPerMinute": -0.1797,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 141.507,
+              "minMiB": 139.44,
+              "maxMiB": 142.0
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 142.23,
+              "minMiB": 141.98,
+              "maxMiB": 142.66
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 142.699,
+              "minMiB": 141.48,
+              "maxMiB": 142.81
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 142.452,
+              "minMiB": 139.73,
+              "maxMiB": 142.8
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 142.737,
+              "minMiB": 141.5,
+              "maxMiB": 142.94
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 137.291,
+              "minMiB": 129.06,
+              "maxMiB": 142.86
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "rustFootprintMb": {
+          "sampleCount": 0
+        },
+        "webContentRssMb": {
+          "sampleCount": 161,
+          "firstMiB": 427.95,
+          "lastMiB": 435.16,
+          "minMiB": 419.69,
+          "maxMiB": 506.23,
+          "slopeMiBPerMinute": 0.3094,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 422.428,
+              "minMiB": 274.86,
+              "maxMiB": 478.84
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 484.779,
+              "minMiB": 478.94,
+              "maxMiB": 489.53
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 495.278,
+              "minMiB": 491.36,
+              "maxMiB": 497.98
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 499.833,
+              "minMiB": 498.48,
+              "maxMiB": 501.08
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 502.525,
+              "minMiB": 501.11,
+              "maxMiB": 504.2
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 473.874,
+              "minMiB": 419.69,
+              "maxMiB": 506.23
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "webContentFootprintMb": {
+          "sampleCount": 0
+        },
+        "networkingRssMb": {
+          "sampleCount": 161,
+          "firstMiB": 12.95,
+          "lastMiB": 16.48,
+          "minMiB": 12.95,
+          "maxMiB": 20.7,
+          "slopeMiBPerMinute": 0.2624,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 12.717,
+              "minMiB": 12.0,
+              "maxMiB": 14.05
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 14.279,
+              "minMiB": 14.05,
+              "maxMiB": 16.11
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 16.19,
+              "minMiB": 16.11,
+              "maxMiB": 16.27
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 16.495,
+              "minMiB": 16.28,
+              "maxMiB": 20.45
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 20.534,
+              "minMiB": 20.47,
+              "maxMiB": 20.61
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 18.833,
+              "minMiB": 16.39,
+              "maxMiB": 20.7
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "gpuRssMb": {
+          "sampleCount": 161,
+          "firstMiB": 43.84,
+          "lastMiB": 40.52,
+          "minMiB": 39.95,
+          "maxMiB": 45.42,
+          "slopeMiBPerMinute": -0.0217,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 43.76,
+              "minMiB": 43.25,
+              "maxMiB": 43.89
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 43.841,
+              "minMiB": 43.7,
+              "maxMiB": 44.0
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 44.641,
+              "minMiB": 43.91,
+              "maxMiB": 45.17
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 45.1,
+              "minMiB": 45.05,
+              "maxMiB": 45.22
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 45.008,
+              "minMiB": 44.89,
+              "maxMiB": 45.42
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 42.909,
+              "minMiB": 39.95,
+              "maxMiB": 45.02
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        }
+      },
+      "phase": {
+        "rustFootprintMb": {
+          "sampleCount": 0
+        },
+        "webContentFootprintMb": {
+          "sampleCount": 0
+        },
+        "webContentMallocAllocatedMb": {
+          "sampleCount": 0
+        },
+        "webContentRssMb": {
+          "sampleCount": 0
+        }
+      }
+    },
+    {
+      "source": "revia-m2-baseline-02-20261021.json",
+      "runCompleted": true,
+      "errors": [],
+      "startedAt": "2026-10-21T15:12:11.544244+08:00",
+      "endedAt": "2026-10-21T15:43:10.298343+08:00",
+      "activeSeconds": 1801.021,
+      "operationWallSeconds": null,
+      "checkpointPauseSeconds": null,
+      "reviaPid": 97185,
+      "visibility": {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": false,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 814,
+        "rafPerSecond": 59.82053838484546,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      "phaseSummary": null,
+      "regular": {
+        "rustRssMb": {
+          "sampleCount": 160,
+          "firstMiB": 143.61,
+          "lastMiB": 124.11,
+          "minMiB": 121.12,
+          "maxMiB": 144.17,
+          "slopeMiBPerMinute": -0.7088,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 30,
+              "meanMiB": 142.994,
+              "minMiB": 140.28,
+              "maxMiB": 144.17
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 29,
+              "meanMiB": 133.689,
+              "minMiB": 132.14,
+              "maxMiB": 134.22
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 133.816,
+              "minMiB": 131.0,
+              "maxMiB": 134.25
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 30,
+              "meanMiB": 129.635,
+              "minMiB": 125.03,
+              "maxMiB": 131.5
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 29,
+              "meanMiB": 123.64,
+              "minMiB": 123.09,
+              "maxMiB": 123.75
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 123.099,
+              "minMiB": 121.12,
+              "maxMiB": 124.11
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "rustFootprintMb": {
+          "sampleCount": 54,
+          "firstMiB": 53.9,
+          "lastMiB": 52.8,
+          "minMiB": 51.1,
+          "maxMiB": 58.1,
+          "slopeMiBPerMinute": -0.0386,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 10,
+              "meanMiB": 54.86,
+              "minMiB": 51.1,
+              "maxMiB": 61.0
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 10,
+              "meanMiB": 54.4,
+              "minMiB": 52.0,
+              "maxMiB": 56.5
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 10,
+              "meanMiB": 52.48,
+              "minMiB": 51.3,
+              "maxMiB": 53.1
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 10,
+              "meanMiB": 54.12,
+              "minMiB": 51.7,
+              "maxMiB": 58.1
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 10,
+              "meanMiB": 53.72,
+              "minMiB": 52.8,
+              "maxMiB": 55.5
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 10,
+              "meanMiB": 52.5,
+              "minMiB": 51.3,
+              "maxMiB": 53.1
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "webContentRssMb": {
+          "sampleCount": 160,
+          "firstMiB": 514.14,
+          "lastMiB": 432.83,
+          "minMiB": 401.02,
+          "maxMiB": 574.94,
+          "slopeMiBPerMinute": -7.1207,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 30,
+              "meanMiB": 496.943,
+              "minMiB": 237.36,
+              "maxMiB": 553.34
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 29,
+              "meanMiB": 560.944,
+              "minMiB": 547.66,
+              "maxMiB": 570.41
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 572.104,
+              "minMiB": 568.77,
+              "maxMiB": 574.94
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 30,
+              "meanMiB": 444.24,
+              "minMiB": 416.11,
+              "maxMiB": 459.84
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 29,
+              "meanMiB": 423.214,
+              "minMiB": 401.02,
+              "maxMiB": 428.28
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 420.332,
+              "minMiB": 412.95,
+              "maxMiB": 432.92
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "webContentFootprintMb": {
+          "sampleCount": 54,
+          "firstMiB": 268.4,
+          "lastMiB": 297.8,
+          "minMiB": 253.3,
+          "maxMiB": 302.7,
+          "slopeMiBPerMinute": 0.4048,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 10,
+              "meanMiB": 259.09,
+              "minMiB": 213.8,
+              "maxMiB": 276.4
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 10,
+              "meanMiB": 266.55,
+              "minMiB": 259.0,
+              "maxMiB": 277.5
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 10,
+              "meanMiB": 265.84,
+              "minMiB": 253.3,
+              "maxMiB": 282.4
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 10,
+              "meanMiB": 270.03,
+              "minMiB": 261.6,
+              "maxMiB": 281.7
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 10,
+              "meanMiB": 271.19,
+              "minMiB": 261.0,
+              "maxMiB": 296.0
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 10,
+              "meanMiB": 276.65,
+              "minMiB": 262.5,
+              "maxMiB": 302.7
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "networkingRssMb": {
+          "sampleCount": 160,
+          "firstMiB": 21.08,
+          "lastMiB": 34.78,
+          "minMiB": 18.88,
+          "maxMiB": 43.41,
+          "slopeMiBPerMinute": 0.4411,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 30,
+              "meanMiB": 18.876,
+              "minMiB": 12.45,
+              "maxMiB": 28.92
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 29,
+              "meanMiB": 28.603,
+              "minMiB": 24.25,
+              "maxMiB": 33.88
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 33.978,
+              "minMiB": 33.88,
+              "maxMiB": 34.02
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 30,
+              "meanMiB": 33.98,
+              "minMiB": 33.98,
+              "maxMiB": 33.98
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 29,
+              "meanMiB": 39.046,
+              "minMiB": 18.88,
+              "maxMiB": 43.41
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 34.485,
+              "minMiB": 33.89,
+              "maxMiB": 43.38
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        },
+        "gpuRssMb": {
+          "sampleCount": 160,
+          "firstMiB": 43.45,
+          "lastMiB": 39.17,
+          "minMiB": 38.97,
+          "maxMiB": 44.11,
+          "slopeMiBPerMinute": -0.0946,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 30,
+              "meanMiB": 43.563,
+              "minMiB": 43.23,
+              "maxMiB": 44.11
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 29,
+              "meanMiB": 39.896,
+              "minMiB": 39.5,
+              "maxMiB": 40.27
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 40.089,
+              "minMiB": 39.91,
+              "maxMiB": 40.23
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 30,
+              "meanMiB": 40.01,
+              "minMiB": 39.7,
+              "maxMiB": 40.22
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 29,
+              "meanMiB": 39.498,
+              "minMiB": 39.39,
+              "maxMiB": 39.64
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 30,
+              "meanMiB": 39.114,
+              "minMiB": 38.97,
+              "maxMiB": 39.42
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 0,
+              "meanMiB": null,
+              "minMiB": null,
+              "maxMiB": null
+            }
+          ]
+        }
+      },
+      "phase": {
+        "rustFootprintMb": {
+          "sampleCount": 0
+        },
+        "webContentFootprintMb": {
+          "sampleCount": 0
+        },
+        "webContentMallocAllocatedMb": {
+          "sampleCount": 0
+        },
+        "webContentRssMb": {
+          "sampleCount": 0
+        }
+      }
+    },
+    {
+      "source": "revia-m2-baseline-03-20261021.json",
+      "runCompleted": true,
+      "errors": [],
+      "startedAt": "2026-10-21T16:16:58.540662+08:00",
+      "endedAt": "2026-10-21T16:49:15.232008+08:00",
+      "activeSeconds": 1801.0359999999998,
+      "operationWallSeconds": 1919.282,
+      "checkpointPauseSeconds": 118.246,
+      "reviaPid": 7266,
+      "visibility": {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": false,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 853,
+        "rafPerSecond": 59.82053838484546,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      "phaseSummary": {
+        "sampleCount": 29,
+        "validSampleCount": 29,
+        "invalidSampleCount": 0,
+        "allocationSource": "vmmap MALLOC ZONE / WebKit Malloc_* / BYTES ALLOCATED",
+        "acceptance": "pending manual same-phase sample sufficiency and trend review"
+      },
+      "regular": {
+        "rustRssMb": {
+          "sampleCount": 171,
+          "firstMiB": 131.69,
+          "lastMiB": 131.84,
+          "minMiB": 128.3,
+          "maxMiB": 133.16,
+          "slopeMiBPerMinute": 0.0465,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 138.654,
+              "minMiB": 128.3,
+              "maxMiB": 144.28
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 132.062,
+              "minMiB": 130.97,
+              "maxMiB": 132.56
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 132.432,
+              "minMiB": 131.27,
+              "maxMiB": 132.73
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 132.831,
+              "minMiB": 131.42,
+              "maxMiB": 133.11
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 133.081,
+              "minMiB": 132.67,
+              "maxMiB": 133.11
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 29,
+              "meanMiB": 132.782,
+              "minMiB": 131.8,
+              "maxMiB": 133.12
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 12,
+              "meanMiB": 132.933,
+              "minMiB": 131.84,
+              "maxMiB": 133.16
+            }
+          ]
+        },
+        "rustFootprintMb": {
+          "sampleCount": 57,
+          "firstMiB": 57.3,
+          "lastMiB": 52.7,
+          "minMiB": 51.3,
+          "maxMiB": 57.3,
+          "slopeMiBPerMinute": -0.0416,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 10,
+              "meanMiB": 55.18,
+              "minMiB": 51.9,
+              "maxMiB": 63.6
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 10,
+              "meanMiB": 53.09,
+              "minMiB": 51.6,
+              "maxMiB": 54.1
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 10,
+              "meanMiB": 52.48,
+              "minMiB": 51.4,
+              "maxMiB": 52.8
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 9,
+              "meanMiB": 52.6,
+              "minMiB": 51.4,
+              "maxMiB": 52.9
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 10,
+              "meanMiB": 52.66,
+              "minMiB": 52.3,
+              "maxMiB": 52.7
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 10,
+              "meanMiB": 52.43,
+              "minMiB": 51.3,
+              "maxMiB": 52.7
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 4,
+              "meanMiB": 52.7,
+              "minMiB": 52.7,
+              "maxMiB": 52.7
+            }
+          ]
+        },
+        "webContentRssMb": {
+          "sampleCount": 171,
+          "firstMiB": 261.84,
+          "lastMiB": 400.83,
+          "minMiB": 261.84,
+          "maxMiB": 400.83,
+          "slopeMiBPerMinute": 2.2845,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 268.35,
+              "minMiB": 220.41,
+              "maxMiB": 328.69
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 362.438,
+              "minMiB": 349.53,
+              "maxMiB": 368.31
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 375.85,
+              "minMiB": 368.34,
+              "maxMiB": 382.67
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 389.217,
+              "minMiB": 382.83,
+              "maxMiB": 392.48
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 394.036,
+              "minMiB": 392.48,
+              "maxMiB": 394.86
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 29,
+              "meanMiB": 396.858,
+              "minMiB": 394.88,
+              "maxMiB": 398.28
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 12,
+              "meanMiB": 398.735,
+              "minMiB": 398.27,
+              "maxMiB": 400.83
+            }
+          ]
+        },
+        "webContentFootprintMb": {
+          "sampleCount": 57,
+          "firstMiB": 221.1,
+          "lastMiB": 251.7,
+          "minMiB": 191.8,
+          "maxMiB": 282.5,
+          "slopeMiBPerMinute": 1.249,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 10,
+              "meanMiB": 195.67,
+              "minMiB": 162.8,
+              "maxMiB": 240.5
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 10,
+              "meanMiB": 236.19,
+              "minMiB": 215.1,
+              "maxMiB": 264.7
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 10,
+              "meanMiB": 233.38,
+              "minMiB": 207.5,
+              "maxMiB": 255.4
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 9,
+              "meanMiB": 248.044,
+              "minMiB": 218.3,
+              "maxMiB": 274.3
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 10,
+              "meanMiB": 259.78,
+              "minMiB": 226.1,
+              "maxMiB": 282.5
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 10,
+              "meanMiB": 259.85,
+              "minMiB": 241.0,
+              "maxMiB": 278.0
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 4,
+              "meanMiB": 243.475,
+              "minMiB": 219.6,
+              "maxMiB": 251.7
+            }
+          ]
+        },
+        "networkingRssMb": {
+          "sampleCount": 171,
+          "firstMiB": 8.17,
+          "lastMiB": 74.89,
+          "minMiB": 8.17,
+          "maxMiB": 74.89,
+          "slopeMiBPerMinute": 1.5109,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 15.497,
+              "minMiB": 8.08,
+              "maxMiB": 23.06
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 23.06,
+              "minMiB": 23.06,
+              "maxMiB": 23.06
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 25.668,
+              "minMiB": 23.06,
+              "maxMiB": 42.16
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 42.608,
+              "minMiB": 42.16,
+              "maxMiB": 42.81
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 42.81,
+              "minMiB": 42.81,
+              "maxMiB": 42.81
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 29,
+              "meanMiB": 45.055,
+              "minMiB": 42.81,
+              "maxMiB": 74.86
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 12,
+              "meanMiB": 74.862,
+              "minMiB": 74.86,
+              "maxMiB": 74.89
+            }
+          ]
+        },
+        "gpuRssMb": {
+          "sampleCount": 171,
+          "firstMiB": 41.11,
+          "lastMiB": 40.97,
+          "minMiB": 40.86,
+          "maxMiB": 42.31,
+          "slopeMiBPerMinute": 0.0149,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 29,
+              "meanMiB": 43.658,
+              "minMiB": 40.86,
+              "maxMiB": 46.19
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 30,
+              "meanMiB": 41.585,
+              "minMiB": 40.86,
+              "maxMiB": 41.91
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 30,
+              "meanMiB": 41.865,
+              "minMiB": 41.36,
+              "maxMiB": 42.06
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 29,
+              "meanMiB": 41.983,
+              "minMiB": 41.61,
+              "maxMiB": 42.23
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 30,
+              "meanMiB": 41.953,
+              "minMiB": 41.55,
+              "maxMiB": 42.25
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 29,
+              "meanMiB": 42.042,
+              "minMiB": 41.59,
+              "maxMiB": 42.31
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 12,
+              "meanMiB": 41.383,
+              "minMiB": 40.91,
+              "maxMiB": 41.98
+            }
+          ]
+        }
+      },
+      "phase": {
+        "rustFootprintMb": {
+          "sampleCount": 27,
+          "firstMiB": 57.4,
+          "lastMiB": 51.4,
+          "minMiB": 51.4,
+          "maxMiB": 57.4,
+          "slopeMiBPerMinute": -0.0738,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 4,
+              "meanMiB": 55.5,
+              "minMiB": 53.4,
+              "maxMiB": 57.4
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 5,
+              "meanMiB": 53.02,
+              "minMiB": 51.6,
+              "maxMiB": 54.0
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 4,
+              "meanMiB": 52.75,
+              "minMiB": 52.7,
+              "maxMiB": 52.8
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 5,
+              "meanMiB": 52.8,
+              "minMiB": 52.7,
+              "maxMiB": 53.0
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 4,
+              "meanMiB": 52.7,
+              "minMiB": 52.7,
+              "maxMiB": 52.7
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 5,
+              "meanMiB": 52.42,
+              "minMiB": 51.4,
+              "maxMiB": 52.7
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 2,
+              "meanMiB": 52.05,
+              "minMiB": 51.4,
+              "maxMiB": 52.7
+            }
+          ]
+        },
+        "webContentFootprintMb": {
+          "sampleCount": 27,
+          "firstMiB": 150.3,
+          "lastMiB": 221.3,
+          "minMiB": 150.3,
+          "maxMiB": 227.3,
+          "slopeMiBPerMinute": 1.7079,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 4,
+              "meanMiB": 148.65,
+              "minMiB": 129.0,
+              "maxMiB": 180.0
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 5,
+              "meanMiB": 192.88,
+              "minMiB": 187.3,
+              "maxMiB": 198.3
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 4,
+              "meanMiB": 204.075,
+              "minMiB": 193.4,
+              "maxMiB": 214.4
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 5,
+              "meanMiB": 220.58,
+              "minMiB": 217.1,
+              "maxMiB": 226.1
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 4,
+              "meanMiB": 225.875,
+              "minMiB": 223.1,
+              "maxMiB": 227.3
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 5,
+              "meanMiB": 221.06,
+              "minMiB": 218.5,
+              "maxMiB": 226.9
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 2,
+              "meanMiB": 220.4,
+              "minMiB": 219.5,
+              "maxMiB": 221.3
+            }
+          ]
+        },
+        "webContentMallocAllocatedMb": {
+          "sampleCount": 27,
+          "firstMiB": 115.1,
+          "lastMiB": 170.4,
+          "minMiB": 115.1,
+          "maxMiB": 175.4,
+          "slopeMiBPerMinute": 1.4599,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 4,
+              "meanMiB": 100.925,
+              "minMiB": 53.9,
+              "maxMiB": 120.1
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 5,
+              "meanMiB": 136.18,
+              "minMiB": 126.5,
+              "maxMiB": 144.6
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 4,
+              "meanMiB": 142.825,
+              "minMiB": 117.3,
+              "maxMiB": 156.1
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 5,
+              "meanMiB": 152.8,
+              "minMiB": 142.7,
+              "maxMiB": 163.8
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 4,
+              "meanMiB": 147.3,
+              "minMiB": 129.4,
+              "maxMiB": 160.4
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 5,
+              "meanMiB": 164.06,
+              "minMiB": 143.9,
+              "maxMiB": 175.4
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 2,
+              "meanMiB": 164.95,
+              "minMiB": 159.5,
+              "maxMiB": 170.4
+            }
+          ]
+        },
+        "webContentRssMb": {
+          "sampleCount": 27,
+          "firstMiB": 261.84,
+          "lastMiB": 400.83,
+          "minMiB": 261.84,
+          "maxMiB": 400.83,
+          "slopeMiBPerMinute": 2.6304,
+          "fiveMinuteWallClockBins": [
+            {
+              "fromMinute": 0,
+              "toMinute": 5,
+              "sampleCount": 4,
+              "meanMiB": 267.327,
+              "minMiB": 232.77,
+              "maxMiB": 320.39
+            },
+            {
+              "fromMinute": 5,
+              "toMinute": 10,
+              "sampleCount": 5,
+              "meanMiB": 361.888,
+              "minMiB": 351.59,
+              "maxMiB": 367.47
+            },
+            {
+              "fromMinute": 10,
+              "toMinute": 15,
+              "sampleCount": 4,
+              "meanMiB": 375.105,
+              "minMiB": 370.41,
+              "maxMiB": 378.28
+            },
+            {
+              "fromMinute": 15,
+              "toMinute": 20,
+              "sampleCount": 5,
+              "meanMiB": 388.854,
+              "minMiB": 382.83,
+              "maxMiB": 392.08
+            },
+            {
+              "fromMinute": 20,
+              "toMinute": 25,
+              "sampleCount": 4,
+              "meanMiB": 394.075,
+              "minMiB": 392.66,
+              "maxMiB": 394.81
+            },
+            {
+              "fromMinute": 25,
+              "toMinute": 30,
+              "sampleCount": 5,
+              "meanMiB": 396.678,
+              "minMiB": 394.91,
+              "maxMiB": 398.28
+            },
+            {
+              "fromMinute": 30,
+              "toMinute": 35,
+              "sampleCount": 2,
+              "meanMiB": 399.75,
+              "minMiB": 398.67,
+              "maxMiB": 400.83
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

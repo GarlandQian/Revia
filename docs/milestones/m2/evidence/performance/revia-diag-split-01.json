@@ -1,0 +1,155 @@
+{
+  "combos": [
+    {
+      "firstScreen": {
+        "devicePixelRatio": 2,
+        "fileCount": 7,
+        "firstRowsMs": 49,
+        "fromListChangesMs": 99,
+        "fromOpenWorktreeMs": 263,
+        "listChangesMs": 50,
+        "rafPainted": false,
+        "renderMs": 49,
+        "rowCount": 8309,
+        "viewportHeight": 718
+      },
+      "highlight": {
+        "lastRoundTripMs": 42,
+        "loadedLines": 400,
+        "roundTrips": 400
+      },
+      "id": 1,
+      "jump": {
+        "appearMs": 32,
+        "colorRestoreMs": 37,
+        "fetchMs": 11,
+        "fromRow": 0,
+        "targetCovered": true,
+        "targetWasCached": true,
+        "timing": {
+          "dataWaitMs": 0,
+          "prioritizeMs": 0,
+          "scrollCallMs": 11,
+          "taskQueueMs": 21
+        },
+        "toRow": 4985,
+        "warmAppearMs": 20,
+        "warmCovered": true,
+        "warmTargetWasCached": true,
+        "warmTiming": {
+          "dataWaitMs": 0,
+          "prioritizeMs": 0,
+          "scrollCallMs": 2,
+          "taskQueueMs": 18
+        },
+        "warmWithinOneFrame": false,
+        "withinOneFrame": false
+      },
+      "jumpDom": {
+        "outward": {
+          "colorDomMs": null,
+          "colorsCachedBefore": false,
+          "final": {
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 80,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "fromRow": 0,
+          "immediate": {
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 80,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "immediateDomMs": 6,
+          "missingRowsBefore": 0,
+          "scrollCallMs": 6,
+          "targetWasCached": true,
+          "textDomMs": 6,
+          "toRow": 6647
+        },
+        "preparationError": "源位置文字与双侧颜色未就绪；颜色恢复样本不适用",
+        "return": {
+          "colorDomMs": null,
+          "colorsCachedBefore": false,
+          "final": {
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 77,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "fromRow": 6647,
+          "immediate": {
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 77,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "immediateDomMs": 1,
+          "missingRowsBefore": 0,
+          "scrollCallMs": 1,
+          "targetWasCached": true,
+          "textDomMs": 1,
+          "toRow": 0
+        },
+        "sourcePreparation": "explicit-cache-and-normal-scroll",
+        "sourceReady": false
+      },
+      "jumpDomError": null,
+      "label": "split / src/generated.ts",
+      "path": "src/generated.ts",
+      "scroll": {
+        "droppedFrames": 3,
+        "fallbackFrames": 0,
+        "frameMaxMs": 26,
+        "frameP50Ms": 17,
+        "frameP95Ms": 20,
+        "frames": 60,
+        "mode": "frame",
+        "rafFrames": 60,
+        "requestedScreens": 60,
+        "screens": 60,
+        "scrollDistancePx": 43080,
+        "seconds": 1.028,
+        "uncoveredFrames": 0,
+        "uncoveredMax": 0,
+        "uncoveredP95": 0
+      },
+      "startedAt": "15:48:19.488",
+      "view": "split",
+      "visibility": {
+        "devicePixelRatio": 2,
+        "hidden": false,
+        "rafPerSecond": 62,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    }
+  ],
+  "ok": true,
+  "visibility": {
+    "devicePixelRatio": 2,
+    "focused": true,
+    "hidden": false,
+    "hiddenTransitions": 0,
+    "maxFrameGapMs": 39,
+    "rafPerSecond": 59.7609561752988,
+    "state": "visible",
+    "viewportHeight": 800,
+    "viewportWidth": 1280
+  }
+}

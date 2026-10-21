@@ -1,0 +1,155 @@
+{
+  "combos": [
+    {
+      "firstScreen": {
+        "devicePixelRatio": 2,
+        "fileCount": 1,
+        "firstRowsMs": 47,
+        "fromListChangesMs": 126,
+        "fromOpenWorktreeMs": 316,
+        "listChangesMs": 78,
+        "rafPainted": true,
+        "renderMs": 47,
+        "rowCount": 60001,
+        "viewportHeight": 718
+      },
+      "highlight": {
+        "lastRoundTripMs": 29,
+        "loadedLines": 400,
+        "roundTrips": 400
+      },
+      "id": 1,
+      "jump": {
+        "appearMs": 17,
+        "colorRestoreMs": 17,
+        "fetchMs": 13,
+        "fromRow": 0,
+        "targetCovered": true,
+        "targetWasCached": false,
+        "timing": {
+          "dataWaitMs": 4,
+          "prioritizeMs": 2,
+          "scrollCallMs": 7,
+          "taskQueueMs": 4
+        },
+        "toRow": 36000,
+        "warmAppearMs": 7,
+        "warmCovered": true,
+        "warmTargetWasCached": true,
+        "warmTiming": {
+          "dataWaitMs": 0,
+          "prioritizeMs": 0,
+          "scrollCallMs": 2,
+          "taskQueueMs": 5
+        },
+        "warmWithinOneFrame": true,
+        "withinOneFrame": false
+      },
+      "jumpDom": {
+        "outward": {
+          "colorDomMs": null,
+          "colorsCachedBefore": false,
+          "final": {
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 40,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "fromRow": 0,
+          "immediate": {
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 0,
+            "matchedRows": 0,
+            "requiredRows": 40,
+            "textMatched": false
+          },
+          "immediateDomMs": 2,
+          "missingRowsBefore": 40,
+          "scrollCallMs": 2,
+          "targetWasCached": false,
+          "textDomMs": 5,
+          "toRow": 48000
+        },
+        "preparationError": null,
+        "return": {
+          "colorDomMs": 38,
+          "colorsCachedBefore": true,
+          "final": {
+            "coloredCells": 39,
+            "colorsCached": true,
+            "colorsMatched": true,
+            "expectedColoredCells": 39,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "fromRow": 48000,
+          "immediate": {
+            "coloredCells": 0,
+            "colorsCached": true,
+            "colorsMatched": false,
+            "expectedColoredCells": 39,
+            "matchedRows": 40,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "immediateDomMs": 1,
+          "missingRowsBefore": 0,
+          "scrollCallMs": 1,
+          "targetWasCached": true,
+          "textDomMs": 1,
+          "toRow": 0
+        },
+        "sourcePreparation": "explicit-cache-and-normal-scroll",
+        "sourceReady": true
+      },
+      "jumpDomError": null,
+      "label": "unified / cold.ts",
+      "path": "cold.ts",
+      "scroll": {
+        "droppedFrames": 0,
+        "fallbackFrames": 0,
+        "frameMaxMs": 18,
+        "frameP50Ms": 17,
+        "frameP95Ms": 17,
+        "frames": 60,
+        "mode": "frame",
+        "rafFrames": 60,
+        "requestedScreens": 60,
+        "screens": 60,
+        "scrollDistancePx": 43080,
+        "seconds": 0.997,
+        "uncoveredFrames": 0,
+        "uncoveredMax": 0,
+        "uncoveredP95": 0
+      },
+      "startedAt": "16:15:07.721",
+      "view": "unified",
+      "visibility": {
+        "devicePixelRatio": 2,
+        "hidden": false,
+        "rafPerSecond": 60,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    }
+  ],
+  "ok": true,
+  "visibility": {
+    "devicePixelRatio": 2,
+    "focused": true,
+    "hidden": false,
+    "hiddenTransitions": 0,
+    "maxFrameGapMs": 22,
+    "rafPerSecond": 60,
+    "state": "visible",
+    "viewportHeight": 800,
+    "viewportWidth": 1280
+  }
+}
