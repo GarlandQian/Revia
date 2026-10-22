@@ -39,7 +39,20 @@ export const zhCN = {
     staging: "暂存中…",
     unstaging: "取消暂存中…",
     fileChanged: "文件已变化，请重新确认",
-    readonlyHint: "只读文件不支持暂存或取消暂存",
+    readonly: "只读",
+    readonlyReasons: {
+      symlink: "符号链接为只读类型，不支持在应用内暂存或取消暂存",
+      submodule: "子模块为只读类型，不支持在应用内暂存或取消暂存",
+      nestedRepo: "嵌套仓库为只读类型，不支持在应用内暂存",
+      conflict: "文件存在未解决的冲突，不支持通过普通操作暂存",
+      nonUtf8Path: "非 UTF-8 路径无法无损处理，仅供只读查看",
+    },
+    shortcuts: {
+      stage: "暂存（空格）",
+      unstage: "取消暂存（空格）",
+      stageFile: "暂存文件（⌥⌘A 或空格）",
+      unstageFile: "取消暂存文件（⌥⌘A 或空格）",
+    },
   },
   diff: {
     split: "并排",
@@ -60,6 +73,7 @@ export const zhCN = {
   errors: {
     gitFailed: "Git 命令失败",
     rejected: "操作被拒绝",
+    needsVerification: "结果待核对",
     internal: "内部错误",
     copy: "复制",
     dismiss: "关闭",

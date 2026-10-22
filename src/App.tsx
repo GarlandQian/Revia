@@ -28,6 +28,7 @@ import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
+import { isInteractiveElement, isPrimaryModifier, isStageFileShortcut } from "@/lib/platform";
 import {
   formatMs,
   measureScroll,
@@ -58,7 +59,7 @@ interface MeasureConfig {
 type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
 
 interface AppErrorInfo {
-  kind: "rejected" | "git" | "environment" | "internal";
+  kind: "rejected" | "git" | "environment" | "internal" | "needsVerification";
   message: string;
 }
 
@@ -446,10 +447,19 @@ export function App() {
 
   // ---------------- 文件写操作（M2 任务 02，Q8/Q79/Q89/Q90/Q93） ----------------
 
-  const [isWriting, setIsWriting] = useState(false);
+  const [writingWorktrees, setWritingWorktrees] = useState<Set<string>>(new Set());
+  const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
+  const worktreeIdRef = useRef<string | null>(null);
+  worktreeIdRef.current = worktreeId;
 
   const reconcileSelection = useCallback(
-    (newSnapshot: ChangesSnapshot, opPath: string, opChanges: ChangesKind, targetChanges: ChangesKind) => {
+    (
+      newSnapshot: ChangesSnapshot,
+      opPath: string,
+      opChanges: ChangesKind,
+      targetChanges: ChangesKind,
+      oldIndex: number,
+    ) => {
       const remainInOriginal = newSnapshot.entries.find(
         (e) => e.path === opPath && e.changes === opChanges,
       );
@@ -463,7 +473,9 @@ export function App() {
       } else if (moved) {
         next = { path: opPath, changes: targetChanges };
       } else if (newSnapshot.entries.length > 0) {
-        next = { path: newSnapshot.entries[0].path, changes: newSnapshot.entries[0].changes };
+        // Q89：离开改动列表则选原位置附近文件，无可选项则清空 diff（审查意见 5）
+        const safeIndex = Math.min(Math.max(0, oldIndex), newSnapshot.entries.length - 1);
+        next = { path: newSnapshot.entries[safeIndex].path, changes: newSnapshot.entries[safeIndex].changes };
       }
 
       if (next && worktreeId) {
@@ -484,62 +496,92 @@ export function App() {
 
   const stageFile = useCallback(
     async (entry: ChangeEntry) => {
-      if (isWriting || !worktreeId || entry.readonlyReason) return;
-      setIsWriting(true);
+      if (!worktreeId || isWriting || entry.readonlyReason) return;
+      const opWorktreeId = worktreeId;
+      const oldIndex = snapshot
+        ? snapshot.entries.findIndex((e) => e.path === entry.path && e.changes === entry.changes)
+        : 0;
+
+      setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
       setError(null);
       try {
         const newSnapshot = await ipc.stageFile({
-          worktreeId,
+          worktreeId: opWorktreeId,
           path: entry.path,
           fingerprint: entry.fingerprint,
         });
+        // Q90：旧响应不得覆盖当前界面（审查意见 4）
+        if (worktreeIdRef.current !== opWorktreeId) {
+          debugLog(`[OP] 操作返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧响应不改写当前界面`);
+          return;
+        }
         setSnapshot(newSnapshot);
-        reconcileSelection(newSnapshot, entry.path, entry.changes, "staged");
+        reconcileSelection(newSnapshot, entry.path, entry.changes, "staged", oldIndex);
       } catch (caught) {
-        setError(toAppError(caught));
-        void refresh();
+        const err = toAppError(caught);
+        setError(err);
+        // 结果待核对或状态失效时重新读取真实状态，绝不自动重跑（规格第 3 节，审查意见 1）
+        if (err.kind === "needsVerification" || err.kind === "rejected") {
+          void refresh();
+        }
       } finally {
-        setIsWriting(false);
+        setWritingWorktrees((current) => {
+          const next = new Set(current);
+          next.delete(opWorktreeId);
+          return next;
+        });
       }
     },
-    [isWriting, reconcileSelection, refresh, worktreeId],
+    [isWriting, reconcileSelection, refresh, snapshot, worktreeId],
   );
 
   const unstageFile = useCallback(
     async (entry: ChangeEntry) => {
-      if (isWriting || !worktreeId || entry.readonlyReason) return;
-      setIsWriting(true);
+      if (!worktreeId || isWriting || entry.readonlyReason) return;
+      const opWorktreeId = worktreeId;
+      const oldIndex = snapshot
+        ? snapshot.entries.findIndex((e) => e.path === entry.path && e.changes === entry.changes)
+        : 0;
+
+      setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
       setError(null);
       try {
         const newSnapshot = await ipc.unstageFile({
-          worktreeId,
+          worktreeId: opWorktreeId,
           path: entry.path,
           fingerprint: entry.fingerprint,
         });
+        // Q90：旧响应不得覆盖当前界面（审查意见 4）
+        if (worktreeIdRef.current !== opWorktreeId) {
+          debugLog(`[OP] 操作返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧响应不改写当前界面`);
+          return;
+        }
         setSnapshot(newSnapshot);
-        reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged");
+        reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged", oldIndex);
       } catch (caught) {
-        setError(toAppError(caught));
-        void refresh();
+        const err = toAppError(caught);
+        setError(err);
+        if (err.kind === "needsVerification" || err.kind === "rejected") {
+          void refresh();
+        }
       } finally {
-        setIsWriting(false);
+        setWritingWorktrees((current) => {
+          const next = new Set(current);
+          next.delete(opWorktreeId);
+          return next;
+        });
       }
     },
-    [isWriting, reconcileSelection, refresh, worktreeId],
+    [isWriting, reconcileSelection, refresh, snapshot, worktreeId],
   );
 
-  // 快捷键（Q19、Q93）：
+  // 快捷键（Q19、Q93、审查意见 6）：
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const isInput =
-        target &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      // 避免输入框、弹窗和按钮键盘操作穿透到后台文件操作（Q93）
+      if (isInteractiveElement(event.target)) return;
 
-      if (isInput) return;
-
-      const meta = event.metaKey || event.ctrlKey;
-      if (meta && event.altKey && event.key.toLowerCase() === "a") {
+      if (isStageFileShortcut(event)) {
         event.preventDefault();
         if (selectedEntry && !isWriting && !selectedEntry.readonlyReason) {
           if (selectedEntry.changes === "staged") {
@@ -551,25 +593,26 @@ export function App() {
         return;
       }
 
-      if (meta && event.key.toLowerCase() === "o") {
+      const primary = isPrimaryModifier(event);
+      if (primary && event.key.toLowerCase() === "o") {
         event.preventDefault();
         void chooseRepo();
-      } else if (meta && event.key.toLowerCase() === "r") {
+      } else if (primary && event.key.toLowerCase() === "r") {
         event.preventDefault();
         void refresh();
-      } else if (meta && event.key === "+") {
+      } else if (primary && event.key === "+") {
         event.preventDefault();
         void changeFontSize(1);
-      } else if (meta && event.key === "-") {
+      } else if (primary && event.key === "-") {
         event.preventDefault();
         void changeFontSize(-1);
       } else if (event.key === "F7") {
         event.preventDefault();
         jumpToHunk(event.shiftKey ? -1 : 1);
-      } else if (event.key === "ArrowDown" && meta) {
+      } else if (event.key === "ArrowDown" && primary) {
         event.preventDefault();
         focusNextFile(1);
-      } else if (event.key === "ArrowUp" && meta) {
+      } else if (event.key === "ArrowUp" && primary) {
         event.preventDefault();
         focusNextFile(-1);
       }
@@ -1612,23 +1655,27 @@ function Toolbar({
         A+
       </Button>
       <Separator orientation="vertical" className="h-5" />
-      <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy || isWriting}>
+      <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>
         {messages.changes.refresh}
       </Button>
       {selectedEntry ? (
         <>
           <Separator orientation="vertical" className="h-5" />
           {selectedEntry.readonlyReason ? (
-            <Badge variant="outline" className="text-xs text-muted-foreground" title={selectedEntry.readonlyReason}>
-              {selectedEntry.readonlyReason}
+            <Badge
+              variant="outline"
+              className="text-xs text-muted-foreground"
+              title={messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
+            >
+              {messages.changes.readonly}
             </Badge>
           ) : selectedEntry.changes === "staged" ? (
             <Button
               variant="outline"
               size="sm"
-              disabled={busy || isWriting}
+              disabled={isWriting}
               onClick={() => onUnstage?.(selectedEntry)}
-              title={`${messages.changes.unstageFile}（⌥⌘A 或空格）`}
+              title={messages.changes.shortcuts.unstageFile}
             >
               {isWriting ? messages.changes.unstaging : messages.changes.unstageFile}
             </Button>
@@ -1636,9 +1683,9 @@ function Toolbar({
             <Button
               variant="outline"
               size="sm"
-              disabled={busy || isWriting}
+              disabled={isWriting}
               onClick={() => onStage?.(selectedEntry)}
-              title={`${messages.changes.stageFile}（⌥⌘A 或空格）`}
+              title={messages.changes.shortcuts.stageFile}
             >
               {isWriting ? messages.changes.staging : messages.changes.stageFile}
             </Button>
@@ -1654,13 +1701,15 @@ function Toolbar({
 
 function ErrorBanner({ error, onDismiss }: { error: AppErrorInfo; onDismiss: () => void }) {
   const title =
-    error.kind === "environment"
-      ? messages.environment.title
-      : error.kind === "git"
-        ? messages.errors.gitFailed
-        : error.kind === "rejected"
-          ? messages.errors.rejected
-          : messages.errors.internal;
+    error.kind === "needsVerification"
+      ? messages.errors.needsVerification
+      : error.kind === "environment"
+        ? messages.environment.title
+        : error.kind === "git"
+          ? messages.errors.gitFailed
+          : error.kind === "rejected"
+            ? messages.errors.rejected
+            : messages.errors.internal;
   return (
     <div className="flex items-start gap-3 border-b bg-destructive/10 px-3 py-2 text-xs text-destructive">
       <strong className="shrink-0">{title}</strong>
@@ -1748,13 +1797,15 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function toAppError(caught: unknown): AppErrorInfo {
   const message = caught instanceof Error ? caught.message : String(caught);
-  const kind: AppErrorInfo["kind"] = /git|退出码/i.test(message)
-    ? "git"
-    : /找不到|环境|shell/i.test(message)
-      ? "environment"
-      : /拒绝|不在当前|请先/.test(message)
-        ? "rejected"
-        : "internal";
+  const kind: AppErrorInfo["kind"] = /待核对|needsverification/i.test(message)
+    ? "needsVerification"
+    : /git|退出码/i.test(message)
+      ? "git"
+      : /找不到|环境|shell/i.test(message)
+        ? "environment"
+        : /拒绝|不在当前|请先|文件已变化/.test(message)
+          ? "rejected"
+          : "internal";
   return { kind, message };
 }
 

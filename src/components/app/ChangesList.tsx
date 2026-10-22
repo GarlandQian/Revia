@@ -10,6 +10,7 @@ import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import { messages } from "@/lib/i18n/zh-CN";
+import { isInteractiveElement } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +42,10 @@ export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, 
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === " " && selected && !isWriting) {
+      // 若当前焦点在折叠按钮等交互控件上，允许其原生空格操作，不穿透到文件动作（审查意见 6）
+      if (isInteractiveElement(event.target)) {
+        return;
+      }
       const target = snapshot.entries.find(
         (e) => e.path === selected.path && e.changes === selected.changes,
       );
@@ -196,17 +201,21 @@ function VirtualRows({
         {entries.slice(first, last).map((entry, offset) => {
           const index = first + offset;
           const isSelected = selected?.path === entry.path && selected?.changes === entry.changes;
+          const readonlyDesc = entry.readonlyReason
+            ? messages.changes.readonlyReasons[entry.readonlyReason]
+            : null;
           return (
-            <div
+            <button
               key={`${entry.changes}-${entry.path}`}
-              className={`group absolute left-0 right-0 flex items-center gap-1.5 px-2 text-left text-xs cursor-pointer ${
+              type="button"
+              className={`group absolute left-0 right-0 flex items-center gap-1.5 px-2 text-left text-xs ${
                 isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
               }`}
               style={{ top: index * ROW_HEIGHT, height: ROW_HEIGHT }}
               onClick={() => onSelect({ path: entry.path, changes: entry.changes })}
               title={
-                entry.readonlyReason
-                  ? `${entry.path}（${entry.readonlyReason}）`
+                readonlyDesc
+                  ? `${entry.path}（${readonlyDesc}）`
                   : entry.originalPath
                     ? `${entry.originalPath} → ${entry.path}`
                     : entry.path
@@ -224,19 +233,20 @@ function VirtualRows({
               <span className={`status-${entry.status} w-3 shrink-0 text-center font-semibold`}>
                 {statusLetter(entry)}
               </span>
-              {entry.readonlyReason ? (
+              {readonlyDesc ? (
                 <span
                   className="shrink-0 text-[10px] text-muted-foreground/60 select-none"
-                  title={entry.readonlyReason}
+                  title={readonlyDesc}
                 >
-                  只读
+                  {messages.changes.readonly}
                 </span>
               ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={isWriting}
-                  className="h-4.5 w-4.5 p-0 shrink-0 text-[11px] font-bold opacity-0 group-hover:opacity-100 focus:opacity-100"
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  className={`h-4.5 w-4.5 flex items-center justify-center shrink-0 rounded text-[11px] font-bold opacity-0 group-hover:opacity-100 group-focus:opacity-100 hover:bg-muted-foreground/20 ${
+                    isWriting ? "pointer-events-none opacity-40" : ""
+                  }`}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (entry.changes === "staged") {
@@ -248,14 +258,14 @@ function VirtualRows({
                   aria-label={entry.changes === "staged" ? messages.changes.unstage : messages.changes.stage}
                   title={
                     entry.changes === "staged"
-                      ? `${messages.changes.unstage}（空格）`
-                      : `${messages.changes.stage}（空格）`
+                      ? messages.changes.shortcuts.unstage
+                      : messages.changes.shortcuts.stage
                   }
                 >
                   {entry.changes === "staged" ? "−" : "+"}
-                </Button>
+                </span>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
