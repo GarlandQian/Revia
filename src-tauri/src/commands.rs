@@ -115,6 +115,22 @@ pub struct RowIndexRequest {
     pub version: FileVersion,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StageFileRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnstageFileRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub fingerprint: String,
+}
+
 #[tauri::command]
 pub async fn list_repos(state: State<'_, AppState>) -> Result<Vec<RepoEntry>> {
     let registry = state
@@ -206,6 +222,34 @@ pub async fn list_changes(state: State<'_, AppState>, request: WorktreeRequest) 
     let inner = result?;
     log_measure(&format!("list_changes 完成：{} 个文件，{} ms", inner.entries.len(), inner.elapsed_ms));
     Ok(inner)
+}
+
+#[tauri::command]
+pub async fn stage_file(
+    state: State<'_, AppState>,
+    request: StageFileRequest,
+) -> Result<ChangesSnapshot> {
+    log_measure(&format!("stage_file 收到：{} {}", request.worktree_id, request.path));
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        session.stage_file(&request.path, &request.fingerprint)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("暂存文件失败：{error}")))?
+}
+
+#[tauri::command]
+pub async fn unstage_file(
+    state: State<'_, AppState>,
+    request: UnstageFileRequest,
+) -> Result<ChangesSnapshot> {
+    log_measure(&format!("unstage_file 收到：{} {}", request.worktree_id, request.path));
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        session.unstage_file(&request.path, &request.fingerprint)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("取消暂存文件失败：{error}")))?
 }
 
 #[tauri::command]

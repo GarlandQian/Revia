@@ -15,7 +15,7 @@ use ts_rs::TS;
 use crate::error::{AppError, Result};
 use crate::git::highlight::{HighlightRequest, HighlightResult, Highlighter};
 use crate::git::rows::{self, HunkAnchor, RenderRow, ViewMode};
-use crate::git::status::{self, ChangesKind, FileStatus};
+use crate::git::status::{self, ChangesKind, FileStatus, StatusEntry};
 use crate::git::{self, Git};
 use crate::shell::{self, ShellEnv};
 
@@ -79,6 +79,10 @@ pub struct ChangeEntry {
     /// 是否已经统计过增删行数（未跟踪文件在打开时才统计）。
     pub metrics_loaded: bool,
     pub hunks: Vec<HunkAnchor>,
+    /// 只读限制原因，None 表示支持写操作。
+    pub readonly_reason: Option<String>,
+    /// 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
+    pub fingerprint: String,
 }
 
 /// 一次状态读取的结果。
@@ -174,6 +178,19 @@ pub struct WorktreeSession {
     /// 已经发给高亮线程的文件内容代际，避免重复传输内容。
     highlight_generations: Mutex<HashMap<String, u64>>,
     generation_counter: Mutex<u64>,
+    /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
+    writing: Mutex<bool>,
+}
+
+/// 写操作互斥 RAII Guard，离开作用域自动释放写锁。
+#[derive(Debug)]
+pub struct WriteGuard<'a>(&'a Mutex<bool>);
+impl<'a> Drop for WriteGuard<'a> {
+    fn drop(&mut self) {
+        if let Ok(mut writing) = self.0.lock() {
+            *writing = false;
+        }
+    }
 }
 
 impl WorktreeSession {
@@ -220,6 +237,7 @@ impl WorktreeSession {
             highlighter: Highlighter::start(),
             highlight_generations: Mutex::new(HashMap::new()),
             generation_counter: Mutex::new(0),
+            writing: Mutex::new(false),
         }))
     }
 
@@ -251,6 +269,11 @@ impl WorktreeSession {
             let language = language_for_path(&entry.path);
             let row_count_unified = model.map(|file| rows::layout(file, ViewMode::Unified).len() as u32).unwrap_or(0);
             let row_count_split = model.map(|file| rows::layout(file, ViewMode::Split).len() as u32).unwrap_or(0);
+            let mut readonly_reason = entry.readonly_reason.clone();
+            if readonly_reason.is_none() && self.path.join(&entry.path).is_symlink() {
+                readonly_reason = Some("符号链接为只读类型，不支持在应用内暂存或取消暂存".to_string());
+            }
+            let fingerprint = compute_file_fingerprint(&self.git, &self.path, entry).unwrap_or_default();
             entries.push(ChangeEntry {
                 path: entry.path.clone(),
                 original_path: entry.original_path.clone(),
@@ -268,6 +291,8 @@ impl WorktreeSession {
                 // 未跟踪文件要读了内容才知道行数，打开时补全。
                 metrics_loaded: entry.changes != ChangesKind::Untracked,
                 hunks: model.map(rows::hunk_anchors).unwrap_or_default(),
+                readonly_reason,
+                fingerprint,
             });
         }
 
@@ -510,6 +535,97 @@ impl WorktreeSession {
             })
             .unwrap_or(false)
     }
+
+    /// 获取当前 worktree 的独占写操作锁（不排队，发现被占用立即拒绝并发写，Q90/T06）。
+    pub fn acquire_write_lock(&self) -> Result<WriteGuard<'_>> {
+        let mut writing = self
+            .writing
+            .lock()
+            .map_err(|_| AppError::internal("写操作锁失败"))?;
+        if *writing {
+            return Err(AppError::rejected("当前 worktree 有正在进行的写操作，请稍候"));
+        }
+        *writing = true;
+        Ok(WriteGuard(&self.writing))
+    }
+
+    /// 整文件暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009）。
+    pub fn stage_file(&self, path: &str, fingerprint: &str) -> Result<ChangesSnapshot> {
+        let _guard = self.acquire_write_lock()?;
+        let status = status::read(&self.git)?;
+        let entry = status
+            .entries
+            .iter()
+            .find(|e| e.path == path && (e.changes == ChangesKind::Unstaged || e.changes == ChangesKind::Untracked))
+            .ok_or_else(|| AppError::rejected(format!("目标文件不在当前可暂存列表中：{path}（请刷新后重试）")))?;
+
+        if let Some(reason) = &entry.readonly_reason {
+            return Err(AppError::rejected(reason.clone()));
+        }
+        if self.path.join(path).is_symlink() {
+            return Err(AppError::rejected("符号链接为只读类型，不支持在应用内暂存或取消暂存"));
+        }
+
+        let current_fp = compute_file_fingerprint(&self.git, &self.path, entry)?;
+        if current_fp != fingerprint {
+            return Err(AppError::rejected("文件已变化，请重新确认"));
+        }
+
+        if let Some(orig) = &entry.original_path {
+            self.git.run_ok(
+                &["-c", "core.quotePath=false", "add", "-A", "--", orig, path],
+                "暂存文件",
+            )?;
+        } else {
+            self.git.run_ok(
+                &["-c", "core.quotePath=false", "add", "-A", "--", path],
+                "暂存文件",
+            )?;
+        }
+
+        self.refresh()
+    }
+
+    /// 整文件取消暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009、T04）。
+    pub fn unstage_file(&self, path: &str, fingerprint: &str) -> Result<ChangesSnapshot> {
+        let _guard = self.acquire_write_lock()?;
+        let status = status::read(&self.git)?;
+        let entry = status
+            .entries
+            .iter()
+            .find(|e| e.path == path && e.changes == ChangesKind::Staged)
+            .ok_or_else(|| AppError::rejected(format!("目标文件不在当前已暂存列表中：{path}（请刷新后重试）")))?;
+
+        if let Some(reason) = &entry.readonly_reason {
+            return Err(AppError::rejected(reason.clone()));
+        }
+
+        let current_fp = compute_file_fingerprint(&self.git, &self.path, entry)?;
+        if current_fp != fingerprint {
+            return Err(AppError::rejected("文件已变化，请重新确认"));
+        }
+
+        if entry.status == FileStatus::Renamed {
+            if let Some(orig) = &entry.original_path {
+                self.git.run_ok(
+                    &["-c", "core.quotePath=false", "reset", "--", orig, path],
+                    "取消暂存文件",
+                )?;
+            } else {
+                self.git.run_ok(
+                    &["-c", "core.quotePath=false", "reset", "--", path],
+                    "取消暂存文件",
+                )?;
+            }
+        } else {
+            self.git.run_ok(
+                &["-c", "core.quotePath=false", "reset", "--", path],
+                "取消暂存文件",
+            )?;
+        }
+
+        self.refresh()
+    }
 }
 
 fn fill_entry(entry: &mut ChangeEntry, model: Option<&git::diff::FileChange>) {
@@ -564,6 +680,102 @@ fn is_collapsed(path: &str, file: &git::diff::FileChange) -> bool {
         return true;
     }
     file.old_lines.max(file.new_lines) > LARGE_FILE_LINES
+}
+
+/// 计算单个文件变更条目的 diff 指纹（Q80、ADR-0009）。
+pub fn compute_file_fingerprint(
+    git: &Git,
+    worktree_path: &Path,
+    entry: &StatusEntry,
+) -> Result<String> {
+    let mut hasher = Sha256::new();
+    // 1. changes
+    hasher.update((entry.changes as u8).to_le_bytes());
+    // 2. path & original_path
+    hasher.update((entry.path.len() as u64).to_le_bytes());
+    hasher.update(entry.path.as_bytes());
+    if let Some(orig) = &entry.original_path {
+        hasher.update(b"orig:");
+        hasher.update((orig.len() as u64).to_le_bytes());
+        hasher.update(orig.as_bytes());
+    }
+    // 3. status
+    hasher.update(entry.status.letter().as_bytes());
+    // 4. modes & oids
+    if let Some(m) = &entry.mode_head {
+        hasher.update(m.as_bytes());
+    }
+    if let Some(m) = &entry.mode_index {
+        hasher.update(m.as_bytes());
+    }
+    if let Some(m) = &entry.mode_worktree {
+        hasher.update(m.as_bytes());
+    }
+    if let Some(oid) = &entry.oid_head {
+        hasher.update(oid.as_bytes());
+    }
+    if let Some(oid) = &entry.oid_index {
+        hasher.update(oid.as_bytes());
+    }
+
+    // 5. diff patch
+    let diff_bytes = match entry.changes {
+        ChangesKind::Unstaged => git.diff_worktree(Some(&entry.path))?,
+        ChangesKind::Staged => {
+            if let Some(orig) = &entry.original_path {
+                let mut args = vec!["-c", "core.quotePath=false", "diff"];
+                args.extend_from_slice(git::DIFF_FLAGS);
+                args.push("--staged");
+                args.push("--");
+                args.push(orig);
+                args.push(&entry.path);
+                git.run_ok(&args, "读取已暂存重命名 diff")?.stdout
+            } else {
+                git.diff_index(Some(&entry.path))?
+            }
+        }
+        ChangesKind::Untracked => git.diff_untracked(&entry.path)?,
+    };
+    hasher.update((diff_bytes.len() as u64).to_le_bytes());
+    hasher.update(&diff_bytes);
+
+    // 6. 工作区实际物理文件状态（针对 Unstaged 与 Untracked）
+    if entry.changes == ChangesKind::Unstaged || entry.changes == ChangesKind::Untracked {
+        let file_path = worktree_path.join(&entry.path);
+        match std::fs::symlink_metadata(&file_path) {
+            Ok(meta) => {
+                hasher.update(b"exists");
+                hasher.update(meta.len().to_le_bytes());
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::MetadataExt;
+                    hasher.update(meta.mode().to_le_bytes());
+                }
+                if meta.is_file() {
+                    if let Ok(mut f) = std::fs::File::open(&file_path) {
+                        use std::io::Read;
+                        let mut buf = Vec::new();
+                        let _ = f.read_to_end(&mut buf);
+                        let file_hash = Sha256::digest(&buf);
+                        hasher.update(&file_hash);
+                    }
+                } else if meta.file_type().is_symlink() {
+                    if let Ok(target) = std::fs::read_link(&file_path) {
+                        hasher.update(target.to_string_lossy().as_bytes());
+                    }
+                }
+            }
+            Err(_) => {
+                hasher.update(b"missing");
+            }
+        }
+    }
+
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
 }
 
 pub const LARGE_FILE_LINES: u32 = 2000;

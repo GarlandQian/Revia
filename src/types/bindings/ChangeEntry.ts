@@ -14,4 +14,12 @@ collapsed: boolean, unmerged: boolean,
 /**
  * 是否已经统计过增删行数（未跟踪文件在打开时才统计）。
  */
-metricsLoaded: boolean, hunks: Array<HunkAnchor>, };
+metricsLoaded: boolean, hunks: Array<HunkAnchor>, 
+/**
+ * 只读限制原因，None 表示支持写操作。
+ */
+readonlyReason: string | null, 
+/**
+ * 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
+ */
+fingerprint: string, };

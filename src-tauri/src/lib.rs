@@ -66,6 +66,8 @@ pub fn run() {
             commands::row_index_for_line,
             commands::syntax_categories,
             commands::command_log_snapshot,
+            commands::stage_file,
+            commands::unstage_file,
             commands::change_entry,
             commands::measure_config,
             commands::write_measurement,

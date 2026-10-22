@@ -10,4 +10,8 @@ originalPath: string | null, changes: ChangesKind, status: FileStatus,
 /**
  * 是否处于 unmerged（冲突）状态。
  */
-unmerged: boolean, };
+unmerged: boolean, 
+/**
+ * 只读限制原因（如符号链接、子模块、冲突文件、非 UTF-8 路径等），None 表示支持写操作。
+ */
+readonlyReason: string | null, };
