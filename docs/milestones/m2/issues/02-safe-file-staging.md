@@ -282,7 +282,7 @@
      - 在 `features/diff/rowWindowStore.ts`（可见行/数据块加载失败）、`features/diff/highlightStore.ts`（高亮失败）、`components/app/ErrorBoundary.tsx`、`main.tsx`（未处理 Promise）及 `App.tsx`（长测、自动测量、IPC 错误记录）中全面替换 `String(error)` / `String(caught)` 为 `getErrorMessage`，彻底根除 diff 视图与测试报告中显示 `[object Object]` 的缺陷。
    - **第 2 条（结果严格归属原 worktree，待核对状态跨工作区保留）**：
      - 在 `App.tsx` 中建立 `worktreeErrors: Record<string, AppErrorPayload | null>` 状态字典，由 `setWorktreeErrors` 维护各工作区的错误与待核对状态；
-     - `stageFile` / `unstageFile` 的失败及待核对结果严格记录到发起操作的原工作区（`opWorktreeId`）；若用户在在途期间已切换至其他工作区，当前界面不弹出原工作区的错误横幅，但切回原工作区时错误横幅与待核对提示完整呈现（满足规格第 3 节与 D05“待核对结果可见”）；
+     - `stageFile` / `unstageFile` 的失败及待核对结果严格记录到发起操作的原工作区（`opWorktreeId`）；若用户在在途期间已切换至其他工作区，当前界面不弹出原工作区的错误横幅；（更正说明：第三轮修改时 `openWorktree` 开头误保留了 `setAppError(null, id)`，导致切回时被清空，第四轮已如实修复为保留至用户主动确认或关闭，满足规格第 3 节与 D05“待核对结果可见”）；
      - `refresh()` 函数在 `await ipc.listChanges(targetWorktreeId)` 返回后，通过 `worktreeIdRef.current !== targetWorktreeId` 严格核验当前工作区，若期间发生切换，绝不将旧快照、旧选中项改写到当前界面。
    - **第 3 条（暂存区版本读取支持字面路径）**：
      - `git/mod.rs` 的 `file_at` 当 scope 为暂存区（`""`、`"index"`、`":"`）时，采用带阶段号的格式 `:0:{path}`，避免当文件名为 `0:x` 时被 Git 误将前导 `0:` 识别为 stage 编号而导致 `fatal: path 'x' does not exist`；
@@ -293,7 +293,7 @@
      - 对 `rename from` / `copy from` / `rename to` / `copy to` 的路径也使用 `unquote` 解码；
      - 增加单元测试 `parses_quoted_paths_and_special_characters`，以及集成测试 `t04_stage_and_unstage_quoted_and_backslash_paths`：验证 `q"x.txt` 与 `back\slash.txt` 的未跟踪发现、整文件暂存、暂存区内容读取与取消暂存全流程。
    - **第 5 条（测试覆盖与真实断言）**：
-     - **T05 真实指纹拒绝**：权限用例在工作区修改属性以保留 `Unstaged` 条目，重命名用例在暂存区外部修改以保留 `Staged` (Renamed) 条目，断言其由于指纹不一致严格返回 `文件已变化，请重新确认`（排除条目不存在的伪拒绝）；
+     - **T05 真实指纹拒绝**：权限用例在工作区修改属性以保留 `Unstaged` 条目（更正说明：第三轮中改动的是文件内容，第四轮已如实更正为内容不变仅改权限位）；重命名用例在暂存区外部修改（更正说明：第三轮重写全部内容导致 Git 退化为新增+删除，第四轮已如实更正为保留 95% 相似度的重命名条目），断言其由于指纹不一致严格返回 `文件已变化，请重新确认`；
      - **非 UTF-8 路径用例**：移除外层的 `if out.status.success()` 与 `if let Some`，改为无条件断言，未构造成功直接使测试失败；
      - **T01 工作区文件模式不变**：在 `t01_stage_and_unstage_regular_file_multi_file_invariants` 中，暂存 target 前后以及取消暂存后，均断言 `sibling_clean` 与 `sibling_dirty` 的工作区文件权限模式（metadata mode）以及暂存区 blob/mode 全程保持不变。
    - **第 6 条（文件行键盘焦点可见）**：
@@ -340,4 +340,46 @@
 5. `App.tsx` 约 1275 行仍有 `String(error)`，改用统一的取错误文字函数。
 
 修改后追加 `### 日期 / Pi 第四轮修改`，如实写修改、测试名与检查结果；重跑 `pnpm exec tsc -b`、`pnpm lint`、`pnpm build`、完整 `cargo test`。
+
+### 2026-10-23 / Pi 第四轮修改
+
+1. **响应 5 条“必须修改”：**
+   - **第 1 条（含空格路径的对称切分与扩展头解析）**：
+     - `src-tauri/src/git/diff.rs` 重构 `file_from_git_header` 与 `parse_git_header_path`：对于不含 `---`/`+++` 的 diff（如含空格的二进制文件、仅权限变化文件），采用对称切分逻辑：以中点空格为界比较左右两部分，左右一致时直接解析完整路径；若不一致则由 `rename from`/`rename to`/`copy from`/`copy to` 扩展头或 `---`/`+++` 覆盖；
+     - 单元测试增加 `parses_spaced_paths_binary_mode_and_rename`；
+     - 集成测试增加 `t02_stage_and_unstage_spaced_paths_binary_mode_and_rename`：真实 Git 验证含空格路径的二进制（`my bin file.bin`）、仅权限变化（`my script with space.sh`）与重命名（`old path with spaces.txt` -> `new path with spaces.txt`）的识别、整文件暂存与取消暂存全流程。
+   - **第 2 条（“结果待核对”切回原 worktree 时保留）**：
+     - 在 `src/App.tsx` 中移除 `openWorktree` 开头的 `setAppError(null, id)`；
+     - 异步操作失败或“结果待核对”记录在 `worktreeErrors[opWorktreeId]` 中后，用户切换至其他工作区再切回原工作区时，错误横幅与待核对提示持续可见（满足规格第 3 节与 D05“待核对结果可见”），保留至用户重新确认或主动点击关闭（`dismissError`）。
+   - **第 3 条（T05 仅权限变化与重命名真实指纹覆盖）**：
+     - **仅权限变化**：在 `script.sh` 保持未暂存内容修改的同时，外部只将工作区权限由 755 改为 644（`chmod 644`，仅改变权限位），条目仍在 `Unstaged` 组，执行 `stage_file` 断言返回 `文件已变化，请重新确认`；
+     - **重命名**：文件预置 20 行内容并在暂存区微调 1 行（保持 95% 相似度），条目持续维持为 `Staged (Renamed)` 重命名条目，执行 `unstage_file` 断言返回 `文件已变化，请重新确认`。
+   - **第 4 条（未跟踪组折叠行为修复）**：
+     - `src/components/app/ChangesList.tsx` 引入 `prevSelectedRef` 记录上一次选中项键值；
+     - 自动展开 effect 仅在选中项发生切换且新选中项属于 `untracked` 组时触发一次展开；用户在已选中未跟踪条目上点击折叠时不再被强制重新展开，未跟踪组可正常折叠。
+   - **第 5 条（清理遗留的 `String(error)`）**：
+     - 将 `src/App.tsx` 约 1275 行（遮挡恢复处理）中的 `String(error)` 统一替换为 `getErrorMessage(error)`。
+
+2. **D06 性能回归实测结果（Release 构建，真实桌面可见窗口）：**
+   - **并排视图**（`REVIA_MEASURE_ONLY=split`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 60`；
+     - 首屏 `fromListChangesMs`: **83ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **8ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**。
+   - **统一视图**（`REVIA_MEASURE_ONLY=unified`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 59`；
+     - 首屏 `fromListChangesMs`: **94ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **8ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**，掉帧: **1**。
+
+3. **检查结果：**
+   - `pnpm exec tsc -b`：通过。
+   - `pnpm lint`：通过。
+   - `pnpm build`：通过。
+   - `cargo test --manifest-path src-tauri/Cargo.toml`：**86 个测试全部通过**（65 个单元测试 + 3 个 flow 集成测试 + 18 个 file_staging 集成测试）。
+   - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
+   - 冒烟检查（`REVIA_SMOKE=1`）：通过（7 个文件全部访问，视图切换行锚点 3322 完好保留）。
+
 
