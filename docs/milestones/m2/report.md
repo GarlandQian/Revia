@@ -1,14 +1,14 @@
 # M2 阶段报告
 
-更新日期：2026-10-23。任务 01、02 已完成，任务 09 等待 Windows CI 复核；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
+更新日期：2026-10-23。任务 01、02、09 已完成；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
 
 ## 当前进度（2026-10-23）
 
 - 任务 01：`done`，MessagePort 泄漏修复及 Q98 长测结论不变，见下一节。
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
-- 任务 09：代码审查通过；`b23ddd9` 的 [CI #39866973456](https://github.com/GarlandQian/Revia/actions/runs/39866973456) 中 macOS 通过，Windows 在 3 个含平台不支持文件名的集成测试失败，release 编译步骤被跳过，不能宣布 Windows 验收通过。当前只修测试 fixture 的平台范围，保留跨平台字面通配符安全覆盖；新结果待实际运行后记录。
+- 任务 09：`done`，`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 已完成，macOS Apple Silicon 与 Windows x64 的前端检查、Rust 测试及 release 编译全部通过。Windows 实际通过 66 单元 + 16 file_staging + 3 session_flow；测试修复增量的 Standards / Spec 双审均无新问题。最终集成仍需任务 10、11 再次验收，见 [任务 09](./issues/09-platform-compile-checks.md)。
 - 按新规则先派给 Paseo 的 deepseek；本轮 3 次重试均为 `503 auth_unavailable`，会话进入 error 且未改文件，由 Codex 接手，不切 Gemini。已把 `main` 的 `837d68a` 规则合入 `m2`，主目录不变。
-- 03、06 先完成只读实现路径核对，尚未实施；02、09 都完成后在同一 worktree 逐个推进。
+- 03、06 已完成只读实现路径核对；02、09 已完成，下一步在同一 worktree 先做 03，再做 06，不同时实施两个任务。
 
 ## 任务 01 结论（2026-10-22）
 

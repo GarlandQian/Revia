@@ -4,16 +4,16 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
 依据：[M2 规格](../spec.md)实现决策 8、D07；Q55、Q62、Q97，ADR-0007。
 
 - [x] 登录 shell、窗口外观、快捷键修饰键等平台逻辑集中，核心 Git／回收／审阅代码不散布 macOS 假设。
 - [x] macOS 现有构建与行为不退化；不提前实现 Windows 安装版、便携版、完整外壳或 hooks 体验。
 - [x] 提供 main 与 m2 的仅编译 CI，覆盖既定 macOS Apple Silicon 与 Windows x64 编译方向；不生成发布安装包或触发发布。
-- [ ] 由规划方按 Q97 正常推送 m2 至现有 origin 后，取得 Windows x64 实际编译结果与对应提交；不以只编写工作流或 Mac 交叉编译冒充通过。
-- [ ] 不推 main、不强推、不打标签、不创建 PR、不发布；权限或运行环境问题如实记录，未通过时不能勾选验收。
-- [ ] 记录本任务编译成功对应的代码版本；最终集成后的再次编译由任务 10、11 验收，早期成功不替代最终验收。
+- [x] 由规划方按 Q97 正常推送 m2 至现有 origin 后，取得 Windows x64 实际编译结果与对应提交；不以只编写工作流或 Mac 交叉编译冒充通过。
+- [x] 不推 main、不强推、不打标签、不创建 PR、不发布；权限或运行环境问题如实记录，未通过时不能勾选验收。
+- [x] 记录本任务编译成功对应的代码版本；最终集成后的再次编译由任务 10、11 验收，早期成功不替代最终验收。
 
 ## Comments
 
@@ -84,3 +84,14 @@
 - 集中本机验证：`/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` 通过，67 单元 + 20 file_staging + 3 session_flow，共 90 项；Windows 结果仍等待真实 CI，不能从本机数量推算通过。
 - 按用户更新规则先派给 Paseo 的 `cpa/deepseek-v4.1-flash`，本次连续 3 次 `503 auth_unavailable` 后进入 error、未修改文件；Codex 接手，没有切换 Gemini。`main` 的 `837d68a` 派发规则已合入 `m2`，未改动主目录。
 - 只修阻塞测试；action 的 Node 运行时弃用提示仍为非阻塞事项，本轮不顺带升级依赖。
+
+
+### 2026-10-23 / Codex 最终编译验收
+
+[Compile Check #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 对应完整提交 `3f22230c60bf8772f9d1b5334dc8e785a8da4a77`，两个作业及整个运行均为 `success`；原始结果保存在 [CI 结果](../evidence/ci-20261023/run-39869756281.json)。
+
+- macOS Apple Silicon：3 分 18 秒，前端类型检查、lint、build、Rust 测试及 release 编译全部通过。
+- Windows x64：11 分 13 秒，同样所有检查通过；直接读取 Windows 日志确认 66 单元 + 16 file_staging + 3 session_flow，共 85 项测试通过，非从 macOS 数量推算。
+- 对 `b23ddd9…3f22230` 增量进行独立两轴审查：Standards 0 项、Spec 0 项；本次未削弱字面路径安全断言，未修改产品写操作。早先 Claude 对平台实现的审查结论保留。
+- 仅按 Q97 正常推送 `m2`，没有推送 `main`、强推、标签、PR 或发布；Node action 运行时弃用提示仍为非阻塞事项。
+- 本任务关闭。这是当前代码的早期跨平台验收，不替代后续功能集成后的任务 10、11 编译与桌面验收。关闭任务的纯文档提交不冒称为本次 CI 所测源码版本。
