@@ -36,7 +36,8 @@ export interface HighlightRangeResult {
 
 /** 与 Rust 侧 `Settings` 对应。 */
 /** 长测诊断只重复的一类操作（M2 任务 01 内存定位）。 */
-export type SoakFocus = "idle" | "ipc" | "channel" | "open" | "remount" | "switch" | "scroll" | "jump" | "view";
+export type SoakFocus = "idle" | "ipc" | "highlight" | "channel" | "open" | "remount" | "switch" | "scroll" | "jump"
+  | "view";
 
 export interface SettingsPayload {
   repos: string[];

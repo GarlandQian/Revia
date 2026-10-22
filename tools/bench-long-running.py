@@ -26,7 +26,7 @@ Q98_MAX_RISE_MB = 10.0
 Q98_MAX_SLOPE_MB_PER_MINUTE = 0.5
 Q98_MIN_PRESSURE_SAMPLES = 3
 # Single-operation diagnostics: which frontend counter proves the focused load actually ran.
-FOCUS_COUNTERS = {"idle": (), "ipc": ("totalIpcRequests",), "channel": ("totalYieldedTasks",), "open": ("totalFileSwitches",),
+FOCUS_COUNTERS = {"idle": (), "ipc": ("totalIpcRequests",), "highlight": ("totalIpcRequests",), "channel": ("totalYieldedTasks",), "open": ("totalFileSwitches",),
                   "remount": ("totalFileSwitches",), "switch": ("totalFileSwitches",),
                   "scroll": ("totalScrolls",), "jump": ("totalJumps",), "view": ("totalViewSwitches",)}
 FULL_LOAD_COUNTERS = ("totalFileSwitches", "totalViewSwitches", "totalScrolls", "totalJumps")

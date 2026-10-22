@@ -981,6 +981,15 @@ export function App() {
             await yieldStep();
           };
           await openSplit(focusEntry);
+          // 每次挂载的 diff 视口元素只留弱引用；压力取样后统计未回收的个数，
+          // 区分“卸载后的 DOM 仍被持有”与“DOM 已回收但原生内存累积”。
+          const mountedRoots: WeakRef<Element>[] = [];
+          const trackRoot = () => {
+            const element = document.querySelector(".diff-scroll");
+            if (element && mountedRoots.at(-1)?.deref() !== element) mountedRoots.push(new WeakRef(element));
+          };
+          const rootSamples: Array<{ cycle: number; tracked: number; alive: number }> = [];
+          report.mountedRootSamples = rootSamples;
           let step = 0;
           while (!isTimeUp()) {
             cycle += 1;
@@ -997,6 +1006,15 @@ export function App() {
                   from, to: Math.min(from + 500, large.rowCountSplit) });
                 ipcRequests += 1;
                 await yieldStep(15);
+              } else if (focus === "highlight") {
+                // 只取两个小文件的高亮、丢弃结果，界面停在固定文件：区分高亮取数与渲染。
+                const entry = smallTexts[step % 2];
+                for (const version of ["old", "new"] as const) {
+                  await ipc.highlightRange({ worktreeId: worktree.id, path: entry.path, changes: entry.changes, version,
+                    fromLine: 1, toLine: 400 });
+                  ipcRequests += 1;
+                }
+                await yieldStep(15);
               } else if (focus === "channel") {
                 // 只反复让出任务（与打开文件时 waitUntil 相同的 nextTask），不取数、不改界面。
                 for (let index = 0; index < 20; index += 1) await nextTask();
@@ -1005,6 +1023,7 @@ export function App() {
               } else if (focus === "remount") {
                 await openSplit(binary);
                 await openSplit(fixed);
+                trackRoot();
               } else if (focus === "switch") {
                 await openSplit(smallTexts[0]);
                 await openSplit(smallTexts[1]);
@@ -1046,6 +1065,12 @@ export function App() {
                 if (focusEntry !== fixed) await openSplit(fixed);
                 diffRef.current?.scrollToRow(0);
                 await holdCheckpoint(fixed, true);
+                if (mountedRoots.length > 0) {
+                  const sample = { cycle, tracked: mountedRoots.length,
+                    alive: mountedRoots.filter((ref) => ref.deref() !== undefined).length };
+                  rootSamples.push(sample);
+                  await ipc.debugLog(`[SOAK_ROOTS] ${JSON.stringify(sample)}`);
+                }
                 if (focusEntry !== fixed) await openSplit(focusEntry);
               }
             } catch (error) {
