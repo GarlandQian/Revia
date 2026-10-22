@@ -445,6 +445,111 @@ fn t02_stage_and_unstage_chinese_and_spaces_path() {
     assert_eq!(ctx.read_file(rel), greeting.as_bytes());
 }
 
+/// 审查意见 1：含空格路径的二进制、仅权限变化与重命名的整文件暂存与取消暂存。
+#[test]
+fn t02_stage_and_unstage_spaced_paths_binary_mode_and_rename() {
+    let ctx = TestContext::new();
+
+    // 1. 初始化含空格的二进制文件、脚本文件和将被重命名的文件
+    let bin_path = "my bin file.bin";
+    let bin_data = vec![0u8, 255, 128, 64, 99];
+    ctx.write_file(bin_path, &bin_data);
+
+    let script_path = "my script with space.sh";
+    ctx.write_file(script_path, b"#!/bin/sh\n");
+
+    let old_rename_path = "old path with spaces.txt";
+    ctx.write_file(old_rename_path, b"rename space content\n");
+
+    ctx.git(&["add", bin_path, script_path, old_rename_path]);
+    ctx.git(&["commit", "-m", "init spaced files"]);
+
+    // 2. 工作区变动：
+    // - 二进制文件内容修改
+    let mut modified_bin = bin_data.clone();
+    modified_bin[2] = 42;
+    ctx.write_file(bin_path, &modified_bin);
+
+    // - 脚本文件仅权限变化（644 -> 755）
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let script_full = ctx.path().join(script_path);
+        fs::set_permissions(&script_full, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    // - 重命名带空格路径
+    let new_rename_path = "new path with spaces.txt";
+    ctx.git(&["mv", old_rename_path, new_rename_path]);
+
+    let session = ctx.open_session();
+    let snap = session.refresh().expect("刷新包含空格特殊变动的快照失败");
+
+    // 3. 验证并暂存含空格二进制文件
+    let bin_entry = snap
+        .entries
+        .iter()
+        .find(|e| e.path == bin_path && e.changes == ChangesKind::Unstaged)
+        .expect("应找到含空格二进制未暂存条目");
+    assert!(bin_entry.binary, "含空格二进制文件应正确识别为 binary");
+    let snap_after_bin_stage = session
+        .stage_file(&bin_entry.path, &bin_entry.fingerprint)
+        .expect("暂存含空格二进制文件应当成功");
+    assert!(snap_after_bin_stage.entries.iter().any(|e| e.path == bin_path && e.changes == ChangesKind::Staged));
+
+    // 取消暂存含空格二进制文件
+    let staged_bin = snap_after_bin_stage
+        .entries
+        .iter()
+        .find(|e| e.path == bin_path && e.changes == ChangesKind::Staged)
+        .unwrap();
+    let snap_after_bin_unstage = session
+        .unstage_file(&staged_bin.path, &staged_bin.fingerprint)
+        .expect("取消暂存含空格二进制文件应当成功");
+    assert!(snap_after_bin_unstage.entries.iter().any(|e| e.path == bin_path && e.changes == ChangesKind::Unstaged));
+    assert_eq!(ctx.read_file(bin_path), modified_bin);
+
+    // 4. 验证并暂存含空格仅权限变化文件
+    #[cfg(unix)]
+    {
+        let mode_entry = snap_after_bin_unstage
+            .entries
+            .iter()
+            .find(|e| e.path == script_path && e.changes == ChangesKind::Unstaged)
+            .expect("应找到含空格脚本未暂存条目");
+        let snap_after_mode_stage = session
+            .stage_file(&mode_entry.path, &mode_entry.fingerprint)
+            .expect("暂存含空格仅权限文件应当成功");
+        let staged_mode = snap_after_mode_stage
+            .entries
+            .iter()
+            .find(|e| e.path == script_path && e.changes == ChangesKind::Staged)
+            .unwrap();
+
+        // 取消暂存仅权限文件
+        let snap_after_mode_unstage = session
+            .unstage_file(&staged_mode.path, &staged_mode.fingerprint)
+            .expect("取消暂存含空格仅权限文件应当成功");
+        assert!(snap_after_mode_unstage.entries.iter().any(|e| e.path == script_path && e.changes == ChangesKind::Unstaged));
+    }
+
+    // 5. 验证并取消暂存含空格重命名文件
+    let rename_entry = snap
+        .entries
+        .iter()
+        .find(|e| e.path == new_rename_path && e.changes == ChangesKind::Staged)
+        .expect("应找到含空格重命名条目");
+    assert_eq!(rename_entry.status, FileStatus::Renamed);
+    assert_eq!(rename_entry.original_path.as_deref(), Some(old_rename_path));
+
+    let snap_after_rename_unstage = session
+        .unstage_file(&rename_entry.path, &rename_entry.fingerprint)
+        .expect("取消暂存含空格重命名文件应当成功");
+    // Q83：取消暂存重命名后，原路径为删除（已暂存），新路径为未跟踪
+    assert!(snap_after_rename_unstage.entries.iter().any(|e| e.path == old_rename_path && e.status == FileStatus::Deleted));
+    assert!(snap_after_rename_unstage.entries.iter().any(|e| e.path == new_rename_path && e.changes == ChangesKind::Untracked));
+}
+
 /// T03: 恢复被删掉的二进制文件暂存与取消暂存测试。
 #[test]
 fn t03_stage_and_unstage_binary_file() {
@@ -691,7 +796,11 @@ fn t05_comprehensive_fingerprint_verification() {
     ctx.write_file("other.txt", b"other v1\n");
     ctx.write_file("binary.bin", &[0u8, 255, 128, 64]);
     ctx.write_file("script.sh", b"#!/bin/sh\n");
-    ctx.write_file("old_renamed.txt", b"rename content\n");
+    let mut rename_content = Vec::new();
+    for i in 0..20 {
+        rename_content.extend_from_slice(format!("line {}\n", i).as_bytes());
+    }
+    ctx.write_file("old_renamed.txt", &rename_content);
     ctx.git(&["add", "target.txt", "other.txt", "binary.bin", "script.sh", "old_renamed.txt"]);
     ctx.git(&["commit", "-m", "init"]);
 
@@ -703,6 +812,7 @@ fn t05_comprehensive_fingerprint_verification() {
     ctx.write_file("other.txt", b"other v2\n");
     ctx.write_file("binary.bin", &[0u8, 255, 99, 64]);
     ctx.write_file("new_untracked.txt", b"untracked v1\n");
+    ctx.write_file("script.sh", b"#!/bin/sh\necho script v2\n");
 
     #[cfg(unix)]
     {
@@ -743,10 +853,12 @@ fn t05_comprehensive_fingerprint_verification() {
     assert!(res_content.is_err());
     assert_eq!(res_content.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 3. 仅权限改变：外部改变工作区属性，条目仍在 Unstaged，旧指纹被拒绝并提示“文件已变化，请重新确认”（审查意见 5）
+    // 3. 仅权限改变：条目仍存在时只改变权限位（755 -> 644，内容不变），旧指纹被拒绝并提示“文件已变化，请重新确认”（审查意见 3）
     #[cfg(unix)]
     {
-        ctx.write_file("script.sh", b"#!/bin/sh\necho updated\n");
+        use std::os::unix::fs::PermissionsExt;
+        let script_full = ctx.path().join("script.sh");
+        fs::set_permissions(&script_full, fs::Permissions::from_mode(0o644)).unwrap();
         let res_mode = session.stage_file(&script_entry.path, &old_script_fp);
         assert!(res_mode.is_err());
         assert_eq!(res_mode.unwrap_err().to_string(), "文件已变化，请重新确认");
@@ -764,8 +876,10 @@ fn t05_comprehensive_fingerprint_verification() {
     assert!(untracked_res.is_err());
     assert_eq!(untracked_res.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 6. 重命名相关路径外部变动：在暂存区外部修改已重命名文件，条目仍在 Staged（Renamed），旧指纹拒绝并提示“文件已变化，请重新确认”（审查意见 5）
-    ctx.write_file("new_renamed.txt", b"rename content updated\n");
+    // 6. 重命名条目外部修改：在暂存区微调内容（保持 95% 相似度，仍为重命名条目），旧指纹拒绝并提示“文件已变化，请重新确认”（审查意见 3）
+    let mut updated_rename_content = rename_content.clone();
+    updated_rename_content.extend_from_slice(b"extra line to alter blob\n");
+    ctx.write_file("new_renamed.txt", &updated_rename_content);
     ctx.git(&["add", "new_renamed.txt"]);
     let renamed_res = session.unstage_file(&renamed_entry.path, &old_renamed_fp);
     assert!(renamed_res.is_err());

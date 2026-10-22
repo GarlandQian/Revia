@@ -296,15 +296,10 @@ fn byte_lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
     })
 }
 
-/// 从 `diff --git a/x b/y` 里取一个初始路径，后续由 `+++` / `---` 覆盖。
+/// 从 `diff --git a/x b/y` 里取一个初始路径，后续由扩展头（rename/copy）或 `+++` / `---` 覆盖。
 fn file_from_git_header(rest: &str) -> FileChange {
-    let (first_tok, remainder) = next_header_token(rest.trim());
-    let (second_tok, _) = next_header_token(remainder.trim());
-    let path = second_tok
-        .as_deref()
-        .and_then(strip_prefix_path)
-        .or_else(|| first_tok.as_deref().and_then(strip_prefix_path))
-        .unwrap_or_default();
+    let rest = rest.trim();
+    let path = parse_git_header_path(rest);
     FileChange {
         path,
         old_path: None,
@@ -317,6 +312,35 @@ fn file_from_git_header(rest: &str) -> FileChange {
         new_lines: 0,
         raw_patch: Vec::new(),
     }
+}
+
+/// 解析 `diff --git <src> <dst>` 行中的路径（审查意见 1）。
+///
+/// 1. 两边路径相同时对称切分（覆盖含空格的二进制文件、仅权限变化等无 `---`/`+++` 的情况）；
+/// 2. 两边不同时尝试分别解析 token；后续行由 `rename from`/`rename to`/`copy from`/`copy to` 扩展头或 `---`/`+++` 覆盖。
+fn parse_git_header_path(rest: &str) -> String {
+    // 1. 对称切分优先：若中间有空格且两边 strip_prefix_path 相同，直接返回该路径。
+    if rest.len() >= 5 {
+        let mid = (rest.len() - 1) / 2;
+        if rest.as_bytes()[mid] == b' ' {
+            let left = &rest[..mid];
+            let right = &rest[mid + 1..];
+            if let (Some(l), Some(r)) = (strip_prefix_path(left), strip_prefix_path(right)) {
+                if l == r {
+                    return r;
+                }
+            }
+        }
+    }
+
+    // 2. 备用 token 切分（如重命名两边路径长度不同）
+    let (first_tok, remainder) = next_header_token(rest);
+    let (second_tok, _) = next_header_token(remainder.trim());
+    second_tok
+        .as_deref()
+        .and_then(strip_prefix_path)
+        .or_else(|| first_tok.as_deref().and_then(strip_prefix_path))
+        .unwrap_or_default()
 }
 
 fn next_header_token(s: &str) -> (Option<String>, &str) {
@@ -577,6 +601,29 @@ rename to "new\" name.txt"
         assert_eq!(result.files[1].status, FileStatus::Added);
         assert_eq!(result.files[2].path, "new\" name.txt");
         assert_eq!(result.files[2].old_path.as_deref(), Some("old\" name.txt"));
+        assert_eq!(result.files[2].status, FileStatus::Renamed);
+    }
+
+    #[test]
+    fn parses_spaced_paths_binary_mode_and_rename() {
+        let patch = r#"diff --git a/my bin file.bin b/my bin file.bin
+index 9bd4759..a08e4bd 100644
+Binary files a/my bin file.bin and b/my bin file.bin differ
+diff --git a/my script with space.sh b/my script with space.sh
+old mode 100644
+new mode 100755
+diff --git a/old path with spaces.txt b/new path with spaces.txt
+similarity index 100%
+rename from old path with spaces.txt
+rename to new path with spaces.txt
+"#;
+        let result = parse(patch);
+        assert_eq!(result.files.len(), 3);
+        assert_eq!(result.files[0].path, "my bin file.bin");
+        assert!(result.files[0].binary);
+        assert_eq!(result.files[1].path, "my script with space.sh");
+        assert_eq!(result.files[2].path, "new path with spaces.txt");
+        assert_eq!(result.files[2].old_path.as_deref(), Some("old path with spaces.txt"));
         assert_eq!(result.files[2].status, FileStatus::Renamed);
     }
 }
