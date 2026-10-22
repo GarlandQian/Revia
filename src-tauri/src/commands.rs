@@ -301,7 +301,7 @@ pub struct SoakDiagnosticConfig {
     pub logging_mode: String,
     pub idle_seconds: u64,
     pub cycles: Option<u64>,
-    /// 只重复一类操作的诊断（idle、ipc、open、scroll、jump、view），用于定位压力后仍保留的内存增长。
+    /// 只重复一类操作的诊断（idle、ipc、channel、open、scroll、jump、view），用于定位压力后仍保留的内存增长。
     pub focus: Option<String>,
 }
 
@@ -318,7 +318,7 @@ fn soak_diagnostic() -> Option<SoakDiagnosticConfig> {
         cycles: std::env::var("REVIA_SOAK_DIAG_CYCLES")
             .ok().and_then(|value| value.parse::<u64>().ok()).filter(|value| *value > 0),
         focus: std::env::var("REVIA_SOAK_DIAG_FOCUS").ok()
-            .filter(|value| matches!(value.as_str(), "idle" | "ipc" | "open" | "scroll" | "jump" | "view")),
+            .filter(|value| matches!(value.as_str(), "idle" | "ipc" | "channel" | "open" | "scroll" | "jump" | "view")),
     })
 }
 

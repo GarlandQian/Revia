@@ -847,6 +847,7 @@ export function App() {
         let scrolls = 0;
         let jumps = 0;
         let ipcRequests = 0;
+        let yieldedTasks = 0;
         let currentView: ViewMode = "split";
         let lastHeartbeat = performance.now();
         let lastCheckpoint = startedAt;
@@ -963,7 +964,7 @@ export function App() {
           const fixed = entries.find((entry) => entry.path === "src/staged.ts" && entry.changes === "staged");
           const large = entries.find((entry) => entry.path === "src/generated.ts");
           if (!fixed || !large) throw new Error("单项诊断缺少固定文件");
-          const focusEntry = focus === "idle" || focus === "ipc" ? fixed : large;
+          const focusEntry = focus === "idle" || focus === "ipc" || focus === "channel" ? fixed : large;
           const openSplit = async (entry: ChangeEntry) => {
             const expand = !entry.binary;
             await openEntry(entry, { view: "split", worktreeId: worktree.id, expand });
@@ -982,7 +983,7 @@ export function App() {
             if (document.hidden) await resumeWhenVisible("操作前窗口不可见");
             try {
               const handle = diffRef.current;
-              if (focus !== "idle" && focus !== "ipc" && focus !== "open" && !handle) throw new Error("diff 未挂载");
+              if (focusEntry === large && focus !== "open" && !handle) throw new Error("diff 未挂载");
               if (focus === "idle") {
                 await sleep(1000);
               } else if (focus === "ipc") {
@@ -991,6 +992,11 @@ export function App() {
                 await ipc.getRows({ worktreeId: worktree.id, path: large.path, changes: large.changes, view: "split",
                   from, to: Math.min(from + 500, large.rowCountSplit) });
                 ipcRequests += 1;
+                await yieldStep(15);
+              } else if (focus === "channel") {
+                // 只反复让出任务（与打开文件时 waitUntil 相同的 nextTask），不取数、不改界面。
+                for (let index = 0; index < 20; index += 1) await nextTask();
+                yieldedTasks += 20;
                 await yieldStep(15);
               } else if (focus === "open") {
                 for (const entry of entries) {
@@ -1159,6 +1165,7 @@ export function App() {
         report.totalScrolls = scrolls;
         report.totalJumps = jumps;
         report.totalIpcRequests = ipcRequests;
+        report.totalYieldedTasks = yieldedTasks;
         report.finalVisibility = finalVisibility;
         report.samplesCount = samples.length;
         report.samples = samples;
