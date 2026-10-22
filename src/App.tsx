@@ -22,7 +22,7 @@ import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffV
 import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
-import { ipc } from "@/lib/ipc";
+import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
@@ -49,7 +49,8 @@ interface MeasureConfig {
   targetPath: string | null;
   soakSeconds: number | null;
   minimalSoakLogging: boolean;
-  soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null } | null;
+  soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null;
+    focus: SoakFocus | null } | null;
 }
 
 type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
@@ -845,6 +846,7 @@ export function App() {
         let viewSwitches = 0;
         let scrolls = 0;
         let jumps = 0;
+        let ipcRequests = 0;
         let currentView: ViewMode = "split";
         let lastHeartbeat = performance.now();
         let lastCheckpoint = startedAt;
@@ -858,8 +860,144 @@ export function App() {
         const yieldStep = async (ms = 30) => {
           await sleep(ms);
         };
+        // 通过工具栏事件调用最新渲染闭包，避免长期任务持有旧的选中项。
+        const clickView = async (label: string, rowCount: number) => {
+          const buttons = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
+          );
+          const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
+          if (!button) throw new Error(`找不到视图按钮：${label}`);
+          button.click();
+          if (!await waitForSoak(() => button.getAttribute("aria-pressed") === "true"
+            && rowStore.rowCountValue === rowCount && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
+            throw new Error(`视图切换未完成：${label}`);
+          }
+        };
+        const heartbeat = async (path: string) => {
+          const now = performance.now();
+          if (now - lastHeartbeat < 10_000 && !isTimeUp()) return;
+          lastHeartbeat = now;
+          const vis = await monitor.sample();
+          const elapsedSec = Math.round((now - startedAt) / 1000);
+          const sample = {
+            elapsedSec,
+            cycle,
+            file: path,
+            view: currentView,
+            visibility: vis,
+            loadedChunks: rowStore.getSnapshot().loadedChunks,
+            highlightLines: highlightStore.getSnapshot().loadedLines,
+            ...(diagnostics ? { ipc: diagnostics.snapshot() } : {}),
+          };
+          samples.push(sample);
+          if (diagnostics) await ipc.debugLog(`[SOAK_HEARTBEAT] ${JSON.stringify(sample)}`);
+          if (vis.hidden || vis.rafPerSecond <= 5 || vis.hiddenTransitions > 0 || vis.maxFrameGapMs > 2000) {
+            throw new Error(`可见连续合成中断：${JSON.stringify(vis)}`);
+          }
+          debugLog(
+            `[SOAK] ${elapsedSec}s/${soakSeconds}s cycle=${cycle} file=${path} view=${currentView} ` +
+              `vis=${vis.state} rAF=${vis.rafPerSecond.toFixed(1)} chunks=${sample.loadedChunks} tokens=${sample.highlightLines}`,
+          );
+        };
+        // 固定阶段：staged.ts、并排、顶部、数据就绪后静置，由驱动在窗口内取样；压力阶段静置更久（Q98）。
+        const holdCheckpoint = async (entry: ChangeEntry, pressure: boolean) => {
+          const pauseStarted = performance.now();
+          await sleep(500);
+          const settled = await waitForSoak(() => rowStore.getSnapshot().pendingChunks === 0
+            && highlightStore.getSnapshot().pending === 0, 1000);
+          if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
+            || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
+          const checkpoint = { cycle, file: entry.path, view: currentView, pressure, startedAt: new Date().toISOString(),
+            endedAt: "",
+            ...(diagnostics ? { ipcBefore: diagnostics.snapshot(), ipcAfter: undefined as IpcDiagnosticSample | undefined } : {}) };
+          checkpoints.push(checkpoint);
+          await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}${pressure ? " pressure" : ""}`);
+          // Hold one known phase briefly; compositor monitoring remains active throughout.
+          await sleep(pressure ? 16_000 : 3500);
+          await ipc.debugLog(`[SOAK_CHECKPOINT_END] ${cycle}`);
+          checkpoint.endedAt = new Date().toISOString();
+          if (diagnostics) checkpoint.ipcAfter = diagnostics.snapshot();
+          checkpointPauseMs += performance.now() - pauseStarted;
+          lastCheckpoint = performance.now();
+        };
 
-        while (!isTimeUp() && (diagnostic?.cycles == null || cycle < diagnostic.cycles)) {
+        // 单项诊断：只重复一类操作，约每 90 秒回到固定阶段做一次压力取样，定位压力后仍保留的内存增长来自哪类操作。
+        const focus = diagnostic?.focus ?? null;
+        if (focus) {
+          const fixed = entries.find((entry) => entry.path === "src/staged.ts" && entry.changes === "staged");
+          const large = entries.find((entry) => entry.path === "src/generated.ts");
+          if (!fixed || !large) throw new Error("单项诊断缺少固定文件");
+          const focusEntry = focus === "idle" || focus === "ipc" ? fixed : large;
+          const openSplit = async (entry: ChangeEntry) => {
+            const expand = !entry.binary;
+            await openEntry(entry, { view: "split", worktreeId: worktree.id, expand });
+            currentView = "split";
+            fileSwitches += 1;
+            if (expand && entry.rowCountSplit > 0 && !await waitForSoak(() => !rowStore.getSnapshot().error
+              && rowStore.rowCountValue > 0 && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
+              throw new Error(`等待行数据超时：${entry.path}`);
+            }
+            await yieldStep();
+          };
+          await openSplit(focusEntry);
+          let step = 0;
+          while (!isTimeUp()) {
+            cycle += 1;
+            const handle = diffRef.current;
+            if (focus !== "idle" && focus !== "ipc" && focus !== "open" && !handle) throw new Error("diff 未挂载");
+            if (focus === "idle") {
+              await sleep(1000);
+            } else if (focus === "ipc") {
+              // 只取行、丢弃结果，界面停在固定文件：区分 IPC 本身与渲染。
+              const from = (step * 500) % large.rowCountSplit;
+              await ipc.getRows({ worktreeId: worktree.id, path: large.path, changes: large.changes, view: "split",
+                from, to: Math.min(from + 500, large.rowCountSplit) });
+              ipcRequests += 1;
+              await yieldStep(15);
+            } else if (focus === "open") {
+              for (const entry of entries) {
+                if (isTimeUp()) break;
+                await openSplit(entry);
+              }
+            } else if (focus === "scroll") {
+              handle!.scrollToRow((step % 12) * 40);
+              scrolls += 1;
+              await yieldStep();
+            } else if (focus === "jump") {
+              const target = Math.floor(large.rowCountSplit * [0.25, 0.5, 0.75][step % 3]);
+              rowStore.prioritize(target, target + 40);
+              handle!.scrollToRow(target);
+              jumps += 1;
+              if (!await waitForSoak(() => rowStore.isCovered(target, target + 40), 2000)) {
+                throw new Error(`跳转数据超时：${large.path}`);
+              }
+              await yieldStep();
+              handle!.scrollToRow(0);
+              jumps += 1;
+              await yieldStep();
+            } else {
+              await clickView("统一", large.rowCountUnified);
+              currentView = "unified";
+              viewSwitches += 1;
+              await yieldStep();
+              await clickView("并排", large.rowCountSplit);
+              currentView = "split";
+              viewSwitches += 1;
+              await yieldStep();
+            }
+            step += 1;
+            await heartbeat(focusEntry.path);
+            if (performance.now() - lastCheckpoint >= 90_000
+              && startedAt + soakSeconds * 1000 + checkpointPauseMs - performance.now() > 5000) {
+              if (focusEntry !== fixed) await openSplit(fixed);
+              diffRef.current?.scrollToRow(0);
+              await holdCheckpoint(fixed, true);
+              if (focusEntry !== fixed) await openSplit(focusEntry);
+            }
+          }
+        }
+
+        while (!focus && !isTimeUp() && (diagnostic?.cycles == null || cycle < diagnostic.cycles)) {
           cycle += 1;
           for (const entry of entries) {
             if (isTimeUp()) break;
@@ -913,20 +1051,6 @@ export function App() {
                 await yieldStep();
               }
 
-              // 通过工具栏事件调用最新渲染闭包，避免长期任务持有旧的选中项。
-              const clickView = async (label: string, rowCount: number) => {
-                const buttons = Array.from(
-                  document.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
-                );
-                const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
-                if (!button) throw new Error(`找不到视图按钮：${label}`);
-                button.click();
-                if (!await waitForSoak(() => button.getAttribute("aria-pressed") === "true"
-                  && rowStore.rowCountValue === rowCount && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
-                  throw new Error(`视图切换未完成：${label}`);
-                }
-              };
-
               if (!isTimeUp()) {
                 await clickView("统一", entry.rowCountUnified);
                 viewSwitches += 1;
@@ -954,58 +1078,16 @@ export function App() {
               }
             }
 
-            const now = performance.now();
             debugLog(
-              `[SOAK] 循环 ${cycle} ${entry.path} 用时 ${Math.round(now - stepStarted)} ms ` +
+              `[SOAK] 循环 ${cycle} ${entry.path} 用时 ${Math.round(performance.now() - stepStarted)} ms ` +
                 `（chunks=${rowStore.getSnapshot().loadedChunks} tokens=${highlightStore.getSnapshot().loadedLines}）`,
             );
-            if (now - lastHeartbeat >= 10_000 || isTimeUp()) {
-              lastHeartbeat = now;
-              const vis = await monitor.sample();
-              const elapsedSec = Math.round((now - startedAt) / 1000);
-              const sample = {
-                elapsedSec,
-                cycle,
-                file: entry.path,
-                view: currentView,
-                visibility: vis,
-                loadedChunks: rowStore.getSnapshot().loadedChunks,
-                highlightLines: highlightStore.getSnapshot().loadedLines,
-                ...(diagnostics ? { ipc: diagnostics.snapshot() } : {}),
-              };
-              samples.push(sample);
-              if (diagnostics) await ipc.debugLog(`[SOAK_HEARTBEAT] ${JSON.stringify(sample)}`);
-              if (vis.hidden || vis.rafPerSecond <= 5 || vis.hiddenTransitions > 0 || vis.maxFrameGapMs > 2000) {
-                throw new Error(`可见连续合成中断：${JSON.stringify(vis)}`);
-              }
-              debugLog(
-                `[SOAK] ${elapsedSec}s/${soakSeconds}s cycle=${cycle} file=${entry.path} view=${currentView} ` +
-                  `vis=${vis.state} rAF=${vis.rafPerSecond.toFixed(1)} chunks=${sample.loadedChunks} tokens=${sample.highlightLines}`,
-              );
-            }
+            await heartbeat(entry.path);
             if (entry.path === "src/staged.ts" && entry.changes === "staged" && currentView === "split"
               && performance.now() - lastCheckpoint >= 60_000
               && startedAt + soakSeconds * 1000 + checkpointPauseMs - performance.now() > 5000) {
-              const pauseStarted = performance.now();
-              await sleep(500);
-              const settled = await waitForSoak(() => rowStore.getSnapshot().pendingChunks === 0
-                && highlightStore.getSnapshot().pending === 0, 1000);
-              if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
-                || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
               // 每第 5 个阶段（约 5 分钟一次）是压力阶段：驱动发送 WebKit 低内存通知，约 10 秒后取样（Q98）。
-              const pressure = checkpoints.length % 5 === 4;
-              const checkpoint = { cycle, file: entry.path, view: currentView, pressure, startedAt: new Date().toISOString(),
-                endedAt: "",
-                ...(diagnostics ? { ipcBefore: diagnostics.snapshot(), ipcAfter: undefined as IpcDiagnosticSample | undefined } : {}) };
-              checkpoints.push(checkpoint);
-              await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}${pressure ? " pressure" : ""}`);
-              // Hold one known phase briefly; compositor monitoring remains active throughout.
-              await sleep(pressure ? 16_000 : 3500);
-              await ipc.debugLog(`[SOAK_CHECKPOINT_END] ${cycle}`);
-              checkpoint.endedAt = new Date().toISOString();
-              if (diagnostics) checkpoint.ipcAfter = diagnostics.snapshot();
-              checkpointPauseMs += performance.now() - pauseStarted;
-              lastCheckpoint = performance.now();
+              await holdCheckpoint(entry, checkpoints.length % 5 === 4);
             }
           }
         }
@@ -1027,6 +1109,7 @@ export function App() {
         report.totalViewSwitches = viewSwitches;
         report.totalScrolls = scrolls;
         report.totalJumps = jumps;
+        report.totalIpcRequests = ipcRequests;
         report.finalVisibility = finalVisibility;
         report.samplesCount = samples.length;
         report.samples = samples;

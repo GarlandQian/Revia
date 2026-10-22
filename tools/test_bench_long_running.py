@@ -298,6 +298,18 @@ class BenchmarkSafetyTests(unittest.TestCase):
         self.assertFalse(verdict["series"]["webContentFootprintMb"]["passed"])
         self.assertFalse(bench.analyze_q98(regular, flat[:2], 10)["passed"])
 
+    def test_focus_diagnostic_requires_only_its_own_load(self):
+        diagnostic = {"loggingMode": "minimal", "idleSeconds": 0, "cycles": None, "focus": "ipc"}
+        frontend = {"ok": True, "diagnostic": diagnostic, "minimalSoakLogging": True, "ipcFinal": {},
+                    "actualDurationSeconds": 60, "idle": {"actualSeconds": 0}, "totalIpcRequests": 10}
+        samples = [{"webContentPids": [45]}]
+        self.assertEqual(bench.completion_errors(frontend, samples, 60, 0, diagnostic, True), [])
+        self.assertTrue(bench.completion_errors(dict(frontend, totalIpcRequests=0), samples, 60, 0, diagnostic, True))
+        idle = dict(diagnostic, focus="idle")
+        self.assertEqual(bench.completion_errors(dict(frontend, diagnostic=idle), samples, 60, 0, idle, True), [])
+        full = dict(diagnostic, focus=None)
+        self.assertTrue(bench.completion_errors(dict(frontend, diagnostic=full), samples, 60, 0, full, True))
+
     def test_cold_fixture_ignores_inherited_git_targets(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "fixture"

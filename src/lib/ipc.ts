@@ -35,6 +35,9 @@ export interface HighlightRangeResult {
 }
 
 /** 与 Rust 侧 `Settings` 对应。 */
+/** 长测诊断只重复的一类操作（M2 任务 01 内存定位）。 */
+export type SoakFocus = "idle" | "ipc" | "open" | "scroll" | "jump" | "view";
+
 export interface SettingsPayload {
   repos: string[];
   lastWorktreeId: string | null;
@@ -103,7 +106,8 @@ export const ipc = {
       smoke: boolean;
       soakSeconds: number | null;
       minimalSoakLogging: boolean;
-      soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null } | null;
+      soakDiagnostic: { loggingMode: "verbose" | "minimal"; idleSeconds: number; cycles: number | null;
+        focus: SoakFocus | null } | null;
     }>("measure_config"),
   writeMeasurement: (payload: unknown) => invoke<string | null>("write_measurement", { payload }),
   debugLog: (message: string) => invoke<void>("debug_log", { message }),

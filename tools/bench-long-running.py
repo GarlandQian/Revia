@@ -25,6 +25,10 @@ Q98_WARMUP_SECONDS = 180
 Q98_MAX_RISE_MB = 10.0
 Q98_MAX_SLOPE_MB_PER_MINUTE = 0.5
 Q98_MIN_PRESSURE_SAMPLES = 3
+# Single-operation diagnostics: which frontend counter proves the focused load actually ran.
+FOCUS_COUNTERS = {"idle": (), "ipc": ("totalIpcRequests",), "open": ("totalFileSwitches",),
+                  "scroll": ("totalScrolls",), "jump": ("totalJumps",), "view": ("totalViewSwitches",)}
+FULL_LOAD_COUNTERS = ("totalFileSwitches", "totalViewSwitches", "totalScrolls", "totalJumps")
 
 
 def webkit_services(domain):
@@ -362,7 +366,8 @@ def completion_errors(frontend, samples, seconds, returncode, diagnostic=None, m
             errors.append("诊断静置时长不足")
     if not samples or any(not s.get("webContentPids") for s in samples):
         errors.append("缺少已归属的 WebContent 内存数据")
-    if any(frontend.get(key, 0) <= 0 for key in ("totalFileSwitches", "totalViewSwitches", "totalScrolls", "totalJumps")):
+    focus = diagnostic.get("focus") if diagnostic else None
+    if any(frontend.get(key, 0) <= 0 for key in (FOCUS_COUNTERS[focus] if focus else FULL_LOAD_COUNTERS)):
         errors.append("缺少必需的操作负载")
     return errors
 
@@ -393,19 +398,23 @@ def main():
     parser.add_argument("--idle-seconds", type=int, default=90)
     parser.add_argument("--keep-on-top", action="store_true",
                         help="受测窗口保持在最前并出现在所有桌面空间（仅诊断用，避免被遮挡中断）")
+    parser.add_argument("--focus", choices=tuple(FOCUS_COUNTERS),
+                        help="诊断只重复一类操作，约每 90 秒压力取样一次（需同时指定 --diagnostic-logging）")
     parser.add_argument("--diagnostic-cycles", type=int,
                         help="诊断固定完整循环数；seconds/minutes 此时只作为主动操作安全上限")
     args = parser.parse_args()
     seconds = args.seconds if args.seconds is not None else args.minutes * 60
     diagnostic = ({"loggingMode": args.diagnostic_logging, "idleSeconds": args.idle_seconds,
-                   "cycles": args.diagnostic_cycles} if args.diagnostic_logging else None)
+                   "cycles": args.diagnostic_cycles, "focus": args.focus} if args.diagnostic_logging else None)
     if args.baseline_minimal_logging and diagnostic:
         parser.error("正式基线和短诊断模式不能同时选择")
     minimal_logging = args.baseline_minimal_logging or args.diagnostic_logging == "minimal"
     if args.idle_seconds < 0 or (args.diagnostic_cycles is not None and args.diagnostic_cycles <= 0):
         parser.error("静置时长不能为负，固定循环数必须为正")
-    if not diagnostic and (args.diagnostic_cycles is not None or args.idle_seconds != 90):
-        parser.error("循环数和静置参数仅适用于显式诊断模式")
+    if not diagnostic and (args.diagnostic_cycles is not None or args.idle_seconds != 90 or args.focus):
+        parser.error("循环数、静置和单项参数仅适用于显式诊断模式")
+    if args.focus and args.diagnostic_cycles is not None:
+        parser.error("单项诊断按时长运行，不能指定固定循环数")
     app, repo, output = Path(args.app).resolve(), Path(args.repo).resolve(), Path(args.output).resolve()
     binary = app / "Contents/MacOS/revia"
     frontend_path, log_path, samples_path, phase_samples_path = (Path(str(output) + suffix) for suffix in (
@@ -429,6 +438,8 @@ def main():
         env.update(REVIA_SOAK_DIAG_LOGS=diagnostic["loggingMode"], REVIA_SOAK_IDLE_SECONDS=str(args.idle_seconds))
         if args.diagnostic_cycles is not None:
             env["REVIA_SOAK_DIAG_CYCLES"] = str(args.diagnostic_cycles)
+        if args.focus:
+            env["REVIA_SOAK_DIAG_FOCUS"] = args.focus
     binary_sha256 = binary_fingerprint(binary)
     started = time.monotonic()
     started_at = datetime.datetime.now().astimezone().isoformat()
@@ -524,7 +535,8 @@ def main():
         "errors": errors, "frontend": frontend, "memoryTimeSeries": samples,
         "memoryAnalysis": (None if diagnostic else analyze_memory(samples, frontend.get("setupSeconds", 0))),
         "phaseMemoryTimeSeries": phase_samples,
-        "q98MemoryVerdict": (None if diagnostic else analyze_q98(samples, phase_samples, frontend.get("setupSeconds", 0))),
+        # Diagnostic runs report the same Q98 numbers for comparison; only baselines count for acceptance.
+        "q98MemoryVerdict": analyze_q98(samples, phase_samples, frontend.get("setupSeconds", 0)),
         "phaseMemorySummary": {
             "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),
             "invalidSampleCount": sum(not s["valid"] for s in phase_samples),
