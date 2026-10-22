@@ -1,0 +1,257 @@
+{
+  "combos": [
+    {
+      "firstScreen": {
+        "devicePixelRatio": 2,
+        "fileCount": 7,
+        "firstRowsMs": 44,
+        "fromListChangesMs": 87,
+        "fromOpenWorktreeMs": 234,
+        "listChangesMs": 42,
+        "rafPainted": false,
+        "renderMs": 44,
+        "rowCount": 8309,
+        "viewportHeight": 718
+      },
+      "highlight": {
+        "lastRoundTripMs": 26,
+        "loadedLines": 800,
+        "roundTrips": 800
+      },
+      "id": 1,
+      "jump": {
+        "appearMs": 18,
+        "colorRestoreMs": 17,
+        "fetchMs": 11,
+        "fromRow": 0,
+        "targetCovered": true,
+        "targetWasCached": true,
+        "timing": {
+          "dataWaitMs": 1,
+          "prioritizeMs": 0,
+          "scrollCallMs": 10,
+          "taskQueueMs": 7
+        },
+        "toRow": 4985,
+        "warmAppearMs": 8,
+        "warmCovered": true,
+        "warmTargetWasCached": true,
+        "warmTiming": {
+          "dataWaitMs": 0,
+          "prioritizeMs": 0,
+          "scrollCallMs": 2,
+          "taskQueueMs": 6
+        },
+        "warmWithinOneFrame": true,
+        "withinOneFrame": false
+      },
+      "jumpDom": {
+        "outward": {
+          "colorDomMs": null,
+          "colorsCachedBefore": false,
+          "completed": true,
+          "final": {
+            "canvasAligned": true,
+            "canvasReady": true,
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 80,
+            "matchedRows": 40,
+            "placeholderExposed": false,
+            "placeholderRows": 0,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "firstFrame": {
+            "callbackMs": 7,
+            "checkedMs": 7,
+            "dom": {
+              "canvasAligned": true,
+              "canvasReady": true,
+              "coloredCells": 0,
+              "colorsCached": false,
+              "colorsMatched": false,
+              "expectedColoredCells": 80,
+              "matchedRows": 40,
+              "placeholderExposed": false,
+              "placeholderRows": 0,
+              "requiredRows": 40,
+              "textMatched": true
+            },
+            "hidden": false,
+            "rafTimestampMs": 7
+          },
+          "frameBudgetMs": 16.7,
+          "frameReady": true,
+          "fromRow": 0,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "immediate": {
+            "canvasAligned": true,
+            "canvasReady": true,
+            "coloredCells": 0,
+            "colorsCached": false,
+            "colorsMatched": false,
+            "expectedColoredCells": 80,
+            "matchedRows": 40,
+            "placeholderExposed": false,
+            "placeholderRows": 0,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "immediateDomMs": 3,
+          "missingRowsBefore": 0,
+          "observer": {
+            "callbacks": 1,
+            "firstCallbackMs": 3,
+            "records": 124
+          },
+          "placeholderStyle": {
+            "backgroundColor": "oklab(0.2038 0 0)",
+            "backgroundImage": "linear-gradient(rgba(0, 0, 0, 0) 17px, oklab(0.2542 0 0) 17px), linear-gradient(to right, oklab(0.229 0 0) 0px, oklab(0.229 0 0) 56px, rgba(0, 0, 0, 0) 56px, rgba(0, 0, 0, 0) 50%, oklab(0.229 0 0) 50%, oklab(0.229 0 0) calc(50% + 56px), rgba(0, 0, 0, 0) calc(50% + 56px))",
+            "backgroundRepeat": "repeat-y",
+            "backgroundSize": "100% 18px",
+            "ready": true,
+            "viewportHeight": 718,
+            "viewportWidth": 980
+          },
+          "scrollCallMs": 2,
+          "targetWasCached": true,
+          "textBudgetMs": 16.7,
+          "textDomMs": 3,
+          "textDomSource": "synchronous",
+          "textWithinBudget": true,
+          "timedOut": false,
+          "timeoutMs": 4000,
+          "toRow": 6647
+        },
+        "preparationError": null,
+        "return": {
+          "colorDomMs": 38,
+          "colorsCachedBefore": true,
+          "completed": true,
+          "final": {
+            "canvasAligned": true,
+            "canvasReady": true,
+            "coloredCells": 77,
+            "colorsCached": true,
+            "colorsMatched": true,
+            "expectedColoredCells": 77,
+            "matchedRows": 40,
+            "placeholderExposed": false,
+            "placeholderRows": 0,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "firstFrame": {
+            "callbackMs": 15,
+            "checkedMs": 15,
+            "dom": {
+              "canvasAligned": true,
+              "canvasReady": true,
+              "coloredCells": 10,
+              "colorsCached": true,
+              "colorsMatched": false,
+              "expectedColoredCells": 77,
+              "matchedRows": 40,
+              "placeholderExposed": false,
+              "placeholderRows": 0,
+              "requiredRows": 40,
+              "textMatched": true
+            },
+            "hidden": false,
+            "rafTimestampMs": 15
+          },
+          "frameBudgetMs": 16.7,
+          "frameReady": true,
+          "fromRow": 6647,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "immediate": {
+            "canvasAligned": true,
+            "canvasReady": true,
+            "coloredCells": 10,
+            "colorsCached": true,
+            "colorsMatched": false,
+            "expectedColoredCells": 77,
+            "matchedRows": 40,
+            "placeholderExposed": false,
+            "placeholderRows": 0,
+            "requiredRows": 40,
+            "textMatched": true
+          },
+          "immediateDomMs": 1,
+          "missingRowsBefore": 0,
+          "observer": {
+            "callbacks": 2,
+            "firstCallbackMs": 1,
+            "records": 867
+          },
+          "placeholderStyle": {
+            "backgroundColor": "oklab(0.2038 0 0)",
+            "backgroundImage": "linear-gradient(rgba(0, 0, 0, 0) 17px, oklab(0.2542 0 0) 17px), linear-gradient(to right, oklab(0.229 0 0) 0px, oklab(0.229 0 0) 56px, rgba(0, 0, 0, 0) 56px, rgba(0, 0, 0, 0) 50%, oklab(0.229 0 0) 50%, oklab(0.229 0 0) calc(50% + 56px), rgba(0, 0, 0, 0) calc(50% + 56px))",
+            "backgroundRepeat": "repeat-y",
+            "backgroundSize": "100% 18px",
+            "ready": true,
+            "viewportHeight": 718,
+            "viewportWidth": 980
+          },
+          "scrollCallMs": 1,
+          "targetWasCached": true,
+          "textBudgetMs": 16.7,
+          "textDomMs": 1,
+          "textDomSource": "synchronous",
+          "textWithinBudget": true,
+          "timedOut": false,
+          "timeoutMs": 4000,
+          "toRow": 0
+        },
+        "sourcePreparation": "explicit-cache-and-normal-scroll",
+        "sourceReady": true
+      },
+      "jumpDomError": null,
+      "label": "split / src/generated.ts",
+      "path": "src/generated.ts",
+      "scroll": {
+        "droppedFrames": 1,
+        "fallbackFrames": 0,
+        "frameMaxMs": 33,
+        "frameP50Ms": 17,
+        "frameP95Ms": 18,
+        "frames": 60,
+        "mode": "frame",
+        "rafFrames": 60,
+        "requestedScreens": 60,
+        "screens": 60,
+        "scrollDistancePx": 43080,
+        "seconds": 0.998,
+        "uncoveredFrames": 0,
+        "uncoveredMax": 0,
+        "uncoveredP95": 0
+      },
+      "startedAt": "23:25:12.028",
+      "view": "split",
+      "visibility": {
+        "devicePixelRatio": 2,
+        "hidden": false,
+        "rafPerSecond": 61,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    }
+  ],
+  "ok": true,
+  "visibility": {
+    "devicePixelRatio": 2,
+    "focused": true,
+    "hidden": false,
+    "hiddenTransitions": 0,
+    "maxFrameGapMs": 37,
+    "rafPerSecond": 60,
+    "state": "visible",
+    "viewportHeight": 800,
+    "viewportWidth": 1280
+  }
+}

@@ -63,7 +63,7 @@ node tools/test-ipc-diagnostics.mjs
 node tools/test-visible-highlight-lines.mjs
 ```
 
-17 项 Python 标准库测试覆盖无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。不引入新的测试框架。另有 11 项 Node 原生 IPC 诊断回归和 13 项可见高亮行回归，后者覆盖两视图、旧/新行号偏移、离散 hunk、纯增删及半开可见窗口。
+20 项 Python 标准库测试覆盖压力取样与 Q98 判定、单项诊断的负载要求、静置期间遮挡判无效、无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。不引入新的测试框架。另有 11 项 Node 原生 IPC 诊断回归和 13 项可见高亮行回归，后者覆盖两视图、旧/新行号偏移、离散 hunk、纯增删及半开可见窗口。
 
 ## 跳转与颜色诊断的口径
 
@@ -121,3 +121,32 @@ caffeinate -di python3 tools/bench-long-running.py --minutes 30 \
 ```
 
 它仍运行同进程 30 分钟主动负载、既定检查点和 180 秒热身分界；不启用固定循环或结束静置。关键心跳、阶段边界、最终报告与只读 IPC 观察仍保存，逐步骤日志不发送，面板布局不变。驱动核对前端日志模式并要求完整时长与 IPC 报告；`runCompleted` 仍不表示内存趋势或 D06 已通过。
+
+
+## 压力取样与 Q98 判定
+
+长测每第 5 个固定阶段（约 5 分钟）是压力阶段：前端静置 16 秒，驱动发送 `notifyutil -p org.WebKit.lowMemory`，约 10 秒后取样。报告的 `q98MemoryVerdict` 按 Q98 判定：热身后压力后样本的 WebContent footprint 与 WebKit malloc allocated 不超过首个样本 10 MiB、线性趋势不超过 0.5 MiB/分钟；Rust 主进程按常规取样同样判定。普通取样照常记录，不单独作为不通过依据。
+
+## 单项诊断（定位用，不算验收）
+
+`--focus` 只重复一类操作，约每 90 秒回到固定阶段压力取样，用于定位压力后仍保留的增长来自哪类操作：
+
+```bash
+caffeinate -di python3 tools/bench-long-running.py --seconds 540 \
+  --diagnostic-logging minimal --idle-seconds 0 --focus open --keep-on-top \
+  --output /tmp/revia-focus-open-new.json
+```
+
+| 模式 | 只做什么 |
+| --- | --- |
+| `idle` | 静止在固定文件 |
+| `ipc` / `highlight` | 只取行 / 只取两个小文件的高亮，丢弃结果，界面不变 |
+| `channel` | 只反复调用 `nextTask` |
+| `open` | 依次打开全部文件 |
+| `switch` / `remount` | 两个小文本文件交替 / 小文件与二进制文件交替（diff 视图反复卸载、挂载，并用弱引用统计未回收的视口元素） |
+| `scroll` / `jump` / `view` | 在大文件内滚动 / 跳转 / 切换视图 |
+
+- 单项诊断遇窗口被遮挡时暂停到恢复可见，记录中断并从主动时长中扣除；静置期间被遮挡的阶段样本判无效。正式长测仍在任何遮挡时中止。
+- 报告同样输出 Q98 数值供对比，但诊断结果不能作为长期运行验收。
+- 需要对象级证据时，先 `notifyutil -p org.WebKit.lowMemory` 强制回收，约 8 秒后对 WebContent 进程运行 `heap -sortBySize <pid>`，隔一段时间再取一次，比较回收后仍增加的类型。
+
