@@ -145,63 +145,61 @@ impl TestContext {
 }
 
 /// 审查意见 1：路径按字面处理，避免通配符误匹配导致非目标文件被暂存。
-/// `x*.txt` 与 `xy.txt` 同时存在时，只暂存 `x*.txt`。
-#[test]
-fn t01_literal_pathspecs_wildcard_safety() {
+/// `target` 作为通配符会匹配到 `decoy`；暂存、取消暂存 `target` 时 `decoy` 必须保持未跟踪。
+fn assert_literal_path_staging(target: &str, decoy: &str) {
     let ctx = TestContext::new();
-    ctx.write_file("x*.txt", b"content of star file\n");
-    ctx.write_file("xy.txt", b"content of xy file\n");
+    ctx.write_file(target, b"content of target file\n");
+    ctx.write_file(decoy, b"content of decoy file\n");
 
     let session = ctx.open_session();
     let snapshot = session.refresh().expect("读取状态失败");
 
-    let star_entry = snapshot
+    let target_entry = snapshot
         .entries
         .iter()
-        .find(|e| e.path == "x*.txt" && e.changes == ChangesKind::Untracked)
-        .expect("应存在 x*.txt 未跟踪条目");
+        .find(|e| e.path == target && e.changes == ChangesKind::Untracked)
+        .unwrap_or_else(|| panic!("应存在 {target} 未跟踪条目"));
 
-    // 暂存 x*.txt
     let snap_after = session
-        .stage_file(&star_entry.path, &star_entry.fingerprint)
-        .expect("暂存带星号文件失败");
+        .stage_file(&target_entry.path, &target_entry.fingerprint)
+        .unwrap_or_else(|error| panic!("暂存 {target} 失败：{error}"));
 
-    // 关键安全断言：xy.txt 绝对不能被误带入暂存区！必须仍是未跟踪！
+    // 关键安全断言：decoy 不能被通配带入暂存区，必须仍是未跟踪。
     assert!(
-        snap_after
-            .entries
-            .iter()
-            .any(|e| e.path == "xy.txt" && e.changes == ChangesKind::Untracked),
-        "xy.txt 必须保持未跟踪状态，不得被 x*.txt 通配暂存！"
+        snap_after.entries.iter().any(|e| e.path == decoy && e.changes == ChangesKind::Untracked),
+        "{decoy} 必须保持未跟踪状态，不得被 {target} 通配暂存"
     );
     assert!(
-        !snap_after
-            .entries
-            .iter()
-            .any(|e| e.path == "xy.txt" && e.changes == ChangesKind::Staged),
-        "xy.txt 绝不得进入已暂存状态！"
+        !snap_after.entries.iter().any(|e| e.path == decoy && e.changes == ChangesKind::Staged),
+        "{decoy} 不得进入已暂存状态"
     );
 
-    // 验证 x*.txt 正常进入已暂存
-    let staged_star = snap_after
+    let staged_target = snap_after
         .entries
         .iter()
-        .find(|e| e.path == "x*.txt" && e.changes == ChangesKind::Staged)
-        .expect("x*.txt 应当已暂存");
-    assert_eq!(staged_star.status, FileStatus::Added);
+        .find(|e| e.path == target && e.changes == ChangesKind::Staged)
+        .unwrap_or_else(|| panic!("{target} 应当已暂存"));
+    assert_eq!(staged_target.status, FileStatus::Added);
 
-    // 取消暂存 x*.txt 也必须按字面路径执行
+    // 取消暂存也必须按字面路径执行。
     let snap_unstage = session
-        .unstage_file(&staged_star.path, &staged_star.fingerprint)
-        .expect("取消暂存带星号文件失败");
-    assert!(snap_unstage
-        .entries
-        .iter()
-        .any(|e| e.path == "x*.txt" && e.changes == ChangesKind::Untracked));
-    assert!(snap_unstage
-        .entries
-        .iter()
-        .any(|e| e.path == "xy.txt" && e.changes == ChangesKind::Untracked));
+        .unstage_file(&staged_target.path, &staged_target.fingerprint)
+        .unwrap_or_else(|error| panic!("取消暂存 {target} 失败：{error}"));
+    assert!(snap_unstage.entries.iter().any(|e| e.path == target && e.changes == ChangesKind::Untracked));
+    assert!(snap_unstage.entries.iter().any(|e| e.path == decoy && e.changes == ChangesKind::Untracked));
+}
+
+/// 方括号在所有平台都能用于文件名，Git 同样会把它当作通配符。
+#[test]
+fn t01_literal_pathspecs_wildcard_safety() {
+    assert_literal_path_staging("[ab].txt", "a.txt");
+}
+
+/// `*` 不能出现在 Windows 文件名中，只在类 Unix 系统上验证。
+#[cfg(unix)]
+#[test]
+fn t01_literal_pathspecs_star_wildcard_safety() {
+    assert_literal_path_staging("x*.txt", "xy.txt");
 }
 
 /// 审查意见 2：非 UTF-8 内容（如 GBK 编码文本）字节口径一致，暂存与取消暂存成功。
@@ -1017,6 +1015,8 @@ fn t14_controlled_entry_rejects_invalid_path() {
 }
 
 /// 审查意见 3：带冒号文件名（如 `0:x.txt`）读取暂存区版本，使用带阶段号 `:0:<path>` 确保字面路径准确。
+// Windows 文件名不支持字面冒号。
+#[cfg(unix)]
 #[test]
 fn t03_staged_file_at_literal_colon_paths() {
     let ctx = TestContext::new();
@@ -1040,6 +1040,8 @@ fn t03_staged_file_at_literal_colon_paths() {
 }
 
 /// 审查意见 4：含 `"` 或 `\` 的路径暂存与取消暂存，先反引号再去前缀，保证路径字面量与指纹 100% 匹配。
+// Windows 不允许双引号文件名，反斜杠作为路径分隔符，不能作为单个文件名字符。
+#[cfg(unix)]
 #[test]
 fn t04_stage_and_unstage_quoted_and_backslash_paths() {
     let ctx = TestContext::new();

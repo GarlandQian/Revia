@@ -73,3 +73,14 @@
 
 “取得 Windows x64 实际编译结果”一项暂不勾选。
 
+
+
+### 2026-10-23 / Codex 接手修正 Windows 测试 fixture
+
+核对 [Compile Check #39866973456](https://github.com/GarlandQian/Revia/actions/runs/39866973456)，对应 `b23ddd9b52dc90045e4465254c1d7fef6528a3e4`：macOS 成功，Windows 的 Rust 测试步骤失败，后续 release 编译被跳过。因此本轮完成前仍不勾选 Windows 验收。
+
+- 保留上一规划方未提交的通配符测试重构：全平台以 `[ab].txt` / `a.txt` 验证路径按字面暂存和取消暂存；`x*.txt` / `xy.txt` 的同一安全断言保留为 Unix 专用测试，不把字面路径覆盖整体关掉。
+- 为冒号文件名、双引号与反斜杠文件名两项加 `#[cfg(unix)]` 和原因注释。这些用例依赖 Unix 文件名语义，不通过在 Windows 构造不可用文件名验证产品行为；未改 Git 写操作代码、错误处理或安全断言。
+- 集中本机验证：`/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` 通过，67 单元 + 20 file_staging + 3 session_flow，共 90 项；Windows 结果仍等待真实 CI，不能从本机数量推算通过。
+- 按用户更新规则先派给 Paseo 的 `cpa/deepseek-v4.1-flash`，本次连续 3 次 `503 auth_unavailable` 后进入 error、未修改文件；Codex 接手，没有切换 Gemini。`main` 的 `837d68a` 派发规则已合入 `m2`，未改动主目录。
+- 只修阻塞测试；action 的 Node 运行时弃用提示仍为非阻塞事项，本轮不顺带升级依赖。
