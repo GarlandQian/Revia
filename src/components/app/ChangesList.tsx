@@ -31,12 +31,17 @@ interface ChangesListProps {
 
 export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, isWriting }: ChangesListProps) {
   const [untrackedOpen, setUntrackedOpen] = useState(false);
+  const prevSelectedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (selected?.changes === "untracked" && !untrackedOpen) {
-      setUntrackedOpen(true);
+    const key = selected ? `${selected.changes}:${selected.path}` : null;
+    if (key !== prevSelectedRef.current) {
+      prevSelectedRef.current = key;
+      if (selected?.changes === "untracked") {
+        setUntrackedOpen(true);
+      }
     }
-  }, [selected?.changes, untrackedOpen]);
+  }, [selected]);
 
   const groups = useMemo(() => {
     const unstaged = snapshot.entries.filter((entry) => entry.changes === "unstaged");

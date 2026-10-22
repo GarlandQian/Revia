@@ -198,7 +198,6 @@ export function App() {
     async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean } = {}) => {
       const targetView = options.view ?? view;
       setBusy(true);
-      setAppError(null, id);
       const openStart = performance.now();
       try {
         const sessionInfo = await ipc.openWorktree(id);
@@ -1272,7 +1271,7 @@ export function App() {
             } catch (error) {
               // 遮挡期间计时器被节流，等待会超时；只有确实发生过遮挡才恢复后重建状态继续。
               if (!hiddenSeen && !document.hidden) throw error;
-              await resumeWhenVisible(`遮挡导致操作失败：${String(error)}`);
+              await resumeWhenVisible(`遮挡导致操作失败：${getErrorMessage(error)}`);
               await openSplit(focusEntry);
             }
           }
