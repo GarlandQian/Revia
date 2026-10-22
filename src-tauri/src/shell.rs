@@ -558,7 +558,9 @@ mod tests {
     #[test]
     fn split_path_drops_empty_entries() {
         let mut vars = HashMap::new();
-        vars.insert("PATH".to_string(), "/a::/b:".to_string());
+        // 按平台分隔符构造（macOS 为 `:`，Windows 为 `;`），中间和末尾各留一个空条目。
+        let separator = if cfg!(windows) { ";" } else { ":" };
+        vars.insert("PATH".to_string(), ["/a", "", "/b", ""].join(separator));
         assert_eq!(split_path(&vars), vec!["/a", "/b"]);
     }
 

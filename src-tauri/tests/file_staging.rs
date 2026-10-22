@@ -1097,3 +1097,34 @@ fn t04_stage_and_unstage_quoted_and_backslash_paths() {
         .expect("取消暂存含反斜杠路径文件失败");
     assert!(snap5.entries.iter().any(|e| e.path == backslash_name && e.changes == ChangesKind::Untracked));
 }
+
+/// 桌面验收：未跟踪文件的内容在首次取行时才统计。列表刷新后行数为 0、元数据未加载；
+/// 取一次空范围（前端打开未跟踪文件时的做法）后，返回的条目带有正确的行数与 hunk 统计。
+#[test]
+fn untracked_file_metrics_load_on_first_rows_request() {
+    let ctx = TestContext::new();
+    ctx.write_file("base.txt", b"base\n");
+    ctx.git(&["add", "base.txt"]);
+    ctx.git(&["commit", "-m", "init"]);
+    ctx.write_file("new file.txt", b"line one\nline two\n");
+
+    let session = ctx.open_session();
+    let snapshot = session.refresh().unwrap();
+    let listed = snapshot
+        .entries
+        .iter()
+        .find(|e| e.path == "new file.txt" && e.changes == ChangesKind::Untracked)
+        .expect("应列出未跟踪文件");
+    assert!(!listed.metrics_loaded, "刷新时不为未跟踪文件取内容");
+    assert_eq!(listed.hunk_count, 0);
+
+    let slice = session
+        .rows("new file.txt", ChangesKind::Untracked, revia_lib::git::rows::ViewMode::Split, 0, 0)
+        .expect("取空范围应当成功");
+    assert!(slice.rows.is_empty(), "空范围不返回行");
+    assert!(slice.row_count > 0, "应统计出显示行数");
+    assert!(slice.entry.metrics_loaded, "返回的条目应已加载元数据");
+    assert_eq!(slice.entry.hunk_count, 1);
+    assert_eq!(slice.entry.added, 2);
+    assert!(slice.entry.row_count_split > 0 && slice.entry.row_count_unified > 0);
+}

@@ -163,7 +163,24 @@ export function App() {
   }, []);
 
   const openEntry = useCallback(
-    async (entry: ChangeEntry, target: { view: ViewMode; worktreeId: string; expand?: boolean }) => {
+    async (requested: ChangeEntry, target: { view: ViewMode; worktreeId: string; expand?: boolean }) => {
+      let entry = requested;
+      // 未跟踪文件的内容与行数在后端首次取行时才统计；先取一次空范围补全元数据，
+      // 否则行数为 0 会被当成空文件，永远不挂载 diff 视图（任务 02 桌面验收）。
+      if (entry.changes === "untracked" && !entry.metricsLoaded && !entry.readonlyReason) {
+        const slice = await ipc.getRows({ worktreeId: target.worktreeId, path: entry.path, changes: entry.changes,
+          view: target.view, from: 0, to: 0 });
+        if (worktreeIdRef.current !== target.worktreeId) {
+          return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
+        }
+        const loaded = slice.entry;
+        entry = loaded;
+        setSnapshot((current) => current && {
+          ...current,
+          entries: current.entries.map((candidate) =>
+            candidate.path === loaded.path && candidate.changes === loaded.changes ? loaded : candidate),
+        });
+      }
       const selection: Selection = { path: entry.path, changes: entry.changes };
       if (target.expand && entry.collapsed) {
         // 测量等同于用户点开：默认收起的文件也要真正渲染，才能测到首屏。
@@ -1550,13 +1567,17 @@ export function App() {
     ? "none"
     : selectedEntry.unmerged
       ? "conflict"
-      : selectedEntry.collapsed && !expanded.has(`${selectedEntry.changes}:${selectedEntry.path}`)
-        ? "collapsed"
-        : selectedEntry.binary
-          ? "binary"
-          : selectedEntry.hunkCount === 0
-            ? "empty"
-            : "diff";
+      : selectedEntry.changes === "untracked" && selectedEntry.readonlyReason
+        ? "readonly"
+        : selectedEntry.changes === "untracked" && !selectedEntry.metricsLoaded
+          ? "loading"
+          : selectedEntry.collapsed && !expanded.has(`${selectedEntry.changes}:${selectedEntry.path}`)
+            ? "collapsed"
+            : selectedEntry.binary
+              ? "binary"
+              : selectedEntry.hunkCount === 0
+                ? "empty"
+                : "diff";
   useEffect(() => {
     if (!selectedEntry) return;
     debugLog(
@@ -1634,6 +1655,10 @@ export function App() {
             </div>
           ) : selectedEntry.unmerged ? (
             <Hint text={messages.changes.conflict} />
+          ) : diffArea === "readonly" && selectedEntry.readonlyReason ? (
+            <Hint text={messages.changes.readonlyReasons[selectedEntry.readonlyReason]} />
+          ) : diffArea === "loading" ? (
+            <Hint text={messages.changes.loadingFile} />
           ) : collapsed ? (
             <Hint text={messages.changes.collapsed} action={{ label: messages.changes.expand, run: () => expandEntry(selectedEntry) }} />
           ) : selectedEntry.binary ? (
