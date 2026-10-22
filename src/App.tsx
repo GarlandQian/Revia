@@ -851,11 +851,40 @@ export function App() {
         let lastHeartbeat = performance.now();
         let lastCheckpoint = startedAt;
         let checkpointPauseMs = 0;
+        let visibilityPauseMs = 0;
         const checkpoints: Array<{ cycle: number; file: string; view: string; pressure: boolean; startedAt: string;
-          endedAt?: string; ipcBefore?: IpcDiagnosticSample; ipcAfter?: IpcDiagnosticSample }> = [];
+          endedAt?: string; hiddenDuringHold?: boolean; ipcBefore?: IpcDiagnosticSample;
+          ipcAfter?: IpcDiagnosticSample }> = [];
         report.phaseCheckpoints = checkpoints;
+        const focus = diagnostic?.focus ?? null;
 
-        const isTimeUp = () => (performance.now() - startedAt - checkpointPauseMs) / 1000 >= soakSeconds;
+        const pausedMs = () => checkpointPauseMs + visibilityPauseMs;
+        const isTimeUp = () => (performance.now() - startedAt - pausedMs()) / 1000 >= soakSeconds;
+        const interrupted = (vis: SoakVisibility) =>
+          vis.hidden || vis.rafPerSecond <= 5 || vis.hiddenTransitions > 0 || vis.maxFrameGapMs > 2000;
+        // 单项诊断只用于定位、不作验收：窗口被遮挡时暂停到恢复可见（最多 10 分钟），记录中断并从主动时长中扣除；
+        // 压力阶段静置期间被遮挡的样本由驱动判为无效。正式长测仍在任何遮挡时中止。
+        let hiddenSeen = false;
+        const visibilityInterruptions: Array<{ elapsedSec: number; pausedSeconds: number; reason: string }> = [];
+        if (focus) {
+          report.visibilityInterruptions = visibilityInterruptions;
+          document.addEventListener("visibilitychange", () => {
+            if (document.hidden) hiddenSeen = true;
+          });
+        }
+        const resumeWhenVisible = async (reason: string) => {
+          const pauseStarted = performance.now();
+          for (;;) {
+            const vis = await monitor.sample();
+            if (!vis.hidden && vis.rafPerSecond > 5) break;
+            if (performance.now() - pauseStarted > 600_000) throw new Error(`窗口 10 分钟未恢复可见：${reason}`);
+          }
+          monitor.reset();
+          hiddenSeen = false;
+          visibilityPauseMs += performance.now() - pauseStarted;
+          visibilityInterruptions.push({ elapsedSec: Math.round((pauseStarted - startedAt) / 1000),
+            pausedSeconds: (performance.now() - pauseStarted) / 1000, reason });
+        };
         // 模拟真实用户操作节奏：每步让出 30ms，避免 0ms 忙循环打满 JS 线程与事件循环。
         const yieldStep = async (ms = 30) => {
           await sleep(ms);
@@ -891,8 +920,9 @@ export function App() {
           };
           samples.push(sample);
           if (diagnostics) await ipc.debugLog(`[SOAK_HEARTBEAT] ${JSON.stringify(sample)}`);
-          if (vis.hidden || vis.rafPerSecond <= 5 || vis.hiddenTransitions > 0 || vis.maxFrameGapMs > 2000) {
-            throw new Error(`可见连续合成中断：${JSON.stringify(vis)}`);
+          if (interrupted(vis)) {
+            if (!focus) throw new Error(`可见连续合成中断：${JSON.stringify(vis)}`);
+            await resumeWhenVisible(JSON.stringify(vis));
           }
           debugLog(
             `[SOAK] ${elapsedSec}s/${soakSeconds}s cycle=${cycle} file=${path} view=${currentView} ` +
@@ -908,13 +938,20 @@ export function App() {
           if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
             || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
           const checkpoint = { cycle, file: entry.path, view: currentView, pressure, startedAt: new Date().toISOString(),
-            endedAt: "",
+            endedAt: "", hiddenDuringHold: false,
             ...(diagnostics ? { ipcBefore: diagnostics.snapshot(), ipcAfter: undefined as IpcDiagnosticSample | undefined } : {}) };
           checkpoints.push(checkpoint);
+          let hiddenDuringHold = document.hidden;
+          const onHoldHidden = () => {
+            if (document.hidden) hiddenDuringHold = true;
+          };
+          document.addEventListener("visibilitychange", onHoldHidden);
           await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}${pressure ? " pressure" : ""}`);
           // Hold one known phase briefly; compositor monitoring remains active throughout.
           await sleep(pressure ? 16_000 : 3500);
           await ipc.debugLog(`[SOAK_CHECKPOINT_END] ${cycle}`);
+          document.removeEventListener("visibilitychange", onHoldHidden);
+          checkpoint.hiddenDuringHold = hiddenDuringHold;
           checkpoint.endedAt = new Date().toISOString();
           if (diagnostics) checkpoint.ipcAfter = diagnostics.snapshot();
           checkpointPauseMs += performance.now() - pauseStarted;
@@ -922,7 +959,6 @@ export function App() {
         };
 
         // 单项诊断：只重复一类操作，约每 90 秒回到固定阶段做一次压力取样，定位压力后仍保留的内存增长来自哪类操作。
-        const focus = diagnostic?.focus ?? null;
         if (focus) {
           const fixed = entries.find((entry) => entry.path === "src/staged.ts" && entry.changes === "staged");
           const large = entries.find((entry) => entry.path === "src/generated.ts");
@@ -943,56 +979,64 @@ export function App() {
           let step = 0;
           while (!isTimeUp()) {
             cycle += 1;
-            const handle = diffRef.current;
-            if (focus !== "idle" && focus !== "ipc" && focus !== "open" && !handle) throw new Error("diff 未挂载");
-            if (focus === "idle") {
-              await sleep(1000);
-            } else if (focus === "ipc") {
-              // 只取行、丢弃结果，界面停在固定文件：区分 IPC 本身与渲染。
-              const from = (step * 500) % large.rowCountSplit;
-              await ipc.getRows({ worktreeId: worktree.id, path: large.path, changes: large.changes, view: "split",
-                from, to: Math.min(from + 500, large.rowCountSplit) });
-              ipcRequests += 1;
-              await yieldStep(15);
-            } else if (focus === "open") {
-              for (const entry of entries) {
-                if (isTimeUp()) break;
-                await openSplit(entry);
+            if (document.hidden) await resumeWhenVisible("操作前窗口不可见");
+            try {
+              const handle = diffRef.current;
+              if (focus !== "idle" && focus !== "ipc" && focus !== "open" && !handle) throw new Error("diff 未挂载");
+              if (focus === "idle") {
+                await sleep(1000);
+              } else if (focus === "ipc") {
+                // 只取行、丢弃结果，界面停在固定文件：区分 IPC 本身与渲染。
+                const from = (step * 500) % large.rowCountSplit;
+                await ipc.getRows({ worktreeId: worktree.id, path: large.path, changes: large.changes, view: "split",
+                  from, to: Math.min(from + 500, large.rowCountSplit) });
+                ipcRequests += 1;
+                await yieldStep(15);
+              } else if (focus === "open") {
+                for (const entry of entries) {
+                  if (isTimeUp()) break;
+                  await openSplit(entry);
+                }
+              } else if (focus === "scroll") {
+                handle!.scrollToRow((step % 12) * 40);
+                scrolls += 1;
+                await yieldStep();
+              } else if (focus === "jump") {
+                const target = Math.floor(large.rowCountSplit * [0.25, 0.5, 0.75][step % 3]);
+                rowStore.prioritize(target, target + 40);
+                handle!.scrollToRow(target);
+                jumps += 1;
+                if (!await waitForSoak(() => rowStore.isCovered(target, target + 40), 2000)) {
+                  throw new Error(`跳转数据超时：${large.path}`);
+                }
+                await yieldStep();
+                handle!.scrollToRow(0);
+                jumps += 1;
+                await yieldStep();
+              } else {
+                await clickView("统一", large.rowCountUnified);
+                currentView = "unified";
+                viewSwitches += 1;
+                await yieldStep();
+                await clickView("并排", large.rowCountSplit);
+                currentView = "split";
+                viewSwitches += 1;
+                await yieldStep();
               }
-            } else if (focus === "scroll") {
-              handle!.scrollToRow((step % 12) * 40);
-              scrolls += 1;
-              await yieldStep();
-            } else if (focus === "jump") {
-              const target = Math.floor(large.rowCountSplit * [0.25, 0.5, 0.75][step % 3]);
-              rowStore.prioritize(target, target + 40);
-              handle!.scrollToRow(target);
-              jumps += 1;
-              if (!await waitForSoak(() => rowStore.isCovered(target, target + 40), 2000)) {
-                throw new Error(`跳转数据超时：${large.path}`);
+              step += 1;
+              await heartbeat(focusEntry.path);
+              if (performance.now() - lastCheckpoint >= 90_000
+                && startedAt + soakSeconds * 1000 + pausedMs() - performance.now() > 5000) {
+                if (focusEntry !== fixed) await openSplit(fixed);
+                diffRef.current?.scrollToRow(0);
+                await holdCheckpoint(fixed, true);
+                if (focusEntry !== fixed) await openSplit(focusEntry);
               }
-              await yieldStep();
-              handle!.scrollToRow(0);
-              jumps += 1;
-              await yieldStep();
-            } else {
-              await clickView("统一", large.rowCountUnified);
-              currentView = "unified";
-              viewSwitches += 1;
-              await yieldStep();
-              await clickView("并排", large.rowCountSplit);
-              currentView = "split";
-              viewSwitches += 1;
-              await yieldStep();
-            }
-            step += 1;
-            await heartbeat(focusEntry.path);
-            if (performance.now() - lastCheckpoint >= 90_000
-              && startedAt + soakSeconds * 1000 + checkpointPauseMs - performance.now() > 5000) {
-              if (focusEntry !== fixed) await openSplit(fixed);
-              diffRef.current?.scrollToRow(0);
-              await holdCheckpoint(fixed, true);
-              if (focusEntry !== fixed) await openSplit(focusEntry);
+            } catch (error) {
+              // 遮挡期间计时器被节流，等待会超时；只有确实发生过遮挡才恢复后重建状态继续。
+              if (!hiddenSeen && !document.hidden) throw error;
+              await resumeWhenVisible(`遮挡导致操作失败：${String(error)}`);
+              await openSplit(focusEntry);
             }
           }
         }
@@ -1085,7 +1129,7 @@ export function App() {
             await heartbeat(entry.path);
             if (entry.path === "src/staged.ts" && entry.changes === "staged" && currentView === "split"
               && performance.now() - lastCheckpoint >= 60_000
-              && startedAt + soakSeconds * 1000 + checkpointPauseMs - performance.now() > 5000) {
+              && startedAt + soakSeconds * 1000 + pausedMs() - performance.now() > 5000) {
               // 每第 5 个阶段（约 5 分钟一次）是压力阶段：驱动发送 WebKit 低内存通知，约 10 秒后取样（Q98）。
               await holdCheckpoint(entry, checkpoints.length % 5 === 4);
             }
@@ -1095,12 +1139,17 @@ export function App() {
         if (diagnostic?.cycles != null && isTimeUp()) throw new Error("固定循环诊断达到主动操作安全时限");
         const wallDurationSeconds = (performance.now() - startedAt) / 1000;
         report.operationsEndedAt = new Date().toISOString();
-        const totalElapsed = wallDurationSeconds - checkpointPauseMs / 1000;
+        const totalElapsed = wallDurationSeconds - pausedMs() / 1000;
         report.wallDurationSeconds = wallDurationSeconds;
         report.checkpointPauseSeconds = checkpointPauseMs / 1000;
-        const finalVisibility = await monitor.sample();
+        report.visibilityPauseSeconds = visibilityPauseMs / 1000;
+        let finalVisibility = await monitor.sample();
+        if (focus && interrupted(finalVisibility)) {
+          await resumeWhenVisible(`结束时：${JSON.stringify(finalVisibility)}`);
+          finalVisibility = await monitor.sample();
+        }
         report.finalVisibility = finalVisibility;
-        if (finalVisibility.hidden || finalVisibility.rafPerSecond <= 5 || finalVisibility.hiddenTransitions > 0 || finalVisibility.maxFrameGapMs > 2000) throw new Error("结束时窗口不可见，长测无效");
+        if (interrupted(finalVisibility)) throw new Error("结束时窗口不可见，长测无效");
         report.ok = true;
         report.targetDurationSeconds = soakSeconds;
         report.actualDurationSeconds = totalElapsed;

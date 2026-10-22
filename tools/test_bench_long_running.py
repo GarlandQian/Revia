@@ -227,7 +227,7 @@ class BenchmarkSafetyTests(unittest.TestCase):
             self.assertFalse(checkpoints.pending)
 
     def test_phase_requires_matching_end_and_frontend_interval_before_valid(self):
-        for case in ("closed", "missing_end", "outside_interval", "missing_frontend"):
+        for case in ("closed", "missing_end", "outside_interval", "missing_frontend", "hidden_during_hold"):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / "frontend.log"
                 path.write_text("[SOAK_CHECKPOINT_BEGIN] 1\n")
@@ -245,6 +245,8 @@ class BenchmarkSafetyTests(unittest.TestCase):
                     frontend["phaseCheckpoints"][0]["endedAt"] = "2026-10-21T07:00:01.500Z"
                 if case == "missing_frontend":
                     frontend = {}
+                if case == "hidden_during_hold":
+                    frontend["phaseCheckpoints"][0]["hiddenDuringHold"] = True
                 bench.finalize_phase_samples([sample], checkpoints, frontend)
                 self.assertEqual(sample["valid"], case == "closed")
                 self.assertEqual(sample["validation"], "final")

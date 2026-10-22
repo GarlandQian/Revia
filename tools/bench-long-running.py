@@ -258,6 +258,8 @@ def finalize_phase_samples(samples, checkpoints, frontend):
             errors.append("前端报告缺少唯一的 staged/split checkpoint")
         elif bool(matches[0].get("pressure")) != bool(sample.get("pressure")):
             errors.append("前端与驱动的压力阶段标记不一致")
+        elif matches[0].get("hiddenDuringHold"):
+            errors.append("阶段静置期间窗口被遮挡")
         else:
             try:
                 if not (instant(matches[0]["startedAt"]) <= instant(sample["timestamp"])
@@ -456,8 +458,9 @@ def main():
                 checkpoints.poll()
                 record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
                 now = time.monotonic()
-                # Allow 120s visibility setup, about 200s phase/pressure holds and an exit margin.
-                if now - started > seconds + 480 + (args.idle_seconds if diagnostic else 0):
+                # Allow 120s visibility setup, about 200s phase/pressure holds and an exit margin;
+                # single-operation diagnostics may also pause up to 10 minutes per hidden-window interruption.
+                if now - started > seconds + 480 + (args.idle_seconds if diagnostic else 0) + (1800 if args.focus else 0):
                     raise TimeoutError("等待可见窗口或操作硬超时")
                 if now >= next_sample:
                     sampling_started_at = datetime.datetime.now().astimezone().isoformat()
