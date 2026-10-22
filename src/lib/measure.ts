@@ -113,19 +113,23 @@ export function percentile(values: number[], fraction: number): number {
 export function nextPaint(timeoutMs = 800): Promise<{ at: number; rafPainted: boolean }> {
   return new Promise((resolve) => {
     let settled = false;
-    const channel = new MessageChannel();
     const finish = (rafPainted: boolean) => {
       if (settled) return;
       settled = true;
-      channel.port1.close();
       resolve({ at: performance.now(), rafPainted });
     };
     requestAnimationFrame(() => requestAnimationFrame(() => finish(true)));
-    setTimeout(() => channel.port1.postMessage(null), 30);
+    setTimeout(() => void nextTask().then(() => finish(false)), 30);
     setTimeout(() => finish(false), timeoutMs);
-    channel.port2.onmessage = () => finish(false);
   });
 }
+
+// 所有让出共用一条长期存在的 MessageChannel（与 React 调度器相同）。每次新建通道时，
+// 只要一端还挂着 onmessage 且没有关闭，WebKit 就会连同两端端口和监听器一直保留，
+// 内存压力也回收不了；打开文件时每次 nextPaint 都会泄漏一组（M2 任务 01）。
+const taskChannel = new MessageChannel();
+const pendingTasks: Array<() => void> = [];
+taskChannel.port1.onmessage = () => pendingTasks.shift()?.();
 
 /**
  * 让出一个任务。用 MessageChannel 而不是 setTimeout：窗口不可见时定时器会被
@@ -133,12 +137,8 @@ export function nextPaint(timeoutMs = 800): Promise<{ at: number; rafPainted: bo
  */
 export function nextTask(): Promise<void> {
   return new Promise((resolve) => {
-    const channel = new MessageChannel();
-    channel.port1.onmessage = () => {
-      channel.port1.close();
-      resolve();
-    };
-    channel.port2.postMessage(null);
+    pendingTasks.push(resolve);
+    taskChannel.port2.postMessage(null);
   });
 }
 
