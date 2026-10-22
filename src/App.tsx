@@ -963,8 +963,12 @@ export function App() {
         if (focus) {
           const fixed = entries.find((entry) => entry.path === "src/staged.ts" && entry.changes === "staged");
           const large = entries.find((entry) => entry.path === "src/generated.ts");
-          if (!fixed || !large) throw new Error("单项诊断缺少固定文件");
-          const focusEntry = focus === "idle" || focus === "ipc" || focus === "channel" ? fixed : large;
+          // remount：小文本与二进制文件交替，diff 视图反复卸载、挂载；switch：两个小文本文件交替，diff 视图保持挂载。
+          const binary = entries.find((entry) => entry.binary);
+          const smallTexts = entries.filter((entry) => !entry.binary && entry.rowCountSplit > 0
+            && entry.rowCountSplit <= 40 && entry !== fixed);
+          if (!fixed || !large || !binary || smallTexts.length < 2) throw new Error("单项诊断缺少固定文件");
+          const focusEntry = focus === "scroll" || focus === "jump" || focus === "view" || focus === "open" ? large : fixed;
           const openSplit = async (entry: ChangeEntry) => {
             const expand = !entry.binary;
             await openEntry(entry, { view: "split", worktreeId: worktree.id, expand });
@@ -998,6 +1002,12 @@ export function App() {
                 for (let index = 0; index < 20; index += 1) await nextTask();
                 yieldedTasks += 20;
                 await yieldStep(15);
+              } else if (focus === "remount") {
+                await openSplit(binary);
+                await openSplit(fixed);
+              } else if (focus === "switch") {
+                await openSplit(smallTexts[0]);
+                await openSplit(smallTexts[1]);
               } else if (focus === "open") {
                 for (const entry of entries) {
                   if (isTimeUp()) break;
