@@ -2,6 +2,7 @@
 import type { ChangesKind } from "./ChangesKind";
 import type { FileStatus } from "./FileStatus";
 import type { HunkAnchor } from "./HunkAnchor";
+import type { ReadonlyReason } from "./ReadonlyReason";
 
 /**
  * 文件列表里的一行。
@@ -18,7 +19,7 @@ metricsLoaded: boolean, hunks: Array<HunkAnchor>,
 /**
  * 只读限制原因，None 表示支持写操作。
  */
-readonlyReason: string | null, 
+readonlyReason: ReadonlyReason | null, 
 /**
  * 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
  */

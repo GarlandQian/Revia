@@ -55,6 +55,8 @@ pub struct FileChange {
     /// 旧版本与新版本参与高亮的行数。
     pub old_lines: u32,
     pub new_lines: u32,
+    /// 展示所用的原始 diff 文本切片，用于计算与展示严格一致的文件级指纹（Q80、ADR-0009）。
+    pub raw_patch: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -94,6 +96,8 @@ pub fn parse(patch: &str) -> DiffParseResult {
         }
 
         let Some(file) = current_file.as_mut() else { continue };
+        file.raw_patch.push_str(line);
+        file.raw_patch.push('\n');
 
         if let Some(rest) = line.strip_prefix("--- ") {
             if let Some(path) = strip_prefix_path(rest) {
@@ -260,6 +264,9 @@ fn file_from_git_header(rest: &str) -> FileChange {
     let path = strip_prefix_path(second)
         .or_else(|| strip_prefix_path(first))
         .unwrap_or_default();
+    let mut raw_patch = String::from("diff --git ");
+    raw_patch.push_str(rest);
+    raw_patch.push('\n');
     FileChange {
         path,
         old_path: None,
@@ -270,6 +277,7 @@ fn file_from_git_header(rest: &str) -> FileChange {
         deleted: 0,
         old_lines: 0,
         new_lines: 0,
+        raw_patch,
     }
 }
 

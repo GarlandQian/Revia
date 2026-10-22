@@ -20,6 +20,8 @@ pub enum ErrorKind {
     Environment,
     /// 内部错误。
     Internal,
+    /// 结果待核对（超时、中断等导致写入结果不确定，Q91/规格第 3 节）。
+    NeedsVerification,
 }
 
 impl AppError {
@@ -37,6 +39,10 @@ impl AppError {
 
     pub fn internal(message: impl Into<String>) -> Self {
         Self { kind: ErrorKind::Internal, message: message.into() }
+    }
+
+    pub fn needs_verification(message: impl Into<String>) -> Self {
+        Self { kind: ErrorKind::NeedsVerification, message: message.into() }
     }
 }
 

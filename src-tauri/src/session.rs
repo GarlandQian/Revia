@@ -15,7 +15,7 @@ use ts_rs::TS;
 use crate::error::{AppError, Result};
 use crate::git::highlight::{HighlightRequest, HighlightResult, Highlighter};
 use crate::git::rows::{self, HunkAnchor, RenderRow, ViewMode};
-use crate::git::status::{self, ChangesKind, FileStatus, StatusEntry};
+use crate::git::status::{self, ChangesKind, FileStatus, ReadonlyReason, StatusEntry};
 use crate::git::{self, Git};
 use crate::shell::{self, ShellEnv};
 
@@ -80,7 +80,7 @@ pub struct ChangeEntry {
     pub metrics_loaded: bool,
     pub hunks: Vec<HunkAnchor>,
     /// 只读限制原因，None 表示支持写操作。
-    pub readonly_reason: Option<String>,
+    pub readonly_reason: Option<ReadonlyReason>,
     /// 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
     pub fingerprint: String,
 }
@@ -269,11 +269,31 @@ impl WorktreeSession {
             let language = language_for_path(&entry.path);
             let row_count_unified = model.map(|file| rows::layout(file, ViewMode::Unified).len() as u32).unwrap_or(0);
             let row_count_split = model.map(|file| rows::layout(file, ViewMode::Split).len() as u32).unwrap_or(0);
-            let mut readonly_reason = entry.readonly_reason.clone();
-            if readonly_reason.is_none() && self.path.join(&entry.path).is_symlink() {
-                readonly_reason = Some("符号链接为只读类型，不支持在应用内暂存或取消暂存".to_string());
+
+            let mut readonly_reason = entry.readonly_reason;
+            let full_path = self.path.join(&entry.path);
+            if readonly_reason.is_none() && full_path.is_symlink() {
+                readonly_reason = Some(ReadonlyReason::Symlink);
             }
-            let fingerprint = compute_file_fingerprint(&self.git, &self.path, entry).unwrap_or_default();
+            if readonly_reason.is_none()
+                && entry.changes == ChangesKind::Untracked
+                && (full_path.join(".git").exists() || entry.path.ends_with('/'))
+            {
+                readonly_reason = Some(ReadonlyReason::NestedRepo);
+            }
+
+            // 指纹来自展示所用的同一份 Git 输出（FileChange.raw_patch），不在刷新中按文件另起 Git 进程（审查意见 3）
+            let raw_diff = model.map(|m| m.raw_patch.as_bytes()).unwrap_or(&[]);
+            let (fingerprint, fp_err) = match compute_file_fingerprint_from_patch(entry, raw_diff, &self.path) {
+                Ok(fp) => (fp, None),
+                Err(e) => (String::new(), Some(e)),
+            };
+
+            // 读取失败不能变成假空指纹，必须标记只读并记录原因
+            if fp_err.is_some() && readonly_reason.is_none() {
+                readonly_reason = Some(ReadonlyReason::NonUtf8Path);
+            }
+
             entries.push(ChangeEntry {
                 path: entry.path.clone(),
                 original_path: entry.original_path.clone(),
@@ -551,80 +571,116 @@ impl WorktreeSession {
 
     /// 整文件暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009）。
     pub fn stage_file(&self, path: &str, fingerprint: &str) -> Result<ChangesSnapshot> {
-        let _guard = self.acquire_write_lock()?;
-        let status = status::read(&self.git)?;
-        let entry = status
-            .entries
-            .iter()
-            .find(|e| e.path == path && (e.changes == ChangesKind::Unstaged || e.changes == ChangesKind::Untracked))
-            .ok_or_else(|| AppError::rejected(format!("目标文件不在当前可暂存列表中：{path}（请刷新后重试）")))?;
-
-        if let Some(reason) = &entry.readonly_reason {
-            return Err(AppError::rejected(reason.clone()));
-        }
-        if self.path.join(path).is_symlink() {
-            return Err(AppError::rejected("符号链接为只读类型，不支持在应用内暂存或取消暂存"));
-        }
-
-        let current_fp = compute_file_fingerprint(&self.git, &self.path, entry)?;
-        if current_fp != fingerprint {
-            return Err(AppError::rejected("文件已变化，请重新确认"));
-        }
-
-        if let Some(orig) = &entry.original_path {
-            self.git.run_ok(
-                &["-c", "core.quotePath=false", "add", "-A", "--", orig, path],
-                "暂存文件",
-            )?;
-        } else {
-            self.git.run_ok(
-                &["-c", "core.quotePath=false", "add", "-A", "--", path],
-                "暂存文件",
-            )?;
-        }
-
-        self.refresh()
+        self.execute_staging_op(path, fingerprint, true)
     }
 
     /// 整文件取消暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009、T04）。
     pub fn unstage_file(&self, path: &str, fingerprint: &str) -> Result<ChangesSnapshot> {
+        self.execute_staging_op(path, fingerprint, false)
+    }
+
+    /// 统一的写操作执行入口：锁重试在操作层进行，每次重试前重新读取状态并核对指纹（审查意见 1、2、7）。
+    fn execute_staging_op(&self, path: &str, expected_fp: &str, is_stage: bool) -> Result<ChangesSnapshot> {
         let _guard = self.acquire_write_lock()?;
-        let status = status::read(&self.git)?;
-        let entry = status
-            .entries
-            .iter()
-            .find(|e| e.path == path && e.changes == ChangesKind::Staged)
-            .ok_or_else(|| AppError::rejected(format!("目标文件不在当前已暂存列表中：{path}（请刷新后重试）")))?;
+        let mut last_lock_err: Option<String> = None;
+        const LOCK_RETRIES: usize = 3;
+        const LOCK_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
 
-        if let Some(reason) = &entry.readonly_reason {
-            return Err(AppError::rejected(reason.clone()));
-        }
-
-        let current_fp = compute_file_fingerprint(&self.git, &self.path, entry)?;
-        if current_fp != fingerprint {
-            return Err(AppError::rejected("文件已变化，请重新确认"));
-        }
-
-        if entry.status == FileStatus::Renamed {
-            if let Some(orig) = &entry.original_path {
-                self.git.run_ok(
-                    &["-c", "core.quotePath=false", "reset", "--", orig, path],
-                    "取消暂存文件",
-                )?;
+        for attempt in 0..=LOCK_RETRIES {
+            // 每次尝试（包含重试）前，都必须重新读取真实状态并核对目标当前版本！（审查意见 2）
+            let status = status::read(&self.git)?;
+            let entry = if is_stage {
+                status
+                    .entries
+                    .iter()
+                    .find(|e| e.path == path && (e.changes == ChangesKind::Unstaged || e.changes == ChangesKind::Untracked))
             } else {
-                self.git.run_ok(
-                    &["-c", "core.quotePath=false", "reset", "--", path],
-                    "取消暂存文件",
-                )?;
+                status
+                    .entries
+                    .iter()
+                    .find(|e| e.path == path && e.changes == ChangesKind::Staged)
+            };
+
+            let entry = entry.ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+
+            if let Some(reason) = &entry.readonly_reason {
+                return Err(AppError::rejected(reason.description()));
             }
-        } else {
-            self.git.run_ok(
-                &["-c", "core.quotePath=false", "reset", "--", path],
-                "取消暂存文件",
-            )?;
+
+            // 检查工作区符号链接或嵌套仓库
+            let full_path = self.path.join(path);
+            if full_path.is_symlink() {
+                return Err(AppError::rejected("符号链接为只读类型，不支持在应用内暂存或取消暂存"));
+            }
+            if entry.changes == ChangesKind::Untracked && (full_path.join(".git").exists() || path.ends_with('/')) {
+                return Err(AppError::rejected("嵌套仓库为只读类型，不支持在应用内暂存"));
+            }
+
+            // 针对该单文件读取当前 diff 并在写前核对指纹
+            let diff_bytes = if is_stage {
+                if entry.changes == ChangesKind::Untracked {
+                    Vec::new()
+                } else {
+                    self.git.diff_worktree(Some(path))?
+                }
+            } else {
+                self.git.diff_index_with_orig(path, entry.original_path.as_deref())?
+            };
+
+            let current_fp = compute_file_fingerprint_from_patch(entry, &diff_bytes, &self.path)?;
+            if current_fp != expected_fp {
+                return Err(AppError::rejected("文件已变化，请重新确认"));
+            }
+
+            // 执行单次写操作（run_once，不绕过核对进行隐式重试）
+            let output = if is_stage {
+                self.git.stage_file(path, entry.original_path.as_deref())?
+            } else {
+                self.git.unstage_file(path, entry.original_path.as_deref())?
+            };
+
+            // 结果不确定时标为“结果待核对”（审查意见 1）
+            if output.timed_out {
+                return Err(AppError::needs_verification(
+                    "Git 命令执行超时，写入结果待核对；请重新核对真实状态后再继续",
+                ));
+            }
+
+            // 检查锁占用
+            if git::is_lock_error(&output) {
+                let err_text = output.stderr.trim().to_string();
+                if attempt < LOCK_RETRIES {
+                    last_lock_err = Some(err_text);
+                    std::thread::sleep(LOCK_RETRY_DELAY * (attempt as u32 + 1));
+                    continue; // 重新进入循环：重新读取状态并重新核对指纹！
+                } else {
+                    let detail = last_lock_err.unwrap_or(err_text);
+                    return Err(AppError::rejected(format!(
+                        "Git 索引被其他进程占用（index.lock），已重试 {LOCK_RETRIES} 次：{detail}"
+                    )));
+                }
+            }
+
+            if output.exit_code != 0 {
+                return Err(AppError::git(format!(
+                    "{}失败（退出码 {}）：{}",
+                    if is_stage { "暂存文件" } else { "取消暂存文件" },
+                    output.exit_code,
+                    output.stderr.trim()
+                )));
+            }
+
+            // 执行成功，跳出重试循环
+            break;
         }
 
-        self.refresh()
+        // 写入成功后重新读取状态；若读取失败，也属于结果待核对（审查意见 1）
+        match self.refresh() {
+            Ok(snap) => Ok(snap),
+            Err(e) => Err(AppError::needs_verification(format!(
+                "文件已操作但读取最新状态失败（结果待核对）：{e}"
+            ))),
+        }
     }
 }
 
@@ -668,6 +724,7 @@ fn empty_file(path: &str, status: FileStatus) -> git::diff::FileChange {
         deleted: 0,
         old_lines: 0,
         new_lines: 0,
+        raw_patch: String::new(),
     }
 }
 
@@ -683,15 +740,17 @@ fn is_collapsed(path: &str, file: &git::diff::FileChange) -> bool {
 }
 
 /// 计算单个文件变更条目的 diff 指纹（Q80、ADR-0009）。
-pub fn compute_file_fingerprint(
-    git: &Git,
-    worktree_path: &Path,
+///
+/// 指纹来自展示所用的同一份 Git 输出切片（diff_bytes），列表刷新时不启动额外 Git 进程。
+pub fn compute_file_fingerprint_from_patch(
     entry: &StatusEntry,
+    diff_bytes: &[u8],
+    worktree_path: &Path,
 ) -> Result<String> {
     let mut hasher = Sha256::new();
-    // 1. changes
+    // 1. 变更组
     hasher.update((entry.changes as u8).to_le_bytes());
-    // 2. path & original_path
+    // 2. 路径及原路径
     hasher.update((entry.path.len() as u64).to_le_bytes());
     hasher.update(entry.path.as_bytes());
     if let Some(orig) = &entry.original_path {
@@ -699,9 +758,9 @@ pub fn compute_file_fingerprint(
         hasher.update((orig.len() as u64).to_le_bytes());
         hasher.update(orig.as_bytes());
     }
-    // 3. status
+    // 3. 状态代码
     hasher.update(entry.status.letter().as_bytes());
-    // 4. modes & oids
+    // 4. Git 状态中的模式与 OID（避免平台分支散落）
     if let Some(m) = &entry.mode_head {
         hasher.update(m.as_bytes());
     }
@@ -718,56 +777,33 @@ pub fn compute_file_fingerprint(
         hasher.update(oid.as_bytes());
     }
 
-    // 5. diff patch
-    let diff_bytes = match entry.changes {
-        ChangesKind::Unstaged => git.diff_worktree(Some(&entry.path))?,
-        ChangesKind::Staged => {
-            if let Some(orig) = &entry.original_path {
-                let mut args = vec!["-c", "core.quotePath=false", "diff"];
-                args.extend_from_slice(git::DIFF_FLAGS);
-                args.push("--staged");
-                args.push("--");
-                args.push(orig);
-                args.push(&entry.path);
-                git.run_ok(&args, "读取已暂存重命名 diff")?.stdout
-            } else {
-                git.diff_index(Some(&entry.path))?
-            }
-        }
-        ChangesKind::Untracked => git.diff_untracked(&entry.path)?,
-    };
+    // 5. diff 输出（展示所用同一份输出）
     hasher.update((diff_bytes.len() as u64).to_le_bytes());
-    hasher.update(&diff_bytes);
+    hasher.update(diff_bytes);
 
-    // 6. 工作区实际物理文件状态（针对 Unstaged 与 Untracked）
-    if entry.changes == ChangesKind::Unstaged || entry.changes == ChangesKind::Untracked {
+    // 6. 针对未跟踪文件或未暂存已跟踪文件：绑定工作区实体哈希（覆盖二进制等在 diff 文本无细节的内容变动）
+    if entry.changes == ChangesKind::Untracked
+        || (entry.changes == ChangesKind::Unstaged && entry.status != FileStatus::Deleted)
+    {
         let file_path = worktree_path.join(&entry.path);
-        match std::fs::symlink_metadata(&file_path) {
-            Ok(meta) => {
-                hasher.update(b"exists");
-                hasher.update(meta.len().to_le_bytes());
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::MetadataExt;
-                    hasher.update(meta.mode().to_le_bytes());
-                }
-                if meta.is_file() {
-                    if let Ok(mut f) = std::fs::File::open(&file_path) {
-                        use std::io::Read;
-                        let mut buf = Vec::new();
-                        let _ = f.read_to_end(&mut buf);
-                        let file_hash = Sha256::digest(&buf);
-                        hasher.update(&file_hash);
-                    }
-                } else if meta.file_type().is_symlink() {
-                    if let Ok(target) = std::fs::read_link(&file_path) {
-                        hasher.update(target.to_string_lossy().as_bytes());
-                    }
-                }
-            }
-            Err(_) => {
-                hasher.update(b"missing");
-            }
+        let meta = std::fs::symlink_metadata(&file_path)
+            .map_err(|e| AppError::rejected(format!("读取工作区文件属性失败（{}）：{}", entry.path, e)))?;
+        hasher.update(b"exists");
+        hasher.update(meta.len().to_le_bytes());
+
+        if meta.is_file() {
+            let mut f = std::fs::File::open(&file_path)
+                .map_err(|e| AppError::rejected(format!("打开工作区文件失败（{}）：{}", entry.path, e)))?;
+            use std::io::Read;
+            let mut buf = Vec::new();
+            f.read_to_end(&mut buf)
+                .map_err(|e| AppError::rejected(format!("读取工作区内容失败（{}）：{}", entry.path, e)))?;
+            let file_hash = Sha256::digest(&buf);
+            hasher.update(&file_hash);
+        } else if meta.file_type().is_symlink() {
+            let target = std::fs::read_link(&file_path)
+                .map_err(|e| AppError::rejected(format!("读取符号链接失败（{}）：{}", entry.path, e)))?;
+            hasher.update(target.to_string_lossy().as_bytes());
         }
     }
 
@@ -915,6 +951,7 @@ mod tests {
             deleted,
             old_lines: added + 3,
             new_lines: deleted + 3,
+            raw_patch: String::new(),
         }
     }
 

@@ -34,6 +34,30 @@ pub enum FileStatus {
     TypeChanged,
 }
 
+/// 只读限制原因（Q81、Q82、规格第 2 节）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ReadonlyReason {
+    Symlink,
+    Submodule,
+    NestedRepo,
+    Conflict,
+    NonUtf8Path,
+}
+
+impl ReadonlyReason {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Symlink => "符号链接为只读类型，不支持在应用内暂存或取消暂存",
+            Self::Submodule => "子模块为只读类型，不支持在应用内暂存或取消暂存",
+            Self::NestedRepo => "嵌套仓库为只读类型，不支持在应用内暂存",
+            Self::Conflict => "文件存在未解决的冲突，不支持通过普通操作暂存",
+            Self::NonUtf8Path => "非 UTF-8 路径无法无损处理，仅供只读查看",
+        }
+    }
+}
+
 impl FileStatus {
     pub fn letter(self) -> &'static str {
         match self {
@@ -69,8 +93,8 @@ pub struct StatusEntry {
     pub status: FileStatus,
     /// 是否处于 unmerged（冲突）状态。
     pub unmerged: bool,
-    /// 只读限制原因（如符号链接、子模块、冲突文件、非 UTF-8 路径等），None 表示支持写操作。
-    pub readonly_reason: Option<String>,
+    /// 只读限制原因，None 表示支持写操作。
+    pub readonly_reason: Option<ReadonlyReason>,
     #[serde(skip)]
     pub mode_head: Option<String>,
     #[serde(skip)]
@@ -149,12 +173,14 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
                     || head.get(3).is_some_and(|m| *m == "160000")
                     || head.get(4).is_some_and(|m| *m == "160000")
                     || head.get(5).is_some_and(|m| *m == "160000");
+                let has_non_utf8 = path.contains('\u{FFFD}')
+                    || original_path.as_deref().is_some_and(|orig| orig.contains('\u{FFFD}'));
                 let readonly_reason = if is_symlink {
-                    Some("符号链接为只读类型，不支持在应用内暂存或取消暂存".to_string())
+                    Some(ReadonlyReason::Symlink)
                 } else if is_submodule {
-                    Some("子模块为只读类型，不支持在应用内暂存或取消暂存".to_string())
-                } else if path.contains('\u{FFFD}') {
-                    Some("非 UTF-8 路径无法无损处理，仅供只读查看".to_string())
+                    Some(ReadonlyReason::Submodule)
+                } else if has_non_utf8 {
+                    Some(ReadonlyReason::NonUtf8Path)
                 } else {
                     None
                 };
@@ -198,14 +224,14 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
             }
             b'u' => {
                 // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
-                let (_head, path) = split_head(&text, 11);
+                let (_head, path) = split_head(&text, 10);
                 status.entries.push(StatusEntry {
                     path: path.to_string(),
                     original_path: None,
                     changes: ChangesKind::Unstaged,
                     status: FileStatus::Conflict,
                     unmerged: true,
-                    readonly_reason: Some("文件存在未解决的冲突，不支持通过普通操作暂存".to_string()),
+                    readonly_reason: Some(ReadonlyReason::Conflict),
                     mode_head: None,
                     mode_index: None,
                     mode_worktree: None,
@@ -215,8 +241,12 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
             }
             b'?' => {
                 let path = text[2..].to_string();
-                let readonly_reason = if path.contains('\u{FFFD}') {
-                    Some("非 UTF-8 路径无法无损处理，仅供只读查看".to_string())
+                let is_non_utf8 = path.contains('\u{FFFD}');
+                let is_nested_repo = path.ends_with('/') || path.ends_with("/.git");
+                let readonly_reason = if is_non_utf8 {
+                    Some(ReadonlyReason::NonUtf8Path)
+                } else if is_nested_repo {
+                    Some(ReadonlyReason::NestedRepo)
                 } else {
                     None
                 };

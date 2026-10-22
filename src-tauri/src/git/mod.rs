@@ -355,6 +355,39 @@ impl Git {
         self.diff(Some("--staged"), path)
     }
 
+    /// 暂存区相对 HEAD 的 diff（已暂存改动）。支持传入 original_path（重命名场景）。
+    pub fn diff_index_with_orig(&self, path: &str, orig_path: Option<&str>) -> Result<Vec<u8>> {
+        let mut args: Vec<&str> = vec!["-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.push("--staged");
+        args.push("--");
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        Ok(self.run_ok(&args, "读取已暂存 diff")?.stdout)
+    }
+
+    /// 整文件暂存：调用 git add -A -- <paths>（Q8、Q79、Q83）。
+    pub fn stage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
+        let mut args = vec!["-c", "core.quotePath=false", "add", "-A", "--"];
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        self.run_once(&args)
+    }
+
+    /// 整文件取消暂存：调用 git reset -- <paths>（Q8、Q79、T04）。
+    pub fn unstage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
+        let mut args = vec!["-c", "core.quotePath=false", "reset", "--"];
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        self.run_once(&args)
+    }
+
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {
         let mut args: Vec<&str> = vec!["-c", "core.quotePath=false", "diff"];
         args.extend_from_slice(DIFF_FLAGS);
@@ -401,7 +434,7 @@ fn read_pipe(pipe: Option<impl Read>) -> Vec<u8> {
     buffer
 }
 
-fn is_lock_error(output: &GitOutput) -> bool {
+pub fn is_lock_error(output: &GitOutput) -> bool {
     output.exit_code != 0 && output.stderr.contains("index.lock")
 }
 
