@@ -74,6 +74,12 @@ export function App() {
   const [snapshot, setSnapshot] = useState<ChangesSnapshot | null>(null);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [view, setView] = useState<ViewMode>("split");
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
   const [fontSize, setFontSize] = useState(12);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -481,6 +487,34 @@ export function App() {
       targetChanges: ChangesKind,
       oldDisplayIndex: number,
     ) => {
+      const currentSelected = selectedRef.current;
+      const currentView = viewRef.current;
+      const isStillOnOperatedFile =
+        currentSelected !== null &&
+        currentSelected.path === opPath &&
+        currentSelected.changes === opChanges;
+
+      // 规则：只有当前选择仍是被操作的文件时才按 Q89 衔接；用户已切走则保持用户当前的选择（审查意见 1）
+      if (!isStillOnOperatedFile) {
+        if (currentSelected && worktreeId) {
+          const matchingEntry = newSnapshot.entries.find(
+            (e) => e.path === currentSelected.path && e.changes === currentSelected.changes,
+          );
+          if (matchingEntry) {
+            void openEntry(matchingEntry, { view: currentView, worktreeId });
+            return;
+          }
+        }
+        const fallback = pickFirstEntry(newSnapshot);
+        if (fallback && worktreeId) {
+          setSelected({ path: fallback.path, changes: fallback.changes });
+          void openEntry(fallback, { view: currentView, worktreeId });
+        } else {
+          setSelected(null);
+        }
+        return;
+      }
+
       const newDisplayList = getDisplayOrderEntries(newSnapshot);
 
       // 规则 1：同文件原组仍有改动则留在原位置（Q89）
@@ -516,8 +550,9 @@ export function App() {
         const nextEntry = newSnapshot.entries.find(
           (e) => e.path === next!.path && e.changes === next!.changes,
         );
+        setSelected(next);
         if (nextEntry) {
-          void openEntry(nextEntry, { view, worktreeId });
+          void openEntry(nextEntry, { view: currentView, worktreeId });
         } else {
           setSelected(null);
         }
@@ -525,7 +560,7 @@ export function App() {
         setSelected(null);
       }
     },
-    [openEntry, view, worktreeId],
+    [openEntry, pickFirstEntry, worktreeId],
   );
 
   const stageFile = useCallback(
