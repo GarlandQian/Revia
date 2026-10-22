@@ -46,6 +46,7 @@ pub fn run() {
                     // 诊断时可选：窗口保持在最前并出现在所有桌面空间，避免被其他窗口遮挡导致长测因不可见而中断。
                     if std::env::var_os("REVIA_SOAK_ON_TOP").is_some() {
                         window.set_always_on_top(true)?;
+                        #[cfg(target_os = "macos")]
                         window.set_visible_on_all_workspaces(true)?;
                     }
                 }

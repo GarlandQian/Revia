@@ -6,6 +6,7 @@
 //! - 覆盖 T01, T03–T06, T14。
 
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -104,22 +105,37 @@ impl TestContext {
         vars.insert("GIT_CONFIG_GLOBAL".into(), self.global_config.display().to_string());
         vars.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
 
+        let mut path_entries = Vec::new();
+        if let Some(ambient) = std::env::var_os("PATH") {
+            for p in std::env::split_paths(&ambient) {
+                let s = p.display().to_string();
+                if !s.is_empty() {
+                    path_entries.push(s);
+                }
+            }
+        }
+        #[cfg(unix)]
+        {
+            for extra in ["/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin"] {
+                if !path_entries.iter().any(|p| p == extra) {
+                    path_entries.push(extra.into());
+                }
+            }
+        }
+
+        let shell_name = if cfg!(windows) { "cmd.exe" } else { "/bin/zsh" };
+
         let shell_env = ShellEnv {
-            path: vec![
-                "/usr/bin".into(),
-                "/bin".into(),
-                "/usr/local/bin".into(),
-                "/opt/homebrew/bin".into(),
-            ],
+            path: path_entries.clone(),
             vars,
             info: revia_lib::shell::EnvCaptureInfo {
                 worktree: self.repo_path.display().to_string(),
-                shell: "/bin/zsh".into(),
+                shell: shell_name.into(),
                 elapsed_ms: 1,
                 timed_out: false,
                 used_fallback: true,
                 var_count: 3,
-                path_entries: vec!["/opt/homebrew/bin".into(), "/usr/bin".into()],
+                path_entries,
                 diagnostics: None,
             },
         };
@@ -590,30 +606,28 @@ fn t03_stage_and_unstage_binary_file() {
     assert_eq!(ctx.read_file("asset.bin"), modified_bin);
 }
 
-/// T03: 恢复被删掉的仅权限变化（mode change）暂存与取消暂存测试。
+/// T03: 仅权限变化（mode change）暂存与取消暂存测试（POSIX 专有）。
+#[cfg(unix)]
 #[test]
 fn t03_stage_and_unstage_mode_change() {
     let ctx = TestContext::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        ctx.write_file("script.sh", b"#!/bin/sh\necho ok\n");
-        ctx.git(&["add", "script.sh"]);
-        ctx.git(&["commit", "-m", "add script"]);
+    use std::os::unix::fs::PermissionsExt;
+    ctx.write_file("script.sh", b"#!/bin/sh\necho ok\n");
+    ctx.git(&["add", "script.sh"]);
+    ctx.git(&["commit", "-m", "add script"]);
 
-        let full_script = ctx.path().join("script.sh");
-        fs::set_permissions(&full_script, fs::Permissions::from_mode(0o755)).unwrap();
+    let full_script = ctx.path().join("script.sh");
+    fs::set_permissions(&full_script, fs::Permissions::from_mode(0o755)).unwrap();
 
-        let session = ctx.open_session();
-        let snap_mode = session.refresh().unwrap();
-        let mode_entry = snap_mode.entries.iter().find(|e| e.path == "script.sh").unwrap();
+    let session = ctx.open_session();
+    let snap_mode = session.refresh().unwrap();
+    let mode_entry = snap_mode.entries.iter().find(|e| e.path == "script.sh").unwrap();
 
-        let snap_mode_staged = session.stage_file(&mode_entry.path, &mode_entry.fingerprint).unwrap();
-        let staged_mode = snap_mode_staged.entries.iter().find(|e| e.path == "script.sh" && e.changes == ChangesKind::Staged).unwrap();
+    let snap_mode_staged = session.stage_file(&mode_entry.path, &mode_entry.fingerprint).unwrap();
+    let staged_mode = snap_mode_staged.entries.iter().find(|e| e.path == "script.sh" && e.changes == ChangesKind::Staged).unwrap();
 
-        let snap_mode_unstage = session.unstage_file(&staged_mode.path, &staged_mode.fingerprint).unwrap();
-        assert!(snap_mode_unstage.entries.iter().any(|e| e.path == "script.sh" && e.changes == ChangesKind::Unstaged));
-    }
+    let snap_mode_unstage = session.unstage_file(&staged_mode.path, &staged_mode.fingerprint).unwrap();
+    assert!(snap_mode_unstage.entries.iter().any(|e| e.path == "script.sh" && e.changes == ChangesKind::Unstaged));
 }
 
 /// T03: 完整能力矩阵只读拒绝：符号链接、子模块、未解决冲突、未跟踪嵌套仓库、非 UTF-8 路径及无权限读取文件。

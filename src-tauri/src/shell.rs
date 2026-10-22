@@ -49,9 +49,11 @@ pub struct ShellEnv {
 }
 
 impl ShellEnv {
-    /// 解析结果里的 PATH 条目。
+    /// 解析结果里的 PATH 条目（跨平台分隔符）。
     pub fn path_string(&self) -> String {
-        self.path.join(":")
+        std::env::join_paths(self.path.iter().map(Path::new))
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| self.path.join(if cfg!(windows) { ";" } else { ":" }))
     }
 
     /// 供展示用的 git / node 等程序的解析结果。
@@ -61,19 +63,42 @@ impl ShellEnv {
 }
 
 fn which_in(path: &[String], program: &str) -> Option<PathBuf> {
-    if program.contains('/') {
+    let has_separator = program.contains('/') || (cfg!(windows) && program.contains('\\'));
+    if has_separator {
         let candidate = PathBuf::from(program);
-        return candidate.is_file().then_some(candidate);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        #[cfg(windows)]
+        {
+            for ext in ["exe", "cmd", "bat"] {
+                let with_ext = candidate.with_extension(ext);
+                if with_ext.is_file() {
+                    return Some(with_ext);
+                }
+            }
+        }
+        return None;
     }
     for dir in path {
         let candidate = Path::new(dir).join(program);
         if candidate.is_file() {
             return Some(candidate);
         }
+        #[cfg(windows)]
+        {
+            for ext in ["exe", "cmd", "bat"] {
+                let with_ext = candidate.with_extension(ext);
+                if with_ext.is_file() {
+                    return Some(with_ext);
+                }
+            }
+        }
     }
     None
 }
 
+#[cfg(unix)]
 /// 最小基线环境：模拟从 Finder 启动时的环境，只保留启动 zsh 必需的部分。
 fn base_env(home: &Path) -> Vec<(String, String)> {
     let mut vars: Vec<(String, String)> = vec![
@@ -92,6 +117,7 @@ fn base_env(home: &Path) -> Vec<(String, String)> {
     vars
 }
 
+#[cfg(unix)]
 /// 回退用环境：shell 不可用或超时时使用。不继承应用进程的 PATH（从 Finder 启动时它是残缺的）。
 fn fallback_env(home: &Path) -> Vec<(String, String)> {
     let mut vars = base_env(home);
@@ -103,10 +129,12 @@ fn fallback_env(home: &Path) -> Vec<(String, String)> {
     vars
 }
 
+#[cfg(unix)]
 fn dump_path(worktree: &Path) -> String {
     worktree.join(".revia-env.dump").display().to_string()
 }
 
+#[cfg(unix)]
 /// 转储脚本：把环境写成 `KEY=VALUE\0`，只保留选定变量，静默执行。
 ///
 /// 用 zsh 自己的 `>&` 重定向打开转储文件，不继承应用进程的任何文件描述符；
@@ -139,6 +167,7 @@ fn sanitize(mut vars: HashMap<String, String>) -> HashMap<String, String> {
     vars
 }
 
+#[cfg(unix)]
 /// 解析 worktree 的运行环境。失败时回退到最小环境，不返回错误，只在 info 里标注。
 pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
     let shell = detect_shell();
@@ -277,7 +306,6 @@ pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
             path_entries: path.clone(),
             diagnostics,
         },
-        // 记录实际生效的 PATH，便于在报告里核对 fnm 的 shim 目录。
         vars: {
             let mut vars = vars;
             vars.insert("REVIA_SHELL".into(), shell_path);
@@ -287,6 +315,41 @@ pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
     }
 }
 
+#[cfg(windows)]
+/// Windows 下无登录 shell，行为合理降级：使用进程自身环境，确保 Windows CI 与开发环境可用（M2 决策 8、Q55）。
+pub fn resolve(_home: &Path, worktree: &Path) -> ShellEnv {
+    let shell = detect_shell();
+    let shell_path = shell.display().to_string();
+    let started = Instant::now();
+
+    let mut vars = HashMap::new();
+    for (key, value) in std::env::vars() {
+        vars.insert(key, value);
+    }
+    let vars = sanitize(vars);
+    let path = split_path(&vars);
+
+    ShellEnv {
+        info: EnvCaptureInfo {
+            worktree: worktree.display().to_string(),
+            shell: shell_path.clone(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
+            timed_out: false,
+            used_fallback: false,
+            var_count: vars.len(),
+            path_entries: path.clone(),
+            diagnostics: None,
+        },
+        vars: {
+            let mut vars = vars;
+            vars.insert("REVIA_SHELL".into(), shell_path);
+            vars
+        },
+        path,
+    }
+}
+
+#[cfg(unix)]
 fn fallback(
     home: &Path,
     worktree: &Path,
@@ -315,6 +378,7 @@ fn fallback(
     }
 }
 
+#[cfg(unix)]
 fn detect_shell() -> PathBuf {
     if let Some(shell) = std::env::var_os("SHELL") {
         let candidate = PathBuf::from(shell);
@@ -329,13 +393,37 @@ fn detect_shell() -> PathBuf {
     zsh
 }
 
+#[cfg(windows)]
+fn detect_shell() -> PathBuf {
+    if let Some(comspec) = std::env::var_os("ComSpec") {
+        let candidate = PathBuf::from(comspec);
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    PathBuf::from("cmd.exe")
+}
+
 fn split_path(vars: &HashMap<String, String>) -> Vec<String> {
-    vars.get("PATH")
+    let path_val = vars.get("PATH").or_else(|| {
+        if cfg!(windows) {
+            vars.get("Path").or_else(|| vars.get("path"))
+        } else {
+            None
+        }
+    });
+
+    path_val
         .map(|value| {
-            value
-                .split(':')
-                .filter(|entry| !entry.is_empty())
-                .map(|entry| entry.to_string())
+            std::env::split_paths(value)
+                .filter_map(|entry| {
+                    let s = entry.to_string_lossy().trim().to_string();
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s)
+                    }
+                })
                 .collect()
         })
         .unwrap_or_default()
@@ -405,13 +493,31 @@ impl EnvCache {
 
 /// 解析当前用户的主目录；从 Finder 启动时 HOME 一定存在，但仍保留回退。
 pub fn home_dir() -> Result<PathBuf> {
+    #[cfg(unix)]
     if let Some(home) = std::env::var_os("HOME") {
         let path = PathBuf::from(home);
         if path.is_dir() {
             return Ok(path);
         }
     }
-    Err(AppError::environment("找不到用户主目录（HOME 未设置）"))
+
+    #[cfg(windows)]
+    {
+        if let Some(profile) = std::env::var_os("USERPROFILE") {
+            let path = PathBuf::from(profile);
+            if path.is_dir() {
+                return Ok(path);
+            }
+        }
+        if let (Some(drive), Some(homepath)) = (std::env::var_os("HOMEDRIVE"), std::env::var_os("HOMEPATH")) {
+            let path = PathBuf::from(format!("{}{}", drive.to_string_lossy(), homepath.to_string_lossy()));
+            if path.is_dir() {
+                return Ok(path);
+            }
+        }
+    }
+
+    Err(AppError::environment("找不到用户主目录（HOME 或 USERPROFILE 未设置）"))
 }
 
 #[cfg(test)]
@@ -436,6 +542,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn resolve_ignores_ambient_path_when_launched_with_minimal_env() {
         // 模拟 Finder 启动：进程自身的 PATH 里没有 homebrew / fnm。
         let worktree = std::env::temp_dir().join("revia-env-test-no-such-dir");
@@ -463,5 +570,41 @@ mod tests {
         let vars = sanitize(vars);
         assert!(!vars.contains_key("PWD"));
         assert!(vars.contains_key("PATH"));
+    }
+
+    #[test]
+    fn path_string_roundtrips_entries() {
+        let env = ShellEnv {
+            vars: HashMap::new(),
+            path: vec!["/bin".into(), "/usr/bin".into()],
+            info: EnvCaptureInfo {
+                worktree: "".into(),
+                shell: "".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: false,
+                var_count: 0,
+                path_entries: vec![],
+                diagnostics: None,
+            },
+        };
+        let joined = env.path_string();
+        if cfg!(windows) {
+            assert!(joined.contains(';') || joined == "/bin" || !joined.contains(':'));
+        } else {
+            assert_eq!(joined, "/bin:/usr/bin");
+        }
+    }
+
+    #[test]
+    fn which_in_finds_file_in_path() {
+        let td = tempfile::tempdir().unwrap();
+        let bin_dir = td.path().join("bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        let script = bin_dir.join("test-tool");
+        std::fs::write(&script, b"#!/bin/sh\n").unwrap();
+        let path = vec![bin_dir.display().to_string()];
+        assert_eq!(which_in(&path, "test-tool"), Some(script));
+        assert_eq!(which_in(&path, "nonexistent-tool"), None);
     }
 }
