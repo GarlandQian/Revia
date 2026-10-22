@@ -545,9 +545,21 @@ fn t02_stage_and_unstage_spaced_paths_binary_mode_and_rename() {
     let snap_after_rename_unstage = session
         .unstage_file(&rename_entry.path, &rename_entry.fingerprint)
         .expect("取消暂存含空格重命名文件应当成功");
-    // Q83：取消暂存重命名后，原路径为删除（已暂存），新路径为未跟踪
-    assert!(snap_after_rename_unstage.entries.iter().any(|e| e.path == old_rename_path && e.status == FileStatus::Deleted));
-    assert!(snap_after_rename_unstage.entries.iter().any(|e| e.path == new_rename_path && e.changes == ChangesKind::Untracked));
+    // 取消暂存重命名后：暂存区恢复为 HEAD 状态，原路径在工作区缺失表现为未暂存的删除（Unstaged），新路径在工作区存在表现为未跟踪（Untracked）
+    let old_deleted = snap_after_rename_unstage
+        .entries
+        .iter()
+        .find(|e| e.path == old_rename_path)
+        .expect("应找到原路径删除条目");
+    assert_eq!(old_deleted.changes, ChangesKind::Unstaged);
+    assert_eq!(old_deleted.status, FileStatus::Deleted);
+
+    let new_untracked = snap_after_rename_unstage
+        .entries
+        .iter()
+        .find(|e| e.path == new_rename_path)
+        .expect("应找到新路径未跟踪条目");
+    assert_eq!(new_untracked.changes, ChangesKind::Untracked);
 }
 
 /// T03: 恢复被删掉的二进制文件暂存与取消暂存测试。
@@ -876,11 +888,22 @@ fn t05_comprehensive_fingerprint_verification() {
     assert!(untracked_res.is_err());
     assert_eq!(untracked_res.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 6. 重命名条目外部修改：在暂存区微调内容（保持 95% 相似度，仍为重命名条目），旧指纹拒绝并提示“文件已变化，请重新确认”（审查意见 3）
+    // 6. 重命名条目外部修改：在暂存区追加内容（Git 判定为 R85 相似度，仍为重命名条目），旧指纹拒绝并提示“文件已变化，请重新确认”
     let mut updated_rename_content = rename_content.clone();
     updated_rename_content.extend_from_slice(b"extra line to alter blob\n");
     ctx.write_file("new_renamed.txt", &updated_rename_content);
     ctx.git(&["add", "new_renamed.txt"]);
+
+    // 断言外部修改后条目在快照中依然保持为重命名条目（更正要求）
+    let snap_after_edit = session.refresh().unwrap();
+    let renamed_still = snap_after_edit
+        .entries
+        .iter()
+        .find(|e| e.path == "new_renamed.txt" && e.changes == ChangesKind::Staged)
+        .expect("应找到修改后的重命名条目");
+    assert_eq!(renamed_still.status, FileStatus::Renamed, "外部修改后条目在快照中依然保持为重命名");
+    assert_eq!(renamed_still.original_path.as_deref(), Some("old_renamed.txt"));
+
     let renamed_res = session.unstage_file(&renamed_entry.path, &old_renamed_fp);
     assert!(renamed_res.is_err());
     assert_eq!(renamed_res.unwrap_err().to_string(), "文件已变化，请重新确认");
