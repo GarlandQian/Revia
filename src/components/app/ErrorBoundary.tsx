@@ -5,6 +5,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportCritical } from "@/features/diff/log";
+import { getErrorMessage } from "@/lib/error";
 
 interface Props {
   children: ReactNode;
@@ -18,11 +19,11 @@ export class ErrorBoundary extends Component<Props, State> {
   state: State = { message: null };
 
   static getDerivedStateFromError(error: unknown): State {
-    return { message: error instanceof Error ? error.message : String(error) };
+    return { message: getErrorMessage(error) };
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {
-    reportCritical(`渲染错误：${error instanceof Error ? `${error.message}\n${error.stack}` : String(error)}\n${info.componentStack}`);
+    reportCritical(`渲染错误：${error instanceof Error ? `${error.message}\n${error.stack}` : getErrorMessage(error)}\n${info.componentStack}`);
   }
 
   render(): ReactNode {

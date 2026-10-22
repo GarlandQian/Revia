@@ -10,6 +10,7 @@
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import { ipc, type HighlightLine } from "@/lib/ipc";
+import { getErrorMessage } from "@/lib/error";
 
 /** 一次请求覆盖的行数。 */
 export const HIGHLIGHT_CHUNK_LINES = 400;
@@ -137,7 +138,7 @@ export class HighlightStore {
     } catch (error) {
       if (epoch !== this.epoch) return;
       this.requested.add(key);
-      this.publish(error instanceof Error ? error.message : String(error), true);
+      this.publish(getErrorMessage(error), true);
     } finally {
       if (epoch === this.epoch) {
         this.pending.delete(key);

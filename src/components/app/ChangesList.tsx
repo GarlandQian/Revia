@@ -5,7 +5,7 @@
  * 选中哪一行就显示哪一侧的 diff。
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
@@ -31,6 +31,12 @@ interface ChangesListProps {
 
 export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, isWriting }: ChangesListProps) {
   const [untrackedOpen, setUntrackedOpen] = useState(false);
+
+  useEffect(() => {
+    if (selected?.changes === "untracked" && !untrackedOpen) {
+      setUntrackedOpen(true);
+    }
+  }, [selected?.changes, untrackedOpen]);
 
   const groups = useMemo(() => {
     const unstaged = snapshot.entries.filter((entry) => entry.changes === "unstaged");
@@ -213,7 +219,7 @@ function VirtualRows({
             >
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left outline-none cursor-pointer"
+                className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left outline-none cursor-pointer focus-visible:ring-1 focus-visible:ring-ring focus-visible:rounded-sm focus-visible:ring-inset"
                 onClick={() => onSelect({ path: entry.path, changes: entry.changes })}
                 onKeyDown={(e) => {
                   if (e.key === " " && !isWriting && !entry.readonlyReason) {

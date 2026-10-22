@@ -30,6 +30,7 @@ import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { getErrorMessage, toAppError } from "@/lib/error";
 import {
   formatMs,
   measureScroll,
@@ -59,11 +60,6 @@ interface MeasureConfig {
 
 type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
 
-interface AppErrorInfo {
-  kind: "rejected" | "git" | "environment" | "internal" | "needsVerification";
-  message: string;
-}
-
 const DEFAULT_VIEWPORT_ROWS = 45;
 
 function debugLog(message: string) {
@@ -82,7 +78,26 @@ export function App() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const [error, setError] = useState<AppErrorPayload | null>(null);
+  const [worktreeErrors, setWorktreeErrors] = useState<Record<string, AppErrorPayload | null>>({});
+  const [globalError, setGlobalError] = useState<AppErrorPayload | null>(null);
+  const error = (worktreeId ? worktreeErrors[worktreeId] : null) ?? globalError;
+
+  const setAppError = useCallback((err: AppErrorPayload | null, targetWorktreeId?: string | null) => {
+    const wtId = targetWorktreeId ?? worktreeId;
+    if (wtId) {
+      setWorktreeErrors((prev) => ({ ...prev, [wtId]: err }));
+    } else {
+      setGlobalError(err);
+    }
+  }, [worktreeId]);
+
+  const dismissError = useCallback(() => {
+    if (worktreeId) {
+      setWorktreeErrors((prev) => ({ ...prev, [worktreeId]: null }));
+    }
+    setGlobalError(null);
+  }, [worktreeId]);
+
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [bootstrapDone, setBootstrapDone] = useState(false);
@@ -183,7 +198,7 @@ export function App() {
     async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean } = {}) => {
       const targetView = options.view ?? view;
       setBusy(true);
-      setError(null);
+      setAppError(null, id);
       const openStart = performance.now();
       try {
         const sessionInfo = await ipc.openWorktree(id);
@@ -192,13 +207,12 @@ export function App() {
         setWorktreeId(id);
         const failed = sessionInfo.checks.filter((check) => !check.ok);
         if (failed.length > 0) {
-          setError({ kind: "environment", message: failed.map((check) => `${check.name}：${check.detail}`).join("\n") });
+          setAppError({ kind: "environment", message: failed.map((check) => `${check.name}：${check.detail}`).join("\n") }, id);
         }
 
         const startedAt = performance.now();
         const next = applySnapshot(await ipc.listChanges(id));
         const listChangesMs = performance.now() - startedAt;
-        debugLog(`list_changes 完成：${Math.round(listChangesMs)} ms，${next.entries.length} 个文件`);
         debugLog(`list_changes 完成：${Math.round(listChangesMs)} ms，${next.entries.length} 个文件`);
         const entry = pickFirstEntry(next, options.targetPath ?? null);
         if (!entry) {
@@ -225,20 +239,24 @@ export function App() {
           devicePixelRatio: opened.devicePixelRatio,
         };
       } catch (caught) {
-        setError(toAppError(caught));
+        setAppError(toAppError(caught), id);
         return null;
       } finally {
         setBusy(false);
       }
     },
-    [applySnapshot, openEntry, pickFirstEntry],
+    [applySnapshot, openEntry, pickFirstEntry, setAppError, view],
   );
 
   const refresh = useCallback(async () => {
     if (!worktreeId) return;
+    const targetWorktreeId = worktreeId;
     setBusy(true);
     try {
-      const next = applySnapshot(await ipc.listChanges(worktreeId));
+      const snap = await ipc.listChanges(targetWorktreeId);
+      // 切换期间完成的旧快照不得写进当前界面（审查意见 2）
+      if (worktreeIdRef.current !== targetWorktreeId) return;
+      const next = applySnapshot(snap);
       setSelected((current) => {
         if (current && next.entries.some((entry) => entry.path === current.path && entry.changes === current.changes)) {
           return current;
@@ -248,11 +266,14 @@ export function App() {
       });
       setStatus(`${next.entries.length} 个文件`);
     } catch (caught) {
-      setError(toAppError(caught));
+      if (worktreeIdRef.current !== targetWorktreeId) return;
+      setAppError(toAppError(caught), targetWorktreeId);
     } finally {
-      setBusy(false);
+      if (worktreeIdRef.current === targetWorktreeId) {
+        setBusy(false);
+      }
     }
-  }, [applySnapshot, pickFirstEntry, worktreeId]);
+  }, [applySnapshot, pickFirstEntry, setAppError, worktreeId]);
 
   // ---------------- 添加仓库 ----------------
 
@@ -268,18 +289,18 @@ export function App() {
         setActiveRepo(repo);
         const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
         if (!worktree) {
-          setError({ kind: "rejected", message: messages.firstRun.notARepo });
+          setAppError({ kind: "rejected", message: messages.firstRun.notARepo });
           return;
         }
         await ipc.selectRepo(repo.id, worktree.id);
         await openWorktree(worktree.id);
       } catch (caught) {
-        setError(toAppError(caught));
+        setAppError(toAppError(caught));
       } finally {
         setBusy(false);
       }
     },
-    [openWorktree],
+    [openWorktree, setAppError],
   );
 
   const chooseRepo = useCallback(async () => {
@@ -328,7 +349,7 @@ export function App() {
           if (worktree) await openWorktree(worktree.id);
         }
       } catch (caught) {
-        setError(toAppError(caught));
+        setAppError(toAppError(caught));
       } finally {
         setBootstrapDone(true);
       }
@@ -518,13 +539,14 @@ export function App() {
       );
 
       setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
-      setError(null);
+      setAppError(null, opWorktreeId);
       try {
         const newSnapshot = await ipc.stageFile({
           worktreeId: opWorktreeId,
           path: entry.path,
           fingerprint: entry.fingerprint,
         });
+        setAppError(null, opWorktreeId);
         // Q90：旧响应不得覆盖当前界面（审查意见 4）
         if (worktreeIdRef.current !== opWorktreeId) {
           debugLog(`[OP] 操作返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧响应不改写当前界面`);
@@ -533,13 +555,13 @@ export function App() {
         setSnapshot(newSnapshot);
         reconcileSelection(newSnapshot, entry.path, entry.changes, "staged", oldDisplayIndex);
       } catch (caught) {
-        // Q90：失败及待核对结果也只归属原 worktree，切换后不改写当前界面（审查意见 4）
+        const err = toAppError(caught);
+        // 规格第 3 节、审查意见 2：失败及待核对结果严格归属原 worktree 保留，回到该 worktree 时可见
+        setAppError(err, opWorktreeId);
         if (worktreeIdRef.current !== opWorktreeId) {
-          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧错误不改写当前界面`);
+          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，结果已保存至原 worktree`);
           return;
         }
-        const err = toAppError(caught);
-        setError(err);
         // 结果待核对或状态失效时重新读取真实状态，绝不自动重跑（规格第 3 节，审查意见 1）
         if (err.kind === "needsVerification" || err.kind === "rejected") {
           void refresh();
@@ -552,7 +574,7 @@ export function App() {
         });
       }
     },
-    [isWriting, reconcileSelection, refresh, snapshot, worktreeId],
+    [isWriting, reconcileSelection, refresh, setAppError, snapshot, worktreeId],
   );
 
   const unstageFile = useCallback(
@@ -565,13 +587,14 @@ export function App() {
       );
 
       setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
-      setError(null);
+      setAppError(null, opWorktreeId);
       try {
         const newSnapshot = await ipc.unstageFile({
           worktreeId: opWorktreeId,
           path: entry.path,
           fingerprint: entry.fingerprint,
         });
+        setAppError(null, opWorktreeId);
         // Q90：旧响应不得覆盖当前界面（审查意见 4）
         if (worktreeIdRef.current !== opWorktreeId) {
           debugLog(`[OP] 操作返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧响应不改写当前界面`);
@@ -580,13 +603,13 @@ export function App() {
         setSnapshot(newSnapshot);
         reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged", oldDisplayIndex);
       } catch (caught) {
-        // Q90：失败及待核对结果也只归属原 worktree，切换后不改写当前界面（审查意见 4）
+        const err = toAppError(caught);
+        // 规格第 3 节、审查意见 2：失败及待核对结果严格归属原 worktree 保留，回到该 worktree 时可见
+        setAppError(err, opWorktreeId);
         if (worktreeIdRef.current !== opWorktreeId) {
-          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧错误不改写当前界面`);
+          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，结果已保存至原 worktree`);
           return;
         }
-        const err = toAppError(caught);
-        setError(err);
         if (err.kind === "needsVerification" || err.kind === "rejected") {
           void refresh();
         }
@@ -598,7 +621,7 @@ export function App() {
         });
       }
     },
-    [isWriting, reconcileSelection, refresh, snapshot, worktreeId],
+    [isWriting, reconcileSelection, refresh, setAppError, snapshot, worktreeId],
   );
 
   // 快捷键（Q19、Q93、审查意见 6）：
@@ -781,7 +804,7 @@ export function App() {
         });
       } catch (caught) {
         // Keep the original samples even when the separate diagnostic fails.
-        jumpDomError = String(caught);
+        jumpDomError = getErrorMessage(caught);
       }
       const measurement: Measurement = {
         id: measurements.length + 1,
@@ -938,7 +961,7 @@ export function App() {
         report.ok = true;
       } catch (caught) {
         report.ok = false;
-        report.error = String(caught);
+        report.error = getErrorMessage(caught);
       }
       await ipc.writeMeasurement(report);
     },
@@ -1416,9 +1439,9 @@ export function App() {
         else debugLog(completionMessage);
       } catch (caught) {
         report.ok = false;
-        report.error = String(caught);
+        report.error = getErrorMessage(caught);
         report.samples = samples;
-        debugLog(`长期运行基线异常中断：${String(caught)}`);
+        debugLog(`长期运行基线异常中断：${getErrorMessage(caught)}`);
       }
       if (diagnostics) {
         report.ipcFinal = diagnostics.snapshot();
@@ -1477,8 +1500,8 @@ export function App() {
         await ipc.writeMeasurement({ ok: true, combos: results, visibility });
         debugLog(`测量完成，共 ${results.length} 组`);
       } catch (caught) {
-        debugLog(`自动测量失败：${String(caught)}`);
-        await ipc.writeMeasurement({ ok: false, error: String(caught) });
+        debugLog(`自动测量失败：${getErrorMessage(caught)}`);
+        await ipc.writeMeasurement({ ok: false, error: getErrorMessage(caught) });
       } finally {
         monitor.stop();
       }
@@ -1521,7 +1544,7 @@ export function App() {
           {messages.firstRun.addButton}
         </Button>
         <p className="text-xs text-muted-foreground">{messages.firstRun.dragHint}</p>
-        {error ? <ErrorBanner error={error} onDismiss={() => setError(null)} /> : null}
+        {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
       </div>
     );
   }
@@ -1569,7 +1592,7 @@ export function App() {
           onStage={(entry) => void stageFile(entry)}
           onUnstage={(entry) => void unstageFile(entry)}
         />
-        {error ? <ErrorBanner error={error} onDismiss={() => setError(null)} /> : null}
+        {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {!selectedEntry ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -1725,7 +1748,7 @@ function Toolbar({
   );
 }
 
-function ErrorBanner({ error, onDismiss }: { error: AppErrorInfo; onDismiss: () => void }) {
+function ErrorBanner({ error, onDismiss }: { error: AppErrorPayload; onDismiss: () => void }) {
   const title =
     error.kind === "needsVerification"
       ? messages.errors.needsVerification
@@ -1827,15 +1850,6 @@ function getDisplayOrderEntries(snapshot: ChangesSnapshot): ChangeEntry[] {
   const untracked = snapshot.entries.filter((entry) => entry.changes === "untracked");
   const staged = snapshot.entries.filter((entry) => entry.changes === "staged");
   return [...unstaged, ...untracked, ...staged];
-}
-
-function toAppError(caught: unknown): AppErrorPayload {
-  if (caught && typeof caught === "object" && "kind" in caught && "message" in caught) {
-    const payload = caught as AppErrorPayload;
-    return { kind: payload.kind, message: String(payload.message) };
-  }
-  const message = caught instanceof Error ? caught.message : String(caught);
-  return { kind: "internal", message };
 }
 
 /**

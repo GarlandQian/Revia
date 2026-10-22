@@ -20,6 +20,7 @@ import type { ViewMode } from "@/types/bindings/ViewMode";
 export const CHUNK_ROWS = 500;
 
 import { logToBackend } from "./log";
+import { getErrorMessage } from "@/lib/error";
 /** 预取最多同时在途的块数；可见块的请求不受这个限制。 */
 const MAX_IN_FLIGHT = 2;
 /** 单独取可见行时，在可见范围上下各多取的行数。 */
@@ -246,8 +247,8 @@ export class RowWindowStore {
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
-      logToBackend(`取可见行 ${from}-${to} 失败：${error instanceof Error ? error.message : String(error)}`);
-      this.publish(error instanceof Error ? error.message : String(error));
+      logToBackend(`取可见行 ${from}-${to} 失败：${getErrorMessage(error)}`);
+      this.publish(getErrorMessage(error));
     } finally {
       if (epoch === this.epoch) this.sliceInFlight = false;
     }
@@ -277,8 +278,8 @@ export class RowWindowStore {
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
-      logToBackend(`取块 ${chunkIndex} 失败：${error instanceof Error ? error.message : String(error)}`);
-      this.publish(error instanceof Error ? error.message : String(error));
+      logToBackend(`取块 ${chunkIndex} 失败：${getErrorMessage(error)}`);
+      this.publish(getErrorMessage(error));
     } finally {
       if (epoch === this.epoch) {
         this.pending.delete(chunkIndex);
