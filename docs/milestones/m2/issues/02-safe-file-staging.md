@@ -191,3 +191,60 @@
 
 修改后在本节下追加说明，如实写每条怎么改、测试名和检查结果，重跑 `pnpm exec tsc -b`、`pnpm lint`、`pnpm build`、完整 `cargo test`，并按 benchmark.md 再测一次并排、统一首屏。
 
+### 2026-10-23 / Pi 第二轮修改
+
+1. **响应 8 条“必须修改”：**
+   - **第 1 条（路径字面量处理，安全漏洞修复）**：
+     - 在 `git/mod.rs` 中为所有带路径的 Git 调用（`stage_file`, `unstage_file`, `diff_index_with_orig`, `diff`, `diff_untracked`）添加 `--literal-pathspecs` 全局标志；
+     - 增加测试 `t01_literal_pathspecs_wildcard_safety`：验证当 `x*.txt` 与 `xy.txt` 同时存在时，暂存 `x*.txt` 只将 `x*.txt` 移入已暂存，`xy.txt` 绝不会被通配符误带入暂存区；随后取消暂存 `x*.txt` 也只恢复 `x*.txt`，`xy.txt` 全程保持未跟踪。
+   - **第 2 条（非 UTF-8 内容字节口径一致）**：
+     - `git/diff.rs` 调整为 `parse_bytes(bytes: &[u8])`，采用 `split_file_slices` 按照原始切片直接截取 `raw_patch: Vec<u8>`，不再逐行拼接并在末尾产生多余换行符；
+     - `session.rs` 的 `refresh()` 与 `rows()` 直接使用 `git::diff::parse_bytes`，保留原始非 UTF-8 字节；
+     - 增加测试 `t02_non_utf8_gbk_content_staging_and_unstaging`：GBK 编码文件在工作区修改后，暂存与取消暂存均顺利通过，指纹核对严格一致，工作区字节全程保持原 GBK 编码不变。
+   - **第 3 条（消除已跟踪文件刷新整读与规范只读原因）**：
+     - `compute_file_fingerprint_from_patch` 仅对未跟踪文件（`ChangesKind::Untracked`）在刷新时读取物理文件内容；已跟踪文件的内容、权限、增删与二进制变动已完全体现在 Git status/diff 输出中，不再在刷新时重复整读文件，根除了首屏退化隐患；
+     - `ReadonlyReason` 新增 `Unreadable` 枚举值，在文件无法读取或无访问权限时返回 `ReadonlyReason::Unreadable`，前端在 `i18n` 对应显示“文件无法读取或无访问权限，仅供只读查看”，不再错误误标为“非 UTF-8 路径”。
+   - **第 4 条（错误分支不污染其他 worktree 界面）**：
+     - `App.tsx` 中的 `stageFile` 与 `unstageFile` 在 catch 分支比对 `worktreeIdRef.current !== opWorktreeId`，若用户已切换至其他 worktree，仅在 debugLog 记录，绝不执行当前界面的 `setError` 或 `refresh()`，保证失败与待核对结果严格归属原 worktree（Q90）。
+   - **第 5 条（Q89 选择衔接按界面顺序）**：
+     - `reconcileSelection` 依界面展示顺序（`[...unstaged, ...untracked, ...staged]`）计算原索引 `oldDisplayIndex`；
+     - 跟随同文件优先匹配同名条目，覆盖修改变未暂存、新增变未跟踪、重命名变删除+未跟踪（优先匹配同名 `new_path`）；
+     - 当文件彻底离开列表时，按界面顺序选取 `Math.min(oldDisplayIndex, newDisplayList.length - 1)` 处的附近条目，全空时清空选中项。
+   - **第 6 条（键盘行为修复与结构解耦）**：
+     - `ChangesList` 移除 `<button>` 嵌套 `<span role="button">` 的无效 HTML 结构，拆分为平级的选择 `<button>` 与操作 `<Button>`（tabIndex={-1}）；
+     - 文件行按钮响应自身的 Space 按键执行暂存/取消暂存，列表容器捕获 Space 时排除了所有按钮元素；
+     - `App.tsx` 全局快捷键仅对输入框（input/textarea/contenteditable）和弹窗放行（`isTextInputOrDialog`），按钮聚焦时依然能响应 ⌘R、⌘O、⌥⌘A、F7、⌘↑、⌘↓ 快捷键。
+   - **第 7 条（测试完整覆盖）**：
+     - 恢复 `t03_stage_and_unstage_binary_file`（二进制文件暂存与取消暂存）；
+     - 恢复 `t03_stage_and_unstage_mode_change`（仅权限变化暂存与取消暂存）；
+     - 恢复 `t05_comprehensive_fingerprint_verification` 中对“文件已变化，请重新确认”错误文本的精确断言；
+     - T03 补齐子模块（模式 160000）、冲突未合并（Conflict）、未跟踪嵌套仓库（测试内全部使用隔离环境 git init）、非 UTF-8 路径注入（通过 git update-index 写入原始非 UTF-8 字节并在 status 读取到 \u{FFFD}）以及无权限访问文件（chmod 000）；
+     - T05 补齐目标文件自身内容修改、仅权限变化、重命名路径修改、未跟踪文件修改、二进制文件修改及已暂存侧外部变动的指纹拒绝测试；
+     - T01 增加多文件仓库断言，验证操作 target 文件时其他 clean / dirty 文件的字节、模式与暂存区 blob 全程不变；
+     - 补齐第 1、2 条的专项测试（`t01_literal_pathspecs_wildcard_safety`, `t02_non_utf8_gbk_content_staging_and_unstaging`）。
+   - **第 8 条（带类型的错误处理）**：
+     - `error.rs` 定义 `AppErrorPayload` 与 `ErrorKind` 枚举，通过 `ts-rs` 导出 TypeScript 绑定；
+     - 前端 `toAppError` 直接根据 `caught.kind`（`rejected`, `git`, `environment`, `internal`, `needsVerification`）提取错误类型，完全废除正则表达式匹配。
+
+2. **D06 性能回归实测结果（Release 构建，真实桌面可见窗口）：**
+   - **并排视图**（`REVIA_MEASURE_ONLY=split`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 60`；
+     - 首屏 `fromListChangesMs`: **93ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **7ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**。
+   - **统一视图**（`REVIA_MEASURE_ONLY=unified`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 60`；
+     - 首屏 `fromListChangesMs`: **79ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **7ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**，掉帧: **0**。
+
+3. **检查结果：**
+   - `pnpm exec tsc -b`：通过。
+   - `pnpm lint`：通过。
+   - `pnpm build`：通过。
+   - `cargo test --manifest-path src-tauri/Cargo.toml`：78 个测试全部通过（63 个单元测试 + 3 个 flow 集成测试 + 15 个 file_staging 集成测试）。
+   - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
+
+
