@@ -250,6 +250,54 @@ class BenchmarkSafetyTests(unittest.TestCase):
                 self.assertEqual(sample["validation"], "final")
                 self.assertEqual(bool(sample["errors"]), case != "closed")
 
+    def test_pressure_checkpoint_posts_low_memory_then_samples_after_settle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "frontend.log"
+            path.write_text("[SOAK_CHECKPOINT_BEGIN] 1\n[SOAK_CHECKPOINT_END] 1\n[SOAK_CHECKPOINT_BEGIN] 7 pressure\n")
+            checkpoints = bench.CheckpointLog(path)
+            checkpoints.poll()
+            regular, pressure = checkpoints.pending.popleft(), checkpoints.pending.popleft()
+            self.assertFalse(regular["pressure"])
+            self.assertTrue(pressure["pressure"])
+            pressure["observedAt"] = 100
+            services = {"WebContent": [45], "Networking": [47], "GPU": [46]}
+            rss = {"rustRssMb": 100, "webContentRssMb": 200,
+                   "webContentPids": [45], "networkingPids": [47], "gpuPids": [46]}
+            proc = mock.Mock(pid=12)
+            proc.poll.return_value = None
+            clock = iter([100, 100.2, 100.3, 113])
+            with mock.patch.object(bench, "sample_memory", side_effect=[rss, rss]), \
+                    mock.patch.object(bench, "physical_footprint", return_value=50), \
+                    mock.patch.object(bench, "webcontent_memory",
+                                      return_value={"pid": 45, "footprintMb": 90, "webkitMallocAllocatedMb": 20}), \
+                    mock.patch.object(bench.subprocess, "run") as run, \
+                    mock.patch.object(bench.time, "sleep") as sleep, \
+                    mock.patch.object(bench.time, "monotonic", side_effect=lambda: next(clock)):
+                sample = bench.sample_phase_memory(proc, checkpoints, pressure, services, 0)
+            run.assert_called_once()
+            self.assertEqual(run.call_args.args[0], ["notifyutil", "-p", "org.WebKit.lowMemory"])
+            self.assertAlmostEqual(sleep.call_args.args[0], 9.9)
+            self.assertTrue(sample["pressure"])
+            self.assertEqual(sample["errors"], [])
+            self.assertEqual(sample["webContentMallocAllocatedMb"], 20)
+
+    def test_q98_verdict_uses_post_pressure_samples_and_regular_rust_samples(self):
+        def phase(elapsed, footprint, malloc, pressure=True, valid=True):
+            return {"pressure": pressure, "valid": valid, "samplingStartedElapsedSec": elapsed,
+                    "webContentFootprintMb": footprint, "webContentMallocAllocatedMb": malloc}
+        regular = [{"elapsedSec": t, "rustFootprintMb": 40 + t / 600} for t in range(200, 1800, 30)]
+        # Pre-warmup, invalid and non-pressure samples must not affect the verdict.
+        noise = [phase(100, 500, 500), phase(700, 500, 500, valid=False), phase(800, 500, 500, pressure=False)]
+        flat = [phase(t, 130 + (t % 2), 22) for t in (300, 600, 900, 1200, 1500)]
+        verdict = bench.analyze_q98(regular, noise + flat, 10)
+        self.assertTrue(verdict["passed"], verdict["errors"])
+        self.assertEqual(verdict["pressureSampleCount"], 5)
+        growing = [phase(t, 130 + t / 60, 22) for t in (300, 600, 900, 1200, 1500)]
+        verdict = bench.analyze_q98(regular, growing, 10)
+        self.assertFalse(verdict["passed"])
+        self.assertFalse(verdict["series"]["webContentFootprintMb"]["passed"])
+        self.assertFalse(bench.analyze_q98(regular, flat[:2], 10)["passed"])
+
     def test_cold_fixture_ignores_inherited_git_targets(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "fixture"

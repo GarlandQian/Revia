@@ -849,8 +849,8 @@ export function App() {
         let lastHeartbeat = performance.now();
         let lastCheckpoint = startedAt;
         let checkpointPauseMs = 0;
-        const checkpoints: Array<{ cycle: number; file: string; view: string; startedAt: string; endedAt?: string;
-          ipcBefore?: IpcDiagnosticSample; ipcAfter?: IpcDiagnosticSample }> = [];
+        const checkpoints: Array<{ cycle: number; file: string; view: string; pressure: boolean; startedAt: string;
+          endedAt?: string; ipcBefore?: IpcDiagnosticSample; ipcAfter?: IpcDiagnosticSample }> = [];
         report.phaseCheckpoints = checkpoints;
 
         const isTimeUp = () => (performance.now() - startedAt - checkpointPauseMs) / 1000 >= soakSeconds;
@@ -992,12 +992,15 @@ export function App() {
                 && highlightStore.getSnapshot().pending === 0, 1000);
               if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
                 || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
-              const checkpoint = { cycle, file: entry.path, view: currentView, startedAt: new Date().toISOString(), endedAt: "",
+              // 每第 5 个阶段（约 5 分钟一次）是压力阶段：驱动发送 WebKit 低内存通知，约 10 秒后取样（Q98）。
+              const pressure = checkpoints.length % 5 === 4;
+              const checkpoint = { cycle, file: entry.path, view: currentView, pressure, startedAt: new Date().toISOString(),
+                endedAt: "",
                 ...(diagnostics ? { ipcBefore: diagnostics.snapshot(), ipcAfter: undefined as IpcDiagnosticSample | undefined } : {}) };
               checkpoints.push(checkpoint);
-              await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}`);
+              await ipc.debugLog(`[SOAK_CHECKPOINT_BEGIN] ${cycle}${pressure ? " pressure" : ""}`);
               // Hold one known phase briefly; compositor monitoring remains active throughout.
-              await sleep(3500);
+              await sleep(pressure ? 16_000 : 3500);
               await ipc.debugLog(`[SOAK_CHECKPOINT_END] ${cycle}`);
               checkpoint.endedAt = new Date().toISOString();
               if (diagnostics) checkpoint.ipcAfter = diagnostics.snapshot();

@@ -18,6 +18,13 @@ import time
 
 ROLES = {"WebContent": "webContent", "Networking": "networking", "GPU": "gpu"}
 PHASE_HOLD_SECONDS = 3.5
+# Q98: pressure checkpoints hold 16s; post WebKit's low-memory notification, sample about 10s later.
+PRESSURE_HOLD_SECONDS = 16.0
+PRESSURE_SETTLE_SECONDS = 10.0
+Q98_WARMUP_SECONDS = 180
+Q98_MAX_RISE_MB = 10.0
+Q98_MAX_SLOPE_MB_PER_MINUTE = 0.5
+Q98_MIN_PRESSURE_SAMPLES = 3
 
 
 def webkit_services(domain):
@@ -141,7 +148,7 @@ class CheckpointLog:
         lines = (self._tail + content).split(b"\n")
         self._tail = lines.pop()
         for line in lines:
-            match = re.fullmatch(rb"(?:\S+\s+)?\[SOAK_CHECKPOINT_(BEGIN|END)\]\s+(\d+)\s*", line)
+            match = re.fullmatch(rb"(?:\S+\s+)?\[SOAK_CHECKPOINT_(BEGIN|END)\]\s+(\d+)(\s+pressure)?\s*", line)
             if not match:
                 continue
             checkpoint_id = int(match[2])
@@ -155,7 +162,7 @@ class CheckpointLog:
             if checkpoint_id not in self._seen:
                 self._seen.add(checkpoint_id)
                 self.pending.append({"checkpointId": checkpoint_id, "generation": self._generation,
-                                     "observedAt": time.monotonic()})
+                                     "pressure": match[3] is not None, "observedAt": time.monotonic()})
 
     def invalid_reasons(self, checkpoint):
         reasons = []
@@ -173,7 +180,9 @@ class CheckpointLog:
 
 def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, started):
     beginning = time.monotonic()
-    sample = {"checkpointId": checkpoint["checkpointId"], "phase": "staged/split/settled",
+    pressure = checkpoint["pressure"]
+    hold = PRESSURE_HOLD_SECONDS if pressure else PHASE_HOLD_SECONDS
+    sample = {"checkpointId": checkpoint["checkpointId"], "phase": "staged/split/settled", "pressure": pressure,
               "checkpointObservedElapsedSec": round(checkpoint["observedAt"] - started, 3),
               "samplingStartedElapsedSec": round(beginning - started, 3),
               "timestamp": datetime.datetime.now().astimezone().isoformat(), "valid": False}
@@ -181,6 +190,16 @@ def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, starte
     try:
         if proc.poll() is not None:
             errors.append("采样前应用已退出")
+        if pressure and not errors:
+            subprocess.run(["notifyutil", "-p", "org.WebKit.lowMemory"], check=True, timeout=5)
+            posted = time.monotonic()
+            sample["lowMemoryPostedElapsedSec"] = round(posted - started, 3)
+            time.sleep(max(0.0, posted + PRESSURE_SETTLE_SECONDS - time.monotonic()))
+            sample["timestamp"] = datetime.datetime.now().astimezone().isoformat()
+            checkpoints.poll()
+            errors.extend(checkpoints.invalid_reasons(checkpoint))
+            if proc.poll() is not None:
+                errors.append("低内存通知后应用已退出")
         if not errors:
             sample.update(sample_memory(proc.pid))
             services = {role: sample[ROLES[role] + "Pids"] for role in ROLES}
@@ -208,8 +227,8 @@ def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, starte
             errors.append(f"阶段结束边界不可核验：{error}")
         if proc.poll() is not None:
             errors.append("阶段采样结束时应用已退出")
-        if ended - checkpoint["observedAt"] >= PHASE_HOLD_SECONDS:
-            errors.append("阶段采样超过固定 3500ms 窗口")
+        if ended - checkpoint["observedAt"] >= hold:
+            errors.append(f"阶段采样超过固定 {hold * 1000:.0f}ms 窗口")
         sample["errors"] = list(dict.fromkeys(errors))
         sample["samplingChecksPassed"] = not errors
         sample["validation"] = "pending checkpoint closure and frontend interval review"
@@ -233,6 +252,8 @@ def finalize_phase_samples(samples, checkpoints, frontend):
             if isinstance(reported, list) else []
         if len(matches) != 1 or matches[0].get("file") != "src/staged.ts" or matches[0].get("view") != "split":
             errors.append("前端报告缺少唯一的 staged/split checkpoint")
+        elif bool(matches[0].get("pressure")) != bool(sample.get("pressure")):
+            errors.append("前端与驱动的压力阶段标记不一致")
         else:
             try:
                 if not (instant(matches[0]["startedAt"]) <= instant(sample["timestamp"])
@@ -251,8 +272,11 @@ def record_phase_samples(checkpoints, proc, services, started, samples, journal)
         samples.append(sample)
         journal.write(json.dumps(sample) + "\n")
         journal.flush()
-        print(f"[phase {sample['checkpointId']}] samplingChecksPassed={sample['samplingChecksPassed']} "
-              f"duration={sample['samplingDurationSeconds']:.3f}s; pending closure", flush=True)
+        detail = (f" WebContent {sample['webContentFootprintMb']:.1f} MB / malloc {sample['webContentMallocAllocatedMb']:.1f} MB"
+                  if "webContentFootprintMb" in sample else "")
+        print(f"[phase {sample['checkpointId']}{' pressure' if sample.get('pressure') else ''}] "
+              f"samplingChecksPassed={sample['samplingChecksPassed']} "
+              f"duration={sample['samplingDurationSeconds']:.3f}s{detail}; pending closure", flush=True)
 
 
 def analyze_memory(samples, start, warmup=180):
@@ -274,6 +298,41 @@ def analyze_memory(samples, start, warmup=180):
             "regressionMbPerMinute": round(sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / denominator, 4) if denominator else None,
             "windows": bins}
     return result
+
+
+def q98_series(points):
+    """Q98: every post-warmup sample within first + 10 MiB, and linear trend within 0.5 MiB/min."""
+    result = {"sampleCount": len(points)}
+    if len(points) < 2:
+        return {**result, "passed": False, "reason": "热身后样本不足 2 个，无法判定趋势"}
+    xs, ys = [x / 60 for x, _ in points], [y for _, y in points]
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    denominator = sum((x - mx) ** 2 for x in xs)
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / denominator if denominator else 0.0
+    max_rise = max(ys) - ys[0]
+    return {**result, "points": [{"elapsedSec": round(x, 2), "mb": round(y, 2)} for x, y in points],
+            "firstMb": round(ys[0], 2), "lastMb": round(ys[-1], 2), "maxMb": round(max(ys), 2),
+            "maxRiseMb": round(max_rise, 2), "regressionMbPerMinute": round(slope, 4),
+            "passed": max_rise <= Q98_MAX_RISE_MB and slope <= Q98_MAX_SLOPE_MB_PER_MINUTE}
+
+
+def analyze_q98(samples, phase_samples, start):
+    cutoff = start + Q98_WARMUP_SECONDS
+    pressure = [s for s in phase_samples if s.get("pressure") and s["valid"] and s["samplingStartedElapsedSec"] >= cutoff]
+    regular = [s for s in samples if s["elapsedSec"] >= cutoff and "rustFootprintMb" in s]
+    series = {
+        "webContentFootprintMb": q98_series([(s["samplingStartedElapsedSec"], s["webContentFootprintMb"]) for s in pressure]),
+        "webContentMallocAllocatedMb": q98_series(
+            [(s["samplingStartedElapsedSec"], s["webContentMallocAllocatedMb"]) for s in pressure]),
+        "rustFootprintMb": q98_series([(s["elapsedSec"], s["rustFootprintMb"]) for s in regular]),
+    }
+    errors = [f"{key}：{value.get('reason', '超过 Q98 阈值')}" for key, value in series.items() if not value["passed"]]
+    if len(pressure) < Q98_MIN_PRESSURE_SAMPLES:
+        errors.append(f"热身后有效压力后样本 {len(pressure)} 个，少于 {Q98_MIN_PRESSURE_SAMPLES} 个")
+    return {"rule": "Q98", "warmupSeconds": Q98_WARMUP_SECONDS, "maxRiseMb": Q98_MAX_RISE_MB,
+            "maxSlopeMbPerMinute": Q98_MAX_SLOPE_MB_PER_MINUTE, "pressureSettleSeconds": PRESSURE_SETTLE_SECONDS,
+            "pressureSource": "notifyutil -p org.WebKit.lowMemory", "pressureSampleCount": len(pressure),
+            "series": series, "errors": errors, "passed": not errors}
 
 
 def completion_errors(frontend, samples, seconds, returncode, diagnostic=None, minimal_logging=None):
@@ -386,8 +445,8 @@ def main():
                 checkpoints.poll()
                 record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
                 now = time.monotonic()
-                # Allow 120s visibility setup, about 120s phase holds and an exit margin.
-                if now - started > seconds + 420 + (args.idle_seconds if diagnostic else 0):
+                # Allow 120s visibility setup, about 200s phase/pressure holds and an exit margin.
+                if now - started > seconds + 480 + (args.idle_seconds if diagnostic else 0):
                     raise TimeoutError("等待可见窗口或操作硬超时")
                 if now >= next_sample:
                     sampling_started_at = datetime.datetime.now().astimezone().isoformat()
@@ -465,6 +524,7 @@ def main():
         "errors": errors, "frontend": frontend, "memoryTimeSeries": samples,
         "memoryAnalysis": (None if diagnostic else analyze_memory(samples, frontend.get("setupSeconds", 0))),
         "phaseMemoryTimeSeries": phase_samples,
+        "q98MemoryVerdict": (None if diagnostic else analyze_q98(samples, phase_samples, frontend.get("setupSeconds", 0))),
         "phaseMemorySummary": {
             "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),
             "invalidSampleCount": sum(not s["valid"] for s in phase_samples),
@@ -475,6 +535,9 @@ def main():
     }
     output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
     print(f"运行{'完成，待验收' if not errors else '失败'}：{errors}；报告 {output}", flush=True)
+    if report["q98MemoryVerdict"] is not None:
+        verdict = report["q98MemoryVerdict"]
+        print(f"Q98 内存判定：{'通过' if verdict['passed'] else '不通过'}；{verdict['errors']}", flush=True)
     return 1 if errors else 0
 
 
