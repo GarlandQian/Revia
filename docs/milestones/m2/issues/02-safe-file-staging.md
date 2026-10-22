@@ -9,13 +9,13 @@
 依据：[M2 规格](../spec.md)实现决策 2、3、7，T01、T03–T06、T14；Q79–Q83、Q89–Q91、Q93。
 
 - [x] 打通固定 Rust 操作、带类型前端调用、文件动作及成功／拒绝反馈；整文件暂存／取消暂存只改变目标暂存区。
-- [ ] 写前校验目标文件相关版本、状态、路径与类型，不因无关文件变化拒绝；不允许前端绕过指纹或传入任意 Git 参数。
-- [ ] 普通文本、二进制、权限、Git 重命名和未跟踪文件遵守能力矩阵；只读类型与未解决冲突由后端和界面共同拒绝。
-- [ ] 无 HEAD、空文件、同文件部分暂存、中文／空格路径及取消暂存重命名后的标准状态通过真实 Git 验证。
-- [ ] 同 worktree 一次一个写操作，其他写入口禁用且不排队；锁短暂重试后提示而不删除；不确定结果显示待核对而非自动重跑。
+- [x] 写前校验目标文件相关版本、状态、路径与类型，不因无关文件变化拒绝；不允许前端绕过指纹或传入任意 Git 参数。
+- [x] 普通文本、二进制、权限、Git 重命名和未跟踪文件遵守能力矩阵；只读类型与未解决冲突由后端和界面共同拒绝。
+- [x] 无 HEAD、空文件、同文件部分暂存、中文／空格路径及取消暂存重命名后的标准状态通过真实 Git 验证。
+- [x] 同 worktree 一次一个写操作，其他写入口禁用且不排队；锁短暂重试后提示而不删除；不确定结果显示待核对而非自动重跑。
 - [ ] 切换文件／worktree 不改变在途目标，旧响应不覆盖当前界面；操作后选择按 Q89 衔接。
 - [ ] ⌥⌘A 和文件列表空格的整文件范围明确，输入框／弹窗／按钮不穿透到文件动作。
-- [ ] 在应用操作入口建立可复用的真实 Git 测试接缝，仓库与应用数据自行隔离，缺 fixture 不得假通过。
+- [x] 在应用操作入口建立可复用的真实 Git 测试接缝，仓库与应用数据自行隔离，缺 fixture 不得假通过。
 
 ## Comments
 
@@ -93,4 +93,75 @@
 - 指纹里 `#[cfg(unix)]` 读取文件系统权限位：状态里已有 Git 给出的模式，优先使用 Git 的模式，避免平台分支散落。
 
 修改后在本节下追加说明，重跑 `pnpm exec tsc -b`、`pnpm lint`、`pnpm build` 与完整 `cargo test`，并说明 D06 首屏是否受影响（可按 benchmark.md 的性能回归命令测一次并排与统一）。
+
+### 2026-10-23 / Pi 按审查修改
+
+1. **响应 10 条“必须修改”：**
+   - **第 1 条（结果待核对）**：
+     - `error.rs` 增加 `ErrorKind::NeedsVerification` 与构造器 `AppError::needs_verification`；
+     - `execute_staging_op` 遇到 Git 命令执行超时（`output.timed_out`）或命令成功后 `refresh()` 失败时，返回 `AppError::needs_verification`；
+     - 前端 `toAppError` 识别 `needsVerification`，`ErrorBanner` 提示“结果待核对”（集中在 i18n）；捕获该类错误后立即自动调用 `refresh()` 重新核验真实状态，绝不自动重试重跑（规格第 3 节、Q91）。
+   - **第 2 条（锁重试核对目标当前版本）**：
+     - 锁重试从 `Git::run` 底层移出，提升至操作层 `execute_staging_op` 受控循环（`LOCK_RETRIES = 3`，重试延迟 100ms 递增）；
+     - 循环体在每次尝试前均通过 `status::read(&self.git)?` 重新读取最新真实状态，并重新计算与核对目标文件的指纹；若等待锁期间文件发生任何变化，立即拒绝并提示“文件已变化，请重新确认”，绝不无脑重试。重试超过 3 次仍占用则报告锁占用，绝不删除锁（规格第 3 节）。
+   - **第 3 条（指纹绑定展示用同一份 Git 输出）**：
+     - `git/diff.rs` 的 `FileChange` 增加 `raw_patch` 字段，在解析整体 patch 时保存对应切片；
+     - `refresh()` 中已跟踪条目直接复用内存中 `FileChange.raw_patch` 的字节，**列表刷新时不额外启动任何 Git 进程，不发起整文件重复读取**；
+     - 指纹算法统一在 `compute_file_fingerprint_from_patch`，写前核对只针对单文件调一次 Git diff，因输入确定性输出严格一致；
+     - 凡是工作区文件读取失败，明确返回 `Err` 并将条目标记为只读不可写，消除 `unwrap_or_default()` 与空指纹风险。
+   - **第 4 条（旧响应不覆盖当前界面）**：
+     - `App.tsx` 的 `stageFile` / `unstageFile` 在发起时记录 `opWorktreeId = worktreeId`；
+     - 异步操作返回后，比对 `worktreeIdRef.current === opWorktreeId`，若用户已切换至其他 worktree，仅在日志中记录结果，**绝不改写当前界面的快照与选中项**（Q90）。
+   - **第 5 条（Q89 操作后离开改动列表选择附近条目）**：
+     - 操作前记录 `oldIndex`；若目标文件完全离开改动列表，新列表非空时选取 `Math.min(oldIndex, newSnapshot.entries.length - 1)` 处的文件，仅当列表全空时清空选中项。
+   - **第 6 条（键盘穿透与修饰键集中管理）**：
+     - 新建平台模块 `src/lib/platform.ts`（AGENTS.md 集中平台代码、Q55），集中判断 `isMac`、`isPrimaryModifier`（Mac 上严格要求 `metaKey && !ctrlKey`，杜绝 Ctrl 冒充 ⌘）、`isAltModifier` 与 `isStageFileShortcut`；
+     - ⌥⌘A 统一使用 `event.code === "KeyA"`，解决 macOS 上 Option+A 输出 "å" 导致匹配失效的问题；
+     - 集中提供 `isInteractiveElement(event.target)`，列表容器空格键、折叠按钮、加减号按钮以及全局快捷键在遇到可交互控件（`<input>`, `<textarea>`, `<select>`, `<button>`, `contenteditable`）时均直接放行原生行为，杜绝穿透。
+   - **第 7 条（能力矩阵补全）**：
+     - `status.rs` 解析未跟踪条目时识别末尾带 `/` 或包含 `.git` 的嵌套目录，标记 `ReadonlyReason::NestedRepo`，写操作直接拒绝；
+     - 重命名条目检查 `original_path` 与 `path` 两端是否包含非 UTF-8 替换符，包含则标记 `ReadonlyReason::NonUtf8Path`。
+   - **第 8 条（测试严格覆盖与环境隔离）**：
+     - `tests/file_staging.rs` 的 `TestContext` 显式隔离 `HOME`、`GIT_CONFIG_GLOBAL`（指向隔离的空配置）与 `GIT_CONFIG_NOSYSTEM = "1"`；
+     - T01 增加 `ls_files_stage` 断言，验证暂存后 blob 改变且模式一致、取消暂存后 blob 严格还原为 HEAD 的 blob 且模式一致；
+     - T03 补齐冲突文件（`ReadonlyReason::Conflict`）、嵌套仓库（`ReadonlyReason::NestedRepo`）、符号链接只读拒绝用例；
+     - T05 补齐未跟踪文件外部改变、二进制外部改变、权限改变、已暂存侧外部变动与重命名路径的指纹拒绝断言；
+     - T06 改为真实启动两个并发线程同时调用 `session.stage_file`，验证必有一方立即返回拒绝“当前 worktree 有正在进行的写操作”，不排队。
+   - **第 9 条（写操作作用域与键盘可达性恢复）**：
+     - 状态改为 `writingWorktrees: Set<string>`，写锁定仅作用于发起操作的目标 worktree，不影响其他 worktree 的操作，且不禁用读取/刷新按钮（Q90）；
+     - `ChangesList` 文件行恢复为语义化 `<button type="button">`，保留原有的 Tab/方向键焦点与键盘可达性（D02）。
+   - **第 10 条（文案全部收敛至 i18n）**：
+     - Rust 端定义强类型枚举 `ReadonlyReason`（`Symlink`, `Submodule`, `NestedRepo`, `Conflict`, `NonUtf8Path`）并导出 TS 类型；
+     - 前端在 `src/lib/i18n/zh-CN.ts` 中集中管理只读标签、只读说明映射表（`readonlyReasons`）、操作提示（`shortcuts`）与“结果待核对”，组件内 0 处硬编码。
+
+2. **响应 4 条“建议”：**
+   - 建议 1：Rust 端将暂存与取消暂存的前置读状态、锁重试、指纹核对合并为统一的 `execute_staging_op`。
+   - 建议 2：Git 参数拼装收敛至 `git::Git::stage_file` 与 `unstage_file` 方法。
+   - 建议 3：指纹拒绝提示统一使用文案键 `"文件已变化，请重新确认"`。
+   - 建议 4：指纹计算中权限与模式优先复用 Git status 已经提取的 `mode_worktree`、`mode_index`，移除平台相关分支。
+
+3. **D06 性能回归实测（按 benchmark.md 性能回归命令，Release 构建，真实桌面可见窗口）：**
+   - **并排视图**（`REVIA_MEASURE_ONLY=split`，独立隔离数据目录）：
+     - `ok: true`, 窗口状态 `visible`, 帧率 `rAF: 61`（有效样本）；
+     - 首屏 `fromListChangesMs`: **90ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **true**；
+     - 已缓存跳转 `warmAppearMs`: **7ms**（达成 ≤16.7ms）；
+     - 颜色恢复 `colorRestoreMs`: **22ms**；
+     - 滚动 60 屏 `uncoveredFrames`: **0**。
+   - **统一视图**（`REVIA_MEASURE_ONLY=unified`，独立隔离数据目录）：
+     - `ok: true`, 窗口状态 `visible`, 帧率 `rAF: 61`（有效样本）；
+     - 首屏 `fromListChangesMs`: **86ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **true**；
+     - 已缓存跳转 `warmAppearMs`: **7ms**（达成 ≤16.7ms）；
+     - 颜色恢复 `colorRestoreMs`: **22ms**；
+     - 滚动 60 屏 `uncoveredFrames`: **0**，掉帧 **0**。
+   - 结论：首屏耗时 86–90ms，相比修改前完全无退化，刷新时 0 个额外 Git 进程。
+
+4. **检查结果：**
+   - `pnpm exec tsc -b`：通过。
+   - `pnpm lint`：通过。
+   - `pnpm build`：通过。
+   - `cargo test --manifest-path src-tauri/Cargo.toml`：75 个测试全部通过（61 个单元测试 + 3 个 flow 集成测试 + 11 个 staging 集成测试）。
+   - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
+
 
