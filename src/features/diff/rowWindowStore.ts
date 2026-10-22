@@ -20,7 +20,8 @@ import type { ViewMode } from "@/types/bindings/ViewMode";
 export const CHUNK_ROWS = 500;
 
 import { logToBackend } from "./log";
-import { getErrorMessage } from "@/lib/error";
+import { getErrorMessage, toAppError } from "@/lib/error";
+import { messages } from "@/lib/i18n/zh-CN";
 /** 预取最多同时在途的块数；可见块的请求不受这个限制。 */
 const MAX_IN_FLIGHT = 2;
 /** 单独取可见行时，在可见范围上下各多取的行数。 */
@@ -39,6 +40,8 @@ export interface RowWindowTarget {
   path: string;
   changes: ChangesKind;
   view: ViewMode;
+  fingerprint: string;
+  snapshotRevision: string;
 }
 
 export interface RowWindowSnapshot {
@@ -48,13 +51,10 @@ export interface RowWindowSnapshot {
   loadedChunks: number;
   pendingChunks: number;
   error: string | null;
+  stale: boolean;
 }
 
-type FetchRows = (request: {
-  worktreeId: string;
-  path: string;
-  changes: ChangesKind;
-  view: ViewMode;
+type FetchRows = (request: RowWindowTarget & {
   from: number;
   to: number;
 }) => Promise<{ rows: RenderRow[]; rowCount: number; entry: ChangeEntry }>;
@@ -69,6 +69,7 @@ export class RowWindowStore {
   /** 同一时刻只发一个可见行请求；返回后若仍有缺口，由下一次 ensure 再发。 */
   private sliceInFlight = false;
   private epoch = 0;
+  private stale = false;
   private version = 0;
   private snapshot: RowWindowSnapshot = {
     version: 0,
@@ -77,6 +78,7 @@ export class RowWindowStore {
     loadedChunks: 0,
     pendingChunks: 0,
     error: null,
+    stale: false,
   };
   private listeners = new Set<() => void>();
   private direction = 1;
@@ -100,32 +102,32 @@ export class RowWindowStore {
 
   /** 切换文件 / 视图；行数与元数据随第一次取块的结果校正。 */
   setTarget(target: RowWindowTarget, rowCount: number, entry: ChangeEntry | null): void {
-    const same =
-      this.target &&
-      this.target.worktreeId === target.worktreeId &&
-      this.target.path === target.path &&
-      this.target.changes === target.changes &&
-      this.target.view === target.view;
-    if (same && this.rowCount === rowCount) return;
+    const same = this.isCurrent(target);
+    if (same && (this.stale || this.rowCount === rowCount)) return;
     this.epoch += 1;
-    this.target = target;
+    this.target = { ...target };
     this.rowCount = rowCount;
     this.chunks.clear();
     this.pending.clear();
     this.looseRows.clear();
     this.sliceInFlight = false;
+    this.stale = false;
     this.direction = 1;
-    this.publish(null, entry);
+    this.entry = entry;
+    this.snapshot = { ...this.snapshot, error: null };
+    this.publish(null);
   }
 
-  /** 只换视图时保留方向判断，但清空块缓存。 */
+  /** 目标包含内容与快照版本，同行数更新也会使缓存失效。 */
   isCurrent(target: RowWindowTarget): boolean {
     return (
       !!this.target &&
       this.target.worktreeId === target.worktreeId &&
       this.target.path === target.path &&
       this.target.changes === target.changes &&
-      this.target.view === target.view
+      this.target.view === target.view &&
+      this.target.fingerprint === target.fingerprint &&
+      this.target.snapshotRevision === target.snapshotRevision
     );
   }
 
@@ -167,6 +169,7 @@ export class RowWindowStore {
    * 返回是否已经齐备（不等待网络/进程往返）。
    */
   ensure(from: number, to: number, prefetchScreens = 2): boolean {
+    if (this.stale) return false;
     if (!this.target) {
       logToBackend(`ensure 被调用但还没有目标文件（${from}..${to}）`);
       return false;
@@ -229,7 +232,7 @@ export class RowWindowStore {
   /** 单独取可见范围（上下各多取几行），用于整块到达之前先把文字显示出来。 */
   private async requestVisibleSlice(visibleFrom: number, visibleTo: number): Promise<void> {
     const target = this.target;
-    if (!target || this.sliceInFlight) return;
+    if (!target || this.stale || this.sliceInFlight) return;
     const epoch = this.epoch;
     const from = Math.max(0, visibleFrom - VISIBLE_SLICE_MARGIN);
     const to = Math.min(this.rowCount, visibleTo + VISIBLE_SLICE_MARGIN);
@@ -238,6 +241,10 @@ export class RowWindowStore {
     try {
       const slice = await this.fetchRows({ ...target, from, to });
       if (epoch !== this.epoch) return;
+      if (!this.entryMatchesTarget(slice.entry, target)) {
+        this.markStale();
+        return;
+      }
       if (this.looseRows.size + slice.rows.length > MAX_LOOSE_ROWS) this.looseRows.clear();
       slice.rows.forEach((row, offset) => {
         const index = from + offset;
@@ -247,6 +254,10 @@ export class RowWindowStore {
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
+      if (toAppError(error).kind === "rejected" || getErrorMessage(error) === messages.changes.fileChanged) {
+        this.markStale();
+        return;
+      }
       logToBackend(`取可见行 ${from}-${to} 失败：${getErrorMessage(error)}`);
       this.publish(getErrorMessage(error));
     } finally {
@@ -256,7 +267,7 @@ export class RowWindowStore {
 
   private async requestChunk(chunkIndex: number): Promise<void> {
     const target = this.target;
-    if (!target) return;
+    if (!target || this.stale) return;
     const epoch = this.epoch;
     const key = this.nextKey++;
     this.pending.set(chunkIndex, key);
@@ -266,6 +277,10 @@ export class RowWindowStore {
     try {
       const slice = await this.fetchRows({ ...target, from, to });
       if (epoch !== this.epoch) return;
+      if (!this.entryMatchesTarget(slice.entry, target)) {
+        this.markStale();
+        return;
+      }
       logToBackend(`取块 ${chunkIndex}（${from}-${to}）完成：${slice.rows.length} 行`);
       this.chunks.set(chunkIndex, slice.rows);
       // 整块到了，块内单独取过的行不再需要。
@@ -278,6 +293,10 @@ export class RowWindowStore {
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
+      if (toAppError(error).kind === "rejected" || getErrorMessage(error) === messages.changes.fileChanged) {
+        this.markStale();
+        return;
+      }
       logToBackend(`取块 ${chunkIndex} 失败：${getErrorMessage(error)}`);
       this.publish(getErrorMessage(error));
     } finally {
@@ -286,6 +305,23 @@ export class RowWindowStore {
         this.publish(null);
       }
     }
+  }
+
+  private entryMatchesTarget(entry: ChangeEntry, target: RowWindowTarget): boolean {
+    return entry.path === target.path && entry.changes === target.changes
+      && entry.fingerprint === target.fingerprint && entry.snapshotRevision === target.snapshotRevision;
+  }
+
+  /** 失效目标必须等新快照，不能由每帧 ensure 重试或混入其他在途结果。 */
+  private markStale(): void {
+    this.epoch += 1;
+    this.stale = true;
+    this.chunks.clear();
+    this.pending.clear();
+    this.looseRows.clear();
+    this.sliceInFlight = false;
+    this.entry = null;
+    this.publish(messages.changes.fileChanged);
   }
 
   /** 缓存超过上限时，从离可见区域最远的块开始丢。 */
@@ -313,6 +349,7 @@ export class RowWindowStore {
       loadedChunks: this.chunks.size,
       pendingChunks: this.pending.size,
       error: error ?? this.snapshot.error,
+      stale: this.stale,
     };
     if (entry) this.entry = entry;
     for (const listener of this.listeners) listener();

@@ -37,6 +37,9 @@ pub struct Hunk {
     /// 原始 hunk 头，用于报告与核对。
     pub header: String,
     pub lines: Vec<DiffLine>,
+    /// 原始 Git 输出中的字节范围；写操作不使用显示文本重建补丁。
+    #[serde(skip)]
+    pub raw_range: std::ops::Range<usize>,
 }
 
 use crate::git::status::FileStatus;
@@ -57,6 +60,28 @@ pub struct FileChange {
     pub new_lines: u32,
     /// 原始 diff 字节切片，用于计算与展示严格一致的文件级指纹（Q80、ADR-0009）。
     pub raw_patch: Vec<u8>,
+}
+
+impl FileChange {
+    /// 保留 Git 的原始文件头和选中 hunk，只排除独立的权限变化。
+    pub fn hunk_patch(&self, index: usize) -> Option<Vec<u8>> {
+        let hunk = self.hunks.get(index)?;
+        let header_end = self.hunks.first()?.raw_range.start;
+        let header = self.raw_patch.get(..header_end)?;
+        let body = self.raw_patch.get(hunk.raw_range.clone())?;
+        if !body.starts_with(b"@@ ") {
+            return None;
+        }
+        let mut patch = Vec::with_capacity(header.len() + body.len());
+        for line in header.split_inclusive(|byte| *byte == b'\n') {
+            if line.starts_with(b"old mode ") || line.starts_with(b"new mode ") {
+                continue;
+            }
+            patch.extend_from_slice(line);
+        }
+        patch.extend_from_slice(body);
+        Some(patch)
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -123,8 +148,8 @@ fn split_file_slices(bytes: &[u8]) -> Vec<&[u8]> {
 }
 
 fn parse_single_file(slice: &[u8]) -> Option<FileChange> {
-    let mut lines = byte_lines(slice);
-    let first_line = lines.next()?;
+    let mut lines = byte_lines_with_offsets(slice);
+    let (_, first_line) = lines.next()?;
     let rest_bytes = first_line.strip_prefix(b"diff --git ")?;
     let rest_str = String::from_utf8_lossy(rest_bytes);
     let mut file = file_from_git_header(&rest_str);
@@ -134,71 +159,75 @@ fn parse_single_file(slice: &[u8]) -> Option<FileChange> {
     let mut old_line: u32 = 0;
     let mut new_line: u32 = 0;
 
-    for line_bytes in lines {
+    for (offset, line_bytes) in lines {
         let line = String::from_utf8_lossy(line_bytes);
 
-        if let Some(rest) = line.strip_prefix("--- ") {
-            if let Some(path) = strip_prefix_path(rest) {
-                if path != file.path {
-                    file.old_path = Some(path);
+        if current_hunk.is_none() {
+            if let Some(rest) = line.strip_prefix("--- ") {
+                if let Some(path) = strip_prefix_path(rest) {
+                    if path != file.path {
+                        file.old_path = Some(path);
+                    }
                 }
+                continue;
             }
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("+++ ") {
-            if let Some(path) = strip_prefix_path(rest) {
-                file.path = path;
+            if let Some(rest) = line.strip_prefix("+++ ") {
+                if let Some(path) = strip_prefix_path(rest) {
+                    file.path = path;
+                }
+                continue;
             }
-            continue;
-        }
 
-        if line.starts_with("old mode ") || line.starts_with("new mode ") {
-            continue;
-        }
-        if line.starts_with("new file mode ") {
-            file.status = FileStatus::Added;
-            continue;
-        }
-        if line.starts_with("deleted file mode ") {
-            file.status = FileStatus::Deleted;
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("rename from ") {
-            file.old_path = Some(unquote(rest.trim()));
-            file.status = FileStatus::Renamed;
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("copy from ") {
-            file.old_path = Some(unquote(rest.trim()));
-            file.status = FileStatus::Renamed;
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("rename to ") {
-            file.path = unquote(rest.trim());
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("copy to ") {
-            file.path = unquote(rest.trim());
-            continue;
-        }
-        if line.starts_with("similarity index ") || line.starts_with("dissimilarity index ") {
-            continue;
-        }
-        if line.starts_with("index ") {
-            continue;
-        }
+            if line.starts_with("old mode ") || line.starts_with("new mode ") {
+                continue;
+            }
+            if line.starts_with("new file mode ") {
+                file.status = FileStatus::Added;
+                continue;
+            }
+            if line.starts_with("deleted file mode ") {
+                file.status = FileStatus::Deleted;
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("rename from ") {
+                file.old_path = Some(unquote(rest.trim()));
+                file.status = FileStatus::Renamed;
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("copy from ") {
+                file.old_path = Some(unquote(rest.trim()));
+                file.status = FileStatus::Renamed;
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("rename to ") {
+                file.path = unquote(rest.trim());
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("copy to ") {
+                file.path = unquote(rest.trim());
+                continue;
+            }
+            if line.starts_with("similarity index ") || line.starts_with("dissimilarity index ") {
+                continue;
+            }
+            if line.starts_with("index ") {
+                continue;
+            }
 
-        if line.starts_with("Binary files ") || line.starts_with("GIT binary patch") {
-            file.binary = true;
-            continue;
+            if line.starts_with("Binary files ") || line.starts_with("GIT binary patch") {
+                file.binary = true;
+                continue;
+            }
         }
 
         if let Some(rest) = line.strip_prefix("@@ ") {
-            if let Some(hunk) = current_hunk.take() {
+            if let Some(mut hunk) = current_hunk.take() {
+                hunk.raw_range.end = offset;
                 file.hunks.push(hunk);
             }
             let header = format!("@@ {rest}");
-            if let Some(hunk) = parse_hunk_header(&header) {
+            if let Some(mut hunk) = parse_hunk_header(&header) {
+                hunk.raw_range = offset..slice.len();
                 old_line = hunk.old_start;
                 new_line = hunk.new_start;
                 current_hunk = Some(hunk);
@@ -289,10 +318,13 @@ fn parse_single_file(slice: &[u8]) -> Option<FileChange> {
     Some(file)
 }
 
-fn byte_lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
-    let trimmed = bytes.strip_suffix(b"\n").unwrap_or(bytes);
-    trimmed.split(|&b| b == b'\n').map(|line| {
-        line.strip_suffix(b"\r").unwrap_or(line)
+fn byte_lines_with_offsets(bytes: &[u8]) -> impl Iterator<Item = (usize, &[u8])> {
+    let mut offset = 0;
+    bytes.split_inclusive(|byte| *byte == b'\n').map(move |raw_line| {
+        let start = offset;
+        offset += raw_line.len();
+        let line = raw_line.strip_suffix(b"\n").unwrap_or(raw_line);
+        (start, line.strip_suffix(b"\r").unwrap_or(line))
     })
 }
 
@@ -450,6 +482,7 @@ fn parse_hunk_header(header: &str) -> Option<Hunk> {
         new_count,
         header: header.to_string(),
         lines: Vec::new(),
+        raw_range: 0..0,
     })
 }
 

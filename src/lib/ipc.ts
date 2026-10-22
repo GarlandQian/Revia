@@ -124,4 +124,8 @@ export const ipc = {
     invoke<ChangesSnapshot>("stage_file", { request }),
   unstageFile: (request: { worktreeId: string; path: string; fingerprint: string }) =>
     invoke<ChangesSnapshot>("unstage_file", { request }),
+  stageHunk: (request: { worktreeId: string; path: string; fingerprint: string; hunkId: string }) =>
+    invoke<ChangesSnapshot>("stage_hunk", { request }),
+  unstageHunk: (request: { worktreeId: string; path: string; fingerprint: string; hunkId: string }) =>
+    invoke<ChangesSnapshot>("unstage_hunk", { request }),
 };

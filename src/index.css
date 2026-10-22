@@ -346,13 +346,47 @@
 }
 
 .row-hunk {
-  display: block;
+  display: flex;
+  gap: 8px;
   padding-left: 8px;
+  padding-right: 16px;
   color: var(--diff-hunk-fg);
   /* 深色模式下 hunk 底色是半透明的，叠在行的不透明底色上，不能直接透出底图。 */
   background-image: linear-gradient(var(--diff-hunk-bg), var(--diff-hunk-bg));
   border-top: 1px solid var(--diff-gutter-border);
   border-bottom: 1px solid var(--diff-gutter-border);
+}
+
+.hunk-section {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hunk-action {
+  flex: none;
+  height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--diff-gutter-border);
+  border-radius: 2px;
+  color: var(--foreground);
+  font: 11px/14px var(--font-sans);
+  cursor: pointer;
+}
+
+.hunk-action:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.hunk-action:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.hunk-action:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .gutter {

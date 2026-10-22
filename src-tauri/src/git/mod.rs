@@ -14,7 +14,7 @@ pub mod rows;
 pub mod status;
 
 use std::collections::VecDeque;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -219,12 +219,17 @@ impl Git {
     }
 
     fn run_once(&self, args: &[&str]) -> Result<GitOutput> {
+        self.run_once_with_input(args, None)
+    }
+
+    fn run_once_with_input(&self, args: &[&str], input: Option<Vec<u8>>) -> Result<GitOutput> {
         let started = Instant::now();
+        let has_input = input.is_some();
         let mut command = Command::new(&self.program);
         command
             .current_dir(&self.directory)
             .args(args)
-            .stdin(Stdio::null())
+            .stdin(if has_input { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .env_clear();
@@ -241,51 +246,66 @@ impl Git {
         })?;
 
         let sequence = self.log.next_sequence();
-        // 必须并发读取管道：diff 等命令的输出可能远大于管道缓冲区，
-        // 先等待子进程结束会死锁。
+        // 三条管道并发处理；stdin 大补丁也必须受同一超时约束。
         let stdout_pipe = child.stdout.take();
         let stderr_pipe = child.stderr.take();
         let stdout_reader = std::thread::spawn(move || read_pipe(stdout_pipe));
         let stderr_reader = std::thread::spawn(move || read_pipe(stderr_pipe));
+        let stdin_writer = input.map(|bytes| {
+            let pipe = child.stdin.take();
+            std::thread::spawn(move || -> io::Result<()> {
+                let mut pipe = pipe.ok_or_else(|| io::Error::other("Git stdin 管道不可用"))?;
+                pipe.write_all(&bytes)
+            })
+        });
 
-        let timed_out = match child.wait_timeout(GIT_TIMEOUT) {
-            Ok(Some(_)) => false,
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                true
-            }
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(AppError::environment(format!("等待 git 失败：{error}")));
-            }
-        };
-
-        let status = child
-            .wait()
-            .map_err(|error| AppError::environment(format!("等待 git 结束失败：{error}")))?;
+        let waited = child.wait_timeout(GIT_TIMEOUT.saturating_sub(started.elapsed()));
+        let timed_out = matches!(&waited, Ok(None));
+        if timed_out || waited.is_err() {
+            let _ = child.kill();
+        }
+        let status = child.wait();
+        // 包括超时/中断路径：先结束子进程，再回收全部管道线程。
+        let input_error = stdin_writer.and_then(|writer| match writer.join() {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error.to_string()),
+            Err(_) => Some("Git stdin 写入线程中断".to_string()),
+        });
         let stdout = stdout_reader.join().unwrap_or_default();
         let stderr_bytes = stderr_reader.join().unwrap_or_default();
         let elapsed = started.elapsed();
         let stderr = String::from_utf8_lossy(&stderr_bytes).into_owned();
+        let exit_code = status.as_ref().ok().and_then(|value| value.code()).unwrap_or(-1);
 
         self.log.record(CommandRecord {
             sequence,
             program: self.program.display().to_string(),
             args: args.iter().map(|arg| arg.to_string()).collect(),
             directory: self.directory.display().to_string(),
-            exit_code: status.code().unwrap_or(-1),
+            exit_code,
             elapsed_ms: elapsed.as_millis() as u64,
             timed_out,
             stdout_bytes: stdout.len(),
             stderr_excerpt: truncate(stderr.trim(), 2000),
         });
 
+        if let Some(error) = waited.err().or_else(|| status.err()) {
+            return Err(if has_input {
+                AppError::needs_verification(format!("等待 Git 写入结果失败，结果待核对：{error}"))
+            } else {
+                AppError::environment(format!("等待 git 结束失败：{error}"))
+            });
+        }
+        if exit_code == 0 {
+            if let Some(error) = input_error {
+                return Err(AppError::needs_verification(format!("无法确认补丁完整写入，结果待核对：{error}")));
+            }
+        }
+        // Git 因锁占用等先退出时，stdin 的 BrokenPipe 不覆盖真实退出原因。
         Ok(GitOutput {
             stdout,
             stderr,
-            exit_code: status.code().unwrap_or(-1),
+            exit_code,
             elapsed,
             timed_out,
         })
@@ -390,6 +410,18 @@ impl Git {
         }
         args.push(path);
         self.run_once(&args)
+    }
+
+    /// 单次应用已校验的原始 hunk，只写暂存区；锁重试由会话层重新校验后决定。
+    pub fn apply_index_patch(&self, patch: Vec<u8>, reverse: bool) -> Result<GitOutput> {
+        let mut args = vec![
+            "-c", "apply.ignoreWhitespace=no", "apply", "--cached", "--whitespace=nowarn",
+        ];
+        if reverse {
+            args.push("--reverse");
+        }
+        args.push("-");
+        self.run_once_with_input(&args, Some(patch))
     }
 
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {

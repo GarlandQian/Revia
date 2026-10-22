@@ -14,14 +14,17 @@ import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, use
 import { flushSync } from "react-dom";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { FileVersion } from "@/types/bindings/FileVersion";
+import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RenderRow } from "@/types/bindings/RenderRow";
 import type { RowCell } from "@/types/bindings/RowCell";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import { ipc } from "@/lib/ipc";
+import { messages } from "@/lib/i18n/zh-CN";
 import { logToBackend } from "./log";
 import type { HighlightStore } from "./highlightStore";
 import type { RowWindowStore } from "./rowWindowStore";
 import { visibleHighlightLines } from "./visibleHighlightLines";
+import { matchesHunkAction } from "./hunkAction";
 
 export const ROW_HEIGHT = 18;
 /** 滚动停止多久之后才请求新高亮（毫秒）。 */
@@ -59,13 +62,15 @@ interface DiffViewProps {
   fontSize: number;
   rows: RowWindowStore;
   highlights: HighlightStore;
+  isWriting?: boolean;
+  onHunkAction?: (action: HunkAction) => void;
   handleRef?: React.Ref<DiffViewHandle>;
   /** 每帧采样：用于测量「可见区域里还没有数据的行数」。 */
   onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
 }
 
 export function DiffView(props: DiffViewProps) {
-  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample } = props;
+  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample, isWriting, onHunkAction } = props;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -83,7 +88,8 @@ export function DiffView(props: DiffViewProps) {
   const jumpRestoreRaf = useRef<number | null>(null);
   const jumpRestoreTimer = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const version = useRowVersion(rows);
+  const rowSnapshot = useSyncExternalStore(rows.subscribe, rows.getSnapshot);
+  const version = rowSnapshot.version;
   const highlightSnapshot = useSyncExternalStore(highlights.subscribe, highlights.getSnapshot);
 
   const rowCount = rows.rowCountValue;
@@ -267,6 +273,15 @@ export function DiffView(props: DiffViewProps) {
     if (element.scrollLeft !== 0) element.scrollLeft = 0;
   }, []);
 
+  const revealHunk = useCallback((top: number) => {
+    // Tab 可进入预渲染区的按钮，滚动仍须经过自绘入口，不能依赖浏览器自动滚动。
+    const current = scrollTopRef.current;
+    if (top < current) applyScroll(top);
+    else if (top + ROW_HEIGHT > current + geometry.current.viewportHeight) {
+      applyScroll(top + ROW_HEIGHT - geometry.current.viewportHeight);
+    }
+  }, [applyScroll]);
+
   const onTrackPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const track = trackRef.current;
@@ -405,10 +420,19 @@ export function DiffView(props: DiffViewProps) {
               highlights={highlights}
               highlightVersion={compact ? 0 : highlightSnapshot.version}
               plainTextOnly={compact}
+              onHunkAction={onHunkAction}
+              onHunkFocus={revealHunk}
+              hunkDisabled={isWriting || !!rowSnapshot.error || !row.hunkAction
+                || !matchesHunkAction(row.hunkAction, worktreeId, entry)}
             />
           ) : null;
         })}
       </div>
+      {rowSnapshot.error ? (
+        <div role="status" className="absolute inset-x-0 top-0 bg-background/95 px-3 py-2 font-sans text-xs text-destructive">
+          {rowSnapshot.error}
+        </div>
+      ) : null}
       <div ref={trackRef} className="diff-scrollbar" onPointerDown={onTrackPointerDown}>
         <div ref={thumbRef} className="diff-scrollbar-thumb" />
       </div>
@@ -428,19 +452,15 @@ function thumbGeometry(
   return { size, offset: (top / maxTop) * (viewportHeight - size) };
 }
 
-/** 订阅行窗口版本：块到达时重新渲染。 */
-function useRowVersion(rows: RowWindowStore): number {
-  const [version, setVersion] = useState(0);
-  useEffect(() => rows.subscribe(() => setVersion(rows.getSnapshot().version)), [rows]);
-  return version;
-}
-
 const RowView = memo(function RowView({
   row,
   top,
   view,
   highlights,
   plainTextOnly,
+  onHunkAction,
+  onHunkFocus,
+  hunkDisabled,
 }: {
   row: RenderRow;
   top: number;
@@ -449,6 +469,9 @@ const RowView = memo(function RowView({
   /** 缓存对象保持不变时，让 memo 行在 token 到达后仍能补绘。 */
   highlightVersion: number;
   plainTextOnly: boolean;
+  onHunkAction?: (action: HunkAction) => void;
+  onHunkFocus: (top: number) => void;
+  hunkDisabled: boolean;
 }) {
   const style: React.CSSProperties = { top, contain: "strict" };
 
@@ -456,9 +479,23 @@ const RowView = memo(function RowView({
     !plainTextOnly && line != null ? highlights.get(version, line) : undefined;
 
   if (row.kind === "hunk") {
+    const action = row.hunkAction;
+    const label = action?.changes === "staged" ? messages.changes.unstageHunk : messages.changes.stageHunk;
     return (
       <div className="row row-hunk" style={style} title={row.section ?? ""}>
-        {row.section ?? ""}
+        <span className="hunk-section">{row.section ?? ""}</span>
+        {action && onHunkAction ? (
+          <button
+            type="button"
+            className="hunk-action"
+            disabled={hunkDisabled}
+            aria-label={`${label}：${row.section ?? ""}`}
+            onFocus={() => onHunkFocus(top)}
+            onClick={() => onHunkAction(action)}
+          >
+            {label}
+          </button>
+        ) : null}
       </div>
     );
   }

@@ -220,7 +220,9 @@ export function inspectJumpDom(options: ProbeOptions): JumpDomProbe {
     const node = nodes.get(index);
     if (!node) continue;
     if (row.kind === "hunk") {
-      if (node.classList.contains("row-hunk") && node.children.length === 0 && node.textContent === (row.section ?? "")) {
+      const section = node.firstElementChild;
+      if (node.classList.contains("row-hunk") && section?.matches("span.hunk-section")
+        && section.textContent === (row.section ?? "")) {
         result.matchedRows += 1;
       }
       continue;

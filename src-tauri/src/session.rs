@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -14,10 +15,12 @@ use ts_rs::TS;
 
 use crate::error::{AppError, Result};
 use crate::git::highlight::{HighlightRequest, HighlightResult, Highlighter};
-use crate::git::rows::{self, HunkAnchor, RenderRow, ViewMode};
+use crate::git::rows::{self, HunkAction, HunkAnchor, RenderRow, RowKind, ViewMode};
 use crate::git::status::{self, ChangesKind, FileStatus, ReadonlyReason, StatusEntry};
 use crate::git::{self, Git};
 use crate::shell::{self, ShellEnv};
+
+static NEXT_SESSION_INSTANCE: AtomicU64 = AtomicU64::new(1);
 
 /// 高亮取的是哪个版本：旧版本（HEAD 或暂存区）还是新版本（暂存区或工作区）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -83,6 +86,8 @@ pub struct ChangeEntry {
     pub readonly_reason: Option<ReadonlyReason>,
     /// 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
     pub fingerprint: String,
+    /// 每次刷新都会变化，不能用内容相同代替 hunk 目标仍然有效。
+    pub snapshot_revision: String,
 }
 
 /// 一次状态读取的结果。
@@ -154,6 +159,7 @@ pub struct WorktreeSessionInfo {
 struct FileModelCache {
     model: git::diff::FileChange,
     unfiled: bool,
+    hunk_actions: Vec<HunkAction>,
 }
 
 struct Snapshot {
@@ -178,6 +184,7 @@ pub struct WorktreeSession {
     /// 已经发给高亮线程的文件内容代际，避免重复传输内容。
     highlight_generations: Mutex<HashMap<String, u64>>,
     generation_counter: Mutex<u64>,
+    instance_id: u64,
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
     writing: Mutex<bool>,
 }
@@ -237,6 +244,7 @@ impl WorktreeSession {
             highlighter: Highlighter::start(),
             highlight_generations: Mutex::new(HashMap::new()),
             generation_counter: Mutex::new(0),
+            instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             writing: Mutex::new(false),
         }))
     }
@@ -256,10 +264,10 @@ impl WorktreeSession {
 
         let mut models: HashMap<String, FileModelCache> = HashMap::new();
         for file in unstaged.files {
-            models.insert(key(ChangesKind::Unstaged, &file.path), FileModelCache { model: file, unfiled: false });
+            models.insert(key(ChangesKind::Unstaged, &file.path), FileModelCache { model: file, unfiled: false, hunk_actions: Vec::new() });
         }
         for file in staged.files {
-            models.insert(key(ChangesKind::Staged, &file.path), FileModelCache { model: file, unfiled: false });
+            models.insert(key(ChangesKind::Staged, &file.path), FileModelCache { model: file, unfiled: false, hunk_actions: Vec::new() });
         }
 
         let mut entries = Vec::with_capacity(status.entries.len());
@@ -313,7 +321,22 @@ impl WorktreeSession {
                 hunks: model.map(rows::hunk_anchors).unwrap_or_default(),
                 readonly_reason,
                 fingerprint,
+                snapshot_revision: String::new(),
             });
+        }
+
+        let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        let generation = {
+            let mut counter = self.generation_counter.lock().map_err(|_| AppError::internal("代际锁失败"))?;
+            *counter += 1;
+            *counter
+        };
+        let revision = generation.to_string();
+        for entry in &mut entries {
+            entry.snapshot_revision = revision.clone();
+            if let Some(cached) = models.get_mut(&key(entry.changes, &entry.path)) {
+                cached.hunk_actions = self.hunk_actions(entry, &cached.model);
+            }
         }
 
         let snapshot = ChangesSnapshot {
@@ -328,13 +351,6 @@ impl WorktreeSession {
             entries: entries.clone(),
             elapsed_ms: started.elapsed().as_millis() as u64,
         };
-
-        let generation = {
-            let mut counter = self.generation_counter.lock().map_err(|_| AppError::internal("代际锁失败"))?;
-            *counter += 1;
-            *counter
-        };
-        let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
         *guard = Some(Snapshot {
             fingerprint,
             entries,
@@ -378,7 +394,7 @@ impl WorktreeSession {
                 .unwrap_or_else(|| empty_file(path, FileStatus::Added));
             snapshot
                 .models
-                .insert(key(changes, path), FileModelCache { model: file, unfiled: false });
+                .insert(key(changes, path), FileModelCache { model: file, unfiled: false, hunk_actions: Vec::new() });
             if let Some(entry) = snapshot
                 .entries
                 .iter_mut()
@@ -394,7 +410,12 @@ impl WorktreeSession {
             .ok_or_else(|| AppError::rejected(format!("没有该文件的改动内容：{path}")))?;
         let layout_key = format!("{changes:?}/{path}/{view:?}");
         if !snapshot.layouts.contains_key(&layout_key) {
-            let layout = rows::layout(&cached.model, view);
+            let mut layout = rows::layout(&cached.model, view);
+            for row in &mut layout {
+                if row.kind == RowKind::Hunk {
+                    row.hunk_action = cached.hunk_actions.get(row.hunk_index as usize).cloned();
+                }
+            }
             // 简单上限：缓存最多 8 份排版（镜像来回切换的常见用法）。
             if snapshot.layouts.len() >= 8 {
                 snapshot.layouts.clear();
@@ -571,16 +592,82 @@ impl WorktreeSession {
 
     /// 整文件暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009）。
     pub fn stage_file(&self, path: &str, fingerprint: &str) -> Result<ChangesSnapshot> {
-        self.execute_staging_op(path, fingerprint, true)
+        self.execute_staging_op(path, fingerprint, true, None)
     }
 
     /// 整文件取消暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009、T04）。
     pub fn unstage_file(&self, path: &str, fingerprint: &str) -> Result<ChangesSnapshot> {
-        self.execute_staging_op(path, fingerprint, false)
+        self.execute_staging_op(path, fingerprint, false, None)
+    }
+
+    pub fn stage_hunk(&self, path: &str, fingerprint: &str, hunk_id: &str) -> Result<ChangesSnapshot> {
+        self.execute_staging_op(path, fingerprint, true, Some(hunk_id))
+    }
+
+    pub fn unstage_hunk(&self, path: &str, fingerprint: &str, hunk_id: &str) -> Result<ChangesSnapshot> {
+        self.execute_staging_op(path, fingerprint, false, Some(hunk_id))
+    }
+
+    fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {
+        if !supports_hunk_actions(entry, file) {
+            return Vec::new();
+        }
+        if file.hunks.iter().any(|hunk| {
+            !file.raw_patch.get(hunk.raw_range.clone()).is_some_and(|raw| raw.starts_with(b"@@ "))
+        }) {
+            return Vec::new();
+        }
+        file.hunks.iter().enumerate().map(|(index, hunk)| {
+            let hunk_id = git::fingerprint(&[
+                &self.instance_id.to_le_bytes(),
+                self.id.as_bytes(),
+                entry.path.as_bytes(),
+                format!("{:?}", entry.changes).as_bytes(),
+                entry.fingerprint.as_bytes(),
+                entry.snapshot_revision.as_bytes(),
+                &(index as u64).to_le_bytes(),
+                &file.raw_patch[hunk.raw_range.clone()],
+            ]);
+            HunkAction {
+                worktree_id: self.id.clone(),
+                path: entry.path.clone(),
+                changes: entry.changes,
+                fingerprint: entry.fingerprint.clone(),
+                snapshot_revision: entry.snapshot_revision.clone(),
+                hunk_id,
+            }
+        }).collect()
+    }
+
+    fn hunk_patch(&self, path: &str, expected_fp: &str, hunk_id: &str, is_stage: bool) -> Result<Vec<u8>> {
+        let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+        let changes = if is_stage { ChangesKind::Unstaged } else { ChangesKind::Staged };
+        let entry = snapshot.entries.iter()
+            .find(|entry| entry.path == path && entry.changes == changes && entry.fingerprint == expected_fp)
+            .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        let cached = snapshot.models.get(&key(changes, path))
+            .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        if !supports_hunk_actions(entry, &cached.model) {
+            return Err(AppError::rejected("这个文件不支持 hunk 操作"));
+        }
+        let index = cached.hunk_actions.iter().position(|action| {
+            action.hunk_id == hunk_id
+                && action.fingerprint == expected_fp
+                && action.snapshot_revision == snapshot.generation.to_string()
+        }).ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        cached.model.hunk_patch(index)
+            .ok_or_else(|| AppError::rejected("当前 hunk 无法生成补丁，请刷新后重新确认"))
     }
 
     /// 统一的写操作执行入口：锁重试在操作层进行，每次重试前重新读取状态并核对指纹（审查意见 1、2、7）。
-    fn execute_staging_op(&self, path: &str, expected_fp: &str, is_stage: bool) -> Result<ChangesSnapshot> {
+    fn execute_staging_op(
+        &self,
+        path: &str,
+        expected_fp: &str,
+        is_stage: bool,
+        hunk_id: Option<&str>,
+    ) -> Result<ChangesSnapshot> {
         let _guard = self.acquire_write_lock()?;
         let mut last_lock_err: Option<String> = None;
         const LOCK_RETRIES: usize = 3;
@@ -633,16 +720,20 @@ impl WorktreeSession {
             }
 
             // 执行单次写操作（run_once，不绕过核对进行隐式重试）
-            let output = if is_stage {
+            let output = if let Some(hunk_id) = hunk_id {
+                // 状态读取期间可能刷新过快照；在真正应用前才解析仍有效的原始目标。
+                let patch = self.hunk_patch(path, expected_fp, hunk_id, is_stage)?;
+                self.git.apply_index_patch(patch, !is_stage)?
+            } else if is_stage {
                 self.git.stage_file(path, entry.original_path.as_deref())?
             } else {
                 self.git.unstage_file(path, entry.original_path.as_deref())?
             };
 
             // 结果不确定时标为“结果待核对”（审查意见 1）
-            if output.timed_out {
+            if output.timed_out || output.exit_code < 0 {
                 return Err(AppError::needs_verification(
-                    "Git 命令执行超时，写入结果待核对；请重新核对真实状态后再继续",
+                    "Git 命令执行超时或中断，写入结果待核对；请重新核对真实状态后再继续",
                 ));
             }
 
@@ -664,7 +755,12 @@ impl WorktreeSession {
             if output.exit_code != 0 {
                 return Err(AppError::git(format!(
                     "{}失败（退出码 {}）：{}",
-                    if is_stage { "暂存文件" } else { "取消暂存文件" },
+                    match (is_stage, hunk_id.is_some()) {
+                        (true, true) => "暂存 hunk",
+                        (false, true) => "取消暂存 hunk",
+                        (true, false) => "暂存文件",
+                        (false, false) => "取消暂存文件",
+                    },
                     output.exit_code,
                     output.stderr.trim()
                 )));
@@ -682,6 +778,17 @@ impl WorktreeSession {
             ))),
         }
     }
+}
+
+fn supports_hunk_actions(entry: &ChangeEntry, file: &git::diff::FileChange) -> bool {
+    entry.changes != ChangesKind::Untracked
+        && entry.readonly_reason.is_none()
+        && !entry.unmerged
+        && !entry.binary
+        && !file.binary
+        && !file.hunks.is_empty()
+        && matches!(entry.status, FileStatus::Modified | FileStatus::Added | FileStatus::Deleted)
+        && matches!(file.status, FileStatus::Modified | FileStatus::Added | FileStatus::Deleted)
 }
 
 fn fill_entry(entry: &mut ChangeEntry, model: Option<&git::diff::FileChange>) {

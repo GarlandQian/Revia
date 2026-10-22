@@ -20,6 +20,7 @@ export interface HighlightTarget {
   worktreeId: string;
   path: string;
   changes: ChangesKind;
+  fingerprint: string;
 }
 
 export interface HighlightSnapshot {
@@ -73,13 +74,15 @@ export class HighlightStore {
       this.target &&
       this.target.worktreeId === target.worktreeId &&
       this.target.path === target.path &&
-      this.target.changes === target.changes;
+      this.target.changes === target.changes &&
+      this.target.fingerprint === target.fingerprint;
     if (same) return;
     this.epoch += 1;
-    this.target = target;
+    this.target = { ...target };
     this.lines = { old: new Map(), new: new Map() };
     this.requested.clear();
     this.pending.clear();
+    this.snapshot = { ...this.snapshot, error: null, lastRoundTripMs: null };
     this.publish(null, true);
   }
 

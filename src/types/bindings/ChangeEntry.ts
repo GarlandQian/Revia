@@ -23,4 +23,8 @@ readonlyReason: ReadonlyReason | null,
 /**
  * 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
  */
-fingerprint: string, };
+fingerprint: string, 
+/**
+ * 每次刷新都会变化，不能用内容相同代替 hunk 目标仍然有效。
+ */
+snapshotRevision: string, };

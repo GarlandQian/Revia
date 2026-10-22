@@ -37,6 +37,8 @@ export const zhCN = {
     unstage: "取消暂存",
     stageFile: "暂存文件",
     unstageFile: "取消暂存文件",
+    stageHunk: "暂存此 hunk",
+    unstageHunk: "取消暂存此 hunk",
     staging: "暂存中…",
     unstaging: "取消暂存中…",
     fileChanged: "文件已变化，请重新确认",

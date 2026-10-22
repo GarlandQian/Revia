@@ -1,0 +1,35 @@
+{
+  "baseCommit": "911751a",
+  "date": "2026-10-23",
+  "sourceState": "task03 implementation committed with this evidence; no later source changes yet",
+  "binarySha256": "724a7be4ce6404d40e24610c236a39acdd533f2a74deac8a232d80ce81708a73",
+  "rust": {
+    "unit": 68,
+    "fileStaging": 20,
+    "hunkStaging": 23,
+    "sessionFlow": 3,
+    "failed": 0
+  },
+  "node": {
+    "rowWindowStore": 25,
+    "visibleHighlightLines": 13,
+    "failed": 0
+  },
+  "typecheck": "passed",
+  "lint": "passed",
+  "releaseBundle": "passed",
+  "files": [
+    {
+      "source": "/tmp/revia-m2-task03-rust-20261023.log",
+      "path": "rust-tests.log.gz",
+      "sourceSha256": "c6a8731de1a615380e498473ab3f31d40914bbcb60882125dfc59324523c7eac",
+      "sha256": "9a2e1403d6e8aa99ce2385fdb1066e6fd0f3d7107c6cd384ca5fd2d0aa38e836"
+    },
+    {
+      "source": "/tmp/revia-m2-task03-frontend-build-20261023.log",
+      "path": "frontend-build.log.gz",
+      "sourceSha256": "820175a27f95dc83b59e4654985319d8580e40dc6014604fcd2909ddf2cf2411",
+      "sha256": "61a83069f918c49f8e50c05810ab9fc8297e779b7ed6c57dedc39915fde6c913"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::git::diff::{FileChange, LineKind};
+use crate::git::status::ChangesKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +42,19 @@ pub struct RowCell {
     pub text: String,
 }
 
+/// 与显示 hunk 同批签发的操作目标；前端只能原样使用，不能按序号重建。
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HunkAction {
+    pub worktree_id: String,
+    pub path: String,
+    pub changes: ChangesKind,
+    pub fingerprint: String,
+    pub snapshot_revision: String,
+    pub hunk_id: String,
+}
+
 /// 界面上的一个显示行。统一视图用 `lineKind`/`text`，并排视图用 `left`/`right`。
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +62,7 @@ pub struct RowCell {
 pub struct RenderRow {
     pub kind: RowKind,
     pub hunk_index: u32,
+    pub hunk_action: Option<HunkAction>,
     /// hunk 头显示的内容。
     pub section: Option<String>,
     /// 统一视图：旧行号 / 新行号；并排视图：配对两侧的行号。
@@ -85,6 +100,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
         rows.push(RenderRow {
             kind: RowKind::Hunk,
             hunk_index: hunk_index as u32,
+            hunk_action: None,
             section: Some(section),
             old_line: Some(hunk.old_start),
             new_line: Some(hunk.new_start),
@@ -100,6 +116,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                     rows.push(RenderRow {
                         kind: RowKind::Line,
                         hunk_index: hunk_index as u32,
+                        hunk_action: None,
                         section: None,
                         old_line: line.old_line,
                         new_line: line.new_line,
@@ -118,6 +135,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                         rows.push(RenderRow {
                             kind: RowKind::Pair,
                             hunk_index: hunk_index as u32,
+                            hunk_action: None,
                             section: None,
                             old_line: line.old_line,
                             new_line: line.new_line,
@@ -152,6 +170,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                         rows.push(RenderRow {
                             kind: RowKind::Pair,
                             hunk_index: hunk_index as u32,
+                            hunk_action: None,
                             section: None,
                             old_line: left_line.and_then(|line| line.old_line),
                             new_line: right_line.and_then(|line| line.new_line),

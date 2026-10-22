@@ -1,16 +1,14 @@
 /**
- * 应用外壳：首次打开 → 添加仓库；之后是「文件列表 + 只读 diff」的只读界面（M1）。
- *
- * 只读：M1 不提供暂存、丢弃、提交等写操作。
+ * 应用外壳：文件列表与只读 diff；M2 提供目标明确的整文件和 hunk 暂存操作。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
-import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
+import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
@@ -24,6 +22,7 @@ import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
 import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
+import { matchesHunkAction } from "@/features/diff/hunkAction";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
@@ -58,6 +57,8 @@ interface MeasureConfig {
     focus: SoakFocus | null } | null;
 }
 
+type StagingTarget = Pick<HunkAction, "worktreeId" | "path" | "changes" | "fingerprint"> & { hunkId?: string };
+
 type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
 
 const DEFAULT_VIEWPORT_ROWS = 45;
@@ -72,6 +73,10 @@ export function App() {
   const [worktreeId, setWorktreeId] = useState<string | null>(null);
   const [info, setInfo] = useState<WorktreeSessionInfo | null>(null);
   const [snapshot, setSnapshot] = useState<ChangesSnapshot | null>(null);
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+  const worktreeIdRef = useRef(worktreeId);
+  worktreeIdRef.current = worktreeId;
   const [selected, setSelected] = useState<Selection | null>(null);
   const [view, setView] = useState<ViewMode>("split");
   const viewRef = useRef(view);
@@ -145,6 +150,7 @@ export function App() {
   // ---------------- 打开仓库 / 刷新 ----------------
 
   const applySnapshot = useCallback((next: ChangesSnapshot) => {
+    snapshotRef.current = next;
     setSnapshot(next);
     return next;
   }, []);
@@ -162,6 +168,22 @@ export function App() {
     return next.entries[0] ?? null;
   }, []);
 
+  const bindDiffTarget = useCallback((entry: ChangeEntry, id: string, targetView: ViewMode) => {
+    const rowCount = targetView === "split" ? entry.rowCountSplit : entry.rowCountUnified;
+    rowStore.setTarget({ worktreeId: id, path: entry.path, changes: entry.changes, view: targetView,
+      fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision }, rowCount, entry);
+    highlightStore.setTarget({ worktreeId: id, path: entry.path, changes: entry.changes,
+      fingerprint: entry.fingerprint });
+    return rowCount;
+  }, [highlightStore, rowStore]);
+
+  // 所有接收快照的入口都重绑版本；不能因路径、行数相同而沿用旧行和旧 hunk 凭据。
+  useLayoutEffect(() => {
+    if (selectedEntry && worktreeId && snapshot?.worktreeId === worktreeId) {
+      bindDiffTarget(selectedEntry, worktreeId, view);
+    }
+  }, [bindDiffTarget, selectedEntry, snapshot?.worktreeId, view, worktreeId]);
+
   const openEntry = useCallback(
     async (requested: ChangeEntry, target: { view: ViewMode; worktreeId: string; expand?: boolean }) => {
       let entry = requested;
@@ -174,11 +196,16 @@ export function App() {
           return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
         }
         const loaded = slice.entry;
+        if (loaded.path !== entry.path || loaded.changes !== entry.changes
+          || loaded.fingerprint !== entry.fingerprint || loaded.snapshotRevision !== entry.snapshotRevision) {
+          throw { kind: "rejected", message: messages.changes.fileChanged };
+        }
         entry = loaded;
         setSnapshot((current) => current && {
           ...current,
           entries: current.entries.map((candidate) =>
-            candidate.path === loaded.path && candidate.changes === loaded.changes ? loaded : candidate),
+            candidate.path === loaded.path && candidate.changes === loaded.changes
+              && candidate.snapshotRevision === loaded.snapshotRevision ? loaded : candidate),
         });
       }
       const selection: Selection = { path: entry.path, changes: entry.changes };
@@ -186,17 +213,7 @@ export function App() {
         // 测量等同于用户点开：默认收起的文件也要真正渲染，才能测到首屏。
         setExpanded((current) => new Set(current).add(`${entry.changes}:${entry.path}`));
       }
-      const rowCount = target.view === "split" ? entry.rowCountSplit : entry.rowCountUnified;
-      rowStore.setTarget(
-        { worktreeId: target.worktreeId, path: entry.path, changes: entry.changes, view: target.view },
-        rowCount,
-        entry,
-      );
-      highlightStore.setTarget({
-        worktreeId: target.worktreeId,
-        path: entry.path,
-        changes: entry.changes,
-      });
+      const rowCount = bindDiffTarget(entry, target.worktreeId, target.view);
       setSelected(selection);
       const covered = await waitUntil(
         () => rowStore.isCovered(0, Math.min(rowCount, DEFAULT_VIEWPORT_ROWS)),
@@ -214,8 +231,29 @@ export function App() {
         devicePixelRatio: window.devicePixelRatio,
       };
     },
-    [highlightStore, rowStore],
+    [bindDiffTarget, rowStore],
   );
+
+  const applyRefreshedSnapshot = useCallback((next: ChangesSnapshot) => {
+    const current = selectedRef.current;
+    const previous = snapshotRef.current;
+    const display = getDisplayOrderEntries(next);
+    const oldIndex = current && previous ? getDisplayOrderEntries(previous).findIndex(
+      (entry) => entry.path === current.path && entry.changes === current.changes,
+    ) : 0;
+    const entry = current
+      ? display.find((entry) => entry.path === current.path && entry.changes === current.changes)
+        ?? display.find((entry) => entry.path === current.path)
+        ?? display[Math.min(Math.max(0, oldIndex), display.length - 1)]
+      : pickFirstEntry(next);
+    applySnapshot(next);
+    if (entry) {
+      void openEntry(entry, { view: viewRef.current, worktreeId: next.worktreeId })
+        .catch((caught) => setAppError(toAppError(caught), next.worktreeId));
+    } else {
+      setSelected(null);
+    }
+  }, [applySnapshot, openEntry, pickFirstEntry, setAppError]);
 
   const openWorktree = useCallback(
     async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean } = {}) => {
@@ -278,15 +316,8 @@ export function App() {
       const snap = await ipc.listChanges(targetWorktreeId);
       // 切换期间完成的旧快照不得写进当前界面（审查意见 2）
       if (worktreeIdRef.current !== targetWorktreeId) return;
-      const next = applySnapshot(snap);
-      setSelected((current) => {
-        if (current && next.entries.some((entry) => entry.path === current.path && entry.changes === current.changes)) {
-          return current;
-        }
-        const entry = pickFirstEntry(next);
-        return entry ? { path: entry.path, changes: entry.changes } : null;
-      });
-      setStatus(`${next.entries.length} 个文件`);
+      applyRefreshedSnapshot(snap);
+      setStatus(`${snap.entries.length} 个文件`);
     } catch (caught) {
       if (worktreeIdRef.current !== targetWorktreeId) return;
       setAppError(toAppError(caught), targetWorktreeId);
@@ -295,7 +326,7 @@ export function App() {
         setBusy(false);
       }
     }
-  }, [applySnapshot, pickFirstEntry, setAppError, worktreeId]);
+  }, [applyRefreshedSnapshot, setAppError, worktreeId]);
 
   // ---------------- 添加仓库 ----------------
 
@@ -408,19 +439,9 @@ export function App() {
       const version: "old" | "new" = row?.left || row?.lineKind === "deletion" ? "old" : "new";
       pendingAnchor.current = line != null ? { line, version, view: next } : null;
       setView(next);
-      const rowCount = next === "split" ? selectedEntry.rowCountSplit : selectedEntry.rowCountUnified;
-      rowStore.setTarget(
-        {
-          worktreeId: worktreeId ?? "",
-          path: selectedEntry.path,
-          changes: selectedEntry.changes,
-          view: next,
-        },
-        rowCount,
-        selectedEntry,
-      );
+      if (worktreeId) bindDiffTarget(selectedEntry, worktreeId, next);
     },
-    [rowStore, selectedEntry, view, worktreeId],
+    [bindDiffTarget, rowStore, selectedEntry, view, worktreeId],
   );
 
   // 视图切换后把锚点行放回顶部（等数据到位再定位）
@@ -489,191 +510,62 @@ export function App() {
     [fontSize],
   );
 
-  // ---------------- 文件写操作（M2 任务 02，Q8/Q79/Q89/Q90/Q93） ----------------
+  // ---------------- 暂存写操作（Q79/Q89/Q90/Q93） ----------------
 
   const [writingWorktrees, setWritingWorktrees] = useState<Set<string>>(new Set());
+  const writingWorktreesRef = useRef(new Set<string>());
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
-  const worktreeIdRef = useRef<string | null>(null);
-  worktreeIdRef.current = worktreeId;
 
-  const reconcileSelection = useCallback(
-    (
-      newSnapshot: ChangesSnapshot,
-      opPath: string,
-      opChanges: ChangesKind,
-      targetChanges: ChangesKind,
-      oldDisplayIndex: number,
-    ) => {
-      const currentSelected = selectedRef.current;
-      const currentView = viewRef.current;
-      const isStillOnOperatedFile =
-        currentSelected !== null &&
-        currentSelected.path === opPath &&
-        currentSelected.changes === opChanges;
-
-      // 规则：只有当前选择仍是被操作的文件时才按 Q89 衔接；用户已切走则保持用户当前的选择（审查意见 1）
-      if (!isStillOnOperatedFile) {
-        if (currentSelected && worktreeId) {
-          const matchingEntry = newSnapshot.entries.find(
-            (e) => e.path === currentSelected.path && e.changes === currentSelected.changes,
-          );
-          if (matchingEntry) {
-            void openEntry(matchingEntry, { view: currentView, worktreeId });
-            return;
-          }
-        }
-        const fallback = pickFirstEntry(newSnapshot);
-        if (fallback && worktreeId) {
-          setSelected({ path: fallback.path, changes: fallback.changes });
-          void openEntry(fallback, { view: currentView, worktreeId });
-        } else {
-          setSelected(null);
-        }
-        return;
-      }
-
-      const newDisplayList = getDisplayOrderEntries(newSnapshot);
-
-      // 规则 1：同文件原组仍有改动则留在原位置（Q89）
-      const remainInOriginal = newDisplayList.find(
-        (e) => e.path === opPath && e.changes === opChanges,
-      );
-
-      // 规则 2：移到另一组则优先跟随同文件（覆盖普通修改变 unstaged、新增变 untracked、重命名变 untracked 等状态变化）
-      const moved =
-        newDisplayList.find((e) => e.path === opPath && e.changes === targetChanges) ??
-        newDisplayList.find(
-          (e) =>
-            e.path === opPath &&
-            (targetChanges === "unstaged"
-              ? e.changes === "unstaged" || e.changes === "untracked"
-              : e.changes === "staged"),
-        ) ??
-        newDisplayList.find((e) => e.path === opPath);
-
-      let next: Selection | null = null;
-      if (remainInOriginal) {
-        next = { path: opPath, changes: opChanges };
-      } else if (moved) {
-        next = { path: moved.path, changes: moved.changes };
-      } else if (newDisplayList.length > 0) {
-        // 规则 3：完全离开改动列表则按界面显示顺序选原位置附近文件（Q89、审查意见 5）
-        const safeIndex = Math.min(Math.max(0, oldDisplayIndex), newDisplayList.length - 1);
-        const nearby = newDisplayList[safeIndex];
-        next = { path: nearby.path, changes: nearby.changes };
-      }
-
-      if (next && worktreeId) {
-        const nextEntry = newSnapshot.entries.find(
-          (e) => e.path === next!.path && e.changes === next!.changes,
-        );
-        setSelected(next);
-        if (nextEntry) {
-          void openEntry(nextEntry, { view: currentView, worktreeId });
-        } else {
-          setSelected(null);
-        }
-      } else {
-        setSelected(null);
-      }
-    },
-    [openEntry, pickFirstEntry, worktreeId],
-  );
-
-  const stageFile = useCallback(
-    async (entry: ChangeEntry) => {
-      if (!worktreeId || isWriting || entry.readonlyReason) return;
-      const opWorktreeId = worktreeId;
-      const oldDisplayList = snapshot ? getDisplayOrderEntries(snapshot) : [];
-      const oldDisplayIndex = oldDisplayList.findIndex(
-        (e) => e.path === entry.path && e.changes === entry.changes,
-      );
-
-      setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
+  const performStaging = useCallback(async (target: StagingTarget) => {
+    const opWorktreeId = target.worktreeId;
+    // ref 在同一事件循环内也互斥；按钮禁用和 Rust 写锁共同兜底，不积压点击。
+    if (writingWorktreesRef.current.has(opWorktreeId)) return;
+    writingWorktreesRef.current.add(opWorktreeId);
+    setWritingWorktrees(new Set(writingWorktreesRef.current));
+    setAppError(null, opWorktreeId);
+    const request = { worktreeId: opWorktreeId, path: target.path, fingerprint: target.fingerprint };
+    try {
+      const unstaging = target.changes === "staged";
+      const next = target.hunkId !== undefined
+        ? await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId })
+        : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
       setAppError(null, opWorktreeId);
-      try {
-        const newSnapshot = await ipc.stageFile({
-          worktreeId: opWorktreeId,
-          path: entry.path,
-          fingerprint: entry.fingerprint,
-        });
-        setAppError(null, opWorktreeId);
-        // Q90：旧响应不得覆盖当前界面（审查意见 4）
-        if (worktreeIdRef.current !== opWorktreeId) {
-          debugLog(`[OP] 操作返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧响应不改写当前界面`);
-          return;
-        }
-        setSnapshot(newSnapshot);
-        reconcileSelection(newSnapshot, entry.path, entry.changes, "staged", oldDisplayIndex);
-      } catch (caught) {
-        const err = toAppError(caught);
-        // 规格第 3 节、审查意见 2：失败及待核对结果严格归属原 worktree 保留，回到该 worktree 时可见
-        setAppError(err, opWorktreeId);
-        if (worktreeIdRef.current !== opWorktreeId) {
-          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，结果已保存至原 worktree`);
-          return;
-        }
-        // 结果待核对或状态失效时重新读取真实状态，绝不自动重跑（规格第 3 节，审查意见 1）
-        if (err.kind === "needsVerification" || err.kind === "rejected") {
-          void refresh();
-        }
-      } finally {
-        setWritingWorktrees((current) => {
-          const next = new Set(current);
-          next.delete(opWorktreeId);
-          return next;
-        });
-      }
-    },
-    [isWriting, reconcileSelection, refresh, setAppError, snapshot, worktreeId],
-  );
+      if (worktreeIdRef.current === opWorktreeId) applyRefreshedSnapshot(next);
+    } catch (caught) {
+      const err = toAppError(caught);
+      setAppError(err, opWorktreeId);
+      // 结果始终归属发起的 worktree；拒绝或待核对只刷新，绝不自动重跑写操作。
+      if (worktreeIdRef.current === opWorktreeId
+        && (err.kind === "needsVerification" || err.kind === "rejected")) void refresh();
+    } finally {
+      writingWorktreesRef.current.delete(opWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+    }
+  }, [applyRefreshedSnapshot, refresh, setAppError]);
 
-  const unstageFile = useCallback(
-    async (entry: ChangeEntry) => {
-      if (!worktreeId || isWriting || entry.readonlyReason) return;
-      const opWorktreeId = worktreeId;
-      const oldDisplayList = snapshot ? getDisplayOrderEntries(snapshot) : [];
-      const oldDisplayIndex = oldDisplayList.findIndex(
-        (e) => e.path === entry.path && e.changes === entry.changes,
-      );
+  const stageFile = useCallback((entry: ChangeEntry) => {
+    if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
+    return performStaging({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
+  }, [performStaging, worktreeId]);
 
-      setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
-      setAppError(null, opWorktreeId);
-      try {
-        const newSnapshot = await ipc.unstageFile({
-          worktreeId: opWorktreeId,
-          path: entry.path,
-          fingerprint: entry.fingerprint,
-        });
-        setAppError(null, opWorktreeId);
-        // Q90：旧响应不得覆盖当前界面（审查意见 4）
-        if (worktreeIdRef.current !== opWorktreeId) {
-          debugLog(`[OP] 操作返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧响应不改写当前界面`);
-          return;
-        }
-        setSnapshot(newSnapshot);
-        reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged", oldDisplayIndex);
-      } catch (caught) {
-        const err = toAppError(caught);
-        // 规格第 3 节、审查意见 2：失败及待核对结果严格归属原 worktree 保留，回到该 worktree 时可见
-        setAppError(err, opWorktreeId);
-        if (worktreeIdRef.current !== opWorktreeId) {
-          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，结果已保存至原 worktree`);
-          return;
-        }
-        if (err.kind === "needsVerification" || err.kind === "rejected") {
-          void refresh();
-        }
-      } finally {
-        setWritingWorktrees((current) => {
-          const next = new Set(current);
-          next.delete(opWorktreeId);
-          return next;
-        });
-      }
-    },
-    [isWriting, reconcileSelection, refresh, setAppError, snapshot, worktreeId],
-  );
+  const unstageFile = useCallback((entry: ChangeEntry) => {
+    if (!worktreeId || entry.readonlyReason || entry.changes !== "staged") return;
+    return performStaging({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
+  }, [performStaging, worktreeId]);
+
+  const changeHunk = useCallback((action: HunkAction) => {
+    const current = selectedRef.current;
+    const entry = snapshotRef.current?.entries.find(
+      (entry) => current && entry.path === current.path && entry.changes === current.changes,
+    );
+    if (!entry || !matchesHunkAction(action, worktreeIdRef.current ?? "", entry)) {
+      setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+      if (worktreeIdRef.current === action.worktreeId) void refresh();
+      return;
+    }
+    // 原样传递显示行绑定的目标，不从当前文件元数据重新拼装 hunk 凭据。
+    void performStaging(action);
+  }, [performStaging, refresh, setAppError]);
 
   // 快捷键（Q19、Q93、审查意见 6）：
   useEffect(() => {
@@ -1675,6 +1567,8 @@ export function App() {
                 rows={rowStore}
                 highlights={highlightStore}
                 handleRef={diffRef}
+                isWriting={isWriting}
+                onHunkAction={changeHunk}
               />
             </ErrorBoundary>
           )}

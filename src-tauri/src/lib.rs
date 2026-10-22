@@ -69,6 +69,8 @@ pub fn run() {
             commands::command_log_snapshot,
             commands::stage_file,
             commands::unstage_file,
+            commands::stage_hunk,
+            commands::unstage_hunk,
             commands::change_entry,
             commands::measure_config,
             commands::write_measurement,

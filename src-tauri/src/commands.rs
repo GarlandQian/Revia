@@ -131,6 +131,15 @@ pub struct UnstageFileRequest {
     pub fingerprint: String,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HunkRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub fingerprint: String,
+    pub hunk_id: String,
+}
+
 #[tauri::command]
 pub async fn list_repos(state: State<'_, AppState>) -> Result<Vec<RepoEntry>> {
     let registry = state
@@ -250,6 +259,26 @@ pub async fn unstage_file(
     })
     .await
     .map_err(|error| AppError::internal(format!("取消暂存文件失败：{error}")))?
+}
+
+#[tauri::command]
+pub async fn stage_hunk(state: State<'_, AppState>, request: HunkRequest) -> Result<ChangesSnapshot> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("暂存 hunk 任务中断，结果待核对：{error}")))?
+}
+
+#[tauri::command]
+pub async fn unstage_hunk(state: State<'_, AppState>, request: HunkRequest) -> Result<ChangesSnapshot> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("取消暂存 hunk 任务中断，结果待核对：{error}")))?
 }
 
 #[tauri::command]
