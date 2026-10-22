@@ -353,7 +353,7 @@
      - 异步操作失败或“结果待核对”记录在 `worktreeErrors[opWorktreeId]` 中后，用户切换至其他工作区再切回原工作区时，错误横幅与待核对提示持续可见（满足规格第 3 节与 D05“待核对结果可见”），保留至用户重新确认或主动点击关闭（`dismissError`）。
    - **第 3 条（T05 仅权限变化与重命名真实指纹覆盖）**：
      - **仅权限变化**：在 `script.sh` 保持未暂存内容修改的同时，外部只将工作区权限由 755 改为 644（`chmod 644`，仅改变权限位），条目仍在 `Unstaged` 组，执行 `stage_file` 断言返回 `文件已变化，请重新确认`；
-     - **重命名**：文件预置 20 行内容并在暂存区微调 1 行（保持 95% 相似度），条目持续维持为 `Staged (Renamed)` 重命名条目，执行 `unstage_file` 断言返回 `文件已变化，请重新确认`。
+     - **重命名**：文件预置 20 行内容并在暂存区追加 1 行（Git 判定为 R85 相似度，更正此前 95% 的笔误），条目持续维持为 `Staged (Renamed)` 重命名条目，执行 `unstage_file` 断言返回 `文件已变化，请重新确认`。
    - **第 4 条（未跟踪组折叠行为修复）**：
      - `src/components/app/ChangesList.tsx` 引入 `prevSelectedRef` 记录上一次选中项键值；
      - 自动展开 effect 仅在选中项发生切换且新选中项属于 `untracked` 组时触发一次展开；用户在已选中未跟踪条目上点击折叠时不再被强制重新展开，未跟踪组可正常折叠。
@@ -397,6 +397,44 @@
 - 说明里“微调 1 行（保持 95% 相似度）”与测试不符（测试追加了一行，Git 给出 R85），请如实改写；T05 重命名用例可加一条断言，确认条目在改动后仍是重命名。
 
 修改后追加 `### 日期 / Pi 第五轮修改`，重跑 `pnpm exec tsc -b`、`pnpm lint`、`pnpm build`、完整 `cargo test`。
+
+### 2026-10-23 / Pi 第五轮修改
+
+1. **响应 1 条“必须修改”与 2 条“更正”：**
+   - **必须修改（同 worktree 在途切换保护与最新视图响应）**：
+     - 在 `src/App.tsx` 中建立 `viewRef` 与 `selectedRef`；
+     - `reconcileSelection` 检查 `selectedRef.current`：只有当用户当前选中的仍是被操作的文件时（`selectedRef.current.path === opPath && selectedRef.current.changes === opChanges`），才按 Q89 规则衔接；
+     - 若用户在写操作在途期间已切换至其他文件，则完全保留用户切走后的当前选择（若该文件依然存在于新快照中则保持选中并以最新视图呈现），绝不把选择强行改回刚刚被操作的文件；
+     - 打开文件时统一通过 `viewRef.current` 获取最新视图模式，绝不用旧闭包中的 `view` 改写用户在途切换的视图。
+   - **更正 1（更正测试注释与变更组断言）**：
+     - `src-tauri/tests/file_staging.rs` 更正注释为 `取消暂存重命名后：暂存区恢复为 HEAD 状态，原路径在工作区缺失表现为未暂存的删除（Unstaged），新路径在工作区存在表现为未跟踪（Untracked）`；
+     - 显式断言原路径条目 `old_deleted.changes == ChangesKind::Unstaged` 与 `old_deleted.status == FileStatus::Deleted`，新路径条目 `new_untracked.changes == ChangesKind::Untracked`。
+   - **更正 2（更正相似度描述与补充重命名状态断言）**：
+     - 上一轮说明中追加 1 行的真实相似度已如实改写为 R85；
+     - 在 `tests/file_staging.rs` 的 T05 用例中增加断言，显式验证暂存区追加 1 行后条目在刷新快照中依然保持为重命名（`FileStatus::Renamed`，`original_path == Some("old_renamed.txt")`），然后再验证指纹拒绝。
+
+2. **D06 性能回归实测结果（Release 构建，真实桌面可见窗口）：**
+   - **并排视图**（`REVIA_MEASURE_ONLY=split`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 60`；
+     - 首屏 `fromListChangesMs`: **83ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **8ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**。
+   - **统一视图**（`REVIA_MEASURE_ONLY=unified`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 59`；
+     - 首屏 `fromListChangesMs`: **94ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **8ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**，掉帧: **1**。
+
+3. **检查结果：**
+   - `pnpm exec tsc -b`：通过。
+   - `pnpm lint`：通过。
+   - `pnpm build`：通过。
+   - `cargo test --manifest-path src-tauri/Cargo.toml`：**86 个测试全部通过**（65 个单元测试 + 3 个 flow 集成测试 + 18 个 file_staging 集成测试）。
+   - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
+   - 冒烟检查（`REVIA_SMOKE=1`）：通过（7 个文件全部访问，视图切换行锚点 3322 完好保留）。
+
 
 **桌面验收清单**（这一条修好后由规划方在真实桌面执行）：从行内 ± 、工具栏、⌥⌘A、列表空格四个入口暂存／取消暂存，选择按 Q89 衔接；输入框、弹窗、折叠按钮里的空格和 ⌥⌘A 不穿透，按钮有焦点时 ⌘R、⌘O 仍可用；用 fixture 占住 `index.lock` 让操作变慢，期间切换文件、视图和 worktree，结果只归属原 worktree 且不改写当前界面；拒绝或待核对提示在切走再切回后仍在，直到关闭；只读条目（符号链接、冲突）显示原因且操作禁用；含空格路径的列表计数正确；D06 并排、统一首屏在可见窗口复测。
 
