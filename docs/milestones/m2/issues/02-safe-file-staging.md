@@ -205,7 +205,7 @@
      - `compute_file_fingerprint_from_patch` 仅对未跟踪文件（`ChangesKind::Untracked`）在刷新时读取物理文件内容；已跟踪文件的内容、权限、增删与二进制变动已完全体现在 Git status/diff 输出中，不再在刷新时重复整读文件，根除了首屏退化隐患；
      - `ReadonlyReason` 新增 `Unreadable` 枚举值，在文件无法读取或无访问权限时返回 `ReadonlyReason::Unreadable`，前端在 `i18n` 对应显示“文件无法读取或无访问权限，仅供只读查看”，不再错误误标为“非 UTF-8 路径”。
    - **第 4 条（错误分支不污染其他 worktree 界面）**：
-     - `App.tsx` 中的 `stageFile` 与 `unstageFile` 在 catch 分支比对 `worktreeIdRef.current !== opWorktreeId`，若用户已切换至其他 worktree，仅在 debugLog 记录，绝不执行当前界面的 `setError` 或 `refresh()`，保证失败与待核对结果严格归属原 worktree（Q90）。
+     - `App.tsx` 中的 `stageFile` 与 `unstageFile` 在 catch 分支比对 `worktreeIdRef.current !== opWorktreeId`，若用户已切换至其他 worktree，仅在 debugLog 记录，不执行当前界面的 `setError` 或 `refresh()`；（更正说明：第二轮修改时未按 worktree 保留错误状态，且 `refresh()` 在 await 期间切换未核对当前工作区，已在第三轮完整修复为按 `worktreeErrors` 字典跨工作区保留并在回到原 worktree 时可见）。
    - **第 5 条（Q89 选择衔接按界面顺序）**：
      - `reconcileSelection` 依界面展示顺序（`[...unstaged, ...untracked, ...staged]`）计算原索引 `oldDisplayIndex`；
      - 跟随同文件优先匹配同名条目，覆盖修改变未暂存、新增变未跟踪、重命名变删除+未跟踪（优先匹配同名 `new_path`）；
@@ -217,7 +217,7 @@
    - **第 7 条（测试完整覆盖）**：
      - 恢复 `t03_stage_and_unstage_binary_file`（二进制文件暂存与取消暂存）；
      - 恢复 `t03_stage_and_unstage_mode_change`（仅权限变化暂存与取消暂存）；
-     - 恢复 `t05_comprehensive_fingerprint_verification` 中对“文件已变化，请重新确认”错误文本的精确断言；
+     - 恢复 `t05_comprehensive_fingerprint_verification` 中对“文件已变化，请重新确认”错误文本的精确断言（更正说明：第二轮中 T05 的权限与重命名撤回因条目消失触发的是“条目不存在”，第三轮已修正为在条目仍存在时修改属性并严格触发“文件已变化，请重新确认”）；
      - T03 补齐子模块（模式 160000）、冲突未合并（Conflict）、未跟踪嵌套仓库（测试内全部使用隔离环境 git init）、非 UTF-8 路径注入（通过 git update-index 写入原始非 UTF-8 字节并在 status 读取到 \u{FFFD}）以及无权限访问文件（chmod 000）；
      - T05 补齐目标文件自身内容修改、仅权限变化、重命名路径修改、未跟踪文件修改、二进制文件修改及已暂存侧外部变动的指纹拒绝测试；
      - T01 增加多文件仓库断言，验证操作 target 文件时其他 clean / dirty 文件的字节、模式与暂存区 blob 全程不变；
@@ -244,7 +244,7 @@
    - `pnpm exec tsc -b`：通过。
    - `pnpm lint`：通过。
    - `pnpm build`：通过。
-   - `cargo test --manifest-path src-tauri/Cargo.toml`：78 个测试全部通过（63 个单元测试 + 3 个 flow 集成测试 + 15 个 file_staging 集成测试）。
+   - `cargo test --manifest-path src-tauri/Cargo.toml`：81 个测试全部通过（63 个单元测试 + 3 个 flow 集成测试 + 15 个 file_staging 集成测试，更正此前 78 的算术笔误）。
    - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
 
 
@@ -273,4 +273,57 @@
 - 删除未再使用的 `isInteractiveElement`；`App.tsx` 的 `AppErrorInfo` 与生成的 `AppErrorPayload` 重复。
 
 修改后追加 `### 日期 / Pi 第三轮修改`，如实写修改、测试名与检查结果；重跑 `pnpm exec tsc -b`、`pnpm lint`、`pnpm build`、完整 `cargo test`。
+
+### 2026-10-23 / Pi 第三轮修改
+
+1. **响应 6 条“必须修改”：**
+   - **第 1 条（统一错误文字提取，消除 [object Object]）**：
+     - 新建 `src/lib/error.ts` 提供 `getErrorMessage`，能够安全解构 `AppErrorPayload ({ kind, message })`、`Error` 实例、带 `message` 字段的异常对象及普通字符串；
+     - 在 `features/diff/rowWindowStore.ts`（可见行/数据块加载失败）、`features/diff/highlightStore.ts`（高亮失败）、`components/app/ErrorBoundary.tsx`、`main.tsx`（未处理 Promise）及 `App.tsx`（长测、自动测量、IPC 错误记录）中全面替换 `String(error)` / `String(caught)` 为 `getErrorMessage`，彻底根除 diff 视图与测试报告中显示 `[object Object]` 的缺陷。
+   - **第 2 条（结果严格归属原 worktree，待核对状态跨工作区保留）**：
+     - 在 `App.tsx` 中建立 `worktreeErrors: Record<string, AppErrorPayload | null>` 状态字典，由 `setWorktreeErrors` 维护各工作区的错误与待核对状态；
+     - `stageFile` / `unstageFile` 的失败及待核对结果严格记录到发起操作的原工作区（`opWorktreeId`）；若用户在在途期间已切换至其他工作区，当前界面不弹出原工作区的错误横幅，但切回原工作区时错误横幅与待核对提示完整呈现（满足规格第 3 节与 D05“待核对结果可见”）；
+     - `refresh()` 函数在 `await ipc.listChanges(targetWorktreeId)` 返回后，通过 `worktreeIdRef.current !== targetWorktreeId` 严格核验当前工作区，若期间发生切换，绝不将旧快照、旧选中项改写到当前界面。
+   - **第 3 条（暂存区版本读取支持字面路径）**：
+     - `git/mod.rs` 的 `file_at` 当 scope 为暂存区（`""`、`"index"`、`":"`）时，采用带阶段号的格式 `:0:{path}`，避免当文件名为 `0:x` 时被 Git 误将前导 `0:` 识别为 stage 编号而导致 `fatal: path 'x' does not exist`；
+     - 增加集成测试 `t03_staged_file_at_literal_colon_paths`：验证文件名含冒号 `0:x.txt` 时，`file_at("", "0:x.txt")` 与 `file_at("index", "0:x.txt")` 能精确读取暂存区版本内容。
+   - **第 4 条（含 `"` 或 `\` 的路径字面量与指纹 100% 匹配）**：
+     - `git/diff.rs` 调整 `strip_prefix_path` 逻辑：先通过 `unquote` 剥掉外层双引号并还原转义字符（如 `\"` -> `"`，`\\` -> `\`），再去 `a/` 或 `b/` 前缀；彻底修复过去因前缀判断失败将键错认为 `b/q"x.txt` 导致指纹匹配失败的缺陷；
+     - 实现 `next_header_token` 正确解析 `diff --git "a/..." "b/..."` 带引号和空格的路径；
+     - 对 `rename from` / `copy from` / `rename to` / `copy to` 的路径也使用 `unquote` 解码；
+     - 增加单元测试 `parses_quoted_paths_and_special_characters`，以及集成测试 `t04_stage_and_unstage_quoted_and_backslash_paths`：验证 `q"x.txt` 与 `back\slash.txt` 的未跟踪发现、整文件暂存、暂存区内容读取与取消暂存全流程。
+   - **第 5 条（测试覆盖与真实断言）**：
+     - **T05 真实指纹拒绝**：权限用例在工作区修改属性以保留 `Unstaged` 条目，重命名用例在暂存区外部修改以保留 `Staged` (Renamed) 条目，断言其由于指纹不一致严格返回 `文件已变化，请重新确认`（排除条目不存在的伪拒绝）；
+     - **非 UTF-8 路径用例**：移除外层的 `if out.status.success()` 与 `if let Some`，改为无条件断言，未构造成功直接使测试失败；
+     - **T01 工作区文件模式不变**：在 `t01_stage_and_unstage_regular_file_multi_file_invariants` 中，暂存 target 前后以及取消暂存后，均断言 `sibling_clean` 与 `sibling_dirty` 的工作区文件权限模式（metadata mode）以及暂存区 blob/mode 全程保持不变。
+   - **第 6 条（文件行键盘焦点可见）**：
+     - `ChangesList.tsx` 中的文件行按钮添加 `focus-visible:ring-1 focus-visible:ring-ring focus-visible:rounded-sm focus-visible:ring-inset`，使用键盘 Tab 移动焦点或键盘操作时焦点清晰可见（满足 D02 键盘可达性）。
+
+2. **响应 3 条“建议”：**
+   - **已跟踪文件不可读场景**：在 `docs/milestones/backlog/` 下建立任务单 `02-tracked-unreadable-file-resilience.md`，记录已跟踪文件被 `chmod 000` 时 Git diff 以 128 退出导致刷新失败的边界问题，供后续专项处理；
+   - **未跟踪组跟随展开**：`ChangesList.tsx` 监听 `selected`，当跟随同文件或选中项属于未跟踪组（`untracked`）且未跟踪组处于折叠状态时，自动触发 `setUntrackedOpen(true)` 展开分组，确保选中项始终可见；
+   - **代码冗余清理**：删除 `platform.ts` 中未再使用的 `isInteractiveElement`，清理 `App.tsx` 中重复声明的 `AppErrorInfo`，统一使用生成的 `AppErrorPayload`。
+
+3. **D06 性能回归实测结果（Release 构建，真实桌面可见窗口）：**
+   - **并排视图**（`REVIA_MEASURE_ONLY=split`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 59`；
+     - 首屏 `fromListChangesMs`: **79ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **8ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**。
+   - **统一视图**（`REVIA_MEASURE_ONLY=unified`）：
+     - 窗口状态 `visible`, 帧率 `rAF: 59`；
+     - 首屏 `fromListChangesMs`: **81ms**（达成 <150ms）；
+     - 首屏 `rafPainted`: **True**；
+     - 已缓存跳转 `warmAppearMs`: **3ms**（达成 ≤16.7ms）；
+     - 滚动 60 屏未覆盖帧: **0**，掉帧: **0**。
+
+4. **检查结果：**
+   - `pnpm exec tsc -b`：通过。
+   - `pnpm lint`：通过。
+   - `pnpm build`：通过。
+   - `cargo test --manifest-path src-tauri/Cargo.toml`：84 个测试全部通过（64 个单元测试 + 3 个 flow 集成测试 + 17 个 file_staging 集成测试）。
+   - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
+   - 冒烟检查（`REVIA_SMOKE=1`）：通过。
+
 
