@@ -10,7 +10,6 @@ import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isInteractiveElement } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -42,19 +41,19 @@ export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, 
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === " " && selected && !isWriting) {
-      // 若当前焦点在折叠按钮等交互控件上，允许其原生空格操作，不穿透到文件动作（审查意见 6）
-      if (isInteractiveElement(event.target)) {
-        return;
+      const target = event.target as HTMLElement | null;
+      if (target && target.tagName === "BUTTON") {
+        return; // 按钮由自身的键盘行为处理，不穿透
       }
-      const target = snapshot.entries.find(
+      const targetEntry = snapshot.entries.find(
         (e) => e.path === selected.path && e.changes === selected.changes,
       );
-      if (target && !target.readonlyReason) {
+      if (targetEntry && !targetEntry.readonlyReason) {
         event.preventDefault();
-        if (target.changes === "staged") {
-          onUnstage?.(target);
+        if (targetEntry.changes === "staged") {
+          onUnstage?.(targetEntry);
         } else {
-          onStage?.(target);
+          onStage?.(targetEntry);
         }
       }
     }
@@ -205,48 +204,63 @@ function VirtualRows({
             ? messages.changes.readonlyReasons[entry.readonlyReason]
             : null;
           return (
-            <button
+            <div
               key={`${entry.changes}-${entry.path}`}
-              type="button"
               className={`group absolute left-0 right-0 flex items-center gap-1.5 px-2 text-left text-xs ${
                 isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
               }`}
               style={{ top: index * ROW_HEIGHT, height: ROW_HEIGHT }}
-              onClick={() => onSelect({ path: entry.path, changes: entry.changes })}
-              title={
-                readonlyDesc
-                  ? `${entry.path}（${readonlyDesc}）`
-                  : entry.originalPath
-                    ? `${entry.originalPath} → ${entry.path}`
-                    : entry.path
-              }
             >
-              <span className="truncate flex-1">{entry.path}</span>
-              {entry.collapsed ? (
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  {messages.changes.collapsed}
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left outline-none cursor-pointer"
+                onClick={() => onSelect({ path: entry.path, changes: entry.changes })}
+                onKeyDown={(e) => {
+                  if (e.key === " " && !isWriting && !entry.readonlyReason) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (entry.changes === "staged") {
+                      onUnstage?.(entry);
+                    } else {
+                      onStage?.(entry);
+                    }
+                  }
+                }}
+                title={
+                  readonlyDesc
+                    ? `${entry.path}（${readonlyDesc}）`
+                    : entry.originalPath
+                      ? `${entry.originalPath} → ${entry.path}`
+                      : entry.path
+                }
+              >
+                <span className="truncate flex-1">{entry.path}</span>
+                {entry.collapsed ? (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {messages.changes.collapsed}
+                  </span>
+                ) : null}
+                <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
+                  +{entry.added} −{entry.deleted}
                 </span>
-              ) : null}
-              <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
-                +{entry.added} −{entry.deleted}
-              </span>
-              <span className={`status-${entry.status} w-3 shrink-0 text-center font-semibold`}>
-                {statusLetter(entry)}
-              </span>
+                <span className={`status-${entry.status} w-3 shrink-0 text-center font-semibold`}>
+                  {statusLetter(entry)}
+                </span>
+              </button>
               {readonlyDesc ? (
                 <span
-                  className="shrink-0 text-[10px] text-muted-foreground/60 select-none"
+                  className="shrink-0 px-1 text-[10px] text-muted-foreground/60 select-none"
                   title={readonlyDesc}
                 >
                   {messages.changes.readonly}
                 </span>
               ) : (
-                <span
-                  role="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   tabIndex={-1}
-                  className={`h-4.5 w-4.5 flex items-center justify-center shrink-0 rounded text-[11px] font-bold opacity-0 group-hover:opacity-100 group-focus:opacity-100 hover:bg-muted-foreground/20 ${
-                    isWriting ? "pointer-events-none opacity-40" : ""
-                  }`}
+                  disabled={isWriting}
+                  className="h-4.5 w-4.5 p-0 shrink-0 text-[11px] font-bold opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-muted-foreground/20"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (entry.changes === "staged") {
@@ -263,9 +277,9 @@ function VirtualRows({
                   }
                 >
                   {entry.changes === "staged" ? "−" : "+"}
-                </span>
+                </Button>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

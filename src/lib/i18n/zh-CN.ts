@@ -46,6 +46,7 @@ export const zhCN = {
       nestedRepo: "嵌套仓库为只读类型，不支持在应用内暂存",
       conflict: "文件存在未解决的冲突，不支持通过普通操作暂存",
       nonUtf8Path: "非 UTF-8 路径无法无损处理，仅供只读查看",
+      unreadable: "文件无法读取或无访问权限，仅供只读查看",
     },
     shortcuts: {
       stage: "暂存（空格）",

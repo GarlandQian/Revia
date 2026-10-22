@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
@@ -28,7 +29,7 @@ import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isInteractiveElement, isPrimaryModifier, isStageFileShortcut } from "@/lib/platform";
+import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import {
   formatMs,
   measureScroll,
@@ -81,7 +82,7 @@ export function App() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const [error, setError] = useState<AppErrorInfo | null>(null);
+  const [error, setError] = useState<AppErrorPayload | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [panelOpen, setPanelOpen] = useState(true);
   const [bootstrapDone, setBootstrapDone] = useState(false);
@@ -458,24 +459,37 @@ export function App() {
       opPath: string,
       opChanges: ChangesKind,
       targetChanges: ChangesKind,
-      oldIndex: number,
+      oldDisplayIndex: number,
     ) => {
-      const remainInOriginal = newSnapshot.entries.find(
+      const newDisplayList = getDisplayOrderEntries(newSnapshot);
+
+      // 规则 1：同文件原组仍有改动则留在原位置（Q89）
+      const remainInOriginal = newDisplayList.find(
         (e) => e.path === opPath && e.changes === opChanges,
       );
-      const moved = newSnapshot.entries.find(
-        (e) => e.path === opPath && e.changes === targetChanges,
-      );
+
+      // 规则 2：移到另一组则优先跟随同文件（覆盖普通修改变 unstaged、新增变 untracked、重命名变 untracked 等状态变化）
+      const moved =
+        newDisplayList.find((e) => e.path === opPath && e.changes === targetChanges) ??
+        newDisplayList.find(
+          (e) =>
+            e.path === opPath &&
+            (targetChanges === "unstaged"
+              ? e.changes === "unstaged" || e.changes === "untracked"
+              : e.changes === "staged"),
+        ) ??
+        newDisplayList.find((e) => e.path === opPath);
 
       let next: Selection | null = null;
       if (remainInOriginal) {
         next = { path: opPath, changes: opChanges };
       } else if (moved) {
-        next = { path: opPath, changes: targetChanges };
-      } else if (newSnapshot.entries.length > 0) {
-        // Q89：离开改动列表则选原位置附近文件，无可选项则清空 diff（审查意见 5）
-        const safeIndex = Math.min(Math.max(0, oldIndex), newSnapshot.entries.length - 1);
-        next = { path: newSnapshot.entries[safeIndex].path, changes: newSnapshot.entries[safeIndex].changes };
+        next = { path: moved.path, changes: moved.changes };
+      } else if (newDisplayList.length > 0) {
+        // 规则 3：完全离开改动列表则按界面显示顺序选原位置附近文件（Q89、审查意见 5）
+        const safeIndex = Math.min(Math.max(0, oldDisplayIndex), newDisplayList.length - 1);
+        const nearby = newDisplayList[safeIndex];
+        next = { path: nearby.path, changes: nearby.changes };
       }
 
       if (next && worktreeId) {
@@ -498,9 +512,10 @@ export function App() {
     async (entry: ChangeEntry) => {
       if (!worktreeId || isWriting || entry.readonlyReason) return;
       const opWorktreeId = worktreeId;
-      const oldIndex = snapshot
-        ? snapshot.entries.findIndex((e) => e.path === entry.path && e.changes === entry.changes)
-        : 0;
+      const oldDisplayList = snapshot ? getDisplayOrderEntries(snapshot) : [];
+      const oldDisplayIndex = oldDisplayList.findIndex(
+        (e) => e.path === entry.path && e.changes === entry.changes,
+      );
 
       setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
       setError(null);
@@ -516,8 +531,13 @@ export function App() {
           return;
         }
         setSnapshot(newSnapshot);
-        reconcileSelection(newSnapshot, entry.path, entry.changes, "staged", oldIndex);
+        reconcileSelection(newSnapshot, entry.path, entry.changes, "staged", oldDisplayIndex);
       } catch (caught) {
+        // Q90：失败及待核对结果也只归属原 worktree，切换后不改写当前界面（审查意见 4）
+        if (worktreeIdRef.current !== opWorktreeId) {
+          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧错误不改写当前界面`);
+          return;
+        }
         const err = toAppError(caught);
         setError(err);
         // 结果待核对或状态失效时重新读取真实状态，绝不自动重跑（规格第 3 节，审查意见 1）
@@ -539,9 +559,10 @@ export function App() {
     async (entry: ChangeEntry) => {
       if (!worktreeId || isWriting || entry.readonlyReason) return;
       const opWorktreeId = worktreeId;
-      const oldIndex = snapshot
-        ? snapshot.entries.findIndex((e) => e.path === entry.path && e.changes === entry.changes)
-        : 0;
+      const oldDisplayList = snapshot ? getDisplayOrderEntries(snapshot) : [];
+      const oldDisplayIndex = oldDisplayList.findIndex(
+        (e) => e.path === entry.path && e.changes === entry.changes,
+      );
 
       setWritingWorktrees((current) => new Set(current).add(opWorktreeId));
       setError(null);
@@ -557,8 +578,13 @@ export function App() {
           return;
         }
         setSnapshot(newSnapshot);
-        reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged", oldIndex);
+        reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged", oldDisplayIndex);
       } catch (caught) {
+        // Q90：失败及待核对结果也只归属原 worktree，切换后不改写当前界面（审查意见 4）
+        if (worktreeIdRef.current !== opWorktreeId) {
+          debugLog(`[OP] 失败返回时工作树已切换 (${opWorktreeId} -> ${worktreeIdRef.current})，旧错误不改写当前界面`);
+          return;
+        }
         const err = toAppError(caught);
         setError(err);
         if (err.kind === "needsVerification" || err.kind === "rejected") {
@@ -578,8 +604,8 @@ export function App() {
   // 快捷键（Q19、Q93、审查意见 6）：
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // 避免输入框、弹窗和按钮键盘操作穿透到后台文件操作（Q93）
-      if (isInteractiveElement(event.target)) return;
+      // 只对文本输入控件和弹窗内的按键放行，不穿透到后台文件操作（Q93、审查意见 6）
+      if (isTextInputOrDialog(event.target)) return;
 
       if (isStageFileShortcut(event)) {
         event.preventDefault();
@@ -1795,18 +1821,21 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 // ---------------- 工具 ----------------
 
-function toAppError(caught: unknown): AppErrorInfo {
+/** 界面展示顺序：未暂存 -> 未跟踪 -> 已暂存（审查意见 5）。 */
+function getDisplayOrderEntries(snapshot: ChangesSnapshot): ChangeEntry[] {
+  const unstaged = snapshot.entries.filter((entry) => entry.changes === "unstaged");
+  const untracked = snapshot.entries.filter((entry) => entry.changes === "untracked");
+  const staged = snapshot.entries.filter((entry) => entry.changes === "staged");
+  return [...unstaged, ...untracked, ...staged];
+}
+
+function toAppError(caught: unknown): AppErrorPayload {
+  if (caught && typeof caught === "object" && "kind" in caught && "message" in caught) {
+    const payload = caught as AppErrorPayload;
+    return { kind: payload.kind, message: String(payload.message) };
+  }
   const message = caught instanceof Error ? caught.message : String(caught);
-  const kind: AppErrorInfo["kind"] = /待核对|needsverification/i.test(message)
-    ? "needsVerification"
-    : /git|退出码/i.test(message)
-      ? "git"
-      : /找不到|环境|shell/i.test(message)
-        ? "environment"
-        : /拒绝|不在当前|请先|文件已变化/.test(message)
-          ? "rejected"
-          : "internal";
-  return { kind, message };
+  return { kind: "internal", message };
 }
 
 /**

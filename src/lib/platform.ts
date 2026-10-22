@@ -36,6 +36,18 @@ export function isStageFileShortcut(event: KeyboardEvent | React.KeyboardEvent):
   return isPrimaryModifier(event) && isAltModifier(event) && event.code === "KeyA";
 }
 
+/** 判断是否在输入类控件（<input>, <textarea>, [contenteditable]）或弹窗内，让出快捷键避免穿透（Q93、审查意见 6）。 */
+export function isTextInputOrDialog(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  const isInput =
+    tag === "textarea" ||
+    (tag === "input" && !["button", "checkbox", "radio", "submit", "reset"].includes((target as HTMLInputElement).type)) ||
+    target.isContentEditable;
+  const inDialog = target.closest("[role='dialog']") !== null || target.closest("dialog") !== null;
+  return isInput || inDialog;
+}
+
 /** 判断目标元素是否为输入控件或按钮，避免键盘事件穿透到后台文件操作（Q93）。 */
 export function isInteractiveElement(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;
