@@ -58,3 +58,18 @@
 5. **遗留问题与交接：**
    - 本机为 macOS Apple Silicon 环境，无 Windows 交叉编译工具链，不以本地交叉检查冒充通过；
    - 待规划方按 Q97 正常推送 `m2` 分支到 GitHub 现有 origin 后，在 GitHub Actions 取得实际 Windows x64 编译结果与对应 commit，并在验收项中确认。
+
+
+### 2026-10-23 / Claude 审查与首次 CI
+
+代码审查通过：登录 shell 环境解析集中在 `shell.rs`，macOS 与 Windows 分别实现，Windows 无登录 shell 时使用进程自身环境；工作流 `Compile Check` 在推送 main、m2 和手动触发时，于 macos-14（Apple Silicon）与 windows-latest（x64）上执行前端类型检查、lint、构建以及 `cargo test`、`cargo build --release`，不打包、不发布。`pnpm-lock.yaml` 为 9.0 格式，与工作流的 pnpm 10 兼容。
+
+按 Q97，规划方于 2026-10-23 把 `m2`（`2a34c9b`）正常推送到 origin（未推 main、未强推、未打标签、未建 PR），运行 [Compile Check #39847227656](https://github.com/GarlandQian/Revia/actions/runs/39847227656)：
+
+- macOS Apple Silicon：通过（6 分 56 秒）。
+- Windows x64：**失败**。前端各步骤通过；整个 crate 与测试在 Windows 上编译成功，`cargo test` 65 项通过、1 项失败：`shell::tests::split_path_drops_empty_entries` 在测试里写死了 `:` 分隔的 PATH（`"/a::/b:"`），Windows 的分隔符是 `;`。这是测试本身的平台假设，不是产品代码问题。
+
+**必须修改**：该测试按平台分隔符构造 PATH（例如用 `std::env::join_paths` 或按 `cfg` 选择分隔符），本机通过后由规划方再次推送并取得 Windows x64 通过的结果。另有一条 GitHub 提示：所用 action 的 Node.js 20 运行时已弃用，可在修改时把 `actions/checkout`、`actions/setup-node`、`actions/cache`、`pnpm/action-setup` 升到当前版本（不阻塞）。
+
+“取得 Windows x64 实际编译结果”一项暂不勾选。
+
