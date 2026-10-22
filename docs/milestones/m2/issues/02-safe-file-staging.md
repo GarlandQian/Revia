@@ -248,3 +248,29 @@
    - 工具回归测试（`test_bench_long_running.py`, `test-ipc-diagnostics.mjs`, `test-visible-highlight-lines.mjs`）：44 个测试全部通过。
 
 
+### 2026-10-23 / Claude 第三轮审查
+
+复核 `8d71782...f3a3eea`。`file_staging` 15 项与完整 `cargo test`（63 + 3 + 15）、类型检查、lint 通过。第二轮第 2、3、5、6、8 条已修好；路径字面量已覆盖暂存、取消暂存与各类 diff，并用真实 Git 验证 `x*.txt`、`[ab].txt`、`:(top)a` 都只改变目标文件。以下仍需修改，验收项状态不变。说明中“78 个测试（63+3+15）”应为 81，T05 的“指纹拒绝”、第 4 条的“严格归属原 worktree”与代码不符，请如实更正。
+
+**必须修改**
+
+1. **错误对象回退为 “[object Object]”。** 错误改为 `{ kind, message }` 对象后，`rowWindowStore.ts` 约 250 行、`highlightStore.ts` 约 140 行仍用 `error instanceof Error ? error.message : String(error)`，diff 视图会显示 “[object Object]”；长测与测量报告的 `report.error = String(caught)` 同样丢失文字。统一用一个取错误文字的函数，并检查其他 `String(error)` 用法。
+2. **结果归属原 worktree**（规格第 3 节“结果提示属于原 worktree”，D05“待核对结果可见”）。
+   - catch 分支在切换后只写 debugLog，“结果待核对”被丢弃。待核对状态要按 worktree 保留，回到该 worktree 时可见。
+   - `refresh()` 在 await 之后没有核对当前 worktree，切换期间完成的旧快照仍会写进当前界面。
+3. **暂存区版本读取不是字面路径。** `file_at` 拼接 `format!("{scope}:{path}")`，暂存区时得到 `:<path>`，文件名为 `0:x` 时 Git 返回 `x` 的内容。暂存区请用带阶段号的写法（如 `:0:<path>`）或其他字面方式，并加测试。
+4. **含 `"` 或 `\` 的路径永远无法暂存。** Git 对这些文件名即使在 `core.quotePath=false` 下也加引号；`strip_prefix_path` 先去 `a/` 再反引号，键变成 `b/q"x.txt`，刷新得到空 diff，写入时总被拒为“文件已变化”。先反引号再去前缀，加测试。
+5. **测试仍未覆盖到位。**
+   - T05 的仅权限与重命名用例把改动撤回，条目消失，拒绝来自“找不到条目”而非指纹不一致。要在条目仍存在、但属性已变化时断言“文件已变化，请重新确认”。
+   - 非 UTF-8 路径用例包在 `if out.status.success()`／`if let Some(...)` 里，可能什么都没验证就通过。macOS 上条目能出现，改为无条件断言；确实无法构造时测试应失败或明确标注限制。
+   - T01 没有断言工作区文件模式不变。
+6. **文件行的键盘焦点不可见。** 行按钮带 `outline-none` 且没有焦点样式，键盘用户看不到当前焦点（D02 键盘可达性）。
+
+**建议（不阻塞）**
+
+- 已跟踪文件不可读时 `git diff` 以 128 退出，整次刷新失败；更好的做法是只把该条目标为不可读。若本任务不处理，请记入 `docs/milestones/backlog/`。
+- 跟随同文件到默认折叠的未跟踪组时，选中项不可见，可考虑展开所在组。
+- 删除未再使用的 `isInteractiveElement`；`App.tsx` 的 `AppErrorInfo` 与生成的 `AppErrorPayload` 重复。
+
+修改后追加 `### 日期 / Pi 第三轮修改`，如实写修改、测试名与检查结果；重跑 `pnpm exec tsc -b`、`pnpm lint`、`pnpm build`、完整 `cargo test`。
+
