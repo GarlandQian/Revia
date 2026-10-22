@@ -3,6 +3,8 @@
 //! 前端按 kind 分别展示（Q36）：操作被拒绝 / Git 命令失败 / 环境问题。
 
 use std::fmt;
+use serde::Serialize;
+use ts_rs::TS;
 
 #[derive(Debug)]
 pub struct AppError {
@@ -10,7 +12,9 @@ pub struct AppError {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub enum ErrorKind {
     /// 操作被拒绝（参数不合法、状态过期等）。
     Rejected,
@@ -22,6 +26,14 @@ pub enum ErrorKind {
     Internal,
     /// 结果待核对（超时、中断等导致写入结果不确定，Q91/规格第 3 节）。
     NeedsVerification,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AppErrorPayload {
+    pub kind: ErrorKind,
+    pub message: String,
 }
 
 impl AppError {
@@ -68,7 +80,11 @@ impl From<serde_json::Error> for AppError {
 
 impl serde::Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.message)
+        let payload = AppErrorPayload {
+            kind: self.kind,
+            message: self.message.clone(),
+        };
+        payload.serialize(serializer)
     }
 }
 

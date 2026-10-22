@@ -251,8 +251,8 @@ impl WorktreeSession {
         let staged_patch = self.git.diff_index(None)?;
         let fingerprint = git::fingerprint(&[&unstaged_patch, &staged_patch]);
 
-        let unstaged = git::diff::parse(&String::from_utf8_lossy(&unstaged_patch));
-        let staged = git::diff::parse(&String::from_utf8_lossy(&staged_patch));
+        let unstaged = git::diff::parse_bytes(&unstaged_patch);
+        let staged = git::diff::parse_bytes(&staged_patch);
 
         let mut models: HashMap<String, FileModelCache> = HashMap::new();
         for file in unstaged.files {
@@ -283,7 +283,7 @@ impl WorktreeSession {
             }
 
             // 指纹来自展示所用的同一份 Git 输出（FileChange.raw_patch），不在刷新中按文件另起 Git 进程（审查意见 3）
-            let raw_diff = model.map(|m| m.raw_patch.as_bytes()).unwrap_or(&[]);
+            let raw_diff = model.map(|m| m.raw_patch.as_slice()).unwrap_or(&[]);
             let (fingerprint, fp_err) = match compute_file_fingerprint_from_patch(entry, raw_diff, &self.path) {
                 Ok(fp) => (fp, None),
                 Err(e) => (String::new(), Some(e)),
@@ -291,7 +291,7 @@ impl WorktreeSession {
 
             // 读取失败不能变成假空指纹，必须标记只读并记录原因
             if fp_err.is_some() && readonly_reason.is_none() {
-                readonly_reason = Some(ReadonlyReason::NonUtf8Path);
+                readonly_reason = Some(ReadonlyReason::Unreadable);
             }
 
             entries.push(ChangeEntry {
@@ -371,7 +371,7 @@ impl WorktreeSession {
             .unwrap_or(true);
         if needs_load {
             let patch = self.git.diff_untracked(path)?;
-            let mut parsed = git::diff::parse(&String::from_utf8_lossy(&patch));
+            let mut parsed = git::diff::parse_bytes(&patch);
             let file = parsed
                 .files
                 .pop()
@@ -724,7 +724,7 @@ fn empty_file(path: &str, status: FileStatus) -> git::diff::FileChange {
         deleted: 0,
         old_lines: 0,
         new_lines: 0,
-        raw_patch: String::new(),
+        raw_patch: Vec::new(),
     }
 }
 
@@ -781,23 +781,23 @@ pub fn compute_file_fingerprint_from_patch(
     hasher.update((diff_bytes.len() as u64).to_le_bytes());
     hasher.update(diff_bytes);
 
-    // 6. 针对未跟踪文件或未暂存已跟踪文件：绑定工作区实体哈希（覆盖二进制等在 diff 文本无细节的内容变动）
-    if entry.changes == ChangesKind::Untracked
-        || (entry.changes == ChangesKind::Unstaged && entry.status != FileStatus::Deleted)
-    {
+    // 6. 针对未跟踪文件：Git status/diff 在刷新时不含内容，必须读取工作区文件以绑定内容变化
+    // 已跟踪文件的变化（无论文本、二进制、权限还是删除）已经完全体现在 Git status/diff 输出中，
+    // 不在刷新时重复整读文件（审查意见 3）。
+    if entry.changes == ChangesKind::Untracked {
         let file_path = worktree_path.join(&entry.path);
         let meta = std::fs::symlink_metadata(&file_path)
-            .map_err(|e| AppError::rejected(format!("读取工作区文件属性失败（{}）：{}", entry.path, e)))?;
-        hasher.update(b"exists");
+            .map_err(|e| AppError::rejected(format!("读取未跟踪文件属性失败（{}）：{}", entry.path, e)))?;
+        hasher.update(b"untracked_meta");
         hasher.update(meta.len().to_le_bytes());
 
         if meta.is_file() {
             let mut f = std::fs::File::open(&file_path)
-                .map_err(|e| AppError::rejected(format!("打开工作区文件失败（{}）：{}", entry.path, e)))?;
+                .map_err(|e| AppError::rejected(format!("打开未跟踪文件失败（{}）：{}", entry.path, e)))?;
             use std::io::Read;
             let mut buf = Vec::new();
             f.read_to_end(&mut buf)
-                .map_err(|e| AppError::rejected(format!("读取工作区内容失败（{}）：{}", entry.path, e)))?;
+                .map_err(|e| AppError::rejected(format!("读取未跟踪文件内容失败（{}）：{}", entry.path, e)))?;
             let file_hash = Sha256::digest(&buf);
             hasher.update(&file_hash);
         } else if meta.file_type().is_symlink() {
@@ -951,7 +951,7 @@ mod tests {
             deleted,
             old_lines: added + 3,
             new_lines: deleted + 3,
-            raw_patch: String::new(),
+            raw_patch: Vec::new(),
         }
     }
 

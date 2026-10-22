@@ -55,8 +55,8 @@ pub struct FileChange {
     /// 旧版本与新版本参与高亮的行数。
     pub old_lines: u32,
     pub new_lines: u32,
-    /// 展示所用的原始 diff 文本切片，用于计算与展示严格一致的文件级指纹（Q80、ADR-0009）。
-    pub raw_patch: String,
+    /// 原始 diff 字节切片，用于计算与展示严格一致的文件级指纹（Q80、ADR-0009）。
+    pub raw_patch: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -79,25 +79,63 @@ impl DiffParseResult {
     }
 }
 
-/// 解析完整的 `git diff` 输出。
-pub fn parse(patch: &str) -> DiffParseResult {
+/// 解析完整的 `git diff` 输出（以原始字节切片解析，保证与 Git 单文件输出字节 100% 一致）。
+pub fn parse_bytes(bytes: &[u8]) -> DiffParseResult {
     let mut result = DiffParseResult::default();
-    let mut current_file: Option<FileChange> = None;
+    for slice in split_file_slices(bytes) {
+        if let Some(file) = parse_single_file(slice) {
+            result.files.push(file);
+        }
+    }
+    result
+}
+
+/// 解析完整的 `git diff` 字符串输出。
+pub fn parse(patch: &str) -> DiffParseResult {
+    parse_bytes(patch.as_bytes())
+}
+
+fn split_file_slices(bytes: &[u8]) -> Vec<&[u8]> {
+    let mut starts = Vec::new();
+    let header = b"diff --git ";
+    if bytes.starts_with(header) {
+        starts.push(0);
+    }
+    for (i, window) in bytes.windows(header.len() + 1).enumerate() {
+        if window[0] == b'\n' && &window[1..] == header {
+            starts.push(i + 1);
+        }
+    }
+    if starts.is_empty() {
+        return Vec::new();
+    }
+    let mut slices = Vec::new();
+    for i in 0..starts.len() {
+        let start = starts[i];
+        let end = if i + 1 < starts.len() {
+            starts[i + 1]
+        } else {
+            bytes.len()
+        };
+        slices.push(&bytes[start..end]);
+    }
+    slices
+}
+
+fn parse_single_file(slice: &[u8]) -> Option<FileChange> {
+    let mut lines = byte_lines(slice);
+    let first_line = lines.next()?;
+    let rest_bytes = first_line.strip_prefix(b"diff --git ")?;
+    let rest_str = String::from_utf8_lossy(rest_bytes);
+    let mut file = file_from_git_header(&rest_str);
+    file.raw_patch = slice.to_vec();
+
     let mut current_hunk: Option<Hunk> = None;
     let mut old_line: u32 = 0;
     let mut new_line: u32 = 0;
 
-    for line in lines(patch) {
-        if let Some(rest) = line.strip_prefix("diff --git ") {
-            finish_hunk(&mut current_file, &mut current_hunk);
-            finish_file(&mut result, &mut current_file);
-            current_file = Some(file_from_git_header(rest));
-            continue;
-        }
-
-        let Some(file) = current_file.as_mut() else { continue };
-        file.raw_patch.push_str(line);
-        file.raw_patch.push('\n');
+    for line_bytes in lines {
+        let line = String::from_utf8_lossy(line_bytes);
 
         if let Some(rest) = line.strip_prefix("--- ") {
             if let Some(path) = strip_prefix_path(rest) {
@@ -151,7 +189,9 @@ pub fn parse(patch: &str) -> DiffParseResult {
         }
 
         if let Some(rest) = line.strip_prefix("@@ ") {
-            finish_hunk(&mut current_file, &mut current_hunk);
+            if let Some(hunk) = current_hunk.take() {
+                file.hunks.push(hunk);
+            }
             let header = format!("@@ {rest}");
             if let Some(hunk) = parse_hunk_header(&header) {
                 old_line = hunk.old_start;
@@ -173,15 +213,12 @@ pub fn parse(patch: &str) -> DiffParseResult {
             continue;
         }
 
-        let (kind, text) = match line.as_bytes().first() {
+        let (kind, text) = match line_bytes.first() {
             Some(b'+') => (LineKind::Addition, &line[1..]),
             Some(b'-') => (LineKind::Deletion, &line[1..]),
             Some(b' ') => (LineKind::Context, &line[1..]),
             None => (LineKind::Context, ""),
-            Some(_) => {
-                // 未知前缀，按上下文处理，避免丢掉 Git 给出的内容。
-                (LineKind::Context, line)
-            }
+            Some(_) => (LineKind::Context, &line[..]),
         };
 
         let (old_number, new_number) = match kind {
@@ -212,48 +249,46 @@ pub fn parse(patch: &str) -> DiffParseResult {
         });
     }
 
-    finish_hunk(&mut current_file, &mut current_hunk);
-    finish_file(&mut result, &mut current_file);
-    result
-}
-
-fn finish_hunk(file: &mut Option<FileChange>, hunk: &mut Option<Hunk>) {
-    if let (Some(file), Some(hunk)) = (file.as_mut(), hunk.take()) {
+    if let Some(hunk) = current_hunk {
         file.hunks.push(hunk);
     }
-}
 
-fn finish_file(result: &mut DiffParseResult, file: &mut Option<FileChange>) {
-    if let Some(mut file) = file.take() {
-        let mut added = 0;
-        let mut deleted = 0;
-        let mut old_lines = 0;
-        let mut new_lines = 0;
-        for hunk in &file.hunks {
-            for line in &hunk.lines {
-                match line.kind {
-                    LineKind::Addition => {
-                        added += 1;
-                        new_lines += 1;
-                    }
-                    LineKind::Deletion => {
-                        deleted += 1;
-                        old_lines += 1;
-                    }
-                    LineKind::Context => {
-                        old_lines += 1;
-                        new_lines += 1;
-                    }
-                    LineKind::NoEol => {}
+    let mut added = 0;
+    let mut deleted = 0;
+    let mut old_lines = 0;
+    let mut new_lines = 0;
+    for hunk in &file.hunks {
+        for line in &hunk.lines {
+            match line.kind {
+                LineKind::Addition => {
+                    added += 1;
+                    new_lines += 1;
                 }
+                LineKind::Deletion => {
+                    deleted += 1;
+                    old_lines += 1;
+                }
+                LineKind::Context => {
+                    old_lines += 1;
+                    new_lines += 1;
+                }
+                LineKind::NoEol => {}
             }
         }
-        file.added = added;
-        file.deleted = deleted;
-        file.old_lines = old_lines;
-        file.new_lines = new_lines;
-        result.files.push(file);
     }
+    file.added = added;
+    file.deleted = deleted;
+    file.old_lines = old_lines;
+    file.new_lines = new_lines;
+
+    Some(file)
+}
+
+fn byte_lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
+    let trimmed = bytes.strip_suffix(b"\n").unwrap_or(bytes);
+    trimmed.split(|&b| b == b'\n').map(|line| {
+        line.strip_suffix(b"\r").unwrap_or(line)
+    })
 }
 
 /// 从 `diff --git a/x b/y` 里取一个初始路径，后续由 `+++` / `---` 覆盖。
@@ -264,9 +299,6 @@ fn file_from_git_header(rest: &str) -> FileChange {
     let path = strip_prefix_path(second)
         .or_else(|| strip_prefix_path(first))
         .unwrap_or_default();
-    let mut raw_patch = String::from("diff --git ");
-    raw_patch.push_str(rest);
-    raw_patch.push('\n');
     FileChange {
         path,
         old_path: None,
@@ -277,7 +309,7 @@ fn file_from_git_header(rest: &str) -> FileChange {
         deleted: 0,
         old_lines: 0,
         new_lines: 0,
-        raw_patch,
+        raw_patch: Vec::new(),
     }
 }
 
@@ -361,15 +393,6 @@ fn parse_range(text: &str) -> Option<(u32, u32)> {
         Some((start, count)) => Some((start.parse().ok()?, count.parse().ok()?)),
         None => Some((text.parse().ok()?, 1)),
     }
-}
-
-/// 按 `\n` 切行；末尾空段不算行，内容里的空行在 diff 中带前缀，不会丢失。
-fn lines(patch: &str) -> impl Iterator<Item = &str> {
-    let mut text = patch;
-    if let Some(stripped) = text.strip_suffix('\n') {
-        text = stripped;
-    }
-    text.split('\n')
 }
 
 #[cfg(test)]

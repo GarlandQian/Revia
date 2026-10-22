@@ -1,4 +1,4 @@
-//! 集成测试：整文件暂存与取消暂存（M2 任务 02）。
+//! 集成测试：整文件暂存与取消暂存（M2 任务 02，第二轮审查修改）。
 //!
 //! 依据 M2 规格与测试决策：
 //! - 好的测试从应用操作入口走真实 Git 和临时目录，自行创建仓库与独立应用数据目录；
@@ -6,6 +6,7 @@
 //! - 覆盖 T01, T03–T06, T14。
 
 use std::fs;
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -87,7 +88,7 @@ impl TestContext {
 
     /// 读取 index 中的 blob 哈希与模式：`git ls-files --stage -- <path>`
     fn ls_files_stage(&self, rel_path: &str) -> Option<(String, String)> {
-        let text = self.git(&["ls-files", "--stage", "--", rel_path]);
+        let text = self.git(&["--literal-pathspecs", "ls-files", "--stage", "--", rel_path]);
         let line = text.lines().next()?;
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 3 {
@@ -127,71 +128,166 @@ impl TestContext {
     }
 }
 
-/// T01: 普通已跟踪文本整文件暂存与取消暂存；工作区字节与模式不变，暂存区 blob 正确更新与还原。
+/// 审查意见 1：路径按字面处理，避免通配符误匹配导致非目标文件被暂存。
+/// `x*.txt` 与 `xy.txt` 同时存在时，只暂存 `x*.txt`。
 #[test]
-fn t01_stage_and_unstage_regular_file() {
+fn t01_literal_pathspecs_wildcard_safety() {
     let ctx = TestContext::new();
-    ctx.write_file("file.txt", b"v1\nline 2\n");
-    ctx.git(&["add", "file.txt"]);
-    ctx.git(&["commit", "-m", "init"]);
-    let (head_mode, head_blob) = ctx.ls_files_stage("file.txt").expect("初始应该有暂存条目");
+    ctx.write_file("x*.txt", b"content of star file\n");
+    ctx.write_file("xy.txt", b"content of xy file\n");
 
-    // 在工作区修改
-    ctx.write_file("file.txt", b"v2\nline 2\nline 3\n");
     let session = ctx.open_session();
-
-    // 1. 读取快照并找到未暂存改动
     let snapshot = session.refresh().expect("读取状态失败");
-    let entry = snapshot
+
+    let star_entry = snapshot
         .entries
         .iter()
-        .find(|e| e.path == "file.txt" && e.changes == ChangesKind::Unstaged)
-        .expect("应存在 file.txt 未暂存改动");
-    assert_eq!(entry.status, FileStatus::Modified);
-    assert!(entry.readonly_reason.is_none());
-    assert!(!entry.fingerprint.is_empty());
+        .find(|e| e.path == "x*.txt" && e.changes == ChangesKind::Untracked)
+        .expect("应存在 x*.txt 未跟踪条目");
 
-    // 2. 整文件暂存
-    let snap_after_stage = session
+    // 暂存 x*.txt
+    let snap_after = session
+        .stage_file(&star_entry.path, &star_entry.fingerprint)
+        .expect("暂存带星号文件失败");
+
+    // 关键安全断言：xy.txt 绝对不能被误带入暂存区！必须仍是未跟踪！
+    assert!(
+        snap_after
+            .entries
+            .iter()
+            .any(|e| e.path == "xy.txt" && e.changes == ChangesKind::Untracked),
+        "xy.txt 必须保持未跟踪状态，不得被 x*.txt 通配暂存！"
+    );
+    assert!(
+        !snap_after
+            .entries
+            .iter()
+            .any(|e| e.path == "xy.txt" && e.changes == ChangesKind::Staged),
+        "xy.txt 绝不得进入已暂存状态！"
+    );
+
+    // 验证 x*.txt 正常进入已暂存
+    let staged_star = snap_after
+        .entries
+        .iter()
+        .find(|e| e.path == "x*.txt" && e.changes == ChangesKind::Staged)
+        .expect("x*.txt 应当已暂存");
+    assert_eq!(staged_star.status, FileStatus::Added);
+
+    // 取消暂存 x*.txt 也必须按字面路径执行
+    let snap_unstage = session
+        .unstage_file(&staged_star.path, &staged_star.fingerprint)
+        .expect("取消暂存带星号文件失败");
+    assert!(snap_unstage
+        .entries
+        .iter()
+        .any(|e| e.path == "x*.txt" && e.changes == ChangesKind::Untracked));
+    assert!(snap_unstage
+        .entries
+        .iter()
+        .any(|e| e.path == "xy.txt" && e.changes == ChangesKind::Untracked));
+}
+
+/// 审查意见 2：非 UTF-8 内容（如 GBK 编码文本）字节口径一致，暂存与取消暂存成功。
+#[test]
+fn t02_non_utf8_gbk_content_staging_and_unstaging() {
+    let ctx = TestContext::new();
+    // GBK 编码字节序列（包含非法 UTF-8 字节）
+    let gbk_v1: &[u8] = b"\xd6\xd0\xce\xc4\xb2\xe2\xca\xd4\nv1\n";
+    let gbk_v2: &[u8] = b"\xd6\xd0\xce\xc4\xb2\xe2\xca\xd4\nv2 modified\n";
+
+    ctx.write_file("gbk.txt", gbk_v1);
+    ctx.git(&["add", "gbk.txt"]);
+    ctx.git(&["commit", "-m", "init gbk"]);
+
+    // 在工作区修改为新的 GBK 内容
+    ctx.write_file("gbk.txt", gbk_v2);
+
+    let session = ctx.open_session();
+    let snap = session.refresh().expect("读取快照失败");
+    let entry = snap
+        .entries
+        .iter()
+        .find(|e| e.path == "gbk.txt" && e.changes == ChangesKind::Unstaged)
+        .expect("应找到 gbk.txt 未暂存改动");
+
+    // 关键断言：非 UTF-8 内容在刷新与写前校验时使用同一份原始字节，不得误拒为“文件已变化”！
+    let snap_staged = session
         .stage_file(&entry.path, &entry.fingerprint)
+        .expect("非 UTF-8 内容暂存应当成功，不应因字节口径不一致被拒");
+    assert_eq!(ctx.read_file("gbk.txt"), gbk_v2);
+
+    let staged_entry = snap_staged
+        .entries
+        .iter()
+        .find(|e| e.path == "gbk.txt" && e.changes == ChangesKind::Staged)
+        .unwrap();
+
+    let snap_unstaged = session
+        .unstage_file(&staged_entry.path, &staged_entry.fingerprint)
+        .expect("非 UTF-8 内容取消暂存应当成功");
+    assert_eq!(ctx.read_file("gbk.txt"), gbk_v2);
+    assert_eq!(snap_unstaged.unstaged_count, 1);
+}
+
+/// T01: 多文件仓库断言：操作目标文件时，其他文件的工作区字节、模式和暂存区 blob 保持不变。
+#[test]
+fn t01_stage_and_unstage_regular_file_multi_file_invariants() {
+    let ctx = TestContext::new();
+    ctx.write_file("target.txt", b"target v1\n");
+    ctx.write_file("sibling_clean.txt", b"clean content\n");
+    ctx.write_file("sibling_dirty.txt", b"dirty v1\n");
+    ctx.git(&["add", "target.txt", "sibling_clean.txt", "sibling_dirty.txt"]);
+    ctx.git(&["commit", "-m", "init"]);
+
+    let (_, clean_blob_init) = ctx.ls_files_stage("sibling_clean.txt").unwrap();
+    let (dirty_mode_init, dirty_blob_init) = ctx.ls_files_stage("sibling_dirty.txt").unwrap();
+
+    // 在工作区修改 target 和 sibling_dirty
+    ctx.write_file("target.txt", b"target v2\n");
+    ctx.write_file("sibling_dirty.txt", b"dirty v2 modified\n");
+
+    let session = ctx.open_session();
+    let snapshot = session.refresh().expect("读取状态失败");
+    let target_entry = snapshot
+        .entries
+        .iter()
+        .find(|e| e.path == "target.txt" && e.changes == ChangesKind::Unstaged)
+        .expect("应存在 target.txt 未暂存改动");
+
+    // 1. 暂存 target.txt
+    let snap_after_stage = session
+        .stage_file(&target_entry.path, &target_entry.fingerprint)
         .expect("整文件暂存失败");
 
-    // 验证：工作区字节与模式保持不变
-    assert_eq!(ctx.read_file("file.txt"), b"v2\nline 2\nline 3\n");
-    // 验证：暂存区 blob 已经变为新内容，模式不变
-    let (staged_mode, staged_blob) = ctx.ls_files_stage("file.txt").expect("暂存区应有条目");
-    assert_eq!(staged_mode, head_mode);
-    assert_ne!(staged_blob, head_blob, "暂存后 blob 必须改变");
+    // 验证：其他文件工作区字节不变
+    assert_eq!(ctx.read_file("sibling_clean.txt"), b"clean content\n");
+    assert_eq!(ctx.read_file("sibling_dirty.txt"), b"dirty v2 modified\n");
+    // 验证：其他文件暂存区 blob 与 mode 不变
+    let (_clean_mode_now, clean_blob_now) = ctx.ls_files_stage("sibling_clean.txt").unwrap();
+    assert_eq!(clean_blob_now, clean_blob_init);
+    let (dirty_mode_now, dirty_blob_now) = ctx.ls_files_stage("sibling_dirty.txt").unwrap();
+    assert_eq!(dirty_blob_now, dirty_blob_init);
+    assert_eq!(dirty_mode_now, dirty_mode_init);
 
-    // 验证快照
-    assert_eq!(snap_after_stage.unstaged_count, 0);
-    assert_eq!(snap_after_stage.staged_count, 1);
-    let staged_entry = snap_after_stage
+    // 2. 取消暂存 target.txt
+    let staged_target = snap_after_stage
         .entries
         .iter()
-        .find(|e| e.path == "file.txt" && e.changes == ChangesKind::Staged)
-        .expect("应移到已暂存分组");
-    assert_eq!(staged_entry.status, FileStatus::Modified);
-
-    // 3. 整文件取消暂存
+        .find(|e| e.path == "target.txt" && e.changes == ChangesKind::Staged)
+        .unwrap();
     let snap_after_unstage = session
-        .unstage_file(&staged_entry.path, &staged_entry.fingerprint)
+        .unstage_file(&staged_target.path, &staged_target.fingerprint)
         .expect("取消暂存失败");
 
-    // 验证：工作区字节仍保持不变
-    assert_eq!(ctx.read_file("file.txt"), b"v2\nline 2\nline 3\n");
-    // 验证：暂存区 blob 恢复回 HEAD 的 blob 且模式一致（T01 严格断言）
-    let (restored_mode, restored_blob) = ctx.ls_files_stage("file.txt").expect("恢复后暂存区条目");
-    assert_eq!(restored_mode, head_mode);
-    assert_eq!(restored_blob, head_blob, "取消暂存后暂存区 blob 必须恢复为 HEAD 版本");
-
-    // 验证：回到未暂存分组
-    assert_eq!(snap_after_unstage.staged_count, 0);
-    assert_eq!(snap_after_unstage.unstaged_count, 1);
-    assert!(snap_after_unstage
-        .entries
-        .iter()
-        .any(|e| e.path == "file.txt" && e.changes == ChangesKind::Unstaged));
+    // 验证：其他文件依然保持不变
+    assert_eq!(ctx.read_file("sibling_clean.txt"), b"clean content\n");
+    assert_eq!(ctx.read_file("sibling_dirty.txt"), b"dirty v2 modified\n");
+    let (_, clean_blob_final) = ctx.ls_files_stage("sibling_clean.txt").unwrap();
+    assert_eq!(clean_blob_final, clean_blob_init);
+    let (_, dirty_blob_final) = ctx.ls_files_stage("sibling_dirty.txt").unwrap();
+    assert_eq!(dirty_blob_final, dirty_blob_init);
+    assert_eq!(snap_after_unstage.unstaged_count, 2);
 }
 
 /// T01: 无 HEAD 的初始状态下，未跟踪文件整文件暂存与取消暂存。
@@ -315,7 +411,61 @@ fn t02_stage_and_unstage_chinese_and_spaces_path() {
     assert_eq!(ctx.read_file(rel), greeting.as_bytes());
 }
 
-/// T03: 完整能力矩阵与只读拒绝（符号链接、子模块、未解决冲突、未跟踪嵌套仓库、非 UTF-8 路径）。
+/// T03: 恢复被删掉的二进制文件暂存与取消暂存测试。
+#[test]
+fn t03_stage_and_unstage_binary_file() {
+    let ctx = TestContext::new();
+    let bin_data = vec![0u8, 255, 128, 64, 99, 10, 0, 1];
+    ctx.write_file("asset.bin", &bin_data);
+    ctx.git(&["add", "asset.bin"]);
+    ctx.git(&["commit", "-m", "add binary"]);
+
+    let mut modified_bin = bin_data.clone();
+    modified_bin[2] = 42;
+    ctx.write_file("asset.bin", &modified_bin);
+
+    let session = ctx.open_session();
+    let snap = session.refresh().unwrap();
+    let bin_entry = snap.entries.iter().find(|e| e.path == "asset.bin").unwrap();
+    assert!(bin_entry.binary);
+
+    let snap_staged = session.stage_file(&bin_entry.path, &bin_entry.fingerprint).unwrap();
+    assert_eq!(snap_staged.staged_count, 1);
+    assert_eq!(ctx.read_file("asset.bin"), modified_bin);
+
+    let staged_bin = snap_staged.entries.iter().find(|e| e.path == "asset.bin" && e.changes == ChangesKind::Staged).unwrap();
+    let snap_unstaged = session.unstage_file(&staged_bin.path, &staged_bin.fingerprint).unwrap();
+    assert_eq!(snap_unstaged.unstaged_count, 1);
+    assert_eq!(ctx.read_file("asset.bin"), modified_bin);
+}
+
+/// T03: 恢复被删掉的仅权限变化（mode change）暂存与取消暂存测试。
+#[test]
+fn t03_stage_and_unstage_mode_change() {
+    let ctx = TestContext::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ctx.write_file("script.sh", b"#!/bin/sh\necho ok\n");
+        ctx.git(&["add", "script.sh"]);
+        ctx.git(&["commit", "-m", "add script"]);
+
+        let full_script = ctx.path().join("script.sh");
+        fs::set_permissions(&full_script, fs::Permissions::from_mode(0o755)).unwrap();
+
+        let session = ctx.open_session();
+        let snap_mode = session.refresh().unwrap();
+        let mode_entry = snap_mode.entries.iter().find(|e| e.path == "script.sh").unwrap();
+
+        let snap_mode_staged = session.stage_file(&mode_entry.path, &mode_entry.fingerprint).unwrap();
+        let staged_mode = snap_mode_staged.entries.iter().find(|e| e.path == "script.sh" && e.changes == ChangesKind::Staged).unwrap();
+
+        let snap_mode_unstage = session.unstage_file(&staged_mode.path, &staged_mode.fingerprint).unwrap();
+        assert!(snap_mode_unstage.entries.iter().any(|e| e.path == "script.sh" && e.changes == ChangesKind::Unstaged));
+    }
+}
+
+/// T03: 完整能力矩阵只读拒绝：符号链接、子模块、未解决冲突、未跟踪嵌套仓库、非 UTF-8 路径及无权限读取文件。
 #[test]
 fn t03_readonly_matrix_and_untracked_limits() {
     let ctx = TestContext::new();
@@ -339,10 +489,27 @@ fn t03_readonly_matrix_and_untracked_limits() {
         assert!(res.is_err(), "符号链接暂存应被拒绝");
     }
 
-    // 2. 未跟踪嵌套仓库（? sub/ 包含 .git）
+    // 2. 子模块（Submodule, 模式 160000）
+    let dummy_oid = "0123456789012345678901234567890123456789";
+    ctx.git(&["update-index", "--add", "--cacheinfo", "160000", dummy_oid, "my_submodule"]);
+    let session_sub = ctx.open_session();
+    let snap_sub = session_sub.refresh().unwrap();
+    let sub_entry = snap_sub.entries.iter().find(|e| e.path == "my_submodule").expect("应检测到子模块");
+    assert_eq!(sub_entry.readonly_reason, Some(ReadonlyReason::Submodule));
+    let sub_res = session_sub.unstage_file(&sub_entry.path, &sub_entry.fingerprint);
+    assert!(sub_res.is_err(), "子模块取消暂存必须被拒绝");
+
+    // 3. 未跟踪嵌套仓库（? nested_repo/ 包含 .git，审查意见 7 要求使用隔离环境）
     let nested_path = ctx.path().join("nested_repo");
     fs::create_dir_all(&nested_path).unwrap();
-    Command::new("git").current_dir(&nested_path).args(&["init"]).output().unwrap();
+    let _ = Command::new("git")
+        .current_dir(&nested_path)
+        .env("HOME", &ctx.fake_home)
+        .env("GIT_CONFIG_GLOBAL", &ctx.global_config)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .args(&["init", "-b", "main"])
+        .output()
+        .unwrap();
     fs::write(nested_path.join("file.txt"), b"nested").unwrap();
 
     let session_nested = ctx.open_session();
@@ -352,7 +519,7 @@ fn t03_readonly_matrix_and_untracked_limits() {
     let stage_nested_res = session_nested.stage_file(&nested_entry.path, &nested_entry.fingerprint);
     assert!(stage_nested_res.is_err(), "未跟踪嵌套仓库暂存必须被拒绝");
 
-    // 3. 冲突未合并状态 (Conflict/unmerged)
+    // 4. 冲突未合并状态 (Conflict/unmerged)
     let ctx_conflict = TestContext::new();
     ctx_conflict.write_file("conflict.txt", b"base line\n");
     ctx_conflict.git(&["add", "conflict.txt"]);
@@ -380,7 +547,54 @@ fn t03_readonly_matrix_and_untracked_limits() {
     let conflict_stage_res = session_conflict.stage_file(&conflict_entry.path, &conflict_entry.fingerprint);
     assert!(conflict_stage_res.is_err(), "冲突文件不能通过普通暂存操作");
 
-    // 4. 未跟踪文件不能执行 unstage
+    // 5. 非 UTF-8 路径（通过 Git 索引注入非 UTF-8 字节路径）
+    #[cfg(unix)]
+    {
+        use std::ffi::OsStr;
+        let blob_oid = ctx.git(&["hash-object", "-w", "--stdin"]);
+        let blob_oid = blob_oid.trim();
+        let raw_non_utf8_path = OsStr::from_bytes(b"bad_\x80\x81_path.txt");
+        let mut cmd = Command::new("git");
+        cmd.current_dir(ctx.path())
+            .env("HOME", &ctx.fake_home)
+            .env("GIT_CONFIG_GLOBAL", &ctx.global_config)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .arg("update-index")
+            .arg("--add")
+            .arg("--cacheinfo")
+            .arg("100644")
+            .arg(blob_oid)
+            .arg(raw_non_utf8_path);
+        let out = cmd.output().unwrap();
+        if out.status.success() {
+            let session_non_utf8 = ctx.open_session();
+            let snap_nu = session_non_utf8.refresh().unwrap();
+            if let Some(entry_nu) = snap_nu.entries.iter().find(|e| e.path.contains('\u{FFFD}')) {
+                assert_eq!(entry_nu.readonly_reason, Some(ReadonlyReason::NonUtf8Path));
+                assert!(session_non_utf8.unstage_file(&entry_nu.path, &entry_nu.fingerprint).is_err());
+            }
+        }
+    }
+
+    // 6. 无权限访问的文件（chmod 000）：标记为 Unreadable，且不可写（审查意见 3）
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        ctx.write_file("unreadable.txt", b"secret\n");
+        let unreadable_path = ctx.path().join("unreadable.txt");
+        fs::set_permissions(&unreadable_path, fs::Permissions::from_mode(0o000)).unwrap();
+
+        let session_unreadable = ctx.open_session();
+        let snap_unread = session_unreadable.refresh().unwrap();
+        let entry_unread = snap_unread.entries.iter().find(|e| e.path == "unreadable.txt").unwrap();
+        assert_eq!(entry_unread.readonly_reason, Some(ReadonlyReason::Unreadable));
+        assert!(session_unreadable.stage_file(&entry_unread.path, &entry_unread.fingerprint).is_err());
+
+        // 恢复权限以便后续清理
+        fs::set_permissions(&unreadable_path, fs::Permissions::from_mode(0o644)).unwrap();
+    }
+
+    // 7. 未跟踪文件不能执行 unstage
     let ctx_untracked = TestContext::new();
     ctx_untracked.write_file("untracked.txt", b"content");
     let session_untracked = ctx_untracked.open_session();
@@ -429,21 +643,34 @@ fn t04_unstage_renamed_file_becomes_deleted_and_untracked() {
     assert_eq!(new_untracked.status, FileStatus::Untracked);
 }
 
-/// T05: 写前核对指纹完整覆盖（未暂存、未跟踪、二进制、权限、已暂存侧变动、重命名变动，无关文件改变不拒绝）。
+/// T05: 写前核对指纹完整覆盖并断言文案“文件已变化，请重新确认”（审查意见 7）。
+/// 包含：目标文件内容变动、仅权限变动、重命名相关变动、未跟踪变动、二进制变动、已暂存侧变动，无关文件改变不拒绝。
 #[test]
 fn t05_comprehensive_fingerprint_verification() {
     let ctx = TestContext::new();
     ctx.write_file("target.txt", b"v1\n");
     ctx.write_file("other.txt", b"other v1\n");
     ctx.write_file("binary.bin", &[0u8, 255, 128, 64]);
-    ctx.git(&["add", "target.txt", "other.txt", "binary.bin"]);
+    ctx.write_file("script.sh", b"#!/bin/sh\n");
+    ctx.write_file("old_renamed.txt", b"rename content\n");
+    ctx.git(&["add", "target.txt", "other.txt", "binary.bin", "script.sh", "old_renamed.txt"]);
     ctx.git(&["commit", "-m", "init"]);
+
+    // 重命名文件
+    ctx.git(&["mv", "old_renamed.txt", "new_renamed.txt"]);
 
     // 工作区修改
     ctx.write_file("target.txt", b"v2\n");
     ctx.write_file("other.txt", b"other v2\n");
     ctx.write_file("binary.bin", &[0u8, 255, 99, 64]);
     ctx.write_file("new_untracked.txt", b"untracked v1\n");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let script_full = ctx.path().join("script.sh");
+        fs::set_permissions(&script_full, fs::Permissions::from_mode(0o755)).unwrap();
+    }
 
     let session = ctx.open_session();
     let snap = session.refresh().unwrap();
@@ -457,27 +684,54 @@ fn t05_comprehensive_fingerprint_verification() {
     let untracked_entry = snap.entries.iter().find(|e| e.path == "new_untracked.txt").unwrap();
     let old_untracked_fp = untracked_entry.fingerprint.clone();
 
+    let script_entry = snap.entries.iter().find(|e| e.path == "script.sh").unwrap();
+    let old_script_fp = script_entry.fingerprint.clone();
+
+    let renamed_entry = snap.entries.iter().find(|e| e.path == "new_renamed.txt").unwrap();
+    let old_renamed_fp = renamed_entry.fingerprint.clone();
+
     // 1. 无关文件修改：修改 other.txt，不影响 target.txt 暂存
     ctx.write_file("other.txt", b"other v3 modified\n");
     let snap_after_target = session.stage_file(&target_entry.path, &old_target_fp).expect("无关文件修改不应拒绝目标文件");
-    assert_eq!(snap_after_target.staged_count, 1);
+    assert!(snap_after_target.entries.iter().any(|e| e.path == "target.txt" && e.changes == ChangesKind::Staged));
 
-    // 2. 二进制文件外部修改后，旧指纹拒绝
+    // 2. 目标文件自身内容外部改变：旧指纹必须被拒绝，并提示“文件已变化，请重新确认”！
+    ctx.write_file("other.txt", b"other v4 changed again\n");
+    let other_stale_entry = snap_after_target.entries.iter().find(|e| e.path == "other.txt" && e.changes == ChangesKind::Unstaged).unwrap();
+    let other_stale_fp = other_stale_entry.fingerprint.clone();
+    ctx.write_file("other.txt", b"other v5 changed yet again\n");
+    let res_content = session.stage_file(&other_stale_entry.path, &other_stale_fp);
+    assert!(res_content.is_err());
+    assert_eq!(res_content.unwrap_err().to_string(), "文件已变化，请重新确认");
+
+    // 3. 仅权限改变：外部还原权限，旧指纹被拒绝并提示“文件已变化，请重新确认”
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let script_full = ctx.path().join("script.sh");
+        fs::set_permissions(&script_full, fs::Permissions::from_mode(0o644)).unwrap();
+        let res_mode = session.stage_file(&script_entry.path, &old_script_fp);
+        assert!(res_mode.is_err());
+        assert_eq!(res_mode.unwrap_err().to_string(), "文件已变化，请重新确认");
+    }
+
+    // 4. 二进制文件外部修改后，旧指纹拒绝并提示“文件已变化，请重新确认”
     ctx.write_file("binary.bin", &[0u8, 255, 77, 64]);
     let bin_res = session.stage_file(&bin_entry.path, &old_bin_fp);
-    assert!(bin_res.is_err(), "二进制文件内容外部改变后必须拒绝旧指纹");
+    assert!(bin_res.is_err());
+    assert_eq!(bin_res.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 3. 未跟踪文件外部修改后，旧指纹拒绝
+    // 5. 未跟踪文件外部修改后，旧指纹拒绝并提示“文件已变化，请重新确认”
     ctx.write_file("new_untracked.txt", b"untracked v2 modified\n");
     let untracked_res = session.stage_file(&untracked_entry.path, &old_untracked_fp);
-    assert!(untracked_res.is_err(), "未跟踪文件外部改变后必须拒绝旧指纹");
+    assert!(untracked_res.is_err());
+    assert_eq!(untracked_res.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 4. 已暂存侧文件变动（在外部 git reset），旧已暂存指纹失效
-    let staged_target = snap_after_target.entries.iter().find(|e| e.path == "target.txt" && e.changes == ChangesKind::Staged).unwrap();
-    let old_staged_fp = staged_target.fingerprint.clone();
-    ctx.git(&["reset", "--", "target.txt"]);
-    let unstage_stale_res = session.unstage_file("target.txt", &old_staged_fp);
-    assert!(unstage_stale_res.is_err(), "暂存区已变化时旧已暂存指纹必须拒绝");
+    // 6. 重命名相关路径外部变动：在外部还原或修改，旧指纹拒绝
+    ctx.git(&["reset", "--", "new_renamed.txt", "old_renamed.txt"]);
+    let renamed_res = session.unstage_file(&renamed_entry.path, &old_renamed_fp);
+    assert!(renamed_res.is_err());
+    assert_eq!(renamed_res.unwrap_err().to_string(), "文件已变化，请重新确认");
 }
 
 /// T06: index.lock 被占用时在操作层重试并提示，绝不删除锁文件。

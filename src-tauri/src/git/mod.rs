@@ -357,7 +357,7 @@ impl Git {
 
     /// 暂存区相对 HEAD 的 diff（已暂存改动）。支持传入 original_path（重命名场景）。
     pub fn diff_index_with_orig(&self, path: &str, orig_path: Option<&str>) -> Result<Vec<u8>> {
-        let mut args: Vec<&str> = vec!["-c", "core.quotePath=false", "diff"];
+        let mut args: Vec<&str> = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
         args.extend_from_slice(DIFF_FLAGS);
         args.push("--staged");
         args.push("--");
@@ -368,9 +368,9 @@ impl Git {
         Ok(self.run_ok(&args, "读取已暂存 diff")?.stdout)
     }
 
-    /// 整文件暂存：调用 git add -A -- <paths>（Q8、Q79、Q83）。
+    /// 整文件暂存：调用 git --literal-pathspecs add -A -- <paths>（Q8、Q79、Q83、审查 1）。
     pub fn stage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
-        let mut args = vec!["-c", "core.quotePath=false", "add", "-A", "--"];
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "add", "-A", "--"];
         if let Some(orig) = orig_path {
             args.push(orig);
         }
@@ -378,9 +378,9 @@ impl Git {
         self.run_once(&args)
     }
 
-    /// 整文件取消暂存：调用 git reset -- <paths>（Q8、Q79、T04）。
+    /// 整文件取消暂存：调用 git --literal-pathspecs reset -- <paths>（Q8、Q79、T04、审查 1）。
     pub fn unstage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
-        let mut args = vec!["-c", "core.quotePath=false", "reset", "--"];
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "reset", "--"];
         if let Some(orig) = orig_path {
             args.push(orig);
         }
@@ -389,7 +389,11 @@ impl Git {
     }
 
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {
-        let mut args: Vec<&str> = vec!["-c", "core.quotePath=false", "diff"];
+        let mut args: Vec<&str> = Vec::new();
+        if path.is_some() {
+            args.push("--literal-pathspecs");
+        }
+        args.extend_from_slice(&["-c", "core.quotePath=false", "diff"]);
         args.extend_from_slice(DIFF_FLAGS);
         if let Some(extra) = extra {
             args.push(extra);
@@ -405,6 +409,7 @@ impl Git {
     /// 保证 hunk 也来自 Git（ADR-0004）。有差异时退出码是 1，不是失败。
     pub fn diff_untracked(&self, path: &str) -> Result<Vec<u8>> {
         let args: Vec<&str> = vec![
+            "--literal-pathspecs",
             "-c",
             "core.quotePath=false",
             "diff",

@@ -3,4 +3,4 @@
 /**
  * 只读限制原因（Q81、Q82、规格第 2 节）。
  */
-export type ReadonlyReason = "symlink" | "submodule" | "nestedRepo" | "conflict" | "nonUtf8Path";
+export type ReadonlyReason = "symlink" | "submodule" | "nestedRepo" | "conflict" | "nonUtf8Path" | "unreadable";
