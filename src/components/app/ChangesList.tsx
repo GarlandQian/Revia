@@ -24,9 +24,12 @@ interface ChangesListProps {
   snapshot: ChangesSnapshot;
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
+  onStage?: (entry: ChangeEntry) => void;
+  onUnstage?: (entry: ChangeEntry) => void;
+  isWriting?: boolean;
 }
 
-export function ChangesList({ snapshot, selected, onSelect }: ChangesListProps) {
+export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, isWriting }: ChangesListProps) {
   const [untrackedOpen, setUntrackedOpen] = useState(false);
 
   const groups = useMemo(() => {
@@ -36,8 +39,24 @@ export function ChangesList({ snapshot, selected, onSelect }: ChangesListProps) 
     return { unstaged, staged, untracked };
   }, [snapshot.entries]);
 
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === " " && selected && !isWriting) {
+      const target = snapshot.entries.find(
+        (e) => e.path === selected.path && e.changes === selected.changes,
+      );
+      if (target && !target.readonlyReason) {
+        event.preventDefault();
+        if (target.changes === "staged") {
+          onUnstage?.(target);
+        } else {
+          onStage?.(target);
+        }
+      }
+    }
+  };
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col outline-none" tabIndex={0} onKeyDown={onKeyDown}>
       <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
         <span className="truncate" title={snapshot.worktreePath}>
           {snapshot.branch ?? "（detached HEAD）"}
@@ -50,12 +69,18 @@ export function ChangesList({ snapshot, selected, onSelect }: ChangesListProps) 
           entries={groups.unstaged}
           selected={selected}
           onSelect={onSelect}
+          onStage={onStage}
+          onUnstage={onUnstage}
+          isWriting={isWriting}
         />
         <Group
           title={messages.changes.untracked}
           entries={groups.untracked}
           selected={selected}
           onSelect={onSelect}
+          onStage={onStage}
+          onUnstage={onUnstage}
+          isWriting={isWriting}
           collapsible
           open={untrackedOpen}
           onToggle={() => setUntrackedOpen((value) => !value)}
@@ -65,6 +90,9 @@ export function ChangesList({ snapshot, selected, onSelect }: ChangesListProps) 
           entries={groups.staged}
           selected={selected}
           onSelect={onSelect}
+          onStage={onStage}
+          onUnstage={onUnstage}
+          isWriting={isWriting}
         />
         {snapshot.entries.length === 0 ? (
           <div className="p-4 text-xs text-muted-foreground">{messages.changes.empty}</div>
@@ -79,6 +107,9 @@ function Group({
   entries,
   selected,
   onSelect,
+  onStage,
+  onUnstage,
+  isWriting,
   collapsible,
   open = true,
   onToggle,
@@ -87,6 +118,9 @@ function Group({
   entries: ChangeEntry[];
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
+  onStage?: (entry: ChangeEntry) => void;
+  onUnstage?: (entry: ChangeEntry) => void;
+  isWriting?: boolean;
   collapsible?: boolean;
   open?: boolean;
   onToggle?: () => void;
@@ -115,7 +149,14 @@ function Group({
         </Badge>
       </header>
       {expanded ? (
-        <VirtualRows entries={entries} selected={selected} onSelect={onSelect} />
+        <VirtualRows
+          entries={entries}
+          selected={selected}
+          onSelect={onSelect}
+          onStage={onStage}
+          onUnstage={onUnstage}
+          isWriting={isWriting}
+        />
       ) : null}
     </section>
   );
@@ -126,10 +167,16 @@ function VirtualRows({
   entries,
   selected,
   onSelect,
+  onStage,
+  onUnstage,
+  isWriting,
 }: {
   entries: ChangeEntry[];
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
+  onStage?: (entry: ChangeEntry) => void;
+  onUnstage?: (entry: ChangeEntry) => void;
+  isWriting?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -150,31 +197,65 @@ function VirtualRows({
           const index = first + offset;
           const isSelected = selected?.path === entry.path && selected?.changes === entry.changes;
           return (
-            <button
+            <div
               key={`${entry.changes}-${entry.path}`}
-              type="button"
-              className={`absolute left-0 right-0 flex items-center gap-2 px-2 text-left text-xs ${
+              className={`group absolute left-0 right-0 flex items-center gap-1.5 px-2 text-left text-xs cursor-pointer ${
                 isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
               }`}
               style={{ top: index * ROW_HEIGHT, height: ROW_HEIGHT }}
               onClick={() => onSelect({ path: entry.path, changes: entry.changes })}
-              title={entry.originalPath ? `${entry.originalPath} → ${entry.path}` : entry.path}
+              title={
+                entry.readonlyReason
+                  ? `${entry.path}（${entry.readonlyReason}）`
+                  : entry.originalPath
+                    ? `${entry.originalPath} → ${entry.path}`
+                    : entry.path
+              }
             >
-              <span className="truncate">{entry.path}</span>
+              <span className="truncate flex-1">{entry.path}</span>
               {entry.collapsed ? (
-                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                <span className="shrink-0 text-[10px] text-muted-foreground">
                   {messages.changes.collapsed}
                 </span>
               ) : null}
-              <span className={`ml-auto shrink-0 tabular-nums text-[10px] text-muted-foreground ${
-                entry.collapsed ? "" : "ml-auto"
-              }`}>
+              <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
                 +{entry.added} −{entry.deleted}
               </span>
               <span className={`status-${entry.status} w-3 shrink-0 text-center font-semibold`}>
                 {statusLetter(entry)}
               </span>
-            </button>
+              {entry.readonlyReason ? (
+                <span
+                  className="shrink-0 text-[10px] text-muted-foreground/60 select-none"
+                  title={entry.readonlyReason}
+                >
+                  只读
+                </span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isWriting}
+                  className="h-4.5 w-4.5 p-0 shrink-0 text-[11px] font-bold opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (entry.changes === "staged") {
+                      onUnstage?.(entry);
+                    } else {
+                      onStage?.(entry);
+                    }
+                  }}
+                  aria-label={entry.changes === "staged" ? messages.changes.unstage : messages.changes.stage}
+                  title={
+                    entry.changes === "staged"
+                      ? `${messages.changes.unstage}（空格）`
+                      : `${messages.changes.stage}（空格）`
+                  }
+                >
+                  {entry.changes === "staged" ? "−" : "+"}
+                </Button>
+              )}
+            </div>
           );
         })}
       </div>

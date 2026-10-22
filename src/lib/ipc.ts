@@ -120,4 +120,8 @@ export const ipc = {
     from: number;
     to: number;
   }) => invoke<ChangeEntry>("change_entry", { request }),
+  stageFile: (request: { worktreeId: string; path: string; fingerprint: string }) =>
+    invoke<ChangesSnapshot>("stage_file", { request }),
+  unstageFile: (request: { worktreeId: string; path: string; fingerprint: string }) =>
+    invoke<ChangesSnapshot>("unstage_file", { request }),
 };

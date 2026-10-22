@@ -8,10 +8,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
+import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -442,11 +444,113 @@ export function App() {
     [fontSize],
   );
 
+  // ---------------- 文件写操作（M2 任务 02，Q8/Q79/Q89/Q90/Q93） ----------------
 
-  // 快捷键（Q19）：只做 M1 范围内的只读操作
+  const [isWriting, setIsWriting] = useState(false);
+
+  const reconcileSelection = useCallback(
+    (newSnapshot: ChangesSnapshot, opPath: string, opChanges: ChangesKind, targetChanges: ChangesKind) => {
+      const remainInOriginal = newSnapshot.entries.find(
+        (e) => e.path === opPath && e.changes === opChanges,
+      );
+      const moved = newSnapshot.entries.find(
+        (e) => e.path === opPath && e.changes === targetChanges,
+      );
+
+      let next: Selection | null = null;
+      if (remainInOriginal) {
+        next = { path: opPath, changes: opChanges };
+      } else if (moved) {
+        next = { path: opPath, changes: targetChanges };
+      } else if (newSnapshot.entries.length > 0) {
+        next = { path: newSnapshot.entries[0].path, changes: newSnapshot.entries[0].changes };
+      }
+
+      if (next && worktreeId) {
+        const nextEntry = newSnapshot.entries.find(
+          (e) => e.path === next!.path && e.changes === next!.changes,
+        );
+        if (nextEntry) {
+          void openEntry(nextEntry, { view, worktreeId });
+        } else {
+          setSelected(null);
+        }
+      } else {
+        setSelected(null);
+      }
+    },
+    [openEntry, view, worktreeId],
+  );
+
+  const stageFile = useCallback(
+    async (entry: ChangeEntry) => {
+      if (isWriting || !worktreeId || entry.readonlyReason) return;
+      setIsWriting(true);
+      setError(null);
+      try {
+        const newSnapshot = await ipc.stageFile({
+          worktreeId,
+          path: entry.path,
+          fingerprint: entry.fingerprint,
+        });
+        setSnapshot(newSnapshot);
+        reconcileSelection(newSnapshot, entry.path, entry.changes, "staged");
+      } catch (caught) {
+        setError(toAppError(caught));
+        void refresh();
+      } finally {
+        setIsWriting(false);
+      }
+    },
+    [isWriting, reconcileSelection, refresh, worktreeId],
+  );
+
+  const unstageFile = useCallback(
+    async (entry: ChangeEntry) => {
+      if (isWriting || !worktreeId || entry.readonlyReason) return;
+      setIsWriting(true);
+      setError(null);
+      try {
+        const newSnapshot = await ipc.unstageFile({
+          worktreeId,
+          path: entry.path,
+          fingerprint: entry.fingerprint,
+        });
+        setSnapshot(newSnapshot);
+        reconcileSelection(newSnapshot, entry.path, entry.changes, "unstaged");
+      } catch (caught) {
+        setError(toAppError(caught));
+        void refresh();
+      } finally {
+        setIsWriting(false);
+      }
+    },
+    [isWriting, reconcileSelection, refresh, worktreeId],
+  );
+
+  // 快捷键（Q19、Q93）：
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const meta = event.metaKey;
+      const target = event.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+
+      if (isInput) return;
+
+      const meta = event.metaKey || event.ctrlKey;
+      if (meta && event.altKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        if (selectedEntry && !isWriting && !selectedEntry.readonlyReason) {
+          if (selectedEntry.changes === "staged") {
+            void unstageFile(selectedEntry);
+          } else {
+            void stageFile(selectedEntry);
+          }
+        }
+        return;
+      }
+
       if (meta && event.key.toLowerCase() === "o") {
         event.preventDefault();
         void chooseRepo();
@@ -472,7 +576,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, focusNextFile, jumpToHunk, refresh]);
+  }, [changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, refresh, selectedEntry, stageFile, unstageFile]);
 
   // ---------------- 测量 ----------------
 
@@ -1369,7 +1473,14 @@ export function App() {
         </div>
         <Separator />
         {snapshot ? (
-          <ChangesList snapshot={snapshot} selected={selected} onSelect={(next) => void selectFromList(next)} />
+          <ChangesList
+            snapshot={snapshot}
+            selected={selected}
+            onSelect={(next) => void selectFromList(next)}
+            onStage={(entry) => void stageFile(entry)}
+            onUnstage={(entry) => void unstageFile(entry)}
+            isWriting={isWriting}
+          />
         ) : (
           <div className="p-3 text-xs text-muted-foreground">{messages.changes.loading}</div>
         )}
@@ -1384,6 +1495,10 @@ export function App() {
           busy={busy}
           status={status}
           environment={info}
+          selectedEntry={selectedEntry}
+          isWriting={isWriting}
+          onStage={(entry) => void stageFile(entry)}
+          onUnstage={(entry) => void unstageFile(entry)}
         />
         {error ? <ErrorBanner error={error} onDismiss={() => setError(null)} /> : null}
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -1458,6 +1573,10 @@ function Toolbar({
   busy,
   status,
   environment,
+  selectedEntry,
+  isWriting,
+  onStage,
+  onUnstage,
 }: {
   view: ViewMode;
   onView: (view: ViewMode) => void;
@@ -1466,6 +1585,10 @@ function Toolbar({
   busy: boolean;
   status: string;
   environment: WorktreeSessionInfo | null;
+  selectedEntry: ChangeEntry | null;
+  isWriting: boolean;
+  onStage?: (entry: ChangeEntry) => void;
+  onUnstage?: (entry: ChangeEntry) => void;
 }) {
   return (
     <div className="flex items-center gap-3 border-b px-3 py-1.5">
@@ -1489,9 +1612,39 @@ function Toolbar({
         A+
       </Button>
       <Separator orientation="vertical" className="h-5" />
-      <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>
+      <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy || isWriting}>
         {messages.changes.refresh}
       </Button>
+      {selectedEntry ? (
+        <>
+          <Separator orientation="vertical" className="h-5" />
+          {selectedEntry.readonlyReason ? (
+            <Badge variant="outline" className="text-xs text-muted-foreground" title={selectedEntry.readonlyReason}>
+              {selectedEntry.readonlyReason}
+            </Badge>
+          ) : selectedEntry.changes === "staged" ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || isWriting}
+              onClick={() => onUnstage?.(selectedEntry)}
+              title={`${messages.changes.unstageFile}（⌥⌘A 或空格）`}
+            >
+              {isWriting ? messages.changes.unstaging : messages.changes.unstageFile}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || isWriting}
+              onClick={() => onStage?.(selectedEntry)}
+              title={`${messages.changes.stageFile}（⌥⌘A 或空格）`}
+            >
+              {isWriting ? messages.changes.staging : messages.changes.stageFile}
+            </Button>
+          )}
+        </>
+      ) : null}
       <span className="ml-auto truncate text-xs text-muted-foreground">
         {environment ? `${environment.gitVersion} · ${status}` : status}
       </span>
