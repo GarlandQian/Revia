@@ -321,9 +321,13 @@ impl Git {
         (!name.is_empty() && name != "HEAD").then(|| name.to_string())
     }
 
-    /// 某个版本中的文件内容：`HEAD:<path>`、`:<path>`（暂存区）。
+    /// 某个版本中的文件内容：`HEAD:<path>`、`:0:<path>`（暂存区 stage 0，审查意见 3）。
     pub fn file_at(&self, scope: &str, path: &str) -> Option<String> {
-        let spec = format!("{scope}:{path}");
+        let spec = if scope.is_empty() || scope == "index" || scope == ":" {
+            format!(":0:{path}")
+        } else {
+            format!("{scope}:{path}")
+        };
         let output = self.run(&["show", &spec]).ok()?;
         if output.exit_code != 0 {
             return None;

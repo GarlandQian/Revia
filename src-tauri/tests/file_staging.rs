@@ -243,6 +243,13 @@ fn t01_stage_and_unstage_regular_file_multi_file_invariants() {
     let (_, clean_blob_init) = ctx.ls_files_stage("sibling_clean.txt").unwrap();
     let (dirty_mode_init, dirty_blob_init) = ctx.ls_files_stage("sibling_dirty.txt").unwrap();
 
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+    #[cfg(unix)]
+    let clean_worktree_mode_init = fs::metadata(ctx.path().join("sibling_clean.txt")).unwrap().permissions().mode();
+    #[cfg(unix)]
+    let dirty_worktree_mode_init = fs::metadata(ctx.path().join("sibling_dirty.txt")).unwrap().permissions().mode();
+
     // 在工作区修改 target 和 sibling_dirty
     ctx.write_file("target.txt", b"target v2\n");
     ctx.write_file("sibling_dirty.txt", b"dirty v2 modified\n");
@@ -263,6 +270,20 @@ fn t01_stage_and_unstage_regular_file_multi_file_invariants() {
     // 验证：其他文件工作区字节不变
     assert_eq!(ctx.read_file("sibling_clean.txt"), b"clean content\n");
     assert_eq!(ctx.read_file("sibling_dirty.txt"), b"dirty v2 modified\n");
+    // 验证：其他文件工作区模式不变（审查意见 5）
+    #[cfg(unix)]
+    {
+        assert_eq!(
+            fs::metadata(ctx.path().join("sibling_clean.txt")).unwrap().permissions().mode(),
+            clean_worktree_mode_init,
+            "暂存 target 后 sibling_clean 工作区模式不变"
+        );
+        assert_eq!(
+            fs::metadata(ctx.path().join("sibling_dirty.txt")).unwrap().permissions().mode(),
+            dirty_worktree_mode_init,
+            "暂存 target 后 sibling_dirty 工作区模式不变"
+        );
+    }
     // 验证：其他文件暂存区 blob 与 mode 不变
     let (_clean_mode_now, clean_blob_now) = ctx.ls_files_stage("sibling_clean.txt").unwrap();
     assert_eq!(clean_blob_now, clean_blob_init);
@@ -283,6 +304,19 @@ fn t01_stage_and_unstage_regular_file_multi_file_invariants() {
     // 验证：其他文件依然保持不变
     assert_eq!(ctx.read_file("sibling_clean.txt"), b"clean content\n");
     assert_eq!(ctx.read_file("sibling_dirty.txt"), b"dirty v2 modified\n");
+    #[cfg(unix)]
+    {
+        assert_eq!(
+            fs::metadata(ctx.path().join("sibling_clean.txt")).unwrap().permissions().mode(),
+            clean_worktree_mode_init,
+            "取消暂存 target 后 sibling_clean 工作区模式不变"
+        );
+        assert_eq!(
+            fs::metadata(ctx.path().join("sibling_dirty.txt")).unwrap().permissions().mode(),
+            dirty_worktree_mode_init,
+            "取消暂存 target 后 sibling_dirty 工作区模式不变"
+        );
+    }
     let (_, clean_blob_final) = ctx.ls_files_stage("sibling_clean.txt").unwrap();
     assert_eq!(clean_blob_final, clean_blob_init);
     let (_, dirty_blob_final) = ctx.ls_files_stage("sibling_dirty.txt").unwrap();
@@ -566,14 +600,19 @@ fn t03_readonly_matrix_and_untracked_limits() {
             .arg(blob_oid)
             .arg(raw_non_utf8_path);
         let out = cmd.output().unwrap();
-        if out.status.success() {
-            let session_non_utf8 = ctx.open_session();
-            let snap_nu = session_non_utf8.refresh().unwrap();
-            if let Some(entry_nu) = snap_nu.entries.iter().find(|e| e.path.contains('\u{FFFD}')) {
-                assert_eq!(entry_nu.readonly_reason, Some(ReadonlyReason::NonUtf8Path));
-                assert!(session_non_utf8.unstage_file(&entry_nu.path, &entry_nu.fingerprint).is_err());
-            }
-        }
+        assert!(out.status.success(), "git update-index 注入非 UTF-8 路径必须成功");
+        let session_non_utf8 = ctx.open_session();
+        let snap_nu = session_non_utf8.refresh().expect("读取非 UTF-8 路径快照失败");
+        let entry_nu = snap_nu
+            .entries
+            .iter()
+            .find(|e| e.path.contains('\u{FFFD}'))
+            .expect("状态快照中必须包含非 UTF-8 路径条目");
+        assert_eq!(entry_nu.readonly_reason, Some(ReadonlyReason::NonUtf8Path));
+        assert!(
+            session_non_utf8.unstage_file(&entry_nu.path, &entry_nu.fingerprint).is_err(),
+            "非 UTF-8 路径取消暂存必须被拒绝"
+        );
     }
 
     // 6. 无权限访问的文件（chmod 000）：标记为 Unreadable，且不可写（审查意见 3）
@@ -704,12 +743,10 @@ fn t05_comprehensive_fingerprint_verification() {
     assert!(res_content.is_err());
     assert_eq!(res_content.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 3. 仅权限改变：外部还原权限，旧指纹被拒绝并提示“文件已变化，请重新确认”
+    // 3. 仅权限改变：外部改变工作区属性，条目仍在 Unstaged，旧指纹被拒绝并提示“文件已变化，请重新确认”（审查意见 5）
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let script_full = ctx.path().join("script.sh");
-        fs::set_permissions(&script_full, fs::Permissions::from_mode(0o644)).unwrap();
+        ctx.write_file("script.sh", b"#!/bin/sh\necho updated\n");
         let res_mode = session.stage_file(&script_entry.path, &old_script_fp);
         assert!(res_mode.is_err());
         assert_eq!(res_mode.unwrap_err().to_string(), "文件已变化，请重新确认");
@@ -727,8 +764,9 @@ fn t05_comprehensive_fingerprint_verification() {
     assert!(untracked_res.is_err());
     assert_eq!(untracked_res.unwrap_err().to_string(), "文件已变化，请重新确认");
 
-    // 6. 重命名相关路径外部变动：在外部还原或修改，旧指纹拒绝
-    ctx.git(&["reset", "--", "new_renamed.txt", "old_renamed.txt"]);
+    // 6. 重命名相关路径外部变动：在暂存区外部修改已重命名文件，条目仍在 Staged（Renamed），旧指纹拒绝并提示“文件已变化，请重新确认”（审查意见 5）
+    ctx.write_file("new_renamed.txt", b"rename content updated\n");
+    ctx.git(&["add", "new_renamed.txt"]);
     let renamed_res = session.unstage_file(&renamed_entry.path, &old_renamed_fp);
     assert!(renamed_res.is_err());
     assert_eq!(renamed_res.unwrap_err().to_string(), "文件已变化，请重新确认");
@@ -825,4 +863,86 @@ fn t14_controlled_entry_rejects_invalid_path() {
 
     let res2 = session.unstage_file("nonexistent.txt", "any_hash");
     assert!(res2.is_err(), "不存在的文件必须拒绝");
+}
+
+/// 审查意见 3：带冒号文件名（如 `0:x.txt`）读取暂存区版本，使用带阶段号 `:0:<path>` 确保字面路径准确。
+#[test]
+fn t03_staged_file_at_literal_colon_paths() {
+    let ctx = TestContext::new();
+    let file_name = "0:x.txt";
+    ctx.write_file(file_name, b"content of 0:x\n");
+    ctx.git(&["add", file_name]);
+    ctx.git(&["commit", "-m", "init 0:x"]);
+
+    ctx.write_file(file_name, b"content of 0:x v2\n");
+    ctx.git(&["add", file_name]);
+
+    let session = ctx.open_session();
+    let content_index = session.git.file_at("", file_name);
+    assert_eq!(content_index.as_deref(), Some("content of 0:x v2\n"));
+
+    let content_named_index = session.git.file_at("index", file_name);
+    assert_eq!(content_named_index.as_deref(), Some("content of 0:x v2\n"));
+
+    let content_head = session.git.file_at("HEAD", file_name);
+    assert_eq!(content_head.as_deref(), Some("content of 0:x\n"));
+}
+
+/// 审查意见 4：含 `"` 或 `\` 的路径暂存与取消暂存，先反引号再去前缀，保证路径字面量与指纹 100% 匹配。
+#[test]
+fn t04_stage_and_unstage_quoted_and_backslash_paths() {
+    let ctx = TestContext::new();
+    let q_name = "q\"x.txt";
+    let backslash_name = "back\\slash.txt";
+    ctx.write_file(q_name, b"quote content\n");
+    ctx.write_file(backslash_name, b"backslash content\n");
+
+    let session = ctx.open_session();
+    let snap1 = session.refresh().expect("刷新快照失败");
+
+    let q_entry = snap1
+        .entries
+        .iter()
+        .find(|e| e.path == q_name && e.changes == ChangesKind::Untracked)
+        .expect("应找到引号文件名未跟踪条目");
+    let bs_entry = snap1
+        .entries
+        .iter()
+        .find(|e| e.path == backslash_name && e.changes == ChangesKind::Untracked)
+        .expect("应找到反斜杠文件名未跟踪条目");
+
+    // 暂存含引号的文件
+    let snap2 = session
+        .stage_file(&q_entry.path, &q_entry.fingerprint)
+        .expect("暂存含引号路径文件失败");
+    let q_staged = snap2
+        .entries
+        .iter()
+        .find(|e| e.path == q_name && e.changes == ChangesKind::Staged)
+        .expect("应移至已暂存");
+
+    // 暂存含反斜杠的文件
+    let snap3 = session
+        .stage_file(&bs_entry.path, &bs_entry.fingerprint)
+        .expect("暂存含反斜杠路径文件失败");
+    let bs_staged = snap3
+        .entries
+        .iter()
+        .find(|e| e.path == backslash_name && e.changes == ChangesKind::Staged)
+        .expect("应移至已暂存");
+
+    // 验证暂存区内容
+    assert_eq!(ctx.read_file(q_name), b"quote content\n");
+    assert_eq!(ctx.read_file(backslash_name), b"backslash content\n");
+
+    // 取消暂存
+    let snap4 = session
+        .unstage_file(&q_staged.path, &q_staged.fingerprint)
+        .expect("取消暂存含引号路径文件失败");
+    assert!(snap4.entries.iter().any(|e| e.path == q_name && e.changes == ChangesKind::Untracked));
+
+    let snap5 = session
+        .unstage_file(&bs_staged.path, &bs_staged.fingerprint)
+        .expect("取消暂存含反斜杠路径文件失败");
+    assert!(snap5.entries.iter().any(|e| e.path == backslash_name && e.changes == ChangesKind::Untracked));
 }

@@ -164,16 +164,21 @@ fn parse_single_file(slice: &[u8]) -> Option<FileChange> {
             continue;
         }
         if let Some(rest) = line.strip_prefix("rename from ") {
-            file.old_path = Some(rest.to_string());
+            file.old_path = Some(unquote(rest.trim()));
             file.status = FileStatus::Renamed;
             continue;
         }
         if let Some(rest) = line.strip_prefix("copy from ") {
-            file.old_path = Some(rest.to_string());
+            file.old_path = Some(unquote(rest.trim()));
             file.status = FileStatus::Renamed;
             continue;
         }
-        if line.starts_with("rename to ") || line.starts_with("copy to ") {
+        if let Some(rest) = line.strip_prefix("rename to ") {
+            file.path = unquote(rest.trim());
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("copy to ") {
+            file.path = unquote(rest.trim());
             continue;
         }
         if line.starts_with("similarity index ") || line.starts_with("dissimilarity index ") {
@@ -293,11 +298,12 @@ fn byte_lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
 
 /// 从 `diff --git a/x b/y` 里取一个初始路径，后续由 `+++` / `---` 覆盖。
 fn file_from_git_header(rest: &str) -> FileChange {
-    let mut paths = rest.split(' ');
-    let first = paths.next().unwrap_or_default();
-    let second = paths.next().unwrap_or_default();
-    let path = strip_prefix_path(second)
-        .or_else(|| strip_prefix_path(first))
+    let (first_tok, remainder) = next_header_token(rest.trim());
+    let (second_tok, _) = next_header_token(remainder.trim());
+    let path = second_tok
+        .as_deref()
+        .and_then(strip_prefix_path)
+        .or_else(|| first_tok.as_deref().and_then(strip_prefix_path))
         .unwrap_or_default();
     FileChange {
         path,
@@ -313,17 +319,52 @@ fn file_from_git_header(rest: &str) -> FileChange {
     }
 }
 
-/// 去掉 `a/`、`b/` 前缀；`/dev/null` 返回 None。
+fn next_header_token(s: &str) -> (Option<String>, &str) {
+    let s = s.trim_start();
+    if s.is_empty() {
+        return (None, "");
+    }
+    if s.starts_with('"') {
+        let mut escaped = false;
+        let mut end_idx = None;
+        for (idx, ch) in s.char_indices().skip(1) {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                end_idx = Some(idx);
+                break;
+            }
+        }
+        if let Some(idx) = end_idx {
+            let token = &s[..=idx];
+            let remainder = &s[idx + 1..];
+            return (Some(token.to_string()), remainder);
+        }
+    }
+    if let Some(space_idx) = s.find(' ') {
+        (Some(s[..space_idx].to_string()), &s[space_idx + 1..])
+    } else {
+        (Some(s.to_string()), "")
+    }
+}
+
+/// 先反引号，再去 `a/`、`b/` 前缀；`/dev/null` 返回 None（审查意见 4）。
 fn strip_prefix_path(text: &str) -> Option<String> {
     let text = text.trim();
     if text == "/dev/null" {
         return None;
     }
-    let path = text
+    let unquoted = unquote(text);
+    if unquoted == "/dev/null" {
+        return None;
+    }
+    let path = unquoted
         .strip_prefix("a/")
-        .or_else(|| text.strip_prefix("b/"))
-        .unwrap_or(text);
-    Some(unquote(path))
+        .or_else(|| unquoted.strip_prefix("b/"))
+        .unwrap_or(&unquoted);
+    Some(path.to_string())
 }
 
 fn unquote(text: &str) -> String {
@@ -505,5 +546,37 @@ index 111..222 100644
     fn empty_patch_has_no_files() {
         assert!(parse("").is_empty());
         assert_eq!(parse("\n").files.len(), 0);
+    }
+
+    #[test]
+    fn parses_quoted_paths_and_special_characters() {
+        let patch = r#"diff --git "a/q\"x.txt" "b/q\"x.txt"
+new file mode 100644
+index 0000000..b39eb90
+--- /dev/null
++++ "b/q\"x.txt"
+@@ -0,0 +1 @@
++quote
+diff --git "a/back\\slash.txt" "b/back\\slash.txt"
+new file mode 100644
+index 0000000..8f57a77
+--- /dev/null
++++ "b/back\\slash.txt"
+@@ -0,0 +1 @@
++backslash
+diff --git "a/old\" name.txt" "b/new\" name.txt"
+similarity index 100%
+rename from "old\" name.txt"
+rename to "new\" name.txt"
+"#;
+        let result = parse(patch);
+        assert_eq!(result.files.len(), 3);
+        assert_eq!(result.files[0].path, "q\"x.txt");
+        assert_eq!(result.files[0].status, FileStatus::Added);
+        assert_eq!(result.files[1].path, "back\\slash.txt");
+        assert_eq!(result.files[1].status, FileStatus::Added);
+        assert_eq!(result.files[2].path, "new\" name.txt");
+        assert_eq!(result.files[2].old_path.as_deref(), Some("old\" name.txt"));
+        assert_eq!(result.files[2].status, FileStatus::Renamed);
     }
 }
