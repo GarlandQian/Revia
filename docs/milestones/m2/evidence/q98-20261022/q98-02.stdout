@@ -1,0 +1,190 @@
+Revia PID=89205，等待可见窗口后连续操作 1800 秒；诊断=None；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/q98-30min/q98-02.json
+[    2.0s] Rust 118.1 MB / WebContent 81.1 MB
+[   12.1s] Rust 140.4 MB / WebContent 196.8 MB
+[   22.1s] Rust 140.6 MB / WebContent 215.0 MB
+[   32.2s] Rust 141.2 MB / WebContent 216.6 MB
+[   42.2s] Rust 142.3 MB / WebContent 224.2 MB
+[   52.2s] Rust 142.8 MB / WebContent 225.7 MB
+[   62.2s] Rust 141.4 MB / WebContent 226.9 MB
+[phase 23] samplingChecksPassed=True duration=1.881s WebContent 119.1 MB / malloc 100.3 MB; pending closure
+[   72.2s] Rust 141.4 MB / WebContent 240.9 MB
+[   82.2s] Rust 142.9 MB / WebContent 241.0 MB
+[   92.3s] Rust 143.0 MB / WebContent 244.3 MB
+[  102.3s] Rust 143.0 MB / WebContent 246.0 MB
+[  112.3s] Rust 142.9 MB / WebContent 247.9 MB
+[  122.3s] Rust 141.7 MB / WebContent 249.8 MB
+[phase 45] samplingChecksPassed=True duration=1.843s WebContent 126.3 MB / malloc 110.1 MB; pending closure
+[  133.4s] Rust 142.9 MB / WebContent 250.5 MB
+[  143.6s] Rust 143.0 MB / WebContent 251.9 MB
+[  153.6s] Rust 143.0 MB / WebContent 254.4 MB
+[  163.6s] Rust 143.0 MB / WebContent 255.1 MB
+[  173.7s] Rust 143.1 MB / WebContent 256.6 MB
+[  183.7s] Rust 143.0 MB / WebContent 256.5 MB
+[  193.7s] Rust 143.0 MB / WebContent 293.5 MB
+[phase 67] samplingChecksPassed=True duration=1.820s WebContent 133.2 MB / malloc 87.5 MB; pending closure
+[  203.8s] Rust 143.0 MB / WebContent 293.5 MB
+[  213.8s] Rust 143.1 MB / WebContent 312.4 MB
+[  224.0s] Rust 143.0 MB / WebContent 312.4 MB
+[  234.0s] Rust 141.8 MB / WebContent 312.4 MB
+[  244.0s] Rust 141.8 MB / WebContent 312.4 MB
+[  254.1s] Rust 143.1 MB / WebContent 333.6 MB
+[phase 89] samplingChecksPassed=True duration=1.821s WebContent 156.2 MB / malloc 125.6 MB; pending closure
+[  264.3s] Rust 143.0 MB / WebContent 333.9 MB
+[  274.3s] Rust 143.1 MB / WebContent 334.4 MB
+[  284.5s] Rust 143.1 MB / WebContent 334.4 MB
+[  294.7s] Rust 143.1 MB / WebContent 334.6 MB
+[  304.9s] Rust 143.1 MB / WebContent 334.9 MB
+[  315.0s] Rust 143.1 MB / WebContent 334.9 MB
+[  325.2s] Rust 143.1 MB / WebContent 334.9 MB
+[phase 111 pressure] samplingChecksPassed=True duration=11.980s WebContent 126.3 MB / malloc 22.9 MB; pending closure
+[  338.6s] Rust 142.5 MB / WebContent 334.8 MB
+[  348.6s] Rust 142.7 MB / WebContent 375.9 MB
+[  358.9s] Rust 142.7 MB / WebContent 376.1 MB
+[  369.0s] Rust 142.7 MB / WebContent 376.2 MB
+[  379.1s] Rust 142.7 MB / WebContent 376.0 MB
+[  389.3s] Rust 142.7 MB / WebContent 375.8 MB
+[  399.5s] Rust 142.7 MB / WebContent 375.9 MB
+[phase 132] samplingChecksPassed=True duration=1.829s WebContent 123.7 MB / malloc 85.1 MB; pending closure
+[  409.6s] Rust 142.7 MB / WebContent 375.9 MB
+[  419.7s] Rust 141.4 MB / WebContent 376.2 MB
+[  429.9s] Rust 142.7 MB / WebContent 376.5 MB
+[  440.1s] Rust 141.4 MB / WebContent 376.7 MB
+[  450.1s] Rust 142.7 MB / WebContent 376.4 MB
+[  460.2s] Rust 141.4 MB / WebContent 376.7 MB
+[  470.4s] Rust 142.7 MB / WebContent 376.7 MB
+[phase 153] samplingChecksPassed=True duration=1.830s WebContent 123.6 MB / malloc 105.8 MB; pending closure
+[  480.5s] Rust 141.4 MB / WebContent 377.0 MB
+[  490.5s] Rust 142.7 MB / WebContent 377.0 MB
+[  500.6s] Rust 142.7 MB / WebContent 377.0 MB
+[  510.8s] Rust 142.7 MB / WebContent 377.0 MB
+[  521.0s] Rust 142.8 MB / WebContent 377.0 MB
+[  531.1s] Rust 142.8 MB / WebContent 377.1 MB
+[phase 174] samplingChecksPassed=True duration=1.843s WebContent 119.9 MB / malloc 91.9 MB; pending closure
+[  541.2s] Rust 142.8 MB / WebContent 377.1 MB
+[  551.2s] Rust 142.8 MB / WebContent 377.4 MB
+[  561.3s] Rust 142.8 MB / WebContent 377.4 MB
+[  571.5s] Rust 142.8 MB / WebContent 377.9 MB
+[  581.6s] Rust 142.8 MB / WebContent 377.8 MB
+[  591.7s] Rust 142.8 MB / WebContent 377.8 MB
+[  601.7s] Rust 142.8 MB / WebContent 377.8 MB
+[phase 195] samplingChecksPassed=True duration=1.820s WebContent 121.4 MB / malloc 107.1 MB; pending closure
+[  611.9s] Rust 142.8 MB / WebContent 377.8 MB
+[  621.9s] Rust 142.9 MB / WebContent 381.6 MB
+[  632.1s] Rust 141.6 MB / WebContent 381.8 MB
+[  642.1s] Rust 141.6 MB / WebContent 381.8 MB
+[  652.2s] Rust 142.9 MB / WebContent 381.8 MB
+[  662.4s] Rust 142.9 MB / WebContent 381.8 MB
+[phase 216 pressure] samplingChecksPassed=True duration=11.940s WebContent 111.5 MB / malloc 27.8 MB; pending closure
+[  682.7s] Rust 142.8 MB / WebContent 381.6 MB
+[  692.7s] Rust 142.8 MB / WebContent 383.5 MB
+[  702.7s] Rust 142.9 MB / WebContent 384.3 MB
+[  712.9s] Rust 142.9 MB / WebContent 384.8 MB
+[  723.0s] Rust 142.9 MB / WebContent 385.0 MB
+[  733.1s] Rust 142.9 MB / WebContent 384.9 MB
+[  743.3s] Rust 142.9 MB / WebContent 385.6 MB
+[phase 237] samplingChecksPassed=True duration=1.805s WebContent 114.7 MB / malloc 100.5 MB; pending closure
+[  753.4s] Rust 142.8 MB / WebContent 385.5 MB
+[  763.5s] Rust 142.9 MB / WebContent 385.5 MB
+[  773.7s] Rust 142.9 MB / WebContent 385.5 MB
+[  783.8s] Rust 142.9 MB / WebContent 385.4 MB
+[  794.0s] Rust 142.9 MB / WebContent 385.5 MB
+[  804.1s] Rust 142.9 MB / WebContent 385.7 MB
+[  814.2s] Rust 142.8 MB / WebContent 385.7 MB
+[phase 258] samplingChecksPassed=True duration=1.866s WebContent 116.3 MB / malloc 104.0 MB; pending closure
+[  824.4s] Rust 142.9 MB / WebContent 385.7 MB
+[  834.5s] Rust 142.9 MB / WebContent 386.1 MB
+[  844.7s] Rust 141.6 MB / WebContent 386.1 MB
+[  854.7s] Rust 142.9 MB / WebContent 386.5 MB
+[  864.7s] Rust 141.6 MB / WebContent 388.4 MB
+[  874.9s] Rust 142.9 MB / WebContent 389.0 MB
+[phase 279] samplingChecksPassed=True duration=1.869s WebContent 125.0 MB / malloc 113.3 MB; pending closure
+[  885.0s] Rust 142.9 MB / WebContent 389.7 MB
+[  895.2s] Rust 142.9 MB / WebContent 391.1 MB
+[  905.4s] Rust 142.9 MB / WebContent 392.9 MB
+[  915.6s] Rust 142.9 MB / WebContent 395.1 MB
+[  925.8s] Rust 142.9 MB / WebContent 396.3 MB
+[  935.8s] Rust 142.9 MB / WebContent 399.1 MB
+[  946.0s] Rust 142.9 MB / WebContent 399.5 MB
+[phase 300] samplingChecksPassed=True duration=1.870s WebContent 117.6 MB / malloc 133.9 MB; pending closure
+[  956.2s] Rust 141.6 MB / WebContent 399.9 MB
+[  966.4s] Rust 142.9 MB / WebContent 425.9 MB
+[  976.5s] Rust 142.9 MB / WebContent 428.2 MB
+[  986.8s] Rust 142.9 MB / WebContent 429.4 MB
+[  996.9s] Rust 142.9 MB / WebContent 432.1 MB
+[ 1007.1s] Rust 142.9 MB / WebContent 432.3 MB
+[phase 320 pressure] samplingChecksPassed=True duration=11.961s WebContent 121.3 MB / malloc 31.9 MB; pending closure
+[ 1024.9s] Rust 142.8 MB / WebContent 432.3 MB
+[ 1034.9s] Rust 142.9 MB / WebContent 433.7 MB
+[ 1045.1s] Rust 142.9 MB / WebContent 433.7 MB
+[ 1055.3s] Rust 143.0 MB / WebContent 433.8 MB
+[ 1065.5s] Rust 143.0 MB / WebContent 433.8 MB
+[ 1075.6s] Rust 143.0 MB / WebContent 433.7 MB
+[ 1085.8s] Rust 143.0 MB / WebContent 433.8 MB
+[phase 341] samplingChecksPassed=True duration=1.817s WebContent 128.0 MB / malloc 74.1 MB; pending closure
+[ 1095.8s] Rust 143.0 MB / WebContent 433.8 MB
+[ 1106.0s] Rust 143.0 MB / WebContent 433.9 MB
+[ 1116.2s] Rust 143.0 MB / WebContent 433.9 MB
+[ 1126.3s] Rust 143.0 MB / WebContent 433.7 MB
+[ 1136.3s] Rust 143.0 MB / WebContent 433.8 MB
+[ 1146.5s] Rust 143.0 MB / WebContent 433.9 MB
+[ 1156.6s] Rust 143.0 MB / WebContent 433.9 MB
+[phase 362] samplingChecksPassed=True duration=1.819s WebContent 129.1 MB / malloc 100.4 MB; pending closure
+[ 1166.8s] Rust 143.0 MB / WebContent 434.1 MB
+[ 1176.8s] Rust 143.0 MB / WebContent 434.0 MB
+[ 1186.8s] Rust 143.0 MB / WebContent 434.0 MB
+[ 1197.0s] Rust 143.0 MB / WebContent 434.1 MB
+[ 1207.2s] Rust 143.0 MB / WebContent 434.1 MB
+[ 1217.3s] Rust 143.0 MB / WebContent 433.8 MB
+[phase 383] samplingChecksPassed=True duration=1.816s WebContent 126.1 MB / malloc 129.2 MB; pending closure
+[ 1227.5s] Rust 141.6 MB / WebContent 433.8 MB
+[ 1237.6s] Rust 143.0 MB / WebContent 434.3 MB
+[ 1247.7s] Rust 143.0 MB / WebContent 434.3 MB
+[ 1257.9s] Rust 143.0 MB / WebContent 434.2 MB
+[ 1268.1s] Rust 143.0 MB / WebContent 434.3 MB
+[ 1278.2s] Rust 143.0 MB / WebContent 434.3 MB
+[ 1288.2s] Rust 143.0 MB / WebContent 434.3 MB
+[phase 404] samplingChecksPassed=True duration=1.810s WebContent 128.3 MB / malloc 135.1 MB; pending closure
+[ 1298.3s] Rust 143.0 MB / WebContent 434.3 MB
+[ 1308.5s] Rust 143.0 MB / WebContent 434.6 MB
+[ 1318.5s] Rust 143.0 MB / WebContent 435.1 MB
+[ 1328.7s] Rust 143.0 MB / WebContent 435.2 MB
+[ 1338.8s] Rust 141.7 MB / WebContent 435.2 MB
+[ 1348.9s] Rust 143.0 MB / WebContent 435.2 MB
+[phase 425 pressure] samplingChecksPassed=True duration=11.958s WebContent 123.8 MB / malloc 36.0 MB; pending closure
+[ 1368.3s] Rust 142.9 MB / WebContent 435.0 MB
+[ 1378.5s] Rust 143.0 MB / WebContent 436.6 MB
+[ 1388.7s] Rust 143.0 MB / WebContent 436.9 MB
+[ 1398.7s] Rust 143.0 MB / WebContent 436.8 MB
+[ 1408.7s] Rust 142.6 MB / WebContent 436.6 MB
+[ 1418.9s] Rust 141.7 MB / WebContent 436.7 MB
+[ 1429.1s] Rust 143.0 MB / WebContent 436.7 MB
+[phase 446] samplingChecksPassed=True duration=1.795s WebContent 128.4 MB / malloc 105.4 MB; pending closure
+[ 1439.1s] Rust 141.6 MB / WebContent 436.7 MB
+[ 1449.3s] Rust 141.7 MB / WebContent 436.7 MB
+[ 1459.5s] Rust 141.7 MB / WebContent 436.7 MB
+[ 1469.6s] Rust 143.0 MB / WebContent 436.6 MB
+[ 1479.8s] Rust 143.0 MB / WebContent 436.8 MB
+[ 1489.8s] Rust 143.0 MB / WebContent 436.8 MB
+[ 1499.9s] Rust 143.0 MB / WebContent 436.9 MB
+[phase 467] samplingChecksPassed=True duration=1.802s WebContent 128.3 MB / malloc 117.1 MB; pending closure
+[ 1510.0s] Rust 142.9 MB / WebContent 436.9 MB
+[ 1520.2s] Rust 143.0 MB / WebContent 436.9 MB
+[ 1530.4s] Rust 143.0 MB / WebContent 436.9 MB
+[ 1540.6s] Rust 143.0 MB / WebContent 436.9 MB
+[ 1550.8s] Rust 143.0 MB / WebContent 436.9 MB
+[ 1560.9s] Rust 143.0 MB / WebContent 436.9 MB
+[phase 488] samplingChecksPassed=True duration=1.803s WebContent 128.3 MB / malloc 97.3 MB; pending closure
+[ 1571.0s] Rust 142.9 MB / WebContent 436.9 MB
+[ 1581.0s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1591.1s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1601.3s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1611.5s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1621.5s] Rust 143.0 MB / WebContent 437.2 MB
+[phase 509] samplingChecksPassed=True duration=1.805s WebContent 128.6 MB / malloc 110.2 MB; pending closure
+[ 1633.1s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1643.1s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1653.2s] Rust 143.0 MB / WebContent 437.1 MB
+[ 1663.3s] Rust 143.0 MB / WebContent 437.2 MB
+[ 1673.5s] Rust 143.0 MB / WebContent 437.2 MB
+运行失败：['应用未成功完成：Error: 可见连续合成中断：{"state":"visible","hidden":false,"viewportWidth":1280,"viewportHeight":800,"devicePixelRatio":2,"rafPerSecond":59.7609561752988,"focused":false,"maxFrameGapMs":864,"hiddenTransitions":1}', '前端连续操作时长不足', '缺少必需的操作负载']；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/q98-30min/q98-02.json
+Q98 内存判定：不通过；['webContentMallocAllocatedMb：超过 Q98 阈值']
