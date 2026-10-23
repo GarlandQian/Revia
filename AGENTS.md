@@ -109,6 +109,9 @@ REVIA_MEASURE_LOG=/tmp/split.json src-tauri/target/release/revia
 # 8. 只读界面冒烟检查（添加仓库 → 文件列表 → 逐个打开 → 切换视图）
 REVIA_SMOKE=1 REVIA_MEASURE_REPO=/tmp/revia-m1-fixtures/diffs \
 REVIA_MEASURE_LOG=/tmp/smoke.json src-tauri/target/release/revia
+
+# 9. 用 Icon Composer 改了 src-tauri/icons/Revia.icon 后，重新生成 Assets.car、icns、ico 和 PNG
+python3 tools/export-app-icon.py
 ```
 
 注意：
