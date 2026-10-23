@@ -1,0 +1,1 @@
+['/opt/homebrew/bin/rustc', '--edition=2021', '/private/tmp/revia-review05-standards-53_7h84n/review.rs', '--extern', 'revia_lib=/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps/librevia_lib.rlib', '-L', 'dependency=/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps', '-o', '/private/tmp/revia-review05-standards-53_7h84n/review']

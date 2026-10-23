@@ -4,6 +4,7 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务 05：`ready-for-agent`（首版审查返修）。固定 `5d9b781...36a39a1`：Standards 8项、Spec 9项，各自最严重 P1；存在无关临时名文件删除、在途清理丢失唯一记录、冲突文件恢复绕过只读、恢复中断/确认/结果门禁及恢复查看/另存/自动到期等缺口。下面的首版自动化统计不等于这些路径已通过。意见与受限复现证据已归档至 [任务05 Comments](./issues/05-safe-recovery.md#comments)，修复并复核前不构建桌面验收版、不标 done。
 - 任务 01：`done`，MessagePort 泄漏修复及 Q98 长测结论不变，见下一节。
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
 - 任务 09：`done`，`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 已完成，macOS Apple Silicon 与 Windows x64 的前端检查、Rust 测试及 release 编译全部通过。Windows 实际通过 66 单元 + 16 file_staging + 3 session_flow；测试修复增量的 Standards / Spec 双审均无新问题。最终集成仍需任务 10、11 再次验收，见 [任务 09](./issues/09-platform-compile-checks.md)。
