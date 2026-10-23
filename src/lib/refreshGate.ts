@@ -150,11 +150,11 @@ export class OperationResultGate {
     this.gate = gate;
   }
 
-  begin(): OperationContext {
-    const context = this.gate.token();
-    const operation = (this.operations.get(context.worktreeId ?? "") ?? 0) + 1;
-    if (context.worktreeId) this.operations.set(context.worktreeId, operation);
-    return { ...context, operation };
+  begin(worktreeId: string): OperationContext {
+    const { activation } = this.gate.current();
+    const operation = (this.operations.get(worktreeId) ?? 0) + 1;
+    this.operations.set(worktreeId, operation);
+    return { activation, worktreeId, operation };
   }
 
   canRecord(context: OperationContext): boolean {

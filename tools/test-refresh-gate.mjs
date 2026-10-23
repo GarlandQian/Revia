@@ -115,7 +115,7 @@ test("写结果走接收门：晚到的 r2 不能覆盖已接受的 r3", () => {
   const gate = new SnapshotGate();
   const ops = new OperationResultGate(gate);
   gate.activate("wt-a");
-  const token = ops.begin();
+  const token = ops.begin("wt-a");
 
   // 自动刷新先接受了 r3。
   assert.equal(gate.accept(gate.token(), { worktreeId: "wt-a", revision: 3 }), true);
@@ -133,7 +133,7 @@ test("写结果 A→B→A：第一次 A 的写结果被拒绝", () => {
   const gate = new SnapshotGate();
   const ops = new OperationResultGate(gate);
   gate.activate("wt-a");
-  const tokenA1 = ops.begin();
+  const tokenA1 = ops.begin("wt-a");
   gate.activate("wt-b");
   gate.activate("wt-a");
 
@@ -146,7 +146,7 @@ test("失败结果只在发起目标仍激活时生效", () => {
   const gate = new SnapshotGate();
   const ops = new OperationResultGate(gate);
   gate.activate("wt-a");
-  const token = ops.begin();
+  const token = ops.begin("wt-a");
   assert.equal(ops.acceptFailure(token), true);
   gate.activate("wt-b");
   assert.equal(ops.acceptFailure(token), false, "切走后旧失败不得污染当前界面");
@@ -156,16 +156,37 @@ test("切走后原操作结果仍可保存，不能覆盖该 worktree 更新的�
   const gate = new SnapshotGate();
   const ops = new OperationResultGate(gate);
   gate.activate("wt-a");
-  const a1 = ops.begin();
+  const a1 = ops.begin("wt-a");
   gate.activate("wt-b");
-  const b = ops.begin();
+  const b = ops.begin("wt-b");
   assert.equal(ops.canRecord(a1), true, "非当前 worktree 的结果必须保留归属");
   assert.equal(ops.acceptFailure(a1), false, "但不能刷新当前 B");
   gate.activate("wt-a");
-  const a2 = ops.begin();
+  const a2 = ops.begin("wt-a");
   assert.equal(ops.canRecord(a1), false, "旧失败不能覆盖新的 A 操作结果");
   assert.equal(ops.canRecord(a2), true);
   assert.equal(ops.canRecord(b), true, "A 的新操作不作废 B 的结果记录");
+});
+
+test("切换未完成时按真实写目标登记，不借用新激活目标的操作序号", () => {
+  const gate = new SnapshotGate();
+  const ops = new OperationResultGate(gate);
+  gate.activate("wt-a");
+  gate.activate("wt-b");
+  // B 的 open_worktree 未完成，旧侧栏仍允许对 A 发起操作。
+  const a = ops.begin("wt-a");
+  const b = ops.begin("wt-b");
+  assert.equal(a.worktreeId, "wt-a");
+  assert.equal(ops.canRecord(a), true, "B 的后续操作不能吞掉 A 的错误或待核对结果");
+  assert.equal(ops.canRecord(b), true);
+  assert.equal(ops.acceptFailure(a), false, "A 的结果不能触发当前 B 的刷新");
+  assert.equal(ops.acceptSuccess(a, { worktreeId: "wt-a", revision: 10 }), false);
+  gate.activate("wt-a");
+  assert.equal(ops.canRecord(a), true, "切回后仍保留原目标的结果提示");
+  assert.equal(ops.acceptSuccess(a, { worktreeId: "wt-a", revision: 10 }), false,
+    "切回 A 仍不能复活旧激活的快照");
+  ops.begin("wt-a");
+  assert.equal(ops.canRecord(a), false, "同目标更新的操作才能淘汰旧结果");
 });
 
 test("真实通知消费路径：首个、连续事件触发刷新，重复与旧激活通知忽略", async () => {

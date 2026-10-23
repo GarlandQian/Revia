@@ -215,3 +215,24 @@ Standards：3 项硬违规，最严重 P1；另有 1 项非阻塞判断性建议
 - 集中检查：`pnpm build`（含类型检查）、`pnpm lint` 通过；Node 四组 64 项通过；Rust 82 单元 + 20 file_staging + 23 hunk_staging + 14 refresh_isolation + 3 session_flow = **142 项通过**。新增回归包含当前 linked 目标的真实外部暂存／取消暂存／HEAD 变化及其他 linked index 隔离。首次编译因 sha2 0.11 的摘要数组不支持 `LowerHex` 失败，修正局部编码后仅重跑 Rust，失败日志保留。
 
 上述为实现与自动检查，不是复审或桌面验收通过。Release 构建、修复后两轴复审、D03 / D05 / Q95 真实桌面及 D06 回归仍待闭合；任务暂保留 `ready-for-agent`，不将已有任务 03 的 CI 冒称为当前版本 Windows 通过。
+
+### 2026-10-23 / Codex 修复后两轴复审（第 3 轮）
+
+固定增量 `git diff 202121d...bec6031`，结合任务全量 `82d305e...bec6031`。两个独立审查代理只做静态复核，未将自动检查或桌面验收算入各自结论。
+
+#### Standards
+
+- 前轮事件进度、linked 元数据与 watcher 安装的三项硬违规已闭合；默认关闭的验收接缝未发现明确安全边界违规，无新增 Fowler 判断性建议。
+- **P2 / 硬违规：切换在途时，真实写目标与操作序号归属可能不一致。** `openWorktree` 先激活 B，等待期间旧侧栏仍可对 A 暂存；`performStaging` 请求目标为 A，而无参数的 `OperationResultGate.begin()` 却从当前 gate 取到 B。B 随后的写操作推进序号后，A 的错误／待核对结果被丢弃，违反 Q90 的原目标结果归属。应使用真实 `opWorktreeId` 显式登记操作。
+
+#### Spec
+
+前轮四项阻塞在 `bec6031` 的源码中均闭合：真实事件通知接入消费路径、linked 自身元数据优先、最终安装与停止原子核对、切走后的结果记录与界面更新分离。未发现新增确定缺陷或范围扩张；桌面逆序响应、持续失败提示与生产轮询交互仍待验收。
+
+Standards：1 项硬违规，最严重 P2。Spec：0 项新增发现。两轴结论独立保留，不以 Spec 无新增发现抵消 Standards 阻塞。
+
+#### 针对新增阻塞的修复
+
+`OperationResultGate.begin(worktreeId)` 改为必传真实操作目标，`performStaging` 传入 `opWorktreeId`；激活代号仍记录发起时的当前值，因此 A 的结果可以保留但不能应用到当前 B，也不能在切回 A 后复活旧快照。新增确定性 Node 回归覆盖切换未完成时 A 写入、B 后续写入、切回 A 及 A 新操作淘汰旧结果；不通过禁用浏览规避竞态。
+
+针对本次前端增量，`tools/test-refresh-gate.mjs` **16 项通过**，`pnpm build`（含类型检查）及 `pnpm lint` 通过；Rust 代码未改，沿用第二轮 142 项结果，没有重复执行或声称本轮重跑。`bec6031` 的 Release 已构建但尚未进行桌面动作；已退出该进程，将重新嵌入前端构建后验收，不混用旧二进制。

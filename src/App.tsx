@@ -709,8 +709,8 @@ export function App() {
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
     setAppError(null, opWorktreeId);
-    // 记下发起时的激活上下文：结果回来时必须仍然属于同一个激活目标（Q90）。
-    const opToken = operationGateRef.current.begin();
+    // 切换期间界面可能仍显示原目标；操作归属取真实写目标，不能取已前进的激活目标。
+    const opToken = operationGateRef.current.begin(opWorktreeId);
     const request = { worktreeId: opWorktreeId, path: target.path, fingerprint: target.fingerprint };
     try {
       const unstaging = target.changes === "staged";
