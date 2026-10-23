@@ -1,6 +1,6 @@
 # M2 阶段报告
 
-更新日期：2026-10-23。任务 01、02、03、09 已完成；任务 06 写结果归属修复两轴复核通过，首轮真实桌面发现前台核对失效与旧计数，已修复待补验；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
+更新日期：2026-10-23。任务 01、02、03、06、09 已完成；任务 06 两轴复核、真实桌面、D06 与最终双平台 CI 已通过，旧前台尝试的取证限制已更正；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
 
 ## 当前进度（2026-10-23）
 
@@ -8,7 +8,7 @@
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
 - 任务 09：`done`，`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 已完成，macOS Apple Silicon 与 Windows x64 的前端检查、Rust 测试及 release 编译全部通过。Windows 实际通过 66 单元 + 16 file_staging + 3 session_flow；测试修复增量的 Standards / Spec 双审均无新问题。最终集成仍需任务 10、11 再次验收，见 [任务 09](./issues/09-platform-compile-checks.md)。
 - 按新规则先派给 Paseo 的 deepseek；本轮 3 次重试均为 `503 auth_unavailable`，会话进入 error 且未改文件，由 Codex 接手，不切 Gemini。已把 `main` 的 `837d68a` 规则合入 `m2`，主目录不变。
-- 任务 06：`ready-for-agent`。第二轮四项缺陷及第三轮真实写目标序号错绑均已修复，两轴独立复核通过。`26b6dc4` Release 的连续保存、跨组选择、linked index／HEAD／共享 ref、八个真实迟到响应场景已实测；监视失败手动读取与安全写入正常，但 F03 回到前台未核对、工具栏旧计数仍需修复后补验。已加原生焦点监听及清理回归，前端 gate 19 项、build／lint 通过，Rust 沿用 142 项未重跑。详细版本、原失败和待验范围见[任务 06 验收](./task06-acceptance.md)；D06、最新 Windows CI 及最终长测未完成，不沿用旧版本结果冒充当前通过。
+- 任务 06：`done`。两轴独立复核通过；`26b6dc4` 的刷新／跨组／linked／八个迟到响应，加 `1fc9ec3` 的真实隐藏恢复前台核对、计数、独立 A↔B、迟到锚点、稳定阅读位置、40 次保存及真实写前读取失败已验收。早期 AX／Raise 未证明实际焦点切换，不再冒称已确认缺陷根因。最终同构建 D06 标准首屏 **105／115ms**，真冷文字 DOM **6／7ms**；四份各60屏、60rAF、0兜底／未覆盖，普通呈现补验通过。前端 gate 19 项、build／lint 通过；[`1fc9ec3` CI #39923257047](https://github.com/GarlandQian/Revia/actions/runs/39923257047) 双平台类型／lint／build／Rust／release 编译通过（macOS **142**、Windows **132** 项）。版本、旧观察限制和两轮证据归档见[任务 06 验收](./task06-acceptance.md)，最终 30 分钟长测仍留 11。
 - 任务 03：`done`，原始 hunk 写入、两视图键盘与真实暂存区核对、相关版本过期拒绝及 D06 已验收。最终 `bbddd4f` 的 [CI #39876636277](https://github.com/GarlandQian/Revia/actions/runs/39876636277) 双平台通过（macOS 114 / Windows 104 项 Rust）；标准首屏 115/95ms、真冷文字 DOM 5/4ms。原超帧值、旧取证不足样本与 P3 命名观察保留，详见 [任务 03 验收](./task03-acceptance.md)。
 
 ## 任务 01 结论（2026-10-22）

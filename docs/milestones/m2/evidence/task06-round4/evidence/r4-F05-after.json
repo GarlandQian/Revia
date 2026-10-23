@@ -1,0 +1,124 @@
+{
+  "timestamp": "2026-10-23T16:12:41.125+08:00",
+  "command": "r4-F05-restored",
+  "after": {
+    "startedAt": "2026-10-23T16:12:41.082+08:00",
+    "finishedAt": "2026-10-23T16:12:41.125+08:00",
+    "repo": "A",
+    "target": "10-target.ts",
+    "gitProgram": "/opt/homebrew/Cellar/git/2.56.0_1/bin/git",
+    "readOnly": true,
+    "consistency": "Sequential observations, not an atomic cross-command snapshot",
+    "paths": {
+      "worktree": "/private/tmp/revia-task06-2fuu2r92/A",
+      "gitDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+      "commonDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+      "index": "/private/tmp/revia-task06-2fuu2r92/A/.git/index"
+    },
+    "worktreeFile": {
+      "path": "/private/tmp/revia-task06-2fuu2r92/A/10-target.ts",
+      "exists": true,
+      "sha256": "9d5186b8636243e8a4bc4293d2edb025535678dd87dc6c5808a4431b55c13cd8",
+      "bytes": 5112,
+      "lines": 180,
+      "mode": "0644",
+      "inode": 163285359,
+      "mtimeNs": 1792742969722039366
+    },
+    "indexFile": {
+      "path": "/private/tmp/revia-task06-2fuu2r92/A/.git/index",
+      "exists": true,
+      "sha256": "eaf6635adea4e1e94f28a0dc6bdfcac2a29d9f8923502518fa326418db6d6b57",
+      "bytes": 446,
+      "lines": 3,
+      "mode": "0644",
+      "inode": 163276776,
+      "mtimeNs": 1792739924060486078
+    },
+    "indexBlobs": [
+      {
+        "path": "10-target.ts",
+        "mode": "100644",
+        "oid": "ff62c5f30c53e982e118e283b39e1e1555cbd3f7",
+        "stage": 0,
+        "bytes": 5112,
+        "sha256": "c8fd05c9f37409465d858d85a0469879c86e6b9a4c5768b7c3f23592f75d72df"
+      }
+    ],
+    "git": {
+      "head": {
+        "args": [
+          "rev-parse",
+          "--verify",
+          "HEAD"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.168,
+        "stdoutText": "4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\n",
+        "stdoutBase64": "NDYxOWI0YjNmMGU3Y2IxYTcxZjYwNzBkZjdiNjdiYzhiMDhlNDM2Ygo=",
+        "stderrText": ""
+      },
+      "status": {
+        "args": [
+          "status",
+          "--porcelain=v2",
+          "--branch",
+          "-z",
+          "--untracked-files=all"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 7.756,
+        "stdoutText": "# branch.oid 4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\u0000# branch.head main\u00001 .M N... 100644 100644 100644 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 10-target.ts\u0000? untracked.txt\u0000",
+        "stdoutBase64": "IyBicmFuY2gub2lkIDQ2MTliNGIzZjBlN2NiMWE3MWY2MDcwZGY3YjY3YmM4YjA4ZTQzNmIAIyBicmFuY2guaGVhZCBtYWluADEgLk0gTi4uLiAxMDA2NDQgMTAwNjQ0IDEwMDY0NCBmZjYyYzVmMzBjNTNlOTgyZTExOGUyODNiMzllMWUxNTU1Y2JkM2Y3IGZmNjJjNWYzMGM1M2U5ODJlMTE4ZTI4M2IzOWUxZTE1NTVjYmQzZjcgMTAtdGFyZ2V0LnRzAD8gdW50cmFja2VkLnR4dAA=",
+        "stderrText": ""
+      },
+      "indexEntry": {
+        "args": [
+          "ls-files",
+          "--stage",
+          "-z",
+          "--",
+          "10-target.ts"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.241,
+        "stdoutText": "100644 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 0\t10-target.ts\u0000",
+        "stdoutBase64": "MTAwNjQ0IGZmNjJjNWYzMGM1M2U5ODJlMTE4ZTI4M2IzOWUxZTE1NTVjYmQzZjcgMAkxMC10YXJnZXQudHMA",
+        "stderrText": ""
+      },
+      "diff": {
+        "args": [
+          "diff",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--binary",
+          "--"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 7.946,
+        "stdoutText": "diff --git a/10-target.ts b/10-target.ts\nindex ff62c5f..480c28d 100644\n--- a/10-target.ts\n+++ b/10-target.ts\n@@ -77,7 +77,7 @@ export const value076 = 76;\n export const value077 = 77;\n export const value078 = 78;\n export const value079 = 79;\n-export const value080 = 80;\n+export const value080 = 87;\n export const value081 = 81;\n export const value082 = 82;\n export const value083 = 83;\n",
+        "stdoutBase64": "ZGlmZiAtLWdpdCBhLzEwLXRhcmdldC50cyBiLzEwLXRhcmdldC50cwppbmRleCBmZjYyYzVmLi40ODBjMjhkIDEwMDY0NAotLS0gYS8xMC10YXJnZXQudHMKKysrIGIvMTAtdGFyZ2V0LnRzCkBAIC03Nyw3ICs3Nyw3IEBAIGV4cG9ydCBjb25zdCB2YWx1ZTA3NiA9IDc2OwogZXhwb3J0IGNvbnN0IHZhbHVlMDc3ID0gNzc7CiBleHBvcnQgY29uc3QgdmFsdWUwNzggPSA3ODsKIGV4cG9ydCBjb25zdCB2YWx1ZTA3OSA9IDc5OwotZXhwb3J0IGNvbnN0IHZhbHVlMDgwID0gODA7CitleHBvcnQgY29uc3QgdmFsdWUwODAgPSA4NzsKIGV4cG9ydCBjb25zdCB2YWx1ZTA4MSA9IDgxOwogZXhwb3J0IGNvbnN0IHZhbHVlMDgyID0gODI7CiBleHBvcnQgY29uc3QgdmFsdWUwODMgPSA4MzsK",
+        "stderrText": ""
+      },
+      "diffCached": {
+        "args": [
+          "diff",
+          "--cached",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--binary",
+          "--"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.666,
+        "stdoutText": "",
+        "stdoutBase64": "",
+        "stderrText": ""
+      }
+    }
+  },
+  "indexBlobsUnchanged": true,
+  "fileBytesAndModeRestored": true
+}

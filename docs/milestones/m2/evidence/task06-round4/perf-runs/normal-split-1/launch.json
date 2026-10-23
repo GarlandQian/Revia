@@ -1,0 +1,14 @@
+{
+  "source": "1fc9ec393a8708b72c224075753b677eaac41dfd",
+  "binary": "/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia",
+  "binarySha256": "37b6d9720f7757492badb0c37342ba3732501027eceb9f07566d2bf9fc3c9c74",
+  "pid": 76991,
+  "kind": "normal",
+  "view": "split",
+  "output": "/private/tmp/revia-task06-2fuu2r92/perf-runs/normal-split-1",
+  "launchedAt": "2026-10-23T16:15:30.782129+08:00",
+  "dataDir": "/private/tmp/revia-task06-2fuu2r92/perf-runs/normal-split-1/data",
+  "repo": "/private/tmp/revia-task06-2fuu2r92/perf-fixtures/diffs",
+  "path": "src/generated.ts",
+  "keepOpen": true
+}

@@ -1,0 +1,8 @@
+{
+  "source": "1fc9ec393a8708b72c224075753b677eaac41dfd",
+  "binarySha256": "37b6d9720f7757492badb0c37342ba3732501027eceb9f07566d2bf9fc3c9c74",
+  "pid": 77681,
+  "dataDir": "/private/tmp/revia-task06-2fuu2r92/diag-round4-visual",
+  "mode": "ordinary UI; production polling; no measure/soak/smoke",
+  "launchedAt": "2026-10-23T16:23:29.717209+08:00"
+}
