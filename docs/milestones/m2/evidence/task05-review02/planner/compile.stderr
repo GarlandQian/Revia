@@ -1,0 +1,21 @@
+warning: unused import: `DiscardPhase`
+ --> /private/tmp/revia-task05-review02-77fqrsqt/review.rs:2:80
+  |
+2 | use revia_lib::{git::{CommandLog,status::ChangesKind},recovery::{RecoveryStore,DiscardPhase},session::{WorktreeSession,ChangeEntry},s...
+  |                                                                                ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `git_input` is never used
+  --> /private/tmp/revia-task05-review02-77fqrsqt/review.rs:13:5
+   |
+ 4 | impl Fixture {
+   | ------------ method in this implementation
+...
+13 |  fn git_input(&self,args:&[&str],input:&str){let mut c=self.command(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio:...
+   |     ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: 2 warnings emitted
+

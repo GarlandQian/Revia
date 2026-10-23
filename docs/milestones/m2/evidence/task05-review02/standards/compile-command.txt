@@ -1,0 +1,1 @@
+/opt/homebrew/bin/rustc --edition=2021 /private/tmp/revia-review05-r2-standards-4aweb5w2/review.rs --extern revia_lib=/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps/librevia_lib.rlib -L dependency=/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps -o /private/tmp/revia-review05-r2-standards-4aweb5w2/review

@@ -1,0 +1,7 @@
+{
+  "pinned_commit": "cb828361d0f248ee4aa5e45f9bc40c7edc94e075",
+  "library": "/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps/librevia_lib.rlib",
+  "sha256": "b829ac27b6e67f8cf9357abe0da55d9820b79b91f1713cac0fabddfa2bc9c17c",
+  "mtime_ns": 1792779491486630718,
+  "limit": "Existing library; no rebuild. Dynamic results corroborate fixed source static reasoning, do not independently establish binary revision."
+}
