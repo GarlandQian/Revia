@@ -377,6 +377,8 @@ pub fn supported_extensions() -> Vec<String> {
 /// 高亮工作线程：串行处理请求，独占解析状态。
 pub struct Highlighter {
     sender: std::sync::mpsc::Sender<Job>,
+    /// 当前文档数（测试与诊断用，读取时向线程查询）。
+    counter: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 /// 最多保留多少个文件的解析状态；超出后按最久未用淘汰（Q88：持续刷新不能无限累积）。
@@ -388,8 +390,15 @@ struct Job {
 }
 
 impl Highlighter {
+    /// 当前保留的文档数（用于验证缓存有界）。
+    pub fn document_count(&self) -> usize {
+        self.counter.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub fn start() -> Self {
         let (sender, receiver) = std::sync::mpsc::channel::<Job>();
+        let counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let thread_counter = counter.clone();
         std::thread::Builder::new()
             .name("revia-highlight".into())
             .spawn(move || {
@@ -402,15 +411,16 @@ impl Highlighter {
                     let result = run_job(&mut documents, job.request);
                     last_used.insert(key, tick);
                     evict_documents(&mut documents, &mut last_used, tick);
+                    thread_counter.store(documents.len(), std::sync::atomic::Ordering::Relaxed);
                     let _ = job.reply.send(result);
                 }
             })
             .expect("启动高亮线程失败");
-        Self { sender }
+        Self { sender, counter }
     }
 
     pub fn clone_handle(&self) -> Self {
-        Self { sender: self.sender.clone() }
+        Self { sender: self.sender.clone(), counter: self.counter.clone() }
     }
 
     /// 同步返回；调用方（Tauri 命令）把它放到阻塞线程池执行。

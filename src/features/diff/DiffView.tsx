@@ -542,6 +542,18 @@ function markerFor(kind?: RenderRow["lineKind"] | RowCell["kind"]): string {
   return " ";
 }
 
+/**
+ * 只有 token 拼回来的文本与显示文本完全一致时才用高亮结果。
+ * 高亮来自另一个版本时（例如未刷新前外部等长改写），宁可显示纯文本，
+ * 也不能让渲染出的文字与 Git hunk / 写指纹不一致（Q88、T05）。
+ */
+function tokensMatchText(tokens: ReturnType<HighlightStore["get"]>, text: string): boolean {
+  if (!tokens) return false;
+  let joined = "";
+  for (const token of tokens) joined += token.text;
+  return joined === text;
+}
+
 function Cell({
   text,
   kind,
@@ -558,8 +570,8 @@ function Cell({
   return (
     <span className={`cell cell-${kind}`}>
       <span className="marker">{marker}</span>
-      {tokens
-        ? tokens.map((token, index) => (
+      {tokensMatchText(tokens, text)
+        ? tokens!.map((token, index) => (
             <span key={index} className={highlights.categoryClass(token.category)}>
               {token.text}
             </span>
@@ -582,8 +594,8 @@ function SplitCell({
   return (
     <span className={`cell cell-${cell.kind}`}>
       <span className="marker">{markerFor(cell.kind)}</span>
-      {tokens
-        ? tokens.map((token, index) => (
+      {tokensMatchText(tokens, cell.text)
+        ? tokens!.map((token, index) => (
             <span key={index} className={highlights.categoryClass(token.category)}>
               {token.text}
             </span>

@@ -519,7 +519,8 @@ impl WorktreeSession {
         let mut attempt = 0u8;
         loop {
             attempt += 1;
-            let (revision, entry_fingerprint) = {
+            // 取快照的不可变证据：版本、文件指纹、以及**展示所用的那份 diff 原始字节**。
+            let (revision, entry_fingerprint, expected_raw, orig_path) = {
                 let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
                 let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
                 let entry = snapshot
@@ -527,7 +528,12 @@ impl WorktreeSession {
                     .iter()
                     .find(|entry| entry.path == path && entry.changes == changes)
                     .ok_or_else(|| AppError::rejected(format!("文件不在当前改动列表中：{path}")))?;
-                (snapshot.generation, entry.fingerprint.clone())
+                let raw = snapshot
+                    .models
+                    .get(&key(changes, path))
+                    .map(|cached| cached.model.raw_patch.clone())
+                    .unwrap_or_default();
+                (snapshot.generation, entry.fingerprint.clone(), raw, entry.original_path.clone())
             };
 
             // 内容版本由文件身份 + 该版本内容指纹确定：同一内容不重建解析状态。
@@ -539,6 +545,13 @@ impl WorktreeSession {
                 sent.get(&document_id).copied()
                     == Some(HighlightStamp { revision, content_version })
             };
+
+            // 首次为这一版内容取高亮前，必须证明这些字节确实属于快照展示的版本：
+            // 重新读取该文件当前的相关 diff，与快照里那份字节逐字节比较。
+            // 仅比对快照代际或 mtime/size 不能排除「未刷新前外部等长改写」（Q88、T05、ADR-0004）。
+            if !already_sent && !self.diff_matches_snapshot(path, changes, &expected_raw, orig_path.as_deref())? {
+                return Err(AppError::rejected("文件已变化，请重新确认"));
+            }
 
             let mut request = HighlightRequest {
                 document_id: document_id.clone(),
@@ -602,6 +615,25 @@ impl WorktreeSession {
         }
     }
 
+    /// 该文件当前的相关 diff 是否与快照记录的那份字节完全一致。
+    ///
+    /// 只有一致时，读取到的版本内容才与界面上展示的 diff / 写指纹属于同一版本；
+    /// 不修改暂存区，也不把无关 worktree 内容混入已暂存侧指纹（ADR-0009）。
+    fn diff_matches_snapshot(
+        &self,
+        path: &str,
+        changes: ChangesKind,
+        expected_raw: &[u8],
+        orig_path: Option<&str>,
+    ) -> Result<bool> {
+        let current = match changes {
+            ChangesKind::Unstaged => self.git.diff_worktree(Some(path))?,
+            ChangesKind::Staged => self.git.diff_index_with_orig(path, orig_path)?,
+            ChangesKind::Untracked => self.git.diff_untracked(path)?,
+        };
+        Ok(current == expected_raw)
+    }
+
     /// 某个版本的文件内容（旧版本可能是 HEAD 或暂存区，新版本可能是暂存区或工作区）。
     fn file_content(&self, path: &str, changes: ChangesKind, version: FileVersion) -> Result<Option<String>> {
         let scope = match (changes, version) {
@@ -625,6 +657,11 @@ impl WorktreeSession {
             .lock()
             .ok()
             .and_then(|guard| guard.as_ref().map(|snapshot| snapshot.fingerprint.clone()))
+    }
+
+    /// 当前高亮线程保留的文档数（验证缓存有界；测试与诊断用）。
+    pub fn highlight_document_count(&self) -> usize {
+        self.highlighter.document_count()
     }
 
     /// 该 worktree 自己的 gitDir（linked worktree 的 `.git` 是文件，由 Git 解析出真实目录）。

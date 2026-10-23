@@ -43,13 +43,16 @@ export interface WatchStatusPayload {
   active: boolean;
   error: string | null;
   activation: number;
+  /** 当前监视目标路径；前端据此确认状态属于自己请求的目标。 */
+  target: string | null;
   roots: number;
 }
 
 /** 与 Rust 侧 `WatchSnapshot` 对应。 */
 export interface WatchSnapshotPayload {
   status: WatchStatusPayload;
-  changes: number;
+  /** 最近一次触发变化的激活代号；只接受属于自己的目标。 */
+  changedActivation: number | null;
 }
 
 /** 与 Rust 侧 `Settings` 对应。 */
@@ -86,8 +89,8 @@ export const ipc = {
   setDiffFontSize: (size: number) => invoke<SettingsPayload>("set_diff_font_size", { size }),
   openWorktree: (worktreeId: string) =>
     invoke<WorktreeSessionInfo>("open_worktree", { request: { worktreeId } }),
-  watchWorktree: (worktreeId: string) =>
-    invoke<WatchStatusPayload>("watch_worktree", { request: { worktreeId } }),
+  watchWorktree: (worktreeId: string, activation: number) =>
+    invoke<WatchStatusPayload>("watch_worktree", { request: { worktreeId, activation } }),
   stopWatch: () => invoke<WatchStatusPayload>("stop_watch"),
   watchStatus: () => invoke<WatchSnapshotPayload>("watch_status"),
   listChanges: (worktreeId: string) =>

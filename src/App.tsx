@@ -30,7 +30,7 @@ import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
-import { RefreshCoordinator, SnapshotGate } from "@/lib/refreshGate";
+import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate } from "@/lib/refreshGate";
 import { getErrorMessage, toAppError } from "@/lib/error";
 import {
   formatMs,
@@ -74,6 +74,8 @@ export function App() {
   const [activeRepo, setActiveRepo] = useState<RepoEntry | null>(null);
   const [worktreeId, setWorktreeId] = useState<string | null>(null);
   const [info, setInfo] = useState<WorktreeSessionInfo | null>(null);
+  const infoRef = useRef(info);
+  infoRef.current = info;
   const [snapshot, setSnapshot] = useState<ChangesSnapshot | null>(null);
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
@@ -81,12 +83,15 @@ export function App() {
   worktreeIdRef.current = worktreeId;
   /** 快照接收门：只接受当前激活 worktree 中版本不倒退的快照（Q88、Q90）。 */
   const gateRef = useRef(new SnapshotGate());
+  /** 选择序号：每次选中/切换自增；晚到的选择与元数据响应必须核对它（Q88）。 */
+  const selectionEpochRef = useRef(0);
+  /** 选择上下文门与写结果门：与 refreshGate 中的实现共用，便于确定性测试。 */
+  const selectionGateRef = useRef(new SelectionGate());
+  const operationGateRef = useRef(new OperationResultGate(gateRef.current));
   const [watchState, setWatchState] = useState<{ active: boolean; error: string | null }>({
     active: false,
     error: null,
   });
-  /** 自动测量 / 长测 / 冒烟模式：脚本自己驱动刷新，不启用后台轮询以免干扰计时。 */
-  const measurementModeRef = useRef(false);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [view, setView] = useState<ViewMode>("split");
   const viewRef = useRef(view);
@@ -196,13 +201,23 @@ export function App() {
 
   const openEntry = useCallback(
     async (requested: ChangeEntry, target: { view: ViewMode; worktreeId: string; expand?: boolean }) => {
+      // 本次选择独占一个上下文：期间又选了别的文件或切走，本次结果一律作废（Q88）。
+      selectionEpochRef.current += 1;
+      const gateToken = gateRef.current.token();
+      const selectionContext = selectionGateRef.current.begin(
+        target.worktreeId, requested.path, requested.changes, gateToken.activation,
+      );
+      const superseded = () =>
+        !selectionGateRef.current.isValid(selectionContext, gateRef.current.token().activation)
+        || worktreeIdRef.current !== target.worktreeId;
       let entry = requested;
       // 未跟踪文件的内容与行数在后端首次取行时才统计；先取一次空范围补全元数据，
       // 否则行数为 0 会被当成空文件，永远不挂载 diff 视图（任务 02 桌面验收）。
       if (entry.changes === "untracked" && !entry.metricsLoaded && !entry.readonlyReason) {
         const slice = await ipc.getRows({ worktreeId: target.worktreeId, path: entry.path, changes: entry.changes,
           view: target.view, from: 0, to: 0 });
-        if (worktreeIdRef.current !== target.worktreeId) {
+        // 迟到的未跟踪元数据不得把选择拉回旧文件（含同 worktree U→V 与 A→B→A）。
+        if (superseded()) {
           return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
         }
         const loaded = slice.entry;
@@ -217,6 +232,9 @@ export function App() {
             candidate.path === loaded.path && candidate.changes === loaded.changes
               && candidate.snapshotRevision === loaded.snapshotRevision ? loaded : candidate),
         });
+      }
+      if (superseded()) {
+        return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
       }
       const selection: Selection = { path: entry.path, changes: entry.changes };
       if (target.expand && entry.collapsed) {
@@ -285,8 +303,10 @@ export function App() {
         }
 
         // 监视只跟随当前 worktree；切换即释放旧监视（Q88）。
-        const watch = await ipc.watchWorktree(id).catch(() => null);
-        if (gateRef.current.token().activation === myToken.activation && watch) {
+        // 把发起时的激活代号带给后端：迟到进入的旧请求会被拒绝，不会装成最新监视。
+        const watch = await ipc.watchWorktree(id, myToken.activation).catch(() => null);
+        if (gateRef.current.token().activation === myToken.activation && watch
+          && watch.target === infoRef.current?.worktreePath) {
           setWatchState({ active: watch.active, error: watch.error });
         }
 
@@ -399,31 +419,60 @@ export function App() {
 
   useEffect(() => () => refreshCoordinator.dispose(), [refreshCoordinator]);
 
-  // 监视状态与变化通知：轮询后端，失败持续展示，成功也不清除历史失败提示以外的东西（Q95）。
+  // 监视状态与变化通知：轮询后端，失败持续展示（Q95）。
+  // 只接受属于当前激活目标的状态与变化，迟到的状态响应不会画到别的目标上。
   useEffect(() => {
-    if (!worktreeId || measurementModeRef.current) return;
+    if (!worktreeId) return;
     let cancelled = false;
-    let seen = -1;
+    let seenActivation: number | null = null;
     const poll = async () => {
+      const token = gateRef.current.token();
       try {
         const snapshot = await ipc.watchStatus();
         if (cancelled) return;
+        // 目标或激活代号已变：这一份状态属于旧目标，丢弃。
+        if (gateRef.current.token().activation !== token.activation) return;
+        const expectedTarget = infoRef.current?.worktreePath ?? null;
+        if (expectedTarget && snapshot.status.target !== expectedTarget) return;
         setWatchState({ active: snapshot.status.active, error: snapshot.status.error });
-        if (seen < 0) {
-          seen = snapshot.changes;
-        } else if (snapshot.changes > seen) {
-          seen = snapshot.changes;
-          refreshCoordinator.request();
+        const changed = snapshot.changedActivation;
+        if (changed === null) return;
+        if (seenActivation === null) {
+          seenActivation = changed;
+          return;
+        }
+        if (changed > seenActivation) {
+          seenActivation = changed;
+          // 只有当前目标的激活代号才触发刷新。
+          if (changed === token.activation) refreshCoordinator.request();
         }
       } catch {
         // 状态查询失败不改变监视结论，等下一轮。
       }
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 600);
+    // 轮询必须让开滚动取数：连续滚动期间暂停，滚动停下后再核对一次。
+    // 这样既保留生产环境的自动刷新，也不会与行数据争用 IPC 造成未覆盖帧。
+    let timer = 0;
+    let lastInteraction = performance.now();
+    const noteInteraction = () => {
+      lastInteraction = performance.now();
+    };
+    window.addEventListener("scroll", noteInteraction, { capture: true, passive: true });
+    window.addEventListener("wheel", noteInteraction, { passive: true });
+    window.addEventListener("keydown", noteInteraction);
+    const tick = () => {
+      const idle = performance.now() - lastInteraction >= 250;
+      if (idle && !document.hidden) void poll();
+      timer = window.setTimeout(tick, idle ? 1000 : 300);
+    };
+    timer = window.setTimeout(tick, 1000);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
+      window.removeEventListener("scroll", noteInteraction, { capture: true });
+      window.removeEventListener("wheel", noteInteraction);
+      window.removeEventListener("keydown", noteInteraction);
     };
   }, [refreshCoordinator, worktreeId]);
 
@@ -484,7 +533,6 @@ export function App() {
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
-        measurementModeRef.current = Boolean(config.autoRun || config.smoke || (config.soakSeconds ?? 0) > 0);
         setLoggingEnabled(config.logging && !config.minimalSoakLogging);
         if (!config.logging) {
           setPanelOpen(false);
@@ -547,6 +595,8 @@ export function App() {
         setAppError(toAppError(caught), id);
         return;
       }
+      selectionEpochRef.current += 1;
+      selectionGateRef.current.clear();
       setSelected(null);
       rowStore.setTarget({ worktreeId: id, path: "", changes: "unstaged", view: viewRef.current,
         fingerprint: "", snapshotRevision: "" }, 0, null);
@@ -582,6 +632,10 @@ export function App() {
     if (!anchor || anchor.view !== view || !selectedEntry) return;
     let cancelled = false;
     void (async () => {
+      // 绑定发起时的选择与版本：迟到的行号结果不得挪动已经切换的视口（Q88）。
+      const anchorEpoch = selectionEpochRef.current;
+      const anchorGate = gateRef.current.token();
+      const anchorRevision = selectedEntry.snapshotRevision;
       const index = await ipc.rowIndexForLine({
         worktreeId: worktreeId ?? "",
         path: selectedEntry.path,
@@ -591,6 +645,15 @@ export function App() {
         version: anchor.version,
       });
       if (cancelled) return;
+      if (anchorEpoch !== selectionEpochRef.current
+        || gateRef.current.token().activation !== anchorGate.activation
+        || selectedRef.current?.path !== selectedEntry.path
+        || selectedRef.current?.changes !== selectedEntry.changes
+        || snapshotRef.current?.entries.find((entry) => entry.path === selectedEntry.path
+          && entry.changes === selectedEntry.changes)?.snapshotRevision !== anchorRevision) {
+        debugLog(`丢弃过期的行号定位结果：${selectedEntry.path}`);
+        return;
+      }
       await waitUntil(() => rowStore.isCovered(index, index + 1), 3000);
       if (cancelled) return;
       diffRef.current?.scrollToRow(index);
@@ -655,25 +718,36 @@ export function App() {
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
     setAppError(null, opWorktreeId);
+    // 记下发起时的激活上下文：结果回来时必须仍然属于同一个激活目标（Q90）。
+    const opToken = operationGateRef.current.begin();
     const request = { worktreeId: opWorktreeId, path: target.path, fingerprint: target.fingerprint };
     try {
       const unstaging = target.changes === "staged";
       const next = target.hunkId !== undefined
         ? await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId })
         : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
-      setAppError(null, opWorktreeId);
-      if (worktreeIdRef.current === opWorktreeId) applyRefreshedSnapshot(next);
+      // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
+      if (operationGateRef.current.acceptSuccess(opToken, next)
+        && acceptSnapshot(opToken, next, true)) {
+        setAppError(null, opWorktreeId);
+      } else {
+        debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);
+      }
     } catch (caught) {
       const err = toAppError(caught);
-      setAppError(err, opWorktreeId);
-      // 结果始终归属发起的 worktree；拒绝或待核对只刷新，绝不自动重跑写操作。
-      if (worktreeIdRef.current === opWorktreeId
-        && (err.kind === "needsVerification" || err.kind === "rejected")) void refresh();
+      // 失败/待核对只归属发起时的激活目标，旧请求不覆盖新界面。
+      if (!operationGateRef.current.acceptFailure(opToken)) {
+        debugLog(`写失败结果已过期，不再更新界面：${opWorktreeId}`);
+      } else {
+        setAppError(err, opWorktreeId);
+        // 拒绝或待核对只刷新，绝不自动重跑写操作。
+        if (err.kind === "needsVerification" || err.kind === "rejected") void refresh();
+      }
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
     }
-  }, [applyRefreshedSnapshot, refresh, setAppError]);
+  }, [acceptSnapshot, refresh, setAppError]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;

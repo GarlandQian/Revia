@@ -25,8 +25,8 @@ pub struct AppState {
     pub command_log: Arc<CommandLog>,
     /// 只监视当前 worktree 的控制器（Q88）。
     pub watch: Arc<WatchController>,
-    /// 供前端轮询的「有变化」代号（由监视线程递增）。
-    pub watch_events: Arc<std::sync::atomic::AtomicU64>,
+    /// 最近一次「有变化」的激活代号（由监视线程写入）。
+    pub watch_events: Arc<Mutex<Option<u64>>>,
 }
 
 impl AppState {
@@ -37,7 +37,7 @@ impl AppState {
             sessions: Mutex::new(HashMap::new()),
             command_log,
             watch: Arc::new(WatchController::new()),
-            watch_events: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            watch_events: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -95,6 +95,14 @@ pub struct SelectRepoRequest {
 #[serde(rename_all = "camelCase")]
 pub struct WorktreeRequest {
     pub worktree_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchWorktreeRequest {
+    pub worktree_id: String,
+    /// 前端发起这次激活时的代号；后端据此拒绝迟到的旧请求。
+    pub activation: u64,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -213,15 +221,18 @@ pub async fn open_worktree(state: State<'_, AppState>, request: WorktreeRequest)
 }
 
 /// 切换当前监视目标：只监视这个 worktree，并释放旧监视（Q88、Q95）。
+///
+/// `activation` 是前端发起时的激活代号：后端用它拒绝迟到进入的旧激活请求。
 #[tauri::command]
-pub async fn watch_worktree(state: State<'_, AppState>, request: WorktreeRequest) -> Result<WatchStatus> {
+pub async fn watch_worktree(state: State<'_, AppState>, request: WatchWorktreeRequest) -> Result<WatchStatus> {
     let session = state.session(&request.worktree_id)?;
     let events = state.watch_events.clone();
     let status = state.watch.activate(
         resolve_roots(&session.path, session.git_dir_path(), session.common_dir_path()),
-        move |_activation| {
-            // 只递增代号：具体读取由前端在合并窗口后触发一次，不在此排队。
-            events.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        request.activation,
+        move |activation| {
+            // 只记录「哪个激活目标发生了变化」：具体读取由前端在合并窗口后触发一次。
+            events.lock().map(|mut guard| *guard = Some(activation)).ok();
         },
     );
     Ok(status)
@@ -238,15 +249,17 @@ pub async fn stop_watch(state: State<'_, AppState>) -> Result<WatchStatus> {
 #[serde(rename_all = "camelCase")]
 pub struct WatchSnapshot {
     pub status: WatchStatus,
-    /// 监视线程累计通知的变化次数。
-    pub changes: u64,
+    /// 最近一次触发变化的激活代号；前端只接受属于自己的目标。
+    pub changed_activation: Option<u64>,
 }
 
 #[tauri::command]
 pub async fn watch_status(state: State<'_, AppState>) -> Result<WatchSnapshot> {
+    let status = state.watch.status();
+    let changed_activation = state.watch_events.lock().ok().and_then(|guard| *guard);
     Ok(WatchSnapshot {
-        status: state.watch.status(),
-        changes: state.watch_events.load(std::sync::atomic::Ordering::Relaxed),
+        status,
+        changed_activation,
     })
 }
 

@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, SelectionGate } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 
 test("同 worktree 内旧版本快照被拒绝，新版本被接受", () => {
@@ -109,4 +109,78 @@ test("刷新协调器 dispose 后不再执行", async () => {
   coordinator.request();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(runs, 0);
+});
+
+test("写结果走接收门：晚到的 r2 不能覆盖已接受的 r3", () => {
+  const gate = new SnapshotGate();
+  const ops = new OperationResultGate(gate);
+  gate.activate("wt-a");
+  const token = ops.begin();
+
+  // 自动刷新先接受了 r3。
+  assert.equal(gate.accept(gate.token(), { worktreeId: "wt-a", revision: 3 }), true);
+
+  // 之前发起的写操作结果 r2 迟到返回：必须被拒绝。
+  assert.equal(ops.acceptSuccess(token, { worktreeId: "wt-a", revision: 2 }), false);
+  assert.equal(gate.acceptedRevision("wt-a"), 3);
+
+  // 更新的 r4 写结果可以接受。
+  assert.equal(ops.acceptSuccess(token, { worktreeId: "wt-a", revision: 4 }), true);
+  assert.equal(gate.acceptedRevision("wt-a"), 4);
+});
+
+test("写结果 A→B→A：第一次 A 的写结果被拒绝", () => {
+  const gate = new SnapshotGate();
+  const ops = new OperationResultGate(gate);
+  gate.activate("wt-a");
+  const tokenA1 = ops.begin();
+  gate.activate("wt-b");
+  gate.activate("wt-a");
+
+  assert.equal(ops.acceptSuccess(tokenA1, { worktreeId: "wt-a", revision: 9 }), false);
+  // 失败结果同样不得作用到新的 A 界面。
+  assert.equal(ops.acceptFailure(tokenA1), false);
+});
+
+test("失败结果只在发起目标仍激活时生效", () => {
+  const gate = new SnapshotGate();
+  const ops = new OperationResultGate(gate);
+  gate.activate("wt-a");
+  const token = ops.begin();
+  assert.equal(ops.acceptFailure(token), true);
+  gate.activate("wt-b");
+  assert.equal(ops.acceptFailure(token), false, "切走后旧失败不得污染当前界面");
+});
+
+test("选择门：同 worktree U→V 时 U 的迟到元数据被作废", () => {
+  const gate = new SelectionGate();
+  const u = gate.begin("wt-a", "u.txt", "untracked", 1);
+  const v = gate.begin("wt-a", "v.txt", "unstaged", 1);
+
+  assert.equal(gate.isValid(u, 1), false, "U 已被 V 取代");
+  assert.equal(gate.isValid(v, 1), true);
+});
+
+test("选择门：A→B→A 时第一次 A 的选择被作废", () => {
+  const gate = new SelectionGate();
+  const a1 = gate.begin("wt-a", "a.txt", "unstaged", 1);
+  gate.begin("wt-b", "b.txt", "unstaged", 2);
+  gate.begin("wt-a", "a.txt", "unstaged", 3);
+
+  assert.equal(gate.isValid(a1, 1), false, "旧激活代号的同路径结果也不得生效");
+  assert.equal(gate.isValid(a1, 3), false);
+});
+
+test("选择门：清空选择后迟到结果不得重新选中", () => {
+  const gate = new SelectionGate();
+  const context = gate.begin("wt-a", "a.txt", "unstaged", 1);
+  gate.clear();
+  assert.equal(gate.isValid(context, 1), false);
+});
+
+test("选择门：当前激活代号变化后旧上下文失效", () => {
+  const gate = new SelectionGate();
+  const context = gate.begin("wt-a", "a.txt", "unstaged", 1);
+  assert.equal(gate.isValid(context, 1), true);
+  assert.equal(gate.isValid(context, 2), false, "外部激活代号已变，旧上下文必须失效");
 });

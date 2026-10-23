@@ -112,3 +112,84 @@ export class RefreshCoordinator {
     this.dirty = false;
   }
 }
+
+/**
+ * 写结果消费路径（Q90）：把「发起时的激活上下文」与「当前已接受快照」绑定在一起，
+ * 供集成测试与 App 共用，避免只测 SnapshotGate 本身而没证明调用方真的用了它。
+ *
+ * 规则：
+ * - 结果快照必须仍然属于发起时的激活目标；
+ * - 结果版本不得低于该目标已接受的版本（晚到的 r2 不能覆盖 r3）；
+ * - 失败/待核对结果同样只在发起目标仍激活时生效。
+ */
+export class OperationResultGate {
+  private readonly gate: SnapshotGate;
+
+  constructor(gate: SnapshotGate) {
+    this.gate = gate;
+  }
+
+  begin(): { activation: number; worktreeId: string | null } {
+    return this.gate.token();
+  }
+
+  /** 成功结果：返回是否应当应用到界面。 */
+  acceptSuccess(
+    token: { activation: number; worktreeId: string | null },
+    result: SnapshotEnvelope,
+  ): boolean {
+    return this.gate.accept(token, result);
+  }
+
+  /** 失败/待核对结果：只在发起目标仍激活时生效。 */
+  acceptFailure(token: { activation: number; worktreeId: string | null }): boolean {
+    return this.gate.token().activation === token.activation
+      && this.gate.token().worktreeId === token.worktreeId;
+  }
+}
+
+/**
+ * 选择上下文（Q88）：异步选择与元数据读取在应用结果前必须核对它。
+ *
+ * - `epoch`：每次选中/切换自增，同 worktree 内 U→V 也会作废 U 的迟到结果；
+ * - `activation`：A→B→A 时第一次 A 的结果必须作废；
+ * - `selection`：应用前再确认当前选中仍是这次请求的文件。
+ */
+export interface SelectionContext {
+  epoch: number;
+  activation: number;
+  worktreeId: string | null;
+  path: string;
+  changes: string;
+}
+
+export class SelectionGate {
+  private epoch = 0;
+  private current: SelectionContext | null = null;
+
+  begin(worktreeId: string | null, path: string, changes: string, activation: number): SelectionContext {
+    this.epoch += 1;
+    this.current = { epoch: this.epoch, activation, worktreeId, path, changes };
+    return this.current;
+  }
+
+  /** 记录「已切走」（切换 worktree 或清空选择）。 */
+  clear(): void {
+    this.epoch += 1;
+    this.current = null;
+  }
+
+  currentContext(): SelectionContext | null {
+    return this.current;
+  }
+
+  /** 该请求的结果现在是否仍然有效。 */
+  isValid(context: SelectionContext, activation: number): boolean {
+    const current = this.current;
+    if (!current) return false;
+    if (current.epoch !== context.epoch) return false;
+    if (current.activation !== context.activation) return false;
+    if (activation !== context.activation) return false;
+    return current.path === context.path && current.changes === context.changes;
+  }
+}

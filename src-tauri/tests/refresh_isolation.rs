@@ -309,61 +309,158 @@ fn t13_untracked_content_change_updates_loaded_metrics() {
     assert!(text.iter().any(|line| line.contains("third")), "刷新后必须读到新内容：{text:?}");
 }
 
-/// 高亮结果必须带版本；同一文件持续刷新不会让文档缓存随版本线性增长。
+/// 高亮必须绑定到**展示版本的实际字节**：未 refresh 前外部等长改写，必须被拒绝，
+/// 不能把新字节当成旧快照的内容返回（否则文字会与 Git hunk / 写指纹不一致）。
 #[test]
-fn t13_highlight_results_carry_versions_and_stay_bounded() {
+fn t13_highlight_rejects_external_edit_before_refresh() {
+    let ctx = TestContext::new();
+    ctx.track("src/app.ts", b"const a = 1;\nconst b = 2;\n");
+    ctx.write("src/app.ts", b"const a = 9;\nconst b = 2;\n");
+
+    let session = ctx.open();
+    let snapshot = session.refresh().unwrap();
+
+    // 快照与行都取好后，外部做等长改写（行数、字节数完全相同），且**不刷新**。
+    ctx.write("src/app.ts", b"const a = 7;\nconst b = 2;\n");
+
+    let error = session
+        .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
+        .expect_err("未刷新前外部改写后，高亮必须拒绝，而不是把新字节标成旧版本");
+    assert_eq!(error.to_string(), "文件已变化，请重新确认");
+
+    // 刷新后，高亮才与新的展示版本一致，且文本来自新内容。
+    let refreshed = session.refresh().unwrap();
+    let result = session
+        .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
+        .unwrap();
+    assert_eq!(result.revision, refreshed.revision);
+    let text: String = result
+        .lines
+        .iter()
+        .filter_map(|line| line.as_ref())
+        .flat_map(|tokens| tokens.iter())
+        .map(|token| token.text.clone())
+        .collect();
+    assert!(text.contains("const a = 7;"), "高亮文本必须来自刷新后的展示版本：{text:?}");
+    assert!(!text.contains("const a = 9;"), "不能返回旧内容：{text:?}");
+}
+
+/// 同一文件持续刷新不会让高亮文档缓存随版本线性增长（可观测上界）。
+#[test]
+fn t13_highlight_cache_stays_bounded_across_versions() {
     let ctx = TestContext::new();
     ctx.track("src/app.ts", b"const a = 1;\nconst b = 2;\n");
     ctx.write("src/app.ts", b"const a = 10;\nconst b = 2;\n");
 
     let session = ctx.open();
-    let first = session.refresh().unwrap();
-    let result = session
-        .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
-        .unwrap();
-    assert_eq!(result.revision, first.revision, "高亮结果必须回传快照版本");
-    assert!(!result.need_content);
+    session.refresh().unwrap();
 
-    // 连续多版本刷新后，仍能取到与最新快照一致的高亮版本。
-    let mut last_revision = first.revision;
-    for index in 0..12 {
+    let mut max_documents = 0;
+    for index in 0..40 {
         ctx.write("src/app.ts", format!("const a = {};\nconst b = 2;\n", 100 + index).as_bytes());
         let snapshot = session.refresh().unwrap();
         let highlighted = session
             .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
             .unwrap();
         assert_eq!(highlighted.revision, snapshot.revision, "高亮必须与最新快照对齐");
-        assert!(snapshot.revision > last_revision);
-        last_revision = snapshot.revision;
+        max_documents = max_documents.max(session.highlight_document_count());
     }
+
+    assert!(
+        max_documents <= 24,
+        "高亮文档缓存必须有界（上限 24），实际峰值 {max_documents}"
+    );
 }
 
-/// 并发刷新：任一时刻发布出的快照版本都必须与它自己的内容一致，且版本严格递增。
+/// 并发刷新：晚发布的那次刷新必须对应它自己读到的内容，不能把旧内容标成新版本。
+///
+/// 做法：先单线程写入 v1..vN 并记录每次的指纹，得到「指纹 → 内容标记」表；
+/// 再让写线程按同样顺序推进、多个线程并发 refresh，最后把观测到的指纹映射回标记，
+/// 断言版本越大内容标记越大（早读晚发布会造成标记倒退）。
 #[test]
-fn t13_concurrent_refreshes_never_publish_stale_snapshot() {
+fn t13_concurrent_refreshes_never_publish_stale_content() {
+    const VERSIONS: u64 = 20;
+
     let ctx = TestContext::new();
     ctx.track("file.txt", b"v0\n");
-
     let session = ctx.open();
+
+    // 1. 单线程建立指纹 → 标记表。
+    let mut fingerprint_to_marker: HashMap<String, u64> = HashMap::new();
+    for marker in 1..=VERSIONS {
+        ctx.write("file.txt", format!("v{marker}\n").as_bytes());
+        let snapshot = session.refresh().unwrap();
+        let fingerprint = snapshot
+            .entries
+            .iter()
+            .find(|entry| entry.path == "file.txt")
+            .expect("应有未暂存改动")
+            .fingerprint
+            .clone();
+        fingerprint_to_marker.insert(fingerprint, marker);
+    }
+    assert_eq!(
+        fingerprint_to_marker.len() as u64, VERSIONS,
+        "每个版本必须有不同的文件指纹"
+    );
+
+    // 2. 写线程按同样顺序推进，多个线程并发刷新。
+    let writer = {
+        let repo = ctx.repo.clone();
+        std::thread::spawn(move || {
+            for marker in 1..=VERSIONS {
+                std::fs::write(repo.join("file.txt"), format!("v{marker}\n")).unwrap();
+                std::thread::sleep(Duration::from_millis(3));
+            }
+        })
+    };
+
     let mut handles = Vec::new();
     for _ in 0..4 {
         let session = session.clone();
         handles.push(std::thread::spawn(move || {
-            let mut revisions = Vec::new();
-            for _ in 0..6 {
-                revisions.push(session.refresh().unwrap().revision);
+            let mut observed: Vec<(u64, String)> = Vec::new();
+            for _ in 0..12 {
+                let snapshot = session.refresh().unwrap();
+                let fingerprint = snapshot
+                    .entries
+                    .iter()
+                    .find(|entry| entry.path == "file.txt")
+                    .map(|entry| entry.fingerprint.clone())
+                    .unwrap_or_default();
+                observed.push((snapshot.revision, fingerprint));
             }
-            revisions
+            observed
         }));
     }
+    writer.join().unwrap();
 
-    let mut all: Vec<u64> = Vec::new();
+    let mut all: Vec<(u64, String)> = Vec::new();
     for handle in handles {
         all.extend(handle.join().unwrap());
     }
-    all.sort_unstable();
-    all.dedup();
-    assert_eq!(all.len(), 24, "24 次刷新必须产生 24 个不同的快照版本，不能重复或倒退");
+    assert!(!all.is_empty(), "并发刷新必须有样本");
+
+    // 版本唯一。
+    let mut revisions: Vec<u64> = all.iter().map(|(revision, _)| *revision).collect();
+    revisions.sort_unstable();
+    let total = revisions.len();
+    revisions.dedup();
+    assert_eq!(revisions.len(), total, "每次刷新必须产生唯一版本，不能重复发布");
+
+    // 版本递增时内容标记不能倒退。
+    all.sort_by_key(|(revision, _)| *revision);
+    let mut previous_marker = 0u64;
+    for (revision, fingerprint) in &all {
+        let marker = *fingerprint_to_marker
+            .get(fingerprint)
+            .unwrap_or_else(|| panic!("版本 {revision} 的指纹不在预计算表中：{fingerprint}"));
+        assert!(
+            marker >= previous_marker,
+            "版本 {revision} 读到更旧的内容（标记 {marker} < 上一版本 {previous_marker}），说明发生了旧内容晚发布"
+        );
+        previous_marker = marker;
+    }
 }
 
 /// linked worktree：监视根必须解析出真实 gitDir，而不是工作区里的 `.git` 文件本身。
@@ -401,7 +498,7 @@ fn t13_watch_failure_stays_visible_across_manual_refresh() {
     let controller = WatchController::new();
     controller.force_failure(Some("自动刷新不可用：测试注入".into()));
 
-    let status = controller.activate(resolve_roots(&session.path, None, None), |_| {});
+    let status = controller.activate(resolve_roots(&session.path, None, None), 1, |_| {});
     assert!(!status.active);
     assert!(status.error.as_deref().unwrap_or("").contains("自动刷新不可用"));
 
@@ -423,7 +520,7 @@ fn t13_watcher_emits_coalesced_change_notification() {
     let hits = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let controller = WatchController::new();
     let counter = hits.clone();
-    let status = controller.activate(resolve_roots(&session.path, None, None), move |_| {
+    let status = controller.activate(resolve_roots(&session.path, None, None), 1, move |_| {
         counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     });
     assert!(status.active, "真实目录应当监视成功：{:?}", status.error);
@@ -523,3 +620,95 @@ fn t13_refresh_does_not_spawn_per_file_git_processes() {
 
 #[allow(dead_code)]
 fn unused(_: CommandRecord) {}
+
+/// 监视范围：当前 worktree 的改动、原子替换、外部暂存、linked index、共享 refs 必须触发；
+/// 其他 worktree 的私有 index 与对象库不得触发当前目标的刷新（Q88）。
+#[test]
+fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let ctx = TestContext::new();
+    ctx.track("file.txt", b"base\n");
+
+    // 建立一个 linked worktree，用于「无关私有元数据」判定。
+    let linked = ctx._temp_dir.path().join("linked");
+    let linked_str = linked.display().to_string();
+    ctx.git(&["worktree", "add", "-b", "linked-branch", &linked_str]);
+
+    let session = ctx.open();
+    let common = ctx.repo.join(".git");
+    let roots = resolve_roots(
+        &session.path,
+        session.git_dir_path(),
+        session.common_dir_path(),
+    );
+    assert!(roots.git_dir.is_dir(), "必须解析出真实 gitDir");
+    assert!(
+        !roots.git_dir.starts_with(&session.path),
+        "linked worktree 的 gitDir 应在 commonDir 下，而不是工作区内"
+    );
+
+    let hits = Arc::new(AtomicU64::new(0));
+    let controller = WatchController::new();
+    let counter = hits.clone();
+    let status = controller.activate(roots.clone(), 1, move |_| {
+        counter.fetch_add(1, Ordering::Relaxed);
+    });
+    assert!(status.active, "当前 worktree 应监视成功：{:?}", status.error);
+
+    let wait_for_hit = |baseline: u64| -> bool {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if hits.load(Ordering::Relaxed) > baseline {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        false
+    };
+    let settle = || std::thread::sleep(Duration::from_millis(250));
+
+    // 1. 当前文件改动：必须触发。
+    let baseline = hits.load(Ordering::Relaxed);
+    ctx.write("file.txt", b"changed\n");
+    assert!(wait_for_hit(baseline), "当前 worktree 的文件改动必须触发刷新");
+
+    // 2. 编辑器原子替换（写临时文件后 rename 覆盖）：必须触发。
+    settle();
+    let baseline = hits.load(Ordering::Relaxed);
+    let temp = ctx.repo.join("file.txt.tmp-atomic");
+    std::fs::write(&temp, b"atomic saved\n").unwrap();
+    std::fs::rename(&temp, ctx.repo.join("file.txt")).unwrap();
+    assert!(wait_for_hit(baseline), "原子替换必须触发刷新");
+
+    // 3. 外部暂存：必须触发。
+    settle();
+    let baseline = hits.load(Ordering::Relaxed);
+    ctx.git(&["--literal-pathspecs", "add", "--", "file.txt"]);
+    assert!(wait_for_hit(baseline), "外部暂存必须触发刷新");
+
+    // 4. linked worktree 的私有 index 变化：不得触发当前 worktree 的刷新。
+    settle();
+    let baseline = hits.load(Ordering::Relaxed);
+    let linked_index = common.join("worktrees/linked/index");
+    assert!(linked_index.exists(), "linked worktree 应有独立 index");
+    let mut bytes = std::fs::read(&linked_index).unwrap();
+    bytes.push(0);
+    std::fs::write(&linked_index, &bytes).unwrap();
+    std::thread::sleep(Duration::from_millis(600));
+    assert_eq!(
+        hits.load(Ordering::Relaxed),
+        baseline,
+        "其他 worktree 的私有 index 变化不得触发当前 worktree 的刷新"
+    );
+
+    // 5. 共享 refs 变化：必须触发（影响当前 worktree 的状态）。
+    settle();
+    let baseline = hits.load(Ordering::Relaxed);
+    std::fs::create_dir_all(common.join("refs/heads")).unwrap();
+    std::fs::write(common.join("refs/heads/another-branch"), "0".repeat(40) + "\n").unwrap();
+    assert!(wait_for_hit(baseline), "共享 refs 变化必须触发刷新");
+
+    controller.stop();
+}
+
