@@ -1026,3 +1026,52 @@ fn multiline_filter_command_is_copied_losslessly() {
     assert_eq!(f.read("target.txt"), b"alpha\nbeta\n");
     assert_eq!(f.index(), index);
 }
+
+/// R04-GUI1 / T03 / Q81：Git 识别的重命名没有 hunk 丢弃。
+/// porcelain `RM` 的未暂存 `M` 仍带原路径，必须被共享能力 gate 拒绝；
+/// 整文件丢弃与「新旧相关路径」记录保持不变。
+#[test]
+fn git_rename_unstaged_side_rejects_hunk_discard_but_keeps_whole_file() {
+    let f = Fixture::new();
+    f.write("old.txt", b"alpha\nbeta\ngamma\n");
+    f.commit();
+    f.git(&["mv", "old.txt", "new.txt"]);
+    f.write("new.txt", b"alpha\nBETA\ngamma\n");
+
+    let session = f.session();
+    let snapshot = session.refresh().unwrap();
+    let staged = snapshot.entries.iter()
+        .find(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Staged)
+        .expect("应有已暂存改名");
+    assert_eq!(staged.status, revia_lib::git::status::FileStatus::Renamed);
+    let unstaged = snapshot.entries.iter()
+        .find(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Unstaged)
+        .expect("应有未暂存修改");
+    assert_eq!(unstaged.original_path.as_deref(), Some("old.txt"));
+
+    let store = f.store();
+    let index = f.index();
+    let before = f.read("new.txt");
+
+    // 后端拒绝 hunk 丢弃，且不产生任何回收记录。
+    let rejected = session
+        .discard_hunk("new.txt", &unstaged.fingerprint, &unstaged.snapshot_revision, "forged-hunk", &store)
+        .expect_err("rename 的未暂存条目不得接受 hunk 丢弃");
+    assert_eq!(
+        rejected.to_string(),
+        "这个文件不支持 hunk 操作",
+        "必须由共享能力 gate 拒绝，而不是靠 hunk 凭据不存在"
+    );
+    assert!(store.list(None).unwrap().is_empty(), "拒绝时不得写回收记录");
+    assert_eq!(f.read("new.txt"), before);
+    assert_eq!(f.index(), index);
+
+    // 整文件丢弃仍然可用，并记录新旧两条相关路径。
+    discard(&session, &unstaged, &store).expect("rename 的整文件丢弃必须保持可用");
+    assert_eq!(f.read("new.txt"), b"alpha\nbeta\ngamma\n");
+    assert_eq!(f.index(), index, "丢弃不得改变暂存区（改名继续保持已暂存）");
+    let records = store.list(None).unwrap();
+    assert_eq!(records.len(), 1);
+    assert!(records[0].paths.contains(&"old.txt".to_string()));
+    assert!(records[0].paths.contains(&"new.txt".to_string()));
+}

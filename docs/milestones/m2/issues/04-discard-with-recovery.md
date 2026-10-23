@@ -4,7 +4,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、4、7，T05、T07、T10、T11、D02；Q9、Q81–Q83、Q85、Q87、Q91、Q93。
 
@@ -241,3 +241,41 @@
 请在共享能力边界按 Git 实际 rename 元数据拒绝 hunk，覆盖 type-2 RM 与后端拒绝，保持整文件丢弃、完整相关路径记录不回归；检查该 gate 对暂存/取消暂存调用者的影响。不得自行猜测删除/未跟踪配对，不扩大 04 到 05/07/08/12/13。此为既有契约漏验，不是新产品决策。修复后集中运行受影响检查、提交 m2 并逐项回应；规划方做增量两轴审查和针对性真实桌面补验。
 
 已按 Q97 正常推送 `36dad65`，CI #39965209864 启动；本条记录时仍进行中。该版本 D06 未执行，最终 30 分钟长测仍留任务 11，不据前版数据冒称本版通过。按 Q105 继续同一 Pi；连续渠道错误计数为 0。
+
+### 2026-10-23 / Pi 修复 R04-GUI1（Git rename 的 hunk 边界）
+
+依据 `../evidence/task04-desktop01/` 的桌面发现。原始证据目录（`task04-desktop01`、`review01`–`review03`）未修改或覆盖；本轮只改共享能力 gate 与相应回归。
+
+#### R04-GUI1 / P2（porcelain `RM` 的未暂存 `M` 仍暴露 hunk）— 已修复
+
+- 根因：`supports_hunk_actions` 只看 `entry.status` / `file.status`。porcelain type-2 `RM`（已暂存改名 + 新路径有未暂存修改）会同时给出 staged `R` 与 unstaged `M`，两者都带 Git 的 `original_path`；未暂存侧因此被当成普通 `M`，暴露 hunk 并让 `hunk_patch` 接受其凭据。
+- 修复：共享 gate 按 **Git 给出的 rename 元数据**判断——`entry.original_path.is_some() || file.old_path.is_some()` 时一律不提供 hunk 能力。该 gate 同时被 `stage_hunk`、`unstage_hunk`、`discard_hunk` 的 `hunk_patch` 复用，因此前端不渲染、后端也拒绝，不依赖前端是否隐藏按钮。没有猜测「删除 + 未跟踪」配对，普通 `M` 文件不受影响。
+- 回归 `t03_git_rename_never_exposes_hunk_actions_on_either_side`（`hunk_staging.rs`，真实 Git）：构造 `RM`，断言 staged `R` 与 unstaged `M` 都保留 `original_path`；两个变更组 × 两种视图的 hunk 行 `hunk_action` 全为空，但未暂存侧的内容改动仍显示为 hunk 行（diff 可见）；`stage_hunk`/`unstage_hunk` 以「这个文件不支持 hunk 操作」拒绝；普通 `M` 文件仍有一个可用的 hunk 动作；整文件暂存/取消暂存仍可用且不删除工作区文件。
+- 回归 `git_rename_unstaged_side_rejects_hunk_discard_but_keeps_whole_file`（`discard_recovery.rs`，真实 Git）：hunk 丢弃被同一 gate 拒绝且**不产生回收记录**、工作区与 index 不变；随后整文件丢弃成功，记录仍同时包含 `old.txt` 与 `new.txt` 两条相关路径，index 不变。
+- 两个回归都做过对照：把 gate 判断临时改成恒 `false` 后，`hunk_staging` 用例在「rename 不得暴露 hunk 动作」处失败，`discard_recovery` 用例在「必须由共享能力 gate 拒绝」处失败（错误文案退化为「文件已变化，请重新确认」），确认用例有牙。
+
+#### 附带发现并修复：`RM` 未暂存条目的整文件暂存失败（同一用例暴露）
+
+- 现象：对 `RM` 的未暂存 `M` 条目执行整文件暂存时，`execute_staging_op` 把 `entry.original_path` 也传给 `git add -A --`，而 `old.txt` 已既不在工作区也不在暂存区，Git 直接 `fatal: pathspec 'old.txt' did not match any files`（退出码 128），整文件暂存改名条目实际不可用。
+- 修复：暂存侧只用当前路径（`stage_file(path, None)`）。`original_path` 只在「取消暂存已识别改名」时需要（`git reset -- old new`），该行为与既有 T04 用例保持不变。
+- 覆盖：上述 `hunk_staging` 回归里的「整文件暂存 rename 未暂存条目」一段；`file_staging` 全部 20 项（含改名取消暂存）保持通过。
+- 说明：这是重命名整文件契约（Q81）内的既有缺陷，不是新增产品决策；仅做最小修正，未扩大 04 范围。
+
+#### 前端
+
+未改前端：hunk 按钮由 `row.hunk_action` 驱动，后端不再下发即不渲染，因此没有新增 UI 逻辑，也未重复 `tsc`/`lint`/`build`/Node 工具或重建 `.app`。
+
+#### 本轮实际检查（同一受影响套件，各跑一次）
+
+- `cargo test --lib`：85 项通过
+- `cargo test --test discard_recovery`：**32** 项通过
+- `cargo test --test hunk_staging`：**24** 项通过
+- `cargo test --test file_staging`：20 项通过
+- `cargo test --test session_flow`：3 项通过
+- 未运行 GUI、Windows、CI、D06、长测；未重建 Release `.app`。
+
+#### 一个与本轮改动无关的既有测试不稳（如实记录，未修）
+
+- `cargo test --test refresh_isolation` 的 `t13_concurrent_refreshes_never_publish_stale_content` 在**未修改该文件**的 HEAD 版本上即间歇失败（观察：5 次运行中 2 次失败；两次完整套件运行中 1 次失败）。失败信息为「版本 N 的指纹不在预计算表中」。
+- 最小复现：`cargo test --manifest-path src-tauri/Cargo.toml --test refresh_isolation`。
+- 该用例属于任务 06 的刷新隔离，与本轮 rename gate / 整文件暂存改动没有代码路径交集；我在诊断中曾尝试把测试写入改为原子替换，仍会复现，故已**完整恢复该测试文件到 HEAD 原样**，没有通过忽略未知指纹、重试或放宽容差让它变绿，也没有改动 refresh 生产逻辑。失败原因未归因，交规划方判断。

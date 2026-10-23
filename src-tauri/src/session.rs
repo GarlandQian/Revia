@@ -941,7 +941,10 @@ impl WorktreeSession {
                 let patch = self.hunk_patch(path, expected_fp, hunk_id, is_stage)?;
                 self.git.apply_index_patch(patch, !is_stage)?
             } else if is_stage {
-                self.git.stage_file(path, entry.original_path.as_deref())?
+                // 暂存只取工作区这一侧；`original_path` 只用于「取消暂存已识别的改名」。
+                // 对 RM 的未暂存条目，原路径已不在工作区或暂存区里，一并传入会让
+                // `git add -A --` 因 pathspec 不匹配而失败（整文件暂存改名条目时发现）。
+                self.git.stage_file(path, None)?
             } else {
                 self.git.unstage_file(path, entry.original_path.as_deref())?
             };
@@ -1001,7 +1004,15 @@ fn discard_pending(error: impl std::fmt::Display) -> AppError {
 }
 
 fn supports_hunk_actions(entry: &ChangeEntry, file: &git::diff::FileChange) -> bool {
+    // Q81：Git 识别的重命名只做整文件操作，不提供 hunk 操作。
+    //
+    // porcelain type-2 的 `RM`（已暂存改名 + 新路径上有未暂存修改）会同时出现
+    // staged `R` 和 unstaged `M` 两个条目，二者都保留 `original_path`。
+    // 只看 status 会把后者当成普通 M 而暴露 hunk；这里按 Git 给出的原路径元数据拒绝，
+    // 既不猜测「删除 + 未跟踪」配对，也不影响真正的普通 M 文件。
+    let renamed_by_git = entry.original_path.is_some() || file.old_path.is_some();
     entry.changes != ChangesKind::Untracked
+        && !renamed_by_git
         && entry.readonly_reason.is_none()
         && !entry.unmerged
         && !entry.binary

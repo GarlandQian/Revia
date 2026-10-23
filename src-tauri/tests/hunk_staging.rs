@@ -1333,3 +1333,84 @@ fn t06_lock_retry_rechecks_file_fingerprint_and_snapshot_token() {
         assert_eq!(ctx.read("target.txt"), lines_with_edits(expected_edits));
     }
 }
+
+/// R04-GUI1 / T03 / Q81：Git 识别的重命名只有整文件操作。
+///
+/// porcelain type-2 `RM`（已暂存改名 + 新路径有未暂存修改）会同时出现 staged `R`
+/// 和 unstaged `M`，两者都保留 Git 给出的原路径；未暂存的 `M` 不能因此获得 hunk 能力。
+/// 同时确认普通 `M` 文件的 hunk 仍然可用，且整文件操作不受影响。
+#[test]
+fn t03_git_rename_never_exposes_hunk_actions_on_either_side() {
+    let ctx = TestContext::new();
+    ctx.track("old.txt", b"alpha\nbeta\ngamma\n");
+    ctx.track("plain.txt", b"one\ntwo\nthree\n");
+    ctx.git(&["mv", "old.txt", "new.txt"]);
+    // 新路径上再加未暂存文本修改：porcelain 变成 RM。
+    ctx.write("new.txt", b"alpha\nBETA\ngamma\n");
+    // 普通修改作为对照。
+    ctx.write("plain.txt", b"one\nTWO\nthree\n");
+
+    let session = ctx.open();
+    let snapshot = session.refresh().unwrap();
+
+    let staged = entry(&snapshot, "new.txt", ChangesKind::Staged);
+    assert_eq!(staged.status, FileStatus::Renamed);
+    assert_eq!(staged.original_path.as_deref(), Some("old.txt"));
+
+    let unstaged = entry(&snapshot, "new.txt", ChangesKind::Unstaged);
+    assert_eq!(unstaged.status, FileStatus::Modified, "用例前提：工作区侧是 M");
+    assert_eq!(
+        unstaged.original_path.as_deref(),
+        Some("old.txt"),
+        "用例前提：Git 的 rename 元数据保留在未暂存条目上"
+    );
+
+    // 两个变更组、两种视图都不得产生 hunk 动作，但 diff 本身仍然可见。
+    for changes in [ChangesKind::Staged, ChangesKind::Unstaged] {
+        for view in [ViewMode::Split, ViewMode::Unified] {
+            let slice = session.rows("new.txt", changes, view, 0, u32::MAX).unwrap();
+            assert!(
+                slice.rows.iter().all(|row| row.hunk_action.is_none()),
+                "rename 不得暴露 hunk 动作（{changes:?}/{view:?}）"
+            );
+            if changes == ChangesKind::Unstaged {
+                assert!(
+                    slice.rows.iter().any(|row| row.kind == RowKind::Hunk),
+                    "未暂存侧的内容改动仍应显示为 diff（{view:?}）"
+                );
+            }
+        }
+    }
+
+    // 后端必须拒绝伪造的 hunk 凭据，而不是只看前端是否渲染按钮。
+    let stage_error = session
+        .stage_hunk("new.txt", &unstaged.fingerprint, "forged-hunk")
+        .expect_err("rename 的未暂存条目不得接受 hunk 暂存");
+    assert_eq!(stage_error.to_string(), "这个文件不支持 hunk 操作");
+    let unstage_error = session
+        .unstage_hunk("new.txt", &staged.fingerprint, "forged-hunk")
+        .expect_err("rename 的已暂存条目不得接受 hunk 取消暂存");
+    assert_eq!(unstage_error.to_string(), "这个文件不支持 hunk 操作");
+
+    // 普通 M 文件仍具备 hunk 能力。
+    let plain = entry(&snapshot, "plain.txt", ChangesKind::Unstaged);
+    let plain_actions = actions(&session, "plain.txt", ChangesKind::Unstaged, ViewMode::Split);
+    assert_eq!(plain_actions.len(), 1, "普通修改必须仍有 hunk 动作");
+
+    // 整文件操作对 rename 仍然可用：暂存未暂存侧的修改。
+    let staged_after = session.stage_file("new.txt", &unstaged.fingerprint).unwrap();
+    assert!(staged_after
+        .entries
+        .iter()
+        .any(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Staged));
+    let _ = plain;
+
+    // 整文件取消暂存把改名退回，工作区文件仍在。
+    let staged_entry = staged_after
+        .entries
+        .iter()
+        .find(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Staged)
+        .expect("暂存后应有 new.txt");
+    session.unstage_file("new.txt", &staged_entry.fingerprint).unwrap();
+    assert!(ctx.repo.join("new.txt").is_file(), "取消暂存不得删除工作区文件");
+}
