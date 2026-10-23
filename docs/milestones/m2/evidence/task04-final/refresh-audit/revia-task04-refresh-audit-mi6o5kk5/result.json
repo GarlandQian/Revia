@@ -1,0 +1,115 @@
+{
+  "root": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5",
+  "at": "2026-10-23T14:37:59.126246+00:00",
+  "runs": [
+    {
+      "source": "a74e9d22296eb90244ff82531537a74b538d4684",
+      "attempt": 1,
+      "command": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/a74e9d2/src-tauri/Cargo.toml",
+        "--test",
+        "refresh_isolation",
+        "t13_concurrent_refreshes_never_publish_stale_content",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exitCode": 101,
+      "log": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/a74e9d2/attempt-1.log"
+    },
+    {
+      "source": "a74e9d22296eb90244ff82531537a74b538d4684",
+      "attempt": 2,
+      "command": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/a74e9d2/src-tauri/Cargo.toml",
+        "--test",
+        "refresh_isolation",
+        "t13_concurrent_refreshes_never_publish_stale_content",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exitCode": 101,
+      "log": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/a74e9d2/attempt-2.log"
+    },
+    {
+      "source": "a74e9d22296eb90244ff82531537a74b538d4684",
+      "attempt": 3,
+      "command": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/a74e9d2/src-tauri/Cargo.toml",
+        "--test",
+        "refresh_isolation",
+        "t13_concurrent_refreshes_never_publish_stale_content",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exitCode": 101,
+      "log": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/a74e9d2/attempt-3.log"
+    },
+    {
+      "source": "41be300e845d66eb3a9fc734bfd247010c22edb8",
+      "attempt": 1,
+      "command": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/41be300e845d66eb3a9fc734bfd247010c22edb8/src-tauri/Cargo.toml",
+        "--test",
+        "refresh_isolation",
+        "t13_concurrent_refreshes_never_publish_stale_content",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exitCode": 101,
+      "log": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/41be300e845d66eb3a9fc734bfd247010c22edb8/attempt-1.log"
+    },
+    {
+      "source": "41be300e845d66eb3a9fc734bfd247010c22edb8",
+      "attempt": 2,
+      "command": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/41be300e845d66eb3a9fc734bfd247010c22edb8/src-tauri/Cargo.toml",
+        "--test",
+        "refresh_isolation",
+        "t13_concurrent_refreshes_never_publish_stale_content",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exitCode": 101,
+      "log": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/41be300e845d66eb3a9fc734bfd247010c22edb8/attempt-2.log"
+    },
+    {
+      "source": "41be300e845d66eb3a9fc734bfd247010c22edb8",
+      "attempt": 3,
+      "command": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/41be300e845d66eb3a9fc734bfd247010c22edb8/src-tauri/Cargo.toml",
+        "--test",
+        "refresh_isolation",
+        "t13_concurrent_refreshes_never_publish_stale_content",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exitCode": 101,
+      "log": "/private/tmp/revia-task04-refresh-audit-mi6o5kk5/41be300e845d66eb3a9fc734bfd247010c22edb8/attempt-3.log"
+    }
+  ],
+  "boundary": "Unmodified git-archived sources, three attempts per version; no relaxed assertions or production edits."
+}

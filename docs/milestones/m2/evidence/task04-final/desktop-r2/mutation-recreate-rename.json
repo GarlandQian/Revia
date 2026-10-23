@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-23T14:55:24.842863+00:00",
+  "path": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/B/50-renamed-new.txt",
+  "beforeSHA256": "2e17e871f1feba9b94fa9cf9de7ae7341f189a036ebde0c9ea1758a5392dce23",
+  "afterSHA256": "b6d3bb90088ff1eb5ac8da58080394d59feacdf0908a55a278e8fd079d6f8fa1",
+  "beforeBase64": "dHJhY2tlZCByZW5hbWUgYmFzZWxpbmUK",
+  "afterBase64": "dHJhY2tlZCByZW5hbWUgYmFzZWxpbmUKdW5zdGFnZWQgYWRkaXRpb24K",
+  "purpose": "recreate synthetic RM unstaged addition for whole-file stage verification"
+}

@@ -1,6 +1,6 @@
 # M2 阶段报告
 
-更新日期：2026-10-23。任务 01、02、03、06、09 已完成；任务 06 两轴复核、真实桌面、D06 与最终双平台 CI 已通过，旧前台尝试的取证限制已更正；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
+更新日期：2026-10-24。任务 01、02、03、04、06、09 已完成；任务 06 两轴复核、真实桌面、D06 与最终双平台 CI 已通过，旧前台尝试的取证限制已更正；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
 
 ## 当前进度（2026-10-23）
 
@@ -8,7 +8,7 @@
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
 - 任务 09：`done`，`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 已完成，macOS Apple Silicon 与 Windows x64 的前端检查、Rust 测试及 release 编译全部通过。Windows 实际通过 66 单元 + 16 file_staging + 3 session_flow；测试修复增量的 Standards / Spec 双审均无新问题。最终集成仍需任务 10、11 再次验收，见 [任务 09](./issues/09-platform-compile-checks.md)。
 - 按新规则先派给 Paseo 的 deepseek；本轮 3 次重试均为 `503 auth_unavailable`，会话进入 error 且未改文件，由 Codex 接手，不切 Gemini。已把 `main` 的 `837d68a` 规则合入 `m2`，主目录不变。
-- 任务 04：`ready-for-human`（实现 + 三轮审查修复 + 桌面发现的 rename hunk 边界修复，等待增量两轴复审与针对性桌面补验）。本轮按 Git rename 元数据补齐共享 hunk 能力边界（R04-GUI1）：porcelain `RM` 的未暂存 `M` 仍带 `original_path`，现在 `stage_hunk`/`unstage_hunk`/`discard_hunk` 均拒绝，普通 `M` 仍可 hunk；同时修正了 `RM` 未暂存条目整文件暂存因带原路径而失败的既有缺陷。本轮实测：lib 85、`discard_recovery` 32、`hunk_staging` 24、`file_staging` 20、`session_flow` 3 全部通过；未改前端/未重建 `.app`，未跑 GUI/Windows/CI/D06/长测。另记录一项**尚未归因**的测试不稳：在当前提交上观察到 `refresh_isolation` 的 `t13_concurrent_refreshes_never_publish_stale_content` 间歇失败；根因及是否既有待独立对照（`refresh` 会经 `hunk_actions` 调用本次修改的 `supports_hunk_actions`，不能据测试文件未改动断言与本次改动无关；规划方正在做修复前后各 3 次受控对照，结果未出前不称已闭合）。详见 [任务 04](./issues/04-discard-with-recovery.md)。
+- 任务 04：`done`。四轮两轴修复／限定复核、第一轮真实桌面与重启151项断言、修复版RM两组/两视图边界及整文件stage/unstage、D06与额外104项断言通过。最终`764d13e`固定Release SHA及版本覆盖见[任务04验收](./task04-acceptance.md)：标准首屏113／99ms、真冷文字DOM4／5ms，四份各60屏60rAF、0兜底／未覆盖；原跳转与慢帧保留。最终[CI39972484556](https://github.com/GarlandQian/Revia/actions/runs/39972484556)双平台全部通过（macOS178／Windows161项Rust及release）。并发刷新旧/新各3次exact均通过但不能消除Pi间歇失败观察，已交任务10，不称已归因。05恢复与清理、11最终30分钟长测未完成；用户新图标后续纳入m2并验证。
 - 任务 06：`done`。两轴独立复核通过；`26b6dc4` 的刷新／跨组／linked／八个迟到响应，加 `1fc9ec3` 的真实隐藏恢复前台核对、计数、独立 A↔B、迟到锚点、稳定阅读位置、40 次保存及真实写前读取失败已验收。早期 AX／Raise 未证明实际焦点切换，不再冒称已确认缺陷根因。最终同构建 D06 标准首屏 **105／115ms**，真冷文字 DOM **6／7ms**；四份各60屏、60rAF、0兜底／未覆盖，普通呈现补验通过。前端 gate 19 项、build／lint 通过；[`1fc9ec3` CI #39923257047](https://github.com/GarlandQian/Revia/actions/runs/39923257047) 双平台类型／lint／build／Rust／release 编译通过（macOS **142**、Windows **132** 项）。版本、旧观察限制和两轮证据归档见[任务 06 验收](./task06-acceptance.md)，最终 30 分钟长测仍留 11。
 - 任务 03：`done`，原始 hunk 写入、两视图键盘与真实暂存区核对、相关版本过期拒绝及 D06 已验收。最终 `bbddd4f` 的 [CI #39876636277](https://github.com/GarlandQian/Revia/actions/runs/39876636277) 双平台通过（macOS 114 / Windows 104 项 Rust）；标准首屏 115/95ms、真冷文字 DOM 5/4ms。原超帧值、旧取证不足样本与 P3 命名观察保留，详见 [任务 03 验收](./task03-acceptance.md)。
 
