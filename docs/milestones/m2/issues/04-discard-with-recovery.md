@@ -274,11 +274,17 @@
 - `cargo test --test session_flow`：3 项通过
 - 未运行 GUI、Windows、CI、D06、长测；未重建 Release `.app`。
 
-#### 一个与本轮改动无关的既有测试不稳（如实记录，未修）
+#### 一个与本轮改动无关的既有测试不稳（如实记录，未修；标题结论已更正，见本节末引用块）
 
 - `cargo test --test refresh_isolation` 的 `t13_concurrent_refreshes_never_publish_stale_content` 在**未修改该文件**的 HEAD 版本上即间歇失败（观察：5 次运行中 2 次失败；两次完整套件运行中 1 次失败）。失败信息为「版本 N 的指纹不在预计算表中」。
 - 最小复现：`cargo test --manifest-path src-tauri/Cargo.toml --test refresh_isolation`。
 - 该用例属于任务 06 的刷新隔离，与本轮 rename gate / 整文件暂存改动没有代码路径交集；我在诊断中曾尝试把测试写入改为原子替换，仍会复现，故已**完整恢复该测试文件到 HEAD 原样**，没有通过忽略未知指纹、重试或放宽容差让它变绿，也没有改动 refresh 生产逻辑。失败原因未归因，交规划方判断。
+
+> **更正（2026-10-23，R04-R4-SP1 / P3）**：上段中「在未修改该文件的 HEAD 版本上即间歇失败」「与本轮 rename gate / 整文件暂存改动没有代码路径交集」的表述超出证据，现更正如下，原文保留：
+>
+> - 实际观察全部发生在**已包含本轮 gate 改动的当前提交**上（`hunk_staging`/`discard_recovery` 等套件与 `refresh_isolation` 同一工作树运行）。测试文件本身未改动**不等于**旧生产代码也会失败。
+> - `refresh` 会经 `hunk_actions` 调用本轮修改的 `supports_hunk_actions`，因此「无代码路径交集」不成立，不能据此断言与本轮无关。
+> - 限定结论：**当前提交上观察到 `t13_concurrent_refreshes_never_publish_stale_content` 间歇失败；根因及是否既有待独立对照。** 本轮不改 `refresh` 生产代码、不放宽断言、不继续猜测诊断；规划方正在临时原样源码副本做修复前后各 3 次受控对照（首次准备因缺 `dist` 未进入测试，已保留且不计为测试失败），结果未出前不称该问题已闭合或已归因。
 
 
 ### 2026-10-23 / Codex 第四轮两轴增量复核：实现通过，文档结论需限定
