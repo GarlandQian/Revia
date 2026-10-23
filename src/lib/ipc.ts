@@ -13,6 +13,7 @@ import type { FileVersion } from "@/types/bindings/FileVersion";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
 import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
+import type { SaveAsOwner } from "@/types/bindings/SaveAsOwner";
 import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
@@ -177,8 +178,17 @@ export const ipc = {
   }) => invoke<RestoreOutcome>("restore_recovery", { request }),
   recoveryTextDiff: (request: { worktreeId: string; recordId: string; path: string }) =>
     invoke<string>("recovery_text_diff", { request }),
-  saveRecoveryAs: (request: { worktreeId: string | null; recordId: string; path: string; destination: string }) =>
-    invoke<number>("save_recovery_as", { request }),
+  /** 解析另存目标的真实归属（固定类型接口；前端不自己判断路径）。 */
+  recoverySaveAsOwner: (destination: string) =>
+    invoke<SaveAsOwner>("recovery_save_as_owner", { request: { destination } }),
+  saveRecoveryAs: (request: {
+    worktreeId: string | null;
+    /** 发起前解析到的归属；后端重新解析后必须一致。 */
+    expectedOwner: string | null;
+    recordId: string;
+    path: string;
+    destination: string;
+  }) => invoke<number>("save_recovery_as", { request }),
   recoveryMaintenance: () => invoke<RecoveryMaintenance>("recovery_maintenance"),
   clearRecovery: () => invoke<number>("clear_recovery"),
   purgeRecovery: () => invoke<number>("purge_recovery"),

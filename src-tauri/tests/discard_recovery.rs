@@ -2217,6 +2217,7 @@ fn save_recovery_command_locks_the_target_worktree() {
             &app.state,
             &revia_lib::commands::RecoverySaveAsRequest {
                 worktree_id: None,
+                expected_owner: Some(app.worktree_id.clone()),
                 record_id: id.clone(),
                 path: "target.txt".into(),
                 destination: destination.display().to_string(),
@@ -2231,6 +2232,7 @@ fn save_recovery_command_locks_the_target_worktree() {
         &app.state,
         &revia_lib::commands::RecoverySaveAsRequest {
             worktree_id: None,
+            expected_owner: Some(app.worktree_id.clone()),
             record_id: id.clone(),
             path: "target.txt".into(),
             destination: destination.display().to_string(),
@@ -2344,4 +2346,117 @@ fn trash_leftovers_are_retried_and_visible() {
         // 平台允许删除只读目录时，残留本身应当已被清掉。
         assert!(!leftover.exists(), "成功路径也必须清掉残留");
     }
+}
+
+/// R05-R4-SP3：完成留证「先 rename 再 sync 目录」的 sync 失败也必须留下待核对。
+///
+/// 用真实的目录同步失败（记录目录 0300：文件读写与 rename 仍可行，但打开目录做 fsync 会失败），
+/// 走生产入口 `restore_record_with_hook`；恢复权限后重新打开存储，list/inspect 不能是 Completed。
+#[cfg(unix)]
+#[test]
+fn completion_journal_sync_failure_persists_needs_verification() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let data = f.root().join("data-sync");
+    let store = RecoveryStore::with_clock(data.clone(), Arc::new(|| 1_792_742_400_123));
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+
+    // 记录目录本身：rename 可行，但目录 fsync（需要打开目录）会真实失败。
+    let record_dir = data.join("recovery").join(&id);
+    let original = fs::metadata(&record_dir).unwrap().permissions();
+    let error = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeComplete {
+                fs::set_permissions(&record_dir, fs::Permissions::from_mode(0o300)).unwrap();
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    // 无论失败点落在完成留证还是尾部核对，都必须报待核对。
+    fs::set_permissions(&record_dir, original).unwrap();
+    assert_eq!(error.kind, ErrorKind::NeedsVerification, "完成留证失败必须待核对：{error:?}");
+    assert!(
+        error.message.contains("待核对"),
+        "错误信息必须明确待核对：{error:?}"
+    );
+
+    // 真实重开：用同一数据目录新建 store，读磁盘上的留证。
+    let reopened = RecoveryStore::with_clock(data.clone(), Arc::new(|| 1_792_742_400_123));
+    let summaries = reopened.list(None).unwrap();
+    let summary = summaries.iter().find(|summary| summary.id == id).expect("记录仍在");
+    let attempt = summary.restore.as_ref().expect("必须有恢复尝试");
+    assert!(
+        matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification),
+        "重开后列表不能显示已完成：{attempt:?}"
+    );
+    assert_eq!(attempt.written, vec!["target.ts".to_string()], "已写入路径必须如实保留");
+
+    let reopened_session = f.session();
+    let detail = reopened_session.inspect_record(&id, &reopened).unwrap();
+    assert!(
+        matches!(
+            detail.restore.as_ref().map(|attempt| attempt.state),
+            Some(revia_lib::recovery::RestoreAttemptState::NeedsVerification)
+        ),
+        "重开后详情不能显示已完成：{:?}",
+        detail.restore
+    );
+    // 工作区确实写回了保存内容（不自动重跑，但事实要如实）。
+    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+}
+
+/// R05-R4-ST1/SP1：前端解析到的归属与后端重新解析不一致时必须拒绝（不信任界面 ID）。
+#[test]
+fn save_as_rejects_stale_expected_owner() {
+    let app = AppFixture::new();
+    app.fixture.write("target.txt", b"base\n");
+    app.fixture.commit();
+    app.fixture.write("target.txt", b"saved change\n");
+    let session = app.fixture.session();
+    let target = entry(&session, "target.txt");
+    let store = app.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    let destination = app.fixture.root().join("repo").join("restored.txt");
+    // 前端解析结果与后端不一致（例如界面还停留在另一个 worktree）：必须拒绝。
+    let error = revia_lib::commands::save_recovery_as_impl(
+        &app.state,
+        &revia_lib::commands::RecoverySaveAsRequest {
+            worktree_id: Some(app.worktree_id.clone()),
+            expected_owner: Some("someone-else".into()),
+            record_id: id.clone(),
+            path: "target.txt".into(),
+            destination: destination.display().to_string(),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected, "归属不一致必须拒绝：{error:?}");
+    assert!(!destination.exists(), "被拒绝时不得写入");
+
+    // 归属解析接口返回真实归属（前端据此进门禁）。
+    let owner = revia_lib::commands::resolve_save_as_owner(&app.state, &destination).unwrap();
+    assert_eq!(owner.worktree_id.as_deref(), Some(app.worktree_id.as_str()));
+    // 外部新路径：无归属，仍然合法可另存。
+    let outside = app.fixture.root().join("outside.txt");
+    let outside_owner = revia_lib::commands::resolve_save_as_owner(&app.state, &outside).unwrap();
+    assert_eq!(outside_owner.worktree_id, None);
+    let bytes = revia_lib::commands::save_recovery_as_impl(
+        &app.state,
+        &revia_lib::commands::RecoverySaveAsRequest {
+            worktree_id: None,
+            expected_owner: None,
+            record_id: id.clone(),
+            path: "target.txt".into(),
+            destination: outside.display().to_string(),
+        },
+    )
+    .unwrap();
+    assert_eq!(bytes, 13);
+    assert_eq!(fs::read(&outside).unwrap(), b"saved change\n");
 }

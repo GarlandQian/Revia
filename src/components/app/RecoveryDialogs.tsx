@@ -80,7 +80,6 @@ export function RecoveryDialog({
     expectedState: RecoveryState;
   }) => Promise<RestoreOutcome>;
   onSaveAs: (request: {
-    worktreeId: string | null;
     recordId: string;
     path: string;
     destination: string;
@@ -105,17 +104,35 @@ export function RecoveryDialog({
   const [busy, setBusy] = useState(false);
   const panelEpoch = useRef(0);
   const requestEpoch = useRef(0);
+  /** 面板内请求的生命周期令牌：与展示代际分开，保证 busy 只由最新请求清除。 */
+  const busyToken = useRef(0);
   const selectedRef = useRef<RecoveryInspection | null>(null);
   selectedRef.current = selected;
+
+  /** 开始一次面板内请求：占住 busy 并返回令牌。 */
+  const beginRequest = () => {
+    const token = ++busyToken.current;
+    setBusy(true);
+    return token;
+  };
+  /** 结束一次面板内请求：只有它仍是最新请求时才解除 busy。 */
+  const endRequest = (token: number) => {
+    if (token === busyToken.current) setBusy(false);
+  };
+  /** 放弃当前面板上下文（返回列表 / 切目标 / 关闭）：立即解除 busy，旧请求不再影响它。 */
+  const abandonRequests = () => {
+    busyToken.current += 1;
+    setBusy(false);
+  };
 
   /** 面板上下文变化（切 worktree / 关闭）：丢掉选择、对比与待确认。 */
   const resetPanel = () => {
     panelEpoch.current += 1;
     requestEpoch.current += 1;
+    abandonRequests();
     setSelected(null);
     setDiff(null);
     setConfirming(null);
-    setBusy(false);
   };
 
   useEffect(() => {
@@ -126,7 +143,7 @@ export function RecoveryDialog({
     setSelected(null);
     setDiff(null);
     setConfirming(null);
-    setBusy(false);
+    abandonRequests();
     void ipc.listRecovery(worktreeId)
       .then((result) => { if (epoch === panelEpoch.current) setRecords(result); })
       .catch((caught) => { if (epoch === panelEpoch.current) setError(getErrorMessage(caught)); });
@@ -142,9 +159,11 @@ export function RecoveryDialog({
   }, [snapshotRevision, activation, worktreeId]);
 
   const backToList = () => {
-    // 只丢弃旧响应；busy 由发起的那个请求自己结束，不在这里遗留。
+    // 展示代际与请求生命周期分开：丢弃旧响应，同时立即解除 busy，
+    // 返回列表后详情、清理等入口可继续使用；旧请求结束时不会再改动 busy。
     panelEpoch.current += 1;
     requestEpoch.current += 1;
+    abandonRequests();
     setSelected(null);
     setDiff(null);
     setConfirming(null);
@@ -159,7 +178,7 @@ export function RecoveryDialog({
   const inspect = (id: string) => {
     const panel = ++panelEpoch.current;
     const request = ++requestEpoch.current;
-    setBusy(true);
+    const token = beginRequest();
     setError(null);
     setDiff(null);
     setConfirming(null);
@@ -172,7 +191,7 @@ export function RecoveryDialog({
         setSelected(inspection);
       })
       .catch((caught) => { if (panel === panelEpoch.current && request === requestEpoch.current) setError(getErrorMessage(caught)); })
-      .finally(() => { if (panel === panelEpoch.current && request === requestEpoch.current) setBusy(false); });
+      .finally(() => endRequest(token));
   };
 
   const showDiff = (path: string) => {
@@ -197,9 +216,9 @@ export function RecoveryDialog({
   const restore = () => {
     if (!selected || !worktreeId || !confirming) return;
     const panel = panelEpoch.current;
-    const request = ++requestEpoch.current;
+    ++requestEpoch.current;
     const recordId = selected.id;
-    setBusy(true);
+    const token = beginRequest();
     setError(null);
     void onRestore({
       worktreeId,
@@ -224,7 +243,7 @@ export function RecoveryDialog({
         setError(err);
         if (/待核对/.test(err)) setNotice(messages.recovery.restoreNeedsCheck);
       })
-      .finally(() => { if (panel === panelEpoch.current && request === requestEpoch.current) setBusy(false); });
+      .finally(() => endRequest(token));
   };
 
   const saveAs = async (path: string) => {
@@ -233,12 +252,11 @@ export function RecoveryDialog({
     if (typeof picked !== "string") return;
     const panel = panelEpoch.current;
     const recordId = selected.id;
-    setBusy(true);
+    const token = beginRequest();
     setError(null);
     try {
       // 结果与门禁都由 App 按实际归属处理；这里只负责当前面板的显示。
       const bytes = await onSaveAs({
-        worktreeId,
         recordId,
         path,
         destination: picked,
@@ -249,28 +267,28 @@ export function RecoveryDialog({
       if (panel !== panelEpoch.current) return;
       setError(getErrorMessage(caught));
     } finally {
-      if (panel === panelEpoch.current) setBusy(false);
+      endRequest(token);
     }
   };
 
   const clear = () => {
     const panel = panelEpoch.current;
-    setBusy(true);
+    const token = beginRequest();
     setError(null);
     void ipc.clearRecovery()
       .then((count) => { if (panel !== panelEpoch.current) return; setConfirmingClear(false); setNotice(`${messages.recovery.cleared}：${count}`); refreshList(); })
       .catch((caught) => { if (panel !== panelEpoch.current) return; setConfirmingClear(false); setError(getErrorMessage(caught)); })
-      .finally(() => { if (panel === panelEpoch.current) setBusy(false); });
+      .finally(() => endRequest(token));
   };
 
   const purge = () => {
     const panel = panelEpoch.current;
-    setBusy(true);
+    const token = beginRequest();
     setError(null);
     void ipc.purgeRecovery()
       .then((count) => { if (panel !== panelEpoch.current) return; setNotice(`${messages.recovery.purged}：${count}`); refreshList(); })
       .catch((caught) => { if (panel === panelEpoch.current) setError(getErrorMessage(caught)); })
-      .finally(() => { if (panel === panelEpoch.current) setBusy(false); });
+      .finally(() => endRequest(token));
   };
 
   const stateLabel = (state: RecoveryState) => ({

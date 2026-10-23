@@ -827,18 +827,21 @@ export function App() {
   /**
    * 另存回收内容（任务 05）。
    *
-   * 与恢复一样进入 App 的全局写门禁与结果通道：
-   * - 归属按**实际目标路径**判断（后端 `worktree_containing` 同一规则，这里只看是否落在某 worktree 内以决定门禁键）；
-   * - 结果/错误按归属 worktree 保留，关面板不会丢；
-   * - 完成后对归属 worktree 真实重读一次，是否更新界面由 `refreshTarget` 判断。
+   * 归属**由后端按目标路径解析**（`recoverySaveAsOwner`，与执行时同一条最具体匹配规则），
+   * 前端不自己判断路径：
+   * - 发起写入前先解析归属，再按该归属进入全局写门禁与 `OperationResultGate`；
+   * - 错误按该归属 worktree 保存，面板关闭后仍留在原目标；
+   * - 完成后对**该归属** worktree 真实重读，界面是否接收由 `refreshTarget` 判断；
+   * - 外部新路径（无归属）合法，只是不进入某个 worktree 的门禁。
    */
   const performSaveAs = useCallback(async (request: {
-    worktreeId: string | null;
     recordId: string;
     path: string;
     destination: string;
   }) => {
-    const ownerId = request.worktreeId;
+    // 后端解析真实归属；解析失败按普通错误抛给调用方，不猜路径。
+    const owner = await ipc.recoverySaveAsOwner(request.destination);
+    const ownerId = owner.worktreeId;
     if (ownerId) {
       if (writingWorktreesRef.current.has(ownerId)) {
         throw { kind: "rejected", message: messages.recovery.busy };
@@ -851,9 +854,10 @@ export function App() {
     try {
       const bytes = await ipc.saveRecoveryAs({
         worktreeId: ownerId,
+        expectedOwner: ownerId,
         recordId: request.recordId,
         path: request.path,
-        destination: request.destination,
+        destination: owner.resolvedDestination,
       });
       if (ownerId && opToken && operationGateRef.current.canRecord(opToken)) {
         setAppError(null, ownerId);

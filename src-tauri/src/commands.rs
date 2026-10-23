@@ -462,9 +462,13 @@ pub struct RecoveryRestoreRequest {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoverySaveAsRequest {
-    /// 当前界面选中的 worktree；仅用于诊断归属，实际写入归属按目标路径判断。
+    /// 当前界面选中的 worktree；仅用于诊断，**不**作为归属依据。
     #[serde(default)]
     pub worktree_id: Option<String>,
+    /// 前端发起写入前解析到的归属（`recovery_save_as_owner` 的结果）。
+    /// 后端重新解析后必须与它一致，否则拒绝，避免界面与真实归属脱节。
+    #[serde(default)]
+    pub expected_owner: Option<String>,
     pub record_id: String,
     /// 记录中的哪个路径（一条记录可能包含重命名的新旧两条）。
     pub path: String,
@@ -526,11 +530,52 @@ pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryResto
     deliver(state.acceptance.as_ref(), "restore_recovery", &context.worktree_id, None, result).await
 }
 
+/// 另存目标的归属：落在哪个已登记 worktree 里，以及解析出的真实路径。
+///
+/// 前端在**发起写入之前**通过 `recovery_save_as_owner` 拿到这个结果，
+/// 用它进入对应 worktree 的全局写门禁与结果通道；后端执行时再解析一次并要求一致（Q90）。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SaveAsOwner {
+    /// 归属 worktree 的 ID；外部路径为 None。
+    pub worktree_id: Option<String>,
+    /// 后端解析出的真实目标路径（父目录已规范化）；前端只用它做展示，不做路径判断。
+    pub resolved_destination: String,
+}
+
 /// 另存的归属解析：目标路径落在哪个已登记 worktree 里。
 ///
 /// 命令与测试共用同一个函数，避免「测试自己挑锁」而命令挑错锁（Q90）。
 pub fn save_as_owner(registry: &Registry, destination: &std::path::Path) -> Option<String> {
     registry.worktree_containing(destination.parent().unwrap_or(destination))
+}
+
+/// 解析另存归属（前端在写入前调用）。
+///
+/// 只解析、不写盘，也不取锁；真正的互斥在后端执行时按同一条规则再核对一次。
+pub fn resolve_save_as_owner(state: &AppState, destination: &std::path::Path) -> Result<SaveAsOwner> {
+    let registry = state
+        .registry
+        .lock()
+        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    let owner = save_as_owner(&registry, destination);
+    Ok(SaveAsOwner {
+        worktree_id: owner,
+        resolved_destination: destination.display().to_string(),
+    })
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAsOwnerRequest {
+    pub destination: String,
+}
+
+/// 查询另存目标的真实归属（固定类型接口；前端不自己判断路径）。
+#[tauri::command]
+pub async fn recovery_save_as_owner(state: State<'_, AppState>, request: SaveAsOwnerRequest) -> Result<SaveAsOwner> {
+    resolve_save_as_owner(&state, std::path::Path::new(&request.destination))
 }
 
 /// 另存的实际执行函数：命令与测试都调用它。
@@ -563,6 +608,12 @@ pub fn save_recovery_as_impl(state: &AppState, request: &RecoverySaveAsRequest) 
             .map_err(|_| AppError::internal("仓库列表锁失败"))?;
         save_as_owner(&registry, &destination)
     };
+    // 归属必须与前端解析到的一致：界面按 A 进的门禁，不能在 B 上落盘（Q90）。
+    if owner != request.expected_owner {
+        return Err(AppError::rejected(
+            "另存目标的归属已变化，请重新选择路径后再试",
+        ));
+    }
     let session = match &owner {
         Some(worktree_id) => Some(state.session(worktree_id)?),
         None => None,
@@ -590,12 +641,17 @@ pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveA
     };
     let store = state.recovery.clone();
     let context = request.clone();
+    let expected = request.expected_owner.clone();
+    let deliver_owner = owner.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        if owner != expected {
+            return Err(AppError::rejected("另存目标的归属已变化，请重新选择路径后再试"));
+        }
         execute_save_as(session.as_ref(), &store, &context.record_id, &context.path, &destination)
     })
     .await
     .map_err(|error| AppError::needs_verification(format!("另存任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "save_recovery_as", owner.as_deref().unwrap_or(""), None, result).await
+    deliver(state.acceptance.as_ref(), "save_recovery_as", deliver_owner.as_deref().unwrap_or(""), None, result).await
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

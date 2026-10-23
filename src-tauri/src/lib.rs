@@ -121,6 +121,7 @@ pub fn run() {
             commands::save_recovery_as,
             commands::recovery_text_diff,
             commands::recovery_maintenance,
+            commands::recovery_save_as_owner,
             commands::clear_recovery,
             commands::purge_recovery,
             commands::change_entry,

@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 第四轮两轴复核未通过，继续交 Pi 返修。历史检查结果不等于本轮生产契约已闭合；全部复核通过后再固定版本做真实桌面和 CI 验收。
+> 勾选仅代表自动化（真实 Git + 独立数据目录 + 受控时钟）与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R4 三项限定返修已完成，等待规划方复核。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -561,3 +561,66 @@ Spec 本轮为静态审查，未运行测试、GUI 或构建；无范围扩张�
 - 面板可直接复用会清busy的上下文重置，或独立请求生命周期清理；必须真正改变返回列表后的行为，不只改注释或依靠刷新。旧操作结束不得清掉新请求的busy，旧内容继续由epoch隔离。
 - 完成日志rename后sync失败也走统一写后失败处理，尽力将留证降为待核对；用既有Rust生产入口和真实存储失败证明重开可见状态，不只对hook返回错误。保留已保存内容与实际written，不自动重跑。
 - 所有修改完成后只集中重跑受影响检查，记录检查前源码hash、原始输出及退出码。精确暂存提交m2，仍由规划方复核全部通过后才桌面验收。
+
+### 2026-10-24 / Pi 实现：第四轮限定返修（R05-R4，三项实质残留）
+
+只修本轮三项与必要文档。未扩展刷新实现、未重跑长循环、未新增诊断客户端；未构建 Release、未操作 GUI、未跑 D06/CI/长测，未推送/合并/发布。
+
+#### R05-R4-ST1 / SP1：另存归属真正由后端解析并贯通前后端
+
+原来的 `performSaveAs` 用 `const ownerId = request.worktreeId` 直接把当前界面 worktree 当归属，A 另存到 B 时门禁、错误保存和重读全落在 A。现在改成：
+
+- 新增固定类型接口 `SaveAsOwner { worktreeId, resolvedDestination }` 与命令 `recovery_save_as_owner`（`resolve_save_as_owner`），前端在**发起写入之前**调用它解析真实归属；前端不做任何路径包含判断。
+- `App.performSaveAs` 用解析结果 `owner.worktreeId` 进入 `writingWorktreesRef` 全局写门禁与 `OperationResultGate`，错误经 `setAppError(err, ownerId)` 存在**归属** worktree 下，完成后 `await refreshTarget(ownerId)` 对归属 worktree 真实重读；面板关闭不影响这些状态（它们都在 App 层，按 worktree 字典保存）。
+- 归属为 `null`（合法外部新路径）时照常另存，只是不进入某个 worktree 的门禁；没有当前 worktree 也能另存。
+- `RecoverySaveAsRequest` 新增 `expectedOwner`；`save_recovery_as_impl` 与命令体在拿到归属后**重新解析一次**并要求与 `expectedOwner` 一致，不一致即 `Rejected`（「另存目标的归属已变化，请重新选择路径后再试」），不信任界面传入的 ID。
+
+生产调用点：`App.performSaveAs` → `ipc.recoverySaveAsOwner` / `ipc.saveRecoveryAs` → `commands::recovery_save_as_owner` / `commands::save_recovery_as` → `save_recovery_as_impl` → `save_as_owner`（`Registry::worktree_containing`，最具体匹配）→ `execute_save_as`（取该 worktree 的写锁）。
+
+验证：
+- `save_as_rejects_stale_expected_owner`：`expectedOwner` 与后端解析不一致时 `Rejected` 且未写盘；`resolve_save_as_owner` 对仓库内目标返回该 worktree、对外部路径返回 `None`；外部路径仍能成功另存。
+- `save_recovery_command_locks_the_target_worktree`（上一轮保留）：命令在目标 worktree 持锁时被拒绝，释放后写入目标 worktree。
+
+#### R05-R4-ST2 / SP2：返回列表后的 busy 生命周期
+
+`busy` 现在由独立的请求生命周期令牌管理，与展示代际分开：
+
+- `beginRequest()` 递增 `busyToken` 并置 busy；`endRequest(token)` **只有**在该 token 仍是最新请求时才清 busy（旧请求结束不会清掉后来新请求的 busy）。
+- `abandonRequests()` 递增令牌并立即清 busy；`backToList`、`resetPanel`、面板 `useEffect` 重载都调用它。返回列表后详情/清理等入口立即可用，不再依赖刷新或重开。
+- 内容响应仍由 `panelEpoch` / `requestEpoch` 隔离：`backToList` 递增两者后，迟到的 inspect/diff/restore 响应不会写回面板。
+
+生产调用点：`RecoveryDialogs.tsx` 的 `backToList` / `resetPanel` / `useEffect` / `inspect` / `restore` / `saveAs` / `clear` / `purge`。
+
+#### R05-R4-SP3：完成留证「rename 后目录同步失败」也要持久待核对
+
+`write_journal` 原来先 `rename` 再 `sync_directory`，sync 失败时磁盘上已经是 `Completed`，`finish_attempt` 只返回 `NeedsVerification`，重开仍显示完成。现在：
+
+- 拆出 `write_journal_steps`，返回 `(错误, 替换是否已落盘)`，用来区分「rename 前失败」与「rename 后 sync 失败」。
+- `finish_attempt` 在 `Completed` 分支失败时调用 `downgrade_after_completion_failure`：直接用**内存里**的 journal（不重新读盘，故障期间目录可能不可读）把这次尝试改成 `NeedsVerification` 并重新落盘。
+- 结果分三种如实上报：降级成功 → `NeedsVerification`；降级已替换但目录同步仍失败 → `NeedsVerification` 且说明「重开应显示待核对」；连替换都失败 → `NeedsVerification` 并明确「磁盘上可能仍显示已完成，请按待核对处理」。
+- `restore_with_hook` 的 `Completed` 写入失败分支不再把已降级的错误包成普通错误。
+
+生产调用点：`session.restore_record_with_hook` → `RecoveryStore::restore_with_hook` → `finish_attempt` → `write_journal_steps` / `downgrade_after_completion_failure`。
+
+验证：`completion_journal_sync_failure_persists_needs_verification`（真实目录同步失败，非 hook 返回值）——在 `BeforeComplete` 把记录目录设为 `0300`（文件读写与 rename 仍可行、打开目录做 fsync 失败），走生产入口恢复；断言错误为 `NeedsVerification`、错误信息含目录同步失败，**用同一数据目录重建 `RecoveryStore`** 后 `list` 与 `inspect` 的 `restore.state` 都是 `needsVerification`、`written` 保留 `["target.ts"]`，工作区确实写回了保存内容且不自动重跑；用例结束恢复 fixture 权限。
+敏感性：把该分支改回「直接返回错误、不降级」后，同一用例失败并复现 `RestoreAttempt { state: Completed, written: ["target.ts"] }`，恢复实现后通过（`history/sensitivity.md`）。
+
+#### 实际执行的检查（改完后集中一次，最小相关）
+
+日志目录：`/private/tmp/revia-task05-r4-1792799672`（`MANIFEST.md`、`source-sha256-before-check.txt`、`pre-change.diff`、`history/sensitivity.md`）。检查后复核源码哈希未变。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml --test discard_recovery` | 0 | **70 项通过**（新增 2 项） |
+| `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml --lib` | 0 | **94 项通过** |
+| `pnpm exec tsc -b` | 0 | 通过（含新导出 `SaveAsOwner`） |
+| `pnpm lint` | 0 | 通过 |
+| `pnpm build` | 0 | 通过 |
+
+按交接要求**未**重跑不受影响的 `file_staging` / `hunk_staging` / `refresh_isolation` / `session_flow`、Node 与 Python 工具测试；上一轮 223 项记录保留为历史，不代表本轮全部重跑。
+
+#### 仍未验证（留给规划方）
+
+- 真实桌面的面板键盘焦点、只读 diff 观感、原生保存对话框、清理失败横幅的实际显示。
+- Windows 编译与 CI。
+- 超大文件恢复/对比的内存占用未量化。

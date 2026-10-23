@@ -864,9 +864,14 @@ impl RecoveryStore {
         };
 
         if let Err(error) = self.finish_attempt(id, index, RestoreAttemptState::Completed, &written, None) {
-            return Err(AppError::needs_verification(format!(
-                "恢复已写入工作区，但结果记录失败，结果待核对：{error}"
-            )));
+            // `finish_attempt` 已把「已完成」尽力改回待核对并返回 NeedsVerification；
+            // 其它错误（例如读不出留证）同样属于写后不确定，统一按待核对上报（Q91）。
+            return Err(match error.kind {
+                crate::error::ErrorKind::NeedsVerification => error,
+                _ => AppError::needs_verification(format!(
+                    "恢复已写入工作区，但结果记录失败，结果待核对：{error}"
+                )),
+            });
         }
 
         // 尾部读取同样受 Q91 约束：失败时把这次尝试改回待核对，而不是留下 Completed。
@@ -961,7 +966,51 @@ impl RecoveryStore {
         attempt.state = state;
         attempt.written = written.to_vec();
         attempt.message = message.map(|value| value.to_string());
-        self.write_journal(&path, &journal)
+        let failure = match self.write_journal_steps(&path, &journal) {
+            Ok(()) => return Ok(()),
+            Err(failure) => failure,
+        };
+        if state != RestoreAttemptState::Completed {
+            return Err(failure.0);
+        }
+        // `write_journal_steps` 先 rename 再 sync 目录：sync 失败时磁盘上已经是 Completed。
+        // 不能就这样返回普通错误把「已完成」留在盘上——尽力写回待核对再报错（Q91）。
+        Err(self.downgrade_after_completion_failure(&path, index, &mut journal, written, &failure.0))
+    }
+
+    /// 完成留证写入失败后的补救：把**内存中**这次尝试改回待核对并重新落盘。
+    ///
+    /// 不重新读盘：记录目录此时可能正不可读（真实故障），而内存里的历史就是刚写下的内容。
+    /// 只要替换成功，重开后看到的就是待核对；若连替换都失败，消息里明确说明
+    /// 「磁盘上可能仍显示已完成」，让用户按待核对处理，而不是相信那个状态。
+    fn downgrade_after_completion_failure(
+        &self,
+        path: &Path,
+        index: usize,
+        journal: &mut RestoreJournal,
+        written: &[String],
+        cause: &AppError,
+    ) -> AppError {
+        let message = format!("恢复已写入工作区，但完成留证失败，结果待核对：{cause}");
+        let downgraded = match journal.attempts.get_mut(index) {
+            Some(attempt) => {
+                attempt.state = RestoreAttemptState::NeedsVerification;
+                attempt.written = written.to_vec();
+                attempt.message = Some(message.clone());
+                self.write_journal_steps(path, journal)
+            }
+            None => Err((AppError::internal("恢复留证丢失"), false)),
+        };
+        match downgraded {
+            // 待核对已落盘（目录同步可能仍失败，但替换成功即代表重开看到的是待核对）。
+            Ok(()) => AppError::needs_verification(message),
+            Err((second, true)) => AppError::needs_verification(format!(
+                "{message}；待核对留证已替换但目录同步失败（{second}），重开应显示待核对"
+            )),
+            Err((second, false)) => AppError::needs_verification(format!(
+                "{message}；且待核对留证也未能写入（{second}），磁盘上可能仍显示已完成，请按待核对处理"
+            )),
+        }
     }
 
     fn read_journal(&self, path: &Path) -> Result<RestoreJournal> {
@@ -981,11 +1030,21 @@ impl RecoveryStore {
     }
 
     fn write_journal(&self, path: &Path, journal: &RestoreJournal) -> Result<()> {
+        self.write_journal_steps(path, journal).map_err(|(error, _)| error)
+    }
+
+    /// 写入留证的三步：写临时文件 → 原子替换 → 同步目录。
+    ///
+    /// 返回 `Err((错误, 替换是否已落盘))`。区分这两件事很关键：只要**替换**成功，
+    /// 重开后读到的就是这次写的内容，即使随后的目录同步失败（Q91）。
+    fn write_journal_steps(&self, path: &Path, journal: &RestoreJournal) -> std::result::Result<(), (AppError, bool)> {
         let temp = path.with_extension(format!("next-{}", (self.clock)()));
-        write_new(&temp, journal)?;
-        fs::rename(&temp, path)?;
+        write_new(&temp, journal).map_err(|error| (error, false))?;
+        fs::rename(&temp, path).map_err(|error| (error.into(), false))?;
         if let Some(parent) = path.parent() {
-            platform::sync_directory(parent)?;
+            if let Err(error) = platform::sync_directory(parent) {
+                return Err((error.into(), true));
+            }
         }
         Ok(())
     }
