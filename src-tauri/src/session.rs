@@ -824,6 +824,30 @@ impl WorktreeSession {
         self.refresh().map_err(|error| AppError::needs_verification(format!("丢弃已执行并保存，最新状态读取失败：{error}")))
     }
 
+
+    /// 从回收记录恢复完整工作区状态（Q29、Q85、ADR-0010）。
+    ///
+    /// 复用同 worktree 的非排队写锁；恢复前重新读取真实身份与工作区字节，
+    /// 只写工作区，不碰暂存区，也不重放反向补丁。
+    pub fn restore_record(
+        &self,
+        id: &str,
+        expected_paths: &[String],
+        expected_state: recovery::RecoveryState,
+        store: &RecoveryStore,
+    ) -> Result<recovery::RecoveryInspection> {
+        let _write = self.acquire_write_lock()?;
+        let identity = WorktreeIdentity::capture(&self.git)?;
+        store.ensure_outside(&identity)?;
+        store.restore(id, &identity, &self.path, expected_paths, expected_state)
+    }
+
+    /// 恢复的只读检查（不写工作区）。
+    pub fn inspect_record(&self, id: &str, store: &RecoveryStore) -> Result<recovery::RecoveryInspection> {
+        let identity = WorktreeIdentity::capture(&self.git)?;
+        store.inspect(id, Some(&identity), Some(&self.path))
+    }
+
     fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {
         if !supports_hunk_actions(entry, file) {
             return Vec::new();

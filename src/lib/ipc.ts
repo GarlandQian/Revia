@@ -11,6 +11,8 @@ import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
+import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
+import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
 import type { RowSlice } from "@/types/bindings/RowSlice";
 import type { ViewMode } from "@/types/bindings/ViewMode";
@@ -161,4 +163,16 @@ export const ipc = {
   discardHunk: (request: { worktreeId: string; path: string; fingerprint: string; snapshotRevision: string; hunkId: string }) =>
     invoke<ChangesSnapshot>("discard_hunk", { request }),
   listRecovery: (worktreeId: string | null) => invoke<RecoverySummary[]>("list_recovery", { worktreeId }),
+  inspectRecovery: (worktreeId: string, recordId: string) =>
+    invoke<RecoveryInspection>("inspect_recovery", { request: { worktreeId, recordId } }),
+  restoreRecovery: (request: {
+    worktreeId: string;
+    recordId: string;
+    expectedPaths: string[];
+    expectedState: RecoveryState;
+  }) => invoke<RecoveryInspection>("restore_recovery", { request }),
+  saveRecoveryAs: (request: { recordId: string; path: string; destination: string }) =>
+    invoke<number>("save_recovery_as", { request }),
+  clearRecovery: () => invoke<number>("clear_recovery"),
+  purgeRecovery: () => invoke<number>("purge_recovery"),
 };

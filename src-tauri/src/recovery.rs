@@ -6,7 +6,8 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex, atomic::{AtomicU64, Ordering}};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,9 @@ use crate::git::Git;
 use crate::platform;
 
 static NEXT_RECORD: AtomicU64 = AtomicU64::new(1);
+
+/// 回收记录的保留期（Q9、规格实现决策 4：14 天）。
+pub const RETENTION_MS: u64 = 14 * 24 * 60 * 60 * 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -137,10 +141,133 @@ pub struct RecoverySummary {
     pub identity_confirmed: bool,
 }
 
+
+/// 一条记录当前的可用状态（Q29、Q85、Q87）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum RecoveryState {
+    /// 与丢弃完成后的状态一致：可以直接恢复。
+    Ready,
+    /// 之后又有了修改：只能只读对比 / 另存，不能覆盖。
+    LaterChanges,
+    /// 没有可信的「丢弃完成后」基线（待核对或未执行）。
+    NoBaseline,
+    /// 原 worktree 身份无法确认（移动、重建、其他 worktree）。
+    IdentityMismatch,
+}
+
+/// 单个路径在某一侧的状态摘要。
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecoveryFileState {
+    pub exists: bool,
+    pub bytes: u64,
+    pub executable: bool,
+    /// 是否按二进制处理（含 NUL 或不是合法 UTF-8）。
+    pub binary: bool,
+    /// 文本内容，供只读对比；二进制为 None。
+    pub text: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecoveryFileView {
+    pub path: String,
+    pub saved: RecoveryFileState,
+    pub current: RecoveryFileState,
+}
+
+/// 恢复前的完整检查结果：界面据此决定是否允许直接恢复。
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecoveryInspection {
+    pub id: String,
+    pub target: String,
+    pub source: RecoverySource,
+    pub created_at_ms: u64,
+    pub worktree_path: String,
+    pub paths: Vec<String>,
+    pub state: RecoveryState,
+    pub files: Vec<RecoveryFileView>,
+}
+
+fn file_state(file: &SavedFile) -> RecoveryFileState {
+    match &file.content {
+        None => RecoveryFileState { exists: false, bytes: 0, executable: false, binary: false, text: None },
+        Some(bytes) => {
+            let binary = bytes.contains(&0) || std::str::from_utf8(bytes).is_err();
+            RecoveryFileState {
+                exists: true,
+                bytes: bytes.len() as u64,
+                executable: file.executable,
+                binary,
+                text: if binary { None } else { Some(String::from_utf8_lossy(bytes).into_owned()) },
+            }
+        }
+    }
+}
+
+/// 把保存的工作区状态写回。调用方必须先完成身份与「无后续变化」校验。
+fn restore_files(worktree: &Path, before: &[SavedFile]) -> Result<()> {
+    for file in before {
+        let full = checked_path(worktree, &file.path)?;
+        match &file.content {
+            Some(bytes) => {
+                if let Some(parent) = full.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                // 先写同目录临时文件再替换：中途失败不会留下半份内容。
+                let temp = full.with_extension("revia-restore-tmp");
+                let _ = fs::remove_file(&temp);
+                let mut options = OpenOptions::new();
+                options.create_new(true).write(true);
+                #[cfg(unix)]
+                { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
+                let mut handle = options.open(&temp)?;
+                handle.write_all(bytes)?;
+                handle.sync_all()?;
+                drop(handle);
+                platform::set_executable(&temp, file.executable)?;
+                fs::rename(&temp, &full)?;
+            }
+            None => {
+                match fs::symlink_metadata(&full) {
+                    // 保存时该路径不存在，恢复就是让它重新不存在。
+                    Ok(meta) if meta.is_file() => fs::remove_file(&full)?,
+                    Ok(_) => return Err(AppError::rejected("目标路径不是普通文件，不能恢复")),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error.into()),
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct RecoveryStore {
     directory: PathBuf,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
+    /// 正在进行保存 / 恢复的记录 ID：清理不能删掉在途操作还需要的记录。
+    in_use: Arc<Mutex<HashSet<String>>>,
+}
+
+/// 在途占用标记；离开作用域自动释放。
+pub struct RecordUse {
+    id: String,
+    in_use: Arc<Mutex<HashSet<String>>>,
+}
+
+impl Drop for RecordUse {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.in_use.lock() {
+            guard.remove(&self.id);
+        }
+    }
 }
 
 impl RecoveryStore {
@@ -149,7 +276,19 @@ impl RecoveryStore {
     }
 
     pub fn with_clock(data_directory: PathBuf, clock: Arc<dyn Fn() -> u64 + Send + Sync>) -> Self {
-        Self { directory: data_directory.join("recovery"), clock }
+        Self { directory: data_directory.join("recovery"), clock, in_use: Arc::new(Mutex::new(HashSet::new())) }
+    }
+
+    /// 标记某条记录正在被使用（保存 / 恢复），清理会跳过它。
+    pub fn use_record(&self, id: &str) -> RecordUse {
+        if let Ok(mut guard) = self.in_use.lock() {
+            guard.insert(id.to_string());
+        }
+        RecordUse { id: id.to_string(), in_use: self.in_use.clone() }
+    }
+
+    fn is_in_use(&self, id: &str) -> bool {
+        self.in_use.lock().map(|guard| guard.contains(id)).unwrap_or(false)
     }
 
     fn allocate(&self, prefix: &str) -> Result<PathBuf> {
@@ -249,6 +388,193 @@ impl RecoveryStore {
         }
         records.sort_by(|a, b| b.created_at_ms.cmp(&a.created_at_ms).then_with(|| b.id.cmp(&a.id)));
         Ok(records)
+    }
+
+
+    /// 检查一条记录是否可以直接恢复，并给出只读对比所需的两侧状态。
+    ///
+    /// 判定基准是**丢弃完成后**的状态（`outcome.after`），不是保存的 `before`（Q29、ADR-0010）。
+    pub fn inspect(
+        &self,
+        id: &str,
+        identity: Option<&WorktreeIdentity>,
+        worktree: Option<&Path>,
+    ) -> Result<RecoveryInspection> {
+        let (record, outcome) = self.read(id)?;
+        let identity_matches = identity.is_some_and(|current| record.identity.confirmed_match(current));
+
+        let after = match &outcome {
+            Some(DiscardOutcome::Completed { after }) => Some(after),
+            _ => None,
+        };
+
+        let mut files = Vec::with_capacity(record.before.len());
+        let mut current_matches_after = after.is_some();
+        for saved in &record.before {
+            let current = match worktree {
+                Some(root) => {
+                    let captured = capture_files(root, std::slice::from_ref(&saved.path))?;
+                    captured.into_iter().next().unwrap_or_else(|| saved.clone())
+                }
+                None => saved.clone(),
+            };
+            if let Some(after) = after {
+                let expected = after.iter().find(|file| file.path == saved.path);
+                if expected != Some(&current) {
+                    current_matches_after = false;
+                }
+            }
+            files.push(RecoveryFileView {
+                path: saved.path.clone(),
+                saved: file_state(saved),
+                current: file_state(&current),
+            });
+        }
+
+        let state = if !identity_matches {
+            RecoveryState::IdentityMismatch
+        } else if after.is_none() {
+            RecoveryState::NoBaseline
+        } else if !current_matches_after {
+            RecoveryState::LaterChanges
+        } else {
+            RecoveryState::Ready
+        };
+
+        Ok(RecoveryInspection {
+            id: record.id.clone(),
+            target: record.target.clone(),
+            source: record.source.clone(),
+            created_at_ms: record.created_at_ms,
+            worktree_path: record.identity.worktree_path.display().to_string(),
+            paths: record.before.iter().map(|file| file.path.clone()).collect(),
+            state,
+            files,
+        })
+    }
+
+    /// 把保存的完整工作区状态写回。只写工作区，不碰暂存区、不重放反向补丁。
+    ///
+    /// `expected_paths` / `expected_state` 来自用户确认时看到的那一次检查：
+    /// 期间记录内容、身份或当前状态变化都会使这次恢复失效。
+    pub fn restore(
+        &self,
+        id: &str,
+        identity: &WorktreeIdentity,
+        worktree: &Path,
+        expected_paths: &[String],
+        expected_state: RecoveryState,
+    ) -> Result<RecoveryInspection> {
+        let _in_use = self.use_record(id);
+        let inspection = self.inspect(id, Some(identity), Some(worktree))?;
+        if inspection.paths != expected_paths {
+            return Err(AppError::rejected("回收记录的相关路径已变化，请重新确认"));
+        }
+        match (expected_state, inspection.state) {
+            (RecoveryState::Ready, RecoveryState::Ready) => {}
+            (_, RecoveryState::IdentityMismatch) => {
+                return Err(AppError::rejected("原 worktree 身份无法确认，不能直接恢复到新目录"))
+            }
+            (_, RecoveryState::NoBaseline) => {
+                return Err(AppError::rejected("这条记录没有可信的丢弃完成状态，结果待核对，不能直接恢复"))
+            }
+            (_, RecoveryState::LaterChanges) => {
+                return Err(AppError::rejected("文件在丢弃之后又有修改，不能覆盖；请改用只读对比或另存"))
+            }
+            _ => return Err(AppError::rejected("回收记录状态已变化，请重新确认")),
+        }
+
+        let (record, _) = self.read(id)?;
+        restore_files(worktree, &record.before)?;
+        // 返回恢复后的真实状态，供界面确认。
+        self.inspect(id, Some(identity), Some(worktree))
+    }
+
+    /// 把保存版本另存到用户选择的新路径；目标必须不存在（含符号链接等）。
+    pub fn save_as(&self, id: &str, path: &str, destination: &Path) -> Result<u64> {
+        let (record, _) = self.read(id)?;
+        let saved = record
+            .before
+            .iter()
+            .find(|file| file.path == path)
+            .ok_or_else(|| AppError::rejected("该记录不包含这个路径"))?;
+        let bytes = saved
+            .content
+            .as_ref()
+            .ok_or_else(|| AppError::rejected("这条记录里该路径不存在内容，无法另存"))?;
+
+        if let Some(parent) = destination.parent() {
+            if !parent.is_dir() {
+                return Err(AppError::rejected("另存目录不存在"));
+            }
+        }
+        // 用 create_new 一步完成「不存在才创建」：不会先截断再发现已存在。
+        let mut options = OpenOptions::new();
+        options.create_new(true).write(true);
+        #[cfg(unix)]
+        { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
+        let mut handle = match options.open(destination) {
+            Ok(handle) => handle,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                return Err(AppError::rejected("目标路径已存在，请选择其他路径"));
+            }
+            Err(error) => return Err(error.into()),
+        };
+        handle.write_all(bytes)?;
+        handle.sync_all()?;
+        platform::set_executable(destination, saved.executable)?;
+        Ok(bytes.len() as u64)
+    }
+
+    /// 删除超过保留期的记录；返回删除数量。
+    ///
+    /// 在途保存 / 恢复占用的记录一律跳过；删除失败不静默。
+    pub fn purge_expired(&self) -> Result<u64> {
+        let now = (self.clock)();
+        let entries = match fs::read_dir(&self.directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(error) => return Err(error.into()),
+        };
+        let mut removed = 0;
+        for entry in entries {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with("record-") || self.is_in_use(&name) {
+                continue;
+            }
+            let (record, _) = match self.read(&name) {
+                Ok(value) => value,
+                // 读不出来的记录不删：宁可保留可见，也不误删未知数据。
+                Err(_) => continue,
+            };
+            if now.saturating_sub(record.created_at_ms) < RETENTION_MS {
+                continue;
+            }
+            fs::remove_dir_all(entry.path())?;
+            removed += 1;
+        }
+        Ok(removed)
+    }
+
+    /// 清空回收区（用户明确确认后调用）。在途记录保留。
+    pub fn clear(&self) -> Result<u64> {
+        let entries = match fs::read_dir(&self.directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(error) => return Err(error.into()),
+        };
+        let mut removed = 0;
+        for entry in entries {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with("record-") || self.is_in_use(&name) {
+                continue;
+            }
+            fs::remove_dir_all(entry.path())?;
+            removed += 1;
+        }
+        Ok(removed)
     }
 
     /// Compute the exact expected result with the same Git patch, away from the worktree.

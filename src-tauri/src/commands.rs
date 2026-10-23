@@ -18,7 +18,7 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
-use crate::recovery::{RecoveryStore, RecoverySummary, WorktreeIdentity};
+use crate::recovery::{RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, WorktreeIdentity};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 pub struct AppState {
@@ -422,6 +422,87 @@ pub async fn list_recovery(state: State<'_, AppState>, worktree_id: Option<Strin
         let identity = session.and_then(|session| WorktreeIdentity::capture(&session.git).ok());
         store.list(identity.as_ref())
     }).await.map_err(|error| AppError::internal(format!("读取回收区失败：{error}")))?
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryInspectRequest {
+    pub worktree_id: String,
+    pub record_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryRestoreRequest {
+    pub worktree_id: String,
+    pub record_id: String,
+    /// 用户确认时看到的记录相关路径与状态；不一致即拒绝。
+    pub expected_paths: Vec<String>,
+    pub expected_state: RecoveryState,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoverySaveAsRequest {
+    pub record_id: String,
+    /// 记录中的哪个路径（一条记录可能包含重命名的新旧两条）。
+    pub path: String,
+    /// 用户选择的新路径（绝对路径）；必须尚不存在。
+    pub destination: String,
+}
+
+/// 只读检查一条记录能否直接恢复，并给出对比所需的两侧状态。
+#[tauri::command]
+pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspectRequest) -> Result<RecoveryInspection> {
+    let session = state.session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || session.inspect_record(&request.record_id, &store))
+        .await
+        .map_err(|error| AppError::internal(format!("读取回收记录失败：{error}")))?
+}
+
+/// 恢复保存时的完整工作区状态（不改变暂存区）。
+#[tauri::command]
+pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryRestoreRequest) -> Result<RecoveryInspection> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let store = state.recovery.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.restore_record(&request.record_id, &request.expected_paths, request.expected_state, &store)
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("恢复任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "restore_recovery", &context.worktree_id, None, result).await
+}
+
+/// 把保存版本另存到尚不存在的新路径。
+#[tauri::command]
+pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveAsRequest) -> Result<u64> {
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store.save_as(&request.record_id, &request.path, std::path::Path::new(&request.destination))
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("另存回收内容失败：{error}")))?
+}
+
+/// 清空回收区（在途记录保留）。
+#[tauri::command]
+pub async fn clear_recovery(state: State<'_, AppState>) -> Result<u64> {
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || store.clear())
+        .await
+        .map_err(|error| AppError::internal(format!("清空回收区失败：{error}")))?
+}
+
+/// 删除超过保留期的记录（启动时与手动清理共用）。
+#[tauri::command]
+pub async fn purge_recovery(state: State<'_, AppState>) -> Result<u64> {
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || store.purge_expired())
+        .await
+        .map_err(|error| AppError::internal(format!("清理过期记录失败：{error}")))?
 }
 
 #[tauri::command]

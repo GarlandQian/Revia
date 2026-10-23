@@ -1075,3 +1075,220 @@ fn git_rename_unstaged_side_rejects_hunk_discard_but_keeps_whole_file() {
     assert!(records[0].paths.contains(&"old.txt".to_string()));
     assert!(records[0].paths.contains(&"new.txt".to_string()));
 }
+
+// ---------------- 任务 05：恢复与清理 ----------------
+
+/// 无后续变化时恢复完整工作区状态：内容、存在状态、可执行权限；index 不变。
+#[test]
+fn restore_returns_full_worktree_state_without_touching_index() {
+    let f = Fixture::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        f.write("script.sh", b"#!/bin/sh\necho v1\n");
+        f.commit();
+        fs::set_permissions(f.repo.join("script.sh"), fs::Permissions::from_mode(0o755)).unwrap();
+        f.git(&["update-index", "--chmod=+x", "script.sh"]);
+        f.commit();
+        f.write("script.sh", b"#!/bin/sh\necho v2\n");
+        let session = f.session();
+        let target = entry(&session, "script.sh");
+        let store = f.store();
+        let before = f.read("script.sh");
+        discard(&session, &target, &store).unwrap();
+        assert_eq!(f.read("script.sh"), b"#!/bin/sh\necho v1\n");
+
+        let index = f.index();
+        let inspection = session.inspect_record(&store.list(None).unwrap()[0].id, &store).unwrap();
+        assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::Ready));
+        session
+            .restore_record(&inspection.id, &inspection.paths, inspection.state, &store)
+            .expect("无后续变化时应可直接恢复");
+        assert_eq!(f.read("script.sh"), before, "必须回到丢弃前的完整字节");
+        assert!(
+            platform::executable(&fs::metadata(f.repo.join("script.sh")).unwrap()),
+            "必须恢复可执行权限"
+        );
+        assert_eq!(f.index(), index, "恢复不得改变暂存区");
+    }
+}
+
+/// 有后续变化时只能只读对比，不能覆盖。
+#[test]
+fn restore_refuses_after_later_changes_and_keeps_current_content() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let record_id = store.list(None).unwrap()[0].id.clone();
+
+    f.write("target.ts", b"later work\n");
+    let inspection = session.inspect_record(&record_id, &store).unwrap();
+    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::LaterChanges));
+    assert_eq!(inspection.files.len(), 1);
+    assert!(inspection.files[0].saved.text.is_some(), "文本应提供只读对比内容");
+    assert_eq!(inspection.files[0].current.text.as_deref(), Some("later work\n"));
+
+    let error = session
+        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected);
+    assert_eq!(f.read("target.ts"), b"later work\n", "不得覆盖后续修改");
+}
+
+/// 结果待核对（无可信 after）时不能假定已丢弃，也不能直接恢复。
+#[test]
+fn restore_refuses_without_trusted_post_discard_baseline() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    // 在完成记录阶段中断：记录保留但无 outcome。
+    let _ = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
+        if phase == DiscardPhase::BeforeComplete { return Err(AppError::internal("controlled")); }
+        Ok(())
+    });
+    let record_id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&record_id, &store).unwrap();
+    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::NoBaseline));
+    let error = session
+        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected);
+}
+
+/// 身份不匹配（其他 worktree / 重建）不得直接恢复。
+#[test]
+fn restore_refuses_when_identity_does_not_match() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let record_id = store.list(None).unwrap()[0].id.clone();
+    drop(session);
+
+    let linked = f.temp.path().join("linked");
+    f.git(&["worktree", "add", "-b", "linked", linked.to_str().unwrap()]);
+    let linked_session = f.session_at(&linked);
+    let inspection = linked_session.inspect_record(&record_id, &store).unwrap();
+    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
+    let error = linked_session
+        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected);
+    // 原文件仍是丢弃后的状态，没有被 linked 覆盖。
+    assert_eq!(f.read("target.ts"), text(&[]));
+}
+
+/// 单 hunk 丢弃的记录恢复的是完整文件，而不是重放反向补丁。
+#[test]
+fn hunk_record_restores_the_whole_file() {
+    let f = Fixture::new();
+    let session = f.changed();
+    session.refresh().unwrap();
+    let rows = session.rows("target.ts", ChangesKind::Unstaged, ViewMode::Split, 0, 400).unwrap();
+    let action = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).expect("应有 hunk").clone();
+    let store = f.store();
+    let before = f.read("target.ts");
+    session
+        .discard_hunk("target.ts", &action.fingerprint, &action.snapshot_revision, &action.hunk_id, &store)
+        .unwrap();
+    let after_hunk = f.read("target.ts");
+    assert_ne!(after_hunk, before);
+
+    let record_id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&record_id, &store).unwrap();
+    assert!(matches!(inspection.source, RecoverySource::DiscardHunk));
+    session
+        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .expect("单 hunk 记录也应能恢复完整文件");
+    assert_eq!(f.read("target.ts"), before, "恢复的是完整文件内容");
+}
+
+/// 另存：目标已存在（含符号链接）拒绝；成功时原文件与 index 不变。
+#[cfg(unix)]
+#[test]
+fn save_as_refuses_existing_targets_and_keeps_original_untouched() {
+    let f = Fixture::new();
+    f.write("blob.bin", b"\0old");
+    f.commit();
+    f.write("blob.bin", b"\0new");
+    let session = f.session();
+    let target = entry(&session, "blob.bin");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let record_id = store.list(None).unwrap()[0].id.clone();
+    let index = f.index();
+    let after_discard = f.read("blob.bin");
+
+    // 已存在的普通文件。
+    let occupied = f.temp.path().join("occupied.bin");
+    fs::write(&occupied, b"keep me").unwrap();
+    assert!(store.save_as(&record_id, "blob.bin", &occupied).is_err());
+    assert_eq!(fs::read(&occupied).unwrap(), b"keep me", "已存在目标不得被截断");
+
+    // 已存在的符号链接（指向真实文件）。
+    let link = f.temp.path().join("link.bin");
+    std::os::unix::fs::symlink(&occupied, &link).unwrap();
+    assert!(store.save_as(&record_id, "blob.bin", &link).is_err());
+    assert_eq!(fs::read(&occupied).unwrap(), b"keep me");
+
+    // 未占用的新路径：成功写入保存版本。
+    let fresh = f.temp.path().join("saved.bin");
+    let bytes = store.save_as(&record_id, "blob.bin", &fresh).expect("新路径应可另存");
+    assert_eq!(bytes, 4);
+    // 保存的是「丢弃前」的工作区内容，也就是被丢弃掉的那一版。
+    assert_eq!(fs::read(&fresh).unwrap(), b"\0new");
+    assert_eq!(f.read("blob.bin"), after_discard, "另存不得改原文件");
+    assert_eq!(f.index(), index);
+}
+
+/// 14 天到期清理（受控时钟）；在途记录跳过；清空只删本应用记录。
+#[test]
+fn purge_expired_uses_controlled_clock_and_clear_keeps_in_use_records() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let now = Arc::new(std::sync::atomic::AtomicU64::new(1_792_742_400_123));
+    let clock = now.clone();
+    let store = RecoveryStore::with_clock(f.temp.path().join("data"), Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)));
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 未到期：不删。
+    now.store(1_792_742_400_123 + revia_lib::recovery::RETENTION_MS - 1, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(store.purge_expired().unwrap(), 0);
+    assert_eq!(store.list(None).unwrap().len(), 1);
+
+    // 在途记录即使过期也跳过。
+    now.store(1_792_742_400_123 + revia_lib::recovery::RETENTION_MS + 1, std::sync::atomic::Ordering::SeqCst);
+    {
+        let _in_use = store.use_record(&id);
+        assert_eq!(store.purge_expired().unwrap(), 0, "在途记录不得被清理");
+        assert_eq!(store.clear().unwrap(), 0, "清空同样不得删在途记录");
+        assert_eq!(store.list(None).unwrap().len(), 1);
+    }
+    // 释放后到期清理生效。
+    assert_eq!(store.purge_expired().unwrap(), 1);
+    assert!(store.list(None).unwrap().is_empty());
+}
+
+/// 清空不误删同一数据目录下的其他文件。
+#[test]
+fn clear_only_removes_this_applications_records() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let data = f.temp.path().join("data");
+    fs::write(data.join("settings.json"), b"{}").unwrap();
+    fs::create_dir_all(data.join("recovery").join("preview-leftover")).unwrap();
+
+    assert_eq!(store.clear().unwrap(), 1);
+    assert!(store.list(None).unwrap().is_empty());
+    assert!(data.join("settings.json").is_file(), "其他应用数据不得被删");
+    assert!(data.join("recovery").join("preview-leftover").is_dir(), "非记录目录不得被删");
+}
