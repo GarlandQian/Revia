@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
-> 勾选仅代表自动化（真实 Git + 独立数据目录 + 受控时钟）与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R2 返修已完成，等待规划方复核。历史实现报告及检查数字保留。
+> 第三轮两轴复核未通过，继续交 Pi 返修。历史检查结果不等于本轮生产契约已闭合；全部复核通过后再固定版本做真实桌面和 CI 验收。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -384,3 +384,50 @@ Spec 本轮为静态审查，未运行测试、GUI 或构建；无范围扩张�
 - Windows 编译与 CI（可执行位在 Windows 恒为 false，沿用任务 04 的 `platform` 抽象）。
 - 超大文件恢复/对比的内存占用未量化；恢复按整文件读入。
 - 恢复仍不改变暂存区；`inspect` 只比较工作区字节，丢弃后仅改 index 不会阻止恢复（按 Q29/ADR-0010，判定基准是工作区后续变化）。
+
+### 2026-10-24 / Codex 规划方：第三轮独立两轴复核，继续返修
+
+固定范围 `git diff cb828361d0f248ee4aa5e45f9bc40c7edc94e075...6071b599ba29a905c2f47549d76909da05c08bbd`；`11a4a71` 为规划方文档，`6071b59` 为 Pi 第二轮返修。两轴分别保留，不把共同发现合并成一个通过结论。本轮仍不通过，未构建 Release、未运行 GUI/D06，不进入桌面验收。
+
+#### Standards（独立结论：9项确定问题）
+
+- **R05-R3-ST1 / P1，原ST1/ST3未闭合**：`src-tauri/src/recovery.rs:353` 只检查下一路径及已写路径，漏查其他未发布相关路径。重命名记录的第二路径变化或冲突时，第一路径仍先写入；随后却登记 Rejected、“未写入任何路径”，违反 Q80/Q85/Q91。须先核对全部相关路径，部分写入后统一待核对。
+- **R05-R3-ST2 / P2，ST3部分**：`src-tauri/src/recovery.rs:749` 完成留证已标 Completed，后续真实读取失败只返回 NeedsVerification，持久状态仍 Completed；末尾再次读取尝试历史还可能透传普通错误。须覆盖全部写后失败并更新留证，遵守 Q91。
+- **R05-R3-ST3 / P2，ST3读取闭环**：`src/App.tsx:818` 仍以 `acceptFailure` 的当前激活条件决定是否读取。恢复期间切走，待核对失败不会调用原目标 `refreshTarget`，违反 Q91。
+- **R05-R3-ST4 / P2，ST4元数据边界**：`src-tauri/src/recovery.rs:963` 只保护源记录的 gitDir/commonDir。A记录另存至另一登记仓库 B 的 Git 元数据新路径可穿过检查；必须保护真实目标仓库元数据。
+- **R05-R3-ST5 / P2，ST4前端未闭合**：`src/components/app/RecoveryDialogs.tsx:204` 另存仍直接 IPC、仅局部 busy，没有目标 worktree 全局门禁及结果保留。关闭面板可丢迟到错误；后端 `deliver` 是验收接缝，不是前端结果通道。违反 Q90。
+- **R05-R3-ST6 / P2，新增归属错误**：`src-tauri/src/settings.rs:147` 返回首个包含目录，不取最具体 worktree。登记 A及嵌套独立仓库 B时，B内另存可能错误取得 A锁，绕过 B互斥，违反 Q90。
+- **R05-R3-ST7 / P2，新增面板卡死**：`src/components/app/RecoveryDialogs.tsx:194` 恢复中返回列表递增 epoch，完成回调便不再清除 busy，详情等入口永久禁用至重开，违反执行期间允许浏览的 Q90。
+- **R05-R3-ST8 / P2，Q87仍缺前端入口**：`src/components/app/RecoveryDialogs.tsx:124` 无当前 worktree 时详情按钮虽启用，处理函数立即返回，保存内容仍无法查看。
+- **R05-R3-ST9 / P2，ST5新增清理残留**：`src-tauri/src/recovery.rs:508` 改名 trash 后删除失败，后续清理跳过 trash；`sweep_trash` 无调用。下轮返回成功又清除错误，残留永久隐藏，违反自动清理及可见失败要求。
+
+规则依据为 `docs/product-direction.md` 的 Q80/Q85/Q87/Q90/Q91，以及任务05 Comments 的普通模式可见失败要求。闭合：ST2常规历史持久化/展示/显式重试；ST3受控阶段错误分类；ST4普通非嵌套目标后端锁；ST5普通模式查询提示。其余如上部分闭合。无额外 Fowler 判断性建议。
+
+#### Spec（独立结论：11项未闭合或新增发现）
+
+以下规格引用指固定 `6071b59` 的 `docs/milestones/m2/spec.md`，issue05同样取固定版本。
+
+- **R05-R3-SP1 / P1，原SP7**：`src-tauri/src/recovery.rs:963` 只传入源记录A身份，L1014仅保护A的gitDir/commonDir，且移除了通用`.git`组件限制；A记录另存到B的Git元数据新路径会放行，B锁不改变边界。违反spec L170“拒绝……越界或不匹配目标”及issue05 L274“真实gitDir/commonDir均保护”。
+- **R05-R3-SP2 / P1，原SP1**：`recovery.rs:353` 只比较next，忽略其余尚未发布路径。rename记录第二路径在BeforeWrite被外改，第一路径先恢复、第二才拒绝；L719还留证“未写入任何路径”及Rejected。违反spec L88“比较……相关版本、状态、路径”、L93待核对及issue05 L271全部相关状态要求。
+- **R05-R3-SP3 / P2，身份拒绝前已改错误目标**：`recovery.rs:690` 验证记录身份前调用prepare，L306会创建目录。把A的子目录记录请求恢复至缺少该目录的B，最终虽拒绝却留下B中的空目录。违反spec L102“不直接恢复到新目录”、L170不匹配目标拒绝。
+- **R05-R3-SP4 / P2，原SP2部分**：`src/App.tsx:818` 仍以当前激活的`acceptFailure`限制原目标重读，A待核对响应切至B后到达则A不核对；`recovery.rs:742`先记Completed，L749最后capture失败仅返回NeedsVerification，历史仍称完成。违反spec L93“重新读取真实状态”及T11 L167。
+- **R05-R3-SP5 / P2，原SP5激活绑定**：`src/components/app/RecoveryDialogs.tsx:90` worktree变化不清selected/confirming，L105仅依赖数值revision；A/B revision相等的后台切换完成时旧确认仍在，没有activation绑定。违反spec L89旧确认失效及issue05 L273“所见版本/快照/激活”。
+- **R05-R3-SP6 / P2，原SP6新增忙碌死锁**：`RecoveryDialogs.tsx:109` 返回列表递增epoch却不清busy，完成后的L194不再清busy，详情/清理持续禁用至关重开。违反spec L92写期间可浏览及issue05 L273面板生命周期。
+- **R05-R3-SP7 / P2，原SP7结果门**：`RecoveryDialogs.tsx:197` 另存直接IPC写局部notice/error，未进入App按目标写状态、OperationResultGate或原目标结果保存，关面板丢结果，迟到响应也无epoch检查；后端deliver只是验收延迟接缝。违反spec L90禁用其他写入口、L92结果归原worktree。
+- **R05-R3-SP8 / P2，原SP7嵌套目标**：`src-tauri/src/settings.rs:143` 返回首个包含路径的仓库，不选最具体匹配；外A先登记、内独立B后登记，另存B取得A锁，可与B写重叠。违反spec L90同worktree互斥。
+- **R05-R3-SP9 / P2，原SP9伪装当前状态**：`recovery.rs:911` 将权限、目录、symlink等读取错误全部转None，再以`/dev/null`生成删除diff，而非仅处理真实不存在。违反spec L101展示“当前状态与保存状态”的diff。
+- **R05-R3-SP10 / P2，原SP10前端入口**：`RecoveryDialogs.tsx:124` 无worktree直接return，详情按钮虽启用但点击无效。违反spec L102“回收记录保留供查看”。新增测试仍直接store，未穿过此入口。
+- **R05-R3-SP11 / P2，清理残留**：`recovery.rs:508` 改名trash后删除失败，list/purge/clear均忽略trash；L514的`sweep_trash`无调用，恢复权限后仍不清残留。spec L103自动清理仅部分实现。
+
+闭合：SP3/4生产历史展示及显式重新恢复，SP8普通模式维护提示，SP9真实缺失侧diff，以及缓存session身份失败的查看fallback已接通；SP1单路径临近发布、写后hook错误分类、普通目标后端另存锁有实质修复，但不等于整项闭合。无新增产品功能越界。
+
+#### 验证边界与返修完成条件
+
+- Standards 9项、最严重P1；Spec 11项、最严重P1。两轴仅固定源码和已有日志静态复核，没有新增客户端、测试运行、构建或GUI。原始Pi检查已[按字节归档](../evidence/task05-review03/manifest.json)：213项等通过可从输出核对，但`source-sha.txt`记的是返修前11a4a71，manifest事后写6071b59，缺少测试前源码文件hash；不冒称规划方独立固定版本验收。所称5次重复和6组敏感性对照未附逐次原始输出，仍按实施方报告而非已核实证据。
+- t13本次日志可确认Git真实短读错误，但不能推定旧“未知指纹”均同根因；真实工具可能直接保存或原子替换。保留两类实际场景，不以替换测试负载代替归因。详细要求同步到[任务10 Comments](./10-integrated-verification.md#comments)。历史Pi说法保留，本节限定其证据边界。
+- 本轮按完整生产调用链闭合，不再以“手工先拿锁后调用store”证明命令已经正确选锁，也不以直接store测试证明无worktree前端已可查看。必要时抽出命令实际调用的最小共享执行函数，用现有真实Git测试直接覆盖它；不引入外部客户端或前端框架。
+- 初次捕获/拒绝必须在创建用户路径等准备动作前；准备后再次核对真实身份、所有相关路径状态及冲突，且每次发布前维护未写after/已写saved的整体预期。首次不匹配不改目标；部分已写后失败统一待核对、如实保留written并重读，不用“未写入任何路径”。最终核对成功前不能持久宣称完成；全部尾部失败都受Q91约束。
+- 原目标核对与当前界面接收分开：切走也读原目标，只有仍激活才更新可见快照。另存的实际归属、后端共享锁、前端共享门禁、结果保存及重读必须贯通；保护源和实际目标的真实Git元数据，不能回退到只比源身份。合法外部新路径继续可用，嵌套登记按最具体归属处理。
+- 面板展示代际与操作结束清理分开；返回/换记录/切目标/刷新后不接收旧内容，但不能把busy永久留下。确认同时绑定worktree、activation、所见快照和记录版本；无当前worktree仍可经过IPC看保存侧。
+- 当前侧未知不可读与真实不存在分开；只在确认不存在时生成空侧diff，不把权限/类型/身份失败绘成删除。trash残留纳入可重试清理及失败可见性，未清除前不能用下一轮0条成功清除错误。
+- 全部改完再集中检查，保留失败历史。检查前记录源码文件hash或可还原diff，记录精确命令/真实退出码/完整输出；只能报告实际留存的运行。按精确路径暂存提交m2，等待两轴复核；全部通过后规划方才桌面验收。
