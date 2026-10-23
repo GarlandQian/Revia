@@ -1,6 +1,6 @@
 # M2 阶段报告
 
-更新日期：2026-10-23。任务 01、02、09 已完成；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
+更新日期：2026-10-23。任务 01、02、03、09 已完成；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
 
 ## 当前进度（2026-10-23）
 
@@ -8,7 +8,7 @@
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
 - 任务 09：`done`，`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 已完成，macOS Apple Silicon 与 Windows x64 的前端检查、Rust 测试及 release 编译全部通过。Windows 实际通过 66 单元 + 16 file_staging + 3 session_flow；测试修复增量的 Standards / Spec 双审均无新问题。最终集成仍需任务 10、11 再次验收，见 [任务 09](./issues/09-platform-compile-checks.md)。
 - 按新规则先派给 Paseo 的 deepseek；本轮 3 次重试均为 `503 auth_unavailable`，会话进入 error 且未改文件，由 Codex 接手，不切 Gemini。已把 `main` 的 `837d68a` 规则合入 `m2`，主目录不变。
-- 任务 03：`ready-for-human`，hunk 写入与显示凭据已实现，114 项 Rust、25 项行缓存、13 项高亮回归及类型／lint／release 构建通过；两轴审查和桌面验收待完成，见 [任务 03](./issues/03-hunk-staging.md)。06 尚未实施。
+- 任务 03：`done`，原始 hunk 写入、两视图键盘与真实暂存区核对、相关版本过期拒绝及 D06 已验收。最终 `bbddd4f` 的 [CI #39876636277](https://github.com/GarlandQian/Revia/actions/runs/39876636277) 双平台通过（macOS 114 / Windows 104 项 Rust）；标准首屏 115/95ms、真冷文字 DOM 5/4ms。原超帧值、旧取证不足样本与 P3 命名观察保留，详见 [任务 03 验收](./task03-acceptance.md)。06 尚未实施。
 
 ## 任务 01 结论（2026-10-22）
 

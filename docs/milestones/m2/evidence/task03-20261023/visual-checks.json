@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-23",
+  "sourceCommit": "bbddd4f356e624e504e93d4db6bf5009df66f468",
+  "binarySha256": "5a3cea3a86dc5721c16ca8ede06d1e67170787fb25a3fbb692abc2861ef5250d",
+  "mode": "ordinary isolated HOME; no automatic measurement",
+  "dataDir": "/private/tmp/revia-task03-visual-cjuzain1/home/Library/Application Support/io.github.garlandqian.revia",
+  "checks": [
+    {
+      "name": "Vue first split",
+      "bothSidesAutomaticallyColored": true
+    },
+    {
+      "name": "Swift first unified",
+      "automaticallyColored": true
+    },
+    {
+      "name": "large unified",
+      "downPages": 10,
+      "upPages": 5,
+      "farJumpApproxLine": 5537,
+      "returnedToTop": true,
+      "colorsRestored": true,
+      "blankBlockObserved": false
+    },
+    {
+      "name": "large split",
+      "downPages": 10,
+      "upPages": 5,
+      "farJumpApproxLine": 5556,
+      "returnedToTop": true,
+      "bothSidesColored": true,
+      "blankBlockObserved": false
+    }
+  ],
+  "screenshots": "Inspected in conversation; no PNG archive. Timed test screenshots are post-measurement same-PID views, not timed-frame captures.",
+  "gitWriteActions": false,
+  "exit": {
+    "method": "Command-Q",
+    "code": 0
+  }
+}

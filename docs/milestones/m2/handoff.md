@@ -8,7 +8,7 @@
 - 任务 02 已 `done`：上一规划方的最终桌面结果按用户交接补录，未冒称 Codex 本轮复测；详见 [任务 02](issues/02-safe-file-staging.md)。
 - 任务 09 已 `done`：`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 中 macOS / Windows 的全部检查与 release 编译通过。任务 10、11 仍须验证最终集成版本。
 - Paseo 会话 `3e5f5941-1e2c-420e-9ae9-b97a955da682` 的 deepseek 本轮连续三次 `503 auth_unavailable`、进入 error 且未修改文件，Codex 已接手。后续继续遵守 deepseek 优先、不可用则规划方实施的规则。
-- [03](issues/03-hunk-staging.md) 已实现并通过集中自动检查，当前 `ready-for-human`；先完成独立两轴审查、真实桌面与 D06 验收，再推进 [06](issues/06-current-worktree-refresh.md)。不在共享 worktree 同时实施两个任务。
+- [03](issues/03-hunk-staging.md) 已 `done`：两轴审查、真实桌面、D06 与最终 `bbddd4f` 双平台 CI 完成，证据和计时限制见 [任务 03 验收](task03-acceptance.md)。接下来推进 [06](issues/06-current-worktree-refresh.md)，不在共享 worktree 同时实施两个任务。
 - `main` 保持 `837d68a` 且干净；派发规则已合入 `m2`。只按 Q97 推送 `m2` 用于编译检查，不提前合并回 `main`、不发布。
 - CI watch 已退出；临时 detached 验收 worktree 已清理，当前仅 main 与 m2 两个 checkout；没有运行中的 Revia GUI 或长测。
 

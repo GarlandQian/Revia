@@ -1,0 +1,12 @@
+{"check": "split-middle-hunk", "indexOnlyLines": [80], "worktreeSha256": "63e824968b39c8d64615188f6fd792821536a15b498101a2b6631b2d9c04c99c", "passed": true}
+{"check": "unified-space-unstage-then-enter-first-hunk", "indexOnlyLines": [10], "worktreeUnchanged": true, "passed": true}
+{"check": "hunk-focus-option-command-a", "scope": "whole-file", "indexLines": [10, 80, 140], "passed": true}
+{"check": "split-unstage-middle-hunk", "indexLines": [10, 140], "passed": true}
+{"check": "staged-unstage-after-worktree-only-change", "indexLines": [140], "worktreeLine80": 2080, "observedAllowed": true, "note": "Relevant HEAD/index versions unchanged; unrelated worktree side is not staged fingerprint."}
+{"check": "unstaged-other-hunk-changed-rejected", "indexBytesUnchanged": true, "observedMessage": "文件已变化，请重新确认", "refreshedLine80": 3080, "passed": true}
+{"check": "staged-other-hunk-changed-rejected", "indexBytesUnchanged": true, "worktreeBytesUnchanged": true, "observedMessage": "文件已变化，请重新确认", "selectedGroup": "staged", "passed": true}
+{"check": "unified-overscan-tab-enter", "indexOnlyLines": [130], "focusedButtonBecameVisible": true, "worktreeUnchanged": true, "passed": true}
+{"check": "split-overscan-tab", "focusedHeader": "item0226", "buttonBecameVisible": true, "passed": true}
+{"check": "hunk-focus-command-o", "nativeOpenPanelOpened": true, "cancelledWithoutRepositoryChange": true, "passed": true}
+{"check": "non-hunk-types", "binaryAfterExpand": "二进制文件，不显示内容", "untrackedRendered": true, "hunkButtonsAbsent": true, "passed": true}
+{"check": "desktop-exit", "method": "Command-Q", "exitCode": 0, "passed": true}

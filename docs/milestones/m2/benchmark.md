@@ -51,9 +51,9 @@ REVIA_MEASURE_LOG=/tmp/revia-perf-split-new.json \
 src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia
 ```
 
-每个视图独立进程，启动后置前窗口；统一视图用 `REVIA_MEASURE_ONLY=unified`。前端结束报告的 `ok` 和可见性必须有效，再检查首屏、跳转、颜色恢复与未覆盖帧，不接受隐藏窗口的计时数据。失败尝试的 JSON 和日志原样保留，补测使用新输出名，不覆盖无效样本。
+每个视图独立进程，启动后置前窗口；统一视图用 `REVIA_MEASURE_ONLY=unified`。显式自动性能测量的标题带 PID，开始前要求前台聚焦，测量期间任一 `blur` 使本次无效；`focusLosses` 是饱和 0/1 标志，不是累计次数。需要测后取证时增加 `REVIA_MEASURE_KEEP_OPEN=1`，结果写入后原窗口不退出，核对 PID、文件和视图后用 Cmd-Q 退出；未设置时仍自动退出，长测与 smoke 不受影响。测后截图不冒充计时期间截图。前端结束报告的 `ok` 和可见性必须有效，再检查首屏、跳转、颜色恢复与未覆盖帧，不接受隐藏窗口的计时数据。失败尝试的 JSON 和日志原样保留，补测使用新输出名，不覆盖无效样本。
 
-`REVIA_MEASURE_DATA_DIR` 仅在自动测量、长测或 `REVIA_SMOKE` 模式生效。只设置该变量和日志路径再普通启动，仍使用正常应用数据目录，不能称为隔离运行；核对启动日志的实际 `data_dir`。普通桌面核验只浏览已有 fixture，不执行 Git 写入。
+`REVIA_MEASURE_DATA_DIR` 仅在自动测量、长测或 `REVIA_SMOKE` 模式生效。只设置该变量和日志路径再普通启动，仍使用正常应用数据目录，不能称为隔离运行；核对启动日志的实际 `data_dir`。本节普通呈现核验只浏览已有 fixture，不执行 Git 写入。任务 02／03 等写入验收另建独立 fixture，并用临时 HOME 和 Git 配置隔离普通实例；必须按启动日志核对实际数据目录。
 
 ## 工具回归检查
 
