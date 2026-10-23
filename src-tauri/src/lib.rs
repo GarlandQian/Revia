@@ -8,6 +8,7 @@ pub mod git;
 pub mod session;
 pub mod settings;
 pub mod shell;
+pub mod watch;
 
 use commands::AppState;
 
@@ -69,6 +70,9 @@ pub fn run() {
             commands::select_repo,
             commands::set_diff_font_size,
             commands::open_worktree,
+            commands::watch_worktree,
+            commands::stop_watch,
+            commands::watch_status,
             commands::list_changes,
             commands::get_rows,
             commands::highlight_range,

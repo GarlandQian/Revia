@@ -17,11 +17,16 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
+use crate::watch::{resolve_roots, WatchController, WatchStatus};
 
 pub struct AppState {
     pub registry: Mutex<Registry>,
     pub sessions: Mutex<HashMap<String, Arc<WorktreeSession>>>,
     pub command_log: Arc<CommandLog>,
+    /// 只监视当前 worktree 的控制器（Q88）。
+    pub watch: Arc<WatchController>,
+    /// 供前端轮询的「有变化」代号（由监视线程递增）。
+    pub watch_events: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl AppState {
@@ -31,15 +36,22 @@ impl AppState {
             registry: Mutex::new(Registry::load(data_dir, command_log.clone())),
             sessions: Mutex::new(HashMap::new()),
             command_log,
+            watch: Arc::new(WatchController::new()),
+            watch_events: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
     /// 取出（必要时创建）某个 worktree 的会话。
+    ///
+    /// 创建全程持有会话表锁：首次并发请求只发布一个会话，避免两个会话各自维护
+    /// 快照代际、高亮线程与写锁（Q88、Q90）。
     fn session(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-        if let Ok(sessions) = self.sessions.lock() {
-            if let Some(session) = sessions.get(worktree_id) {
-                return Ok(session.clone());
-            }
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::internal("会话锁失败"))?;
+        if let Some(session) = sessions.get(worktree_id) {
+            return Ok(session.clone());
         }
         let path = {
             let registry = self
@@ -53,12 +65,15 @@ impl AppState {
         let home = crate::shell::home_dir()?;
         let shell_env = crate::shell::resolve(&home, &path);
         let session = WorktreeSession::open(worktree_id, &path, shell_env, self.command_log.clone())?;
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| AppError::internal("会话锁失败"))?;
         sessions.insert(worktree_id.to_string(), session.clone());
         Ok(session)
+    }
+
+    /// 释放某个 worktree 的会话（切换离开时用）：停止其高亮线程引用与缓存。
+    pub fn release_session(&self, worktree_id: &str) {
+        if let Ok(mut sessions) = self.sessions.lock() {
+            sessions.remove(worktree_id);
+        }
     }
 }
 
@@ -195,6 +210,44 @@ pub async fn open_worktree(state: State<'_, AppState>, request: WorktreeRequest)
     let session = state.session(&request.worktree_id)?;
     log_measure(&format!("open_worktree 完成：{}", session.info.git_version));
     Ok(session.info.clone())
+}
+
+/// 切换当前监视目标：只监视这个 worktree，并释放旧监视（Q88、Q95）。
+#[tauri::command]
+pub async fn watch_worktree(state: State<'_, AppState>, request: WorktreeRequest) -> Result<WatchStatus> {
+    let session = state.session(&request.worktree_id)?;
+    let events = state.watch_events.clone();
+    let status = state.watch.activate(
+        resolve_roots(&session.path, session.git_dir_path(), session.common_dir_path()),
+        move |_activation| {
+            // 只递增代号：具体读取由前端在合并窗口后触发一次，不在此排队。
+            events.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        },
+    );
+    Ok(status)
+}
+
+/// 停止监视（离开 worktree 或关闭窗口）。
+#[tauri::command]
+pub async fn stop_watch(state: State<'_, AppState>) -> Result<WatchStatus> {
+    Ok(state.watch.stop())
+}
+
+/// 当前监视状态与变化代号（前端轮询；失败时持续返回错误）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchSnapshot {
+    pub status: WatchStatus,
+    /// 监视线程累计通知的变化次数。
+    pub changes: u64,
+}
+
+#[tauri::command]
+pub async fn watch_status(state: State<'_, AppState>) -> Result<WatchSnapshot> {
+    Ok(WatchSnapshot {
+        status: state.watch.status(),
+        changes: state.watch_events.load(std::sync::atomic::Ordering::Relaxed),
+    })
 }
 
 /// 写入测量日志文件（只在设置 REVIA_MEASURE_LOG 时生效）。

@@ -101,6 +101,8 @@ pub struct ChangesSnapshot {
     pub detached: bool,
     /// 本次界面看到的 diff 指纹；写操作必须携带（ADR-0005，M2 使用）。
     pub fingerprint: String,
+    /// 顶层快照版本（单调递增，空列表也有）：前端用它拒绝晚到的旧响应（Q88、Q89）。
+    pub revision: u64,
     pub entries: Vec<ChangeEntry>,
     pub staged_count: u32,
     pub unstaged_count: u32,
@@ -122,6 +124,8 @@ pub struct RowSlice {
     pub row_count: u32,
     pub rows: Vec<RenderRow>,
     pub fingerprint: String,
+    /// 生成这段行的快照版本；前端据此拒绝晚到的旧行（Q88、T05）。
+    pub revision: u64,
     /// 该文件最新的列表元数据（未跟踪文件在此时才补全）。
     pub entry: ChangeEntry,
 }
@@ -180,13 +184,22 @@ pub struct WorktreeSession {
     pub shell_env: ShellEnv,
     pub info: WorktreeSessionInfo,
     snapshot: Mutex<Option<Snapshot>>,
+    /// 状态读取串行锁：读取与发布必须成对，避免早开始的读取后发布、覆盖较新的快照（Q88）。
+    read_lock: Mutex<()>,
     highlighter: Highlighter,
-    /// 已经发给高亮线程的文件内容代际，避免重复传输内容。
-    highlight_generations: Mutex<HashMap<String, u64>>,
+    /// 已经发给高亮线程的文件内容代际，避免重复传输内容（按稳定文档键 + 版本）。
+    highlight_generations: Mutex<HashMap<String, HighlightStamp>>,
     generation_counter: Mutex<u64>,
     instance_id: u64,
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
     writing: Mutex<bool>,
+}
+
+/// 发给高亮线程的内容版本记录：同一文档只在版本不同时重发内容。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HighlightStamp {
+    revision: u64,
+    content_version: u64,
 }
 
 /// 写操作互斥 RAII Guard，离开作用域自动释放写锁。
@@ -241,6 +254,7 @@ impl WorktreeSession {
             shell_env,
             info,
             snapshot: Mutex::new(None),
+            read_lock: Mutex::new(()),
             highlighter: Highlighter::start(),
             highlight_generations: Mutex::new(HashMap::new()),
             generation_counter: Mutex::new(0),
@@ -250,7 +264,15 @@ impl WorktreeSession {
     }
 
     /// 重新读取状态并解析 diff（`list_changes`）。
+    ///
+    /// 读取与发布在 `read_lock` 内成对完成：早开始的读取不会晚于较新的读取发布，
+    /// 因此发布出的 generation 始终与内容同步递增（Q88、T05）。
     pub fn refresh(&self) -> Result<ChangesSnapshot> {
+        let _read = self.read_lock.lock().map_err(|_| AppError::internal("读取锁失败"))?;
+        self.refresh_locked()
+    }
+
+    fn refresh_locked(&self) -> Result<ChangesSnapshot> {
         let started = std::time::Instant::now();
         let status = status::read(&self.git)?;
 
@@ -345,6 +367,7 @@ impl WorktreeSession {
             branch: status.branch.clone(),
             detached: status.detached,
             fingerprint: fingerprint.clone(),
+            revision: generation,
             staged_count: count(&entries, ChangesKind::Staged),
             unstaged_count: count(&entries, ChangesKind::Unstaged),
             untracked_count: count(&entries, ChangesKind::Untracked),
@@ -446,6 +469,7 @@ impl WorktreeSession {
             row_count,
             rows,
             fingerprint: snapshot.fingerprint.clone(),
+            revision: snapshot.generation,
             entry,
         })
     }
@@ -487,56 +511,95 @@ impl WorktreeSession {
     ) -> Result<HighlightResult> {
         let from0 = from_line.saturating_sub(1) as usize;
         let to0 = to_line as usize;
-        let (generation, language, fingerprint) = {
-            let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
-            let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
-            if !snapshot.entries.iter().any(|entry| entry.path == path && entry.changes == changes) {
-                return Err(AppError::rejected(format!("文件不在当前改动列表中：{path}")));
-            }
-            let language = language_for_path(path);
-            (snapshot.generation, language, snapshot.fingerprint.clone())
-        };
 
-        let document_id = format!("{fingerprint}/{changes:?}/{version:?}/{path}");
-        let already_sent = {
-            let sent = self.highlight_generations.lock().map_err(|_| AppError::internal("高亮锁失败"))?;
-            sent.get(&document_id).copied() == Some(generation)
-        };
+        // 稳定文档键：不含全局快照指纹，持续刷新不会无限新建文档（Q88）。
+        let document_id = format!("{}/{changes:?}/{version:?}/{path}", self.id);
+        let language = language_for_path(path);
 
-        let mut request = HighlightRequest {
-            document_id: document_id.clone(),
-            generation,
-            language,
-            from_line: from0,
-            to_line: to0,
-            content: None,
-        };
+        let mut attempt = 0u8;
+        loop {
+            attempt += 1;
+            let (revision, entry_fingerprint) = {
+                let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+                let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+                let entry = snapshot
+                    .entries
+                    .iter()
+                    .find(|entry| entry.path == path && entry.changes == changes)
+                    .ok_or_else(|| AppError::rejected(format!("文件不在当前改动列表中：{path}")))?;
+                (snapshot.generation, entry.fingerprint.clone())
+            };
 
-        if !already_sent {
-            request.content = self.file_content(path, changes, version)?;
-        }
+            // 内容版本由文件身份 + 该版本内容指纹确定：同一内容不重建解析状态。
+            let content = self.file_content(path, changes, version)?;
+            let content_version = content_version_of(&document_id, &entry_fingerprint, content.as_deref());
 
-        let mut result = self.highlighter.highlight(request)?;
-        if result.need_content {
-            // 高亮线程上没有这个文件的解析状态（可能被淘汰），补发一次内容。
-            let mut retry = HighlightRequest {
+            let already_sent = {
+                let sent = self.highlight_generations.lock().map_err(|_| AppError::internal("高亮锁失败"))?;
+                sent.get(&document_id).copied()
+                    == Some(HighlightStamp { revision, content_version })
+            };
+
+            let mut request = HighlightRequest {
                 document_id: document_id.clone(),
-                generation,
-                language: language_for_path(path),
+                generation: content_version,
+                language: language.clone(),
                 from_line: from0,
                 to_line: to0,
-                content: self.file_content(path, changes, version)?,
+                content: None,
+                revision,
             };
-            retry.content = retry.content.or(Some(String::new()));
-            result = self.highlighter.highlight(retry)?;
-        }
-        if !result.need_content {
-            let mut sent = self.highlight_generations.lock().map_err(|_| AppError::internal("高亮锁失败"))?;
-            sent.insert(document_id, generation);
+
+            if !already_sent {
+                request.content = content.clone();
+            }
+
+            let mut result = self.highlighter.highlight(request)?;
+            if result.need_content {
+                // 高亮线程上没有这个文件的解析状态（可能被淘汰），补发一次内容。
+                let retry = HighlightRequest {
+                    document_id: document_id.clone(),
+                    generation: content_version,
+                    language: language.clone(),
+                    from_line: from0,
+                    to_line: to0,
+                    content: Some(content.clone().unwrap_or_default()),
+                    revision,
+                };
+                result = self.highlighter.highlight(retry)?;
+            }
+            if result.need_content {
+                return Err(AppError::internal("高亮线程没有接受文件内容"));
+            }
+
+            // 读取内容期间快照可能已前进：本次结果属于旧版本，要求调用方重新请求，
+            // 绝不把旧内容标成新版本（Q88、T05）。
+            let now = self
+                .snapshot
+                .lock()
+                .map_err(|_| AppError::internal("状态锁失败"))?
+                .as_ref()
+                .map(|snapshot| snapshot.generation)
+                .unwrap_or(revision);
+            if now != revision {
+                if attempt < 2 {
+                    continue;
+                }
+                return Err(AppError::rejected("文件已变化，请重新确认"));
+            }
+
+            {
+                let mut sent = self.highlight_generations.lock().map_err(|_| AppError::internal("高亮锁失败"))?;
+                // 有界清理：只保留当前版本的记录，避免刷新累积旧键。
+                sent.retain(|key, _| key == &document_id);
+                sent.insert(document_id.clone(), HighlightStamp { revision, content_version });
+            }
             // 对外统一成 1 基行号（与界面一致）。
             result.from_line = from_line as usize;
+            result.revision = revision;
+            result.content_version = content_version;
+            return Ok(result);
         }
-        Ok(result)
     }
 
     /// 某个版本的文件内容（旧版本可能是 HEAD 或暂存区，新版本可能是暂存区或工作区）。
@@ -562,6 +625,18 @@ impl WorktreeSession {
             .lock()
             .ok()
             .and_then(|guard| guard.as_ref().map(|snapshot| snapshot.fingerprint.clone()))
+    }
+
+    /// 该 worktree 自己的 gitDir（linked worktree 的 `.git` 是文件，由 Git 解析出真实目录）。
+    pub fn git_dir_path(&self) -> Option<PathBuf> {
+        let text = self.git.try_run(&["rev-parse", "--path-format=absolute", "--git-dir"])?;
+        let path = text.trim();
+        (!path.is_empty()).then(|| PathBuf::from(path))
+    }
+
+    /// 共享 commonDir（主仓库的 .git）；单独仓库与 gitDir 相同。
+    pub fn common_dir_path(&self) -> Option<PathBuf> {
+        self.git.common_dir()
     }
 
     /// M1 没有写操作，这里只用于报告与测试。
@@ -814,6 +889,27 @@ fn fill_entry(entry: &mut ChangeEntry, model: Option<&git::diff::FileChange>) {
 
 fn key(changes: ChangesKind, path: &str) -> String {
     format!("{changes:?}/{path}")
+}
+
+/// 内容版本：由稳定文档键与该版本内容指纹确定，同一内容不重建解析状态（Q88）。
+fn content_version_of(document_id: &str, entry_fingerprint: &str, content: Option<&str>) -> u64 {
+    let mut hasher = Sha256::new();
+    hasher.update(document_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(entry_fingerprint.as_bytes());
+    hasher.update(b"\0");
+    match content {
+        Some(text) => {
+            hasher.update(b"content");
+            hasher.update((text.len() as u64).to_le_bytes());
+            hasher.update(text.as_bytes());
+        }
+        None => hasher.update(b"missing"),
+    }
+    let digest = hasher.finalize();
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&digest[..8]);
+    u64::from_le_bytes(bytes)
 }
 
 fn count(entries: &[ChangeEntry], changes: ChangesKind) -> u32 {

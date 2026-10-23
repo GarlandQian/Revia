@@ -11,6 +11,7 @@ import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import { ipc, type HighlightLine } from "@/lib/ipc";
 import { getErrorMessage } from "@/lib/error";
+import { logToBackend } from "./log";
 
 /** 一次请求覆盖的行数。 */
 export const HIGHLIGHT_CHUNK_LINES = 400;
@@ -21,6 +22,8 @@ export interface HighlightTarget {
   path: string;
   changes: ChangesKind;
   fingerprint: string;
+  /** 该目标所属的快照版本；结果版本不匹配即丢弃（Q88、T05）。 */
+  snapshotRevision: string;
 }
 
 export interface HighlightSnapshot {
@@ -75,7 +78,8 @@ export class HighlightStore {
       this.target.worktreeId === target.worktreeId &&
       this.target.path === target.path &&
       this.target.changes === target.changes &&
-      this.target.fingerprint === target.fingerprint;
+      this.target.fingerprint === target.fingerprint &&
+      this.target.snapshotRevision === target.snapshotRevision;
     if (same) return;
     this.epoch += 1;
     this.target = { ...target };
@@ -126,6 +130,13 @@ export class HighlightStore {
         toLine,
       });
       if (epoch !== this.epoch) return;
+      // 服务端可能已经前进到更新的快照：旧版本结果不能写进当前缓存（Q88）。
+      if (String(result.revision) !== target.snapshotRevision) {
+        logToBackend(
+          `丢弃旧高亮结果：${target.path} ${version} 版本 ${result.revision} ≠ ${target.snapshotRevision}`,
+        );
+        return;
+      }
       if (result.kind === "plainText") {
         this.requested.add(key);
         this.publish(null, false);

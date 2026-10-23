@@ -9,6 +9,10 @@ import type { ViewMode } from "./ViewMode";
  */
 export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number, rows: Array<RenderRow>, fingerprint: string, 
 /**
+ * 生成这段行的快照版本；前端据此拒绝晚到的旧行（Q88、T05）。
+ */
+revision: number, 
+/**
  * 该文件最新的列表元数据（未跟踪文件在此时才补全）。
  */
 entry: ChangeEntry, };

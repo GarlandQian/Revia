@@ -11,6 +11,7 @@ import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
+import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { RefreshCoordinator, SnapshotGate } from "@/lib/refreshGate";
 import { getErrorMessage, toAppError } from "@/lib/error";
 import {
   formatMs,
@@ -77,6 +79,14 @@ export function App() {
   snapshotRef.current = snapshot;
   const worktreeIdRef = useRef(worktreeId);
   worktreeIdRef.current = worktreeId;
+  /** 快照接收门：只接受当前激活 worktree 中版本不倒退的快照（Q88、Q90）。 */
+  const gateRef = useRef(new SnapshotGate());
+  const [watchState, setWatchState] = useState<{ active: boolean; error: string | null }>({
+    active: false,
+    error: null,
+  });
+  /** 自动测量 / 长测 / 冒烟模式：脚本自己驱动刷新，不启用后台轮询以免干扰计时。 */
+  const measurementModeRef = useRef(false);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [view, setView] = useState<ViewMode>("split");
   const viewRef = useRef(view);
@@ -118,7 +128,7 @@ export function App() {
     () =>
       new RowWindowStore(async (request) => {
         const slice = await ipc.getRows(request);
-        return { rows: slice.rows, rowCount: slice.rowCount, entry: slice.entry };
+        return { rows: slice.rows, rowCount: slice.rowCount, revision: slice.revision, entry: slice.entry };
       }),
     [],
   );
@@ -173,7 +183,7 @@ export function App() {
     rowStore.setTarget({ worktreeId: id, path: entry.path, changes: entry.changes, view: targetView,
       fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision }, rowCount, entry);
     highlightStore.setTarget({ worktreeId: id, path: entry.path, changes: entry.changes,
-      fingerprint: entry.fingerprint });
+      fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision });
     return rowCount;
   }, [highlightStore, rowStore]);
 
@@ -260,8 +270,12 @@ export function App() {
       const targetView = options.view ?? view;
       setBusy(true);
       const openStart = performance.now();
+      // 切换请求发起时立即改激活目标：此后旧 worktree 的响应一律丢弃（含 A→B→A）。
+      gateRef.current.activate(id);
+      const myToken = gateRef.current.token();
       try {
         const sessionInfo = await ipc.openWorktree(id);
+        if (gateRef.current.token().activation !== myToken.activation) return null;
         debugLog(`open_worktree 完成：${Math.round(performance.now() - openStart)} ms`);
         setInfo(sessionInfo);
         setWorktreeId(id);
@@ -270,8 +284,19 @@ export function App() {
           setAppError({ kind: "environment", message: failed.map((check) => `${check.name}：${check.detail}`).join("\n") }, id);
         }
 
+        // 监视只跟随当前 worktree；切换即释放旧监视（Q88）。
+        const watch = await ipc.watchWorktree(id).catch(() => null);
+        if (gateRef.current.token().activation === myToken.activation && watch) {
+          setWatchState({ active: watch.active, error: watch.error });
+        }
+
         const startedAt = performance.now();
-        const next = applySnapshot(await ipc.listChanges(id));
+        const rawSnapshot = await ipc.listChanges(id);
+        if (!gateRef.current.accept(myToken, { worktreeId: rawSnapshot.worktreeId, revision: rawSnapshot.revision })) {
+          debugLog(`丢弃非当前激活或过期的快照：${rawSnapshot.worktreeId}@${rawSnapshot.revision}`);
+          return null;
+        }
+        const next = applySnapshot(rawSnapshot);
         const listChangesMs = performance.now() - startedAt;
         debugLog(`list_changes 完成：${Math.round(listChangesMs)} ms，${next.entries.length} 个文件`);
         const entry = pickFirstEntry(next, options.targetPath ?? null);
@@ -299,34 +324,122 @@ export function App() {
           devicePixelRatio: opened.devicePixelRatio,
         };
       } catch (caught) {
-        setAppError(toAppError(caught), id);
+        // 旧请求的失败同样只归属它自己的 worktree。
+        if (gateRef.current.token().activation === myToken.activation) {
+          setAppError(toAppError(caught), id);
+        }
         return null;
       } finally {
-        setBusy(false);
+        // 旧请求结束不能清掉新请求的忙碌状态。
+        if (gateRef.current.token().activation === myToken.activation) setBusy(false);
       }
     },
     [applySnapshot, openEntry, pickFirstEntry, setAppError, view],
   );
 
+  /**
+   * 统一的快照接收入口：先过接收门（激活 + 版本），再更新界面（Q88、Q90）。
+   * 返回是否被接受，调用方据此决定后续动作。
+   */
+  const acceptSnapshot = useCallback(
+    (token: { activation: number; worktreeId: string | null }, snap: ChangesSnapshot, quiet = true): boolean => {
+      if (!gateRef.current.accept(token, { worktreeId: snap.worktreeId, revision: snap.revision })) {
+        debugLog(`丢弃过期快照：${snap.worktreeId}@${snap.revision}（当前激活 ${gateRef.current.current().worktreeId}）`);
+        return false;
+      }
+      applyRefreshedSnapshot(snap);
+      if (!quiet) setStatus(`${snap.entries.length} 个文件`);
+      return true;
+    },
+    [applyRefreshedSnapshot],
+  );
+
+  /** 读取并接收一次快照；自动刷新、手动刷新与回到前台共用同一条路径。 */
+  const readAndAccept = useCallback(
+    async (targetWorktreeId: string, quiet: boolean): Promise<boolean> => {
+      const token = gateRef.current.token();
+      const snap = await ipc.listChanges(targetWorktreeId);
+      return acceptSnapshot(token, snap, quiet);
+    },
+    [acceptSnapshot],
+  );
+
   const refresh = useCallback(async () => {
     if (!worktreeId) return;
     const targetWorktreeId = worktreeId;
+    const token = gateRef.current.token();
     setBusy(true);
     try {
-      const snap = await ipc.listChanges(targetWorktreeId);
-      // 切换期间完成的旧快照不得写进当前界面（审查意见 2）
-      if (worktreeIdRef.current !== targetWorktreeId) return;
-      applyRefreshedSnapshot(snap);
-      setStatus(`${snap.entries.length} 个文件`);
+      await readAndAccept(targetWorktreeId, false);
     } catch (caught) {
-      if (worktreeIdRef.current !== targetWorktreeId) return;
-      setAppError(toAppError(caught), targetWorktreeId);
-    } finally {
-      if (worktreeIdRef.current === targetWorktreeId) {
-        setBusy(false);
+      // 旧请求的错误只归属它自己的 worktree。
+      if (gateRef.current.token().activation === token.activation) {
+        setAppError(toAppError(caught), targetWorktreeId);
       }
+    } finally {
+      if (gateRef.current.token().activation === token.activation) setBusy(false);
     }
-  }, [applyRefreshedSnapshot, setAppError, worktreeId]);
+  }, [readAndAccept, setAppError, worktreeId]);
+
+  // 自动刷新协调器：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
+  const refreshCoordinator = useMemo(
+    () => new RefreshCoordinator(async () => {
+      const active = gateRef.current.current().worktreeId;
+      if (!active) return;
+      try {
+        await readAndAccept(active, true);
+      } catch (caught) {
+        if (gateRef.current.current().worktreeId === active) {
+          setAppError(toAppError(caught), active);
+        }
+      }
+    }),
+    [readAndAccept, setAppError],
+  );
+
+  useEffect(() => () => refreshCoordinator.dispose(), [refreshCoordinator]);
+
+  // 监视状态与变化通知：轮询后端，失败持续展示，成功也不清除历史失败提示以外的东西（Q95）。
+  useEffect(() => {
+    if (!worktreeId || measurementModeRef.current) return;
+    let cancelled = false;
+    let seen = -1;
+    const poll = async () => {
+      try {
+        const snapshot = await ipc.watchStatus();
+        if (cancelled) return;
+        setWatchState({ active: snapshot.status.active, error: snapshot.status.error });
+        if (seen < 0) {
+          seen = snapshot.changes;
+        } else if (snapshot.changes > seen) {
+          seen = snapshot.changes;
+          refreshCoordinator.request();
+        }
+      } catch {
+        // 状态查询失败不改变监视结论，等下一轮。
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 600);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [refreshCoordinator, worktreeId]);
+
+  // 回到前台（窗口重新可见）必须重新核对真实状态（Q88）。
+  useEffect(() => {
+    if (!worktreeId) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshCoordinator.request();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [refreshCoordinator, worktreeId]);
 
   // ---------------- 添加仓库 ----------------
 
@@ -371,6 +484,7 @@ export function App() {
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
+        measurementModeRef.current = Boolean(config.autoRun || config.smoke || (config.soakSeconds ?? 0) > 0);
         setLoggingEnabled(config.logging && !config.minimalSoakLogging);
         if (!config.logging) {
           setPanelOpen(false);
@@ -422,6 +536,24 @@ export function App() {
       void unlisten.then((dispose) => dispose());
     };
   }, [addRepo]);
+
+  /** 切换当前 worktree：记录选择并重开，监视随之切换（Q88）。 */
+  const switchWorktree = useCallback(
+    async (id: string) => {
+      if (!activeRepo || id === worktreeId) return;
+      try {
+        await ipc.selectRepo(activeRepo.id, id);
+      } catch (caught) {
+        setAppError(toAppError(caught), id);
+        return;
+      }
+      setSelected(null);
+      rowStore.setTarget({ worktreeId: id, path: "", changes: "unstaged", view: viewRef.current,
+        fingerprint: "", snapshotRevision: "" }, 0, null);
+      await openWorktree(id);
+    },
+    [activeRepo, openWorktree, rowStore, setAppError, worktreeId],
+  );
 
   // ---------------- 视图切换与跳转 ----------------
 
@@ -1546,8 +1678,17 @@ export function App() {
           isWriting={isWriting}
           onStage={(entry) => void stageFile(entry)}
           onUnstage={(entry) => void unstageFile(entry)}
+          worktrees={activeRepo?.worktrees ?? []}
+          activeWorktreeId={worktreeId}
+          onWorktree={(id) => void switchWorktree(id)}
+          watch={watchState}
         />
         {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+        {watchState.error ? (
+          <div className="border-b bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+            {messages.changes.watchUnavailableHint}
+          </div>
+        ) : null}
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {!selectedEntry ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -1630,6 +1771,10 @@ function Toolbar({
   isWriting,
   onStage,
   onUnstage,
+  worktrees,
+  activeWorktreeId,
+  onWorktree,
+  watch,
 }: {
   view: ViewMode;
   onView: (view: ViewMode) => void;
@@ -1642,9 +1787,31 @@ function Toolbar({
   isWriting: boolean;
   onStage?: (entry: ChangeEntry) => void;
   onUnstage?: (entry: ChangeEntry) => void;
+  worktrees: WorktreeEntry[];
+  activeWorktreeId: string | null;
+  onWorktree: (worktreeId: string) => void;
+  watch: { active: boolean; error: string | null };
 }) {
   return (
     <div className="flex items-center gap-3 border-b px-3 py-1.5">
+      {worktrees.length > 1 ? (
+        <>
+          <select
+            aria-label={messages.changes.worktreeLabel}
+            className="h-7 max-w-[220px] truncate rounded-md border bg-background px-2 text-xs"
+            value={activeWorktreeId ?? ""}
+            onChange={(event) => onWorktree(event.target.value)}
+          >
+            {worktrees.map((worktree) => (
+              <option key={worktree.id} value={worktree.id}>
+                {worktree.branch ?? worktree.path}
+                {worktree.isMain ? ` ${messages.changes.worktreeMain}` : ""}
+              </option>
+            ))}
+          </select>
+          <Separator orientation="vertical" className="h-5" />
+        </>
+      ) : null}
       <ToggleGroup
         value={[view]}
         onValueChange={(values) => {
@@ -1702,7 +1869,12 @@ function Toolbar({
           )}
         </>
       ) : null}
-      <span className="ml-auto truncate text-xs text-muted-foreground">
+      {watch.error ? (
+        <Badge variant="outline" className="ml-auto shrink-0 text-xs text-destructive" title={watch.error}>
+          {messages.changes.watchUnavailable}
+        </Badge>
+      ) : null}
+      <span className={`${watch.error ? "" : "ml-auto "}truncate text-xs text-muted-foreground`}>
         {environment ? `${environment.gitVersion} · ${status}` : status}
       </span>
     </div>

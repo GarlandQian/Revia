@@ -51,6 +51,10 @@ export const zhCN = {
       nonUtf8Path: "非 UTF-8 路径无法无损处理，仅供只读查看",
       unreadable: "文件无法读取或无访问权限，仅供只读查看",
     },
+    worktreeLabel: "当前 worktree",
+    worktreeMain: "（主目录）",
+    watchUnavailable: "自动刷新不可用",
+    watchUnavailableHint: "自动刷新不可用：文件变化不会自动出现，请用手动刷新或回到前台重新核对；写入前仍会校验真实状态。",
     shortcuts: {
       stage: "暂存（空格）",
       unstage: "取消暂存（空格）",

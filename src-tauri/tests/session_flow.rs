@@ -153,5 +153,6 @@ fn highlight_request_shape_matches_frontend() {
         from_line: 0,
         to_line: 0,
         content: None,
+        revision: 1,
     };
 }

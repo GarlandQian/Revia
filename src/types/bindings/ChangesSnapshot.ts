@@ -8,7 +8,11 @@ export type ChangesSnapshot = { worktreeId: string, worktreePath: string, branch
 /**
  * 本次界面看到的 diff 指纹；写操作必须携带（ADR-0005，M2 使用）。
  */
-fingerprint: string, entries: Array<ChangeEntry>, stagedCount: number, unstagedCount: number, untrackedCount: number, 
+fingerprint: string, 
+/**
+ * 顶层快照版本（单调递增，空列表也有）：前端用它拒绝晚到的旧响应（Q88、Q89）。
+ */
+revision: number, entries: Array<ChangeEntry>, stagedCount: number, unstagedCount: number, untrackedCount: number, 
 /**
  * 读取状态与解析 diff 的耗时（毫秒）。
  */

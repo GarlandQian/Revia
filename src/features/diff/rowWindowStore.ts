@@ -57,7 +57,7 @@ export interface RowWindowSnapshot {
 type FetchRows = (request: RowWindowTarget & {
   from: number;
   to: number;
-}) => Promise<{ rows: RenderRow[]; rowCount: number; entry: ChangeEntry }>;
+}) => Promise<{ rows: RenderRow[]; rowCount: number; revision: number; entry: ChangeEntry }>;
 
 export class RowWindowStore {
   private target: RowWindowTarget | null = null;
@@ -241,7 +241,7 @@ export class RowWindowStore {
     try {
       const slice = await this.fetchRows({ ...target, from, to });
       if (epoch !== this.epoch) return;
-      if (!this.entryMatchesTarget(slice.entry, target)) {
+      if (!this.entryMatchesTarget(slice.entry, target, slice.revision)) {
         this.markStale();
         return;
       }
@@ -277,7 +277,7 @@ export class RowWindowStore {
     try {
       const slice = await this.fetchRows({ ...target, from, to });
       if (epoch !== this.epoch) return;
-      if (!this.entryMatchesTarget(slice.entry, target)) {
+      if (!this.entryMatchesTarget(slice.entry, target, slice.revision)) {
         this.markStale();
         return;
       }
@@ -307,7 +307,8 @@ export class RowWindowStore {
     }
   }
 
-  private entryMatchesTarget(entry: ChangeEntry, target: RowWindowTarget): boolean {
+  private entryMatchesTarget(entry: ChangeEntry, target: RowWindowTarget, revision?: number): boolean {
+    if (revision !== undefined && String(revision) !== target.snapshotRevision) return false;
     return entry.path === target.path && entry.changes === target.changes
       && entry.fingerprint === target.fingerprint && entry.snapshotRevision === target.snapshotRevision;
   }

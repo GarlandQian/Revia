@@ -32,6 +32,24 @@ export interface HighlightRangeResult {
   elapsedMs: number;
   parsedLines: number;
   totalLines: number;
+  /** 本结果对应的快照版本；前端据此拒绝晚到的旧结果。 */
+  revision: number;
+  /** 本结果对应的文件内容版本。 */
+  contentVersion: number;
+}
+
+/** 与 Rust 侧 `WatchStatus` 对应（Q88、Q95）。 */
+export interface WatchStatusPayload {
+  active: boolean;
+  error: string | null;
+  activation: number;
+  roots: number;
+}
+
+/** 与 Rust 侧 `WatchSnapshot` 对应。 */
+export interface WatchSnapshotPayload {
+  status: WatchStatusPayload;
+  changes: number;
 }
 
 /** 与 Rust 侧 `Settings` 对应。 */
@@ -68,6 +86,10 @@ export const ipc = {
   setDiffFontSize: (size: number) => invoke<SettingsPayload>("set_diff_font_size", { size }),
   openWorktree: (worktreeId: string) =>
     invoke<WorktreeSessionInfo>("open_worktree", { request: { worktreeId } }),
+  watchWorktree: (worktreeId: string) =>
+    invoke<WatchStatusPayload>("watch_worktree", { request: { worktreeId } }),
+  stopWatch: () => invoke<WatchStatusPayload>("stop_watch"),
+  watchStatus: () => invoke<WatchSnapshotPayload>("watch_status"),
   listChanges: (worktreeId: string) =>
     invoke<ChangesSnapshot>("list_changes", { request: { worktreeId } }),
   getRows: (request: {

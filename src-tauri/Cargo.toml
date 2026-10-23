@@ -21,6 +21,7 @@ syntect = "5.3"
 two-face = { version = "0.5", features = ["syntect-default-onig"] }
 sha2 = "0.11"
 wait-timeout = "0.2"
+notify = "8"
 ts-rs = { version = "12", features = ["serde-compat", "no-serde-warnings"] }
 
 [dev-dependencies]

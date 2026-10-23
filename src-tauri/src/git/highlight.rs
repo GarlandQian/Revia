@@ -112,9 +112,10 @@ pub type HighlightLine = Option<Vec<HighlightToken>>;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HighlightRequest {
-    /// 文件标识（worktree + 文件 + 改动分组 + 版本），用于复用解析状态。
+    /// 稳定的文件标识（worktree + 文件 + 改动分组 + 版本）。
+    /// 不含全局快照指纹，避免每次刷新都新建文档（Q88）。
     pub document_id: String,
-    /// 内容代际；变化时丢弃缓存的解析状态。
+    /// 内容版本；变化时重建解析状态。
     pub generation: u64,
     pub language: String,
     /// 请求的行范围（0 基、左闭右开）。
@@ -123,6 +124,9 @@ pub struct HighlightRequest {
     /// 首次请求时携带完整内容；之后可以省略。
     #[serde(default)]
     pub content: Option<String>,
+    /// 请求对应的快照版本（原样回传，供调用方拒绝晚到的旧结果）。
+    #[serde(default)]
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -137,6 +141,10 @@ pub struct HighlightResult {
     /// 本次为满足请求而解析的行数（诊断用）。
     pub parsed_lines: usize,
     pub total_lines: usize,
+    /// 本结果对应的快照版本（前端拒绝晚到的旧结果，Q88、T05）。
+    pub revision: u64,
+    /// 本结果对应的文件内容版本（同一文件内容变化时才重建解析状态）。
+    pub content_version: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -371,6 +379,9 @@ pub struct Highlighter {
     sender: std::sync::mpsc::Sender<Job>,
 }
 
+/// 最多保留多少个文件的解析状态；超出后按最久未用淘汰（Q88：持续刷新不能无限累积）。
+const MAX_DOCUMENTS: usize = 24;
+
 struct Job {
     request: HighlightRequest,
     reply: std::sync::mpsc::Sender<Result<HighlightResult>>,
@@ -383,8 +394,14 @@ impl Highlighter {
             .name("revia-highlight".into())
             .spawn(move || {
                 let mut documents: HashMap<String, Document> = HashMap::new();
+                let mut last_used: HashMap<String, u64> = HashMap::new();
+                let mut tick: u64 = 0;
                 while let Ok(job) = receiver.recv() {
+                    tick += 1;
+                    let key = job.request.document_id.clone();
                     let result = run_job(&mut documents, job.request);
+                    last_used.insert(key, tick);
+                    evict_documents(&mut documents, &mut last_used, tick);
                     let _ = job.reply.send(result);
                 }
             })
@@ -408,6 +425,27 @@ impl Highlighter {
     }
 }
 
+/// 文档数超限时，丢弃最久未使用的一半，使缓存有界而不随刷新版本线性增长。
+fn evict_documents(
+    documents: &mut HashMap<String, Document>,
+    last_used: &mut HashMap<String, u64>,
+    tick: u64,
+) {
+    if documents.len() <= MAX_DOCUMENTS {
+        return;
+    }
+    let mut order: Vec<(String, u64)> = documents
+        .keys()
+        .map(|key| (key.clone(), last_used.get(key).copied().unwrap_or(tick)))
+        .collect();
+    order.sort_by_key(|(_, used)| *used);
+    let drop_count = documents.len() - MAX_DOCUMENTS / 2;
+    for (key, _) in order.into_iter().take(drop_count) {
+        documents.remove(&key);
+        last_used.remove(&key);
+    }
+}
+
 fn run_job(documents: &mut HashMap<String, Document>, request: HighlightRequest) -> Result<HighlightResult> {
     let started = Instant::now();
     let known = documents
@@ -424,6 +462,8 @@ fn run_job(documents: &mut HashMap<String, Document>, request: HighlightRequest)
                 elapsed_ms: started.elapsed().as_millis() as u64,
                 parsed_lines: 0,
                 total_lines: 0,
+                revision: request.revision,
+                content_version: request.generation,
             });
         };
         documents.insert(
@@ -451,6 +491,8 @@ fn run_job(documents: &mut HashMap<String, Document>, request: HighlightRequest)
         elapsed_ms: started.elapsed().as_millis() as u64,
         parsed_lines: document.cursor.saturating_sub(before),
         total_lines: document.total_lines(),
+        revision: request.revision,
+        content_version: request.generation,
     })
 }
 
@@ -470,6 +512,7 @@ mod tests {
             from_line: from,
             to_line: to,
             content: Some(content.into()),
+            revision: 1,
         }
     }
 
