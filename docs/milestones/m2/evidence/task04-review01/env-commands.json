@@ -1,0 +1,490 @@
+[
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "init",
+      "-q"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "user.name",
+      "Revia isolated fixture"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "core.filemode",
+      "false"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "add",
+      "--",
+      "target.txt"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "commit",
+      "-qm",
+      "fixture"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v2",
+      "-z"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "1 .M N... 100644 100644 100644 4b48deed3a433909bfd6b6ab3d4b91348b6af464 4b48deed3a433909bfd6b6ab3d4b91348b6af464 target.txt\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/preview",
+    "command": [
+      "git",
+      "init",
+      "-q"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.autocrlf"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "false\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/preview",
+    "command": [
+      "git",
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.eol"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.safecrlf"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.ignorecase"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/preview",
+    "command": [
+      "git",
+      "config",
+      "core.ignorecase",
+      "true"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.filemode"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/preview",
+    "command": [
+      "git",
+      "config",
+      "core.filemode",
+      "true"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo/.git"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "init",
+      "-q"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "user.name",
+      "Revia isolated fixture"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "core.filemode",
+      "false"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "add",
+      "--",
+      "target.txt"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "commit",
+      "-qm",
+      "fixture"
+    ],
+    "envExtra": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v2",
+      "-z"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "1 .M N... 100644 100644 100644 4b48deed3a433909bfd6b6ab3d4b91348b6af464 4b48deed3a433909bfd6b6ab3d4b91348b6af464 target.txt\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/preview",
+    "command": [
+      "git",
+      "init",
+      "-q"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.autocrlf"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "false\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/preview",
+    "command": [
+      "git",
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.eol"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.safecrlf"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.ignorecase"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/preview",
+    "command": [
+      "git",
+      "config",
+      "core.ignorecase",
+      "true"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "command": [
+      "git",
+      "config",
+      "--get",
+      "core.filemode"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/preview",
+    "command": [
+      "git",
+      "config",
+      "core.filemode",
+      "true"
+    ],
+    "envExtra": {
+      "GIT_DIR": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo/.git",
+      "GIT_WORK_TREE": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

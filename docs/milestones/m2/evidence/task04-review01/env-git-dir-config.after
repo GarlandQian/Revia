@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+	autocrlf = false
+[user]
+	name = Revia isolated fixture
+	email = fixture@example.invalid

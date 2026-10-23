@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "a38fd8527a8da34821597db2a4e4f9f7c157c000",
+  "files": [
+    {
+      "file": "attributes-repro.py",
+      "source": "/tmp/revia-task04-review-attributes.py",
+      "bytes": 5148,
+      "sha256": "c59acc6b0c21e6c6196c64774d89d0f4fe571f445b89cf69069b55950ac175e7"
+    },
+    {
+      "file": "attributes-result.json",
+      "source": "/private/tmp/revia-task04-review-attributes-7yhkwrom/result.json",
+      "bytes": 791,
+      "sha256": "27aecac53a9d2b978295bb3e11091b98e3dbc5980d7490beace5e871754d1984"
+    },
+    {
+      "file": "env-result.json",
+      "source": "/private/tmp/revia-review04-env-2_ajnstp/result.json",
+      "bytes": 1538,
+      "sha256": "c514633ac5c941cc4c3eddbcb4412be18a9866a61273410748e0193b217de43f"
+    },
+    {
+      "file": "env-commands.json",
+      "source": "/private/tmp/revia-review04-env-2_ajnstp/commands.json",
+      "bytes": 11258,
+      "sha256": "979a0b810422c8720fac911b7057cf126f8e947ce6ecde8b5005b2351f56ae3c"
+    },
+    {
+      "file": "env-git-dir-config.before",
+      "source": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/config.before",
+      "bytes": 227,
+      "sha256": "58af9794057ad6dd88256f7499c9f089d09814177d9ff2810b2c6573f2dea9ed"
+    },
+    {
+      "file": "env-git-dir-config.after",
+      "source": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/config.after",
+      "bytes": 226,
+      "sha256": "338c13c88753754eb7123d48bbe558871ea04052f8bf2275c08e5a15bea0fcfc"
+    }
+  ]
+}
