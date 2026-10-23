@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792739012710,
+  "command": "highlight_range",
+  "contentVersion": 6254616528053559705,
+  "entryFingerprint": null,
+  "id": "R04HighlightL",
+  "outcome": "ok",
+  "path": "10-target.ts",
+  "payloadSha256": "caeffb8b6aed0fcb797757f51e3ca0bd023bb756d0f14f150b1c5c28a378edb6",
+  "pid": 67588,
+  "revision": 13,
+  "worktreeId": "8076ee2e206e98cc"
+}

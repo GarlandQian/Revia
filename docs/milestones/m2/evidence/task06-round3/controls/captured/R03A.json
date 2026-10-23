@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792738591122,
+  "command": "list_changes",
+  "contentVersion": null,
+  "entryFingerprint": null,
+  "id": "R03A",
+  "outcome": "ok",
+  "path": null,
+  "payloadSha256": "ef31f42353fc7db8b594eeaa8cefd6fa53c5f863fffd7357f8f7b15fa9e2ad5d",
+  "pid": 67588,
+  "revision": 26,
+  "worktreeId": "f3b6d663947f7764"
+}

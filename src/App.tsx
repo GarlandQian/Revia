@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
@@ -31,6 +32,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
+import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
 import {
   formatMs,
@@ -362,13 +364,13 @@ export function App() {
    * 返回是否被接受，调用方据此决定后续动作。
    */
   const acceptSnapshot = useCallback(
-    (token: { activation: number; worktreeId: string | null }, snap: ChangesSnapshot, quiet = true): boolean => {
+    (token: { activation: number; worktreeId: string | null }, snap: ChangesSnapshot): boolean => {
       if (!gateRef.current.accept(token, { worktreeId: snap.worktreeId, revision: snap.revision })) {
         debugLog(`丢弃过期快照：${snap.worktreeId}@${snap.revision}（当前激活 ${gateRef.current.current().worktreeId}）`);
         return false;
       }
       applyRefreshedSnapshot(snap);
-      if (!quiet) setStatus(`${snap.entries.length} 个文件`);
+      setStatus(snap.entries.length > 0 ? `${snap.entries.length} 个文件` : messages.changes.empty);
       return true;
     },
     [applyRefreshedSnapshot],
@@ -376,10 +378,10 @@ export function App() {
 
   /** 读取并接收一次快照；自动刷新、手动刷新与回到前台共用同一条路径。 */
   const readAndAccept = useCallback(
-    async (targetWorktreeId: string, quiet: boolean): Promise<boolean> => {
+    async (targetWorktreeId: string): Promise<boolean> => {
       const token = gateRef.current.token();
       const snap = await ipc.listChanges(targetWorktreeId);
-      return acceptSnapshot(token, snap, quiet);
+      return acceptSnapshot(token, snap);
     },
     [acceptSnapshot],
   );
@@ -390,7 +392,7 @@ export function App() {
     const token = gateRef.current.token();
     setBusy(true);
     try {
-      await readAndAccept(targetWorktreeId, false);
+      await readAndAccept(targetWorktreeId);
     } catch (caught) {
       // 旧请求的错误只归属它自己的 worktree。
       if (gateRef.current.token().activation === token.activation) {
@@ -407,7 +409,7 @@ export function App() {
       const active = gateRef.current.current().worktreeId;
       if (!active) return;
       try {
-        await readAndAccept(active, true);
+        await readAndAccept(active);
       } catch (caught) {
         if (gateRef.current.current().worktreeId === active) {
           setAppError(toAppError(caught), active);
@@ -475,7 +477,14 @@ export function App() {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    // WKWebView 不保证原生窗口重新激活会触发 DOM focus / visibilitychange。
+    const stopNativeFocus = subscribeToForeground(
+      (onFocus) => getCurrentWindow().onFocusChanged(({ payload }) => onFocus(payload)),
+      () => refreshCoordinator.request(),
+      (caught) => debugLog(`原生窗口焦点监听失败：${getErrorMessage(caught)}`),
+    );
     return () => {
+      stopNativeFocus();
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
@@ -720,7 +729,7 @@ export function App() {
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       if (operationGateRef.current.acceptSuccess(opToken, next)
-        && acceptSnapshot(opToken, next, true)) {
+        && acceptSnapshot(opToken, next)) {
         setAppError(null, opWorktreeId);
       } else {
         debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);

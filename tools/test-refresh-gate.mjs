@@ -21,6 +21,58 @@ const imports = registerHooks({
 });
 const { SnapshotGate, RefreshCoordinator, OperationResultGate, SelectionGate, WatchEventGate } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
+const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
+
+test("原生前台事件进入真实刷新协调器，失焦与卸载后的事件不刷新", async () => {
+  let focus;
+  let stopped = 0;
+  let reads = 0;
+  const errors = [];
+  const coordinator = new RefreshCoordinator(async () => { reads += 1; });
+  const dispose = subscribeToForeground(async (handler) => {
+    focus = handler;
+    return () => { stopped += 1; };
+  }, () => coordinator.request(), (error) => errors.push(error));
+  await Promise.resolve();
+  focus(false);
+  assert.equal(reads, 0);
+  focus(true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(reads, 1);
+  dispose();
+  dispose();
+  focus(true);
+  assert.equal(reads, 1);
+  assert.equal(stopped, 1);
+  assert.deepEqual(errors, []);
+});
+
+test("原生焦点监听安装晚于清理时立即释放，不泄漏旧目标监听", async () => {
+  let installed;
+  let focus;
+  let stopped = 0;
+  let refreshed = 0;
+  const dispose = subscribeToForeground((handler) => {
+    focus = handler;
+    return new Promise((resolve) => { installed = resolve; });
+  }, () => { refreshed += 1; }, assert.fail);
+  dispose();
+  focus(true);
+  installed(() => { stopped += 1; });
+  await Promise.resolve();
+  assert.equal(refreshed, 0);
+  assert.equal(stopped, 1);
+});
+
+test("原生焦点监听安装失败可见于调用方，清理后不再汇报旧错误", async () => {
+  const failure = new Error("native focus subscription failed");
+  const errors = [];
+  subscribeToForeground(async () => { throw failure; }, assert.fail, (error) => errors.push(error));
+  const dispose = subscribeToForeground(async () => { throw failure; }, assert.fail, (error) => errors.push(error));
+  dispose();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(errors, [failure]);
+});
 
 test("同 worktree 内旧版本快照被拒绝，新版本被接受", () => {
   const gate = new SnapshotGate();

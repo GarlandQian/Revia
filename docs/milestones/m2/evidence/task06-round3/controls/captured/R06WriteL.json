@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792739217740,
+  "command": "stage_hunk",
+  "contentVersion": null,
+  "entryFingerprint": null,
+  "id": "R06WriteL",
+  "outcome": "ok",
+  "path": "10-target.ts",
+  "payloadSha256": "1f637aaa83cfa4a19475d90a2b4a4d6bfd8738ac312bf55c03791e0cc8d387d9",
+  "pid": 67588,
+  "revision": 15,
+  "worktreeId": "8076ee2e206e98cc"
+}

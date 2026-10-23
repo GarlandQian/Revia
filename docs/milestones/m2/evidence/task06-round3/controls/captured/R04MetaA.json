@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792738901992,
+  "command": "get_rows",
+  "contentVersion": null,
+  "entryFingerprint": "54081aa6de37163a52b95a6ced8f2c97e1280a1cb5f6138ec7a96559847714c1",
+  "id": "R04MetaA",
+  "outcome": "ok",
+  "path": "untracked.txt",
+  "payloadSha256": "8953f9bab0159e6b0dd01363f339e750e4e15e8c1443b9a138d3b253ab27dbe7",
+  "pid": 67588,
+  "revision": 29,
+  "worktreeId": "f3b6d663947f7764"
+}

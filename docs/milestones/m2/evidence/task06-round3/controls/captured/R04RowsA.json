@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792738752578,
+  "command": "get_rows",
+  "contentVersion": null,
+  "entryFingerprint": "29a89a623b2e045ab6e0879ac14d21276880c6aa99d484d246dcea915a0c146a",
+  "id": "R04RowsA",
+  "outcome": "ok",
+  "path": "10-target.ts",
+  "payloadSha256": "1212ca02518dd32e0fffe6e372548808889c7c9851b1874975f47e4d282eacdb",
+  "pid": 67588,
+  "revision": 28,
+  "worktreeId": "f3b6d663947f7764"
+}

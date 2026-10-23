@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792739843996,
+  "command": "stage_file",
+  "contentVersion": null,
+  "entryFingerprint": null,
+  "id": "R07ErrorL",
+  "outcome": "error",
+  "path": "10-target.ts",
+  "payloadSha256": "c7e3484e77c8e667853b80ff17efc7f83e53f1b789acdfd30f61767478889189",
+  "pid": 67588,
+  "revision": null,
+  "worktreeId": "8076ee2e206e98cc"
+}

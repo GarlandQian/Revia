@@ -1,6 +1,6 @@
 # M2 阶段报告
 
-更新日期：2026-10-23。任务 01、02、03、09 已完成；任务 06 第二轮修复已完成两轴复审，正修复新增的切换在途写结果归属问题，桌面验收未完成；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
+更新日期：2026-10-23。任务 01、02、03、09 已完成；任务 06 写结果归属修复两轴复核通过，首轮真实桌面发现前台核对失效与旧计数，已修复待补验；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
 
 ## 当前进度（2026-10-23）
 
@@ -8,7 +8,7 @@
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
 - 任务 09：`done`，`3f22230c60bf8772f9d1b5334dc8e785a8da4a77` 的 [CI #39869756281](https://github.com/GarlandQian/Revia/actions/runs/39869756281) 已完成，macOS Apple Silicon 与 Windows x64 的前端检查、Rust 测试及 release 编译全部通过。Windows 实际通过 66 单元 + 16 file_staging + 3 session_flow；测试修复增量的 Standards / Spec 双审均无新问题。最终集成仍需任务 10、11 再次验收，见 [任务 09](./issues/09-platform-compile-checks.md)。
 - 按新规则先派给 Paseo 的 deepseek；本轮 3 次重试均为 `503 auth_unavailable`，会话进入 error 且未改文件，由 Codex 接手，不切 Gemini。已把 `main` 的 `837d68a` 规则合入 `m2`，主目录不变。
-- 任务 06：`ready-for-agent`。第二轮独立两轴复审发现自动刷新事件无法连续消费、当前 linked 元数据被过滤、旧 watcher 晚安装与切走后待核对结果丢失，已由 Codex 在 Pi 渠道 `unexpected EOF` 后接手修复。Rust 142 项、Node 64 项、类型检查／lint／前端构建通过；首次 sha2 编码编译失败与修正后结果均保留。补充默认关闭、使用真实独立数据目录的[桌面接缝](./desktop-seams.md)。当前修复后两轴复审、Release 构建与桌面／D06 尚待完成；上一轮 136／62／20 项与 104／76ms 样本仅为旧版本证据，不代替最新版本验收。见[任务 06](./issues/06-current-worktree-refresh.md)。
+- 任务 06：`ready-for-agent`。第二轮四项缺陷及第三轮真实写目标序号错绑均已修复，两轴独立复核通过。`26b6dc4` Release 的连续保存、跨组选择、linked index／HEAD／共享 ref、八个真实迟到响应场景已实测；监视失败手动读取与安全写入正常，但 F03 回到前台未核对、工具栏旧计数仍需修复后补验。已加原生焦点监听及清理回归，前端 gate 19 项、build／lint 通过，Rust 沿用 142 项未重跑。详细版本、原失败和待验范围见[任务 06 验收](./task06-acceptance.md)；D06、最新 Windows CI 及最终长测未完成，不沿用旧版本结果冒充当前通过。
 - 任务 03：`done`，原始 hunk 写入、两视图键盘与真实暂存区核对、相关版本过期拒绝及 D06 已验收。最终 `bbddd4f` 的 [CI #39876636277](https://github.com/GarlandQian/Revia/actions/runs/39876636277) 双平台通过（macOS 114 / Windows 104 项 Rust）；标准首屏 115/95ms、真冷文字 DOM 5/4ms。原超帧值、旧取证不足样本与 P3 命名观察保留，详见 [任务 03 验收](./task03-acceptance.md)。
 
 ## 任务 01 结论（2026-10-22）
