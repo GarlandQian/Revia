@@ -1,0 +1,18 @@
+{
+  "git_config_redirect": {
+    "retained_GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config",
+    "before_sha256": "d70886544b9c6f67e8d8dce03814b207e2d372f3f3781b81277e92d6f234b313",
+    "after_sha256": "be1f7ef271539ec039d1785276b55930c9051521c293ad4a2a38c64b371b59c9",
+    "changed": true,
+    "diff": "--- config.before\n+++ config.after\n@@ -8,3 +8,5 @@\n [filter \"demo\"]\n \tclean = cat\n \tsmudge = cat\n+\tclean = cat\n+\tsmudge = cat\n"
+  },
+  "linked_info_attributes": {
+    "linked_git_dir": "/private/tmp/revia-review04-round2-ol8lamwo/main/.git/worktrees/linked",
+    "code_looked_for": "/private/tmp/revia-review04-round2-ol8lamwo/main/.git/worktrees/linked/info/attributes",
+    "code_path_exists": false,
+    "git_effective_info_attributes": "/private/tmp/revia-review04-round2-ol8lamwo/main/.git/info/attributes",
+    "actual_attrs": "target.txt|text|set|target.txt|eol|crlf|",
+    "scratch_attrs": "",
+    "equal": false
+  }
+}

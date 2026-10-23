@@ -1,0 +1,633 @@
+[
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "config",
+      "user.name",
+      "Review Fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "config",
+      "commit.gpgsign",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "config",
+      "core.attributesFile",
+      "/private/tmp/revia-task04-review02-1sbdt0cx/external-attributes"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-preview",
+    "args": [
+      "init",
+      "-q"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-preview",
+    "args": [
+      "config",
+      "core.attributesFile",
+      "/private/tmp/revia-task04-review02-1sbdt0cx/config-preview/.attributes-file"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/config-repo",
+    "args": [
+      "config",
+      "core.attributesFile"
+    ],
+    "exit": 0,
+    "stdout": "/private/tmp/revia-task04-review02-1sbdt0cx/config-preview/.attributes-file\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "config",
+      "user.name",
+      "Review Fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "config",
+      "commit.gpgsign",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "add",
+      "--all"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "commit",
+      "-q",
+      "-m",
+      "fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo",
+    "args": [
+      "worktree",
+      "add",
+      "-q",
+      "-b",
+      "linked",
+      "/private/tmp/revia-task04-review02-1sbdt0cx/linked"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-dir"
+    ],
+    "exit": 0,
+    "stdout": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo/.git/worktrees/linked\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-path",
+      "info/attributes"
+    ],
+    "exit": 0,
+    "stdout": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo/.git/info/attributes\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "check-attr",
+      "-a",
+      "-z",
+      "--",
+      "target.txt"
+    ],
+    "exit": 0,
+    "stdout": "target.txt\u0000text\u0000set\u0000target.txt\u0000eol\u0000crlf\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked-preview",
+    "args": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked-preview",
+    "args": [
+      "config",
+      "user.name",
+      "Review Fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked-preview",
+    "args": [
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked-preview",
+    "args": [
+      "config",
+      "commit.gpgsign",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked-preview",
+    "args": [
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked-preview",
+    "args": [
+      "check-attr",
+      "-a",
+      "-z",
+      "--",
+      "target.txt"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "diff",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--binary",
+      "--full-index",
+      "--",
+      "target.txt"
+    ],
+    "exit": 0,
+    "stdout": "diff --git a/target.txt b/target.txt\nindex fbbee861521bd5355538b096fa3998541cd33909..cd964df426dd6f6b7c723de841a342efbaf4cc69 100644\n--- a/target.txt\n+++ b/target.txt\n@@ -1,2 +1,2 @@\n alpha\n-beta\n+BETA\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "ls-files",
+      "--stage",
+      "-z"
+    ],
+    "exit": 0,
+    "stdout": "100644 fbbee861521bd5355538b096fa3998541cd33909 0\ttarget.txt\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "-c",
+      "apply.ignoreWhitespace=no",
+      "apply",
+      "--reverse",
+      "--whitespace=nowarn",
+      "-"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/linked",
+    "args": [
+      "ls-files",
+      "--stage",
+      "-z"
+    ],
+    "exit": 0,
+    "stdout": "100644 fbbee861521bd5355538b096fa3998541cd33909 0\ttarget.txt\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "user.name",
+      "Review Fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "commit.gpgsign",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "filter.copy.clean",
+      "cat"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "filter.copy.smudge",
+      ":\ncat"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "filter.copy.required",
+      "true"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "add",
+      "--all"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "commit",
+      "-q",
+      "-m",
+      "fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "diff",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--binary",
+      "--full-index",
+      "--",
+      "target.txt"
+    ],
+    "exit": 0,
+    "stdout": "diff --git a/target.txt b/target.txt\nindex fbbee861521bd5355538b096fa3998541cd33909..cd964df426dd6f6b7c723de841a342efbaf4cc69 100644\n--- a/target.txt\n+++ b/target.txt\n@@ -1,2 +1,2 @@\n alpha\n-beta\n+BETA\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "user.name",
+      "Review Fixture"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "user.email",
+      "fixture@example.invalid"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "commit.gpgsign",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "core.autocrlf",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "config",
+      "--get-regexp",
+      "^filter."
+    ],
+    "exit": 0,
+    "stdout": "filter.copy.clean cat\nfilter.copy.smudge :\ncat\nfilter.copy.required true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "--add",
+      "filter.copy.clean",
+      "cat"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "--add",
+      "filter.copy.smudge",
+      ":"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "config",
+      "--add",
+      "filter.copy.required",
+      "true"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "check-attr",
+      "-a",
+      "-z",
+      "--",
+      "target.txt"
+    ],
+    "exit": 0,
+    "stdout": "target.txt\u0000filter\u0000copy\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "check-attr",
+      "-a",
+      "-z",
+      "--",
+      "target.txt"
+    ],
+    "exit": 0,
+    "stdout": "target.txt\u0000filter\u0000copy\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-preview",
+    "args": [
+      "-c",
+      "apply.ignoreWhitespace=no",
+      "apply",
+      "--reverse",
+      "--whitespace=nowarn",
+      "-"
+    ],
+    "exit": 128,
+    "stdout": "",
+    "stderr": "error: cannot run :: No such file or directory\nerror: cannot fork to run external filter ':'\nerror: external filter ':' failed\nfatal: target.txt: smudge filter copy failed\n"
+  },
+  {
+    "cwd": "/private/tmp/revia-task04-review02-1sbdt0cx/multiline-filter",
+    "args": [
+      "-c",
+      "apply.ignoreWhitespace=no",
+      "apply",
+      "--reverse",
+      "--whitespace=nowarn",
+      "-"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]
