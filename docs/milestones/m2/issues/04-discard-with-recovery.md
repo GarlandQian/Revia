@@ -4,7 +4,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、4、7，T05、T07、T10、T11、D02；Q9、Q81–Q83、Q85、Q87、Q91、Q93。
 
@@ -207,3 +207,37 @@
 - `git rev-parse --git-path` 在极旧 Git 上的行为未单独验证（项目最低要求 Git 2.11；本轮在 Git 2.56 实测）。
 - 写前核对与 Git 子进程启动之间的外部竞态窗口仍未消除（与上一轮结论一致）。
 - 记录容量上限与 14 天清理仍属 05，未做。
+
+
+### 2026-10-23 / Codex 第三轮两轴增量审查：通过；桌面发现新边界遗漏
+
+第三轮固定增量 `git diff 970c690...36dad65`，受审提交 `36dad654fe0d2d337e34d7bd69aaae04d833903f`。两轴独立，未重复上一轮已闭合的 SP1/V1/ST3。
+
+#### Standards
+
+**无新增发现。** R2-ST1 的 `GIT_CONFIG` / 配置注入隔离、R2-ST2 的 linked 有效属性路径均闭合。配置 API 的 NUL 记录、首 LF 键值边界与两个调用者同步，未发现确定规范违规或值得单列的 Fowler 判断性建议。独立真实 Git 核对原配置前后字节与 SHA 完全相同，多行/空值/多值配置复制无损，linked 与 scratch 的实际属性相同。独立证据在 `../evidence/task04-review03/`。此轴未跑项目构建/测试，也未做 Windows 实机验收。
+
+#### Spec
+
+**无新增确定缺陷。** R2-SP1 的 linked `git-path`、R2-SP2 的多行 filter 无损值与上下文指纹、R2-SP3 的配置重定向隔离均静态闭合；无缺失或范围扩张。本轴仅静态复核与 `git diff --check`，未亲自重跑 Rust，不把未执行的桌面/Windows 验收记为通过。
+
+#### 真实桌面第一轮：大部分通过，但任务不关闭
+
+规划方以 `36dad65` 的 Release bundle（二进制 SHA-256 `6e119703a7ecf9db37b0f2db0072bbb802f6088432b59b819caeebab21d8dfc9`）完成隔离 A/B/L fixture 桌面操作。主要进程 PID 71299，重启保留 PID 79082，Git 2.56.0；生产 watcher 开启。前一 Git 2.54 进程未做写入，排除写验收。截图只在 CUA 会话展示，不声称有本地 PNG。两受测进程均正常退出，控制文件无待执行 arm，hold 已显式释放。
+
+- 并排中间 hunk、统一首 hunk、默认取消焦点、弹窗内快捷键不穿透、Tab/Space 确认、diff 焦点下整文件快捷键范围通过；完整文件保存、未选 hunk 和 A/B/L index 不变。
+- 打开旧 hunk 确认后修改同文件其他 hunk，watcher 使确认禁用并明确失效，键盘不能执行；取消后显示新快照，不套旧序号。
+- 真实回收目录权限失败显示 `Permission denied`，工作区/暂存区/记录数全部不变。
+- 暂停真实 A apply 时同 worktree 写入口禁用，仍可浏览文件及切到 linked；显式释放后 A 结果不覆盖 L。部分暂存只恢复到 index，不恢复到 HEAD。
+- L 真实 apply 成功后 wrapper 返回 141，界面显示「结果待核对」、读取真实两 hunk，记录保留且无完成回执；重启后仍待核对，实际 apply 计数始终为 1。
+- 二进制、mode-only、删除状态、rename、中文空格路径整文件丢弃通过。记录包含二进制完整字节、可执行位、不存在状态及 rename 新旧路径。已暂存、符号链接、未跟踪无丢弃入口，快捷键不执行。
+- 回收区显示时间/来源/目标/保存状态/原 worktree，非当前记录明确标记；重启保留全部 10 条（9 完成 + 1 待核对），前后文件/回执一致。`assertions.json` 的 **151 项**字节/权限/归属/index 断言通过。
+- `partial-finished-on-linked.json` 虽以 finished 命名，实际捕获在 release 后、完成前，不用于声称完成；后续稳定快照及 Completed 回执证明完成。原始记录不改写。证据在 `../evidence/task04-desktop01/`。
+
+#### R04-GUI1 / P2 / Git rename 的未暂存 M 条目仍暴露 hunk 操作
+
+依据规格第 2 节/T03（Q81）：「Git 识别的重命名」只整文件、无 hunk 操作。真实 fixture 的 porcelain type-2 `RM` 在已暂存组为 R、未暂存组为 M，两条都保留 `original_path`。桌面 `50-renamed-new.txt +1 −0 M` 的 Help 已显示 `50-renamed-old.txt → 50-renamed-new.txt`，但统一 diff `@@ -1 +1,2 @@` 仍有「暂存此 hunk」「丢弃此 hunk」。`src-tauri/src/session.rs` 的 `supports_hunk_actions` 只检查 `entry.status`/`file.status`，没有检查原路径元数据；这个 M 条目通过共享能力 gate，`hunk_patch` 也会接受其凭据。未在 rename 上执行 hunk，实际只执行了整文件丢弃。
+
+请在共享能力边界按 Git 实际 rename 元数据拒绝 hunk，覆盖 type-2 RM 与后端拒绝，保持整文件丢弃、完整相关路径记录不回归；检查该 gate 对暂存/取消暂存调用者的影响。不得自行猜测删除/未跟踪配对，不扩大 04 到 05/07/08/12/13。此为既有契约漏验，不是新产品决策。修复后集中运行受影响检查、提交 m2 并逐项回应；规划方做增量两轴审查和针对性真实桌面补验。
+
+已按 Q97 正常推送 `36dad65`，CI #39965209864 启动；本条记录时仍进行中。该版本 D06 未执行，最终 30 分钟长测仍留任务 11，不据前版数据冒称本版通过。按 Q105 继续同一 Pi；连续渠道错误计数为 0。
