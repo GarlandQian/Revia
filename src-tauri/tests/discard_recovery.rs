@@ -1960,3 +1960,388 @@ fn auto_purge_failure_is_queryable_in_normal_mode() {
     reopened.auto_purge().unwrap();
     assert!(reopened.maintenance().error.is_none(), "成功后必须清空错误");
 }
+
+// ---------------- 任务 05 第三轮返修回归（R05-R3） ----------------
+
+/// 用真实命令层（`AppState` + 登记仓库）搭出生产调用链。
+struct AppFixture {
+    fixture: Fixture,
+    data: PathBuf,
+    state: revia_lib::commands::AppState,
+    worktree_id: String,
+}
+
+impl AppFixture {
+    fn new() -> Self {
+        let fixture = Fixture::new();
+        let data = fixture.root().join("app-data");
+        fs::create_dir_all(&data).unwrap();
+        let state = revia_lib::commands::AppState::new(data.clone());
+        let entry = {
+            let mut registry = state.registry.lock().unwrap();
+            registry.add(fixture.repo.to_str().unwrap()).unwrap()
+        };
+        let worktree_id = entry.worktrees.first().map(|worktree| worktree.id.clone())
+            .unwrap_or_else(|| entry.id.clone());
+        Self { fixture, data, state, worktree_id }
+    }
+
+    /// 在同一个 AppState 里再登记一个仓库（用于嵌套/跨仓库场景）。
+    fn add_repo(&self, path: &Path) -> String {
+        let entry = {
+            let mut registry = self.state.registry.lock().unwrap();
+            registry.add(path.to_str().unwrap()).unwrap()
+        };
+        entry.worktrees.first().map(|worktree| worktree.id.clone()).unwrap_or(entry.id.clone())
+    }
+
+    fn store(&self) -> &RecoveryStore {
+        &self.state.recovery
+    }
+
+    /// 走命令层的同一条会话解析路径。
+    fn state_session(&self) -> Arc<WorktreeSession> {
+        self.state.worktree_session(&self.worktree_id).unwrap()
+    }
+}
+
+/// R05-R3-ST1/SP2：多路径记录里，**其他未发布路径**变化也必须整体拦下。
+///
+/// 重命名记录有两条相关路径；第二路径在 `BeforeWrite` 被外部改动时，
+/// 第一路径不得先被写入，也不能留下「未写入任何路径」的假陈述。
+#[test]
+fn every_related_path_is_checked_before_publishing_any() {
+    let f = Fixture::new();
+    f.write("old.txt", b"old content\n");
+    f.commit();
+    f.git(&["mv", "old.txt", "new.txt"]);
+    let session = f.session();
+    // 重命名记录：先暂存重命名，再对未暂存侧做改动并丢弃。
+    f.git(&["add", "-A"]);
+    f.write("new.txt", b"old content\nplus one line\n");
+    let session = f.session();
+    let target = entry(&session, "new.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    assert!(inspection.paths.len() >= 2, "重命名记录应包含两条相关路径：{:?}", inspection.paths);
+    let after_discard = inspection.files.iter()
+        .map(|file| (file.path.clone(), file.current.as_ref().and_then(|current| current.text.clone())))
+        .collect::<Vec<_>>();
+
+    let error = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeWrite {
+                // 改的是**另一条**相关路径（不是第一个要发布的那个）。
+                for (path, _) in &after_discard {
+                    let full = f.repo.join(path);
+                    if full.exists() {
+                        fs::write(&full, b"external change on sibling path\n").unwrap();
+                        break;
+                    }
+                }
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected, "相关路径变化必须拒绝：{error:?}");
+    // 第一路径也不得被写入：仍保留外部改动或丢弃后状态，不能变成 saved 内容。
+    let attempt = store.latest_attempt(&id).unwrap().unwrap();
+    assert!(attempt.written.is_empty(), "拒绝时不得写入任何路径：{attempt:?}");
+    assert!(!attempt.message.as_deref().unwrap_or("").contains("未写入任何路径")
+        || attempt.written.is_empty(), "陈述必须与实际一致");
+}
+
+/// R05-R3-SP3：身份不匹配时，连目标目录里的准备动作都不能发生。
+#[test]
+fn identity_mismatch_creates_nothing_in_the_target() {
+    let f = Fixture::new();
+    f.write("dir/nested.txt", b"base\n");
+    f.commit();
+    f.write("dir/nested.txt", b"changed\n");
+    let session = f.session();
+    let target = entry(&session, "dir/nested.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+
+    // 另一个真实仓库（身份不同），里面没有 dir/ 目录。
+    let other = f.root().join("other-repo");
+    fs::create_dir_all(&other).unwrap();
+    let output = Command::new("git")
+        .current_dir(&other)
+        .env_clear()
+        .envs(&f.vars)
+        .args(["init", "-b", "main"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let other_session = f.session_at(&other);
+
+    let error = other_session
+        .restore_record(&id, &expectation_of(&inspection), &store)
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected, "身份不匹配必须拒绝：{error:?}");
+    assert!(!other.join("dir").exists(), "拒绝时不得在新 worktree 里创建目录");
+}
+
+/// R05-R3-ST2/SP4：完成留证之后的尾部失败必须把留证改回待核对。
+#[test]
+fn tail_failure_after_completion_downgrades_the_attempt() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+
+    // 让最终重读失败：把目标变成非普通文件（目录），inspect 会报「不是普通文件」。
+    let error = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeComplete {
+                // 恢复写入之后把文件替换成目录，制造最终核对失败。
+                fs::remove_file(f.repo.join("target.ts")).unwrap();
+                fs::create_dir_all(f.repo.join("target.ts")).unwrap();
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::NeedsVerification, "尾部失败必须待核对：{error:?}");
+    let attempt = store.latest_attempt(&id).unwrap().unwrap();
+    assert!(
+        matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification),
+        "留证不能停留在 Completed：{attempt:?}"
+    );
+    assert_eq!(attempt.written, vec!["target.ts".to_string()]);
+}
+
+/// R05-R3-ST4/SP1：另存到**另一个**登记仓库的 Git 元数据也必须被拒绝。
+#[test]
+fn save_as_protects_the_target_repository_metadata() {
+    let f = Fixture::new();
+    f.write("target.txt", b"base\n");
+    f.commit();
+    f.write("target.txt", b"saved change\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 第二个真实仓库（记录来自第一个仓库）。
+    let other = f.root().join("other-repo");
+    fs::create_dir_all(&other).unwrap();
+    let output = Command::new("git")
+        .current_dir(&other)
+        .env_clear()
+        .envs(&f.vars)
+        .args(["init", "-b", "main"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    // 普通 .git 目录。
+    let inside_git = other.join(".git").join("restored.txt");
+    assert!(store.save_as(&id, "target.txt", &inside_git).is_err(), "不得写入另一仓库的 .git");
+    assert!(!inside_git.exists());
+    // --separate-git-dir：元数据目录不叫 .git。
+    let separate = f.root().join("separate-repo");
+    let metadata = f.root().join("separate-metadata");
+    fs::create_dir_all(&separate).unwrap();
+    let output = Command::new("git")
+        .env_clear()
+        .envs(&f.vars)
+        .args(["init", "-b", "main", "--separate-git-dir", metadata.to_str().unwrap(), separate.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let inside_separate = metadata.join("restored.txt");
+    assert!(
+        store.save_as(&id, "target.txt", &inside_separate).is_err(),
+        "不得写入 --separate-git-dir 的元数据目录"
+    );
+    assert!(!inside_separate.exists());
+    // 该仓库里的普通工作区路径仍可另存（合法外部新路径）。
+    let ok = separate.join("restored.txt");
+    assert!(store.save_as(&id, "target.txt", &ok).is_ok(), "工作区内的新路径应当允许");
+}
+
+/// R05-R3-ST6/SP8：嵌套登记时另存归属最具体的那个 worktree。
+#[test]
+fn save_as_owner_picks_the_most_specific_registered_worktree() {
+    let app = AppFixture::new();
+    // 外层仓库里再建一个独立的嵌套仓库并登记。
+    let nested = app.fixture.repo.join("nested");
+    fs::create_dir_all(&nested).unwrap();
+    let output = Command::new("git")
+        .current_dir(&nested)
+        .env_clear()
+        .envs(&app.fixture.vars)
+        .args(["init", "-b", "main"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let nested_id = app.add_repo(&nested);
+    assert_ne!(nested_id, app.worktree_id);
+
+    let registry = app.state.registry.lock().unwrap();
+    let target = app.fixture.root().join("repo").join("nested").join("restored.txt");
+    let owner = revia_lib::commands::save_as_owner(&registry, &target);
+    assert_eq!(owner.as_deref(), Some(nested_id.as_str()), "嵌套仓库内的路径必须归属内层");
+    let outside = app.fixture.root().join("outside.txt");
+    assert_eq!(revia_lib::commands::save_as_owner(&registry, &outside), None, "外部路径无归属");
+}
+
+/// R05-R3-ST5/SP7：另存命令本身（`save_recovery_as_impl`）取的是目标 worktree 的锁。
+#[test]
+fn save_recovery_command_locks_the_target_worktree() {
+    let app = AppFixture::new();
+    app.fixture.write("target.txt", b"base\n");
+    app.fixture.commit();
+    app.fixture.write("target.txt", b"saved change\n");
+    let session = app.fixture.session();
+    let target = entry(&session, "target.txt");
+    let store = app.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 目标路径必须用真实路径构造（macOS 的 /var 是系统别名，等价于祖先符号链接）。
+    let destination = app.fixture.root().join("repo").join("restored.txt");
+    // 目标 worktree 正在写：命令必须被该 worktree 的写锁拒绝。
+    let session = app.state_session();
+    {
+        let _writing = session.acquire_write_lock().unwrap();
+        let error = revia_lib::commands::save_recovery_as_impl(
+            &app.state,
+            &revia_lib::commands::RecoverySaveAsRequest {
+                worktree_id: None,
+                record_id: id.clone(),
+                path: "target.txt".into(),
+                destination: destination.display().to_string(),
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error.kind, ErrorKind::Rejected, "命令必须命中目标 worktree 的写锁：{error:?}");
+        assert!(!destination.exists());
+    }
+    // 释放后命令成功，并写入目标 worktree。
+    let bytes = revia_lib::commands::save_recovery_as_impl(
+        &app.state,
+        &revia_lib::commands::RecoverySaveAsRequest {
+            worktree_id: None,
+            record_id: id.clone(),
+            path: "target.txt".into(),
+            destination: destination.display().to_string(),
+        },
+    )
+    .unwrap();
+    assert_eq!(bytes, 13);
+    assert_eq!(fs::read(&destination).unwrap(), b"saved change\n");
+}
+
+/// R05-R3-ST8/SP10：没有当前 worktree 时，**命令层**仍能列出与查看保存版本。
+#[test]
+fn recovery_commands_still_show_saved_version_without_current_worktree() {
+    let app = AppFixture::new();
+    app.fixture.write("target.txt", b"base\n");
+    app.fixture.commit();
+    app.fixture.write("target.txt", b"saved change\n");
+    let session = app.fixture.session();
+    let target = entry(&session, "target.txt");
+    let store = app.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    drop(session);
+    // 目录整体消失：会话无法再捕获身份。
+    fs::remove_dir_all(&app.fixture.repo).unwrap();
+
+    let summaries = revia_lib::commands::list_recovery_impl(&app.state, Some(&app.worktree_id))
+        .expect("没有当前 worktree 时也要能列出");
+    assert_eq!(summaries.len(), 1);
+    let inspection = revia_lib::commands::inspect_recovery_impl(
+        &app.state,
+        &revia_lib::commands::RecoveryInspectRequest {
+            worktree_id: app.worktree_id.clone(),
+            record_id: id.clone(),
+        },
+    )
+    .expect("没有当前 worktree 时也要能看详情");
+    assert!(inspection.files[0].saved.text.is_some(), "保存内容必须可读");
+    assert!(inspection.files[0].current_unavailable);
+}
+
+/// R05-R3-SP9：当前侧读取失败不能伪装成「删除」。
+#[cfg(unix)]
+#[test]
+fn text_diff_never_disguises_read_failure_as_deletion() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let f = Fixture::new();
+    f.write("target.txt", b"saved line\n");
+    f.commit();
+    f.write("target.txt", b"saved line\nmore\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 当前文件不可读：必须报错，而不是画成删除。
+    let full = f.repo.join("target.txt");
+    let original = fs::metadata(&full).unwrap().permissions();
+    fs::set_permissions(&full, fs::Permissions::from_mode(0o000)).unwrap();
+    let result = session.recovery_text_diff(&id, "target.txt", &store);
+    fs::set_permissions(&full, original).unwrap();
+    let error = result.expect_err("读取失败不能返回删除 diff");
+    assert!(
+        !error.message.is_empty() && !matches!(error.kind, ErrorKind::Rejected if error.message.contains("不存在")),
+        "必须如实报读取失败：{error:?}"
+    );
+
+    // 目标换成目录（类型不对）：同样不能画成删除。
+    fs::remove_file(&full).unwrap();
+    fs::create_dir_all(&full).unwrap();
+    let error = session.recovery_text_diff(&id, "target.txt", &store).unwrap_err();
+    assert!(error.message.contains("不是普通文件"), "类型错误必须如实报告：{error:?}");
+}
+
+/// R05-R3-ST9/SP11：trash 残留可重试清理，且失败可见。
+#[cfg(unix)]
+#[test]
+fn trash_leftovers_are_retried_and_visible() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let now = Arc::new(std::sync::atomic::AtomicU64::new(1_792_742_400_123));
+    let clock = now.clone();
+    let data = f.root().join("data-trash");
+    let store = RecoveryStore::with_clock(data.clone(), Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)));
+    discard(&session, &target, &store).unwrap();
+    now.fetch_add(revia_lib::recovery::RETENTION_MS + 1, std::sync::atomic::Ordering::SeqCst);
+
+    // 手工放一个残留目录，模拟「改名成功但删除中断」。
+    let recovery_dir = data.join("recovery");
+    let leftover = recovery_dir.join("trash-1-2-record-leftover");
+    fs::create_dir_all(&leftover).unwrap();
+    fs::write(leftover.join("saved.json"), b"{}").unwrap();
+
+    // 残留删不掉时，清理必须报错（不能靠下一轮 0 条把错误清掉）。
+    let permissions = fs::metadata(&leftover).unwrap().permissions();
+    fs::set_permissions(&leftover, fs::Permissions::from_mode(0o500)).unwrap();
+    let result = store.auto_purge();
+    fs::set_permissions(&leftover, permissions).unwrap();
+    if result.is_err() {
+        assert!(store.maintenance().error.is_some(), "残留失败必须可见");
+        // 恢复权限后再次清理：残留被真正删除，错误被清空。
+        store.auto_purge().unwrap();
+        assert!(!leftover.exists(), "重试必须清掉残留");
+        assert!(store.maintenance().error.is_none());
+    } else {
+        // 平台允许删除只读目录时，残留本身应当已被清掉。
+        assert!(!leftover.exists(), "成功路径也必须清掉残留");
+    }
+}

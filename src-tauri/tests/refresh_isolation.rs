@@ -425,14 +425,22 @@ fn t13_concurrent_refreshes_never_publish_stale_content() {
         handles.push(std::thread::spawn(move || {
             let mut observed: Vec<(u64, String)> = Vec::new();
             for _ in 0..12 {
-                let snapshot = session.refresh().unwrap();
-                let fingerprint = snapshot
-                    .entries
-                    .iter()
-                    .find(|entry| entry.path == "file.txt")
-                    .map(|entry| entry.fingerprint.clone())
-                    .unwrap_or_default();
-                observed.push((snapshot.revision, fingerprint));
+                // 读取期间文件变了会被拒绝（不发布可能混合的快照）；内容稳定后必须能读到。
+                match session.refresh() {
+                    Ok(snapshot) => {
+                        let fingerprint = snapshot
+                            .entries
+                            .iter()
+                            .find(|entry| entry.path == "file.txt")
+                            .map(|entry| entry.fingerprint.clone())
+                            .unwrap_or_default();
+                        observed.push((snapshot.revision, fingerprint));
+                    }
+                    Err(error) => assert!(
+                        error.message.contains("正在变化"),
+                        "只允许「读取期间文件变化」这一种失败：{error:?}"
+                    ),
+                }
             }
             observed
         }));
@@ -443,6 +451,8 @@ fn t13_concurrent_refreshes_never_publish_stale_content() {
     for handle in handles {
         all.extend(handle.join().unwrap());
     }
+    // 写线程结束后必须能稳定读取：所有并发读都被拒绝说明校验过度。
+    assert!(session.refresh().is_ok(), "内容稳定后必须能读取");
     assert!(!all.is_empty(), "并发刷新必须有样本");
 
     // 版本唯一。
@@ -465,6 +475,147 @@ fn t13_concurrent_refreshes_never_publish_stale_content() {
         );
         previous_marker = marker;
     }
+}
+
+/// 直接保存（截断后写入）是真实存在的编辑方式：并发刷新可能遇到 Git 短读。
+///
+/// 要求（任务 05 第三轮、任务 10 Comments）：
+/// - 短读导致的刷新失败**不能**伪造快照或推进版本；
+/// - 成功发布的快照必须对应工作区当时**真实存在**的内容，不能是拼出来的假内容；
+/// - 内容稳定后必须能重新读取到最终内容。
+///
+/// 直接保存会短暂产生截断内容（`""`、`"v"`、`"v1"`），那是工作区的真实状态，
+/// 因此这里先把「所有可能的真实内容」（完整版本 + 每个版本的截断前缀）建成指纹表，
+/// 再用它判定：任何不在表里的指纹都是伪造，不能靠「忽略未知指纹」蒙过去。
+#[test]
+fn t13_direct_save_short_read_never_publishes_forged_snapshot() {
+    const VERSIONS: u64 = 20;
+
+    let ctx = TestContext::new();
+    ctx.track("file.txt", b"v0\n");
+    let session = ctx.open();
+
+    // 完整版本：指纹 → 标记。
+    let mut full_markers: HashMap<String, u64> = HashMap::new();
+    for marker in 1..=VERSIONS {
+        ctx.write("file.txt", format!("v{marker}\n").as_bytes());
+        let snapshot = session.refresh().unwrap();
+        let fingerprint = snapshot
+            .entries
+            .iter()
+            .find(|entry| entry.path == "file.txt")
+            .expect("应有未暂存改动")
+            .fingerprint
+            .clone();
+        full_markers.insert(fingerprint, marker);
+    }
+    assert_eq!(full_markers.len() as u64, VERSIONS, "每个完整版本必须有不同指纹");
+
+    // 截断前缀：直接保存过程中真实存在的内容（`""`、`"v"`、`"v1"` …）。
+    let mut partial_fingerprints: HashMap<String, u64> = HashMap::new();
+    for marker in 1..=VERSIONS {
+        let full = format!("v{marker}\n");
+        for length in 0..full.len() {
+            ctx.write("file.txt", &full.as_bytes()[..length]);
+            let snapshot = session.refresh().unwrap();
+            let fingerprint = snapshot
+                .entries
+                .iter()
+                .find(|entry| entry.path == "file.txt")
+                .map(|entry| entry.fingerprint.clone())
+                .unwrap_or_default();
+            partial_fingerprints.insert(fingerprint, marker);
+        }
+    }
+
+    // 写线程用**直接保存**（先截断再写入）推进内容，这是真实编辑器也会做的事。
+    let writer = {
+        let repo = ctx.repo.clone();
+        std::thread::spawn(move || {
+            for marker in 1..=VERSIONS {
+                // 真实的「直接保存」：`fs::write` 先截断再写入，中间没有额外停顿。
+                // 这正是会让 `git diff` 分两次读到不同内容（先算哈希、再取文本）的写法。
+                std::fs::write(repo.join("file.txt"), format!("v{marker}\n")).unwrap();
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        })
+    };
+
+    let mut handles = Vec::new();
+    for _ in 0..4 {
+        let session = session.clone();
+        handles.push(std::thread::spawn(move || {
+            let mut accepted: Vec<(u64, String)> = Vec::new();
+            let mut transient_errors = 0usize;
+            for _ in 0..24 {
+                match session.refresh() {
+                    Ok(snapshot) => {
+                        let fingerprint = snapshot
+                            .entries
+                            .iter()
+                            .find(|entry| entry.path == "file.txt")
+                            .map(|entry| entry.fingerprint.clone())
+                            .unwrap_or_default();
+                        accepted.push((snapshot.revision, fingerprint));
+                    }
+                    // 真实短读：允许失败，但不允许留下伪造的快照。
+                    Err(_) => transient_errors += 1,
+                }
+            }
+            (accepted, transient_errors)
+        }));
+    }
+    writer.join().unwrap();
+
+    let mut all: Vec<(u64, String)> = Vec::new();
+    let mut errors = 0usize;
+    for handle in handles {
+        let (accepted, transient) = handle.join().unwrap();
+        all.extend(accepted);
+        errors += transient;
+    }
+    assert!(!all.is_empty(), "并发刷新必须有成功样本");
+    assert!(errors <= 4 * 24, "错误计数不能超过请求数");
+
+    // 成功发布的版本唯一：失败刷新不得推进或重复版本。
+    let mut revisions: Vec<u64> = all.iter().map(|(revision, _)| *revision).collect();
+    revisions.sort_unstable();
+    let total = revisions.len();
+    revisions.dedup();
+    assert_eq!(revisions.len(), total, "失败刷新不得伪造或重复版本");
+
+    // 每个指纹都必须对应工作区真实存在过的内容：完整版本或它的截断前缀。
+    all.sort_by_key(|(revision, _)| *revision);
+    let mut previous_full_marker = 0u64;
+    for (revision, fingerprint) in &all {
+        if let Some(marker) = full_markers.get(fingerprint) {
+            assert!(
+                *marker >= previous_full_marker,
+                "版本 {revision} 读到更旧的完整内容（标记 {marker} < 上一完整版本 {previous_full_marker}）"
+            );
+            previous_full_marker = *marker;
+        } else {
+            assert!(
+                partial_fingerprints.contains_key(fingerprint),
+                "版本 {revision} 的指纹不对应任何真实内容（伪造快照）：{fingerprint}"
+            );
+        }
+    }
+
+    // 内容稳定后必须能重新读取到最终内容。
+    let final_snapshot = session.refresh().expect("稳定后必须能读取");
+    let final_fingerprint = final_snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == "file.txt")
+        .expect("应有未暂存改动")
+        .fingerprint
+        .clone();
+    assert_eq!(
+        full_markers.get(&final_fingerprint),
+        Some(&VERSIONS),
+        "稳定后必须读到最后一个版本的内容"
+    );
 }
 
 /// linked worktree：监视根必须解析出真实 gitDir，而不是工作区里的 `.git` 文件本身。

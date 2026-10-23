@@ -277,9 +277,27 @@ impl WorktreeSession {
         let started = std::time::Instant::now();
         let status = status::read(&self.git)?;
 
+        // `git diff` 会分几次读同一个文件（先算 blob 哈希、再取内容）。如果外部正在**直接保存**
+        // （先截断再写入），同一次调用可能拿到「index 行的 blob 来自 A 状态、hunk 文本来自 B 状态」
+        // 这种内部不一致的输出。发布它等于伪造快照，指纹也会与实际内容不符。
+        // 因此在 diff 前后各取一次工作区文件的 stat；只要有一个变了，这次读取就不发布。
+        let watched: Vec<&str> = status
+            .entries
+            .iter()
+            .filter(|entry| entry.changes != ChangesKind::Staged)
+            .map(|entry| entry.path.as_str())
+            .collect();
+        let before = self.worktree_stats(&watched);
+
         // 一次读取两种 diff：未暂存（工作区 vs 暂存区）与已暂存（暂存区 vs HEAD）。
         let unstaged_patch = self.git.diff_worktree(None)?;
         let staged_patch = self.git.diff_index(None)?;
+
+        let after = self.worktree_stats(&watched);
+        if before != after {
+            // 读取期间工作区变了：这次结果可能是混合的，按「读取失败」处理，不发布。
+            return Err(AppError::git("读取状态期间文件正在变化，请稍后重试"));
+        }
         let fingerprint = git::fingerprint(&[&unstaged_patch, &staged_patch]);
 
         let unstaged = git::diff::parse_bytes(&unstaged_patch);
@@ -879,6 +897,31 @@ impl WorktreeSession {
             Ok(identity) => store.inspect(id, Some(&identity), Some(&self.path)),
             Err(_) => store.inspect(id, None, None),
         }
+    }
+
+    /// 工作区文件的轻量快照（大小 + 纳秒 mtime + inode），用于判断一次读取期间文件是否变化。
+    fn worktree_stats(&self, paths: &[&str]) -> Vec<Option<(u64, i128, u64)>> {
+        paths
+            .iter()
+            .map(|path| {
+                let full = self.path.join(path);
+                let meta = std::fs::symlink_metadata(&full).ok()?;
+                let mtime = meta
+                    .modified()
+                    .ok()
+                    .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|duration| duration.as_nanos() as i128)
+                    .unwrap_or(-1);
+                #[cfg(unix)]
+                let inode = {
+                    use std::os::unix::fs::MetadataExt;
+                    meta.ino()
+                };
+                #[cfg(not(unix))]
+                let inode = 0u64;
+                Some((meta.len(), mtime, inode))
+            })
+            .collect()
     }
 
     fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {

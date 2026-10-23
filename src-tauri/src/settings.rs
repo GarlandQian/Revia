@@ -138,23 +138,28 @@ impl Registry {
     }
 
     /// 目标路径落在哪个已登记 worktree 里（用于把写入归属到真实目标，而不是当前选择）。
+    ///
+    /// 取**最具体**的匹配：登记了外层 A 与嵌套的独立仓库 B 时，B 内的路径归属 B。
+    /// 否则会拿到 A 的锁，和 B 的写操作并发（Q90）。
     pub fn worktree_containing(&self, path: &Path) -> Option<String> {
         let target = fs::canonicalize(path).ok()?;
-        for repo in &self.repos {
-            for worktree in &repo.worktrees {
-                let root = Path::new(&worktree.path);
-                let root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
-                if target == root || target.starts_with(&root) {
-                    return Some(id_for_path(Path::new(&worktree.path)));
-                }
-            }
-            let root = Path::new(&repo.path);
+        let mut best: Option<(usize, String)> = None;
+        let mut consider = |root: &Path, id: String| {
             let root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
             if target == root || target.starts_with(&root) {
-                return Some(repo.id.clone());
+                let depth = root.components().count();
+                if best.as_ref().is_none_or(|(current, _)| depth > *current) {
+                    best = Some((depth, id));
+                }
             }
+        };
+        for repo in &self.repos {
+            for worktree in &repo.worktrees {
+                consider(Path::new(&worktree.path), id_for_path(Path::new(&worktree.path)));
+            }
+            consider(Path::new(&repo.path), repo.id.clone());
         }
-        None
+        best.map(|(_, id)| id)
     }
 
     pub fn update_font_size(&mut self, size: u32) -> Result<Settings> {

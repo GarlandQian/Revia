@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 第三轮两轴复核未通过，继续交 Pi 返修。历史检查结果不等于本轮生产契约已闭合；全部复核通过后再固定版本做真实桌面和 CI 验收。
+> 勾选仅代表自动化（真实 Git + 独立数据目录 + 受控时钟）与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R3 返修已完成，等待规划方复核。历史检查结果保留。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -431,3 +431,105 @@ Spec 本轮为静态审查，未运行测试、GUI 或构建；无范围扩张�
 - 面板展示代际与操作结束清理分开；返回/换记录/切目标/刷新后不接收旧内容，但不能把busy永久留下。确认同时绑定worktree、activation、所见快照和记录版本；无当前worktree仍可经过IPC看保存侧。
 - 当前侧未知不可读与真实不存在分开；只在确认不存在时生成空侧diff，不把权限/类型/身份失败绘成删除。trash残留纳入可重试清理及失败可见性，未清除前不能用下一轮0条成功清除错误。
 - 全部改完再集中检查，保留失败历史。检查前记录源码文件hash或可还原diff，记录精确命令/真实退出码/完整输出；只能报告实际留存的运行。按精确路径暂存提交m2，等待两轴复核；全部通过后规划方才桌面验收。
+
+### 2026-10-24 / Pi 实现：第三轮两轴复核返修（R05-R3）
+
+只返修 R05-R3 清单。未做 07/08/10/11/12/13，未改已确认决策，未构建 Release、未操作 GUI、未跑 D06/CI/长测，未推送/合并/发布。
+
+#### Standards
+
+**R05-R3-ST1 / SP2（P1）：发布前核对全部相关路径，部分写入后统一待核对**
+
+`verify_publish` 原来只比较「下一个要发布的那条」与已写路径，现在改为遍历**记录里全部相关路径**：
+
+- 已写路径必须等于本次恢复写入的 `saved`；
+- 未写路径（含下一个）必须仍等于丢弃完成后的 `after`；
+- 任一相关路径处于 unmerged 都拒绝。
+
+调用点也重排了：`written` 非空时不再输出「未写入任何路径」，而是 `NeedsVerification` + 如实列出已写路径。
+生产调用点：`session::restore_record_with_hook` → `RecoveryStore::restore_with_hook`（命令 `restore_recovery_impl` 调它）。
+回归 `every_related_path_is_checked_before_publishing_any`：真实 `git mv` 产生的重命名记录（两条相关路径），在 `BeforeWrite` 改**另一条**路径，断言拒绝、`written` 为空、陈述与实际一致。
+
+**R05-R3-ST2 / SP4（P2）：完成留证与尾部失败**
+
+顺序改为：全部写完后先做**最后一次真实核对**，通过才写 `Completed`；之后任何尾部失败（最终重读失败、恢复历史读取失败）都经 `tail_failure` 把这次尝试改回 `NeedsVerification` 并返回 `NeedsVerification`，不再留下 `Completed` 或透传普通错误。
+回归 `tail_failure_after_completion_downgrades_the_attempt`：`BeforeComplete` 之后把目标换成目录使最终核对失败，断言 kind 为 `NeedsVerification`、留证不是 `Completed`、`written` 如实。
+
+**R05-R3-ST3 / SP4（P2）：切走后仍重读原目标**
+
+`App.performRestore` 的 catch 分支不再受 `acceptFailure`（当前激活）约束：无论是否切走都 `await refreshTarget(opWorktreeId)` 对**原目标**真实重读；界面是否接收由 `refreshTarget` 内部的激活判断决定。
+
+**R05-R3-ST4 / SP1（P2）：保护实际目标仓库的 Git 元数据**
+
+新增 `enclosing_git_roots`：从目标目录逐级向上解析 `.git` 目录、`.git` 文件指针（linked worktree / `--separate-git-dir`）、`commondir`，以及「目录自身就是 Git 元数据」（有 `HEAD` 且有 `objects/`）的情形，全部纳入保护集合。`prepare_destination` 现在保护**源记录身份 + 目标侧解析结果**。
+回归 `save_as_protects_the_target_repository_metadata`：记录来自 A，另存到 B 的 `.git` 被拒绝；另存到 `--separate-git-dir` 的元数据目录（名字不叫 `.git`）也被拒绝；该仓库工作区内的新路径仍允许。
+
+**R05-R3-ST5 / SP7（P2）：另存进入 App 全局门禁与结果通道**
+
+`App.performSaveAs` 复用 `writingWorktreesRef`（全局非排队写门禁）与 `OperationResultGate`，错误按归属 worktree 保留，完成后对该 worktree 真实重读；`RecoveryDialog` 不再直接调 IPC，改为调用注入的 `onSaveAs`。后端 `deliver` 仍只是验收延迟接缝，不当作前端结果门。
+
+**R05-R3-ST6 / SP8（P2）：嵌套登记取最具体归属**
+
+`Registry::worktree_containing` 改为在所有匹配中取路径层级最深的一个（外层 A + 嵌套独立仓库 B 时返回 B）。
+回归 `save_as_owner_picks_the_most_specific_registered_worktree`：真实嵌套 `git init` 并登记，断言 B 内路径归属 B、外部路径无归属。
+
+**R05-R3-ST7 / SP6（P2）：面板 busy 不再永久卡住**
+
+`busy` 与面板代际彻底分开：`backToList` 只递增 `panelEpoch`/`requestEpoch` 丢弃旧响应，**不再遗留 busy**；每个发起请求的 `finally` 只在自己仍是当前代际时清 busy；切 worktree / 关闭时 `resetPanel` 一并清空。返回列表后详情、清理等入口可继续使用。
+
+**R05-R3-ST8 / SP10（P2）：无当前 worktree 也能查看**
+
+`inspect` 不再因 `worktreeId === null` 提前返回；后端 `inspect_recovery_impl` 在 `state.session()` 失败时回退 `store.inspect(id, None, None)`。
+回归 `recovery_commands_still_show_saved_version_without_current_worktree`：删除整个仓库目录后，仍通过**命令层** `list_recovery_impl` / `inspect_recovery_impl` 列出并查看保存内容。
+
+**R05-R3-ST9 / SP11（P2）：trash 残留可重试清理且失败可见**
+
+`sweep_trash` 返回未清除数量，`purge_expired` 与 `clear` 都会调用它；残留未清则返回错误（`auto_purge` 会把错误写进可查询的 `RecoveryMaintenance`），不会因为「本轮删了 0 条」把错误清掉。
+回归 `trash_leftovers_are_retried_and_visible`：手工放置 `trash-*` 残留，清理失败时 `maintenance().error` 可见；恢复权限后重试真正删除残留并清空错误。
+
+#### Spec
+
+- **SP1** 见 ST4：保护源与**实际目标**的真实 Git 元数据，合法外部新路径仍可用。
+- **SP2** 见 ST1：全部相关路径核对；部分写入后 `NeedsVerification`，不再出现「未写入任何路径」的假陈述。
+- **SP3（P2）**：身份核对移到**准备之前**。`restore_with_hook` 先 `capture` 并校验身份/冲突/基线，通过后才 `prepare_files`。回归 `identity_mismatch_creates_nothing_in_the_target`：把 A 的记录恢复到另一个真实仓库 B（无该子目录），断言拒绝且 **B 里没有被创建出目录**。
+- **SP4** 见 ST2、ST3。
+- **SP5（P2）**：确认对象改为 `{ version, snapshotRevision, activation, worktreeId, recordId }`；`useEffect` 依赖 `snapshotRevision`、`activation`、`worktreeId`，任一变化清空待确认；面板按 `activation` 重新加载，worktree 变化时清空选择与确认。
+- **SP6** 见 ST7。
+- **SP7** 见 ST5。
+- **SP8** 见 ST6。
+- **SP9（P2）**：`text_diff` 只有 `symlink_metadata` 明确 `NotFound` 才用 `/dev/null`；权限/类型/读取失败与「无当前 worktree」都返回明确错误，不画成删除。回归 `text_diff_never_disguises_read_failure_as_deletion`：`chmod 000` 与「目标变成目录」两种情形都断言报错而非删除 diff。
+- **SP10** 见 ST8。
+- **SP11** 见 ST9。
+
+#### 顺带：t13「未知指纹」的真实归因（任务 10 Comments 要求）
+
+按任务 10 的边界，保留**直接保存**与**原子替换**两类场景，不靠忽略未知指纹或重试通过：
+
+- 先复现：`t13_direct_save_short_read_never_publishes_forged_snapshot` 在加入一致性校验前，确实报出「指纹不对应任何真实内容」（`history/fail-*.log`）。
+- 独立探测确认根因在 Git 一侧：并发直接保存时，同一次 `git diff` 可能给出「`index` 行的 blob 来自 A 状态、hunk 文本来自 B 状态」的内部不一致输出（我用 `git hash-object --stdin` 逐条校验 hunk 文本，181 种组合中 16 种 index 行与内容不符）。
+- 产品修复：`WorktreeSession::refresh_locked` 在读取 diff **前后**各取一次工作区文件 stat（大小 + 纳秒 mtime + inode），只要有一个变了就不发布这次结果，返回「读取状态期间文件正在变化，请稍后重试」。
+- 敏感性：临时移除该校验后 `t13_direct_save` 在 40 次运行中失败 4 次（`history/no-guard-*.log`）；加回后 15 次运行 0 失败。原子替换场景保留，允许「读取期间变化」这一种失败（断言错误消息），并要求内容稳定后必须能读到最终版本、成功版本指纹必须属于真实内容。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录：`/private/tmp/revia-task05-r3-1792792216`（`MANIFEST.md` 含每条命令的退出码、原始 stdout/stderr；`source-sha256-before-check.txt` 是本次检查实际所测源码的哈希，检查后复核未变；`pre-change.diff` 是改动前完整 diff）。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` | 0 | **223 项通过**：lib 93、`discard_recovery` **68**、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` **15**、`session_flow` 3 |
+| `pnpm exec tsc -b` | 0 | 通过 |
+| `pnpm lint` | 0 | 通过 |
+| `pnpm build` | 0 | 通过 |
+| `node tools/test-*.mjs` | 0 | 25 + 13 + 11 + 19 = **68 项通过** |
+| `python3 -m unittest tools.test_bench_long_running` | 0 | **20 项通过** |
+
+本轮新增回归 9 项（discard_recovery 8 项 + refresh_isolation 1 项），全部走生产入口：
+`restore_record_with_hook` / `restore_record`、`save_as`、`commands::save_recovery_as_impl`、`commands::list_recovery_impl`、`commands::inspect_recovery_impl`、`session.recovery_text_diff`、`store.auto_purge`。
+`save_recovery_as_impl` 走真实的 `Registry::worktree_containing` + `AppState::session` + `acquire_write_lock`，不再由测试手工先拿锁。
+
+#### 仍未验证（留给规划方）
+
+- 真实桌面的面板键盘焦点、只读 diff 观感、原生保存对话框、清理失败横幅的实际显示。
+- 本轮按要求**未**构建 Release、未跑 GUI/D06/CI/长测。
+- Windows 编译与 CI。
+- 超大文件恢复/对比的内存占用未量化。

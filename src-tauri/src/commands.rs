@@ -75,6 +75,11 @@ impl AppState {
         Ok(session)
     }
 
+    /// 取得某个已登记 worktree 的会话（命令层与生产入口测试共用同一条路径）。
+    pub fn worktree_session(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
+        self.session(worktree_id)
+    }
+
     /// 释放某个 worktree 的会话（切换离开时用）：停止其高亮线程引用与缓存。
     pub fn release_session(&self, worktree_id: &str) {
         if let Ok(mut sessions) = self.sessions.lock() {
@@ -413,6 +418,15 @@ pub async fn discard_hunk(state: State<'_, AppState>, request: DiscardRequest) -
     execute_discard(state, request, true).await
 }
 
+/// 列出回收记录的实际执行函数：命令与测试共用。
+///
+/// 原 worktree 可能已被移动或删除：取不到 session 时仍要能列出记录（Q87）。
+pub fn list_recovery_impl(state: &AppState, worktree_id: Option<&str>) -> Result<Vec<RecoverySummary>> {
+    let session = worktree_id.and_then(|id| state.session(id).ok());
+    let identity = session.and_then(|session| WorktreeIdentity::capture(&session.git).ok());
+    state.recovery.list(identity.as_ref())
+}
+
 #[tauri::command]
 pub async fn list_recovery(state: State<'_, AppState>, worktree_id: Option<String>) -> Result<Vec<RecoverySummary>> {
     // 原 worktree 可能已被移动或删除：取不到 session 时仍要能列出记录（Q87）。
@@ -458,6 +472,16 @@ pub struct RecoverySaveAsRequest {
     pub destination: String,
 }
 
+/// 只读检查的实际执行函数：命令与测试共用。
+///
+/// 没有当前 worktree 时回退为「当前侧不可用」，而不是直接报错（Q87）。
+pub fn inspect_recovery_impl(state: &AppState, request: &RecoveryInspectRequest) -> Result<RecoveryInspection> {
+    match state.session(&request.worktree_id) {
+        Ok(session) => session.inspect_record(&request.record_id, &state.recovery),
+        Err(_) => state.recovery.inspect(&request.record_id, None, None),
+    }
+}
+
 /// 只读检查一条记录能否直接恢复，并给出对比所需的两侧状态。
 #[tauri::command]
 pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspectRequest) -> Result<RecoveryInspection> {
@@ -470,6 +494,17 @@ pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspe
     })
     .await
     .map_err(|error| AppError::internal(format!("读取回收记录失败：{error}")))?
+}
+
+/// 恢复的实际执行函数：命令与测试共用。
+pub fn restore_recovery_impl(state: &AppState, request: &RecoveryRestoreRequest) -> Result<recovery::RestoreOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let expected = RestoreExpectation {
+        version: request.expected_version.clone(),
+        paths: request.expected_paths.clone(),
+        state: request.expected_state,
+    };
+    session.restore_record(&request.record_id, &expected, &state.recovery)
 }
 
 /// 恢复保存时的完整工作区状态（不改变暂存区）。
@@ -491,6 +526,50 @@ pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryResto
     deliver(state.acceptance.as_ref(), "restore_recovery", &context.worktree_id, None, result).await
 }
 
+/// 另存的归属解析：目标路径落在哪个已登记 worktree 里。
+///
+/// 命令与测试共用同一个函数，避免「测试自己挑锁」而命令挑错锁（Q90）。
+pub fn save_as_owner(registry: &Registry, destination: &std::path::Path) -> Option<String> {
+    registry.worktree_containing(destination.parent().unwrap_or(destination))
+}
+
+/// 另存的实际执行函数：命令与测试都调用它。
+///
+/// 归属存在时先取得**那个** worktree 的非排队写锁；外部路径不强行加锁。
+pub fn execute_save_as(
+    owner: Option<&std::sync::Arc<crate::session::WorktreeSession>>,
+    store: &RecoveryStore,
+    record_id: &str,
+    path: &str,
+    destination: &std::path::Path,
+) -> Result<u64> {
+    let _guard = match owner {
+        Some(session) => Some(session.acquire_write_lock()?),
+        None => None,
+    };
+    store.save_as(record_id, path, destination)
+}
+
+/// 另存的完整执行路径：解析归属 → 取该 worktree 的会话与写锁 → 写入。
+///
+/// 命令与测试共用这个函数，因此「命令是否挑对锁」由真实测试覆盖，
+/// 而不是测试自己手工先拿锁再调用 store（Q90）。
+pub fn save_recovery_as_impl(state: &AppState, request: &RecoverySaveAsRequest) -> Result<u64> {
+    let destination = std::path::PathBuf::from(&request.destination);
+    let owner = {
+        let registry = state
+            .registry
+            .lock()
+            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        save_as_owner(&registry, &destination)
+    };
+    let session = match &owner {
+        Some(worktree_id) => Some(state.session(worktree_id)?),
+        None => None,
+    };
+    execute_save_as(session.as_ref(), &state.recovery, &request.record_id, &request.path, &destination)
+}
+
 /// 把保存版本另存到尚不存在的新路径。
 ///
 /// 目标落在已登记 worktree 里时，写入归属**那个** worktree：取得它的非排队写锁，
@@ -503,7 +582,7 @@ pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveA
             .registry
             .lock()
             .map_err(|_| AppError::internal("仓库列表锁失败"))?;
-        registry.worktree_containing(destination.parent().unwrap_or(&destination))
+        save_as_owner(&registry, &destination)
     };
     let session = match &owner {
         Some(worktree_id) => Some(state.session(worktree_id)?),
@@ -512,11 +591,7 @@ pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveA
     let store = state.recovery.clone();
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let _guard = match &session {
-            Some(session) => Some(session.acquire_write_lock()?),
-            None => None,
-        };
-        store.save_as(&context.record_id, &context.path, &destination)
+        execute_save_as(session.as_ref(), &store, &context.record_id, &context.path, &destination)
     })
     .await
     .map_err(|error| AppError::needs_verification(format!("另存任务中断，结果待核对：{error}")))?;

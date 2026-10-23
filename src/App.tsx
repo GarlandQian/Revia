@@ -813,17 +813,65 @@ export function App() {
       return outcome;
     } catch (caught) {
       const err = toAppError(caught);
-      if (operationGateRef.current.canRecord(opToken)) {
-        setAppError(err, opWorktreeId);
-        if (operationGateRef.current.acceptFailure(opToken)
-          && (err.kind === "needsVerification" || err.kind === "rejected")) {
-          void refreshTarget(opWorktreeId);
-        }
-      }
+      // 结果提示仍归原 worktree；但**真实重读**不依赖当前激活：
+      // 切走之后原目标也必须核对真实状态（Q91），界面是否接收由 refreshTarget 判断。
+      if (operationGateRef.current.canRecord(opToken)) setAppError(err, opWorktreeId);
+      await refreshTarget(opWorktreeId);
       throw err;
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
+    }
+  }, [refreshTarget, setAppError]);
+
+  /**
+   * 另存回收内容（任务 05）。
+   *
+   * 与恢复一样进入 App 的全局写门禁与结果通道：
+   * - 归属按**实际目标路径**判断（后端 `worktree_containing` 同一规则，这里只看是否落在某 worktree 内以决定门禁键）；
+   * - 结果/错误按归属 worktree 保留，关面板不会丢；
+   * - 完成后对归属 worktree 真实重读一次，是否更新界面由 `refreshTarget` 判断。
+   */
+  const performSaveAs = useCallback(async (request: {
+    worktreeId: string | null;
+    recordId: string;
+    path: string;
+    destination: string;
+  }) => {
+    const ownerId = request.worktreeId;
+    if (ownerId) {
+      if (writingWorktreesRef.current.has(ownerId)) {
+        throw { kind: "rejected", message: messages.recovery.busy };
+      }
+      writingWorktreesRef.current.add(ownerId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+    }
+    const opToken = ownerId ? operationGateRef.current.begin(ownerId) : null;
+    if (ownerId) setAppError(null, ownerId);
+    try {
+      const bytes = await ipc.saveRecoveryAs({
+        worktreeId: ownerId,
+        recordId: request.recordId,
+        path: request.path,
+        destination: request.destination,
+      });
+      if (ownerId && opToken && operationGateRef.current.canRecord(opToken)) {
+        setAppError(null, ownerId);
+        await refreshTarget(ownerId);
+      }
+      return bytes;
+    } catch (caught) {
+      const err = toAppError(caught);
+      if (ownerId && opToken && operationGateRef.current.canRecord(opToken)) {
+        setAppError(err, ownerId);
+        await refreshTarget(ownerId);
+      }
+      throw err;
+    } finally {
+      if (ownerId) {
+        writingWorktreesRef.current.delete(ownerId);
+        setWritingWorktrees(new Set(writingWorktreesRef.current));
+      }
     }
   }, [refreshTarget, setAppError]);
 
@@ -1939,7 +1987,10 @@ export function App() {
           worktreeId={worktreeId}
           isWriting={isWriting}
           snapshotRevision={snapshot?.revision ?? 0}
+          activation={gateRef.current.token().activation}
+          isWritingFor={(id) => writingWorktrees.has(id)}
           onRestore={performRestore}
+          onSaveAs={performSaveAs}
           onClose={() => setRecoveryOpen(false)}
         />
       ) : null}

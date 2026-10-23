@@ -330,38 +330,105 @@ fn prepare_files(worktree: &Path, before: &[SavedFile]) -> Result<Vec<PreparedFi
 
 /// 发布前校验：用**刚刚重新捕获**的真实状态判断这次发布是否仍然安全。
 ///
+/// 检查的是**全部相关路径**，不是只看下一个要发布的那条（Q80、Q85、Q91）：
 /// - 身份必须与记录一致（不拿传入的旧 identity 充数）；
-/// - 目标路径不得处于未解决冲突（Q82）；
-/// - 尚未发布的路径必须仍等于丢弃完成后的状态（有后续变化就不覆盖，Q29）；
-/// - 已经发布的路径必须等于这次恢复写入的内容（多路径时不因前面的写入误判为「外部变化」）。
+/// - 任何相关路径处于未解决冲突都拒绝（Q82）；
+/// - 已经发布的路径必须等于这次恢复写入的 `saved`；
+/// - 尚未发布的路径（含下一个）必须仍等于丢弃完成后的 `after`。
 fn verify_publish(
     pre: &RestorePreconditions,
     record: &RecoveryRecord,
     after: &[SavedFile],
     written: &[String],
-    next: &str,
 ) -> Result<()> {
     if !record.identity.confirmed_match(&pre.identity) {
         return Err(AppError::rejected("原 worktree 身份无法确认，不能直接恢复到新目录"));
     }
-    if pre.conflicts.iter().any(|path| path == next) {
-        return Err(AppError::rejected("文件存在未解决的冲突，不能从回收区恢复"));
+    for saved in &record.before {
+        if pre.conflicts.iter().any(|path| path == &saved.path) {
+            return Err(AppError::rejected("文件存在未解决的冲突，不能从回收区恢复"));
+        }
     }
     for saved in &record.before {
-        let observed = pre.files.iter().find(|file| file.path == saved.path);
-        let observed = observed.ok_or_else(|| AppError::rejected("无法读取目标文件的真实状态"))?;
-        if saved.path == next {
+        let observed = pre
+            .files
+            .iter()
+            .find(|file| file.path == saved.path)
+            .ok_or_else(|| AppError::rejected("无法读取目标文件的真实状态"))?;
+        if written.iter().any(|path| path == &saved.path) {
+            // 已经发布：必须等于本次恢复写入的内容。
+            if observed != saved {
+                return Err(AppError::rejected("恢复期间文件被外部改动，请重新确认"));
+            }
+        } else {
+            // 尚未发布：必须仍等于丢弃完成后的基线。
             let baseline = after.iter().find(|file| file.path == saved.path);
             if baseline != Some(observed) {
                 return Err(AppError::rejected("文件在丢弃之后又有修改，不能覆盖"));
             }
-        } else if written.iter().any(|path| path == &saved.path) {
-            if observed != saved {
-                return Err(AppError::rejected("恢复期间文件被外部改动，请重新确认"));
-            }
         }
     }
     Ok(())
+}
+
+/// 目标路径上方**所有** Git 仓库的真实元数据目录。
+///
+/// 按 `.git` 目录 / `.git` 文件指针（linked worktree、`--separate-git-dir`）解析，
+/// 并读出 `commondir` 指向的共享目录；逐级向上，因此嵌套仓库的外层元数据也会被保护。
+/// 不依赖目录名字叫 `.git`：真实 gitDir 可能在任意位置。
+fn enclosing_git_roots(start: &Path) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    let push = |path: PathBuf, roots: &mut Vec<PathBuf>| {
+        if !roots.contains(&path) {
+            roots.push(path);
+        }
+    };
+    let mut cursor = Some(start);
+    while let Some(directory) = cursor {
+        // 目录**自己**就是 Git 元数据（`--separate-git-dir`、裸仓库、linked worktree 私有目录）。
+        if directory.join("HEAD").is_file() && directory.join("objects").is_dir() {
+            if let Ok(resolved) = fs::canonicalize(directory) {
+                push(resolved, &mut roots);
+            }
+            if let Ok(text) = fs::read_to_string(directory.join("commondir")) {
+                let common = PathBuf::from(text.trim());
+                let common = if common.is_absolute() { common } else { directory.join(common) };
+                if let Ok(common) = fs::canonicalize(&common) {
+                    push(common, &mut roots);
+                }
+            }
+        }
+        let dot_git = directory.join(".git");
+        match fs::symlink_metadata(&dot_git) {
+            Ok(meta) if meta.is_dir() => {
+                if let Ok(resolved) = fs::canonicalize(&dot_git) {
+                    push(resolved, &mut roots);
+                }
+            }
+            Ok(meta) if meta.is_file() => {
+                if let Ok(text) = fs::read_to_string(&dot_git) {
+                    if let Some(rest) = text.trim().strip_prefix("gitdir:") {
+                        let target = PathBuf::from(rest.trim());
+                        let target = if target.is_absolute() { target } else { directory.join(target) };
+                        if let Ok(resolved) = fs::canonicalize(&target) {
+                            // linked worktree 的 commondir 指向共享目录。
+                            if let Ok(text) = fs::read_to_string(resolved.join("commondir")) {
+                                let common = PathBuf::from(text.trim());
+                                let common = if common.is_absolute() { common } else { resolved.join(common) };
+                                if let Ok(common) = fs::canonicalize(&common) {
+                                    push(common, &mut roots);
+                                }
+                            }
+                            push(resolved, &mut roots);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        cursor = directory.parent();
+    }
+    roots
 }
 
 /// 回收区维护状态：自动清理失败必须能被普通模式查询到，不能只写测量日志（Q9）。
@@ -511,14 +578,18 @@ impl RecoveryStore {
     }
 
     /// 清理上次删除留下的临时目录（改名成功但删除中断时）。
-    fn sweep_trash(&self) {
-        let Ok(entries) = fs::read_dir(&self.directory) else { return };
+    ///
+    /// 返回未能清除的残留数量；调用方据此把失败暴露出来（不能静默跳过）。
+    fn sweep_trash(&self) -> usize {
+        let Ok(entries) = fs::read_dir(&self.directory) else { return 0 };
+        let mut remaining = 0;
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with("trash-") {
-                let _ = fs::remove_dir_all(entry.path());
+            if name.starts_with("trash-") && fs::remove_dir_all(entry.path()).is_err() {
+                remaining += 1;
             }
         }
+        remaining
     }
 
     pub fn finish(&self, record: &RecoveryRecord, outcome: &DiscardOutcome) -> Result<()> {
@@ -651,8 +722,12 @@ impl RecoveryStore {
 
     /// 把保存的完整工作区状态写回。只写工作区，不碰暂存区、不重放反向补丁。
     ///
-    /// 流程固定为「准备临时内容 → 受控阶段 → 重新捕获真实身份/全部相关状态/冲突 → 发布」：
-    /// `capture` 在**每个路径发布前**重新读取真实状态，多路径时还要满足前面已写路径的预期状态。
+    /// 固定顺序，任何一步都不允许提前改用户路径：
+    /// 1. 校验确认版本与丢弃基线；
+    /// 2. **先核对真实身份与全部相关状态**（不匹配时连准备动作都不做）；
+    /// 3. 准备临时内容（不触碰工作区）；
+    /// 4. 受控阶段后，**每个路径发布前**重新捕获全部相关路径与冲突再发布；
+    /// 5. 全部写完并再次核对真实状态后，才把这次尝试记为完成。
     pub fn restore_with_hook(
         &self,
         id: &str,
@@ -677,6 +752,8 @@ impl RecoveryStore {
             }
         };
 
+        let paths: Vec<String> = record.before.iter().map(|file| file.path.clone()).collect();
+
         // 写入前就留下这次尝试：之后任何阶段中断都能据此核对（Q91）。
         let attempt_version = version_now.clone();
         let index = self.append_attempt(id, RestoreAttempt {
@@ -687,9 +764,24 @@ impl RecoveryStore {
             message: None,
         })?;
 
-        let paths: Vec<String> = record.before.iter().map(|file| file.path.clone()).collect();
-        let prepared = prepare_files(worktree, &record.before);
-        let mut prepared = match prepared {
+        // 2. 身份与全部相关状态的第一次核对。必须在任何准备动作之前：
+        //    否则请求落到另一个 worktree 时会先在那里建出目录（Q87、spec L102）。
+        let first = match capture(&paths) {
+            Ok(value) => value,
+            Err(error) => {
+                let message = format!("恢复前无法读取真实状态，未写入任何路径：{error}");
+                let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &[], Some(&message));
+                return Err(AppError::needs_verification(message));
+            }
+        };
+        if let Err(error) = verify_publish(&first, &record, &after, &[]) {
+            let message = format!("{error}（恢复未写入任何路径）");
+            let _ = self.finish_attempt(id, index, RestoreAttemptState::Rejected, &[], Some(&message));
+            return Err(error);
+        }
+
+        // 3. 准备临时内容。此时身份已经确认过，不会往别人的目录里建东西。
+        let mut prepared = match prepare_files(worktree, &record.before) {
             Ok(prepared) => prepared,
             Err(error) => {
                 let message = format!("恢复准备失败，未写入任何路径：{error}");
@@ -704,31 +796,45 @@ impl RecoveryStore {
             return Err(AppError::needs_verification(message));
         }
 
+        // 4. 逐个发布；每次发布前都重新捕获**全部**相关路径与冲突。
         let mut written: Vec<String> = Vec::with_capacity(prepared.len());
         for file in prepared.iter_mut() {
-            // 发布前重新捕获真实状态：准备期间的外部编辑、身份改变、unmerged 都在这里拦下。
             let preconditions = match capture(&paths) {
                 Ok(value) => value,
                 Err(error) => {
-                    let message = format!("恢复前无法读取真实状态，未写入该路径：{error}");
+                    let message = if written.is_empty() {
+                        format!("恢复前无法读取真实状态，未写入任何路径：{error}")
+                    } else {
+                        format!("恢复期间无法读取真实状态，可能已写入部分路径，结果待核对：{error}")
+                    };
                     let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
                     return Err(AppError::needs_verification(message));
                 }
             };
-            if let Err(error) = verify_publish(&preconditions, &record, &after, &written, &file.path) {
-                let message = format!("{error}（恢复未写入任何路径）");
-                let _ = self.finish_attempt(id, index, RestoreAttemptState::Rejected, &written, Some(&message));
-                return Err(error);
+            if let Err(error) = verify_publish(&preconditions, &record, &after, &written) {
+                // 已写入路径时不能声称「未写入任何路径」：如实标待核对。
+                if written.is_empty() {
+                    let message = format!("{error}（恢复未写入任何路径）");
+                    let _ = self.finish_attempt(id, index, RestoreAttemptState::Rejected, &[], Some(&message));
+                    return Err(error);
+                }
+                let message = format!("{error}（已写入 {} 个路径，结果待核对）", written.len());
+                let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
+                return Err(AppError::needs_verification(message));
             }
             if let Err(error) = file.publish() {
-                let message = format!("恢复写入失败，可能已写入部分路径，结果待核对：{error}");
+                let message = if written.is_empty() {
+                    format!("恢复写入失败，结果待核对：{error}")
+                } else {
+                    format!("恢复写入失败，可能已写入部分路径，结果待核对：{error}")
+                };
                 let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
                 return Err(AppError::needs_verification(message));
             }
             written.push(file.path.clone());
         }
 
-        // 从这里开始工作区已经写过：任何失败都只能标待核对，并保留记录。
+        // 5. 从这里开始工作区已经写过：任何失败都只能标待核对，并保留记录。
         if let Err(error) = hook(RestorePhase::AfterWrite) {
             let message = format!("恢复写入后中断，结果待核对：{error}");
             let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
@@ -739,30 +845,47 @@ impl RecoveryStore {
             let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
             return Err(AppError::needs_verification(message));
         }
+
+        // 完成前最后一次核对真实状态；**通过之前不写 Completed**。
+        let verified = match capture(&paths) {
+            Ok(pre) => match verify_publish(&pre, &record, &after, &written) {
+                Ok(()) => Ok(pre),
+                Err(error) => Err(error.to_string()),
+            },
+            Err(error) => Err(error.to_string()),
+        };
+        let final_state = match verified {
+            Ok(pre) => pre,
+            Err(reason) => {
+                let message = format!("恢复已写入工作区，但完成前核对失败，结果待核对：{reason}");
+                let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
+                return Err(AppError::needs_verification(message));
+            }
+        };
+
         if let Err(error) = self.finish_attempt(id, index, RestoreAttemptState::Completed, &written, None) {
-            // 工作区已写但完成记录失败：不当作普通错误，也不伪称完成。
             return Err(AppError::needs_verification(format!(
                 "恢复已写入工作区，但结果记录失败，结果待核对：{error}"
             )));
         }
-        // 真实重读：返回的状态来自磁盘，不是推断。
-        let inspection = match capture(&paths) {
-            Ok(pre) => match self.inspect(id, Some(&pre.identity), Some(worktree)) {
-                Ok(inspection) => inspection,
-                Err(error) => {
-                    return Err(AppError::needs_verification(format!(
-                        "恢复已写入工作区，但最新状态读取失败，结果待核对：{error}"
-                    )))
-                }
-            },
-            Err(error) => {
-                return Err(AppError::needs_verification(format!(
-                    "恢复已写入工作区，但无法重新读取真实状态，结果待核对：{error}"
-                )))
-            }
+
+        // 尾部读取同样受 Q91 约束：失败时把这次尝试改回待核对，而不是留下 Completed。
+        let inspection = match self.inspect(id, Some(&final_state.identity), Some(worktree)) {
+            Ok(inspection) => inspection,
+            Err(error) => return Err(self.tail_failure(id, index, &written, &format!("最新状态读取失败：{error}"))),
         };
-        let attempt = self.attempts(id)?.last().cloned();
+        let attempt = match self.latest_attempt(id) {
+            Ok(attempt) => attempt,
+            Err(error) => return Err(self.tail_failure(id, index, &written, &format!("恢复历史读取失败：{error}"))),
+        };
         Ok(RestoreOutcome { inspection, attempt })
+    }
+
+    /// 写后尾部失败：把留证改回待核对并返回 `NeedsVerification`（Q91）。
+    fn tail_failure(&self, id: &str, index: usize, written: &[String], reason: &str) -> AppError {
+        let message = format!("恢复已写入工作区，但{reason}，结果待核对");
+        let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, written, Some(&message));
+        AppError::needs_verification(message)
     }
 
     /// 读取恢复尝试历史（按时间顺序，最新在末尾）。
@@ -904,13 +1027,29 @@ impl RecoveryStore {
                 return Err(AppError::rejected("二进制内容不提供文本对比"));
             }
         }
-        // 当前侧不可读时按「不存在」呈现，但只有真的读到「不存在」才这么算。
+        // 只有**确认不存在**才把当前侧当空侧；读不出来、类型不对、身份不可用都必须如实报错，
+        // 不能伪装成「删除」画出来（spec L101）。
         let current_bytes: Option<Vec<u8>> = match worktree {
-            Some(root) => match capture_files(root, std::slice::from_ref(&path.to_string())) {
-                Ok(captured) => captured.into_iter().next().and_then(|file| file.content),
-                Err(_) => None,
-            },
-            None => None,
+            Some(root) => {
+                let full = checked_path(root, path)?;
+                match fs::symlink_metadata(&full) {
+                    Ok(meta) if meta.is_file() => Some(fs::read(&full)?),
+                    Ok(_) => {
+                        return Err(AppError::rejected("当前路径不是普通文件，无法生成文本对比"))
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                    Err(error) => {
+                        return Err(AppError::environment(format!(
+                            "无法读取当前内容，不能生成对比：{error}"
+                        )))
+                    }
+                }
+            }
+            None => {
+                return Err(AppError::rejected(
+                    "当前 worktree 不可用，无法读取当前状态；保存版本仍可查看或另存",
+                ))
+            }
         };
         if let Some(bytes) = &current_bytes {
             if is_binary(bytes) {
@@ -960,6 +1099,7 @@ impl RecoveryStore {
             .ok_or_else(|| AppError::rejected("这条记录里该路径不存在内容，无法另存"))?;
         // 目标路径的每一级祖先都要通过安全检查；真实 gitDir/commonDir 由 Git 自己解析，
         // 不只认名为 `.git` 的目录（`--separate-git-dir`、linked worktree 的私有目录都要挡住）。
+        // 同时保护**目标所在仓库**的元数据：记录来自 A，但目标可能落在另一个登记仓库 B。
         let destination = &self.prepare_destination(destination, &record.identity)?;
 
         let mut options = OpenOptions::new();
@@ -1011,7 +1151,11 @@ impl RecoveryStore {
         }
         let resolved_parent = fs::canonicalize(parent)?;
         // 真实 gitDir / commonDir 可能叫任何名字（--separate-git-dir），必须按解析结果判断。
-        for protected in [&identity.git_dir, &identity.common_dir] {
+        let mut protected_roots: Vec<PathBuf> = vec![identity.git_dir.clone(), identity.common_dir.clone()];
+        // 目标侧：逐级解析祖先链上的 `.git`（目录或 gitdir 文件指针）与 commondir，
+        // 这样嵌套仓库、另一个登记仓库的元数据都被挡住，而不是只比源记录的身份。
+        protected_roots.extend(enclosing_git_roots(&resolved_parent));
+        for protected in &protected_roots {
             if let Ok(root) = fs::canonicalize(protected) {
                 if resolved_parent == root || resolved_parent.starts_with(&root) {
                     return Err(AppError::rejected("不能写入 Git 元数据目录"));
@@ -1056,6 +1200,13 @@ impl RecoveryStore {
             if self.remove_if_unused(&name, &entry.path())? {
                 removed += 1;
             }
+        }
+        // 上次删除留下的残留也在这一轮一起清；清不掉就报错，不能靠「本轮删了 0 条」把它藏起来。
+        let leftover = self.sweep_trash();
+        if leftover > 0 {
+            return Err(AppError::environment(format!(
+                "回收区还有 {leftover} 个未清理的残留目录，请稍后重试"
+            )));
         }
         Ok(removed)
     }
@@ -1126,6 +1277,12 @@ impl RecoveryStore {
             if self.remove_if_unused(&name, &entry.path())? {
                 removed += 1;
             }
+        }
+        let leftover = self.sweep_trash();
+        if leftover > 0 {
+            return Err(AppError::environment(format!(
+                "回收区还有 {leftover} 个未清理的残留目录，请稍后重试"
+            )));
         }
         Ok(removed)
     }

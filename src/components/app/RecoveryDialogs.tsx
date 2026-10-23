@@ -50,21 +50,28 @@ export function DiscardDialog({ path, worktree, section, valid, onConfirm, onClo
 /**
  * 回收区面板。
  *
- * 两个代际保证异步结果不串：
- * - `panelEpoch`：每次返回列表 / 换记录 / 刷新都会递增，旧响应直接丢弃；
- * - `requestEpoch`：同一记录内每次发起 diff/inspect/restore 递增，旧请求不得覆盖新结果。
- * 恢复确认绑定记录的 `version`（记录内容 + 丢弃回执 + 恢复历史），刷新后旧确认自动失效。
+ * 三条独立的状态线，互不牵连：
+ * - `panelEpoch`：每次返回列表 / 换记录 / 切 worktree / 卸载递增，旧响应一律丢弃；
+ * - `requestEpoch`：同一记录内每次 inspect/diff 递增，旧请求不得覆盖新结果；
+ * - `busy`：只表示**当前这次面板内请求**还在跑，由该请求自己结束时清掉，
+ *   返回列表不会留下永久 busy（写操作的门禁在 App，不在这里）。
+ * 确认同时绑定 worktree、activation、所见快照与记录 version，任一变化即失效。
  */
 export function RecoveryDialog({
   worktreeId,
   isWriting,
+  isWritingFor,
   snapshotRevision,
+  activation,
   onRestore,
+  onSaveAs,
   onClose,
 }: {
   worktreeId: string | null;
   isWriting: boolean;
+  isWritingFor: (worktreeId: string) => boolean;
   snapshotRevision: number;
+  activation: number;
   onRestore: (request: {
     worktreeId: string;
     recordId: string;
@@ -72,6 +79,12 @@ export function RecoveryDialog({
     expectedPaths: string[];
     expectedState: RecoveryState;
   }) => Promise<RestoreOutcome>;
+  onSaveAs: (request: {
+    worktreeId: string | null;
+    recordId: string;
+    path: string;
+    destination: string;
+  }) => Promise<number>;
   onClose: () => void;
 }) {
   const [records, setRecords] = useState<RecoverySummary[] | null>(null);
@@ -81,17 +94,39 @@ export function RecoveryDialog({
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<RecoveryInspection | null>(null);
   const [diff, setDiff] = useState<{ path: string; text: string | null; error: string | null } | null>(null);
-  const [confirming, setConfirming] = useState<{ version: string; snapshotRevision: number } | null>(null);
+  const [confirming, setConfirming] = useState<{
+    version: string;
+    snapshotRevision: number;
+    activation: number;
+    worktreeId: string | null;
+    recordId: string;
+  } | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [busy, setBusy] = useState(false);
   const panelEpoch = useRef(0);
   const requestEpoch = useRef(0);
+  const selectedRef = useRef<RecoveryInspection | null>(null);
+  selectedRef.current = selected;
+
+  /** 面板上下文变化（切 worktree / 关闭）：丢掉选择、对比与待确认。 */
+  const resetPanel = () => {
+    panelEpoch.current += 1;
+    requestEpoch.current += 1;
+    setSelected(null);
+    setDiff(null);
+    setConfirming(null);
+    setBusy(false);
+  };
 
   useEffect(() => {
     const epoch = ++panelEpoch.current;
     requestEpoch.current += 1;
     setRecords(null);
     setError(null);
+    setSelected(null);
+    setDiff(null);
+    setConfirming(null);
+    setBusy(false);
     void ipc.listRecovery(worktreeId)
       .then((result) => { if (epoch === panelEpoch.current) setRecords(result); })
       .catch((caught) => { if (epoch === panelEpoch.current) setError(getErrorMessage(caught)); });
@@ -99,14 +134,15 @@ export function RecoveryDialog({
       .then((result) => { if (epoch === panelEpoch.current) setMaintenance(result); })
       .catch(() => {});
     return () => { panelEpoch.current += 1; };
-  }, [reload, worktreeId]);
+  }, [reload, worktreeId, activation]);
 
-  // 主界面快照刷新后，用户看到的状态已变：旧确认一律失效（Q89）。
+  // 主界面快照刷新或激活变化后，用户看到的状态已变：旧确认一律失效（Q89）。
   useEffect(() => {
     setConfirming(null);
-  }, [snapshotRevision]);
+  }, [snapshotRevision, activation, worktreeId]);
 
   const backToList = () => {
+    // 只丢弃旧响应；busy 由发起的那个请求自己结束，不在这里遗留。
     panelEpoch.current += 1;
     requestEpoch.current += 1;
     setSelected(null);
@@ -121,14 +157,15 @@ export function RecoveryDialog({
   };
 
   const inspect = (id: string) => {
-    if (!worktreeId) return;
     const panel = ++panelEpoch.current;
     const request = ++requestEpoch.current;
     setBusy(true);
     setError(null);
     setDiff(null);
     setConfirming(null);
-    void ipc.inspectRecovery(worktreeId, id)
+    // 没有当前 worktree 也要能看保存侧：后端在 session 不可用时回退为「当前侧不可用」。
+    const target = worktreeId ?? "";
+    void ipc.inspectRecovery(target, id)
       .then((inspection) => {
         if (panel !== panelEpoch.current || request !== requestEpoch.current) return;
         if (inspection.id !== id) return;
@@ -146,7 +183,6 @@ export function RecoveryDialog({
     setDiff({ path, text: null, error: null });
     void ipc.recoveryTextDiff({ worktreeId, recordId, path })
       .then((text) => {
-        // 迟到的 R1 响应不能显示在已切到 R2 的面板里。
         if (panel !== panelEpoch.current || request !== requestEpoch.current) return;
         if (selectedRef.current?.id !== recordId) return;
         setDiff({ path, text, error: null });
@@ -157,9 +193,6 @@ export function RecoveryDialog({
         setDiff({ path, text: null, error: getErrorMessage(caught) });
       });
   };
-
-  const selectedRef = useRef<RecoveryInspection | null>(null);
-  selectedRef.current = selected;
 
   const restore = () => {
     if (!selected || !worktreeId || !confirming) return;
@@ -185,8 +218,8 @@ export function RecoveryDialog({
           : messages.recovery.restoreNeedsCheck);
       })
       .catch((caught) => {
-        const err = getErrorMessage(caught);
         if (panel !== panelEpoch.current) return;
+        const err = getErrorMessage(caught);
         setConfirming(null);
         setError(err);
         if (/待核对/.test(err)) setNotice(messages.recovery.restoreNeedsCheck);
@@ -198,34 +231,46 @@ export function RecoveryDialog({
     if (!selected) return;
     const picked = await saveDialog({ title: messages.recovery.saveAsPrompt });
     if (typeof picked !== "string") return;
+    const panel = panelEpoch.current;
+    const recordId = selected.id;
     setBusy(true);
     setError(null);
     try {
-      const bytes = await ipc.saveRecoveryAs({ worktreeId, recordId: selected.id, path, destination: picked });
+      // 结果与门禁都由 App 按实际归属处理；这里只负责当前面板的显示。
+      const bytes = await onSaveAs({
+        worktreeId,
+        recordId,
+        path,
+        destination: picked,
+      });
+      if (panel !== panelEpoch.current) return;
       setNotice(`${messages.recovery.saveAsDone}：${bytes} ${messages.recovery.bytes}`);
     } catch (caught) {
+      if (panel !== panelEpoch.current) return;
       setError(getErrorMessage(caught));
     } finally {
-      setBusy(false);
+      if (panel === panelEpoch.current) setBusy(false);
     }
   };
 
   const clear = () => {
+    const panel = panelEpoch.current;
     setBusy(true);
     setError(null);
     void ipc.clearRecovery()
-      .then((count) => { setConfirmingClear(false); setNotice(`${messages.recovery.cleared}：${count}`); refreshList(); })
-      .catch((caught) => { setConfirmingClear(false); setError(getErrorMessage(caught)); })
-      .finally(() => setBusy(false));
+      .then((count) => { if (panel !== panelEpoch.current) return; setConfirmingClear(false); setNotice(`${messages.recovery.cleared}：${count}`); refreshList(); })
+      .catch((caught) => { if (panel !== panelEpoch.current) return; setConfirmingClear(false); setError(getErrorMessage(caught)); })
+      .finally(() => { if (panel === panelEpoch.current) setBusy(false); });
   };
 
   const purge = () => {
+    const panel = panelEpoch.current;
     setBusy(true);
     setError(null);
     void ipc.purgeRecovery()
-      .then((count) => { setNotice(`${messages.recovery.purged}：${count}`); refreshList(); })
-      .catch((caught) => setError(getErrorMessage(caught)))
-      .finally(() => setBusy(false));
+      .then((count) => { if (panel !== panelEpoch.current) return; setNotice(`${messages.recovery.purged}：${count}`); refreshList(); })
+      .catch((caught) => { if (panel === panelEpoch.current) setError(getErrorMessage(caught)); })
+      .finally(() => { if (panel === panelEpoch.current) setBusy(false); });
   };
 
   const stateLabel = (state: RecoveryState) => ({
@@ -243,7 +288,7 @@ export function RecoveryDialog({
   })[attempt.state];
 
   return (
-    <Modal title={messages.recovery.title} onClose={onClose}>
+    <Modal title={messages.recovery.title} onClose={() => { resetPanel(); onClose(); }}>
       <p className="mb-3 text-xs text-muted-foreground">{messages.recovery.viewOnly}</p>
       {maintenance?.error ? (
         <p role="alert" className="mb-3 text-xs text-destructive">
@@ -288,7 +333,7 @@ export function RecoveryDialog({
                   <p className="text-muted-foreground">{messages.recovery.binaryInfo}</p>
                 ) : (
                   <div className="mt-1 space-y-1">
-                    <Button variant="ghost" size="sm" disabled={busy}
+                    <Button variant="ghost" size="sm" disabled={busy || !worktreeId}
                       onClick={() => showDiff(file.path)}>
                       {messages.recovery.diffTitle}
                     </Button>
@@ -328,8 +373,15 @@ export function RecoveryDialog({
             <Button variant="outline" size="sm" onClick={backToList}>{messages.recovery.back}</Button>
             <Button
               size="sm"
-              disabled={busy || isWriting || selected.state !== "ready"}
-              onClick={() => setConfirming({ version: selected.version, snapshotRevision })}
+              disabled={busy || isWriting || selected.state !== "ready" || !worktreeId
+                || isWritingFor(worktreeId)}
+              onClick={() => setConfirming({
+                version: selected.version,
+                snapshotRevision,
+                activation,
+                worktreeId,
+                recordId: selected.id,
+              })}
               title={messages.recovery.restoreFullFile}
             >
               {messages.recovery.restore}
@@ -375,7 +427,7 @@ export function RecoveryDialog({
             <Button variant="ghost" size="sm" disabled={busy} onClick={purge}>{messages.recovery.purge}</Button>
             <Button variant="outline" size="sm" disabled={busy} onClick={() => setConfirmingClear(true)}>{messages.recovery.clear}</Button>
             <Button variant="outline" size="sm" onClick={() => setReload((value) => value + 1)}>{messages.recovery.refresh}</Button>
-            <Button autoFocus size="sm" onClick={onClose}>{messages.recovery.close}</Button>
+            <Button autoFocus size="sm" onClick={() => { resetPanel(); onClose(); }}>{messages.recovery.close}</Button>
           </div>
           {confirmingClear ? (
             <div role="dialog" aria-label={messages.recovery.confirmClear} className="mt-2 rounded border border-destructive/40 p-3 text-xs">
