@@ -107,11 +107,11 @@
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-first/app.log",
-      "stored": "desktop-r1/run-first/app.log",
+      "stored": "desktop-r1/run-first/app.log.gz",
       "sourceBytes": 1896,
-      "storedBytes": 1896,
+      "storedBytes": 709,
       "sourceSHA256": "082b3e26669159a64c824dc4722b7795d23e1cacb69c351cc0139a844d1ffca8",
-      "storedSHA256": "082b3e26669159a64c824dc4722b7795d23e1cacb69c351cc0139a844d1ffca8"
+      "storedSHA256": "edb8cfe8b680ebf7fa039c0c7ecbca5efc898ec4ed406e7ae489d28b2e40d58b"
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-first/launch.json",
@@ -123,19 +123,19 @@
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-first/stdout.log",
-      "stored": "desktop-r1/run-first/stdout.log",
+      "stored": "desktop-r1/run-first/stdout.log.gz",
       "sourceBytes": 0,
-      "storedBytes": 0,
+      "storedBytes": 20,
       "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "storedSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "storedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-persistence/app.log",
-      "stored": "desktop-r1/run-persistence/app.log",
+      "stored": "desktop-r1/run-persistence/app.log.gz",
       "sourceBytes": 3841,
-      "storedBytes": 3841,
+      "storedBytes": 857,
       "sourceSHA256": "68f30e6864081326ddeaf9c8f8e62144130d068071d69b44ffa9efaf4edfb037",
-      "storedSHA256": "68f30e6864081326ddeaf9c8f8e62144130d068071d69b44ffa9efaf4edfb037"
+      "storedSHA256": "80f0bbe9d2aa4698eca219e3b3ba025e79e32b3f64f1b590e1042bd770774a0b"
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-persistence/launch.json",
@@ -147,11 +147,11 @@
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-persistence/stdout.log",
-      "stored": "desktop-r1/run-persistence/stdout.log",
+      "stored": "desktop-r1/run-persistence/stdout.log.gz",
       "sourceBytes": 106,
-      "storedBytes": 106,
+      "storedBytes": 125,
       "sourceSHA256": "ccfa63be510e30c925197be1d82de0ec41520bfe3e577f7fdf79080986196ad1",
-      "storedSHA256": "ccfa63be510e30c925197be1d82de0ec41520bfe3e577f7fdf79080986196ad1"
+      "storedSHA256": "5837a189b5dc7ad2f8aef5ad603e4f61d9fd669fddd4b537002db6d61f61b4a8"
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-second/app.log",
@@ -171,11 +171,11 @@
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-second/stdout.log",
-      "stored": "desktop-r1/run-second/stdout.log",
+      "stored": "desktop-r1/run-second/stdout.log.gz",
       "sourceBytes": 106,
-      "storedBytes": 106,
+      "storedBytes": 125,
       "sourceSHA256": "a7a2620780e02d44ae91d1aa9d45cee0115062c7c403c8378fcf21a10b19eaa4",
-      "storedSHA256": "a7a2620780e02d44ae91d1aa9d45cee0115062c7c403c8378fcf21a10b19eaa4"
+      "storedSHA256": "15b31509988a589a0f53a330e3f6b26ed7700e96a7fbd4ff9c27f747abd4a158"
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/split-middle-hunk.json",
@@ -259,11 +259,11 @@
     },
     {
       "source": "/private/tmp/revia-task04-build-36dad65.log",
-      "stored": "helpers/revia-task04-build-36dad65.log",
+      "stored": "helpers/revia-task04-build-36dad65.log.gz",
       "sourceBytes": 1349,
-      "storedBytes": 1349,
+      "storedBytes": 721,
       "sourceSHA256": "fe3eccb8684960428760b632929d704b8f15d9cc630435b0eea4c6b223212b2a",
-      "storedSHA256": "fe3eccb8684960428760b632929d704b8f15d9cc630435b0eea4c6b223212b2a"
+      "storedSHA256": "3b445a8b3c3ca25cef251a0c5f26db58617b0e4e65a78997e32c81a8931748ad"
     },
     {
       "source": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/initial-state.json",
