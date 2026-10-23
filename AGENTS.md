@@ -15,7 +15,7 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 
 M1 已合并进 main。下一个里程碑是 M2：先复现并验证长时间运行问题，发现故障先修复，未复现时按 Q78 留证验收（见 [长期运行验收](docs/product-direction.md#m2-长期运行验收)）；然后做暂存与取消暂存、丢弃与回收区、diff 指纹校验、审阅标记和文件监视，范围见 [产品方向](docs/product-direction.md#实施顺序)。
 
-M2 访谈已完成（Q78–Q97），接下来按 [M2 规格](docs/milestones/m2/spec.md)和[任务单](docs/milestones/m2/issues/)交接实施；只有依赖全部完成的任务才能开始，首先通过长期运行基线验收。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
+M2 访谈已完成（Q78–Q104，其中 Q99–Q104 为界面清理与美化），接下来按 [M2 规格](docs/milestones/m2/spec.md)和[任务单](docs/milestones/m2/issues/)交接实施；只有依赖全部完成的任务才能开始，首先通过长期运行基线验收。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
 ## 工作流程
 
