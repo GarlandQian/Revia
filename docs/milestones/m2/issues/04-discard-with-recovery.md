@@ -279,3 +279,18 @@
 - `cargo test --test refresh_isolation` 的 `t13_concurrent_refreshes_never_publish_stale_content` 在**未修改该文件**的 HEAD 版本上即间歇失败（观察：5 次运行中 2 次失败；两次完整套件运行中 1 次失败）。失败信息为「版本 N 的指纹不在预计算表中」。
 - 最小复现：`cargo test --manifest-path src-tauri/Cargo.toml --test refresh_isolation`。
 - 该用例属于任务 06 的刷新隔离，与本轮 rename gate / 整文件暂存改动没有代码路径交集；我在诊断中曾尝试把测试写入改为原子替换，仍会复现，故已**完整恢复该测试文件到 HEAD 原样**，没有通过忽略未知指纹、重试或放宽容差让它变绿，也没有改动 refresh 生产逻辑。失败原因未归因，交规划方判断。
+
+
+### 2026-10-23 / Codex 第四轮两轴增量复核：实现通过，文档结论需限定
+
+固定增量 `git diff a74e9d2...41be300`，受审 `41be300e845d66eb3a9fc734bfd247010c22edb8`。
+
+#### Standards
+
+无新增硬违规或值得单列的 Fowler 判断性建议。按 Git rename 元数据统一禁止 hunk，展示和后端共用 gate；整文件暂存只传当前路径，取消暂存仍带新旧路径，符合既有契约。独立真实 Git 核对：旧参数退出 128、新参数成功且无关文件未暂存、取消暂存不删除工作区文件。仅静态及独立临时 Git 命令，未跑项目套件、构建或桌面；证据源 `/private/tmp/revia-review04-rename-8mtcsayz/result.json`，最终验收一并归档。
+
+#### Spec
+
+实现无新增确定缺陷或范围扩张。新增回归覆盖 RM 两组/两视图无 hunk 凭据、后端拒绝且不落记录、普通 M 仍支持 hunk、整文件丢弃和 index 不变。仅静态审查与 diff 检查，未亲自重跑套件或桌面。
+
+**R04-R4-SP1 / P3 / 文档验证结论超出证据。** `report.md` 当前进度与上一条 Comments 称并发测试不稳为「既有、与本轮无关」「没有代码路径交集」，但 `refresh` 实际会经 `hunk_actions` 调用本轮修改的 `supports_hunk_actions`。测试文件没改不能证明旧生产版本同样失败；规格“记录实测结果”要求限定结论。请保留原始过程记录，以追加更正并修正 report 当前结论的方式，改为「当前提交上观察到间歇失败；根因及是否既有待独立对照」，不能仅凭直觉断言没有路径交集。规划方正在临时原样源码副本做修复前后各三次受控对照；第一次准备因缺 `dist` 未进入测试，已保留且不算测试失败。本条只要求文档限定，不扩修 refresh，不放宽断言，不重复全部检查。
