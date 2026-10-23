@@ -70,7 +70,7 @@ pub fn run() {
             state.acceptance = acceptance_dir.map(acceptance::Acceptance::new).transpose()?.map(std::sync::Arc::new);
 
             // 回收区到期自动清理：启动时一次，之后每小时一次（Q9、规格实现决策 4）。
-            // 失败不静默：写入测量日志，且手动「清理过期记录」仍可用。
+            // 失败不静默：状态持久化到回收区目录，普通模式下也能查询并显示（不依赖测量日志）。
             let recovery = state.recovery.clone();
             let startup_purge = commands::purge_expired_now(&recovery);
             match &startup_purge {
@@ -120,6 +120,7 @@ pub fn run() {
             commands::restore_recovery,
             commands::save_recovery_as,
             commands::recovery_text_diff,
+            commands::recovery_maintenance,
             commands::clear_recovery,
             commands::purge_recovery,
             commands::change_entry,

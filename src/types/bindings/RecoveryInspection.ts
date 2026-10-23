@@ -2,8 +2,13 @@
 import type { RecoveryFileView } from "./RecoveryFileView";
 import type { RecoverySource } from "./RecoverySource";
 import type { RecoveryState } from "./RecoveryState";
+import type { RestoreAttempt } from "./RestoreAttempt";
 
 /**
  * 恢复前的完整检查结果：界面据此决定是否允许直接恢复。
  */
-export type RecoveryInspection = { id: string, target: string, source: RecoverySource, createdAtMs: number, worktreePath: string, paths: Array<string>, state: RecoveryState, files: Array<RecoveryFileView>, };
+export type RecoveryInspection = { id: string, target: string, source: RecoverySource, createdAtMs: number, worktreePath: string, paths: Array<string>, state: RecoveryState, files: Array<RecoveryFileView>, 
+/**
+ * 最近一次恢复尝试（含历史中最新状态），供详情与重启后展示。
+ */
+restore: RestoreAttempt | null, version: string, };

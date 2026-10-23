@@ -18,7 +18,7 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
-use crate::recovery::{RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
+use crate::recovery::{self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 pub struct AppState {
@@ -438,6 +438,8 @@ pub struct RecoveryInspectRequest {
 pub struct RecoveryRestoreRequest {
     pub worktree_id: String,
     pub record_id: String,
+    /// 用户确认时看到的记录版本；记录/回执/恢复历史任何变化都会使确认失效。
+    pub expected_version: String,
     /// 用户确认时看到的记录相关路径与状态；不一致即拒绝。
     pub expected_paths: Vec<String>,
     pub expected_state: RecoveryState,
@@ -446,6 +448,9 @@ pub struct RecoveryRestoreRequest {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoverySaveAsRequest {
+    /// 当前界面选中的 worktree；仅用于诊断归属，实际写入归属按目标路径判断。
+    #[serde(default)]
+    pub worktree_id: Option<String>,
     pub record_id: String,
     /// 记录中的哪个路径（一条记录可能包含重命名的新旧两条）。
     pub path: String,
@@ -469,12 +474,16 @@ pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspe
 
 /// 恢复保存时的完整工作区状态（不改变暂存区）。
 #[tauri::command]
-pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryRestoreRequest) -> Result<RecoveryInspection> {
+pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryRestoreRequest) -> Result<recovery::RestoreOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let expected = RestoreExpectation { paths: request.expected_paths, state: request.expected_state };
+        let expected = RestoreExpectation {
+            version: request.expected_version,
+            paths: request.expected_paths,
+            state: request.expected_state,
+        };
         session.restore_record(&request.record_id, &expected, &store)
     })
     .await
@@ -483,14 +492,35 @@ pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryResto
 }
 
 /// 把保存版本另存到尚不存在的新路径。
+///
+/// 目标落在已登记 worktree 里时，写入归属**那个** worktree：取得它的非排队写锁，
+/// 并把结果交回它的结果通道；外部新路径不强行加锁，但仍逐级校验路径边界（Q90、T14）。
 #[tauri::command]
 pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveAsRequest) -> Result<u64> {
+    let destination = std::path::PathBuf::from(&request.destination);
+    let owner = {
+        let registry = state
+            .registry
+            .lock()
+            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        registry.worktree_containing(destination.parent().unwrap_or(&destination))
+    };
+    let session = match &owner {
+        Some(worktree_id) => Some(state.session(worktree_id)?),
+        None => None,
+    };
     let store = state.recovery.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        store.save_as(&request.record_id, &request.path, std::path::Path::new(&request.destination))
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = match &session {
+            Some(session) => Some(session.acquire_write_lock()?),
+            None => None,
+        };
+        store.save_as(&context.record_id, &context.path, &destination)
     })
     .await
-    .map_err(|error| AppError::internal(format!("另存回收内容失败：{error}")))?
+    .map_err(|error| AppError::needs_verification(format!("另存任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "save_recovery_as", owner.as_deref().unwrap_or(""), None, result).await
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -522,7 +552,13 @@ pub async fn clear_recovery(state: State<'_, AppState>) -> Result<u64> {
 
 /// 启动与周期自动清理：由 `lib.rs` 在 setup 与后台线程调用。
 pub fn purge_expired_now(store: &RecoveryStore) -> Result<u64> {
-    store.purge_expired()
+    store.auto_purge()
+}
+
+/// 读取自动清理状态：普通模式下界面据此显示持久失败提示（Q9）。
+#[tauri::command]
+pub async fn recovery_maintenance(state: State<'_, AppState>) -> Result<recovery::RecoveryMaintenance> {
+    Ok(state.recovery.maintenance())
 }
 
 /// 删除超过保留期的记录（启动时与手动清理共用）。

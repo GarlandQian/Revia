@@ -7,6 +7,9 @@ import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
+import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
+import type { RestoreAttempt } from "@/types/bindings/RestoreAttempt";
+import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -44,104 +47,161 @@ export function DiscardDialog({ path, worktree, section, valid, onConfirm, onClo
   );
 }
 
+/**
+ * 回收区面板。
+ *
+ * 两个代际保证异步结果不串：
+ * - `panelEpoch`：每次返回列表 / 换记录 / 刷新都会递增，旧响应直接丢弃；
+ * - `requestEpoch`：同一记录内每次发起 diff/inspect/restore 递增，旧请求不得覆盖新结果。
+ * 恢复确认绑定记录的 `version`（记录内容 + 丢弃回执 + 恢复历史），刷新后旧确认自动失效。
+ */
 export function RecoveryDialog({
   worktreeId,
   isWriting,
+  snapshotRevision,
   onRestore,
   onClose,
 }: {
   worktreeId: string | null;
   isWriting: boolean;
+  snapshotRevision: number;
   onRestore: (request: {
     worktreeId: string;
     recordId: string;
+    expectedVersion: string;
     expectedPaths: string[];
     expectedState: RecoveryState;
-  }) => Promise<RecoveryInspection>;
+  }) => Promise<RestoreOutcome>;
   onClose: () => void;
 }) {
   const [records, setRecords] = useState<RecoverySummary[] | null>(null);
+  const [maintenance, setMaintenance] = useState<RecoveryMaintenance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<RecoveryInspection | null>(null);
   const [diff, setDiff] = useState<{ path: string; text: string | null; error: string | null } | null>(null);
-  const [confirmingRestore, setConfirmingRestore] = useState(false);
+  const [confirming, setConfirming] = useState<{ version: string; snapshotRevision: number } | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [busy, setBusy] = useState(false);
+  const panelEpoch = useRef(0);
+  const requestEpoch = useRef(0);
 
   useEffect(() => {
-    let active = true;
+    const epoch = ++panelEpoch.current;
+    requestEpoch.current += 1;
     setRecords(null);
     setError(null);
-    void ipc.listRecovery(worktreeId).then((result) => { if (active) setRecords(result); })
-      .catch((caught) => { if (active) setError(getErrorMessage(caught)); });
-    return () => { active = false; };
+    void ipc.listRecovery(worktreeId)
+      .then((result) => { if (epoch === panelEpoch.current) setRecords(result); })
+      .catch((caught) => { if (epoch === panelEpoch.current) setError(getErrorMessage(caught)); });
+    void ipc.recoveryMaintenance()
+      .then((result) => { if (epoch === panelEpoch.current) setMaintenance(result); })
+      .catch(() => {});
+    return () => { panelEpoch.current += 1; };
   }, [reload, worktreeId]);
 
-  const refreshList = () => { setSelected(null); setDiff(null); setConfirmingRestore(false); setReload((value) => value + 1); };
+  // 主界面快照刷新后，用户看到的状态已变：旧确认一律失效（Q89）。
+  useEffect(() => {
+    setConfirming(null);
+  }, [snapshotRevision]);
 
-  // 任何会让旧确认失效的动作都清掉待确认状态（Q89）。
   const backToList = () => {
+    panelEpoch.current += 1;
+    requestEpoch.current += 1;
     setSelected(null);
     setDiff(null);
-    setConfirmingRestore(false);
+    setConfirming(null);
+  };
+
+  const refreshList = () => {
+    backToList();
     setNotice(null);
+    setReload((value) => value + 1);
   };
 
   const inspect = (id: string) => {
     if (!worktreeId) return;
+    const panel = ++panelEpoch.current;
+    const request = ++requestEpoch.current;
     setBusy(true);
     setError(null);
     setDiff(null);
-    setConfirmingRestore(false);
+    setConfirming(null);
     void ipc.inspectRecovery(worktreeId, id)
-      .then((inspection) => setSelected(inspection))
-      .catch((caught) => setError(getErrorMessage(caught)))
-      .finally(() => setBusy(false));
+      .then((inspection) => {
+        if (panel !== panelEpoch.current || request !== requestEpoch.current) return;
+        if (inspection.id !== id) return;
+        setSelected(inspection);
+      })
+      .catch((caught) => { if (panel === panelEpoch.current && request === requestEpoch.current) setError(getErrorMessage(caught)); })
+      .finally(() => { if (panel === panelEpoch.current && request === requestEpoch.current) setBusy(false); });
   };
 
   const showDiff = (path: string) => {
     if (!selected || !worktreeId) return;
+    const panel = panelEpoch.current;
+    const recordId = selected.id;
+    const request = ++requestEpoch.current;
     setDiff({ path, text: null, error: null });
-    void ipc.recoveryTextDiff({ worktreeId, recordId: selected.id, path })
-      .then((text) => setDiff({ path, text, error: null }))
-      .catch((caught) => setDiff({ path, text: null, error: getErrorMessage(caught) }));
+    void ipc.recoveryTextDiff({ worktreeId, recordId, path })
+      .then((text) => {
+        // 迟到的 R1 响应不能显示在已切到 R2 的面板里。
+        if (panel !== panelEpoch.current || request !== requestEpoch.current) return;
+        if (selectedRef.current?.id !== recordId) return;
+        setDiff({ path, text, error: null });
+      })
+      .catch((caught) => {
+        if (panel !== panelEpoch.current || request !== requestEpoch.current) return;
+        if (selectedRef.current?.id !== recordId) return;
+        setDiff({ path, text: null, error: getErrorMessage(caught) });
+      });
   };
 
+  const selectedRef = useRef<RecoveryInspection | null>(null);
+  selectedRef.current = selected;
+
   const restore = () => {
-    if (!selected || !worktreeId) return;
+    if (!selected || !worktreeId || !confirming) return;
+    const panel = panelEpoch.current;
+    const request = ++requestEpoch.current;
+    const recordId = selected.id;
     setBusy(true);
     setError(null);
     void onRestore({
       worktreeId,
-      recordId: selected.id,
+      recordId,
+      expectedVersion: confirming.version,
       expectedPaths: selected.paths,
       expectedState: selected.state,
     })
-      .then((inspection) => {
-        setConfirmingRestore(false);
-        setSelected(inspection);
-        setNotice(messages.recovery.restoreDone);
+      .then((outcome) => {
+        if (panel !== panelEpoch.current) return;
+        if (outcome.inspection.id !== recordId) return;
+        setConfirming(null);
+        setSelected(outcome.inspection);
+        setNotice(outcome.attempt?.state === "completed"
+          ? messages.recovery.restoreDone
+          : messages.recovery.restoreNeedsCheck);
       })
       .catch((caught) => {
-        setConfirmingRestore(false);
         const err = getErrorMessage(caught);
+        if (panel !== panelEpoch.current) return;
+        setConfirming(null);
         setError(err);
         if (/待核对/.test(err)) setNotice(messages.recovery.restoreNeedsCheck);
       })
-      .finally(() => setBusy(false));
+      .finally(() => { if (panel === panelEpoch.current && request === requestEpoch.current) setBusy(false); });
   };
 
   const saveAs = async (path: string) => {
     if (!selected) return;
-    // 保存对话框允许输入尚不存在的新文件名；后端仍用 create_new 拒绝已存在目标。
     const picked = await saveDialog({ title: messages.recovery.saveAsPrompt });
     if (typeof picked !== "string") return;
     setBusy(true);
     setError(null);
     try {
-      const bytes = await ipc.saveRecoveryAs({ recordId: selected.id, path, destination: picked });
+      const bytes = await ipc.saveRecoveryAs({ worktreeId, recordId: selected.id, path, destination: picked });
       setNotice(`${messages.recovery.saveAsDone}：${bytes} ${messages.recovery.bytes}`);
     } catch (caught) {
       setError(getErrorMessage(caught));
@@ -175,9 +235,21 @@ export function RecoveryDialog({
     identityMismatch: messages.recovery.stateIdentityMismatch,
   })[state];
 
+  const attemptLabel = (attempt: RestoreAttempt) => ({
+    pending: messages.recovery.attemptPending,
+    completed: messages.recovery.attemptCompleted,
+    needsVerification: messages.recovery.attemptNeedsCheck,
+    rejected: messages.recovery.attemptRejected,
+  })[attempt.state];
+
   return (
     <Modal title={messages.recovery.title} onClose={onClose}>
       <p className="mb-3 text-xs text-muted-foreground">{messages.recovery.viewOnly}</p>
+      {maintenance?.error ? (
+        <p role="alert" className="mb-3 text-xs text-destructive">
+          {`${messages.recovery.maintenanceFailed}：${maintenance.error}`}
+        </p>
+      ) : null}
       {error ? <p role="alert" className="mb-3 text-xs text-destructive">{error}</p> : null}
       {notice ? <p role="status" className="mb-3 text-xs text-muted-foreground">{notice}</p> : null}
       {selected ? (
@@ -188,6 +260,12 @@ export function RecoveryDialog({
           <p>{selected.source === "discardHunk" ? messages.recovery.sourceHunk : messages.recovery.sourceFile}</p>
           <p className="text-muted-foreground">{messages.recovery.restoreFullFile}</p>
           <p role="status">{stateLabel(selected.state)}</p>
+          {selected.restore ? (
+            <p role="status" className={selected.restore.state === "needsVerification" ? "text-destructive" : "text-muted-foreground"}>
+              {`${messages.recovery.attemptLabel}：${attemptLabel(selected.restore)} · ${new Date(selected.restore.atMs).toLocaleString()}`}
+              {selected.restore.message ? ` · ${selected.restore.message}` : ""}
+            </p>
+          ) : null}
           <div className="max-h-[40vh] space-y-2 overflow-y-auto">
             {selected.files.map((file) => (
               <section key={file.path} className="rounded border p-2">
@@ -210,7 +288,7 @@ export function RecoveryDialog({
                   <p className="text-muted-foreground">{messages.recovery.binaryInfo}</p>
                 ) : (
                   <div className="mt-1 space-y-1">
-                    <Button variant="ghost" size="sm" disabled={busy || !file.current || file.currentUnavailable}
+                    <Button variant="ghost" size="sm" disabled={busy}
                       onClick={() => showDiff(file.path)}>
                       {messages.recovery.diffTitle}
                     </Button>
@@ -251,17 +329,17 @@ export function RecoveryDialog({
             <Button
               size="sm"
               disabled={busy || isWriting || selected.state !== "ready"}
-              onClick={() => setConfirmingRestore(true)}
+              onClick={() => setConfirming({ version: selected.version, snapshotRevision })}
               title={messages.recovery.restoreFullFile}
             >
               {messages.recovery.restore}
             </Button>
           </div>
-          {confirmingRestore ? (
+          {confirming ? (
             <div role="dialog" aria-label={messages.recovery.confirmRestore} className="rounded border border-destructive/40 p-3">
               <p>{messages.recovery.confirmRestore}</p>
               <div className="mt-2 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setConfirmingRestore(false)}>{messages.recovery.cancel}</Button>
+                <Button variant="outline" size="sm" onClick={() => setConfirming(null)}>{messages.recovery.cancel}</Button>
                 <Button variant="destructive" size="sm" disabled={busy || isWriting} onClick={restore}>{messages.recovery.confirm}</Button>
               </div>
             </div>
@@ -278,10 +356,15 @@ export function RecoveryDialog({
                 <p>{new Date(record.createdAtMs).toLocaleString()} · {record.bytes} {messages.recovery.bytes}</p>
                 <p>{record.source === "discardHunk" ? messages.recovery.sourceHunk : messages.recovery.sourceFile}</p>
                 <p>{messages.recovery[record.status]}</p>
+                {record.restore ? (
+                  <p className={record.restore.state === "needsVerification" ? "text-destructive" : "text-muted-foreground"}>
+                    {`${messages.recovery.attemptLabel}：${attemptLabel(record.restore)} · ${new Date(record.restore.atMs).toLocaleString()}`}
+                  </p>
+                ) : null}
                 <p className="break-all text-muted-foreground">{record.worktreePath}</p>
                 <p className="break-all font-mono text-muted-foreground">{record.paths.join(" · ")}</p>
                 {!record.identityConfirmed ? <p className="text-muted-foreground">{messages.recovery.otherWorktree}</p> : null}
-                <Button variant="outline" size="sm" disabled={busy || !worktreeId} onClick={() => inspect(record.id)}>
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => inspect(record.id)}>
                   {messages.recovery.details}
                 </Button>
               </article>

@@ -12,6 +12,8 @@ import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
+import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
+import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
 import type { RowSlice } from "@/types/bindings/RowSlice";
@@ -168,13 +170,16 @@ export const ipc = {
   restoreRecovery: (request: {
     worktreeId: string;
     recordId: string;
+    /** 用户确认时看到的记录版本；记录/回执/恢复历史任何变化都会使确认失效。 */
+    expectedVersion: string;
     expectedPaths: string[];
     expectedState: RecoveryState;
-  }) => invoke<RecoveryInspection>("restore_recovery", { request }),
+  }) => invoke<RestoreOutcome>("restore_recovery", { request }),
   recoveryTextDiff: (request: { worktreeId: string; recordId: string; path: string }) =>
     invoke<string>("recovery_text_diff", { request }),
-  saveRecoveryAs: (request: { recordId: string; path: string; destination: string }) =>
+  saveRecoveryAs: (request: { worktreeId: string | null; recordId: string; path: string; destination: string }) =>
     invoke<number>("save_recovery_as", { request }),
+  recoveryMaintenance: () => invoke<RecoveryMaintenance>("recovery_maintenance"),
   clearRecovery: () => invoke<number>("clear_recovery"),
   purgeRecovery: () => invoke<number>("purge_recovery"),
 };

@@ -139,6 +139,10 @@ pub struct RecoverySummary {
     pub bytes: u64,
     pub status: RecoveryStatus,
     pub identity_confirmed: bool,
+    /// 最近一次恢复尝试（没有则为 None）。重启后仍从这里如实展示，不用丢弃回执冒充。
+    pub restore: Option<RestoreAttempt>,
+    /// 记录当前内容版本；确认恢复时绑定它，任何记录/回执/尝试变化都会使旧确认失效。
+    pub version: String,
 }
 
 
@@ -196,6 +200,9 @@ pub struct RecoveryInspection {
     pub paths: Vec<String>,
     pub state: RecoveryState,
     pub files: Vec<RecoveryFileView>,
+    /// 最近一次恢复尝试（含历史中最新状态），供详情与重启后展示。
+    pub restore: Option<RestoreAttempt>,
+    pub version: String,
 }
 
 fn file_state(file: &SavedFile) -> RecoveryFileState {
@@ -253,55 +260,131 @@ fn exclusive_temp_file(target: &Path) -> Result<(TempFile, File)> {
     Err(AppError::environment("无法创建恢复用临时文件"))
 }
 
-/// 恢复的单个路径：写入后立即返回本次创建/删除的路径，供阶段留证。
-fn restore_one(worktree: &Path, file: &SavedFile) -> Result<()> {
-    let full = checked_path(worktree, &file.path)?;
-    match &file.content {
-        Some(bytes) => {
-            if let Some(parent) = full.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            let (temp, mut handle) = exclusive_temp_file(&full)?;
-            handle.write_all(bytes)?;
-            handle.sync_all()?;
-            drop(handle);
-            platform::set_executable(&temp.path, file.executable)?;
-            // rename 成功时 temp 已不存在，Drop 中的清理是无害的空操作。
-            fs::rename(&temp.path, &full)?;
-            Ok(())
-        }
-        None => {
-            match fs::symlink_metadata(&full) {
-                // 保存时该路径不存在，恢复就是让它重新不存在。
-                Ok(meta) if meta.is_file() => fs::remove_file(&full)?,
+/// 准备阶段的产物：临时文件已经写好并 fsync，但**尚未发布**到工作区。
+struct PreparedFile {
+    path: String,
+    full: PathBuf,
+    /// Some：用临时文件原子替换；None：该路径原本不存在，发布就是删除。
+    temp: Option<(TempFile, File)>,
+    executable: bool,
+    remove: bool,
+}
+
+impl PreparedFile {
+    /// 发布：一次 rename（或删除）。失败时 TempFile 的 Drop 只清理本次创建的文件。
+    fn publish(&mut self) -> Result<()> {
+        if self.remove {
+            match fs::symlink_metadata(&self.full) {
+                Ok(meta) if meta.is_file() => fs::remove_file(&self.full)?,
                 Ok(_) => return Err(AppError::rejected("目标路径不是普通文件，不能恢复")),
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => return Err(error.into()),
             }
-            Ok(())
+            return Ok(());
         }
+        let (temp, handle) = self
+            .temp
+            .take()
+            .ok_or_else(|| AppError::internal("恢复准备内容已失效"))?;
+        drop(handle);
+        platform::set_executable(&temp.path, self.executable)?;
+        fs::rename(&temp.path, &self.full)?;
+        Ok(())
     }
 }
 
-/// 把保存的工作区状态写回。调用方必须先完成身份与「无后续变化」校验。
+/// 准备：为每个路径创建并写好临时文件，**不触碰工作区**。
 ///
-/// 多路径按顺序写入；中途失败时已写入的路径保持新内容、其余保持原样，
-/// 由调用方标为「结果待核对」，**不声称事务原子**。
-fn restore_files(worktree: &Path, before: &[SavedFile], mut hook: impl FnMut(RestorePhase) -> Result<()>) -> Result<Vec<String>> {
-    hook(RestorePhase::BeforeWrite)?;
-    let mut written = Vec::with_capacity(before.len());
+/// 准备失败时工作区一个字节都没有改动，因此可以如实标为「未写入」。
+fn prepare_files(worktree: &Path, before: &[SavedFile]) -> Result<Vec<PreparedFile>> {
+    let mut prepared = Vec::with_capacity(before.len());
     for file in before {
-        restore_one(worktree, file)?;
-        written.push(file.path.clone());
+        let full = checked_path(worktree, &file.path)?;
+        match &file.content {
+            Some(bytes) => {
+                if let Some(parent) = full.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                let (temp, mut handle) = exclusive_temp_file(&full)?;
+                handle.write_all(bytes)?;
+                handle.sync_all()?;
+                prepared.push(PreparedFile {
+                    path: file.path.clone(),
+                    full,
+                    temp: Some((temp, handle)),
+                    executable: file.executable,
+                    remove: false,
+                });
+            }
+            None => prepared.push(PreparedFile {
+                path: file.path.clone(),
+                full,
+                temp: None,
+                executable: false,
+                remove: true,
+            }),
+        }
     }
-    hook(RestorePhase::AfterWrite)?;
-    Ok(written)
+    Ok(prepared)
+}
+
+/// 发布前校验：用**刚刚重新捕获**的真实状态判断这次发布是否仍然安全。
+///
+/// - 身份必须与记录一致（不拿传入的旧 identity 充数）；
+/// - 目标路径不得处于未解决冲突（Q82）；
+/// - 尚未发布的路径必须仍等于丢弃完成后的状态（有后续变化就不覆盖，Q29）；
+/// - 已经发布的路径必须等于这次恢复写入的内容（多路径时不因前面的写入误判为「外部变化」）。
+fn verify_publish(
+    pre: &RestorePreconditions,
+    record: &RecoveryRecord,
+    after: &[SavedFile],
+    written: &[String],
+    next: &str,
+) -> Result<()> {
+    if !record.identity.confirmed_match(&pre.identity) {
+        return Err(AppError::rejected("原 worktree 身份无法确认，不能直接恢复到新目录"));
+    }
+    if pre.conflicts.iter().any(|path| path == next) {
+        return Err(AppError::rejected("文件存在未解决的冲突，不能从回收区恢复"));
+    }
+    for saved in &record.before {
+        let observed = pre.files.iter().find(|file| file.path == saved.path);
+        let observed = observed.ok_or_else(|| AppError::rejected("无法读取目标文件的真实状态"))?;
+        if saved.path == next {
+            let baseline = after.iter().find(|file| file.path == saved.path);
+            if baseline != Some(observed) {
+                return Err(AppError::rejected("文件在丢弃之后又有修改，不能覆盖"));
+            }
+        } else if written.iter().any(|path| path == &saved.path) {
+            if observed != saved {
+                return Err(AppError::rejected("恢复期间文件被外部改动，请重新确认"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// 回收区维护状态：自动清理失败必须能被普通模式查询到，不能只写测量日志（Q9）。
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecoveryMaintenance {
+    /// 最近一次自动清理的时间；从未执行过为 None。
+    pub last_purge_at_ms: Option<u64>,
+    /// 最近一次自动清理删除的记录数。
+    pub last_purge_removed: u64,
+    /// 最近一次自动清理的失败原因；成功时清空。
+    pub error: Option<String>,
 }
 
 #[derive(Clone)]
 pub struct RecoveryStore {
     directory: PathBuf,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
+    /// 自动清理的可查询状态（持久化到回收区目录，重启后仍能看到失败）。
+    maintenance: Arc<Mutex<RecoveryMaintenance>>,
+    /// 上次持久化失败：保留内存状态并在下次读取时重试，避免只读窗口里彻底丢掉提示。
+    maintenance_dirty: Arc<Mutex<bool>>,
     /// 在途记录 ID → 持有者数量。清理与删除在**同一把锁内**完成检查与删除，
     /// 因此不存在「检查完释放锁再删」的 TOCTOU 窗口（Q91）。
     in_use: Arc<Mutex<HashMap<String, usize>>>,
@@ -333,7 +416,15 @@ impl RecoveryStore {
     }
 
     pub fn with_clock(data_directory: PathBuf, clock: Arc<dyn Fn() -> u64 + Send + Sync>) -> Self {
-        Self { directory: data_directory.join("recovery"), clock, in_use: Arc::new(Mutex::new(HashMap::new())) }
+        let directory = data_directory.join("recovery");
+        let maintenance = read_maintenance(&directory);
+        Self {
+            directory,
+            clock,
+            in_use: Arc::new(Mutex::new(HashMap::new())),
+            maintenance: Arc::new(Mutex::new(maintenance)),
+            maintenance_dirty: Arc::new(Mutex::new(false)),
+        }
     }
 
     /// 标记某条记录正在被使用（保存 / 恢复 / 另存），清理会跳过它。
@@ -342,11 +433,6 @@ impl RecoveryStore {
             *guard.entry(id.to_string()).or_insert(0) += 1;
         }
         RecordUse { id: id.to_string(), in_use: self.in_use.clone() }
-    }
-
-    /// 登记占用（用于尚未发布、只知道目录名的保存中记录）。
-    fn use_directory(&self, directory_name: &str) -> RecordUse {
-        self.use_record(directory_name)
     }
 
     fn allocate(&self, prefix: &str) -> Result<PathBuf> {
@@ -408,8 +494,31 @@ impl RecoveryStore {
         if guard.get(id).copied().unwrap_or(0) > 0 {
             return Ok(false);
         }
-        fs::remove_dir_all(path)?;
+        // 先原子改名再删除：目录不可写时改名会失败，此时记录内容一个字节都没动。
+        // 直接 `remove_dir_all` 会先删内容再删目录，失败后只剩一个读不出来的空壳。
+        let name = path
+            .file_name()
+            .map(|value| value.to_string_lossy().into_owned())
+            .ok_or_else(|| AppError::internal("回收记录路径无效"))?;
+        let trashed = path.with_file_name(format!(
+            "trash-{}-{}-{name}",
+            (self.clock)(),
+            NEXT_RECORD.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::rename(path, &trashed)?;
+        fs::remove_dir_all(&trashed)?;
         Ok(true)
+    }
+
+    /// 清理上次删除留下的临时目录（改名成功但删除中断时）。
+    fn sweep_trash(&self) {
+        let Ok(entries) = fs::read_dir(&self.directory) else { return };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("trash-") {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
     }
 
     pub fn finish(&self, record: &RecoveryRecord, outcome: &DiscardOutcome) -> Result<()> {
@@ -453,6 +562,8 @@ impl RecoveryStore {
                 Ok(value) => value,
                 Err(error) => return Err(AppError::environment(format!("回收记录 {name} 无法读取：{error}"))),
             };
+            let restore = self.latest_attempt(&record.id).ok().flatten();
+            let version = self.version_of(&record, outcome.as_ref()).unwrap_or_default();
             records.push(RecoverySummary {
                 id: record.id, created_at_ms: record.created_at_ms, source: record.source, target: record.target,
                 worktree_path: record.identity.worktree_path.display().to_string(),
@@ -460,6 +571,8 @@ impl RecoveryStore {
                 bytes: record.before.iter().filter_map(|file| file.content.as_ref()).map(|bytes| bytes.len() as u64).sum(),
                 status: match outcome { Some(DiscardOutcome::Completed { .. }) => RecoveryStatus::Completed, Some(DiscardOutcome::NotApplied) => RecoveryStatus::NotApplied, None => RecoveryStatus::NeedsVerification },
                 identity_confirmed: current.is_some_and(|current| record.identity.confirmed_match(current)),
+                restore,
+                version,
             });
         }
         records.sort_by(|a, b| b.created_at_ms.cmp(&a.created_at_ms).then_with(|| b.id.cmp(&a.id)));
@@ -531,98 +644,222 @@ impl RecoveryStore {
             paths: record.before.iter().map(|file| file.path.clone()).collect(),
             state,
             files,
+            restore: self.latest_attempt(&record.id).ok().flatten(),
+            version: self.version_of(&record, outcome.as_ref()).unwrap_or_default(),
         })
     }
 
     /// 把保存的完整工作区状态写回。只写工作区，不碰暂存区、不重放反向补丁。
     ///
-    /// `expected` 来自用户确认时看到的那一次检查（含记录、相关路径、状态与所见版本）；
-    /// 期间记录内容、身份或当前状态变化都会使这次恢复失效（Q89、Q91）。
-    pub fn restore(
-        &self,
-        id: &str,
-        identity: &WorktreeIdentity,
-        worktree: &Path,
-        expected: &RestoreExpectation,
-    ) -> Result<RecoveryInspection> {
-        self.restore_with_hook(id, identity, worktree, expected, |_| Ok(()))
-    }
-
-    /// 带受控阶段接缝的恢复；正常调用传入空钩子。
+    /// 流程固定为「准备临时内容 → 受控阶段 → 重新捕获真实身份/全部相关状态/冲突 → 发布」：
+    /// `capture` 在**每个路径发布前**重新读取真实状态，多路径时还要满足前面已写路径的预期状态。
     pub fn restore_with_hook(
         &self,
         id: &str,
-        identity: &WorktreeIdentity,
         worktree: &Path,
         expected: &RestoreExpectation,
+        mut capture: impl FnMut(&[String]) -> Result<RestorePreconditions>,
         mut hook: impl FnMut(RestorePhase) -> Result<()>,
-    ) -> Result<RecoveryInspection> {
+    ) -> Result<RestoreOutcome> {
         let _in_use = self.use_record(id);
-        let inspection = self.inspect(id, Some(identity), Some(worktree))?;
-        if inspection.paths != expected.paths {
-            return Err(AppError::rejected("回收记录的相关路径已变化，请重新确认"));
+        let (record, outcome) = self.read(id)?;
+        let version_now = self.version_of(&record, outcome.as_ref())?;
+        // 确认必须绑定用户看到的那一版记录；刷新后旧确认一律失效（Q89）。
+        if expected.version != version_now {
+            return Err(AppError::rejected("回收记录已变化，请重新确认"));
         }
-        if inspection.state != expected.state {
-            return Err(AppError::rejected("回收记录状态已变化，请重新确认"));
-        }
-        match inspection.state {
-            RecoveryState::Ready => {}
-            RecoveryState::IdentityMismatch => {
-                return Err(AppError::rejected("原 worktree 身份无法确认，不能直接恢复到新目录"))
-            }
-            RecoveryState::NoBaseline => {
-                return Err(AppError::rejected("这条记录没有可信的丢弃完成状态，结果待核对，不能直接恢复"))
-            }
-            RecoveryState::LaterChanges => {
-                return Err(AppError::rejected("文件在丢弃之后又有修改，不能覆盖；请改用只读对比或另存"))
-            }
-        }
-
-        // 恢复自身的结果留证：先落一份 pending，写入开始前就存在。
-        let journal = self.begin_restore_journal(id)?;
-        let (record, _) = self.read(id)?;
-        // 写入前最后一次核对真实身份与相关字节（防止检查与写入之间被外部改动）。
-        let refreshed = self.inspect(id, Some(identity), Some(worktree))?;
-        if refreshed.state != RecoveryState::Ready || refreshed.paths != expected.paths {
-            let _ = self.write_restore_journal(&journal, RestoreJournalState::Rejected, &[]);
-            return Err(AppError::rejected("恢复前复核失败，文件或身份已变化，请重新确认"));
-        }
-
-        let written = match restore_files(worktree, &record.before, &mut hook) {
-            Ok(written) => written,
-            Err(error) => {
-                // 可能已经写入了一部分：保留记录并标为待核对，不自动续跑。
-                let _ = self.write_restore_journal(&journal, RestoreJournalState::NeedsVerification, &[]);
-                return Err(AppError::needs_verification(format!(
-                    "恢复过程中断，可能已写入部分路径，结果待核对；请重新读取真实状态：{error}"
-                )));
+        let after = match &outcome {
+            Some(DiscardOutcome::Completed { after }) => after.clone(),
+            _ => {
+                return Err(AppError::rejected(
+                    "这条记录没有可信的丢弃完成状态，结果待核对，不能直接恢复",
+                ))
             }
         };
-        hook(RestorePhase::BeforeComplete)?;
-        self.write_restore_journal(&journal, RestoreJournalState::Completed, &written)?;
-        // 返回恢复后的真实状态，供界面确认。
-        self.inspect(id, Some(identity), Some(worktree))
-    }
 
-    fn begin_restore_journal(&self, id: &str) -> Result<PathBuf> {
-        let directory = self.record_directory(id)?;
-        let path = directory.join("restore.pending");
-        let journal = RestoreJournal {
-            state: RestoreJournalState::Pending,
-            written: Vec::new(),
+        // 写入前就留下这次尝试：之后任何阶段中断都能据此核对（Q91）。
+        let attempt_version = version_now.clone();
+        let index = self.append_attempt(id, RestoreAttempt {
             at_ms: (self.clock)(),
+            state: RestoreAttemptState::Pending,
+            written: Vec::new(),
+            version: attempt_version,
+            message: None,
+        })?;
+
+        let paths: Vec<String> = record.before.iter().map(|file| file.path.clone()).collect();
+        let prepared = prepare_files(worktree, &record.before);
+        let mut prepared = match prepared {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                let message = format!("恢复准备失败，未写入任何路径：{error}");
+                let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &[], Some(&message));
+                return Err(AppError::needs_verification(message));
+            }
         };
-        write_new(&path, &journal)?;
-        platform::sync_directory(&directory)?;
-        Ok(path)
+
+        if let Err(error) = hook(RestorePhase::BeforeWrite) {
+            let message = format!("恢复在写入前中断，未写入任何路径：{error}");
+            let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &[], Some(&message));
+            return Err(AppError::needs_verification(message));
+        }
+
+        let mut written: Vec<String> = Vec::with_capacity(prepared.len());
+        for file in prepared.iter_mut() {
+            // 发布前重新捕获真实状态：准备期间的外部编辑、身份改变、unmerged 都在这里拦下。
+            let preconditions = match capture(&paths) {
+                Ok(value) => value,
+                Err(error) => {
+                    let message = format!("恢复前无法读取真实状态，未写入该路径：{error}");
+                    let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
+                    return Err(AppError::needs_verification(message));
+                }
+            };
+            if let Err(error) = verify_publish(&preconditions, &record, &after, &written, &file.path) {
+                let message = format!("{error}（恢复未写入任何路径）");
+                let _ = self.finish_attempt(id, index, RestoreAttemptState::Rejected, &written, Some(&message));
+                return Err(error);
+            }
+            if let Err(error) = file.publish() {
+                let message = format!("恢复写入失败，可能已写入部分路径，结果待核对：{error}");
+                let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
+                return Err(AppError::needs_verification(message));
+            }
+            written.push(file.path.clone());
+        }
+
+        // 从这里开始工作区已经写过：任何失败都只能标待核对，并保留记录。
+        if let Err(error) = hook(RestorePhase::AfterWrite) {
+            let message = format!("恢复写入后中断，结果待核对：{error}");
+            let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
+            return Err(AppError::needs_verification(message));
+        }
+        if let Err(error) = hook(RestorePhase::BeforeComplete) {
+            let message = format!("恢复完成记录阶段中断，结果待核对：{error}");
+            let _ = self.finish_attempt(id, index, RestoreAttemptState::NeedsVerification, &written, Some(&message));
+            return Err(AppError::needs_verification(message));
+        }
+        if let Err(error) = self.finish_attempt(id, index, RestoreAttemptState::Completed, &written, None) {
+            // 工作区已写但完成记录失败：不当作普通错误，也不伪称完成。
+            return Err(AppError::needs_verification(format!(
+                "恢复已写入工作区，但结果记录失败，结果待核对：{error}"
+            )));
+        }
+        // 真实重读：返回的状态来自磁盘，不是推断。
+        let inspection = match capture(&paths) {
+            Ok(pre) => match self.inspect(id, Some(&pre.identity), Some(worktree)) {
+                Ok(inspection) => inspection,
+                Err(error) => {
+                    return Err(AppError::needs_verification(format!(
+                        "恢复已写入工作区，但最新状态读取失败，结果待核对：{error}"
+                    )))
+                }
+            },
+            Err(error) => {
+                return Err(AppError::needs_verification(format!(
+                    "恢复已写入工作区，但无法重新读取真实状态，结果待核对：{error}"
+                )))
+            }
+        };
+        let attempt = self.attempts(id)?.last().cloned();
+        Ok(RestoreOutcome { inspection, attempt })
     }
 
-    fn write_restore_journal(&self, path: &Path, state: RestoreJournalState, written: &[String]) -> Result<()> {
-        let journal = RestoreJournal { state, written: written.to_vec(), at_ms: (self.clock)() };
-        // 原子替换，避免读到半份回执。
-        let temp = path.with_extension("next");
-        let _ = fs::remove_file(&temp);
-        write_new(&temp, &journal)?;
+    /// 读取恢复尝试历史（按时间顺序，最新在末尾）。
+    pub fn attempts(&self, id: &str) -> Result<Vec<RestoreAttempt>> {
+        let path = self.journal_path(id)?;
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(self.legacy_attempt(id)?)
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let journal: RestoreJournal = serde_json::from_slice(&bytes)?;
+        Ok(journal.attempts)
+    }
+
+    /// 最近一次恢复尝试。
+    pub fn latest_attempt(&self, id: &str) -> Result<Option<RestoreAttempt>> {
+        Ok(self.attempts(id)?.pop())
+    }
+
+    /// 早期版本把唯一一次尝试写在 `restore.pending` 里；读取时兼容，不丢历史。
+    fn legacy_attempt(&self, id: &str) -> Result<Vec<RestoreAttempt>> {
+        let directory = self.record_directory(id)?;
+        let bytes = match fs::read(directory.join("restore.pending")) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(error.into()),
+        };
+        let legacy: LegacyRestoreJournal = serde_json::from_slice(&bytes)?;
+        Ok(vec![RestoreAttempt {
+            at_ms: legacy.at_ms,
+            state: match legacy.state {
+                LegacyRestoreJournalState::Pending => RestoreAttemptState::Pending,
+                LegacyRestoreJournalState::Completed => RestoreAttemptState::Completed,
+                LegacyRestoreJournalState::NeedsVerification => RestoreAttemptState::NeedsVerification,
+                LegacyRestoreJournalState::Rejected => RestoreAttemptState::Rejected,
+            },
+            written: legacy.written,
+            version: String::new(),
+            message: None,
+        }])
+    }
+
+    fn journal_path(&self, id: &str) -> Result<PathBuf> {
+        Ok(self.record_directory(id)?.join("restore.json"))
+    }
+
+    /// 追加一次尝试并返回它的序号；历史永不覆盖（Q91）。
+    fn append_attempt(&self, id: &str, attempt: RestoreAttempt) -> Result<usize> {
+        let path = self.journal_path(id)?;
+        let mut journal = self.read_journal(&path)?;
+        journal.attempts.push(attempt);
+        let index = journal.attempts.len() - 1;
+        self.write_journal(&path, &journal)?;
+        Ok(index)
+    }
+
+    fn finish_attempt(
+        &self,
+        id: &str,
+        index: usize,
+        state: RestoreAttemptState,
+        written: &[String],
+        message: Option<&str>,
+    ) -> Result<()> {
+        let path = self.journal_path(id)?;
+        let mut journal = self.read_journal(&path)?;
+        let attempt = journal
+            .attempts
+            .get_mut(index)
+            .ok_or_else(|| AppError::internal("恢复留证丢失"))?;
+        attempt.state = state;
+        attempt.written = written.to_vec();
+        attempt.message = message.map(|value| value.to_string());
+        self.write_journal(&path, &journal)
+    }
+
+    fn read_journal(&self, path: &Path) -> Result<RestoreJournal> {
+        match fs::read(path) {
+            Ok(bytes) => match serde_json::from_slice::<RestoreJournal>(&bytes) {
+                Ok(journal) => Ok(journal),
+                // 读不出来的历史不覆盖：改名留档，再从空历史继续（仍然可核对）。
+                Err(_) => {
+                    let backup = path.with_extension(format!("corrupt-{}", (self.clock)()));
+                    let _ = fs::rename(path, backup);
+                    Ok(RestoreJournal::default())
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(RestoreJournal::default()),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    fn write_journal(&self, path: &Path, journal: &RestoreJournal) -> Result<()> {
+        let temp = path.with_extension(format!("next-{}", (self.clock)()));
+        write_new(&temp, journal)?;
         fs::rename(&temp, path)?;
         if let Some(parent) = path.parent() {
             platform::sync_directory(parent)?;
@@ -630,20 +867,27 @@ impl RecoveryStore {
         Ok(())
     }
 
-    /// 读取恢复留证（供查看与「重启后仍待核对」）。
-    pub fn restore_journal(&self, id: &str) -> Result<Option<RestoreJournal>> {
-        let directory = self.record_directory(id)?;
-        match fs::read(directory.join("restore.pending")) {
-            Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(error.into()),
+    /// 记录内容版本：记录本身 + 丢弃回执 + 恢复历史。任何一项变化都使旧确认失效。
+    pub fn version_of(&self, record: &RecoveryRecord, outcome: Option<&DiscardOutcome>) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(b"recovery-version-v1");
+        hasher.update(serde_json::to_vec(record)?);
+        hasher.update([0]);
+        if let Some(outcome) = outcome {
+            hasher.update(serde_json::to_vec(outcome)?);
         }
+        hasher.update([0]);
+        for attempt in self.attempts(&record.id)? {
+            hasher.update(serde_json::to_vec(&attempt)?);
+            hasher.update([0]);
+        }
+        Ok(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect())
     }
 
     /// 生成「保存版本 vs 当前内容」的只读 diff（文本）。
     ///
-    /// 由 Rust 侧调用真实 Git（`--no-index`）产出，前端只渲染；
-    /// 两个输入都写在回收区自己的临时目录里，不在用户仓库里创建文件。
+    /// 任一侧不存在也能对比（保存时是删除 / 之后被删除），用 Git 的 `/dev/null`
+    /// 表示空侧。两个输入都写在回收区自己的临时目录里，不在用户仓库里创建文件。
     pub fn text_diff(&self, git: &Git, id: &str, path: &str, worktree: Option<&Path>) -> Result<String> {
         let (record, _) = self.read(id)?;
         let saved = record
@@ -651,34 +895,50 @@ impl RecoveryStore {
             .iter()
             .find(|file| file.path == path)
             .ok_or_else(|| AppError::rejected("该记录不包含这个路径"))?;
-        let saved_bytes = saved
-            .content
-            .as_ref()
-            .ok_or_else(|| AppError::rejected("这条记录里该路径不存在内容，无法对比"))?;
-        if saved_bytes.contains(&0) || std::str::from_utf8(saved_bytes).is_err() {
-            return Err(AppError::rejected("二进制内容不提供文本对比"));
+        let saved_bytes = match &saved.content {
+            Some(bytes) => Some(bytes.as_slice()),
+            None => None,
+        };
+        if let Some(bytes) = saved_bytes {
+            if is_binary(bytes) {
+                return Err(AppError::rejected("二进制内容不提供文本对比"));
+            }
         }
-        let worktree = worktree.ok_or_else(|| AppError::rejected("当前 worktree 不可用，无法生成对比"))?;
-        let current = capture_files(worktree, std::slice::from_ref(&path.to_string()))?
-            .into_iter()
-            .next()
-            .ok_or_else(|| AppError::rejected("读取当前内容失败"))?;
-        let current_bytes = current
-            .content
-            .ok_or_else(|| AppError::rejected("当前路径不存在，无法生成文本对比"))?;
-        if current_bytes.contains(&0) || std::str::from_utf8(&current_bytes).is_err() {
-            return Err(AppError::rejected("二进制内容不提供文本对比"));
+        // 当前侧不可读时按「不存在」呈现，但只有真的读到「不存在」才这么算。
+        let current_bytes: Option<Vec<u8>> = match worktree {
+            Some(root) => match capture_files(root, std::slice::from_ref(&path.to_string())) {
+                Ok(captured) => captured.into_iter().next().and_then(|file| file.content),
+                Err(_) => None,
+            },
+            None => None,
+        };
+        if let Some(bytes) = &current_bytes {
+            if is_binary(bytes) {
+                return Err(AppError::rejected("二进制内容不提供文本对比"));
+            }
+        }
+        if saved_bytes.is_none() && current_bytes.is_none() {
+            return Ok(String::new());
         }
 
         let scratch = self.allocate("diff")?;
         let result = (|| {
             let old_path = scratch.join("saved");
             let new_path = scratch.join("current");
-            fs::write(&old_path, saved_bytes)?;
-            fs::write(&new_path, &current_bytes)?;
+            if let Some(bytes) = saved_bytes {
+                fs::write(&old_path, bytes)?;
+            }
+            if let Some(bytes) = &current_bytes {
+                fs::write(&new_path, bytes)?;
+            }
+            // 缺失的一侧交给 Git 的 /dev/null，让它生成「新增」或「删除」的完整 hunk。
+            let missing = Path::new("/dev/null");
             let bytes = git
                 .in_isolated_directory(&scratch)
-                .diff_no_index(&old_path, &new_path)?;
+                .diff_no_index(
+                    if saved_bytes.is_some() { &old_path } else { missing },
+                    if current_bytes.is_some() { &new_path } else { missing },
+                )?;
             Ok(String::from_utf8_lossy(&bytes).into_owned())
         })();
         let _ = fs::remove_dir_all(scratch);
@@ -698,44 +958,10 @@ impl RecoveryStore {
             .content
             .as_ref()
             .ok_or_else(|| AppError::rejected("这条记录里该路径不存在内容，无法另存"))?;
+        // 目标路径的每一级祖先都要通过安全检查；真实 gitDir/commonDir 由 Git 自己解析，
+        // 不只认名为 `.git` 的目录（`--separate-git-dir`、linked worktree 的私有目录都要挡住）。
+        let destination = &self.prepare_destination(destination, &record.identity)?;
 
-        // 目标必须是一个正常的外部路径：祖先链不得含符号链接、不得落在 Git 元数据里。
-        // 只校验目标本身不存在（create_new 保证），不因目标已存在而先截断。
-        let name = destination
-            .file_name()
-            .and_then(|value| value.to_str())
-            .ok_or_else(|| AppError::rejected("另存路径包含无法无损处理的字符"))?;
-        if name.is_empty() || name == "." || name == ".." || name.eq_ignore_ascii_case(".git") {
-            return Err(AppError::rejected("另存路径无效"));
-        }
-        let parent = destination
-            .parent()
-            .ok_or_else(|| AppError::rejected("另存目录无效"))?;
-        if !parent.is_dir() {
-            return Err(AppError::rejected("另存目录不存在"));
-        }
-        // 逐段核对**原始路径**的每一级祖先：任一级是符号链接就拒绝（绝不穿透到别的目录写入）。
-        // 这里不做 canonicalize 后比较：一旦规范化就丢掉了「这一级是链接」的证据。
-        // 目标本身不要求存在，因此只检查它的上级；create_new 保证目标不会被截断或替换。
-        let mut cursor = PathBuf::new();
-        for component in parent.components() {
-            cursor.push(component);
-            if let std::path::Component::Normal(name) = component {
-                if name.to_string_lossy().eq_ignore_ascii_case(".git") {
-                    return Err(AppError::rejected("不能写入 Git 元数据目录"));
-                }
-            }
-            match fs::symlink_metadata(&cursor) {
-                Ok(meta) if meta.file_type().is_symlink() => {
-                    return Err(AppError::rejected("另存路径的上级目录是符号链接，请选择真实目录"));
-                }
-                Ok(meta) if meta.is_dir() => {}
-                Ok(_) => return Err(AppError::rejected("另存路径的上级不是目录")),
-                Err(_) => return Err(AppError::rejected("另存路径的上级目录不可访问")),
-            }
-        }
-
-        // 用 create_new 一步完成「不存在才创建」：不会先截断再发现已存在。
         let mut options = OpenOptions::new();
         options.create_new(true).write(true);
         #[cfg(unix)]
@@ -751,6 +977,55 @@ impl RecoveryStore {
         handle.sync_all()?;
         platform::set_executable(destination, saved.executable)?;
         Ok(bytes.len() as u64)
+    }
+
+    /// 校验另存目标：祖先链无符号链接、不落在 Git 元数据里、目标本身尚不存在。
+    ///
+    /// 返回实际要写入的路径。这里不使用 `canonicalize` 后比较：一旦规范化就丢掉了
+    /// 「这一级是链接」的证据，会让 `link/inner` 穿透重新成立。
+    fn prepare_destination(&self, destination: &Path, identity: &WorktreeIdentity) -> Result<PathBuf> {
+        let name = destination
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| AppError::rejected("另存路径包含无法无损处理的字符"))?;
+        if name.is_empty() || name == "." || name == ".." {
+            return Err(AppError::rejected("另存路径无效"));
+        }
+        let parent = destination
+            .parent()
+            .ok_or_else(|| AppError::rejected("另存目录无效"))?;
+        if !parent.is_dir() {
+            return Err(AppError::rejected("另存目录不存在"));
+        }
+        let mut cursor = PathBuf::new();
+        for component in parent.components() {
+            cursor.push(component);
+            match fs::symlink_metadata(&cursor) {
+                Ok(meta) if meta.file_type().is_symlink() => {
+                    return Err(AppError::rejected("另存路径的上级目录是符号链接，请选择真实目录"));
+                }
+                Ok(meta) if meta.is_dir() => {}
+                Ok(_) => return Err(AppError::rejected("另存路径的上级不是目录")),
+                Err(_) => return Err(AppError::rejected("另存路径的上级目录不可访问")),
+            }
+        }
+        let resolved_parent = fs::canonicalize(parent)?;
+        // 真实 gitDir / commonDir 可能叫任何名字（--separate-git-dir），必须按解析结果判断。
+        for protected in [&identity.git_dir, &identity.common_dir] {
+            if let Ok(root) = fs::canonicalize(protected) {
+                if resolved_parent == root || resolved_parent.starts_with(&root) {
+                    return Err(AppError::rejected("不能写入 Git 元数据目录"));
+                }
+            }
+            if resolved_parent == protected.as_path() || resolved_parent.starts_with(protected) {
+                return Err(AppError::rejected("不能写入 Git 元数据目录"));
+            }
+        }
+        let target = resolved_parent.join(name);
+        if fs::symlink_metadata(&target).is_ok() {
+            return Err(AppError::rejected("目标路径已存在，请选择其他路径"));
+        }
+        Ok(target)
     }
 
     /// 删除超过保留期的记录；返回删除数量。
@@ -783,6 +1058,55 @@ impl RecoveryStore {
             }
         }
         Ok(removed)
+    }
+
+    /// 自动清理入口：记录成功/失败到可查询状态，并持久化（普通模式可见）。
+    pub fn auto_purge(&self) -> Result<u64> {
+        let result = self.purge_expired();
+        let at = (self.clock)();
+        {
+            let mut maintenance = self
+                .maintenance
+                .lock()
+                .map_err(|_| AppError::internal("回收区维护状态锁失败"))?;
+            maintenance.last_purge_at_ms = Some(at);
+            match &result {
+                Ok(removed) => {
+                    maintenance.last_purge_removed = *removed;
+                    maintenance.error = None;
+                }
+                Err(error) => {
+                    maintenance.error = Some(error.to_string());
+                }
+            }
+            if write_maintenance(&self.directory, &maintenance).is_err() {
+                // 目录暂时不可写：保留内存状态，下次读取时再落盘。
+                if let Ok(mut dirty) = self.maintenance_dirty.lock() {
+                    *dirty = true;
+                }
+            } else if let Ok(mut dirty) = self.maintenance_dirty.lock() {
+                *dirty = false;
+            }
+        }
+        result
+    }
+
+    /// 读取自动清理状态（普通模式下界面据此提示失败）。
+    ///
+    /// 若上次落盘失败，这里会重试；内存中的失败原因不会因为一次只读窗口而丢失。
+    pub fn maintenance(&self) -> RecoveryMaintenance {
+        let value = self.maintenance.lock().map(|value| value.clone()).unwrap_or(RecoveryMaintenance {
+            last_purge_at_ms: None,
+            last_purge_removed: 0,
+            error: Some("回收区维护状态不可读".into()),
+        });
+        let dirty = self.maintenance_dirty.lock().map(|dirty| *dirty).unwrap_or(false);
+        if dirty && write_maintenance(&self.directory, &value).is_ok() {
+            if let Ok(mut dirty) = self.maintenance_dirty.lock() {
+                *dirty = false;
+            }
+        }
+        value
     }
 
     /// 清空回收区（用户明确确认后调用）。在途记录保留。
@@ -992,29 +1316,99 @@ fn write_new(path: &Path, value: &impl Serialize) -> Result<()> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestoreExpectation {
+    /// 用户确认时看到的记录版本（记录内容 + 回执 + 恢复历史的摘要）。
+    pub version: String,
     pub paths: Vec<String>,
     pub state: RecoveryState,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub enum RestoreJournalState { Pending, Completed, NeedsVerification, Rejected }
+#[ts(export)]
+pub enum RestoreAttemptState { Pending, Completed, NeedsVerification, Rejected }
 
-/// 恢复自身的阶段结果（与丢弃的 Completed 回执相互独立）。
+/// 一次恢复尝试。历史按时间追加保留，最新一条是当前状态（Q91）。
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreAttempt {
+    pub at_ms: u64,
+    pub state: RestoreAttemptState,
+    /// 已发布到工作区的路径；部分完成时如实列出，不冒充全部完成。
+    pub written: Vec<String>,
+    /// 这次尝试核对时看到的记录版本。
+    pub version: String,
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
+/// 恢复自身的留证文件：按时间追加，永不覆盖（Q91）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RestoreJournal {
+    #[serde(default)]
+    attempts: Vec<RestoreAttempt>,
+}
+
+/// 早期版本写入 `restore.pending` 的单一尝试；读取时兼容，不丢历史。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RestoreJournal {
-    pub state: RestoreJournalState,
-    pub written: Vec<String>,
-    pub at_ms: u64,
+struct LegacyRestoreJournal {
+    state: LegacyRestoreJournalState,
+    written: Vec<String>,
+    at_ms: u64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum LegacyRestoreJournalState { Pending, Completed, NeedsVerification, Rejected }
+
+/// 恢复结果：真实重读的检查结果 + 这次尝试的留证。
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreOutcome {
+    pub inspection: RecoveryInspection,
+    pub attempt: Option<RestoreAttempt>,
 }
 
 /// 恢复的阶段，供受控中断接缝与结果留证使用。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RestorePhase { BeforeWrite, AfterWrite, BeforeComplete }
 
+/// 发布每个路径前重新捕获的真实状态（身份 + 全部相关路径 + 冲突）。
+#[derive(Debug, Clone)]
+pub struct RestorePreconditions {
+    pub identity: WorktreeIdentity,
+    pub files: Vec<SavedFile>,
+    /// 当前处于未解决冲突的路径（Q82：冲突文件只读）。
+    pub conflicts: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiscardPhase { BeforeSave, AfterSave, BeforeWrite, AfterWrite, BeforeComplete }
+
+/// 自动清理状态落盘：重启后仍能看到上次失败（不静默降级）。
+fn write_maintenance(directory: &Path, value: &RecoveryMaintenance) -> Result<()> {
+    fs::create_dir_all(directory)?;
+    let path = directory.join("maintenance.json");
+    let temp = directory.join(format!("maintenance-{}.json", NEXT_RECORD.fetch_add(1, Ordering::Relaxed)));
+    write_new(&temp, value)?;
+    fs::rename(&temp, &path)?;
+    Ok(())
+}
+
+fn read_maintenance(directory: &Path) -> RecoveryMaintenance {
+    fs::read(directory.join("maintenance.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or(RecoveryMaintenance { last_purge_at_ms: None, last_purge_removed: 0, error: None })
+}
+
+/// 文本对比只接受合法 UTF-8 且不含 NUL 的内容。
+fn is_binary(bytes: &[u8]) -> bool {
+    bytes.contains(&0) || std::str::from_utf8(bytes).is_err()
+}
 
 pub fn unchanged(before: &[SavedFile], after: &[SavedFile]) -> bool {
     // Comparing actual bytes also catches clean filters that hide worktree changes from Git.

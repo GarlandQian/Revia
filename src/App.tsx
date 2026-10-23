@@ -407,6 +407,28 @@ export function App() {
     }
   }, [readAndAccept, setAppError, worktreeId]);
 
+  /**
+   * 对**指定** worktree 做一次真实重读（Q90、Q91）。
+   *
+   * 写操作的结果归属原目标：即使已经切走，也要对原目标真实读一次，
+   * 不能因为当前选择变了就跳过核对；但只有它仍是激活目标时才更新界面。
+   */
+  const refreshTarget = useCallback(async (targetWorktreeId: string) => {
+    const token = gateRef.current.token();
+    try {
+      const snap = await ipc.listChanges(targetWorktreeId);
+      if (token.activation === gateRef.current.token().activation
+        && gateRef.current.current().worktreeId === targetWorktreeId) {
+        acceptSnapshot(token, snap);
+      }
+    } catch (caught) {
+      if (token.activation === gateRef.current.token().activation
+        && gateRef.current.current().worktreeId === targetWorktreeId) {
+        setAppError(toAppError(caught), targetWorktreeId);
+      }
+    }
+  }, [acceptSnapshot, setAppError]);
+
   // 自动刷新协调器：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
   const refreshCoordinator = useMemo(
     () => new RefreshCoordinator(async () => {
@@ -770,6 +792,7 @@ export function App() {
   const performRestore = useCallback(async (request: {
     worktreeId: string;
     recordId: string;
+    expectedVersion: string;
     expectedPaths: string[];
     expectedState: RecoveryState;
   }) => {
@@ -782,19 +805,19 @@ export function App() {
     setAppError(null, opWorktreeId);
     const opToken = operationGateRef.current.begin(opWorktreeId);
     try {
-      const inspection = await ipc.restoreRecovery(request);
+      const outcome = await ipc.restoreRecovery(request);
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       // 恢复不产生新的 ChangesSnapshot：真实读取一次，不依赖 watcher。
-      if (gateRef.current.token().worktreeId === opWorktreeId) await refresh();
-      return inspection;
+      // 切走时也必须重读原目标（真实重读不能因当前选择而跳过）。
+      await refreshTarget(opWorktreeId);
+      return outcome;
     } catch (caught) {
       const err = toAppError(caught);
       if (operationGateRef.current.canRecord(opToken)) {
         setAppError(err, opWorktreeId);
         if (operationGateRef.current.acceptFailure(opToken)
-          && (err.kind === "needsVerification" || err.kind === "rejected")
-          && gateRef.current.token().worktreeId === opWorktreeId) {
-          void refresh();
+          && (err.kind === "needsVerification" || err.kind === "rejected")) {
+          void refreshTarget(opWorktreeId);
         }
       }
       throw err;
@@ -802,7 +825,7 @@ export function App() {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
     }
-  }, [refresh, setAppError]);
+  }, [refreshTarget, setAppError]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
@@ -1915,6 +1938,7 @@ export function App() {
         <RecoveryDialog
           worktreeId={worktreeId}
           isWriting={isWriting}
+          snapshotRevision={snapshot?.revision ?? 0}
           onRestore={performRestore}
           onClose={() => setRecoveryOpen(false)}
         />

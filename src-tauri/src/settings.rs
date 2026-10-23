@@ -2,6 +2,7 @@
 //!
 //! 只写自己的数据目录，不改动用户的 Git 配置，也不往仓库目录里写东西。
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -131,6 +132,26 @@ impl Registry {
             }
             if repo.id == worktree_id || id_for_path(Path::new(&repo.path)) == worktree_id {
                 return Some(PathBuf::from(&repo.path));
+            }
+        }
+        None
+    }
+
+    /// 目标路径落在哪个已登记 worktree 里（用于把写入归属到真实目标，而不是当前选择）。
+    pub fn worktree_containing(&self, path: &Path) -> Option<String> {
+        let target = fs::canonicalize(path).ok()?;
+        for repo in &self.repos {
+            for worktree in &repo.worktrees {
+                let root = Path::new(&worktree.path);
+                let root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+                if target == root || target.starts_with(&root) {
+                    return Some(id_for_path(Path::new(&worktree.path)));
+                }
+            }
+            let root = Path::new(&repo.path);
+            let root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+            if target == root || target.starts_with(&root) {
+                return Some(repo.id.clone());
             }
         }
         None

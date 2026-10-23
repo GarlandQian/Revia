@@ -828,14 +828,14 @@ impl WorktreeSession {
 
     /// 从回收记录恢复完整工作区状态（Q29、Q85、ADR-0010）。
     ///
-    /// 复用同 worktree 的非排队写锁；恢复前重新读取真实身份与工作区字节，
-    /// 只写工作区，不碰暂存区，也不重放反向补丁。
+    /// 复用同 worktree 的非排队写锁；每个路径发布前重新读取**真实**身份、全部相关状态
+    /// 与未解决冲突，只写工作区，不碰暂存区，也不重放反向补丁。
     pub fn restore_record(
         &self,
         id: &str,
         expected: &recovery::RestoreExpectation,
         store: &RecoveryStore,
-    ) -> Result<recovery::RecoveryInspection> {
+    ) -> Result<recovery::RestoreOutcome> {
         self.restore_record_with_hook(id, expected, store, |_| Ok(()))
     }
 
@@ -846,22 +846,24 @@ impl WorktreeSession {
         expected: &recovery::RestoreExpectation,
         store: &RecoveryStore,
         hook: impl FnMut(recovery::RestorePhase) -> Result<()>,
-    ) -> Result<recovery::RecoveryInspection> {
+    ) -> Result<recovery::RestoreOutcome> {
         let _write = self.acquire_write_lock()?;
         let identity = WorktreeIdentity::capture(&self.git)?;
         store.ensure_outside(&identity)?;
-        // 恢复前确认目标不是 Git 未解决冲突（Q82）：冲突文件只读。
-        let status = status::read(&self.git)?;
-        for path in &expected.paths {
-            if status
+        // 每次发布前都重新捕获：不把这里的旧身份当作发布时的真实身份（Q80、Q82、Q87）。
+        let capture = |paths: &[String]| -> Result<recovery::RestorePreconditions> {
+            let identity = WorktreeIdentity::capture(&self.git)?;
+            let files = recovery::capture_files(&self.path, paths)?;
+            let status = status::read(&self.git)?;
+            let conflicts = status
                 .entries
                 .iter()
-                .any(|entry| entry.path == *path && entry.unmerged)
-            {
-                return Err(AppError::rejected("文件存在未解决的冲突，不能从回收区恢复"));
-            }
-        }
-        store.restore_with_hook(id, &identity, &self.path, expected, hook)
+                .filter(|entry| entry.unmerged)
+                .map(|entry| entry.path.clone())
+                .collect::<Vec<_>>();
+            Ok(recovery::RestorePreconditions { identity, files, conflicts })
+        };
+        store.restore_with_hook(id, &self.path, expected, capture, hook)
     }
 
     /// 「保存版本 vs 当前内容」的只读 diff（由 Rust 侧真实 Git 生成）。
@@ -871,8 +873,12 @@ impl WorktreeSession {
 
     /// 恢复的只读检查（不写工作区）。
     pub fn inspect_record(&self, id: &str, store: &RecoveryStore) -> Result<recovery::RecoveryInspection> {
-        let identity = WorktreeIdentity::capture(&self.git)?;
-        store.inspect(id, Some(&identity), Some(&self.path))
+        // 身份捕获失败（目录被移动/删除、Git 元数据缺失）不能让详情不可用：
+        // 回退为「当前侧不可用」，保存版本照常展示（Q87）。
+        match WorktreeIdentity::capture(&self.git) {
+            Ok(identity) => store.inspect(id, Some(&identity), Some(&self.path)),
+            Err(_) => store.inspect(id, None, None),
+        }
     }
 
     fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {

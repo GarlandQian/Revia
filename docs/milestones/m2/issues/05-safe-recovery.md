@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 第二轮两轴复核未通过，按最新 Comments 继续交 Pi 返修。历史实现报告及检查数字保留，但不代表当前验收通过；全部复核通过后才进行固定版本真实桌面与 CI 验收。
+> 勾选仅代表自动化（真实 Git + 独立数据目录 + 受控时钟）与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R2 返修已完成，等待规划方复核。历史实现报告及检查数字保留。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -274,3 +274,113 @@ Spec 本轮为静态审查，未运行测试、GUI 或构建；无范围扩张�
 - 另存按实际路径归属取得相应登记worktree锁和结果通道，真实gitDir/commonDir均保护；正常外部新路径仍可用。运行中的源/目标身份、原路径、权限/类型安全限制不放宽。
 - 自动清理失败在普通模式有持久或可查询的用户提示；存在/不存在的文本版本也生成正确只读Git diff；保存版本查看不依赖有效当前worktree或存活缓存session。以上属于既定契约补齐，不是新产品取舍。
 - Pi首轮返修使用 `git add -A` 且提前运行Release/GUI/D06，偏离明确交接。保留其原记录，不反向篡改；后续实施方只按明确文件暂存，不构建Release或操作GUI，规划方全审通过后固定源码/二进制进行桌面验收。当前检查表未给原始日志路径，198等数字仅为实施方报告，不视作规划方已核实的最终验收。
+
+### 2026-10-24 / Pi 实现：第二轮两轴复核返修（R05-R2）
+
+只返修 R05-R2 列出的条目。未做 07/08/10/11/12/13，未改已确认决策，未构建 Release、未操作 GUI、未跑 D06/CI/长测，未推送/合并/发布。
+
+#### Standards
+
+**R05-R2-ST1 / SP1（P1）：准备完成后再重新捕获，临近发布校验**
+
+恢复流程改成固定四段，不再有「早于写入准备的最后检查」：
+
+1. `prepare_files` 为每个路径在**同目录**独占创建临时文件、写入并 `fsync`，**不触碰工作区**；
+2. 受控阶段 `BeforeWrite`；
+3. **每个路径发布前**调用 `capture(&paths)` 重新读取：`WorktreeIdentity::capture`（真实 Git 解析，不拿传入的旧 identity）、`capture_files` 全部相关路径真实字节、`status::read` 的 unmerged 集合；
+4. `verify_publish` 判定后才 `publish()`（一次 `rename`）。
+
+`verify_publish` 对**多路径**维护预期：尚未发布的路径必须仍等于丢弃完成后的 `after`；**已经发布**的路径必须等于这次恢复写入的 `saved`，所以前面的写入不会被误判成「外部变化」。身份不匹配、目标 unmerged、未发布路径有后续变化，都拒绝且**一个字节都没写**。
+回归（全部用真实 Git + 生产入口 `restore_record_with_hook`）：
+- `publish_rechecks_real_state_after_prepare_and_does_not_overwrite`：`BeforeWrite` 里外部改写目标 → 拒绝、外部内容保留、留下 `Rejected` 尝试。
+- `publish_refuses_real_unmerged_conflict_target`：先真实 `git branch/checkout/commit` + `git merge` 制造 unmerged（断言 status 里 `unmerged == true`，不靠测试名），恢复被拒绝、冲突内容未被覆盖、`written` 为空。
+- `publish_rechecks_identity_instead_of_reusing_captured_one`：`BeforeWrite` 里把原目录整体移走、同路径换成新 `git init` 仓库 → 拒绝、新目录未被写、原目录内容未变。
+
+**R05-R2-ST2 / SP3 / SP4（P2）：恢复留证进入生产查看，且不是一次性**
+
+- 留证从「固定 `restore.pending` 独占创建」改为 `restore.json` 的**追加历史**（`RestoreAttempt[]`，每次尝试 `Pending → Completed/NeedsVerification/Rejected` 原地更新，历史永不覆盖）。
+- `RecoverySummary` / `RecoveryInspection` 新增 `restore: RestoreAttempt | null` 与 `version`，`list` 与 `inspect` 都从磁盘读；`RecoveryDialog` 列表与详情都显示「最近一次恢复 + 时间 + 已写入路径 + 待核对原因」。
+- 再次显式恢复不再报 `File exists`：没有固定文件占位，新一次尝试只要重新核对得到 `Ready` 就能执行。
+回归：
+- `restore_history_is_visible_through_list_and_inspect_after_reopen`：`BeforeComplete` 失败 → 列表 `status` 仍是丢弃的 `Completed`（不冒充），但 `restore.state` 是 `needsVerification` 且 `written` 含目标；drop session 后重开，列表与详情仍是 `needsVerification`。
+- `restore_can_be_explicitly_retried_after_rechecking`：失败后把工作区恢复到可信 `after`，重新 `inspect` 得 `Ready`，再次显式恢复成功；`attempts` 长度为 2，旧记录保留。
+
+**R05-R2-ST3 / SP2（P2）：写后任何阶段失败统一待核对**
+
+`AfterWrite`、`BeforeComplete`、以及完成留证写失败，全部走 `finish_attempt(NeedsVerification)` + `ErrorKind::NeedsVerification`，随后**真实重读**（`capture` + `inspect`）而不是推断；完成留证失败时明确提示「已写入工作区，但结果记录失败」。
+回归 `every_post_write_failure_is_pending_verification_and_rereads_truth`：对 `AfterWrite`、`BeforeComplete` 两个阶段各跑一遍，断言 kind、工作区真实内容、留证 `needsVerification` 与 `written`。
+
+**R05-R2-ST4 / SP7（P2）：另存按实际目标归属互斥**
+
+`save_recovery_as` 先用新增的 `Registry::worktree_containing` 按**目标路径**判断归属；落在已登记 worktree 内就取**那个** worktree 的 `acquire_write_lock`，结果交回它的 `deliver(...)` 通道；外部路径不强行加锁。源/目标身份、原路径、权限与类型限制不变。
+`prepare_destination` 不再只认名为 `.git` 的目录，改为按 Git 解析出的真实 `git_dir` / `common_dir` 判断（覆盖 `--separate-git-dir`、linked worktree 私有目录），仍逐段拒绝祖先符号链接。
+回归 `save_as_belongs_to_the_target_worktree_and_respects_its_lock`：真实 `git worktree add` 建 linked worktree，目标 worktree 持锁时另存被 `Rejected` 且未写入；释放后可写入，原 worktree 不受影响。
+
+**R05-R2-ST5 / SP8（P2）：普通模式可见的自动清理失败**
+
+新增 `RecoveryMaintenance { last_purge_at_ms, last_purge_removed, error }`，`auto_purge()` 记录成功/失败并**持久化**到回收区 `maintenance.json`；新增命令 `recovery_maintenance`，面板顶部直接显示「回收区自动清理失败：…」。落盘失败时保留内存状态并在下次读取时重试，不会因一次只读窗口丢掉提示。
+回归 `auto_purge_failure_is_queryable_in_normal_mode`：受控时钟让记录过期，把回收区目录改成 `0o500` 使删除真实失败 → `auto_purge` 返回错误、`maintenance().error` 有值、重建 `RecoveryStore` 后仍能读到、记录未被误删；恢复权限后再次清理成功并清空错误。
+顺带修掉一个真实缺陷：`remove_if_unused` 原来直接 `remove_dir_all`，目录不可写时会先删内容再删目录失败，留下读不出来的空壳（该回归首次运行即复现）。改为**先原子改名到 `trash-*` 再删除**，并清理残留 `trash-*`。
+
+#### Spec
+
+**R05-R2-SP1 / SP2 / SP3 / SP4** 同上 ST1 / ST3 / ST2 各条，覆盖 spec L88、L93、L101、T08/T11。
+
+**R05-R2-SP5（P2）：确认绑定所见版本**
+
+`RestoreExpectation` 增加 `version`；`RecoveryStore::version_of` 用 SHA-256 覆盖**记录内容 + 丢弃回执 + 全部恢复历史**，`list`/`inspect` 返回同一版本。`restore_with_hook` 第一件事就是比对版本，不一致即 `Rejected`（「回收记录已变化，请重新确认」）。
+前端 `RecoveryDialog` 的确认对象是 `{ version, snapshotRevision }`，`App` 传入 `snapshotRevision`，主快照刷新时 `useEffect` 清空待确认——刷新后旧确认失效，而不只是清一个返回按钮的布尔值。
+回归 `stale_confirmation_version_is_rejected`：版本被改后拒绝且不写入；正确版本可恢复。
+
+**R05-R2-SP6（P2）：面板异步结果绑定记录与请求代际**
+
+`RecoveryDialog` 引入 `panelEpoch`（返回列表 / 换记录 / 刷新 / 卸载递增）与 `requestEpoch`（每次 inspect/diff/restore 递增）。`inspect` 校验 `inspection.id === 目标 id`，`diff` 额外校验 `selectedRef.current.id === recordId`，`restore` 校验 `outcome.inspection.id === recordId`。迟到的 R1 diff 不会显示在已切到的 R2 面板里。
+
+**R05-R2-SP7（P2）** 见 ST4：目标 worktree 写锁 + 真实 `gitDir`/`commonDir` 保护，合法外部新路径仍可用。
+
+**R05-R2-SP8（P2）** 见 ST5：普通模式可查询的持久失败提示。
+
+**R05-R2-SP9（P2）：任一侧缺失也能生成只读 Git diff**
+
+`text_diff` 不再要求两侧都存在：缺失的一侧用 `/dev/null` 传给 `git diff --no-index`，从而正确生成「新增」或「删除」的完整 hunk；两侧都缺失时返回空字符串。仍由 Rust 侧真实 Git 生成，临时文件只写在回收区自己的目录里。
+回归 `text_diff_handles_missing_saved_or_current_side`：当前侧被删除 → 输出 `+++ /dev/null` 并含保存版本内容；保存侧是真实删除（走生产丢弃入口）→ 输出 `--- /dev/null` 并含当前内容。
+
+**R05-R2-SP10（P2）：查看不依赖有效当前 worktree**
+
+`inspect_record` 在 `WorktreeIdentity::capture` 失败时回退 `store.inspect(id, None, None)`，不再直接报错；`list_recovery` / `inspect_recovery` 在没有 session 时同样回退。前端详情按钮不再因 `worktreeId === null` 禁用。
+回归 `saved_version_is_viewable_without_current_worktree`：删除整个仓库目录后仍能 `list` 与 `inspect`，保存内容可读、`current` 为 `null`、`current_unavailable` 为真、状态 `IdentityMismatch`。
+
+#### 顺带修正：`refresh_isolation` t13 间歇失败的真实原因
+
+首轮全量测试时 `t13_concurrent_refreshes_never_publish_stale_content` 失败，错误是 Git 报 `cannot hash file.txt` / `unable to read <oid>`。定位到**测试自身**：写线程用 `std::fs::write` 先截断再写入，并发 `git diff` 会读到半截文件。改为「写 `file.txt.tmp` 再 `rename`」（与真实编辑器一致），断言一条未放宽；修复后连跑 5 次全通过。此前把它记为「未归因的间歇失败」，现在有了确定原因与修复，历史日志一并保留。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录：`/private/tmp/revia-task05-r2-1792786030`（含 `MANIFEST.md`、每条命令的原始 stdout/stderr 与退出码、失败历史 `history/`）。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` | 0 | **213 项通过**：lib 93、`discard_recovery` **59**（新增 11 项）、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` 14、`session_flow` 3 |
+| `pnpm exec tsc -b` | 0 | 通过（含新导出 `RestoreAttempt`、`RestoreOutcome`、`RecoveryMaintenance`） |
+| `pnpm lint` | 0 | 通过 |
+| `pnpm build` | 0 | 通过 |
+| `node tools/test-*.mjs` | 0 | 25 + 13 + 11 + 19 = **68 项通过** |
+| `python3 -m unittest tools.test_bench_long_running` | 0 | **20 项通过** |
+
+失败历史（保留）：首次全量 `cargo test` 退出码 101，`refresh_isolation` t13 失败，原因与修复见上节。
+
+敏感性对照（逐项临时退化实现，确认对应用例确实失败，随后恢复）：
+- 去掉 `verify_publish` → 5 个用例失败（外部编辑、身份更换、unmerged、`LaterChanges`、身份不匹配）；
+- `BeforeComplete` 失败直接透传 → 3 个用例失败（写后失败待核对、历史可见、可再次恢复）；
+- 去掉版本比对 → `stale_confirmation_version_is_rejected` 失败；
+- 文本 diff 单侧缺失即拒绝 → `text_diff_handles_missing_saved_or_current_side` 失败；
+- 恢复历史改为覆盖 → `restore_can_be_explicitly_retried_after_rechecking` 失败；
+- 清理失败不记录 → `auto_purge_failure_is_queryable_in_normal_mode` 失败。
+
+#### 仍未验证（留给规划方）
+
+- 真实桌面的恢复面板键盘焦点、只读 diff 观感、原生保存对话框、清理失败横幅的实际显示。
+- 本轮按要求**未**构建 Release、未跑 GUI/D06/CI/长测。
+- Windows 编译与 CI（可执行位在 Windows 恒为 false，沿用任务 04 的 `platform` 抽象）。
+- 超大文件恢复/对比的内存占用未量化；恢复按整文件读入。
+- 恢复仍不改变暂存区；`inspect` 只比较工作区字节，丢弃后仅改 index 不会阻止恢复（按 Q29/ADR-0010，判定基准是工作区后续变化）。

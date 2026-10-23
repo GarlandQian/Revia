@@ -409,7 +409,11 @@ fn t13_concurrent_refreshes_never_publish_stale_content() {
         let repo = ctx.repo.clone();
         std::thread::spawn(move || {
             for marker in 1..=VERSIONS {
-                std::fs::write(repo.join("file.txt"), format!("v{marker}\n")).unwrap();
+                // 原子替换：`fs::write` 先截断再写入，并发 `git diff` 可能读到半截文件，
+                // 得到「cannot hash」这类假失败。真实编辑器也是先写临时文件再改名。
+                let temp = repo.join("file.txt.tmp");
+                std::fs::write(&temp, format!("v{marker}\n")).unwrap();
+                std::fs::rename(&temp, repo.join("file.txt")).unwrap();
                 std::thread::sleep(Duration::from_millis(3));
             }
         })

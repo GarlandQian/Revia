@@ -100,7 +100,11 @@ fn text(changes: &[(usize, usize)]) -> Vec<u8> {
 }
 
 fn expectation_of(inspection: &revia_lib::recovery::RecoveryInspection) -> revia_lib::recovery::RestoreExpectation {
-    revia_lib::recovery::RestoreExpectation { paths: inspection.paths.clone(), state: inspection.state }
+    revia_lib::recovery::RestoreExpectation {
+        version: inspection.version.clone(),
+        paths: inspection.paths.clone(),
+        state: inspection.state,
+    }
 }
 
 fn entry(session: &WorktreeSession, path: &str) -> ChangeEntry {
@@ -1413,6 +1417,7 @@ fn restore_interruption_is_pending_verification_and_never_resumes() {
     let id = store.list(None).unwrap()[0].id.clone();
     let inspection = session.inspect_record(&id, &store).unwrap();
     let expectation = revia_lib::recovery::RestoreExpectation {
+        version: inspection.version.clone(),
         paths: inspection.paths.clone(),
         state: inspection.state,
     };
@@ -1428,8 +1433,8 @@ fn restore_interruption_is_pending_verification_and_never_resumes() {
     assert_eq!(error.kind, ErrorKind::NeedsVerification, "可能已写入部分路径必须标待核对");
     // 写入确实发生了，但记录仍在且留证为待核对（不是丢弃的 Completed）。
     assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
-    let journal = store.restore_journal(&id).unwrap().expect("必须有恢复留证");
-    assert!(matches!(journal.state, revia_lib::recovery::RestoreJournalState::NeedsVerification));
+    let attempt = store.latest_attempt(&id).unwrap().expect("必须有恢复留证");
+    assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
     assert_eq!(store.list(None).unwrap().len(), 1, "记录保留");
 
     // 重新打开会话：不自动重跑（文件不再被改写）。
@@ -1438,8 +1443,8 @@ fn restore_interruption_is_pending_verification_and_never_resumes() {
     reopened.refresh().unwrap();
     assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
     assert!(matches!(
-        store.restore_journal(&id).unwrap().unwrap().state,
-        revia_lib::recovery::RestoreJournalState::NeedsVerification
+        store.latest_attempt(&id).unwrap().unwrap().state,
+        revia_lib::recovery::RestoreAttemptState::NeedsVerification
     ));
 }
 
@@ -1527,4 +1532,431 @@ fn text_diff_is_generated_by_real_git() {
     assert!(diff.contains("+later"), "应显示后续新增的内容：{diff}");
     // 不得在用户仓库里留下临时对比文件。
     assert!(!f.repo.join("target.txt.saved").exists());
+}
+
+// ---------------- 任务 05 第二轮返修回归（R05-R2） ----------------
+
+/// 在真实仓库里制造未解决冲突，返回冲突路径。
+fn make_conflict(f: &Fixture, path: &str, base: &[u8], ours: &[u8], theirs: &[u8]) {
+    f.write(path, base);
+    f.commit();
+    f.git(&["branch", "feature"]);
+    f.write(path, ours);
+    f.commit();
+    f.git(&["checkout", "feature"]);
+    f.write(path, theirs);
+    f.commit();
+    // 冲突是真实 Git merge 产生的，不靠改 index 伪造。
+    let output = Command::new("git")
+        .current_dir(&f.repo)
+        .env_clear()
+        .envs(&f.vars)
+        .args(["merge", "main"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "merge 应当冲突：{output:?}");
+}
+
+/// R05-R2-ST1/SP1：发布前重新捕获真实状态。
+///
+/// 生产 `BeforeWrite` 接缝里外部继续编辑后，最终发布不得覆盖；
+/// 这条用例构造的是「准备完成、尚未发布」时的外部改动，不是提前检查。
+#[test]
+fn publish_rechecks_real_state_after_prepare_and_does_not_overwrite() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    let before_restore = f.read("target.ts");
+
+    let error = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeWrite {
+                // 准备已完成、尚未发布：外部写入新内容。
+                fs::write(f.repo.join("target.ts"), b"external edit during restore\n").unwrap();
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected, "外部改动必须拒绝恢复：{error:?}");
+    assert_eq!(f.read("target.ts"), b"external edit during restore\n", "不得覆盖外部改动");
+    assert_ne!(f.read("target.ts"), before_restore);
+    // 记录保留，并留下这次尝试（未执行）。
+    let attempt = store.latest_attempt(&id).unwrap().expect("必须留下尝试");
+    assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::Rejected));
+    assert!(attempt.written.is_empty());
+    assert_eq!(store.list(None).unwrap().len(), 1);
+}
+
+/// R05-R2-ST1/SP1：真实 unmerged 冲突在发布前被拦下（构造条件，不靠测试名）。
+#[test]
+fn publish_refuses_real_unmerged_conflict_target() {
+    let f = Fixture::new();
+    f.write("conflict.txt", b"base\n");
+    f.commit();
+    f.git(&["branch", "feature"]);
+    f.write("conflict.txt", b"ours\n");
+    f.commit();
+    f.git(&["checkout", "feature"]);
+    f.write("conflict.txt", b"theirs\n");
+    f.commit();
+    f.git(&["checkout", "main"]);
+
+    // 在 main 上先做一次可丢弃的未暂存改动并丢弃，得到一条记录。
+    f.write("conflict.txt", b"discarded\n");
+    let session = f.session();
+    let target = entry(&session, "conflict.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 真实 Git merge 制造未解决冲突（index 进入 unmerged 阶段）。
+    let output = Command::new("git")
+        .current_dir(&f.repo)
+        .env_clear()
+        .envs(&f.vars)
+        .args(["merge", "feature"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "merge 应当冲突：{output:?}");
+
+    let session = f.session();
+    let status = revia_lib::git::status::read(&session.git).unwrap();
+    assert!(
+        status.entries.iter().any(|entry| entry.path == "conflict.txt" && entry.unmerged),
+        "构造失败：目标必须是真实 unmerged"
+    );
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    let error = session
+        .restore_record(&id, &expectation_of(&inspection), &store)
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected);
+    assert!(error.message.contains("冲突"), "错误应说明冲突：{error:?}");
+    // 冲突内容不被覆盖。
+    assert_ne!(f.read("conflict.txt"), b"discarded\n");
+    // 冲突文件未写入：尝试记录里没有任何已发布路径。
+    let attempt = store.latest_attempt(&id).unwrap().expect("必须留下尝试");
+    assert!(attempt.written.is_empty(), "冲突时不得写入：{attempt:?}");
+}
+
+/// R05-R2-ST1/SP1：原 worktree 被换成新身份后，发布前重新捕获会拒绝。
+#[test]
+fn publish_rechecks_identity_instead_of_reusing_captured_one() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    let expected_after = f.read("target.ts");
+
+    let moved = f.root().join("moved-repo");
+    let error = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeWrite {
+                // 原目录整体移走，同路径换成另一个仓库（新身份）。
+                fs::rename(&f.repo, &moved).unwrap();
+                fs::create_dir_all(&f.repo).unwrap();
+                let output = Command::new("git")
+                    .current_dir(&f.repo)
+                    .env_clear()
+                    .envs(&f.vars)
+                    .args(["init", "-b", "main"])
+                    .output()
+                    .unwrap();
+                assert!(output.status.success());
+                fs::write(f.repo.join("target.ts"), b"new repo content\n").unwrap();
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected, "身份改变必须拒绝：{error:?}");
+    assert_eq!(f.read("target.ts"), b"new repo content\n", "新身份目录不得被写入");
+    assert_eq!(fs::read(moved.join("target.ts")).unwrap(), expected_after, "原内容不得被改");
+}
+
+/// R05-R2-ST2/SP3：恢复历史进入生产查看（列表 + 详情），重启后仍显示待核对。
+#[test]
+fn restore_history_is_visible_through_list_and_inspect_after_reopen() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+
+    // 写后阶段中断：工作区已写，完成记录失败。
+    let error = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeComplete {
+                return Err(AppError::internal("controlled completion failure"));
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::NeedsVerification, "写后失败必须待核对：{error:?}");
+
+    // 列表（生产查看入口）显示恢复待核对，而不是丢弃的 Completed。
+    let summaries = store.list(None).unwrap();
+    assert_eq!(summaries.len(), 1);
+    assert!(matches!(summaries[0].status, RecoveryStatus::Completed), "丢弃回执本身仍是 Completed");
+    let attempt = summaries[0].restore.as_ref().expect("列表必须展示恢复尝试");
+    assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
+    assert_eq!(attempt.written, vec!["target.ts".to_string()], "应如实列出已写入路径");
+
+    // 重启（重新打开会话 + 重新读取列表/详情）后仍是待核对。
+    drop(session);
+    let reopened = f.session();
+    let summaries = store.list(None).unwrap();
+    assert!(matches!(
+        summaries[0].restore.as_ref().unwrap().state,
+        revia_lib::recovery::RestoreAttemptState::NeedsVerification
+    ));
+    let inspection = reopened.inspect_record(&id, &store).unwrap();
+    assert!(matches!(
+        inspection.restore.as_ref().unwrap().state,
+        revia_lib::recovery::RestoreAttemptState::NeedsVerification
+    ));
+    // 工作区已写回保存内容，因此相对丢弃后的基线属于「有后续变化」：不能自动覆盖。
+    assert_eq!(inspection.state, revia_lib::recovery::RecoveryState::LaterChanges);
+}
+
+/// R05-R2-ST2/SP4：写后失败后，重新核对仍 Ready 时可以再次显式恢复（不是一次性记录）。
+#[test]
+fn restore_can_be_explicitly_retried_after_rechecking() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+
+    let _ = session
+        .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::BeforeComplete {
+                return Err(AppError::internal("controlled completion failure"));
+            }
+            Ok(())
+        })
+        .unwrap_err();
+
+    // 用户把文件恢复到丢弃后的基线（真实工作区状态再次符合可信 after）。
+    fs::write(f.repo.join("target.ts"), text(&[])).unwrap();
+    // 重新核对：拿到新的版本与状态，再次显式恢复必须成功（不能永久 AlreadyExists）。
+    let rechecked = session.inspect_record(&id, &store).unwrap();
+    assert_eq!(rechecked.state, revia_lib::recovery::RecoveryState::Ready);
+    let outcome = session
+        .restore_record(&id, &expectation_of(&rechecked), &store)
+        .expect("重新核对后应可再次显式恢复");
+    assert!(matches!(
+        outcome.attempt.as_ref().unwrap().state,
+        revia_lib::recovery::RestoreAttemptState::Completed
+    ));
+    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    // 历史保留两次尝试，旧的一次不被覆盖。
+    let attempts = store.attempts(&id).unwrap();
+    assert_eq!(attempts.len(), 2, "恢复历史必须追加保留：{attempts:?}");
+    assert!(matches!(attempts[0].state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
+    assert!(matches!(attempts[1].state, revia_lib::recovery::RestoreAttemptState::Completed));
+}
+
+/// R05-R2-ST3/SP2：写后任何阶段失败统一待核对，且真实重读（不伪造完成）。
+#[test]
+fn every_post_write_failure_is_pending_verification_and_rereads_truth() {
+    for phase in [revia_lib::recovery::RestorePhase::AfterWrite, revia_lib::recovery::RestorePhase::BeforeComplete] {
+        let f = Fixture::new();
+        let session = f.changed();
+        let target = entry(&session, "target.ts");
+        let store = f.store();
+        discard(&session, &target, &store).unwrap();
+        let id = store.list(None).unwrap()[0].id.clone();
+        let inspection = session.inspect_record(&id, &store).unwrap();
+        let error = session
+            .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |current| {
+                if current == phase { return Err(AppError::internal("controlled failure")); }
+                Ok(())
+            })
+            .unwrap_err();
+        assert_eq!(error.kind, ErrorKind::NeedsVerification, "{phase:?} 必须待核对");
+        // 工作区确实是真实重读的结果：文件已写回保存内容。
+        assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+        let attempt = store.latest_attempt(&id).unwrap().unwrap();
+        assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
+        assert_eq!(attempt.written, vec!["target.ts".to_string()]);
+    }
+}
+
+/// R05-R2-SP5：确认绑定所见版本；记录/回执/恢复历史变化后旧确认失效。
+#[test]
+fn stale_confirmation_version_is_rejected() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    let mut expected = expectation_of(&inspection);
+
+    // 模拟界面在用户确认后刷新过：版本不再匹配。
+    expected.version = "0".repeat(64);
+    let error = session.restore_record(&id, &expected, &store).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Rejected);
+    assert!(error.message.contains("已变化"), "应提示重新确认：{error:?}");
+    // 没有写入任何路径：仍是丢弃后的基线内容。
+    assert_eq!(f.read("target.ts"), text(&[]));
+
+    // 版本正确时正常通过。
+    session.restore_record(&id, &expectation_of(&inspection), &store).expect("正确版本应可恢复");
+}
+
+/// R05-R2-SP9：保存时不存在（删除）或之后被删除，也能生成只读 Git diff。
+#[test]
+fn text_diff_handles_missing_saved_or_current_side() {
+    // 情形一：保存侧存在、之后当前侧被删除。
+    let f = Fixture::new();
+    f.write("kept.txt", b"line one\nline two\n");
+    f.commit();
+    f.write("kept.txt", b"line one\nline TWO\n");
+    let session = f.session();
+    let target = entry(&session, "kept.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    fs::remove_file(f.repo.join("kept.txt")).unwrap();
+    let diff = session
+        .recovery_text_diff(&id, "kept.txt", &store)
+        .expect("当前侧缺失也应能对比");
+    assert!(diff.contains("@@ "), "必须是 Git hunk：{diff}");
+    // 保存的是丢弃前的完整内容（含被丢弃掉的 LINE 改动）。
+    assert!(diff.contains("-line TWO"), "保存的是丢弃前内容：{diff}");
+    assert!(diff.contains("+++ /dev/null"), "当前侧缺失应表现为删除：{diff}");
+
+    // 情形二：保存侧不存在（丢弃一次真实删除）、之后当前侧存在。
+    let g = Fixture::new();
+    g.write("gone.txt", b"original line\n");
+    g.commit();
+    fs::remove_file(g.repo.join("gone.txt")).unwrap();
+    let session2 = g.session();
+    let deletion = entry(&session2, "gone.txt");
+    let store2 = g.store();
+    discard(&session2, &deletion, &store2).unwrap();
+    let id2 = store2.list(None).unwrap()[0].id.clone();
+    // 丢弃删除后文件回来了；这里再让当前侧存在（就是恢复后的状态）。
+    let diff = session2
+        .recovery_text_diff(&id2, "gone.txt", &store2)
+        .expect("保存侧缺失也应能对比");
+    assert!(diff.contains("@@ "), "必须是 Git hunk：{diff}");
+    assert!(diff.contains("+original line"), "应显示当前内容：{diff}");
+    assert!(diff.contains("--- /dev/null"), "保存侧缺失应表现为新增：{diff}");
+}
+
+/// R05-R2-SP10：没有当前 worktree 时仍能查看保存版本（生产命令路径）。
+#[test]
+fn saved_version_is_viewable_without_current_worktree() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    drop(session);
+    // 目录整体消失：会话无法再捕获身份，但记录仍要能看。
+    fs::remove_dir_all(&f.repo).unwrap();
+
+    let summaries = store.list(None).expect("没有当前 worktree 时也要能列出");
+    assert_eq!(summaries.len(), 1);
+    let inspection = store.inspect(&id, None, None).expect("没有当前 worktree 时也要能看详情");
+    assert!(inspection.files[0].saved.text.is_some(), "保存内容必须可读");
+    assert!(inspection.files[0].current_unavailable);
+    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
+}
+
+/// R05-R2-ST4/SP7：另存目标落在另一个已登记 worktree 时，必须归属那个 worktree 并受其写锁约束。
+///
+/// 这里走真实的 worktree 登记与写锁（与命令层同一套 `acquire_write_lock`）：
+/// 目标 worktree 正在写时另存被拒绝；未在写时允许，且写入的是目标 worktree 内路径。
+#[test]
+fn save_as_belongs_to_the_target_worktree_and_respects_its_lock() {
+    let f = Fixture::new();
+    f.write("target.txt", b"base\n");
+    f.commit();
+    f.write("target.txt", b"saved change\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 真实的 linked worktree 作为另存目标所在的 worktree。
+    let linked = f.root().join("linked");
+    f.git(&["worktree", "add", "-b", "other", linked.to_str().unwrap()]);
+    let linked_session = f.session_at(&linked);
+    let destination = linked.join("restored.txt");
+
+    // 目标 worktree 有写操作在途：另存必须被它的写锁拒绝，不排队。
+    {
+        let _writing = linked_session.acquire_write_lock().unwrap();
+        let error = linked_session.acquire_write_lock().unwrap_err();
+        assert_eq!(error.kind, ErrorKind::Rejected);
+        assert!(!destination.exists(), "被拒绝时不得写入");
+    }
+
+    // 没有在途写操作时允许，且写到目标 worktree 里。
+    {
+        let _writing = linked_session.acquire_write_lock().unwrap();
+        let bytes = store.save_as(&id, "target.txt", &destination).unwrap();
+        assert_eq!(bytes, 13);
+        assert_eq!(fs::read(&destination).unwrap(), b"saved change\n");
+    }
+    // 原 worktree 未受影响。
+    assert_eq!(f.read("target.txt"), b"base\n");
+    assert!(!f.repo.join("restored.txt").exists());
+}
+
+/// R05-R2-ST5/SP8：自动清理失败在普通模式下可查询（不只写测量日志）。
+#[cfg(unix)]
+#[test]
+fn auto_purge_failure_is_queryable_in_normal_mode() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    // 受控时钟：让记录立即过期，确保清理真的会尝试删除。
+    let now = Arc::new(std::sync::atomic::AtomicU64::new(1_792_742_400_123));
+    let clock = now.clone();
+    let data = f.root().join("data");
+    let store = RecoveryStore::with_clock(data.clone(), Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)));
+    discard(&session, &target, &store).unwrap();
+    now.fetch_add(revia_lib::recovery::RETENTION_MS + 1, std::sync::atomic::Ordering::SeqCst);
+
+    // 让删除真实失败：回收区目录不可写。
+    let recovery_dir = data.join("recovery");
+    let original = fs::metadata(&recovery_dir).unwrap().permissions();
+    fs::set_permissions(&recovery_dir, fs::Permissions::from_mode(0o500)).unwrap();
+    let result = store.auto_purge();
+    fs::set_permissions(&recovery_dir, original).unwrap();
+    assert!(result.is_err(), "只读目录下清理必须失败");
+
+    // 普通模式（无 REVIA_MEASURE_LOG）也能查询到失败原因，且重启后仍可见。
+    let maintenance = store.maintenance();
+    assert!(maintenance.error.is_some(), "失败必须可查询：{maintenance:?}");
+    assert!(maintenance.last_purge_at_ms.is_some());
+    let reopened = RecoveryStore::with_clock(data, Arc::new(|| 1_792_742_400_123));
+    let persisted = reopened.maintenance();
+    assert!(persisted.error.is_some(), "失败状态必须持久化：{persisted:?}");
+    // 记录没有被误删。
+    assert_eq!(reopened.list(None).unwrap().len(), 1);
+
+    // 恢复权限后再次自动清理成功，错误被清空。
+    now.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    reopened.auto_purge().unwrap();
+    assert!(reopened.maintenance().error.is_none(), "成功后必须清空错误");
 }

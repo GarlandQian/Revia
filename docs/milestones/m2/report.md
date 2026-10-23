@@ -4,7 +4,7 @@
 
 ## 当前进度（2026-10-23）
 
-- 任务 05：`ready-for-agent`（第二轮复核返修，覆盖首版/首轮当前状态）。固定`36a39a1...cb82836`，Standards 5项、Spec 10项，各自最严重P1；生产写前重核、恢复日志展示/尝试生命周期、完成阶段待核对、确认/面板代际、另存目标互斥/真实Git元数据、清理失败可见性、缺失文本diff及身份失效查看仍未闭合。意见及受限补充证据见[任务05 Comments](./issues/05-safe-recovery.md#comments)。Pi越交接运行的两份D06仅原样归档，不采为规划方验收。另已核对[平台提示](./platform-notice-20261024.md)，无法得知内部命中规则；落实本地验证范围和原始证据规范后继续Pi返修，不关闭防护。
+- 任务 05：`ready-for-human`（第二轮复核返修完成，等待规划方复核）。固定 `36a39a1...cb82836` 的 Standards 5 项、Spec 10 项已逐条闭合：恢复改为「准备临时内容 → 受控阶段 → **每个路径发布前**重新捕获真实身份/全部相关状态/冲突 → 发布」，多路径维护已写路径预期；写后任何阶段失败统一 `NeedsVerification` 并真实重读；恢复留证改为追加历史并进入 `list`/`inspect` 生产查看，重启后仍显示待核对，重新核对为 `Ready` 时可再次显式恢复（不再是一次性）；确认绑定 `version`（记录 + 丢弃回执 + 恢复历史），主快照刷新即失效；面板 `panelEpoch`/`requestEpoch` 绑定记录与请求代际；另存按**实际目标路径**取该 worktree 写锁与结果通道，并按 Git 解析出的真实 `gitDir`/`commonDir` 保护；自动清理失败持久化并可经 `recovery_maintenance` 在普通模式显示；文本 diff 支持任一侧缺失（`/dev/null`）；原 worktree 不可用时仍可查看保存版本。本轮实测：Rust **213** 项（`discard_recovery` **59**）、Node 68 项、Python 20 项通过，tsc/lint/build 通过；另定位并修掉 `refresh_isolation` t13 的真实原因（测试用非原子写导致 Git 读到半截文件），断言未放宽。按交接要求**未**构建 Release、未操作 GUI、未跑 D06/CI/长测。原始日志见 `/private/tmp/revia-task05-r2-1792786030/MANIFEST.md`。详见 [任务 05](./issues/05-safe-recovery.md)。
 - 任务 05：`ready-for-agent`（首版审查返修）。固定 `5d9b781...36a39a1`：Standards 8项、Spec 9项，各自最严重 P1；存在无关临时名文件删除、在途清理丢失唯一记录、冲突文件恢复绕过只读、恢复中断/确认/结果门禁及恢复查看/另存/自动到期等缺口。下面的首版自动化统计不等于这些路径已通过。意见与受限复现证据已归档至 [任务05 Comments](./issues/05-safe-recovery.md#comments)，修复并复核前不构建桌面验收版、不标 done。
 - 任务 01：`done`，MessagePort 泄漏修复及 Q98 长测结论不变，见下一节。
 - 任务 02：`done`，最终键盘与跨仓库提示归属结果按用户交接补录，见 [任务 02](./issues/02-safe-file-staging.md)。未稳定复现的按键序列观察单独保留，不猜测根因或声称修复。
