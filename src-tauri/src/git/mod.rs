@@ -424,6 +424,18 @@ impl Git {
         self.run_once_with_input(&args, Some(patch))
     }
 
+    pub fn discard_patch(&self, path: &str) -> Result<Vec<u8>> {
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.extend_from_slice(&["--binary", "--full-index", "--", path]);
+        Ok(self.run_ok(&args, "读取完整丢弃补丁")?.stdout)
+    }
+
+    /// No --index/--cached/--3way: discarding must not change the index.
+    pub fn apply_worktree_patch(&self, patch: Vec<u8>) -> Result<GitOutput> {
+        self.run_once_with_input(&["-c", "apply.ignoreWhitespace=no", "apply", "--reverse", "--whitespace=nowarn", "-"], Some(patch))
+    }
+
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {
         let mut args: Vec<&str> = Vec::new();
         if path.is_some() {

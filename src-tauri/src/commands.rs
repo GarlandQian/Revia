@@ -18,6 +18,7 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
+use crate::recovery::{RecoveryStore, RecoverySummary, WorktreeIdentity};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 pub struct AppState {
@@ -29,12 +30,14 @@ pub struct AppState {
     /// 合并事件的单调进度及激活归属。
     pub watch_events: Arc<Mutex<WatchEvents>>,
     pub acceptance: Option<Arc<Acceptance>>,
+    pub recovery: RecoveryStore,
 }
 
 impl AppState {
     pub fn new(data_dir: PathBuf) -> Self {
         let command_log = Arc::new(CommandLog::default());
         Self {
+            recovery: RecoveryStore::new(data_dir.clone()),
             registry: Mutex::new(Registry::load(data_dir, command_log.clone())),
             sessions: Mutex::new(HashMap::new()),
             command_log,
@@ -164,6 +167,16 @@ pub struct HunkRequest {
     pub path: String,
     pub fingerprint: String,
     pub hunk_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscardRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub fingerprint: String,
+    pub snapshot_revision: String,
+    pub hunk_id: Option<String>,
 }
 
 #[tauri::command]
@@ -373,6 +386,42 @@ pub async fn unstage_hunk(state: State<'_, AppState>, request: HunkRequest) -> R
     .await
     .map_err(|error| AppError::needs_verification(format!("取消暂存 hunk 任务中断，结果待核对：{error}")))?;
     deliver(state.acceptance.as_ref(), "unstage_hunk", &context.worktree_id, Some(&context.path), result).await
+}
+
+async fn execute_discard(state: State<'_, AppState>, request: DiscardRequest, hunk: bool) -> Result<ChangesSnapshot> {
+    if hunk != request.hunk_id.is_some() { return Err(AppError::rejected("丢弃目标范围不匹配")); }
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let store = state.recovery.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(id) = request.hunk_id {
+            session.discard_hunk(&request.path, &request.fingerprint, &request.snapshot_revision, &id, &store)
+        } else {
+            session.discard_file(&request.path, &request.fingerprint, &request.snapshot_revision, &store)
+        }
+    }).await.map_err(|error| AppError::needs_verification(format!("丢弃任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), if hunk { "discard_hunk" } else { "discard_file" }, &context.worktree_id, Some(&context.path), result).await
+}
+
+#[tauri::command]
+pub async fn discard_file(state: State<'_, AppState>, request: DiscardRequest) -> Result<ChangesSnapshot> {
+    execute_discard(state, request, false).await
+}
+
+#[tauri::command]
+pub async fn discard_hunk(state: State<'_, AppState>, request: DiscardRequest) -> Result<ChangesSnapshot> {
+    execute_discard(state, request, true).await
+}
+
+#[tauri::command]
+pub async fn list_recovery(state: State<'_, AppState>, worktree_id: Option<String>) -> Result<Vec<RecoverySummary>> {
+    let session = worktree_id.as_deref().and_then(|id| state.session(id).ok());
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        // Unavailable/replaced worktrees must not prevent viewing their saved records.
+        let identity = session.and_then(|session| WorktreeIdentity::capture(&session.git).ok());
+        store.list(identity.as_ref())
+    }).await.map_err(|error| AppError::internal(format!("读取回收区失败：{error}")))?
 }
 
 #[tauri::command]

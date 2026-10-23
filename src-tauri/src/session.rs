@@ -19,6 +19,7 @@ use crate::git::rows::{self, HunkAction, HunkAnchor, RenderRow, RowKind, ViewMod
 use crate::git::status::{self, ChangesKind, FileStatus, ReadonlyReason, StatusEntry};
 use crate::git::{self, Git};
 use crate::shell::{self, ShellEnv};
+use crate::recovery::{self, DiscardOutcome, DiscardPhase, RecoverySource, RecoveryStore, WorktreeIdentity};
 
 static NEXT_SESSION_INSTANCE: AtomicU64 = AtomicU64::new(1);
 
@@ -720,6 +721,100 @@ impl WorktreeSession {
         self.execute_staging_op(path, fingerprint, false, Some(hunk_id))
     }
 
+    pub fn discard_file(&self, path: &str, fingerprint: &str, revision: &str, store: &RecoveryStore) -> Result<ChangesSnapshot> {
+        self.discard_with_hook(path, fingerprint, revision, None, store, |_| Ok(()))
+    }
+
+    pub fn discard_hunk(&self, path: &str, fingerprint: &str, revision: &str, hunk_id: &str, store: &RecoveryStore) -> Result<ChangesSnapshot> {
+        self.discard_with_hook(path, fingerprint, revision, Some(hunk_id), store, |_| Ok(()))
+    }
+
+    fn check_discard_target(&self, path: &str, fingerprint: &str, revision: &str) -> Result<StatusEntry> {
+        {
+            let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+            let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+            if !snapshot.entries.iter().any(|entry| entry.path == path && entry.changes == ChangesKind::Unstaged
+                && entry.fingerprint == fingerprint && entry.snapshot_revision == revision) {
+                return Err(AppError::rejected("文件已变化，请重新确认"));
+            }
+        }
+        let status = status::read(&self.git)?;
+        let entry = status.entries.into_iter().find(|entry| entry.path == path && entry.changes == ChangesKind::Unstaged)
+            .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        if let Some(reason) = &entry.readonly_reason { return Err(AppError::rejected(reason.description())); }
+        // intent-to-add（`git add -N`）在暂存区还没有 blob：既没有可恢复的提交基线，
+        // 反向应用又会直接删除文件。按「未跟踪文件没有删除入口」的既有边界明确拒绝。
+        if entry.status == FileStatus::Added
+            && entry.oid_index.as_deref().map_or(true, |oid| oid.chars().all(|ch| ch == '0'))
+        {
+            return Err(AppError::rejected("新增文件没有可恢复的原始版本，不能在应用内丢弃"));
+        }
+        let diff = self.git.diff_worktree(Some(path))?;
+        if compute_file_fingerprint_from_patch(&entry, &diff, &self.path)? != fingerprint {
+            return Err(AppError::rejected("文件已变化，请重新确认"));
+        }
+        Ok(entry)
+    }
+
+    /// Test seams surround real storage and real Git; normal operations pass a no-op.
+    pub fn discard_with_hook(
+        &self, path: &str, fingerprint: &str, revision: &str, hunk_id: Option<&str>,
+        store: &RecoveryStore, mut hook: impl FnMut(DiscardPhase) -> Result<()>,
+    ) -> Result<ChangesSnapshot> {
+        let _write = self.acquire_write_lock()?;
+        let entry = self.check_discard_target(path, fingerprint, revision)?;
+        let identity = WorktreeIdentity::capture(&self.git)?;
+        store.ensure_outside(&identity)?;
+        let mut paths = vec![entry.path.clone()];
+        if let Some(original) = &entry.original_path { paths.push(original.clone()); }
+        paths.sort();
+        paths.dedup();
+        let before = recovery::capture_files(&self.path, &paths)?;
+        let patch = match hunk_id {
+            Some(id) => self.hunk_patch(path, fingerprint, id, true)?,
+            None => self.git.discard_patch(path)?,
+        };
+        if patch.is_empty() { return Err(AppError::rejected("文件已变化，请重新确认")); }
+        let expected_after = store.preview(&self.git, &self.path, &before, &patch)?;
+        hook(DiscardPhase::BeforeSave)?;
+        // A complete, durably published record is the prerequisite for any worktree write.
+        let record = store.save(identity.clone(), if hunk_id.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone())?;
+        hook(DiscardPhase::AfterSave).map_err(discard_pending)?;
+        hook(DiscardPhase::BeforeWrite).map_err(discard_pending)?;
+        {
+            // Do not let an internal refresh replace hunk credentials between the final check and Git.
+            let _read = self.read_lock.lock().map_err(|_| AppError::internal("读取锁失败"))?;
+            let validation = (|| {
+                self.check_discard_target(path, fingerprint, revision)?;
+                if WorktreeIdentity::capture(&self.git)? != identity || !recovery::unchanged(&before, &recovery::capture_files(&self.path, &paths)?) {
+                    return Err(AppError::rejected("文件已变化，请重新确认"));
+                }
+                let current_patch = match hunk_id {
+                    Some(id) => self.hunk_patch(path, fingerprint, id, true)?,
+                    None => self.git.discard_patch(path)?,
+                };
+                if current_patch != patch { return Err(AppError::rejected("文件已变化，请重新确认")); }
+                Ok(())
+            })();
+            if let Err(error) = validation {
+                store.finish(&record, &DiscardOutcome::NotApplied).map_err(discard_pending)?;
+                return Err(error);
+            }
+            let output = self.git.apply_worktree_patch(patch).map_err(discard_pending)?;
+            if output.timed_out || output.exit_code != 0 {
+                return Err(discard_pending(format!("Git 退出码 {}：{}", output.exit_code, output.stderr.trim())));
+            }
+        }
+        hook(DiscardPhase::AfterWrite).map_err(discard_pending)?;
+        let actual_after = recovery::capture_files(&self.path, &paths).map_err(discard_pending)?;
+        if actual_after != expected_after {
+            return Err(discard_pending("写后状态与已校验结果不同，可能有外部修改"));
+        }
+        hook(DiscardPhase::BeforeComplete).map_err(discard_pending)?;
+        store.finish(&record, &DiscardOutcome::Completed { after: expected_after }).map_err(discard_pending)?;
+        self.refresh().map_err(|error| AppError::needs_verification(format!("丢弃已执行并保存，最新状态读取失败：{error}")))
+    }
+
     fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {
         if !supports_hunk_actions(entry, file) {
             return Vec::new();
@@ -892,6 +987,10 @@ impl WorktreeSession {
     }
 }
 
+fn discard_pending(error: impl std::fmt::Display) -> AppError {
+    AppError::needs_verification(format!("内容已保存到回收区，丢弃结果待核对；不会自动继续：{error}"))
+}
+
 fn supports_hunk_actions(entry: &ChangeEntry, file: &git::diff::FileChange) -> bool {
     entry.changes != ChangesKind::Untracked
         && entry.readonly_reason.is_none()
@@ -1021,29 +1120,37 @@ pub fn compute_file_fingerprint_from_patch(
     hasher.update((diff_bytes.len() as u64).to_le_bytes());
     hasher.update(diff_bytes);
 
-    // 6. 针对未跟踪文件：Git status/diff 在刷新时不含内容，必须读取工作区文件以绑定内容变化
-    // 已跟踪文件的变化（无论文本、二进制、权限还是删除）已经完全体现在 Git status/diff 输出中，
-    // 不在刷新时重复整读文件（审查意见 3）。
-    if entry.changes == ChangesKind::Untracked {
+    // Binary and mode-only diffs contain no content-bearing hunks. Bind their
+    // actual worktree bytes too; textual hunks already bind the Git file version.
+    let lacks_text_hunks = !diff_bytes.windows(4).any(|bytes| bytes == b"\n@@ ");
+    if entry.changes == ChangesKind::Untracked || (entry.changes == ChangesKind::Unstaged && lacks_text_hunks) {
         let file_path = worktree_path.join(&entry.path);
-        let meta = std::fs::symlink_metadata(&file_path)
-            .map_err(|e| AppError::rejected(format!("读取未跟踪文件属性失败（{}）：{}", entry.path, e)))?;
-        hasher.update(b"untracked_meta");
+        let meta = match std::fs::symlink_metadata(&file_path) {
+            Ok(meta) => Some(meta),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound && entry.changes == ChangesKind::Unstaged => None,
+            Err(error) => return Err(AppError::rejected(format!("读取文件属性失败（{}）：{error}", entry.path))),
+        };
+        hasher.update(b"worktree_meta");
+        if let Some(meta) = meta {
+        hasher.update(b"present");
         hasher.update(meta.len().to_le_bytes());
 
         if meta.is_file() {
             let mut f = std::fs::File::open(&file_path)
-                .map_err(|e| AppError::rejected(format!("打开未跟踪文件失败（{}）：{}", entry.path, e)))?;
+                .map_err(|e| AppError::rejected(format!("打开文件失败（{}）：{}", entry.path, e)))?;
             use std::io::Read;
             let mut buf = Vec::new();
             f.read_to_end(&mut buf)
-                .map_err(|e| AppError::rejected(format!("读取未跟踪文件内容失败（{}）：{}", entry.path, e)))?;
+                .map_err(|e| AppError::rejected(format!("读取文件内容失败（{}）：{}", entry.path, e)))?;
             let file_hash = Sha256::digest(&buf);
             hasher.update(&file_hash);
         } else if meta.file_type().is_symlink() {
             let target = std::fs::read_link(&file_path)
                 .map_err(|e| AppError::rejected(format!("读取符号链接失败（{}）：{}", entry.path, e)))?;
             hasher.update(target.to_string_lossy().as_bytes());
+        }
+        } else {
+            hasher.update(b"absent");
         }
     }
 

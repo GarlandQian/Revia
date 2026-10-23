@@ -64,13 +64,14 @@ interface DiffViewProps {
   highlights: HighlightStore;
   isWriting?: boolean;
   onHunkAction?: (action: HunkAction) => void;
+  onHunkDiscard?: (action: HunkAction, section: string) => void;
   handleRef?: React.Ref<DiffViewHandle>;
   /** 每帧采样：用于测量「可见区域里还没有数据的行数」。 */
   onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
 }
 
 export function DiffView(props: DiffViewProps) {
-  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample, isWriting, onHunkAction } = props;
+  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample, isWriting, onHunkAction, onHunkDiscard } = props;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -421,6 +422,7 @@ export function DiffView(props: DiffViewProps) {
               highlightVersion={compact ? 0 : highlightSnapshot.version}
               plainTextOnly={compact}
               onHunkAction={onHunkAction}
+              onHunkDiscard={onHunkDiscard}
               onHunkFocus={revealHunk}
               hunkDisabled={isWriting || !!rowSnapshot.error || !row.hunkAction
                 || !matchesHunkAction(row.hunkAction, worktreeId, entry)}
@@ -459,6 +461,7 @@ const RowView = memo(function RowView({
   highlights,
   plainTextOnly,
   onHunkAction,
+  onHunkDiscard,
   onHunkFocus,
   hunkDisabled,
 }: {
@@ -470,6 +473,7 @@ const RowView = memo(function RowView({
   highlightVersion: number;
   plainTextOnly: boolean;
   onHunkAction?: (action: HunkAction) => void;
+  onHunkDiscard?: (action: HunkAction, section: string) => void;
   onHunkFocus: (top: number) => void;
   hunkDisabled: boolean;
 }) {
@@ -494,6 +498,13 @@ const RowView = memo(function RowView({
             onClick={() => onHunkAction(action)}
           >
             {label}
+          </button>
+        ) : null}
+        {action?.changes === "unstaged" && onHunkDiscard ? (
+          <button type="button" className="hunk-action" disabled={hunkDisabled}
+            aria-label={`${messages.changes.discardHunk}：${row.section ?? ""}`}
+            onFocus={() => onHunkFocus(top)} onClick={() => onHunkDiscard(action, row.section ?? "")}>
+            {messages.changes.discardHunk}
           </button>
         ) : null}
       </div>

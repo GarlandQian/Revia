@@ -36,6 +36,10 @@ export function isStageFileShortcut(event: KeyboardEvent | React.KeyboardEvent):
   return isPrimaryModifier(event) && isAltModifier(event) && event.code === "KeyA";
 }
 
+export function isDiscardFileShortcut(event: KeyboardEvent | React.KeyboardEvent): boolean {
+  return isPrimaryModifier(event) && isAltModifier(event) && event.code === "KeyZ";
+}
+
 /** 判断是否在输入类控件（<input>, <textarea>, [contenteditable]）或弹窗内，让出快捷键避免穿透（Q93、审查意见 6）。 */
 export function isTextInputOrDialog(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;

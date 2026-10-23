@@ -11,6 +11,7 @@ import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
+import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
 import type { RowSlice } from "@/types/bindings/RowSlice";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
@@ -155,4 +156,9 @@ export const ipc = {
     invoke<ChangesSnapshot>("stage_hunk", { request }),
   unstageHunk: (request: { worktreeId: string; path: string; fingerprint: string; hunkId: string }) =>
     invoke<ChangesSnapshot>("unstage_hunk", { request }),
+  discardFile: (request: { worktreeId: string; path: string; fingerprint: string; snapshotRevision: string }) =>
+    invoke<ChangesSnapshot>("discard_file", { request }),
+  discardHunk: (request: { worktreeId: string; path: string; fingerprint: string; snapshotRevision: string; hunkId: string }) =>
+    invoke<ChangesSnapshot>("discard_hunk", { request }),
+  listRecovery: (worktreeId: string | null) => invoke<RecoverySummary[]>("list_recovery", { worktreeId }),
 };

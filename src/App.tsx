@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChangesList, type Selection } from "@/components/app/ChangesList";
+import { DiscardDialog, RecoveryDialog } from "@/components/app/RecoveryDialogs";
 import { logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
@@ -30,7 +31,7 @@ import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { isDiscardFileShortcut, isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -62,6 +63,8 @@ interface MeasureConfig {
 }
 
 type StagingTarget = Pick<HunkAction, "worktreeId" | "path" | "changes" | "fingerprint"> & { hunkId?: string };
+type DiscardTarget = StagingTarget & { snapshotRevision: string };
+type DiscardConfirmation = { target: DiscardTarget; epoch: number; activation: number; worktree: string; section?: string };
 
 type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
 
@@ -710,8 +713,10 @@ export function App() {
   const [writingWorktrees, setWritingWorktrees] = useState<Set<string>>(new Set());
   const writingWorktreesRef = useRef(new Set<string>());
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
+  const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
 
-  const performStaging = useCallback(async (target: StagingTarget) => {
+  const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
     // ref 在同一事件循环内也互斥；按钮禁用和 Rust 写锁共同兜底，不积压点击。
     if (writingWorktreesRef.current.has(opWorktreeId)) return;
@@ -723,9 +728,18 @@ export function App() {
     const request = { worktreeId: opWorktreeId, path: target.path, fingerprint: target.fingerprint };
     try {
       const unstaging = target.changes === "staged";
-      const next = target.hunkId !== undefined
-        ? await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId })
-        : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
+      let next: ChangesSnapshot;
+      if (discard) {
+        if (!("snapshotRevision" in target)) throw { kind: "rejected", message: messages.changes.fileChanged };
+        const discardRequest = { ...request, snapshotRevision: target.snapshotRevision };
+        next = target.hunkId !== undefined
+          ? await ipc.discardHunk({ ...discardRequest, hunkId: target.hunkId })
+          : await ipc.discardFile(discardRequest);
+      } else {
+        next = target.hunkId !== undefined
+          ? await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId })
+          : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
+      }
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       if (operationGateRef.current.acceptSuccess(opToken, next)
@@ -750,13 +764,13 @@ export function App() {
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
-    return performStaging({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
-  }, [performStaging, worktreeId]);
+    return performWrite({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
+  }, [performWrite, worktreeId]);
 
   const unstageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes !== "staged") return;
-    return performStaging({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
-  }, [performStaging, worktreeId]);
+    return performWrite({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
+  }, [performWrite, worktreeId]);
 
   const changeHunk = useCallback((action: HunkAction) => {
     const current = selectedRef.current;
@@ -769,14 +783,55 @@ export function App() {
       return;
     }
     // 原样传递显示行绑定的目标，不从当前文件元数据重新拼装 hunk 凭据。
-    void performStaging(action);
-  }, [performStaging, refresh, setAppError]);
+    void performWrite(action);
+  }, [performWrite, refresh, setAppError]);
+
+  const requestDiscard = useCallback((target: DiscardTarget, section?: string) => {
+    const current = selectedRef.current;
+    const entry = snapshotRef.current?.entries.find((entry) => entry.path === current?.path && entry.changes === current.changes);
+    if (writingWorktreesRef.current.has(target.worktreeId) || target.changes !== "unstaged" || !entry || entry.readonlyReason
+      || target.worktreeId !== worktreeIdRef.current || target.path !== entry.path || target.changes !== entry.changes
+      || target.fingerprint !== entry.fingerprint || target.snapshotRevision !== entry.snapshotRevision) return;
+    setDiscardConfirmation({ target, section, epoch: selectionEpochRef.current, activation: gateRef.current.token().activation,
+      worktree: snapshotRef.current?.worktreePath ?? "" });
+  }, []);
+
+  const discardFile = useCallback((entry: ChangeEntry) => {
+    if (worktreeId) requestDiscard({ worktreeId, path: entry.path, changes: entry.changes,
+      fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision });
+  }, [requestDiscard, worktreeId]);
+
+  const discardHunk = useCallback((action: HunkAction, section: string) => {
+    const current = selectedRef.current;
+    const entry = snapshotRef.current?.entries.find((entry) => entry.path === current?.path && entry.changes === current.changes);
+    if (!entry || !matchesHunkAction(action, worktreeIdRef.current ?? "", entry)) {
+      setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+      return;
+    }
+    requestDiscard(action, section);
+  }, [requestDiscard, setAppError]);
+
+  const confirmationValid = useCallback((confirmation: DiscardConfirmation) => {
+    const target = confirmation.target;
+    const current = selectedRef.current;
+    const entry = snapshotRef.current?.entries.find((entry) => entry.path === current?.path && entry.changes === current.changes);
+    return !!entry && target.worktreeId === worktreeIdRef.current && target.path === entry.path && target.changes === entry.changes
+      && target.fingerprint === entry.fingerprint && target.snapshotRevision === entry.snapshotRevision
+      && confirmation.epoch === selectionEpochRef.current && confirmation.activation === gateRef.current.token().activation
+      && !writingWorktreesRef.current.has(target.worktreeId);
+  }, []);
 
   // 快捷键（Q19、Q93、审查意见 6）：
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 只对文本输入控件和弹窗内的按键放行，不穿透到后台文件操作（Q93、审查意见 6）
       if (isTextInputOrDialog(event.target)) return;
+
+      if (isDiscardFileShortcut(event)) {
+        event.preventDefault();
+        if (selectedEntry && !isWriting) discardFile(selectedEntry);
+        return;
+      }
 
       if (isStageFileShortcut(event)) {
         event.preventDefault();
@@ -816,7 +871,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, refresh, selectedEntry, stageFile, unstageFile]);
+  }, [changeFontSize, chooseRepo, discardFile, focusNextFile, isWriting, jumpToHunk, refresh, selectedEntry, stageFile, unstageFile]);
 
   // ---------------- 测量 ----------------
 
@@ -1751,6 +1806,8 @@ export function App() {
           isWriting={isWriting}
           onStage={(entry) => void stageFile(entry)}
           onUnstage={(entry) => void unstageFile(entry)}
+          onDiscard={discardFile}
+          onRecovery={() => setRecoveryOpen(true)}
           worktrees={activeRepo?.worktrees ?? []}
           activeWorktreeId={worktreeId}
           onWorktree={(id) => void switchWorktree(id)}
@@ -1791,6 +1848,7 @@ export function App() {
                 handleRef={diffRef}
                 isWriting={isWriting}
                 onHunkAction={changeHunk}
+                onHunkDiscard={discardHunk}
               />
             </ErrorBoundary>
           )}
@@ -1802,6 +1860,16 @@ export function App() {
           onClear={() => setMeasurements([])}
         />
       </main>
+      {discardConfirmation ? (
+        <DiscardDialog path={discardConfirmation.target.path} worktree={discardConfirmation.worktree} section={discardConfirmation.section}
+          valid={confirmationValid(discardConfirmation)} onClose={() => setDiscardConfirmation(null)}
+          onConfirm={() => {
+            if (!confirmationValid(discardConfirmation)) return;
+            setDiscardConfirmation(null);
+            void performWrite(discardConfirmation.target, true);
+          }} />
+      ) : null}
+      {recoveryOpen ? <RecoveryDialog worktreeId={worktreeId} onClose={() => setRecoveryOpen(false)} /> : null}
     </div>
   );
 
@@ -1844,6 +1912,8 @@ function Toolbar({
   isWriting,
   onStage,
   onUnstage,
+  onDiscard,
+  onRecovery,
   worktrees,
   activeWorktreeId,
   onWorktree,
@@ -1860,6 +1930,8 @@ function Toolbar({
   isWriting: boolean;
   onStage?: (entry: ChangeEntry) => void;
   onUnstage?: (entry: ChangeEntry) => void;
+  onDiscard: (entry: ChangeEntry) => void;
+  onRecovery: () => void;
   worktrees: WorktreeEntry[];
   activeWorktreeId: string | null;
   onWorktree: (worktreeId: string) => void;
@@ -1927,7 +1999,7 @@ function Toolbar({
               onClick={() => onUnstage?.(selectedEntry)}
               title={messages.changes.shortcuts.unstageFile}
             >
-              {isWriting ? messages.changes.unstaging : messages.changes.unstageFile}
+              {isWriting ? messages.changes.writing : messages.changes.unstageFile}
             </Button>
           ) : (
             <Button
@@ -1937,11 +2009,17 @@ function Toolbar({
               onClick={() => onStage?.(selectedEntry)}
               title={messages.changes.shortcuts.stageFile}
             >
-              {isWriting ? messages.changes.staging : messages.changes.stageFile}
+              {isWriting ? messages.changes.writing : messages.changes.stageFile}
             </Button>
           )}
         </>
       ) : null}
+      {selectedEntry?.changes === "unstaged" && !selectedEntry.readonlyReason ? (
+        <Button variant="outline" size="sm" disabled={isWriting} onClick={() => onDiscard(selectedEntry)} title={messages.changes.shortcuts.discardFile}>
+          {messages.changes.discardFile}
+        </Button>
+      ) : null}
+      <Button variant="ghost" size="sm" onClick={onRecovery}>{messages.recovery.title}</Button>
       {watch.error ? (
         <Badge variant="outline" className="ml-auto shrink-0 text-xs text-destructive" title={watch.error}>
           {messages.changes.watchUnavailable}

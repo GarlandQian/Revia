@@ -6,6 +6,8 @@ pub mod acceptance;
 pub mod commands;
 pub mod error;
 pub mod git;
+pub mod platform;
+pub mod recovery;
 pub mod session;
 pub mod settings;
 pub mod shell;
@@ -89,6 +91,9 @@ pub fn run() {
             commands::unstage_file,
             commands::stage_hunk,
             commands::unstage_hunk,
+            commands::discard_file,
+            commands::discard_hunk,
+            commands::list_recovery,
             commands::change_entry,
             commands::measure_config,
             commands::write_measurement,
