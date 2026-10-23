@@ -140,3 +140,28 @@
 - **写前检查与 exec 之间的极小窗口**：上下文在 `read_lock` 内核对后、Git 子进程启动前，外部进程仍可能改写 `.gitattributes`。这是进程内锁无法覆盖的外部竞态；发生时写后比对会转 `NeedsVerification`（但按本轮结论，**这不等于写前安全**）。未宣称已消除该窗口。
 - **属性等价性依赖 `check-attr` 自证**：若某来源的属性无法在临时仓库复现，会走"无法等价复现"的明确拒绝，而不是继续写入；这类拒绝尚未在真实桌面统计出现频率。
 - 未做长时内存/大文件压力观测；单条记录仍按完整文件大小存储，容量上限与 14 天清理属 05。
+
+### 2026-10-23 / Codex 第二轮两轴审查：仍需修复
+
+固定点 `9b3f2831ef0d0cbb0474547d552fdc4526e69eb9`，受审实现 `6d8a7090d96e5b83a2f8a77c08b0106f2db7c566`；命令 `git diff 9b3f283...6d8a709`，唯一修复提交 `6d8a709`。`.codex/` 为未跟踪本地环境目录，用户已于本轮要求继续，按原样保留、忽略、不读取、不提交。以下仍按两个独立审查轴保留。
+
+#### Standards
+
+- **R04-R2-ST1 / P2 / 原 ST1 残留，Windows**：`src-tauri/src/git/mod.rs:175` 的隔离名单遗漏 `GIT_CONFIG`。Windows 继承该变量后，`src-tauri/src/recovery.rs:340` 的 `config --add` 仍向它指定的真实仓库配置追加 filter；`:378` 的属性路径设置同样能改写该配置。违反 `docs/product-direction.md:206`「不修改用户的 Git 配置」。独立临时真实 Git 已确认原 config 哈希改变、clean/smudge 重复；主审另复现真实 `core.attributesFile` 被改指向临时 scratch 文件（scratch 清除后该路径失效）。原 `GIT_DIR/GIT_WORK_TREE` 路径已修复，但不能据此称全部配置重定向已隔离。应确保 scratch 配置写入绝不可能落入用户配置，补 `GIT_CONFIG` 回归并核对原配置字节和 index。生产 Windows 可达性为环境继承静态结论，未冒称 Windows 实机验收。
+- **R04-R2-ST2 / P2 / 原 ST2 残留**：`src-tauri/src/recovery.rs:360` 用 linked worktree 私有 `--git-dir` 拼 `info/attributes`；Git 实际使用 commonDir 下的文件。真实 Git fixture 里目标 `text/eol=crlf` 属性未复制到 scratch，`:385` 的比较会拒绝正常文本丢弃，仍违反 `docs/product-direction.md:52` 的普通已跟踪文本支持范围。应通过 Git 的 `rev-parse --git-path info/attributes` 等实际路径解析取有效位置，而不是猜私有目录布局。
+
+原 ST3 已闭合：遮罩颜色使用主题变量。没有其他确定的规范违规或值得单列的 Fowler 判断性异味。本轴 2 项，最高 P2。
+
+#### Spec
+
+- **R04-R2-SP1 / P2 / 原 SP2 残留，linked worktree**：规格 `docs/milestones/m2/spec.md:73` 要求普通已跟踪文本支持丢弃。`src-tauri/src/recovery.rs:360` 取错共享属性位置，使真实有效属性为 `text/eol=crlf`、scratch 属性却为空，随后拒绝正常文本。与 R04-R2-ST2 同修，保留本轴独立结论。
+- **R04-R2-SP2 / P2 / 原 SP2 残留，多行 filter 值损坏**：同一规格要求受影响。`src-tauri/src/git/mod.rs:414` 用 `.lines()` 拆配置，`src-tauri/src/recovery.rs:339` 再按空格拆键值，不能保留合法多行 shell 命令。真实复现 `clean=cat`、`smudge=":\ncat"`：复制后 smudge 只剩 `:`，两边 `check-attr` 完全相同，但 scratch apply 退出 128、真实仓库退出 0 并恢复原内容。应使用 NUL 分隔等无歧义的 Git 配置格式，保留完整值、空白、多值与必要键名边界；写前上下文指纹也使用同一无损口径。不能用「属性检查一致」冒充 filter 命令一致。
+- **R04-R2-SP3 / P2 / 环境隔离残留**：`src-tauri/src/git/mod.rs:175` 仍保留 `GIT_CONFIG`，使预览配置命令改写用户配置，违反 `docs/product-direction.md:206` 的安全边界；与 R04-R2-ST1 同修。真实 Git 重定向已复现，Windows 应用可达性仅静态确认。
+
+原 SP1 的保存后属性变化场景已有写前校验，静态闭合；V1 的新回归确实在真实 Git 写入后模拟失去成功结果，并断言记录保留、结果待核对、index 不变且不重跑，补齐了原验证缺口。无新范围扩张。本轴 3 项，最高 P2。
+
+#### 主审复现与后续
+
+主审在 `/private/tmp` 独立 fixture 复现了上述三条路径，原始脚本、命令、结果、config 前后字节及各轴独立结果保存在 `../evidence/task04-review02/`，manifest 记录来源与哈希。没有对用户仓库执行复现写入。linked worktree 同一补丁在真实 Git 中可正确应用且 index 不变；多行 filter 两侧有效属性相同，不能被现有自证检查识别。
+
+本轮仅要求补齐上述安全与等价性缺口；沿用真实 Git、独立数据目录和现有测试体系，不扩大 04 范围，不提前做 05/07/08/12/13。相关修改完成后集中运行最小受影响回归；共享 Git 配置 API 的返回契约变化须检查其调用者。原 SP1/V1 已闭合，不无理由重做整套旧验收。GUI、D06、Windows CI 与最终长测仍未完成；修复交回 Pi，连续渠道报错三次才接管，不把测试失败或 `paseo wait` 等待到时计作渠道错误。
