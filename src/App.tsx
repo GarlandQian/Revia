@@ -1400,15 +1400,21 @@ export function App() {
     async (config: MeasureConfig) => {
       debugLog(`自动测量启动：only=${config.only?.join(",") ?? "(全部)"} repo=${config.repoPath}`);
       const monitor = monitorSoakVisibility();
+      let focusLosses = 0;
+      const onWindowBlur = () => { focusLosses = 1; };
+      const results: Measurement[] = [];
+      let lastVisibility: (SoakVisibility & { focusLosses: number }) | null = null;
       try {
         setStatus("性能测量等待可见窗口，请将此窗口置于前台");
         const deadline = performance.now() + 120_000;
         let ready = false;
         while (performance.now() < deadline) {
           const sample = await monitor.sample();
-          if (!sample.hidden && sample.rafPerSecond > 5) { ready = true; break; }
+          if (!sample.hidden && sample.focused && sample.rafPerSecond > 5) { ready = true; break; }
         }
-        if (!ready) throw new Error("性能测量未获得可见合成窗口");
+        if (!ready) throw new Error("性能测量未获得前台可见合成窗口");
+        // 入口与结束采样都聚焦还不够；测量途中失焦也使整次证据无效。
+        window.addEventListener("blur", onWindowBlur);
         monitor.reset();
         const added = config.repoPath ? await ipc.addRepo(config.repoPath) : null;
         const list = await ipc.listRepos();
@@ -1419,7 +1425,6 @@ export function App() {
         const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
         if (!worktree) throw new Error("没有可测量的 worktree");
         setWorktreeId(worktree.id);
-        const results: Measurement[] = [];
         const views = (config.only?.length ? config.only : ["split", "unified"]) as ViewMode[];
         for (const targetView of views) {
           const measurement = await runMeasurement(
@@ -1435,17 +1440,20 @@ export function App() {
               `滚动未覆盖帧 ${measurement?.scroll?.uncoveredFrames ?? "?"}`,
           );
         }
-        const visibility = await monitor.sample();
-        if (visibility.hidden || visibility.rafPerSecond <= 5 || visibility.hiddenTransitions > 0 || visibility.maxFrameGapMs > 2000) {
-          throw new Error(`性能测量可见性无效：${JSON.stringify(visibility)}`);
+        const visibility = { ...await monitor.sample(), focusLosses };
+        lastVisibility = visibility;
+        if (!visibility.focused || visibility.focusLosses > 0 || visibility.hidden || visibility.rafPerSecond <= 5
+          || visibility.hiddenTransitions > 0 || visibility.maxFrameGapMs > 2000) {
+          throw new Error(`性能测量前台可见性无效：${JSON.stringify(visibility)}`);
         }
         if (results.length !== views.length) throw new Error("性能测量结果缺失");
         await ipc.writeMeasurement({ ok: true, combos: results, visibility });
         debugLog(`测量完成，共 ${results.length} 组`);
       } catch (caught) {
         debugLog(`自动测量失败：${getErrorMessage(caught)}`);
-        await ipc.writeMeasurement({ ok: false, error: getErrorMessage(caught) });
+        await ipc.writeMeasurement({ ok: false, error: getErrorMessage(caught), combos: results, visibility: lastVisibility });
       } finally {
+        window.removeEventListener("blur", onWindowBlur);
         monitor.stop();
       }
     },

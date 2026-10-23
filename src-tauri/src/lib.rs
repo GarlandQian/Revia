@@ -40,6 +40,14 @@ pub fn run() {
                 data_dir.display(),
                 std::env::var("REVIA_MEASURE").ok()
             ));
+            if commands::is_measure_auto_run()
+                && commands::soak_seconds().is_none()
+                && std::env::var_os("REVIA_SMOKE").is_none()
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&format!("Revia - 性能测量 PID {}", std::process::id()))?;
+                }
+            }
             if commands::soak_seconds().is_some() {
                 if let Some(window) = app.get_webview_window("main") {
                     window.set_title(&format!("Revia - 长测 PID {}", std::process::id()))?;

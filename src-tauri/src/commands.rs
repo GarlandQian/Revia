@@ -454,8 +454,15 @@ pub async fn write_measurement(payload: serde_json::Value) -> Result<Option<Stri
     let text = serde_json::to_string_pretty(&payload)?;
     std::fs::write(&path, text)
         .map_err(|error| AppError::internal(format!("写入测量结果失败：{error}")))?;
-    // 自动测量、冒烟检查或长测结束写入结果后退出应用进程，使 `open -n -W` 能正常阻塞并返回。
-    if is_measure_auto_run() || is_soak_run() || std::env::var("REVIA_SMOKE").is_ok() {
+    // 自动测量可在写完结果后保留原进程供截图；不改变测量边界或数据。
+    let keep_measurement_open = is_measure_auto_run()
+        && !is_soak_run()
+        && std::env::var_os("REVIA_SMOKE").is_none()
+        && std::env::var("REVIA_MEASURE_KEEP_OPEN").as_deref() == Ok("1");
+    // 默认仍自动退出，使 `open -n -W` 能正常阻塞并返回。
+    if !keep_measurement_open
+        && (is_measure_auto_run() || is_soak_run() || std::env::var("REVIA_SMOKE").is_ok())
+    {
         std::thread::spawn(|| {
             std::thread::sleep(std::time::Duration::from_millis(500));
             std::process::exit(0);
