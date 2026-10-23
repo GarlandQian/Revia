@@ -175,6 +175,12 @@ impl Git {
         const REDIRECT_VARS: &[&str] = &[
             "GIT_DIR",
             "GIT_WORK_TREE",
+            // 配置重定向：`GIT_CONFIG` 指向单个配置文件，`GIT_CONFIG_COUNT` /
+            // `GIT_CONFIG_PARAMETERS` / `GIT_CONFIG_KEY_*` 可在环境里注入配置。
+            // 保留任一都会让 scratch 的 `config` 写进用户配置。
+            "GIT_CONFIG",
+            "GIT_CONFIG_COUNT",
+            "GIT_CONFIG_PARAMETERS",
             "GIT_INDEX_FILE",
             "GIT_OBJECT_DIRECTORY",
             "GIT_ALTERNATE_OBJECT_DIRECTORIES",
@@ -191,6 +197,13 @@ impl Git {
             .env
             .iter()
             .filter(|(key, _)| {
+                if key
+                    .to_ascii_uppercase()
+                    .starts_with("GIT_CONFIG_KEY_")
+                    || key.to_ascii_uppercase().starts_with("GIT_CONFIG_VALUE_")
+                {
+                    return false;
+                }
                 !REDIRECT_VARS
                     .iter()
                     .any(|name| key.eq_ignore_ascii_case(name))
@@ -401,20 +414,26 @@ impl Git {
             .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
     }
 
-    /// 读取某个前缀下的全部配置项（`key value` 行），用于等价复制 filter.* 等设置。
-    pub fn config_entries(&self, prefix: &str) -> Result<Vec<String>> {
+    /// 读取某个前缀下的全部配置项，返回（键, 值）。
+    ///
+    /// 必须使用 `--null`：配置值可以合法包含换行（例如 `smudge = ":\ncat"`），
+    /// 按行拆分会把多行命令截断，复制到预览仓库后与原仓库语义不同。
+    pub fn config_entries(&self, prefix: &str) -> Result<Vec<(String, String)>> {
         let pattern = format!("^{prefix}");
-        let output = self.run(&["config", "--get-regexp", &pattern])?;
+        let output = self.run(&["config", "--null", "--get-regexp", &pattern])?;
         if output.exit_code == 1 {
             return Ok(Vec::new());
         }
         let output = output.into_success("读取 Git 配置")?;
-        Ok(output
-            .stdout_lossy()
-            .lines()
-            .map(|line| line.trim_end().to_string())
-            .filter(|line| !line.is_empty())
-            .collect())
+        Ok(parse_config_null(&output.stdout))
+    }
+
+    /// Git 自己解析出的真实路径（例如 `info/attributes` 在 linked worktree 下位于 commonDir）。
+    /// 返回值可能是相对路径，调用方按工作目录解析。
+    pub fn git_path(&self, name: &str) -> Option<PathBuf> {
+        let text = self.try_run(&["rev-parse", "--git-path", name])?;
+        let path = text.trim();
+        (!path.is_empty()).then(|| PathBuf::from(path))
     }
 
     /// `git config --get`；未设置时返回 None。
@@ -540,6 +559,26 @@ fn read_pipe(pipe: Option<impl Read>) -> Vec<u8> {
     let mut buffer = Vec::new();
     let _ = pipe.read_to_end(&mut buffer);
     buffer
+}
+
+/// 解析 `git config --null --get-regexp` 的输出：每条记录是 `key\nvalue\0`。
+/// 值内部可以包含换行与空白，必须原样保留。
+fn parse_config_null(bytes: &[u8]) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    for chunk in bytes.split(|byte| *byte == 0) {
+        if chunk.is_empty() {
+            continue;
+        }
+        match chunk.iter().position(|byte| *byte == b'\n') {
+            Some(index) => entries.push((
+                String::from_utf8_lossy(&chunk[..index]).into_owned(),
+                String::from_utf8_lossy(&chunk[index + 1..]).into_owned(),
+            )),
+            // 没有分隔符时是「值为真」的布尔配置。
+            None => entries.push((String::from_utf8_lossy(chunk).into_owned(), "true".into())),
+        }
+    }
+    entries
 }
 
 pub fn is_lock_error(output: &GitOutput) -> bool {

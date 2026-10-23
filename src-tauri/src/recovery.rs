@@ -289,8 +289,11 @@ pub fn context_fingerprint(git: &Git, paths: &[String]) -> Result<String> {
         }
         hasher.update([0]);
     }
-    for line in git.config_entries("filter.")? {
-        hasher.update(line.as_bytes());
+    for (key, value) in git.config_entries("filter.")? {
+        hasher.update(key.as_bytes());
+        hasher.update([0]);
+        hasher.update((value.len() as u64).to_le_bytes());
+        hasher.update(value.as_bytes());
         hasher.update([0]);
     }
     for path in paths {
@@ -335,10 +338,9 @@ fn prepare_scratch(git: &Git, worktree: &Path, scratch: &Path, paths: &[String])
         }
     }
     // 2. 本地 filter.* 全部子键：转换是否发生、如何发生都由它决定。
-    for entry in git.config_entries("filter.")? {
-        if let Some((key, value)) = entry.split_once(' ') {
-            isolated.run_ok(&["config", "--add", key, value], "复制预览 filter 配置")?;
-        }
+    //    值可能是多行 shell 命令，必须原样作为单个参数传递。
+    for (key, value) in git.config_entries("filter.")? {
+        isolated.run_ok(&["config", "--add", &key, &value], "复制预览 filter 配置")?;
     }
     // 3. 工作区 `.gitattributes` 链（根到目标父目录）。
     let mut attribute_dirs: Vec<PathBuf> = Vec::new();
@@ -356,10 +358,12 @@ fn prepare_scratch(git: &Git, worktree: &Path, scratch: &Path, paths: &[String])
             }
         }
     }
-    // 4. 该仓库的 info/attributes（不受工作区文件影响，但同样参与属性判定）。
-    let info_attributes = git
-        .try_run(&["rev-parse", "--path-format=absolute", "--git-dir"])
-        .map(|dir| PathBuf::from(dir.trim()).join("info/attributes"));
+    // 4. 该仓库实际生效的 info/attributes。
+    //    linked worktree 的私有 gitDir 下没有 info/，Git 用的是 commonDir 下那份；
+    //    这里交给 Git 自己解析，不猜目录布局。返回值可能是相对工作目录的路径。
+    let info_attributes = git.git_path("info/attributes").map(|path| {
+        if path.is_absolute() { path } else { worktree.join(path) }
+    });
     if let Some(source) = info_attributes.as_ref().filter(|path| path.is_file()) {
         let destination = scratch.join(".git").join("info");
         fs::create_dir_all(&destination)?;

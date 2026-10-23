@@ -4,7 +4,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、4、7，T05、T07、T10、T11、D02；Q9、Q81–Q83、Q85、Q87、Q91、Q93。
 
@@ -165,3 +165,45 @@
 主审在 `/private/tmp` 独立 fixture 复现了上述三条路径，原始脚本、命令、结果、config 前后字节及各轴独立结果保存在 `../evidence/task04-review02/`，manifest 记录来源与哈希。没有对用户仓库执行复现写入。linked worktree 同一补丁在真实 Git 中可正确应用且 index 不变；多行 filter 两侧有效属性相同，不能被现有自证检查识别。
 
 本轮仅要求补齐上述安全与等价性缺口；沿用真实 Git、独立数据目录和现有测试体系，不扩大 04 范围，不提前做 05/07/08/12/13。相关修改完成后集中运行最小受影响回归；共享 Git 配置 API 的返回契约变化须检查其调用者。原 SP1/V1 已闭合，不无理由重做整套旧验收。GUI、D06、Windows CI 与最终长测仍未完成；修复交回 Pi，连续渠道报错三次才接管，不把测试失败或 `paseo wait` 等待到时计作渠道错误。
+
+### 2026-10-23 / Pi 审查修复（第 2 轮）
+
+受审实现 `6d8a709`；本轮逐项处理 `../evidence/task04-review02/` 的 3 条发现。原两轮证据目录均未修改或覆盖。上一轮已闭合的 SP1（保存后属性变化写前拒绝）、V1（真实写入后回执丢失）与 ST3（CSS 变量）本轮未重做。
+
+#### R04-R2-ST1 / R04-R2-SP3（`GIT_CONFIG` 使 scratch 配置写入落进用户配置）— 已修复
+
+- `Git::in_isolated_directory` 的剔除名单补齐配置重定向：`GIT_CONFIG`、`GIT_CONFIG_COUNT`、`GIT_CONFIG_PARAMETERS`，以及 `GIT_CONFIG_KEY_*` / `GIT_CONFIG_VALUE_*`（前缀匹配，大小写不敏感）。此前只覆盖定位类变量，确实漏掉了配置类。
+- 回归 `git_config_redirect_environment_never_writes_user_config`：在真实仓库里预置 `filter.demo.clean/smudge` 与 `core.attributesFile`，把 `GIT_CONFIG` 指向该仓库 config 后打开会话并丢弃，断言**整份 config 字节完全不变**、`git config --get-all filter.demo.clean` 仍只有一条（无重复追加）、`core.attributesFile` 仍指向原文件且原文件仍在、index 不变、丢弃正常完成。
+- 已用"临时从名单移除 `GIT_CONFIG`"验证该用例会失败（有牙），与审查复现一致。
+- **更正上一轮范围声明**：上一轮 Comments 写「`init`/`config`/`apply` 全部改用隔离上下文」「剔除所有把 Git 定位或配置重定向到别处的环境变量」——当时只覆盖了定位类变量，配置类未覆盖，该说法过宽。原文保留，本段为更正。
+
+#### R04-R2-ST2 / R04-R2-SP1（linked worktree 的 `info/attributes` 取错位置）— 已修复
+
+- 改为使用 Git 自己解析的路径：`git rev-parse --git-path info/attributes`（新增 `Git::git_path`），相对路径按工作目录解析。不再用私有 `--git-dir` 拼 `info/attributes`——linked worktree 的私有 gitDir 下并没有这个文件，Git 实际用的是 commonDir 下那份。
+- 回归 `linked_worktree_uses_shared_info_attributes_for_discard`：主仓库 + `git worktree add` 的 linked，在**共享** `.git/info/attributes` 设 `*.txt text eol=crlf`，linked 内两个 CRLF 文本分别做整文件丢弃与单 hunk 丢弃；断言整文件回到提交字节、未选中 hunk 保持提交内容、linked 的 index 不变、两条记录的身份确认为 linked 且 `worktreePath` 为 linked（canonical），main 身份查询同一批记录为未确认（不串记录）。
+- 原 main 仓库的 `info/attributes` / `core.attributesFile` / 本地 filter 用例全部保留并通过。
+- 已用"临时改回 `--git-dir` 拼路径"验证该用例会失败（有牙）。
+
+#### R04-R2-SP2（多行 filter 值被按行拆坏）— 已修复
+
+- `Git::config_entries` 改为**无损**读取：`git config --null --get-regexp`，解析 `key\nvalue\0` 记录，值内部换行、空白、空值与多值全部原样保留；返回值从 `Vec<String>` 改为带类型的 `Vec<(String, String)>`。
+- 复制到预览仓库时用 `config --add <key> <value>` 逐条传单个参数，不再按空格拆分、不再按行重建命令。
+- `context_fingerprint` 使用同一无损口径（键 + 值长度 + 值），避免"指纹相同但命令不同"。
+- 共享 API 调用者已检查：`config_entries` 的两个调用点（复制 filter、上下文指纹）均已更新，`git_path` 单点新增；`file_staging`/`hunk_staging`/`refresh_isolation`/`session_flow` 全部复跑通过。
+- 回归 `multiline_filter_command_is_copied_losslessly`：真实 Git 配置 `clean=cat`、`smudge=":\ncat"`、`required=true`，普通文本可正常丢弃且字节、index 正确；原单行 filter 用例保留。
+- 已用"临时改回按行拆分"验证该用例会失败（有牙），失败形态与审查一致（scratch apply 失败、真实仓库成功）。
+
+#### 本轮实际执行的检查
+
+- `cargo test --manifest-path src-tauri/Cargo.toml`：**176 项通过**
+  - lib 85、`discard_recovery` **31**、`file_staging` 20、`hunk_staging` 23、`refresh_isolation` 14、`session_flow` 3
+- 未改前端，因此未重复 `tsc`/`lint`/`build`/Node 工具，也未重建 `.app`（按指示等规划方复核后再构建）。
+- 三个新回归均做过"回退修复即失败"的对照验证。
+
+#### 仍未验证 / 遗留风险
+
+- **真实桌面、Windows 实机、CI、D06、最终长测均未执行**，未声称通过。
+- `GIT_CONFIG` 相关路径在 macOS 生产环境被现有白名单挡住，Windows 可达性为**静态结论**（`shell.rs` 的 Windows 分支继承进程全部环境），未做 Windows 实机验证。
+- `git rev-parse --git-path` 在极旧 Git 上的行为未单独验证（项目最低要求 Git 2.11；本轮在 Git 2.56 实测）。
+- 写前核对与 Git 子进程启动之间的外部竞态窗口仍未消除（与上一轮结论一致）。
+- 记录容量上限与 14 天清理仍属 05，未做。

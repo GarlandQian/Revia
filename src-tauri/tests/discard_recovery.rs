@@ -887,3 +887,142 @@ fn git_apply_lost_receipt_keeps_record_and_never_retries() {
     assert_eq!(store.list(None).unwrap().len(), 1);
     assert_eq!(fs::read_to_string(&counter).unwrap_or_default().matches('x').count(), 1);
 }
+
+/// R04-R2-ST1 / R04-R2-SP3：`GIT_CONFIG` 指向真实配置时（Windows 生产会继承该变量），
+/// 预览的 `config` 写入绝不能落进用户配置；整份 config、filter、attributesFile、index 都必须不变。
+#[test]
+fn git_config_redirect_environment_never_writes_user_config() {
+    let f = Fixture::new();
+    f.git(&["config", "filter.demo.clean", "cat"]);
+    f.git(&["config", "filter.demo.smudge", "cat"]);
+    let attrs = f.temp.path().join("repo-level-attributes");
+    fs::write(&attrs, b"").unwrap();
+    f.git(&["config", "core.attributesFile", attrs.to_str().unwrap()]);
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let config_path = f.repo.join(".git").join("config");
+    let config_before = fs::read(&config_path).unwrap();
+    let index_before = f.index();
+
+    // 模拟从设置了 GIT_CONFIG 的终端启动。
+    let mut vars = f.vars.clone();
+    vars.insert("GIT_CONFIG".into(), config_path.display().to_string());
+    let redirected = WorktreeSession::open("fixture-config-redirect", &f.repo, ShellEnv {
+        vars, path: f.paths.clone(),
+        info: EnvCaptureInfo { worktree: f.repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
+            timed_out: false, used_fallback: true, var_count: f.vars.len(), path_entries: f.paths.clone(), diagnostics: None },
+    }, Arc::new(CommandLog::default())).unwrap();
+    let redirected_target = entry(&redirected, "target.ts");
+    let store = f.store();
+    redirected
+        .discard_file("target.ts", &redirected_target.fingerprint, &redirected_target.snapshot_revision, &store)
+        .expect("GIT_CONFIG 重定向下也必须能正常丢弃");
+
+    assert_eq!(fs::read(&config_path).unwrap(), config_before, "用户 Git 配置字节必须完全不变");
+    assert_eq!(f.git(&["config", "--get-all", "filter.demo.clean"]), b"cat\n", "filter 不得重复追加");
+    assert_eq!(f.git(&["config", "--get-all", "filter.demo.smudge"]), b"cat\n");
+    assert_eq!(
+        f.git(&["config", "--get", "core.attributesFile"]).trim_ascii(),
+        attrs.display().to_string().as_bytes(),
+        "core.attributesFile 不得被改指向临时预览路径"
+    );
+    assert!(attrs.is_file(), "原属性文件必须仍在");
+    assert_eq!(f.index(), index_before);
+    assert_eq!(f.read("target.ts"), text(&[]));
+}
+
+/// R04-R2-ST2 / R04-R2-SP1：linked worktree 的 `info/attributes` 位于 commonDir。
+/// 共享属性设为 CRLF 时，linked 目标必须能正常整文件与 hunk 丢弃，记录归属 linked 而非 main。
+#[test]
+fn linked_worktree_uses_shared_info_attributes_for_discard() {
+    let f = Fixture::new();
+    f.write("base.txt", b"base\n");
+    f.commit();
+    let linked = f.temp.path().join("linked");
+    f.git(&["worktree", "add", "-b", "linked", linked.to_str().unwrap()]);
+
+    // 共享 info/attributes：Git 对 linked worktree 实际生效的位置。
+    let common_info = f.repo.join(".git").join("info").join("attributes");
+    fs::create_dir_all(common_info.parent().unwrap()).unwrap();
+    fs::write(&common_info, b"*.txt text eol=crlf\n").unwrap();
+
+    // 在 linked 中准备两个 CRLF 文本：一个整文件丢弃、一个 hunk 丢弃。
+    fs::write(linked.join("whole.txt"), b"alpha\nbeta\n").unwrap();
+    fs::write(linked.join("part.txt"), b"one\ntwo\nthree\nfour\nfive\n").unwrap();
+    let linked_git = |args: &[&str]| {
+        let output = Command::new("git").current_dir(&linked).env_clear().envs(&f.vars).args(args).output().unwrap();
+        assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+        output.stdout
+    };
+    linked_git(&["add", "--all"]);
+    linked_git(&["commit", "-m", "linked fixture"]);
+    for name in ["whole.txt", "part.txt"] {
+        fs::remove_file(linked.join(name)).unwrap();
+        linked_git(&["checkout", "--", name]);
+        assert_eq!(fs::read(linked.join(name)).unwrap().windows(2).filter(|w| w == b"\r\n").count() > 0, true);
+    }
+    let whole_committed = fs::read(linked.join("whole.txt")).unwrap();
+    let part_committed = fs::read(linked.join("part.txt")).unwrap();
+    fs::write(linked.join("whole.txt"), b"alpha\r\nBETA\r\n").unwrap();
+    fs::write(linked.join("part.txt"), b"one\r\ntwo\r\nTHREE\r\nfour\r\nfive\r\n").unwrap();
+
+    let session = f.session_at(&linked);
+    let store = f.store();
+    let index_before = {
+        let output = Command::new("git").current_dir(&linked).env_clear().envs(&f.vars)
+            .args(["ls-files", "--stage", "-z"]).output().unwrap();
+        output.stdout
+    };
+
+    let whole = entry(&session, "whole.txt");
+    discard(&session, &whole, &store).expect("linked 整文件丢弃必须成功");
+    assert_eq!(fs::read(linked.join("whole.txt")).unwrap(), whole_committed);
+
+    let part = entry(&session, "part.txt");
+    session.refresh().unwrap();
+    let rows = session.rows("part.txt", ChangesKind::Unstaged, ViewMode::Split, 0, 200).unwrap();
+    let action = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).expect("应有 hunk").clone();
+    session
+        .discard_hunk("part.txt", &action.fingerprint, &action.snapshot_revision, &action.hunk_id, &store)
+        .expect("linked hunk 丢弃必须成功");
+    let after = fs::read(linked.join("part.txt")).unwrap();
+    assert_eq!(after, part_committed, "未选中的 hunk 必须保持提交内容");
+
+    // index 不变，记录归属 linked 而不是 main。
+    let index_after = Command::new("git").current_dir(&linked).env_clear().envs(&f.vars)
+        .args(["ls-files", "--stage", "-z"]).output().unwrap().stdout;
+    assert_eq!(index_after, index_before, "丢弃不得改变 linked 的暂存区");
+    let linked_identity = WorktreeIdentity::capture(&session.git).unwrap();
+    let records = store.list(Some(&linked_identity)).unwrap();
+    assert_eq!(records.len(), 2);
+    assert!(records.iter().all(|record| record.identity_confirmed));
+    let linked_canonical = fs::canonicalize(&linked).unwrap().display().to_string();
+    assert!(
+        records.iter().all(|record| record.worktree_path == linked_canonical),
+        "记录必须归属 linked worktree：{records:?}"
+    );
+    let main_session = f.session();
+    let main_identity = WorktreeIdentity::capture(&main_session.git).unwrap();
+    assert!(store.list(Some(&main_identity)).unwrap().iter().all(|record| !record.identity_confirmed));
+}
+
+/// R04-R2-SP2：配置值可以合法包含换行（`smudge = ":\\ncat"`）。
+/// 复制到预览仓库时必须无损，否则 scratch apply 失败而真实仓库成功。
+#[cfg(unix)]
+#[test]
+fn multiline_filter_command_is_copied_losslessly() {
+    let f = Fixture::new();
+    f.git(&["config", "filter.copy.clean", "cat"]);
+    f.git(&["config", "filter.copy.smudge", ":\ncat"]);
+    f.git(&["config", "filter.copy.required", "true"]);
+    f.write(".gitattributes", b"target.txt filter=copy\n");
+    f.write("target.txt", b"alpha\nbeta\n");
+    f.commit();
+    f.write("target.txt", b"alpha\nBETA\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let index = f.index();
+    discard(&session, &target, &f.store()).expect("多行 filter 配置下的普通文本必须可丢弃");
+    assert_eq!(f.read("target.txt"), b"alpha\nbeta\n");
+    assert_eq!(f.index(), index);
+}
