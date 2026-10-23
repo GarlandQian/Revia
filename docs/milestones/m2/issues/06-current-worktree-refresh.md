@@ -202,3 +202,16 @@
 - **P2：切走后原 worktree 的「结果待核对」被永久丢弃。** `src/App.tsx:739` 对非当前激活直接丢弃写错误，未写入既有的 `worktreeErrors`；返回原 worktree 也看不到提示，违反实现决策 3 的「结果提示属于原 worktree」及「操作显示结果待核对」。应区分不污染当前界面与保存原操作结果；保存归属时也须防止旧错误覆盖该 worktree 较新的操作结果，不自动重跑写入。
 
 Standards：3 项硬违规，最严重 P1；另有 1 项非阻塞判断性建议。Spec：4 项，最严重 P1。两轴分别保留，不以一轴通过代替另一轴。原生产轮询性能样本仅证明相应滚动指标，不能替代自动刷新功能链路的验证。
+
+### 2026-10-23 / Codex 接手第二轮修复
+
+已按 Q75 通过 `paseo send` 交给当前 Revia Pi 会话，并用 `paseo wait` 等待；渠道最终返回 `unexpected EOF`、会话为 `error`，未产出修改。按仓库约定由 Codex 直接接手，没有切换其他模型。
+
+- 通知拆成 `WatchEvents.sequence` 与 `activation`；同一次激活的每次合并事件都递增，旧激活不能盖掉新事件。生产轮询实际使用 `WatchEventGate`，首个事件不再被当基线吞掉，状态也须匹配当前激活。
+- 先识别自有 gitDir 的顶层元数据，再处理 commonDir；主目录共享 refs 仍被识别，linked 的自身 index / HEAD 不再被屏蔽，其他 worktree 的私有 index 不被当作共享元数据。
+- 最新受理、安装序号、当前 watcher 与保留状态集中在同一锁内；启动在锁外，安装时原子复核序号，停止也使在途安装失效，旧 watcher 仍在锁外释放。用通道明确阻塞旧请求的启动、先安装新目标或停止、再释放旧请求，未靠 sleep 碰竞态。
+- 写结果增加每 worktree 的操作序号；失败保存在原目标的错误字典，切走不丢失，旧操作不能盖掉该目标更新的操作结果。只有当前激活可以更新快照或触发当前读取，绝不重跑写入。
+- 补充默认关闭的文件控制验收接缝，必须 `REVIA_ACCEPTANCE=1` 加独立绝对 `REVIA_ACCEPTANCE_DIR`，该目录实际用于应用数据；普通运行不读控制目录。真实响应完成并释放业务锁后才门控，可一次性捕获、显式释放；失败注入不破坏仓库或 Git。方法及超时／错误证据限制见 [桌面接缝](../desktop-seams.md)。
+- 集中检查：`pnpm build`（含类型检查）、`pnpm lint` 通过；Node 四组 64 项通过；Rust 82 单元 + 20 file_staging + 23 hunk_staging + 14 refresh_isolation + 3 session_flow = **142 项通过**。新增回归包含当前 linked 目标的真实外部暂存／取消暂存／HEAD 变化及其他 linked index 隔离。首次编译因 sha2 0.11 的摘要数组不支持 `LowerHex` 失败，修正局部编码后仅重跑 Rust，失败日志保留。
+
+上述为实现与自动检查，不是复审或桌面验收通过。Release 构建、修复后两轴复审、D03 / D05 / Q95 真实桌面及 D06 回归仍待闭合；任务暂保留 `ready-for-agent`，不将已有任务 03 的 CI 冒称为当前版本 Windows 通过。

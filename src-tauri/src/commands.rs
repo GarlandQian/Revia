@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::State;
 
+use crate::acceptance::{deliver, Acceptance};
 use crate::error::{AppError, Result};
 use crate::git::highlight::HighlightResult;
 use crate::git::rows::ViewMode;
@@ -17,7 +18,7 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
-use crate::watch::{resolve_roots, WatchController, WatchStatus};
+use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 pub struct AppState {
     pub registry: Mutex<Registry>,
@@ -25,8 +26,9 @@ pub struct AppState {
     pub command_log: Arc<CommandLog>,
     /// 只监视当前 worktree 的控制器（Q88）。
     pub watch: Arc<WatchController>,
-    /// 最近一次「有变化」的激活代号（由监视线程写入）。
-    pub watch_events: Arc<Mutex<Option<u64>>>,
+    /// 合并事件的单调进度及激活归属。
+    pub watch_events: Arc<Mutex<WatchEvents>>,
+    pub acceptance: Option<Arc<Acceptance>>,
 }
 
 impl AppState {
@@ -37,7 +39,8 @@ impl AppState {
             sessions: Mutex::new(HashMap::new()),
             command_log,
             watch: Arc::new(WatchController::new()),
-            watch_events: Arc::new(Mutex::new(None)),
+            watch_events: Arc::new(Mutex::new(WatchEvents::default())),
+            acceptance: None,
         }
     }
 
@@ -226,13 +229,15 @@ pub async fn open_worktree(state: State<'_, AppState>, request: WorktreeRequest)
 #[tauri::command]
 pub async fn watch_worktree(state: State<'_, AppState>, request: WatchWorktreeRequest) -> Result<WatchStatus> {
     let session = state.session(&request.worktree_id)?;
+    apply_acceptance_watch_failure(&state);
     let events = state.watch_events.clone();
     let status = state.watch.activate(
         resolve_roots(&session.path, session.git_dir_path(), session.common_dir_path()),
         request.activation,
         move |activation| {
-            // 只记录「哪个激活目标发生了变化」：具体读取由前端在合并窗口后触发一次。
-            events.lock().map(|mut guard| *guard = Some(activation)).ok();
+            if let Ok(mut events) = events.lock() {
+                events.record(activation);
+            }
         },
     );
     Ok(status)
@@ -251,16 +256,30 @@ pub struct WatchSnapshot {
     pub status: WatchStatus,
     /// 最近一次触发变化的激活代号；前端只接受属于自己的目标。
     pub changed_activation: Option<u64>,
+    pub event_sequence: u64,
 }
 
 #[tauri::command]
 pub async fn watch_status(state: State<'_, AppState>) -> Result<WatchSnapshot> {
+    apply_acceptance_watch_failure(&state);
     let status = state.watch.status();
-    let changed_activation = state.watch_events.lock().ok().and_then(|guard| *guard);
+    let events = state.watch_events.lock().map(|guard| *guard)
+        .map_err(|_| AppError::internal("监视事件锁失败"))?;
     Ok(WatchSnapshot {
         status,
-        changed_activation,
+        changed_activation: events.activation,
+        event_sequence: events.sequence,
     })
+}
+
+fn apply_acceptance_watch_failure(state: &AppState) {
+    if let Some(acceptance) = &state.acceptance {
+        let failure = acceptance.watch_failure();
+        state.watch.force_failure(failure.clone());
+        if let Some(reason) = failure {
+            state.watch.fail_current(reason);
+        }
+    }
 }
 
 /// 写入测量日志文件（只在设置 REVIA_MEASURE_LOG 时生效）。
@@ -294,9 +313,10 @@ pub async fn list_changes(state: State<'_, AppState>, request: WorktreeRequest) 
     let result = tauri::async_runtime::spawn_blocking(move || session.refresh())
         .await
         .map_err(|error| AppError::internal(format!("读取状态失败：{error}")))?;
-    let inner = result?;
-    log_measure(&format!("list_changes 完成：{} 个文件，{} ms", inner.entries.len(), inner.elapsed_ms));
-    Ok(inner)
+    if let Ok(inner) = &result {
+        log_measure(&format!("list_changes 完成：{} 个文件，{} ms", inner.entries.len(), inner.elapsed_ms));
+    }
+    deliver(state.acceptance.as_ref(), "list_changes", &request.worktree_id, None, result).await
 }
 
 #[tauri::command]
@@ -306,11 +326,13 @@ pub async fn stage_file(
 ) -> Result<ChangesSnapshot> {
     log_measure(&format!("stage_file 收到：{} {}", request.worktree_id, request.path));
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.stage_file(&request.path, &request.fingerprint)
     })
     .await
-    .map_err(|error| AppError::internal(format!("暂存文件失败：{error}")))?
+    .map_err(|error| AppError::internal(format!("暂存文件失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "stage_file", &context.worktree_id, Some(&context.path), result).await
 }
 
 #[tauri::command]
@@ -320,31 +342,37 @@ pub async fn unstage_file(
 ) -> Result<ChangesSnapshot> {
     log_measure(&format!("unstage_file 收到：{} {}", request.worktree_id, request.path));
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.unstage_file(&request.path, &request.fingerprint)
     })
     .await
-    .map_err(|error| AppError::internal(format!("取消暂存文件失败：{error}")))?
+    .map_err(|error| AppError::internal(format!("取消暂存文件失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "unstage_file", &context.worktree_id, Some(&context.path), result).await
 }
 
 #[tauri::command]
 pub async fn stage_hunk(state: State<'_, AppState>, request: HunkRequest) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("暂存 hunk 任务中断，结果待核对：{error}")))?
+    .map_err(|error| AppError::needs_verification(format!("暂存 hunk 任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "stage_hunk", &context.worktree_id, Some(&context.path), result).await
 }
 
 #[tauri::command]
 pub async fn unstage_hunk(state: State<'_, AppState>, request: HunkRequest) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("取消暂存 hunk 任务中断，结果待核对：{error}")))?
+    .map_err(|error| AppError::needs_verification(format!("取消暂存 hunk 任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "unstage_hunk", &context.worktree_id, Some(&context.path), result).await
 }
 
 #[tauri::command]
@@ -354,11 +382,13 @@ pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Resul
         request.path, request.from, request.to
     ));
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.rows(&request.path, request.changes, request.view, request.from, request.to)
     })
     .await
-    .map_err(|error| AppError::internal(format!("取显示行失败：{error}")))?
+    .map_err(|error| AppError::internal(format!("取显示行失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "get_rows", &context.worktree_id, Some(&context.path), result).await
 }
 
 #[tauri::command]
@@ -368,7 +398,8 @@ pub async fn highlight_range(state: State<'_, AppState>, request: HighlightReque
         request.path, request.changes, request.version, request.from_line, request.to_line
     ));
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.highlight(
             &request.path,
             request.changes,
@@ -378,13 +409,15 @@ pub async fn highlight_range(state: State<'_, AppState>, request: HighlightReque
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("高亮失败：{error}")))?
+    .map_err(|error| AppError::internal(format!("高亮失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "highlight_range", &context.worktree_id, Some(&context.path), result).await
 }
 
 #[tauri::command]
 pub async fn row_index_for_line(state: State<'_, AppState>, request: RowIndexRequest) -> Result<u32> {
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         session.row_index_for_line(
             &request.path,
             request.changes,
@@ -394,7 +427,8 @@ pub async fn row_index_for_line(state: State<'_, AppState>, request: RowIndexReq
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("换算行号失败：{error}")))?
+    .map_err(|error| AppError::internal(format!("换算行号失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "row_index_for_line", &context.worktree_id, Some(&context.path), result).await
 }
 
 /// 语法类别名（按索引顺序），前端用它建立 index → CSS 变量的映射（Q50）。

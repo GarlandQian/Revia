@@ -13,6 +13,26 @@ export interface SnapshotEnvelope {
   revision: number;
 }
 
+export interface ActivationContext {
+  activation: number;
+  worktreeId: string | null;
+}
+
+export interface OperationContext extends ActivationContext {
+  operation: number;
+}
+
+/** 激活是归属，事件序号才是进度；首个事件和同激活内的连续保存都必须消费。 */
+export class WatchEventGate {
+  private seenSequence = 0;
+
+  consume(activation: number, event: { changedActivation: number | null; eventSequence: number }): boolean {
+    if (event.changedActivation !== activation || event.eventSequence <= this.seenSequence) return false;
+    this.seenSequence = event.eventSequence;
+    return true;
+  }
+}
+
 export class SnapshotGate {
   /** 每次切换 worktree 递增；用于识别 A→B→A 里第一次 A 的迟到响应。 */
   private activation = 0;
@@ -120,30 +140,38 @@ export class RefreshCoordinator {
  * 规则：
  * - 结果快照必须仍然属于发起时的激活目标；
  * - 结果版本不得低于该目标已接受的版本（晚到的 r2 不能覆盖 r3）；
- * - 失败/待核对结果同样只在发起目标仍激活时生效。
+ * - 失败/待核对结果保留在原 worktree；只有读取与当前快照更新受激活约束。
  */
 export class OperationResultGate {
   private readonly gate: SnapshotGate;
+  private operations = new Map<string, number>();
 
   constructor(gate: SnapshotGate) {
     this.gate = gate;
   }
 
-  begin(): { activation: number; worktreeId: string | null } {
-    return this.gate.token();
+  begin(): OperationContext {
+    const context = this.gate.token();
+    const operation = (this.operations.get(context.worktreeId ?? "") ?? 0) + 1;
+    if (context.worktreeId) this.operations.set(context.worktreeId, operation);
+    return { ...context, operation };
+  }
+
+  canRecord(context: OperationContext): boolean {
+    return context.worktreeId !== null && this.operations.get(context.worktreeId) === context.operation;
   }
 
   /** 成功结果：返回是否应当应用到界面。 */
   acceptSuccess(
-    token: { activation: number; worktreeId: string | null },
+    token: OperationContext,
     result: SnapshotEnvelope,
   ): boolean {
-    return this.gate.accept(token, result);
+    return this.canRecord(token) && this.gate.accept(token, result);
   }
 
   /** 失败/待核对结果：只在发起目标仍激活时生效。 */
-  acceptFailure(token: { activation: number; worktreeId: string | null }): boolean {
-    return this.gate.token().activation === token.activation
+  acceptFailure(token: OperationContext): boolean {
+    return this.canRecord(token) && this.gate.token().activation === token.activation
       && this.gate.token().worktreeId === token.worktreeId;
   }
 }

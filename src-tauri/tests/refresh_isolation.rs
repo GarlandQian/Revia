@@ -643,10 +643,8 @@ fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
         session.common_dir_path(),
     );
     assert!(roots.git_dir.is_dir(), "必须解析出真实 gitDir");
-    assert!(
-        !roots.git_dir.starts_with(&session.path),
-        "linked worktree 的 gitDir 应在 commonDir 下，而不是工作区内"
-    );
+    assert_eq!(fs::canonicalize(&roots.git_dir).unwrap(), fs::canonicalize(&common).unwrap(),
+        "本用例监视主目录；linked 目标的私有元数据另有专门回归");
 
     let hits = Arc::new(AtomicU64::new(0));
     let controller = WatchController::new();
@@ -709,6 +707,45 @@ fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
     std::fs::write(common.join("refs/heads/another-branch"), "0".repeat(40) + "\n").unwrap();
     assert!(wait_for_hit(baseline), "共享 refs 变化必须触发刷新");
 
+    controller.stop();
+}
+
+#[test]
+fn t13_current_linked_worktree_notifies_for_own_index_head_but_not_other_index() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let ctx = TestContext::new();
+    ctx.track("file.txt", b"base\n");
+    let linked = ctx._temp_dir.path().join("current-linked");
+    let other = ctx._temp_dir.path().join("other-linked");
+    ctx.git(&["worktree", "add", "-b", "current-linked", &linked.display().to_string()]);
+    ctx.git(&["worktree", "add", "-b", "other-linked", &other.display().to_string()]);
+    ctx.git(&["branch", "linked-alias"]);
+    let roots = resolve_roots(&linked, None, Some(ctx.repo.join(".git")));
+    let hits = Arc::new(AtomicU64::new(0));
+    let counter = hits.clone();
+    let controller = WatchController::new();
+    assert!(controller.activate(roots, 1, move |_| { counter.fetch_add(1, Ordering::Relaxed); }).active);
+    let expect_event = |operation: &dyn Fn()| {
+        std::thread::sleep(Duration::from_millis(300));
+        let baseline = hits.load(Ordering::Relaxed);
+        operation();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while hits.load(Ordering::Relaxed) == baseline && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(hits.load(Ordering::Relaxed) > baseline, "当前 linked 的实际 Git 变化必须通知");
+    };
+    expect_event(&|| fs::write(linked.join("file.txt"), b"changed\n").unwrap());
+    expect_event(&|| { ctx.git(&["-C", &linked.display().to_string(), "add", "--", "file.txt"]); });
+    expect_event(&|| { ctx.git(&["-C", &linked.display().to_string(), "reset", "--", "file.txt"]); });
+    expect_event(&|| { ctx.git(&["-C", &linked.display().to_string(), "symbolic-ref", "HEAD", "refs/heads/linked-alias"]); });
+    std::thread::sleep(Duration::from_millis(300));
+    let baseline = hits.load(Ordering::Relaxed);
+    fs::write(other.join("file.txt"), b"unrelated\n").unwrap();
+    ctx.git(&["-C", &other.display().to_string(), "add", "--", "file.txt"]);
+    std::thread::sleep(Duration::from_millis(600));
+    assert_eq!(hits.load(Ordering::Relaxed), baseline, "其他 linked 的私有 index 不得通知当前目标");
     controller.stop();
 }
 

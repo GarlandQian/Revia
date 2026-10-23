@@ -30,7 +30,7 @@ import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
-import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate } from "@/lib/refreshGate";
+import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { getErrorMessage, toAppError } from "@/lib/error";
 import {
   formatMs,
@@ -424,7 +424,7 @@ export function App() {
   useEffect(() => {
     if (!worktreeId) return;
     let cancelled = false;
-    let seenActivation: number | null = null;
+    const notifications = new WatchEventGate();
     const poll = async () => {
       const token = gateRef.current.token();
       try {
@@ -432,20 +432,11 @@ export function App() {
         if (cancelled) return;
         // 目标或激活代号已变：这一份状态属于旧目标，丢弃。
         if (gateRef.current.token().activation !== token.activation) return;
+        if (snapshot.status.activation !== token.activation) return;
         const expectedTarget = infoRef.current?.worktreePath ?? null;
         if (expectedTarget && snapshot.status.target !== expectedTarget) return;
         setWatchState({ active: snapshot.status.active, error: snapshot.status.error });
-        const changed = snapshot.changedActivation;
-        if (changed === null) return;
-        if (seenActivation === null) {
-          seenActivation = changed;
-          return;
-        }
-        if (changed > seenActivation) {
-          seenActivation = changed;
-          // 只有当前目标的激活代号才触发刷新。
-          if (changed === token.activation) refreshCoordinator.request();
-        }
+        if (notifications.consume(token.activation, snapshot)) refreshCoordinator.request();
       } catch {
         // 状态查询失败不改变监视结论，等下一轮。
       }
@@ -727,6 +718,7 @@ export function App() {
         ? await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId })
         : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
+      if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       if (operationGateRef.current.acceptSuccess(opToken, next)
         && acceptSnapshot(opToken, next, true)) {
         setAppError(null, opWorktreeId);
@@ -735,13 +727,11 @@ export function App() {
       }
     } catch (caught) {
       const err = toAppError(caught);
-      // 失败/待核对只归属发起时的激活目标，旧请求不覆盖新界面。
-      if (!operationGateRef.current.acceptFailure(opToken)) {
-        debugLog(`写失败结果已过期，不再更新界面：${opWorktreeId}`);
-      } else {
+      // 原目标的结果不能因切走而丢失；字典按 worktree 隔离，不污染另一目标。
+      if (operationGateRef.current.canRecord(opToken)) {
         setAppError(err, opWorktreeId);
-        // 拒绝或待核对只刷新，绝不自动重跑写操作。
-        if (err.kind === "needsVerification" || err.kind === "rejected") void refresh();
+        if (operationGateRef.current.acceptFailure(opToken)
+          && (err.kind === "needsVerification" || err.kind === "rejected")) void refresh();
       }
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);

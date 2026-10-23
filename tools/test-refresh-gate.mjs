@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, SelectionGate } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, SelectionGate, WatchEventGate } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 
 test("同 worktree 内旧版本快照被拒绝，新版本被接受", () => {
@@ -150,6 +150,43 @@ test("失败结果只在发起目标仍激活时生效", () => {
   assert.equal(ops.acceptFailure(token), true);
   gate.activate("wt-b");
   assert.equal(ops.acceptFailure(token), false, "切走后旧失败不得污染当前界面");
+});
+
+test("切走后原操作结果仍可保存，不能覆盖该 worktree 更新的操作", () => {
+  const gate = new SnapshotGate();
+  const ops = new OperationResultGate(gate);
+  gate.activate("wt-a");
+  const a1 = ops.begin();
+  gate.activate("wt-b");
+  const b = ops.begin();
+  assert.equal(ops.canRecord(a1), true, "非当前 worktree 的结果必须保留归属");
+  assert.equal(ops.acceptFailure(a1), false, "但不能刷新当前 B");
+  gate.activate("wt-a");
+  const a2 = ops.begin();
+  assert.equal(ops.canRecord(a1), false, "旧失败不能覆盖新的 A 操作结果");
+  assert.equal(ops.canRecord(a2), true);
+  assert.equal(ops.canRecord(b), true, "A 的新操作不作废 B 的结果记录");
+});
+
+test("真实通知消费路径：首个、连续事件触发刷新，重复与旧激活通知忽略", async () => {
+  const notifications = new WatchEventGate();
+  let runs = 0;
+  const coordinator = new RefreshCoordinator(async () => { runs += 1; });
+  const poll = async (activation, changedActivation, eventSequence) => {
+    if (notifications.consume(activation, { changedActivation, eventSequence })) coordinator.request();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  await poll(1, null, 0);
+  assert.equal(runs, 0);
+  await poll(1, 1, 1);
+  assert.equal(runs, 1, "首个事件不能只记作基线后吞掉");
+  await poll(1, 1, 2);
+  assert.equal(runs, 2, "相同 activation 的后续事件也必须驱动刷新");
+  await poll(1, 1, 2);
+  await poll(2, 1, 3);
+  assert.equal(runs, 2);
+  await poll(2, 2, 4);
+  assert.equal(runs, 3);
 });
 
 test("选择门：同 worktree U→V 时 U 的迟到元数据被作废", () => {

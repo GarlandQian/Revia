@@ -53,6 +53,8 @@ export interface WatchSnapshotPayload {
   status: WatchStatusPayload;
   /** 最近一次触发变化的激活代号；只接受属于自己的目标。 */
   changedActivation: number | null;
+  /** 每次合并事件递增，不能用固定激活号代替。 */
+  eventSequence: number;
 }
 
 /** 与 Rust 侧 `Settings` 对应。 */

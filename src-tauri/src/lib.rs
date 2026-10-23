@@ -2,6 +2,7 @@
 //!
 //! 边界：所有 Git 调用都在 Rust 层完成（ADR-0002）；前端只调用固定、带类型的命令。
 
+pub mod acceptance;
 pub mod commands;
 pub mod error;
 pub mod git;
@@ -26,7 +27,10 @@ pub fn run() {
             let measuring = commands::soak_seconds().is_some()
                 || commands::is_measure_auto_run()
                 || std::env::var_os("REVIA_SMOKE").is_some();
-            let data_dir = if measuring {
+            let acceptance_dir = acceptance::data_directory(&data_dir)?;
+            let data_dir = if let Some(directory) = &acceptance_dir {
+                directory.clone()
+            } else if measuring {
                 match std::env::var_os("REVIA_MEASURE_DATA_DIR").map(std::path::PathBuf::from) {
                     Some(path) if path.is_absolute() => path,
                     Some(_) => return Err("测量数据目录必须是绝对路径".into()),
@@ -60,7 +64,9 @@ pub fn run() {
                     }
                 }
             }
-            app.manage(AppState::new(data_dir));
+            let mut state = AppState::new(data_dir);
+            state.acceptance = acceptance_dir.map(acceptance::Acceptance::new).transpose()?.map(std::sync::Arc::new);
+            app.manage(state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

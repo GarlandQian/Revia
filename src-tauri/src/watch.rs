@@ -12,7 +12,7 @@
 //! 因此监视失败不会降低写前校验强度（ADR-0005、ADR-0009）。
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -324,6 +324,15 @@ impl WatchFilter {
                 .is_some_and(|name| GIT_METADATA_FILES.contains(&name.as_str()))
         };
 
+        // 当前 linked worktree 的 gitDir 位于 commonDir 内，必须先识别它自己的元数据。
+        if let Ok(relative) = path.strip_prefix(&self.git_dir) {
+            let mut components = relative.components();
+            let first = components.next();
+            if first.is_some() && components.next().is_none() {
+                return name_is_metadata(path);
+            }
+        }
+
         // 1. 共享 commonDir 的 refs 子树：任何深度都相关。
         //    仅当该目录确实不同于工作区本身时才按 commonDir 规则判定。
         if let Some(common) = self.common_dir.as_ref().filter(|common| common.as_path() != self.worktree) {
@@ -335,7 +344,7 @@ impl WatchFilter {
                 }
                 // commonDir 顶层的 ref 指针文件（packed-refs / HEAD / ORIG_HEAD）。
                 if first.is_some() && components.next().is_none() {
-                    return name_is_metadata(path);
+                    return first.as_deref() != Some("index") && name_is_metadata(path);
                 }
                 // 其余（objects/、worktrees/<other>/ 等）与本 worktree 无关。
                 return false;
@@ -381,26 +390,47 @@ impl WatchFilter {
     }
 }
 
+struct WatchInstallState {
+    current: Option<Arc<WorktreeWatcher>>,
+    last: WatchStatus,
+    accepted: u64,
+    installation: u64,
+}
+
+/// 事件进度独立于激活身份；旧 watcher 的迟到通知不能覆盖新目标的通知。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WatchEvents {
+    pub sequence: u64,
+    pub activation: Option<u64>,
+}
+
+impl WatchEvents {
+    pub fn record(&mut self, activation: u64) {
+        if self.activation.is_some_and(|latest| activation < latest) {
+            return;
+        }
+        self.sequence += 1;
+        self.activation = Some(activation);
+    }
+}
+
 /// 当前激活的监视器集合（只保留一个）。
 pub struct WatchController {
-    current: Mutex<Option<Arc<WorktreeWatcher>>>,
-    counter: AtomicU64,
+    state: Mutex<WatchInstallState>,
     /// 测试接缝：非空时直接报告监视失败，不启动真实监视（Q95 确定性证据）。
     forced_failure: Mutex<Option<String>>,
-    /// 最近一次激活 / 停止的结果；没有 watcher 时仍保留失败原因（Q95）。
-    last: Mutex<WatchStatus>,
-    /// 已受理的最大请求代号：用来拒绝迟到进入的旧激活请求（A→B→A）。
-    accepted: Mutex<u64>,
 }
 
 impl Default for WatchController {
     fn default() -> Self {
         Self {
-            current: Mutex::new(None),
-            counter: AtomicU64::new(0),
+            state: Mutex::new(WatchInstallState {
+                current: None,
+                last: WatchStatus::idle(),
+                accepted: 0,
+                installation: 0,
+            }),
             forced_failure: Mutex::new(None),
-            last: Mutex::new(WatchStatus::idle()),
-            accepted: Mutex::new(0),
         }
     }
 }
@@ -426,76 +456,87 @@ impl WatchController {
     where
         F: Fn(u64) + Send + 'static,
     {
+        self.activate_with_start(roots, requested, on_change, || {})
+    }
+
+    fn activate_with_start<F, S>(&self, roots: WatchRoots, requested: u64, on_change: F, before_start: S) -> WatchStatus
+    where
+        F: Fn(u64) + Send + 'static,
+        S: FnOnce(),
+    {
         let target = roots.worktree.display().to_string();
-
-        // 先受理请求：分配本地代号并检查是否已被更晚的请求超越。
-        let accepted = {
-            let mut latest = self.accepted.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            if requested < *latest {
-                // 迟到的旧意图：不安装、不替换当前监视。
-                return WatchStatus {
-                    active: false,
-                    error: Some("自动刷新不可用：监视请求已被更新的切换取代".into()),
-                    activation: requested,
-                    target: Some(target),
-                    roots: 0,
-                };
-            }
-            *latest = requested;
-            requested
+        let superseded = || WatchStatus {
+            active: false,
+            error: Some("自动刷新不可用：监视请求已被更新的切换取代".into()),
+            activation: requested,
+            target: Some(target.clone()),
+            roots: 0,
         };
-
-        if let Some(reason) = self.forced_failure.lock().ok().and_then(|guard| guard.clone()) {
-            if let Ok(mut guard) = self.current.lock() {
-                guard.take();
+        let installation = {
+            let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if requested < state.accepted {
+                return superseded();
             }
-            let status = WatchStatus {
+            state.accepted = requested;
+            state.installation += 1;
+            state.installation
+        };
+        before_start();
+        let failure = self.forced_failure.lock().ok().and_then(|guard| guard.clone());
+        let watcher = failure.is_none().then(|| Arc::new(WorktreeWatcher::start(roots, requested, on_change)));
+        let status = match &watcher {
+            Some(watcher) => watcher.status(),
+            None => WatchStatus {
                 active: false,
-                error: Some(reason),
-                activation: accepted,
-                target: Some(target),
+                error: failure,
+                activation: requested,
+                target: Some(target.clone()),
                 roots: 0,
-            };
-            self.remember(&status);
-            return status;
-        }
-
-        // 先在锁外完成启动，再把旧的替换下来：
-        // 若在持锁期间 drop 旧 watcher，旧线程 join 会阻塞新 watcher 的安装。
-        let watcher = Arc::new(WorktreeWatcher::start(roots, accepted, on_change));
-        let status = watcher.status();
-        let previous = {
-            let mut guard = self.current.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            guard.replace(watcher)
+            },
         };
-        // 旧 watcher 在锁外被 drop：停止线程与底层监视，不再发事件。
+        // 受理与最终安装共用同一把锁；慢启动不能覆盖更新的激活或停止请求。
+        let previous = {
+            let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if state.installation != installation {
+                drop(state);
+                drop(watcher);
+                return superseded();
+            }
+            state.last = status.clone();
+            std::mem::replace(&mut state.current, watcher)
+        };
         drop(previous);
-        self.remember(&status);
         status
     }
 
-    fn remember(&self, status: &WatchStatus) {
-        if let Ok(mut guard) = self.last.lock() {
-            *guard = status.clone();
+    /// 显式诊断接缝：停止当前通知，但保留实际失败状态直到重新激活。
+    pub fn fail_current(&self, reason: String) {
+        let watcher = self.state.lock().ok().and_then(|state| state.current.clone());
+        if let Some(watcher) = watcher {
+            watcher.stop.store(true, Ordering::Relaxed);
+            if let Ok(mut status) = watcher.status.lock() {
+                status.active = false;
+                status.error = Some(reason);
+            }
         }
     }
 
     /// 停止监视（离开 worktree 或应用退出）。
     pub fn stop(&self) -> WatchStatus {
-        if let Ok(mut guard) = self.current.lock() {
-            guard.take();
-        }
         let status = WatchStatus::idle();
-        self.remember(&status);
+        let previous = {
+            let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            state.installation += 1;
+            state.last = status.clone();
+            state.current.take()
+        };
+        drop(previous);
         status
     }
 
     pub fn status(&self) -> WatchStatus {
-        self.current
-            .lock()
-            .ok()
-            .and_then(|guard| guard.as_ref().map(|watcher| watcher.status()))
-            .or_else(|| self.last.lock().ok().map(|guard| guard.clone()))
+        self.state.lock().ok()
+            .map(|state| state.current.as_ref().map(|watcher| watcher.status()).unwrap_or_else(|| state.last.clone()))
             .unwrap_or_else(WatchStatus::idle)
     }
 }
@@ -580,6 +621,72 @@ mod tests {
             !filter.event_relevant(&modify(root.join(".git/objects/ab/cdef"))),
             "对象库不得相关"
         );
+    }
+
+    #[test]
+    fn linked_filter_keeps_own_metadata_and_shared_refs() {
+        let dir = tempfile::tempdir().unwrap();
+        let common = dir.path().join("main/.git");
+        let linked = dir.path().join("linked");
+        let own = common.join("worktrees/linked");
+        for path in [&own, &common.join("worktrees/other"), &common.join("refs/heads"), &linked] {
+            std::fs::create_dir_all(path).unwrap();
+        }
+        let filter = WatchFilter::from_roots(&resolve_roots(&linked, Some(own.clone()), Some(common.clone())));
+        assert!(filter.path_relevant(&own.join("index")));
+        assert!(filter.path_relevant(&own.join("HEAD")));
+        assert!(filter.path_relevant(&common.join("refs/heads/main")));
+        assert!(!filter.path_relevant(&common.join("worktrees/other/index")));
+        assert!(!filter.path_relevant(&common.join("objects/ab/cdef")));
+    }
+
+    #[test]
+    fn event_sequence_advances_within_activation_and_rejects_old_notifications() {
+        let mut events = WatchEvents::default();
+        events.record(1);
+        assert_eq!((events.sequence, events.activation), (1, Some(1)));
+        events.record(1);
+        assert_eq!((events.sequence, events.activation), (2, Some(1)));
+        events.record(2);
+        events.record(1);
+        assert_eq!((events.sequence, events.activation), (3, Some(2)));
+    }
+
+    #[test]
+    fn early_request_cannot_install_after_new_target_or_stop() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a");
+        let b = dir.path().join("b");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        let controller = Arc::new(WatchController::new());
+        for (activation, stop) in [(1, false), (3, true)] {
+            let (entered_tx, entered_rx) = channel();
+            let (release_tx, release_rx) = channel();
+            let pending = controller.clone();
+            let roots = resolve_roots(&a, None, None);
+            let worker = std::thread::spawn(move || {
+                pending.activate_with_start(roots, activation, |_| {}, || {
+                    entered_tx.send(()).unwrap();
+                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                })
+            });
+            entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            if stop {
+                controller.stop();
+            } else {
+                assert!(controller.activate(resolve_roots(&b, None, None), 2, |_| {}).active);
+            }
+            release_tx.send(()).unwrap();
+            assert!(!worker.join().unwrap().active, "早受理的请求不得晚安装");
+            let current = controller.status();
+            if stop {
+                assert_eq!(current, WatchStatus::idle());
+            } else {
+                assert_eq!(current.activation, 2);
+                assert_eq!(current.target, Some(b.display().to_string()));
+            }
+        }
     }
 
     #[test]
