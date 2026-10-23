@@ -10,6 +10,7 @@ use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use ts_rs::TS;
 
 use crate::error::{AppError, Result};
@@ -103,6 +104,10 @@ pub struct RecoveryRecord {
     pub target: String,
     pub identity: WorktreeIdentity,
     pub before: Vec<SavedFile>,
+    /// 保存时影响字节转换的有效上下文（属性 + 相关配置）指纹。
+    /// 写入前必须复核；变化即拒绝，避免用旧上下文写入未选中的内容。
+    #[serde(default)]
+    pub context_fingerprint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -179,11 +184,11 @@ impl RecoveryStore {
         Ok(())
     }
 
-    pub fn save(&self, identity: WorktreeIdentity, source: RecoverySource, target: &str, before: Vec<SavedFile>) -> Result<RecoveryRecord> {
+    pub fn save(&self, identity: WorktreeIdentity, source: RecoverySource, target: &str, before: Vec<SavedFile>, context_fingerprint: String) -> Result<RecoveryRecord> {
         self.ensure_outside(&identity)?;
         let directory = self.allocate("saving")?;
         let id = directory.file_name().unwrap().to_string_lossy().replacen("saving-", "record-", 1);
-        let record = RecoveryRecord { id, created_at_ms: (self.clock)(), source, target: target.into(), identity, before };
+        let record = RecoveryRecord { id, created_at_ms: (self.clock)(), source, target: target.into(), identity, before, context_fingerprint };
         write_new(&directory.join("saved.json"), &record)?;
         platform::sync_directory(&directory)?;
         fs::rename(&directory, self.directory.join(&record.id))?;
@@ -248,16 +253,14 @@ impl RecoveryStore {
 
     /// Compute the exact expected result with the same Git patch, away from the worktree.
     ///
-    /// `git apply` runs the working-tree conversion (`core.autocrlf`, `core.eol`,
-    /// `.gitattributes` filters) **only inside a repository**. Previewing outside one
-    /// would either fail on `eol=crlf` text or silently produce different bytes, so the
-    /// scratch is a throw-away repository carrying the same attributes and newline config.
-    pub fn preview(&self, git: &Git, worktree: &Path, before: &[SavedFile], patch: &[u8]) -> Result<Vec<SavedFile>> {
+    /// `git apply` 只在仓库内执行工作区转换（`core.autocrlf`、`core.eol`、`.gitattributes`、
+    /// `info/attributes`、`core.attributesFile`、`filter.*`）。预览必须在与真实仓库**等价**的
+    /// 上下文里运行，否则会误拒正常文本，或算出与真实写入不同的字节。
+    pub fn preview(&self, git: &Git, worktree: &Path, paths: &[String], before: &[SavedFile], patch: &[u8]) -> Result<Vec<SavedFile>> {
         let scratch = self.allocate("preview")?;
         let result = (|| {
-            init_scratch_repository(&scratch, git)?;
+            prepare_scratch(git, worktree, &scratch, paths)?;
             for file in before {
-                copy_attribute_chain(worktree, &scratch, &file.path)?;
                 let path = checked_path(&scratch, &file.path)?;
                 if let Some(bytes) = &file.content {
                     fs::create_dir_all(path.parent().unwrap())?;
@@ -265,8 +268,8 @@ impl RecoveryStore {
                     platform::set_executable(&path, file.executable)?;
                 }
             }
-            let scratch_git = git.in_directory(&scratch);
-            scratch_git.apply_worktree_patch(patch.to_vec())?.into_success("校验丢弃补丁")?;
+            let isolated = git.in_isolated_directory(&scratch);
+            isolated.apply_worktree_patch(patch.to_vec())?.into_success("校验丢弃补丁")?;
             capture_files(&scratch, &before.iter().map(|file| file.path.clone()).collect::<Vec<_>>())
         })();
         let _ = fs::remove_dir_all(scratch);
@@ -274,16 +277,115 @@ impl RecoveryStore {
     }
 }
 
-/// 在预览目录里建立一个丢弃用的临时仓库，并沿用真实仓库的换行相关配置。
-///
-/// 仓库级配置（例如 `core.autocrlf=true`）不会随全局配置继承，必须显式复制，
-/// 否则预览写入的字节会与真实 worktree 的结果不一致。
-fn init_scratch_repository(scratch: &Path, git: &Git) -> Result<()> {
-    git.in_directory(scratch).run_ok(&["init", "-q"], "初始化预览仓库")?;
-    for key in ["core.autocrlf", "core.eol", "core.safecrlf", "core.ignorecase", "core.filemode"] {
+/// 保存时记录的有效转换上下文指纹；写入前复核，变化即拒绝。
+pub fn context_fingerprint(git: &Git, paths: &[String]) -> Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"ctx-v1");
+    for key in CONTEXT_CONFIG_KEYS {
+        hasher.update(key.as_bytes());
+        match git.config_get(key) {
+            Some(value) => hasher.update(value.as_bytes()),
+            None => hasher.update(b"<unset>"),
+        }
+        hasher.update([0]);
+    }
+    for line in git.config_entries("filter.")? {
+        hasher.update(line.as_bytes());
+        hasher.update([0]);
+    }
+    for path in paths {
+        hasher.update(path.as_bytes());
+        hasher.update([0]);
+        hasher.update(&check_attr(git, path)?);
+        hasher.update([0]);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+/// 这些配置直接决定 index 与工作区之间的字节转换。
+const CONTEXT_CONFIG_KEYS: &[&str] = &[
+    "core.autocrlf",
+    "core.eol",
+    "core.safecrlf",
+    "core.attributesFile",
+    "core.ignorecase",
+    "core.filemode",
+];
+
+/// 该路径的**有效属性**（Git 自己按全部来源与优先级算出）。
+fn check_attr(git: &Git, path: &str) -> Result<Vec<u8>> {
+    Ok(git
+        .run_ok(&["check-attr", "-a", "-z", "--", path], "读取有效属性")?
+        .stdout)
+}
+
+/// 在隔离目录里重建与真实仓库等价的属性与转换上下文。
+fn prepare_scratch(git: &Git, worktree: &Path, scratch: &Path, paths: &[String]) -> Result<()> {
+    let isolated = git.in_isolated_directory(scratch);
+    isolated.run_ok(&["init", "-q"], "初始化预览仓库")?;
+
+    // 1. 仓库级换行/属性配置（全局配置由同一份 HOME/GIT_CONFIG_GLOBAL 自然继承）。
+    for key in CONTEXT_CONFIG_KEYS {
         if let Some(value) = git.config_get(key) {
-            git.in_directory(scratch)
-                .run_ok(&["config", key, &value], "复制预览仓库配置")?;
+            isolated.run_ok(&["config", key, &value], "复制预览仓库配置")?;
+        }
+    }
+    // 2. 本地 filter.* 全部子键：转换是否发生、如何发生都由它决定。
+    for entry in git.config_entries("filter.")? {
+        if let Some((key, value)) = entry.split_once(' ') {
+            isolated.run_ok(&["config", "--add", key, value], "复制预览 filter 配置")?;
+        }
+    }
+    // 3. 工作区 `.gitattributes` 链（根到目标父目录）。
+    let mut attribute_dirs: Vec<PathBuf> = Vec::new();
+    for path in paths {
+        copy_attribute_chain(worktree, scratch, path)?;
+        if let Some(parent) = Path::new(path).parent() {
+            let mut prefix = PathBuf::new();
+            for component in parent.components() {
+                if let Component::Normal(name) = component {
+                    prefix.push(name);
+                    if !attribute_dirs.contains(&prefix) {
+                        attribute_dirs.push(prefix.clone());
+                    }
+                }
+            }
+        }
+    }
+    // 4. 该仓库的 info/attributes（不受工作区文件影响，但同样参与属性判定）。
+    let info_attributes = git
+        .try_run(&["rev-parse", "--path-format=absolute", "--git-dir"])
+        .map(|dir| PathBuf::from(dir.trim()).join("info/attributes"));
+    if let Some(source) = info_attributes.as_ref().filter(|path| path.is_file()) {
+        let destination = scratch.join(".git").join("info");
+        fs::create_dir_all(&destination)?;
+        fs::copy(source, destination.join("attributes"))?;
+    }
+    // 5. 仓库级 core.attributesFile：复制内容并把配置指到副本，避免预览读到会变化的原件。
+    if let Some(configured) = git.config_get("core.attributesFile") {
+        let source = {
+            let raw = PathBuf::from(&configured);
+            if raw.is_absolute() { raw } else { worktree.join(raw) }
+        };
+        if source.is_file() {
+            let copy = scratch.join(".attributes-file");
+            fs::copy(&source, &copy)?;
+            isolated.run_ok(
+                &["config", "core.attributesFile", &copy.display().to_string()],
+                "复制预览属性文件",
+            )?;
+        }
+    }
+    // 6. 直接核对：预览上下文必须与真实仓库算出完全相同的有效属性。
+    for path in paths {
+        if check_attr(git, path)? != check_attr(&isolated, path)? {
+            return Err(AppError::rejected(
+                "无法等价复现该文件的 Git 属性上下文，已停止丢弃（不会修改工作区）",
+            ));
         }
     }
     Ok(())
@@ -296,7 +398,6 @@ fn copy_attribute_chain(worktree: &Path, scratch: &Path, relative: &str) -> Resu
         None => return Ok(()),
     };
     let mut prefix = PathBuf::new();
-    // 根目录与每一级父目录都可能定义属性；逐级复制，后级覆盖前级。
     for component in parent.components() {
         if let Component::Normal(name) = component {
             prefix.push(name);
@@ -310,7 +411,6 @@ fn copy_attribute_chain(worktree: &Path, scratch: &Path, relative: &str) -> Resu
             }
         }
     }
-    // 根级属性即使父目录为空也要复制。
     let root_attributes = worktree.join(".gitattributes");
     if root_attributes.is_file() && !scratch.join(".gitattributes").exists() {
         fs::copy(&root_attributes, scratch.join(".gitattributes"))?;

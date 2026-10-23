@@ -85,3 +85,58 @@
 - 复现脚本、结果及命令记录在 `../evidence/task04-review01/`。本轮未完成 GUI、D06、Windows CI 或最终长测，任务不得设为 done。
 
 实施方完成上述相关修改后集中运行受影响的检查，按核心安全契约补最小回归；逐项回复 R04-ST1/ST2/ST3、R04-SP1/SP2、R04-V1。只提交 m2，不推送、不合并 main、不提前实施 05/07/08/12/13。按 Q105 继续交同一 Pi 会话；渠道报错保留改动并重试，连续三次才由规划方接管。
+
+### 2026-10-23 / Pi 审查修复（第 1 轮）
+
+受审实现 `a38fd85`；本轮逐项处理 `../evidence/task04-review01/` 的 6 项发现。原始证据目录未被修改或覆盖。
+
+#### R04-ST1 / P2（Windows 预览可能改写用户 Git 配置）— 已修复
+
+- 新增 `Git::in_isolated_directory`：在切换工作目录之外，**剔除所有把 Git 定位或配置重定向到别处的环境变量**（`GIT_DIR`、`GIT_WORK_TREE`、`GIT_INDEX_FILE`、`GIT_OBJECT_DIRECTORY`、`GIT_ALTERNATE_OBJECT_DIRECTORIES`、`GIT_COMMON_DIR`、`GIT_NAMESPACE`、`GIT_PREFIX`、`GIT_CEILING_DIRECTORIES` 等），按**大小写不敏感**比较（Windows 环境变量名不区分大小写）。预览的 `init`/`config`/`apply` 全部改用该隔离上下文；正常 worktree 操作不受影响。
+- 回归 `preview_isolates_git_location_environment_from_the_real_repository`：把仓库 `core.filemode` 设为 `false` 后，以带 `GIT_DIR`/`GIT_WORK_TREE` 的环境打开会话并丢弃；断言**原仓库 config 字节完全不变**、`core.filemode` 仍为 `false`、index 不变、工作区正确回退。已用"临时改回 `in_directory`"验证该用例确实会失败（有牙）。
+- 审查明确该路径在 macOS 生产白名单下不可达，本轮按 Windows 静态可达性修复，**未声称 macOS 生产路径已复现**。
+
+#### R04-ST2 / P2 与 R04-SP2 / P2（预览缺少真实属性语义）— 已修复
+
+- 预览不再只复制根 `.gitattributes` 与五个 core 键，而是在临时仓库里重建**等价上下文**：
+  1. 目标路径经过的每一级工作区 `.gitattributes`；
+  2. `$GIT_DIR/info/attributes`；
+  3. 仓库级 `core.attributesFile`（复制内容并把预览配置指向副本）；
+  4. 本地 `filter.*` 的全部子键（`clean`/`smudge`/`process`/`required` 等）；
+  5. `core.autocrlf`/`core.eol`/`core.safecrlf`/`core.ignorecase`/`core.filemode`。
+- 复制完成后**直接核对等价性**：对每个目标路径分别在本仓库与预览仓库运行 `git check-attr -a`，结果不同则停止丢弃（不改工作区）。这样覆盖了 `.gitattributes` 的层级、`info/attributes`、`core.attributesFile` 以及全局/系统属性的实际优先级，而不是靠再实现一遍规则。
+- 回归 `preview_honors_info_attributes_and_repository_attributes_file`：`info/attributes` 的 `*.txt text eol=crlf` 与仓库级 `core.attributesFile` 两种普通文本都能正常丢弃并回到提交时的 CRLF 字节；`preview_honors_local_clean_filter_configuration`：本地 `filter.upper.clean/smudge` 配置下普通文本可丢弃。已用"临时不复制 info/attributes"验证该用例会失败。
+- 未新增任何"只读"限制来回避问题；所有新增拒绝路径都只在上下文**无法等价复现**时触发，并明确告知不会修改工作区。
+
+#### R04-SP1 / P1（保存后改属性仍执行不等价写入）— 已修复，并更正上一轮结论
+
+- 新增 `recovery::context_fingerprint`：把上述**有效属性**（每个目标路径的 `check-attr -a` 输出）、相关 core 配置与本地 `filter.*` 一起哈希，保存时写入 `RecoveryRecord.context_fingerprint`（旧记录用 `#[serde(default)]` 兼容）。
+- 写入前在 `read_lock` 内重新计算并与记录比较；**不一致即拒绝**（`ErrorKind::Rejected`），把记录标为 `NotApplied`，不写入工作区、不改 index、不自动续跑。
+- 回归 `attribute_context_change_after_save_is_rejected_before_writing`：LF 文本 3 个 hunk、保存后把 `text eol=lf` 改成 `text eol=crlf`（目标字节与规范化补丁都不变），断言**写入前**就拒绝、工作区字节不变、index 不变、记录保留且为 `NotApplied`、重开会话不重试。已用"临时删掉该检查"复现审查里的原缺陷（会走到写后待核对），确认用例有牙。
+- `unrelated_attribute_file_change_does_not_block_discard`：修改无关文件与无关 `.gitattributes` 不阻止丢弃，避免把"相关上下文"扩大成"任何变化都拒绝"。
+- **更正上一轮结论**：上一轮 Comments 写的「若仓库在保存与写入之间修改了 `.gitattributes`，写后比对会失败并转 `NeedsVerification`（安全失败，不会写错内容）」是**错的**。审查已用真实 Git 复现：目标字节与补丁都不变时，属性变化会让真实 `git apply` 把未选中 hunk 的 180 行全部从 LF 改成 CRLF，属于"已经写错、事后才发现"，不能算写前安全。原过程记录保留，本段为更正。
+
+#### R04-ST3 / P3（遮罩颜色写死）— 已修复
+
+- `src/index.css` 新增 `--overlay` 主题变量（浅色 `oklch(0 0 0 / 35%)`、深色 `oklch(0 0 0 / 55%)`，含 `@media (prefers-color-scheme: dark)` 与 `.dark` 两处），`.recovery-dialog::backdrop` 改用 `var(--overlay)`。未做其它视觉改动，未引入测试框架。
+
+#### R04-V1 / T11（写入中失败/中断缺少真实回归）— 已补
+
+- 新增真实 Git 回归 `git_apply_lost_receipt_keeps_record_and_never_retries`（Unix）：用一个**严格限定 fixture** 的 `git` 包装器——只对真实仓库目录下的 `apply` 生效，先调用真实 Git 完成写入，再返回 141 模拟"失去成功回执"；其余子命令与预览 scratch 一律透传。
+- 断言：错误为 `NeedsVerification`（不是"未执行"）；工作区确实已回到提交内容（真实写入发生）；index 不变；**实际 apply 只执行一次**（计数文件，无自动重试）；完整记录保留且无 `outcome.json`；重新打开会话只读真实状态、记录数仍为 1、apply 计数仍为 1。
+- 该用例覆盖的是"调用内部失败/结果丢失"，与既有 `AfterWrite`/`BeforeComplete` 钩子（调用前后的受控中断）互补，不再把 `AfterWrite` 当作全部"写入中"覆盖。
+
+#### 本轮实际执行的检查
+
+- `cargo test --manifest-path src-tauri/Cargo.toml`：**173 项通过**
+  - lib 85、`discard_recovery` **28**、`file_staging` 20、`hunk_staging` 23、`refresh_isolation` 14、`session_flow` 3
+- Node 内置工具：25 + 13 + 11 + 19 = **68 项通过**
+- `pnpm exec tsc -b`、`pnpm lint`、`pnpm build`：通过
+- 未重建 `.app`（按指示等规划方复核后再构建），未运行 GUI/Windows/D06/长测。
+
+#### 仍未验证 / 遗留风险
+
+- **真实桌面、Windows 实机与 CI 未执行**：本轮只做本机 macOS 与真实 Git 自动化；`in_isolated_directory` 的 Windows 语义按静态推理与大小写不敏感写法处理，需 CI 实际编译/运行确认。
+- **写前检查与 exec 之间的极小窗口**：上下文在 `read_lock` 内核对后、Git 子进程启动前，外部进程仍可能改写 `.gitattributes`。这是进程内锁无法覆盖的外部竞态；发生时写后比对会转 `NeedsVerification`（但按本轮结论，**这不等于写前安全**）。未宣称已消除该窗口。
+- **属性等价性依赖 `check-attr` 自证**：若某来源的属性无法在临时仓库复现，会走"无法等价复现"的明确拒绝，而不是继续写入；这类拒绝尚未在真实桌面统计出现频率。
+- 未做长时内存/大文件压力观测；单条记录仍按完整文件大小存储，容量上限与 14 天清理属 05。

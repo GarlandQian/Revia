@@ -631,3 +631,259 @@ fn unix_backslash_filename_is_a_normal_discard_target() {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].paths, vec![name.to_string()]);
 }
+
+/// R04-ST1：预览必须使用隔离环境。即使从设置了 GIT_DIR / GIT_WORK_TREE 的终端启动，
+/// 预览的 init/config 也只能作用于自己的 scratch，绝不能再初始化或改写原仓库配置。
+#[test]
+fn preview_isolates_git_location_environment_from_the_real_repository() {
+    let f = Fixture::new();
+    let session = f.changed();
+    // 让非隔离的 `git init` 会真实改写这一项（审查复现同款）。
+    f.git(&["config", "core.filemode", "false"]);
+    let before = f.read("target.ts");
+    let config_path = f.repo.join(".git").join("config");
+    let config_before = fs::read(&config_path).unwrap();
+    let index_before = f.index();
+    let store = f.store();
+
+    // 模拟从带 Git 定位变量的终端启动（Windows 分支会继承进程全部环境）。
+    let mut env = f.vars.clone();
+    env.insert("GIT_DIR".into(), f.repo.join(".git").display().to_string());
+    env.insert("GIT_WORK_TREE".into(), f.repo.display().to_string());
+    let isolated_session = WorktreeSession::open("fixture-env", &f.repo, ShellEnv {
+        vars: env, path: f.paths.clone(),
+        info: EnvCaptureInfo { worktree: f.repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
+            timed_out: false, used_fallback: true, var_count: f.vars.len(), path_entries: f.paths.clone(), diagnostics: None },
+    }, Arc::new(CommandLog::default())).unwrap();
+
+    let target_env = entry(&isolated_session, "target.ts");
+    isolated_session
+        .discard_file(&target_env.path, &target_env.fingerprint, &target_env.snapshot_revision, &store)
+        .expect("隔离环境下丢弃应当成功");
+
+    assert_eq!(fs::read(&config_path).unwrap(), config_before, "原仓库 config 不得被预览修改");
+    assert_eq!(f.git(&["config", "core.filemode"]), b"false\n", "预览不得把 core.filemode 改回 true");
+    assert_eq!(f.index(), index_before, "原仓库 index 不得被预览修改");
+    assert_eq!(f.read("target.ts"), text(&[]));
+    assert_ne!(before, f.read("target.ts"));
+}
+
+/// R04-ST2 / R04-SP2：`info/attributes`、仓库级 `core.attributesFile` 与本地 filter
+/// 都属于有效属性上下文；预览必须与真实仓库等价，不能误拒普通文本。
+#[test]
+fn preview_honors_info_attributes_and_repository_attributes_file() {
+    // 1. info/attributes 指定 CRLF 的普通文本。
+    let f = Fixture::new();
+    let info = f.repo.join(".git").join("info").join("attributes");
+    fs::create_dir_all(info.parent().unwrap()).unwrap();
+    fs::write(&info, b"*.txt text eol=crlf\n").unwrap();
+    f.write("target.txt", b"alpha\nbeta\n");
+    f.commit();
+    fs::remove_file(f.repo.join("target.txt")).unwrap();
+    f.git(&["checkout", "--", "target.txt"]);
+    let committed = f.read("target.txt");
+    assert_eq!(committed, b"alpha\r\nbeta\r\n");
+    f.write("target.txt", b"alpha\r\nBETA\r\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let index = f.index();
+    discard(&session, &target, &f.store()).expect("info/attributes 下的普通文本必须可丢弃");
+    assert_eq!(f.read("target.txt"), committed);
+    assert_eq!(f.index(), index);
+
+    // 2. 仓库级 core.attributesFile（不放在工作区，避免影响其他文件）。
+    let f2 = Fixture::new();
+    let attrs = f2.temp.path().join("repo-attributes");
+    fs::write(&attrs, b"target.dat text eol=crlf\n").unwrap();
+    f2.git(&["config", "core.attributesFile", attrs.to_str().unwrap()]);
+    f2.write("target.dat", b"alpha\nbeta\n");
+    f2.commit();
+    fs::remove_file(f2.repo.join("target.dat")).unwrap();
+    f2.git(&["checkout", "--", "target.dat"]);
+    let committed2 = f2.read("target.dat");
+    assert_eq!(committed2, b"alpha\r\nbeta\r\n");
+    f2.write("target.dat", b"alpha\r\nBETA\r\n");
+    let session2 = f2.session();
+    let target2 = entry(&session2, "target.dat");
+    discard(&session2, &target2, &f2.store()).expect("core.attributesFile 下的普通文本必须可丢弃");
+    assert_eq!(f2.read("target.dat"), committed2);
+}
+
+/// R04-ST2：本地 `filter.*` 转换同样属于有效上下文；预览必须应用同一条过滤器。
+#[cfg(unix)]
+#[test]
+fn preview_honors_local_clean_filter_configuration() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    let script = f.temp.path().join("upper.sh");
+    fs::write(&script, b"#!/bin/sh\ntr 'a-z' 'A-Z'\n").unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    let restore = f.temp.path().join("lower.sh");
+    fs::write(&restore, b"#!/bin/sh\ntr 'A-Z' 'a-z'\n").unwrap();
+    fs::set_permissions(&restore, fs::Permissions::from_mode(0o755)).unwrap();
+    f.git(&["config", "filter.upper.clean", script.to_str().unwrap()]);
+    f.git(&["config", "filter.upper.smudge", restore.to_str().unwrap()]);
+    f.git(&["config", "filter.upper.required", "true"]);
+    f.write(".gitattributes", b"target.txt filter=upper\n");
+    f.write("target.txt", b"alpha\nbeta\n");
+    f.commit();
+    // 让过滤器真正作用于工作区，读出干净状态作为对照。
+    fs::remove_file(f.repo.join("target.txt")).unwrap();
+    f.git(&["checkout", "--", "target.txt"]);
+    let committed = f.read("target.txt");
+    f.write("target.txt", b"alpha\ngamma\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let index = f.index();
+    discard(&session, &target, &f.store()).expect("带本地 filter 的普通文本必须可丢弃");
+    assert_eq!(f.read("target.txt"), committed, "丢弃后应恢复提交时的工作区内容");
+    assert_eq!(f.index(), index);
+}
+
+/// R04-SP1：保存后属性/转换上下文改变时，目标字节与规范化补丁都可能不变，
+/// 但同一份补丁会写出不同字节。必须在写入前拒绝，保留记录，不自动续跑。
+#[test]
+fn attribute_context_change_after_save_is_rejected_before_writing() {
+    let f = Fixture::new();
+    f.write(".gitattributes", b"target.txt text eol=lf\n");
+    f.write("target.txt", &text(&[]));
+    f.commit();
+    f.write("target.txt", &text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    let session = f.session();
+    session.refresh().unwrap();
+    let rows = session.rows("target.txt", ChangesKind::Unstaged, ViewMode::Split, 0, 400).unwrap();
+    let action = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).expect("应有 hunk").clone();
+    let before = f.read("target.txt");
+    let index = f.index();
+    let store = f.store();
+
+    let error = session.discard_with_hook("target.txt", &action.fingerprint, &action.snapshot_revision,
+        Some(&action.hunk_id), &store, |phase| {
+            if phase == DiscardPhase::AfterSave {
+                // 目标字节与补丁都不变，只改转换上下文。
+                f.write(".gitattributes", b"target.txt text eol=crlf\n");
+            }
+            Ok(())
+        }).unwrap_err();
+
+    assert_eq!(error.kind, ErrorKind::Rejected, "必须在写入前拒绝，而不是写后再待核对");
+    assert_eq!(f.read("target.txt"), before, "拒绝时不得写入工作区");
+    assert_eq!(f.index(), index, "拒绝时不得改变暂存区");
+    let records = store.list(None).unwrap();
+    assert_eq!(records.len(), 1, "完整记录必须保留");
+    assert!(matches!(records[0].status, RecoveryStatus::NotApplied));
+    assert!(matches!(store.read(&records[0].id).unwrap().1, Some(DiscardOutcome::NotApplied)));
+    // 不自动续跑。
+    drop(session);
+    let reopened = f.session();
+    reopened.refresh().unwrap();
+    assert_eq!(f.read("target.txt"), before);
+    assert_eq!(store.list(None).unwrap().len(), 1);
+}
+
+/// R04-SP1：无关文件变化不得触发拒绝。
+#[test]
+fn unrelated_attribute_file_change_does_not_block_discard() {
+    let f = Fixture::new();
+    f.write(".gitattributes", b"target.txt text eol=lf\n");
+    f.write("other.txt", b"other\n");
+    f.write("target.txt", &text(&[]));
+    f.commit();
+    f.write("target.txt", &text(&[(10, 1010)]));
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    discard(&session, &target, &f.store()).expect("基线丢弃应当成功");
+    assert_eq!(f.read("target.txt"), text(&[]));
+
+    let f2 = Fixture::new();
+    f2.write(".gitattributes", b"target.txt text eol=lf\n");
+    f2.write("other.txt", b"other\n");
+    f2.write("target.txt", &text(&[]));
+    f2.commit();
+    f2.write("target.txt", &text(&[(10, 1010)]));
+    let session2 = f2.session();
+    let target2 = entry(&session2, "target.txt");
+    let store2 = f2.store();
+    session2.discard_with_hook("target.txt", &target2.fingerprint, &target2.snapshot_revision, None, &store2, |phase| {
+        if phase == DiscardPhase::AfterSave {
+            // 与目标无关的属性和文件变化。
+            f2.write("other.txt", b"other changed\n");
+            f2.write("unrelated.gitattributes", b"*.bin binary\n");
+        }
+        Ok(())
+    }).expect("无关文件变化不应阻止丢弃");
+    assert_eq!(f2.read("target.txt"), text(&[]));
+}
+
+/// R04-V1 / T11：真实 `git apply` 执行成功、但成功回执丢失（子进程被模拟中断）。
+/// 必须保留完整记录、标结果待核对（而非未执行），index 不变，实际写命令只执行一次，
+/// 重新打开会话只读取真实状态、不自动续跑。
+#[cfg(unix)]
+#[test]
+fn git_apply_lost_receipt_keeps_record_and_never_retries() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let before = f.read("target.ts");
+    let index_before = f.index();
+
+    // 严格限定 fixture 的包装器：只对真实仓库目录下的 apply 生效，先执行真实写入，
+    // 再让调用方「失去成功回执」；其他目录（预览 scratch）与其它子命令一律透传。
+    let real_git = String::from_utf8(
+        Command::new("sh").arg("-c").arg("command -v git").output().unwrap().stdout,
+    ).unwrap().trim().to_string();
+    let wrapper_dir = f.temp.path().join("wrapper");
+    fs::create_dir_all(&wrapper_dir).unwrap();
+    let counter = f.temp.path().join("apply-count");
+    let wrapper = wrapper_dir.join("git");
+    fs::write(&wrapper, format!(
+        "#!/bin/sh\nREAL=\"{real_git}\"\nfound=\"\"\nfor a in \"$@\"; do [ \"$a\" = \"apply\" ] && found=1; done\n\
+         if [ -n \"$found\" ] && [ \"$(pwd -P)\" = \"$WRAP_REPO\" ]; then\n\
+         \x20 \"$REAL\" \"$@\"; rc=$?\n\
+         \x20 echo x >> \"$WRAP_COUNT\"\n\
+         \x20 if [ \"$rc\" -eq 0 ]; then exit 141; fi\n\
+         \x20 exit \"$rc\"\n\
+         fi\nexec \"$REAL\" \"$@\"\n")).unwrap();
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut vars = f.vars.clone();
+    vars.insert("WRAP_REPO".into(), fs::canonicalize(&f.repo).unwrap().display().to_string());
+    vars.insert("WRAP_COUNT".into(), counter.display().to_string());
+    let mut paths = vec![wrapper_dir.display().to_string()];
+    paths.extend(f.paths.clone());
+    let wrapped = WorktreeSession::open("fixture-wrapper", &f.repo, ShellEnv {
+        vars, path: paths.clone(),
+        info: EnvCaptureInfo { worktree: f.repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
+            timed_out: false, used_fallback: true, var_count: f.vars.len(), path_entries: paths, diagnostics: None },
+    }, Arc::new(CommandLog::default())).unwrap();
+
+    let store = f.store();
+    let wrapped_target = entry(&wrapped, "target.ts");
+    assert_eq!(wrapped_target.fingerprint, target.fingerprint, "包装器不应改变真实状态");
+    let error = wrapped
+        .discard_file("target.ts", &wrapped_target.fingerprint, &wrapped_target.snapshot_revision, &store)
+        .expect_err("失去成功回执必须报待核对，而不是成功");
+    assert_eq!(error.kind, ErrorKind::NeedsVerification, "必须标结果待核对，不能断言未执行");
+
+    // 真实写入已经发生：工作区回到提交内容，index 未变。
+    assert_eq!(f.read("target.ts"), text(&[]));
+    assert_ne!(f.read("target.ts"), before);
+    assert_eq!(f.index(), index_before, "丢弃不得改变暂存区");
+    // 写命令只执行一次，没有自动重试。
+    let count = fs::read_to_string(&counter).unwrap_or_default();
+    assert_eq!(count.matches('x').count(), 1, "实际 apply 只能执行一次");
+    // 完整记录保留，但没有完成回执，不能被当成已完成。
+    let records = store.list(None).unwrap();
+    assert_eq!(records.len(), 1, "必须保留已保存的完整记录");
+    assert!(matches!(records[0].status, RecoveryStatus::NeedsVerification));
+    assert!(store.read(&records[0].id).unwrap().1.is_none());
+    // 重新打开会话只读取真实状态，不自动续跑。
+    drop(wrapped);
+    let reopened = f.session();
+    reopened.refresh().unwrap();
+    assert_eq!(f.read("target.ts"), text(&[]));
+    assert_eq!(store.list(None).unwrap().len(), 1);
+    assert_eq!(fs::read_to_string(&counter).unwrap_or_default().matches('x').count(), 1);
+}

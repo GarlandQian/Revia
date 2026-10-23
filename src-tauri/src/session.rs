@@ -775,10 +775,12 @@ impl WorktreeSession {
             None => self.git.discard_patch(path)?,
         };
         if patch.is_empty() { return Err(AppError::rejected("文件已变化，请重新确认")); }
-        let expected_after = store.preview(&self.git, &self.path, &before, &patch)?;
+        // 预览与保存必须使用同一套「字节如何转换」的上下文（属性 + 相关配置）。
+        let context = recovery::context_fingerprint(&self.git, &paths)?;
+        let expected_after = store.preview(&self.git, &self.path, &paths, &before, &patch)?;
         hook(DiscardPhase::BeforeSave)?;
         // A complete, durably published record is the prerequisite for any worktree write.
-        let record = store.save(identity.clone(), if hunk_id.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone())?;
+        let record = store.save(identity.clone(), if hunk_id.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone(), context.clone())?;
         hook(DiscardPhase::AfterSave).map_err(discard_pending)?;
         hook(DiscardPhase::BeforeWrite).map_err(discard_pending)?;
         {
@@ -794,6 +796,13 @@ impl WorktreeSession {
                     None => self.git.discard_patch(path)?,
                 };
                 if current_patch != patch { return Err(AppError::rejected("文件已变化，请重新确认")); }
+                // 属性/转换上下文变化时，同一份补丁会写出不同的字节（例如未选中的行也被改了换行）。
+                // 目标字节与补丁都相同并不能证明写入等价，必须在此之前拒绝。
+                if recovery::context_fingerprint(&self.git, &paths)? != context {
+                    return Err(AppError::rejected(
+                        "文件的 Git 属性或换行转换配置已变化，请重新确认后再丢弃",
+                    ));
+                }
                 Ok(())
             })();
             if let Err(error) = validation {

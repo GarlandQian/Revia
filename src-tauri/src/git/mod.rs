@@ -166,6 +166,45 @@ impl Git {
         }
     }
 
+    /// 在**完全隔离**的目录里执行：去掉所有把 Git 定位或配置重定向到别处的环境变量。
+    ///
+    /// 只改工作目录不够：从设置了 `GIT_DIR` / `GIT_WORK_TREE` 的终端启动时（Windows
+    /// 分支会继承进程全部环境），`git init` 仍会作用在原仓库上，等于修改用户的 Git 配置。
+    /// 这里按大小写不敏感的方式剔除（Windows 环境变量名不区分大小写）。
+    pub fn in_isolated_directory(&self, directory: &Path) -> Self {
+        const REDIRECT_VARS: &[&str] = &[
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_COMMON_DIR",
+            "GIT_NAMESPACE",
+            "GIT_PREFIX",
+            "GIT_CEILING_DIRECTORIES",
+            "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+            "GIT_SHALLOW_FILE",
+            "GIT_GRAFT_FILE",
+            "GIT_REPLACE_REF_BASE",
+        ];
+        let env = self
+            .env
+            .iter()
+            .filter(|(key, _)| {
+                !REDIRECT_VARS
+                    .iter()
+                    .any(|name| key.eq_ignore_ascii_case(name))
+            })
+            .cloned()
+            .collect();
+        Self {
+            program: self.program.clone(),
+            directory: directory.to_path_buf(),
+            env: Arc::new(env),
+            log: self.log.clone(),
+        }
+    }
+
     pub fn version(&self) -> Result<String> {
         let output = self.run_ok(&["--version"], "读取 git 版本")?;
         Ok(output.stdout_lossy().trim().to_string())
@@ -360,6 +399,22 @@ impl Git {
         std::fs::read(self.directory.join(path))
             .ok()
             .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    /// 读取某个前缀下的全部配置项（`key value` 行），用于等价复制 filter.* 等设置。
+    pub fn config_entries(&self, prefix: &str) -> Result<Vec<String>> {
+        let pattern = format!("^{prefix}");
+        let output = self.run(&["config", "--get-regexp", &pattern])?;
+        if output.exit_code == 1 {
+            return Ok(Vec::new());
+        }
+        let output = output.into_success("读取 Git 配置")?;
+        Ok(output
+            .stdout_lossy()
+            .lines()
+            .map(|line| line.trim_end().to_string())
+            .filter(|line| !line.is_empty())
+            .collect())
     }
 
     /// `git config --get`；未设置时返回 None。

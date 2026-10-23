@@ -81,6 +81,8 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    /* 模态遮罩：跟随主题，不写死颜色（Q50、technical-direction）。 */
+    --overlay: oklch(0 0 0 / 35%);
 }
 
 /* 跟随系统深浅色（Q50）；也保留 .dark 类以便以后加手动覆盖。 */
@@ -118,6 +120,8 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    /* 深色下遮罩更重，保证对比。 */
+    --overlay: oklch(0 0 0 / 55%);
   }
 }
 
@@ -153,6 +157,7 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    --overlay: oklch(0 0 0 / 55%);
 }
 
 
@@ -396,7 +401,7 @@
 }
 
 .recovery-dialog::backdrop {
-  background: rgb(0 0 0 / 35%);
+  background: var(--overlay);
 }
 
 .gutter {
