@@ -21,6 +21,12 @@ struct Fixture {
 }
 
 impl Fixture {
+    /// 真实路径根：tempdir 在 macOS 上位于 /var 别名之下，测试构造目标路径时必须先规范化，
+    /// 否则等于在测「祖先符号链接」而不是另存本身（实现侧对符号链接是安全拒绝）。
+    fn root(&self) -> PathBuf {
+        self.temp.path().canonicalize().unwrap()
+    }
+
     fn new() -> Self {
         let temp = tempfile::tempdir().unwrap();
         let repo = temp.path().join("repo");
@@ -91,6 +97,10 @@ impl Fixture {
 
 fn text(changes: &[(usize, usize)]) -> Vec<u8> {
     (1..=180).map(|line| format!("export const value{line:03} = {};\n", changes.iter().find(|(n, _)| *n == line).map(|(_, value)| *value).unwrap_or(line))).collect::<String>().into_bytes()
+}
+
+fn expectation_of(inspection: &revia_lib::recovery::RecoveryInspection) -> revia_lib::recovery::RestoreExpectation {
+    revia_lib::recovery::RestoreExpectation { paths: inspection.paths.clone(), state: inspection.state }
 }
 
 fn entry(session: &WorktreeSession, path: &str) -> ChangeEntry {
@@ -1102,7 +1112,7 @@ fn restore_returns_full_worktree_state_without_touching_index() {
         let inspection = session.inspect_record(&store.list(None).unwrap()[0].id, &store).unwrap();
         assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::Ready));
         session
-            .restore_record(&inspection.id, &inspection.paths, inspection.state, &store)
+            .restore_record(&inspection.id, &expectation_of(&inspection), &store)
             .expect("无后续变化时应可直接恢复");
         assert_eq!(f.read("script.sh"), before, "必须回到丢弃前的完整字节");
         assert!(
@@ -1128,10 +1138,10 @@ fn restore_refuses_after_later_changes_and_keeps_current_content() {
     assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::LaterChanges));
     assert_eq!(inspection.files.len(), 1);
     assert!(inspection.files[0].saved.text.is_some(), "文本应提供只读对比内容");
-    assert_eq!(inspection.files[0].current.text.as_deref(), Some("later work\n"));
+    assert_eq!(inspection.files[0].current.as_ref().unwrap().text.as_deref(), Some("later work\n"));
 
     let error = session
-        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .restore_record(&record_id, &expectation_of(&inspection), &store)
         .unwrap_err();
     assert_eq!(error.kind, ErrorKind::Rejected);
     assert_eq!(f.read("target.ts"), b"later work\n", "不得覆盖后续修改");
@@ -1153,7 +1163,7 @@ fn restore_refuses_without_trusted_post_discard_baseline() {
     let inspection = session.inspect_record(&record_id, &store).unwrap();
     assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::NoBaseline));
     let error = session
-        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .restore_record(&record_id, &expectation_of(&inspection), &store)
         .unwrap_err();
     assert_eq!(error.kind, ErrorKind::Rejected);
 }
@@ -1175,7 +1185,7 @@ fn restore_refuses_when_identity_does_not_match() {
     let inspection = linked_session.inspect_record(&record_id, &store).unwrap();
     assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
     let error = linked_session
-        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .restore_record(&record_id, &expectation_of(&inspection), &store)
         .unwrap_err();
     assert_eq!(error.kind, ErrorKind::Rejected);
     // 原文件仍是丢弃后的状态，没有被 linked 覆盖。
@@ -1202,7 +1212,7 @@ fn hunk_record_restores_the_whole_file() {
     let inspection = session.inspect_record(&record_id, &store).unwrap();
     assert!(matches!(inspection.source, RecoverySource::DiscardHunk));
     session
-        .restore_record(&record_id, &inspection.paths, inspection.state, &store)
+        .restore_record(&record_id, &expectation_of(&inspection), &store)
         .expect("单 hunk 记录也应能恢复完整文件");
     assert_eq!(f.read("target.ts"), before, "恢复的是完整文件内容");
 }
@@ -1224,19 +1234,19 @@ fn save_as_refuses_existing_targets_and_keeps_original_untouched() {
     let after_discard = f.read("blob.bin");
 
     // 已存在的普通文件。
-    let occupied = f.temp.path().join("occupied.bin");
+    let occupied = f.root().join("occupied.bin");
     fs::write(&occupied, b"keep me").unwrap();
     assert!(store.save_as(&record_id, "blob.bin", &occupied).is_err());
     assert_eq!(fs::read(&occupied).unwrap(), b"keep me", "已存在目标不得被截断");
 
     // 已存在的符号链接（指向真实文件）。
-    let link = f.temp.path().join("link.bin");
+    let link = f.root().join("link.bin");
     std::os::unix::fs::symlink(&occupied, &link).unwrap();
     assert!(store.save_as(&record_id, "blob.bin", &link).is_err());
     assert_eq!(fs::read(&occupied).unwrap(), b"keep me");
 
     // 未占用的新路径：成功写入保存版本。
-    let fresh = f.temp.path().join("saved.bin");
+    let fresh = f.root().join("saved.bin");
     let bytes = store.save_as(&record_id, "blob.bin", &fresh).expect("新路径应可另存");
     assert_eq!(bytes, 4);
     // 保存的是「丢弃前」的工作区内容，也就是被丢弃掉的那一版。
@@ -1291,4 +1301,230 @@ fn clear_only_removes_this_applications_records() {
     assert!(store.list(None).unwrap().is_empty());
     assert!(data.join("settings.json").is_file(), "其他应用数据不得被删");
     assert!(data.join("recovery").join("preview-leftover").is_dir(), "非记录目录不得被删");
+}
+
+// ---------------- 任务 05 返修回归（R05-R1） ----------------
+
+/// ST1/SP1：恢复不得删除同名的既有用户文件；临时文件必须独占创建。
+#[test]
+fn restore_never_deletes_preexisting_lookalike_files() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"saved change\n");
+    let session = f.session();
+    let target = entry(&session, "a.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+
+    // 用户自己的同名文件（旧实现会删除它）。
+    let decoy = f.repo.join("a.revia-restore-tmp");
+    fs::write(&decoy, b"unrelated valuable bytes\n").unwrap();
+    // 目标文件本身就叫这个名字的情况。
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    session
+        .restore_record(&id, &expectation_of(&inspection), &store)
+        .expect("恢复应成功");
+    assert_eq!(fs::read(&decoy).unwrap(), b"unrelated valuable bytes\n", "无关文件必须保留");
+    assert_eq!(f.read("a.txt"), b"saved change\n");
+}
+
+/// ST2/SP2：生产丢弃全程持有占用，AfterSave 阶段清空不会删掉唯一备份。
+#[test]
+fn production_discard_holds_record_through_clear_during_after_save() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    let mut cleared = 0u64;
+    session
+        .discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
+            if phase == DiscardPhase::AfterSave {
+                // 真实生产入口的占用必须已生效：这里清空不能删掉唯一记录。
+                cleared = store.clear()?;
+            }
+            Ok(())
+        })
+        .expect("丢弃应完成");
+    assert_eq!(cleared, 0, "在途记录不得被清空");
+    let records = store.list(None).unwrap();
+    assert_eq!(records.len(), 1, "唯一备份必须保留");
+    assert!(matches!(records[0].status, RecoveryStatus::Completed));
+    // 备份内容仍是丢弃前的完整文件。
+    let (record, _) = store.read(&records[0].id).unwrap();
+    assert_eq!(record.before[0].content.as_ref().unwrap(), &text(&[(10, 1010), (80, 1080), (140, 1140)]));
+}
+
+/// ST2：占用登记是引用计数，多个持有者时任一释放都不解除保护。
+#[test]
+fn record_use_is_refcounted_and_clear_is_atomic() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    let first = store.use_record(&id);
+    let second = store.use_record(&id);
+    drop(first);
+    assert_eq!(store.clear().unwrap(), 0, "仍有一个持有者，不得删除");
+    assert_eq!(store.list(None).unwrap().len(), 1);
+    drop(second);
+    assert_eq!(store.clear().unwrap(), 1, "全部释放后才可删除");
+}
+
+/// ST3：Git 未解决冲突的目标不得恢复；普通暂存变化但工作区 after 未变仍可恢复。
+#[test]
+fn restore_refuses_unmerged_targets_but_allows_plain_index_changes() {
+    let f = Fixture::new();
+    f.write("target.txt", b"base\n");
+    f.commit();
+    f.write("target.txt", b"saved change\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let index_before = f.index();
+
+    // 普通暂存变化（另一个文件）：目标的工作区 after 未变，仍应允许恢复且 index 不变。
+    f.write("other.txt", b"other change\n");
+    f.git(&["add", "--", "other.txt"]);
+    let index_staged = f.index();
+    assert_ne!(index_staged, index_before);
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    session
+        .restore_record(&id, &expectation_of(&inspection), &store)
+        .expect("普通 index 变化不应阻止恢复");
+    assert_eq!(f.read("target.txt"), b"saved change\n");
+    assert_eq!(f.index(), index_staged, "恢复不得改变暂存区");
+}
+
+/// ST5/SP3：恢复写入中阶段中断 -> 待核对 + 阶段留证；重启后不自动续跑。
+#[test]
+fn restore_interruption_is_pending_verification_and_never_resumes() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    let inspection = session.inspect_record(&id, &store).unwrap();
+    let expectation = revia_lib::recovery::RestoreExpectation {
+        paths: inspection.paths.clone(),
+        state: inspection.state,
+    };
+
+    let error = session
+        .restore_record_with_hook(&id, &expectation, &store, |phase| {
+            if phase == revia_lib::recovery::RestorePhase::AfterWrite {
+                return Err(AppError::internal("controlled interruption"));
+            }
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::NeedsVerification, "可能已写入部分路径必须标待核对");
+    // 写入确实发生了，但记录仍在且留证为待核对（不是丢弃的 Completed）。
+    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    let journal = store.restore_journal(&id).unwrap().expect("必须有恢复留证");
+    assert!(matches!(journal.state, revia_lib::recovery::RestoreJournalState::NeedsVerification));
+    assert_eq!(store.list(None).unwrap().len(), 1, "记录保留");
+
+    // 重新打开会话：不自动重跑（文件不再被改写）。
+    drop(session);
+    let reopened = f.session();
+    reopened.refresh().unwrap();
+    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    assert!(matches!(
+        store.restore_journal(&id).unwrap().unwrap().state,
+        revia_lib::recovery::RestoreJournalState::NeedsVerification
+    ));
+}
+
+/// SP8：另存不得穿过祖先符号链接或写入 Git 元数据。
+#[cfg(unix)]
+#[test]
+fn save_as_rejects_symlinked_ancestors_and_git_metadata() {
+    let f = Fixture::new();
+    f.write("target.txt", b"base\n");
+    f.commit();
+    f.write("target.txt", b"saved change\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    let real_dir = f.root().join("real-dir");
+    fs::create_dir_all(&real_dir).unwrap();
+    let linked_dir = f.root().join("linked-dir");
+    std::os::unix::fs::symlink(&real_dir, &linked_dir).unwrap();
+    assert!(
+        store.save_as(&id, "target.txt", &linked_dir.join("out.txt")).is_err(),
+        "祖先为符号链接时必须拒绝"
+    );
+    assert!(!real_dir.join("out.txt").exists(), "不得穿透链接写入");
+
+    // 深层祖先：link/inner/new.bin，其中 inner 是真实子目录但经由链接到达。
+    let deep = linked_dir.join("inner");
+    fs::create_dir_all(&deep).unwrap();
+    assert!(
+        store.save_as(&id, "target.txt", &deep.join("new.txt")).is_err(),
+        "祖先链中任一级是符号链接都必须拒绝"
+    );
+    assert!(!real_dir.join("inner").join("new.txt").exists(), "不得穿透链接写入深层路径");
+
+    // 未占用的真实外部目录：正常另存成功。
+    let external = f.root().join("external");
+    fs::create_dir_all(&external).unwrap();
+    assert_eq!(store.save_as(&id, "target.txt", &external.join("new.txt")).unwrap(), 13);
+    assert_eq!(fs::read(external.join("new.txt")).unwrap(), b"saved change\n");
+
+    let inside_git = f.repo.join(".git").join("out.txt");
+    assert!(store.save_as(&id, "target.txt", &inside_git).is_err(), "不得写入 Git 元数据目录");
+    assert!(!inside_git.exists());
+}
+
+/// SP9：原 worktree 不可用时仍能查看保存内容，当前侧标为不可用。
+#[test]
+fn inspection_remains_viewable_when_worktree_is_gone() {
+    let f = Fixture::new();
+    let session = f.changed();
+    let target = entry(&session, "target.ts");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    drop(session);
+    fs::remove_dir_all(&f.repo).unwrap();
+
+    let inspection = store.inspect(&id, None, None).expect("worktree 不存在时仍应可查看");
+    assert_eq!(inspection.paths, vec!["target.ts".to_string()]);
+    assert!(inspection.files[0].saved.exists);
+    assert!(inspection.files[0].saved.text.is_some(), "保存内容必须可读");
+    assert!(inspection.files[0].current_unavailable, "当前侧必须如实标为不可用");
+    assert!(inspection.files[0].current.is_none(), "不得用保存内容冒充当前内容");
+    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
+}
+
+/// SP6：文本对比由 Rust 侧真实 Git 生成只读 diff。
+#[test]
+fn text_diff_is_generated_by_real_git() {
+    let f = Fixture::new();
+    f.write("target.txt", b"alpha\nbeta\n");
+    f.commit();
+    f.write("target.txt", b"alpha\nBETA\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+    f.write("target.txt", b"alpha\nBETA\nlater\n");
+
+    let diff = session.recovery_text_diff(&id, "target.txt", &store).expect("应生成只读 diff");
+    assert!(diff.contains("@@ "), "必须是 Git 生成的 hunk：{diff}");
+    assert!(diff.contains("+later"), "应显示后续新增的内容：{diff}");
+    // 不得在用户仓库里留下临时对比文件。
+    assert!(!f.repo.join("target.txt.saved").exists());
 }

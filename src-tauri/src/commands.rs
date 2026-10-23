@@ -18,7 +18,7 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
-use crate::recovery::{RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, WorktreeIdentity};
+use crate::recovery::{RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 pub struct AppState {
@@ -415,6 +415,7 @@ pub async fn discard_hunk(state: State<'_, AppState>, request: DiscardRequest) -
 
 #[tauri::command]
 pub async fn list_recovery(state: State<'_, AppState>, worktree_id: Option<String>) -> Result<Vec<RecoverySummary>> {
+    // 原 worktree 可能已被移动或删除：取不到 session 时仍要能列出记录（Q87）。
     let session = worktree_id.as_deref().and_then(|id| state.session(id).ok());
     let store = state.recovery.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -455,11 +456,15 @@ pub struct RecoverySaveAsRequest {
 /// 只读检查一条记录能否直接恢复，并给出对比所需的两侧状态。
 #[tauri::command]
 pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspectRequest) -> Result<RecoveryInspection> {
-    let session = state.session(&request.worktree_id)?;
     let store = state.recovery.clone();
-    tauri::async_runtime::spawn_blocking(move || session.inspect_record(&request.record_id, &store))
-        .await
-        .map_err(|error| AppError::internal(format!("读取回收记录失败：{error}")))?
+    let session = state.session(&request.worktree_id).ok();
+    tauri::async_runtime::spawn_blocking(move || match session {
+        Some(session) => session.inspect_record(&request.record_id, &store),
+        // 当前 worktree 不可用：仍返回保存内容，当前侧标为不可用。
+        None => store.inspect(&request.record_id, None, None),
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取回收记录失败：{error}")))?
 }
 
 /// 恢复保存时的完整工作区状态（不改变暂存区）。
@@ -469,7 +474,8 @@ pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryResto
     let context = request.clone();
     let store = state.recovery.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.restore_record(&request.record_id, &request.expected_paths, request.expected_state, &store)
+        let expected = RestoreExpectation { paths: request.expected_paths, state: request.expected_state };
+        session.restore_record(&request.record_id, &expected, &store)
     })
     .await
     .map_err(|error| AppError::needs_verification(format!("恢复任务中断，结果待核对：{error}")))?;
@@ -487,6 +493,24 @@ pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveA
     .map_err(|error| AppError::internal(format!("另存回收内容失败：{error}")))?
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryDiffRequest {
+    pub worktree_id: String,
+    pub record_id: String,
+    pub path: String,
+}
+
+/// 保存版本与当前内容的只读 diff（文本），由 Rust 侧真实 Git 生成。
+#[tauri::command]
+pub async fn recovery_text_diff(state: State<'_, AppState>, request: RecoveryDiffRequest) -> Result<String> {
+    let session = state.session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || session.recovery_text_diff(&request.record_id, &request.path, &store))
+        .await
+        .map_err(|error| AppError::internal(format!("生成对比失败：{error}")))?
+}
+
 /// 清空回收区（在途记录保留）。
 #[tauri::command]
 pub async fn clear_recovery(state: State<'_, AppState>) -> Result<u64> {
@@ -494,6 +518,11 @@ pub async fn clear_recovery(state: State<'_, AppState>) -> Result<u64> {
     tauri::async_runtime::spawn_blocking(move || store.clear())
         .await
         .map_err(|error| AppError::internal(format!("清空回收区失败：{error}")))?
+}
+
+/// 启动与周期自动清理：由 `lib.rs` 在 setup 与后台线程调用。
+pub fn purge_expired_now(store: &RecoveryStore) -> Result<u64> {
+    store.purge_expired()
 }
 
 /// 删除超过保留期的记录（启动时与手动清理共用）。

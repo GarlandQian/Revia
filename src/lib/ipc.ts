@@ -171,6 +171,8 @@ export const ipc = {
     expectedPaths: string[];
     expectedState: RecoveryState;
   }) => invoke<RecoveryInspection>("restore_recovery", { request }),
+  recoveryTextDiff: (request: { worktreeId: string; recordId: string; path: string }) =>
+    invoke<string>("recovery_text_diff", { request }),
   saveRecoveryAs: (request: { recordId: string; path: string; destination: string }) =>
     invoke<number>("save_recovery_as", { request }),
   clearRecovery: () => invoke<number>("clear_recovery"),

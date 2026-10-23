@@ -780,7 +780,8 @@ impl WorktreeSession {
         let expected_after = store.preview(&self.git, &self.path, &paths, &before, &patch)?;
         hook(DiscardPhase::BeforeSave)?;
         // A complete, durably published record is the prerequisite for any worktree write.
-        let record = store.save(identity.clone(), if hunk_id.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone(), context.clone())?;
+        // 占用标记覆盖「保存 → 写入 → 结果记录」全程：期间清理不能删掉这条唯一备份（Q91）。
+        let (record, _record_in_use) = store.save(identity.clone(), if hunk_id.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone(), context.clone())?;
         hook(DiscardPhase::AfterSave).map_err(discard_pending)?;
         hook(DiscardPhase::BeforeWrite).map_err(discard_pending)?;
         {
@@ -832,14 +833,40 @@ impl WorktreeSession {
     pub fn restore_record(
         &self,
         id: &str,
-        expected_paths: &[String],
-        expected_state: recovery::RecoveryState,
+        expected: &recovery::RestoreExpectation,
         store: &RecoveryStore,
+    ) -> Result<recovery::RecoveryInspection> {
+        self.restore_record_with_hook(id, expected, store, |_| Ok(()))
+    }
+
+    /// 带受控阶段接缝的恢复（正常调用传入空钩子）。
+    pub fn restore_record_with_hook(
+        &self,
+        id: &str,
+        expected: &recovery::RestoreExpectation,
+        store: &RecoveryStore,
+        hook: impl FnMut(recovery::RestorePhase) -> Result<()>,
     ) -> Result<recovery::RecoveryInspection> {
         let _write = self.acquire_write_lock()?;
         let identity = WorktreeIdentity::capture(&self.git)?;
         store.ensure_outside(&identity)?;
-        store.restore(id, &identity, &self.path, expected_paths, expected_state)
+        // 恢复前确认目标不是 Git 未解决冲突（Q82）：冲突文件只读。
+        let status = status::read(&self.git)?;
+        for path in &expected.paths {
+            if status
+                .entries
+                .iter()
+                .any(|entry| entry.path == *path && entry.unmerged)
+            {
+                return Err(AppError::rejected("文件存在未解决的冲突，不能从回收区恢复"));
+            }
+        }
+        store.restore_with_hook(id, &identity, &self.path, expected, hook)
+    }
+
+    /// 「保存版本 vs 当前内容」的只读 diff（由 Rust 侧真实 Git 生成）。
+    pub fn recovery_text_diff(&self, id: &str, path: &str, store: &RecoveryStore) -> Result<String> {
+        store.text_diff(&self.git, id, path, Some(&self.path))
     }
 
     /// 恢复的只读检查（不写工作区）。

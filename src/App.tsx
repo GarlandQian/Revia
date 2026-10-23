@@ -8,6 +8,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
+import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
@@ -761,6 +762,47 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
     }
   }, [acceptSnapshot, refresh, setAppError]);
+
+  /**
+   * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
+   * 结果/错误按发起 worktree 保留，关闭面板或切换后不会丢；成功后真实读取快照。
+   */
+  const performRestore = useCallback(async (request: {
+    worktreeId: string;
+    recordId: string;
+    expectedPaths: string[];
+    expectedState: RecoveryState;
+  }) => {
+    const opWorktreeId = request.worktreeId;
+    if (writingWorktreesRef.current.has(opWorktreeId)) {
+      throw { kind: "rejected", message: messages.recovery.busy };
+    }
+    writingWorktreesRef.current.add(opWorktreeId);
+    setWritingWorktrees(new Set(writingWorktreesRef.current));
+    setAppError(null, opWorktreeId);
+    const opToken = operationGateRef.current.begin(opWorktreeId);
+    try {
+      const inspection = await ipc.restoreRecovery(request);
+      if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
+      // 恢复不产生新的 ChangesSnapshot：真实读取一次，不依赖 watcher。
+      if (gateRef.current.token().worktreeId === opWorktreeId) await refresh();
+      return inspection;
+    } catch (caught) {
+      const err = toAppError(caught);
+      if (operationGateRef.current.canRecord(opToken)) {
+        setAppError(err, opWorktreeId);
+        if (operationGateRef.current.acceptFailure(opToken)
+          && (err.kind === "needsVerification" || err.kind === "rejected")
+          && gateRef.current.token().worktreeId === opWorktreeId) {
+          void refresh();
+        }
+      }
+      throw err;
+    } finally {
+      writingWorktreesRef.current.delete(opWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+    }
+  }, [refresh, setAppError]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
@@ -1869,7 +1911,14 @@ export function App() {
             void performWrite(discardConfirmation.target, true);
           }} />
       ) : null}
-      {recoveryOpen ? <RecoveryDialog worktreeId={worktreeId} onClose={() => setRecoveryOpen(false)} /> : null}
+      {recoveryOpen ? (
+        <RecoveryDialog
+          worktreeId={worktreeId}
+          isWriting={isWriting}
+          onRestore={performRestore}
+          onClose={() => setRecoveryOpen(false)}
+        />
+      ) : null}
     </div>
   );
 

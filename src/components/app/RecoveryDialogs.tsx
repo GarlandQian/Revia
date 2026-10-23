@@ -5,7 +5,8 @@ import { ipc } from "@/lib/ipc";
 import { getErrorMessage } from "@/lib/error";
 import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import type { RecoveryState } from "@/types/bindings/RecoveryState";
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -43,12 +44,28 @@ export function DiscardDialog({ path, worktree, section, valid, onConfirm, onClo
   );
 }
 
-export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | null; onClose: () => void }) {
+export function RecoveryDialog({
+  worktreeId,
+  isWriting,
+  onRestore,
+  onClose,
+}: {
+  worktreeId: string | null;
+  isWriting: boolean;
+  onRestore: (request: {
+    worktreeId: string;
+    recordId: string;
+    expectedPaths: string[];
+    expectedState: RecoveryState;
+  }) => Promise<RecoveryInspection>;
+  onClose: () => void;
+}) {
   const [records, setRecords] = useState<RecoverySummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<RecoveryInspection | null>(null);
+  const [diff, setDiff] = useState<{ path: string; text: string | null; error: string | null } | null>(null);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,42 +79,70 @@ export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | n
     return () => { active = false; };
   }, [reload, worktreeId]);
 
-  const refreshList = () => { setSelected(null); setReload((value) => value + 1); };
+  const refreshList = () => { setSelected(null); setDiff(null); setConfirmingRestore(false); setReload((value) => value + 1); };
+
+  // 任何会让旧确认失效的动作都清掉待确认状态（Q89）。
+  const backToList = () => {
+    setSelected(null);
+    setDiff(null);
+    setConfirmingRestore(false);
+    setNotice(null);
+  };
 
   const inspect = (id: string) => {
     if (!worktreeId) return;
     setBusy(true);
     setError(null);
+    setDiff(null);
+    setConfirmingRestore(false);
     void ipc.inspectRecovery(worktreeId, id)
       .then((inspection) => setSelected(inspection))
       .catch((caught) => setError(getErrorMessage(caught)))
       .finally(() => setBusy(false));
   };
 
+  const showDiff = (path: string) => {
+    if (!selected || !worktreeId) return;
+    setDiff({ path, text: null, error: null });
+    void ipc.recoveryTextDiff({ worktreeId, recordId: selected.id, path })
+      .then((text) => setDiff({ path, text, error: null }))
+      .catch((caught) => setDiff({ path, text: null, error: getErrorMessage(caught) }));
+  };
+
   const restore = () => {
     if (!selected || !worktreeId) return;
     setBusy(true);
     setError(null);
-    void ipc.restoreRecovery({
+    void onRestore({
       worktreeId,
       recordId: selected.id,
       expectedPaths: selected.paths,
       expectedState: selected.state,
     })
-      .then((inspection) => { setConfirmingRestore(false); setSelected(inspection); setNotice(messages.recovery.restore); })
-      .catch((caught) => { setConfirmingRestore(false); setError(getErrorMessage(caught)); })
+      .then((inspection) => {
+        setConfirmingRestore(false);
+        setSelected(inspection);
+        setNotice(messages.recovery.restoreDone);
+      })
+      .catch((caught) => {
+        setConfirmingRestore(false);
+        const err = getErrorMessage(caught);
+        setError(err);
+        if (/待核对/.test(err)) setNotice(messages.recovery.restoreNeedsCheck);
+      })
       .finally(() => setBusy(false));
   };
 
   const saveAs = async (path: string) => {
     if (!selected) return;
-    const picked = await openDialog({ directory: false, multiple: false, title: messages.recovery.saveAsPrompt });
+    // 保存对话框允许输入尚不存在的新文件名；后端仍用 create_new 拒绝已存在目标。
+    const picked = await saveDialog({ title: messages.recovery.saveAsPrompt });
     if (typeof picked !== "string") return;
     setBusy(true);
     setError(null);
     try {
       const bytes = await ipc.saveRecoveryAs({ recordId: selected.id, path, destination: picked });
-      setNotice(`${messages.recovery.savedAs}：${bytes} ${messages.recovery.bytes}`);
+      setNotice(`${messages.recovery.saveAsDone}：${bytes} ${messages.recovery.bytes}`);
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -123,7 +168,7 @@ export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | n
       .finally(() => setBusy(false));
   };
 
-  const stateLabel = (state: RecoveryInspection["state"]) => ({
+  const stateLabel = (state: RecoveryState) => ({
     ready: messages.recovery.stateReady,
     laterChanges: messages.recovery.stateLaterChanges,
     noBaseline: messages.recovery.stateNoBaseline,
@@ -137,9 +182,7 @@ export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | n
       {notice ? <p role="status" className="mb-3 text-xs text-muted-foreground">{notice}</p> : null}
       {selected ? (
         <div className="space-y-3 text-xs">
-          <Button variant="ghost" size="sm" onClick={() => { setSelected(null); setNotice(null); }}>
-            ← {messages.recovery.back}
-          </Button>
+          <Button variant="ghost" size="sm" onClick={backToList}>← {messages.recovery.back}</Button>
           <h3 className="break-all font-mono font-semibold">{selected.target}</h3>
           <p>{new Date(selected.createdAtMs).toLocaleString()} · {selected.worktreePath}</p>
           <p>{selected.source === "discardHunk" ? messages.recovery.sourceHunk : messages.recovery.sourceFile}</p>
@@ -151,24 +194,45 @@ export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | n
                 <h4 className="break-all font-mono font-semibold">{file.path}</h4>
                 <p className="text-muted-foreground">
                   {messages.recovery.savedVersion}：{file.saved.exists
-                    ? `${file.saved.bytes} ${messages.recovery.bytes}${file.saved.executable ? " · 可执行" : ""}`
+                    ? `${file.saved.bytes} ${messages.recovery.bytes}${file.saved.executable ? ` · ${messages.recovery.executable}` : ""}`
                     : messages.recovery.noContent}
                 </p>
-                <p className="text-muted-foreground">
-                  {messages.recovery.currentVersion}：{file.current.exists
-                    ? `${file.current.bytes} ${messages.recovery.bytes}${file.current.executable ? " · 可执行" : ""}`
-                    : messages.recovery.noContent}
-                </p>
-                {file.saved.binary || file.current.binary ? (
+                {file.currentUnavailable || !file.current ? (
+                  <p className="text-muted-foreground">{messages.recovery.currentUnavailable}</p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {messages.recovery.currentVersion}：{file.current.exists
+                      ? `${file.current.bytes} ${messages.recovery.bytes}${file.current.executable ? ` · ${messages.recovery.executable}` : ""}`
+                      : messages.recovery.noContent}
+                  </p>
+                )}
+                {file.saved.binary || file.current?.binary ? (
                   <p className="text-muted-foreground">{messages.recovery.binaryInfo}</p>
                 ) : (
-                  <div className="mt-1 grid grid-cols-2 gap-2">
-                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">
-                      {file.saved.text ?? messages.recovery.noContent}
-                    </pre>
-                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">
-                      {file.current.text ?? messages.recovery.noContent}
-                    </pre>
+                  <div className="mt-1 space-y-1">
+                    <Button variant="ghost" size="sm" disabled={busy || !file.current || file.currentUnavailable}
+                      onClick={() => showDiff(file.path)}>
+                      {messages.recovery.diffTitle}
+                    </Button>
+                    {diff?.path === file.path ? (
+                      diff.error ? (
+                        <p role="alert" className="text-destructive">{`${messages.recovery.diffUnavailable}：${diff.error}`}</p>
+                      ) : diff.text === null ? (
+                        <p className="text-muted-foreground">{messages.recovery.loading}</p>
+                      ) : (
+                        <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">
+                          {diff.text}
+                        </pre>
+                      )
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-2">
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">
+                        {file.saved.text ?? messages.recovery.noContent}
+                      </pre>
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">
+                        {file.current?.text ?? messages.recovery.currentUnavailable}
+                      </pre>
+                    </div>
                   </div>
                 )}
                 {file.saved.exists ? (
@@ -183,12 +247,10 @@ export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | n
             <p className="text-muted-foreground">{messages.recovery.laterChangesHint}</p>
           ) : null}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setSelected(null); setNotice(null); }}>
-              {messages.recovery.back}
-            </Button>
+            <Button variant="outline" size="sm" onClick={backToList}>{messages.recovery.back}</Button>
             <Button
               size="sm"
-              disabled={busy || selected.state !== "ready"}
+              disabled={busy || isWriting || selected.state !== "ready"}
               onClick={() => setConfirmingRestore(true)}
               title={messages.recovery.restoreFullFile}
             >
@@ -200,7 +262,7 @@ export function RecoveryDialog({ worktreeId, onClose }: { worktreeId: string | n
               <p>{messages.recovery.confirmRestore}</p>
               <div className="mt-2 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setConfirmingRestore(false)}>{messages.recovery.cancel}</Button>
-                <Button variant="destructive" size="sm" disabled={busy} onClick={restore}>{messages.recovery.confirm}</Button>
+                <Button variant="destructive" size="sm" disabled={busy || isWriting} onClick={restore}>{messages.recovery.confirm}</Button>
               </div>
             </div>
           ) : null}

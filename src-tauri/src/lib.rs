@@ -68,6 +68,28 @@ pub fn run() {
             }
             let mut state = AppState::new(data_dir);
             state.acceptance = acceptance_dir.map(acceptance::Acceptance::new).transpose()?.map(std::sync::Arc::new);
+
+            // 回收区到期自动清理：启动时一次，之后每小时一次（Q9、规格实现决策 4）。
+            // 失败不静默：写入测量日志，且手动「清理过期记录」仍可用。
+            let recovery = state.recovery.clone();
+            let startup_purge = commands::purge_expired_now(&recovery);
+            match &startup_purge {
+                Ok(removed) => commands::log_measure(&format!("回收区启动清理：删除 {removed} 条")),
+                Err(error) => commands::log_measure(&format!("回收区启动清理失败：{error}")),
+            }
+            let periodic = recovery.clone();
+            std::thread::Builder::new()
+                .name("revia-recovery-purge".into())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(3600));
+                    match commands::purge_expired_now(&periodic) {
+                        Ok(0) => {}
+                        Ok(removed) => commands::log_measure(&format!("回收区定期清理：删除 {removed} 条")),
+                        Err(error) => commands::log_measure(&format!("回收区定期清理失败：{error}")),
+                    }
+                })
+                .ok();
+
             app.manage(state);
             Ok(())
         })
@@ -97,6 +119,7 @@ pub fn run() {
             commands::inspect_recovery,
             commands::restore_recovery,
             commands::save_recovery_as,
+            commands::recovery_text_diff,
             commands::clear_recovery,
             commands::purge_recovery,
             commands::change_entry,

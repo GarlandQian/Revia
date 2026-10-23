@@ -529,6 +529,34 @@ impl Git {
 
     /// 未跟踪文件：用 `git diff --no-index -- /dev/null <路径>` 生成 diff，
     /// 保证 hunk 也来自 Git（ADR-0004）。有差异时退出码是 1，不是失败。
+    /// 两个目录外文件之间的只读 diff（用于回收区「保存版本 vs 当前内容」）。
+    ///
+    /// 走 `git diff --no-index`，因此 hunk 仍由 Git 生成（ADR-0004）；
+    /// 两个文件都在临时目录里，不往用户仓库写任何东西。
+    pub fn diff_no_index(&self, old: &Path, new: &Path) -> Result<Vec<u8>> {
+        let old_text = old.display().to_string();
+        let new_text = new.display().to_string();
+        let args: Vec<&str> = vec![
+            "--no-pager",
+            "-c",
+            "core.quotePath=false",
+            "diff",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+            "--unified=3",
+            "--no-index",
+            "--",
+            &old_text,
+            &new_text,
+        ];
+        Ok(self
+            .run_allow_difference(&args, "生成回收内容对比 diff")?
+            .stdout)
+    }
+
     pub fn diff_untracked(&self, path: &str) -> Result<Vec<u8>> {
         let args: Vec<&str> = vec![
             "--literal-pathspecs",

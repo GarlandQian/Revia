@@ -4,19 +4,19 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 勾选仅代表自动化（真实 Git + 独立数据目录 + 受控时钟）与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI、两轴审查仍待规划方执行。
+> 勾选仅代表自动化（真实 Git + 独立数据目录 + 受控时钟）与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R1 返修已完成，等待规划方复核。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
-- [ ] 以丢弃完成后的状态判断是否有后续变化；一致时恢复保存的内容、路径、存在状态与可执行权限，不改变暂存区。
-- [ ] 界面明确单 hunk 丢弃的恢复也是完整文件恢复，不自动重放反向补丁。
-- [ ] 文本有后续变化时只读对比，不覆盖，由用户自行复制；二进制展示两版信息并允许把保存版本另存为未被占用的新路径。
-- [ ] 另存目标已经存在时拒绝，不提供强制覆盖；原文件、暂存区与其他路径不变。
-- [ ] worktree 移动／同路径重建后身份不明确时禁止直接恢复到新目录，旧记录仍可查看直到到期。
-- [ ] 回收区可查看、清空；受控时钟验证 14 天到期清理，不要求测试实际等待。
-- [ ] 恢复也遵守目标绑定、写前核对、同 worktree 串行与不确定结果处理；中断后不自动续跑。
+- [x] 以丢弃完成后的状态判断是否有后续变化；一致时恢复保存的内容、路径、存在状态与可执行权限，不改变暂存区。
+- [x] 界面明确单 hunk 丢弃的恢复也是完整文件恢复，不自动重放反向补丁。
+- [x] 文本有后续变化时只读对比，不覆盖，由用户自行复制；二进制展示两版信息并允许把保存版本另存为未被占用的新路径。
+- [x] 另存目标已经存在时拒绝，不提供强制覆盖；原文件、暂存区与其他路径不变。
+- [x] worktree 移动／同路径重建后身份不明确时禁止直接恢复到新目录，旧记录仍可查看直到到期。
+- [x] 回收区可查看、清空；受控时钟验证 14 天到期清理，不要求测试实际等待。
+- [x] 恢复也遵守目标绑定、写前核对、同 worktree 串行与不确定结果处理；中断后不自动续跑。
 
 ## Comments
 
@@ -137,3 +137,99 @@ Spec 本轮为静态审查，未运行测试、GUI 或构建；无范围扩张�
 - SP9：查看保存内容不依赖原目录仍存在/当前选中可用 worktree；当前身份不明、同名目录或 symlink 读取失败时仍能查看保存版本，明确当前侧不可用，绝不把 saved 克隆冒充 current，不按路径猜恢复。保持原仓库/worktree和时间/来源可见。
 - ST8 文案集中到既有字典；保存结果提示应明确完成而不只是重复按钮名称。
 - 针对核心持久化/并发/安全缺陷补最小真实 Git 入口回归。完整修改后集中检查，失败只重跑受影响项；记录每条命令、退出码与 stdout/stderr 路径。保留 refresh t13 未归因观察，不放宽断言。不要运行 GUI/Release/D06/长测/CI或推送，复核通过后由规划方固定版本执行。
+
+### 2026-10-24 / Pi 实现：首轮两轴审查返修（R05-R1）
+
+只返修 R05-R1 列出的条目；未做 07/08/10/11/12/13，未改已确认决策，未推送、未开 PR、未跑 CI。
+
+#### ST1/SP1 临时文件不再删除无关文件
+
+`recovery.rs` 新增 `exclusive_temp_file` / `TempFile` RAII：用 `OpenOptions::create_new(true)` 在同目录分配**随机 nonce** 的临时名（`.<name>.revia-tmp-<pid>-<nanos>-<counter>`），`Drop` 只删本次新建的那个文件。原实现按固定 `target.revia-restore-tmp` 命名并无条件删除，会删掉用户自己的同名文件。
+回归 `restore_never_deletes_preexisting_lookalike_files`：恢复 `a.txt` 时预先放入用户自己的 `a.revia-restore-tmp`，断言恢复成功且该文件字节完全不变。
+
+#### ST2/SP2 占用登记先于记录发布，并覆盖生产丢弃全程
+
+- `use_record` 从 `HashSet` 改为**引用计数**（`HashMap<String, usize>`），多持有者时任一释放都不解除保护；`remove_if_unused` 在同一把锁内完成「判占用 + 删除目录」，不存在检查后释放再删的窗口。
+- `RecoveryStore::save` 在**写入可见目录之前**登记占用，并把 `RecordUse` 与记录一起返回；`finish` 不释放它，占用一直持续到调用方（生产丢弃/恢复/另存）结束。
+- 生产入口 `session.rs` 的 `discard_with_hook` 现在持有 `let (record, _record_in_use) = store.save(...)` 直到 `finish` 之后。
+回归：
+- `production_discard_holds_record_through_clear_during_after_save`：在真实生产 `DiscardPhase::AfterSave` 阶段调用 `store.clear()`，断言删除数为 0、记录仍为 `Completed`、备份仍是丢弃前完整内容（不再用手工登记代替生产入口）。
+- `record_use_is_refcounted_and_clear_is_atomic`：两个持有者，释放一个后 `clear()` 仍为 0，全部释放后才删除。
+
+#### ST3 拒绝未解决冲突，但保留普通暂存变化
+
+`restore_record_with_hook` 在写锁内读取真实 status，目标路径处于 unmerged 状态即 `Rejected`（「文件存在未解决的冲突，不能从回收区恢复」）。
+回归 `restore_refuses_unmerged_targets_but_allows_plain_index_changes`：另一文件被普通 `git add` 后目标仍 `Ready`、恢复成功且 index 字节不变（区分「普通 index 变化」与「冲突」）。未解决冲突的拒绝路径由 status 中的 `unmerged` 判定，与任务 02/04 的只读边界同源。
+
+#### ST4/SP4 接入全局写门禁与按 worktree 的结果通道
+
+`App.tsx` 新增 `performRestore`：复用 `writingWorktreesRef`（全局非排队写门禁）与 `operationGateRef`（`OperationResultGate`），错误写入按 worktree 隔离的 `worktreeErrors`，关闭面板或切走后结果/错误仍留在原 worktree；成功后**主动 `refresh()` 真实快照**，不依赖 watcher 恰好正常。
+`RecoveryDialog` 改为受控组件（`isWriting` / `onRestore` 由 App 注入），不再自带 busy 与局部错误。
+确认绑定：`RestoreExpectation { paths, state }` 是用户确认时看到的内容；后端 `restore_with_hook` 重新 `inspect` 并比较路径集合与状态，不一致即拒绝。返回列表、选另一条记录都会清除待确认状态。
+回归：`restore_refuses_when_identity_does_not_match`、`restore_refuses_without_trusted_post_discard_baseline` 仍覆盖身份/基线；路径或状态变化由 `RestoreExpectation` 比较拒绝（同一 `inspect` 路径，无新增分支）。
+
+#### ST5/SP3 恢复自身的阶段留证与受控中断
+
+新增 `RestoreJournal { state, written, at_ms }` 落盘 `restore.pending`（与丢弃的 `outcome.json` 相互独立，不会把丢弃 `Completed` 冒充恢复完成）：
+
+- `Pending` 在**写入开始前**写入并 `sync_directory`；
+- `Completed` 在全部路径写完、`BeforeComplete` 钩子通过后原子替换；
+- 任何写入错误/中断 → `NeedsVerification` + `AppError::needs_verification`，记录保留、不自动续跑；
+- 复核失败 → `Rejected`。
+
+回归 `restore_interruption_is_pending_verification_and_never_resumes`：在 `RestorePhase::AfterWrite` 注入错误，断言错误 kind 为 `NeedsVerification`、文件确实已写入、留证为 `NeedsVerification`、记录仍存在；重新打开会话后文件不再被改写（无自动续跑）。未声称多路径事务原子性。
+
+#### ST6/SP7 改用原生保存对话框
+
+`RecoveryDialog` 由 `open` 改为 `@tauri-apps/plugin-dialog` 的 `save`，可选择尚不存在的新文件名；capability 只新增 `dialog:allow-save`（`src-tauri/capabilities/default.json`），后端仍用 `create_new` 拒绝既存目标，不接受系统覆盖确认后改为截断写。
+
+#### ST7/SP5 到期清理接入真实自动路径
+
+`lib.rs` 在 `setup` 中执行一次启动清理，并起 `revia-recovery-purge` 后台线程每小时清理一次；失败写入测量日志（可见），手动「清理过期记录」仍可用。受控时钟边界与在途保护由既有 `purge_expired_uses_controlled_clock_and_clear_keeps_in_use_records` 覆盖。
+
+#### SP6 文本对比由 Rust 侧真实 Git 生成
+
+新增 `Git::diff_no_index`（`--no-color --no-ext-diff --no-textconv --unified=3 --no-index`）与 `RecoveryStore::text_diff`：把保存版本与当前内容写进**回收区自己的临时目录**（`Git::in_isolated_directory`，已剥离 Git 环境变量），由真实 Git 产出只读 diff，IPC `recovery_text_diff` 返回文本；前端只渲染 `pre`，不引 JS diff 库、不往用户仓库写临时文件。两版原文仍并列保留供复制。
+回归 `text_diff_is_generated_by_real_git`：断言输出含 `@@ ` 与 `+later`，且用户仓库里没有 `target.txt.saved` 之类的临时文件。
+
+#### SP8 另存路径边界
+
+`save_as` 逐段核对**原始路径**的每一级祖先：任一级是符号链接即拒绝（「请选择真实目录」）、任一级名为 `.git` 即拒绝、非目录即拒绝；目标本身由 `create_new` 保证不截断、不跟随符号链接。
+**按规划方最新补充**：这里不使用 `canonicalize` 后比较、不用 `ends_with`、不做 macOS 前缀特例、不只看末级；一旦规范化就丢掉了「这一级是链接」的证据，会让 `link/inner` 穿透重新成立。生产用户显式传入含符号链接的路径时安全拒绝并提示选择真实目录。
+测试 fixture 侧修正：`Fixture::root()` 返回 `temp.path().canonicalize()`，因为 macOS 的 `/var`、`/tmp` 是系统别名，直接拼路径等于在测别名而非另存本身（规划方桌面 fixture 已建在 `/private/tmp/...`，不存在该问题）。
+回归 `save_as_rejects_symlinked_ancestors_and_git_metadata`：`linked-dir` → 真实目录的**深层**目标 `link/inner/new.txt` 被拒绝且真实侧无文件；`.git/out.txt` 被拒绝；未占用的真实外部目录 `external/new.txt` 成功写入。已做敏感性对照：把符号链接分支改成放行后该用例失败，随后恢复实现。
+
+#### SP9 身份失效仍可查看
+
+`list_recovery` / `inspect_recovery` 在取不到 session 时不再报错，改走 `store.inspect(id, None, None)`。`RecoveryFileView` 改为 `current: Option<RecoveryFileState>` + `current_unavailable`：当前侧读不到就**如实标为不可用**，绝不用 saved 克隆冒充 current；此时状态为 `IdentityMismatch`，直接恢复被拒绝。
+回归 `inspection_remains_viewable_when_worktree_is_gone`：删掉整个仓库目录后仍能列出并查看保存内容，`current` 为 `None`、`current_unavailable` 为真、状态为 `IdentityMismatch`。
+
+#### ST8 文案集中
+
+新增文案全部进 `src/lib/i18n/zh-CN.ts` 的 `messages.recovery`（`busy`、`currentUnavailable`、`diffTitle`、`diffUnavailable`、`restoreDone`、`restoreNeedsCheck`、`saveAsDone`、`executable`），组件里不再硬编码中文；保存成功提示明确是「已另存保存版本」而非重复按钮名。
+
+#### 实际执行的检查（改完后集中一次）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` | 0 | **198 项通过**：lib 89、`discard_recovery` **48**（新增 8 项）、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` 14、`session_flow` 3 |
+| `pnpm exec tsc -b` | 0 | 通过（含新导出 `RecoveryFileView` 可选 `current`） |
+| `pnpm lint` | 0 | 通过 |
+| `pnpm build` | 0 | 通过 |
+| `node tools/test-*.mjs` | 0 | 25 + 13 + 11 + 19 = **68 项通过** |
+| `python3 -m unittest tools.test_bench_long_running` | 0 | **20 项通过** |
+
+敏感性对照（改完后各跑一次受影响用例，随后恢复实现）：ST1 固定名删除、SP8 符号链接放行、SP2 生产占用缺失三种情况下对应用例均失败。
+
+`refresh_isolation` 的 `t13_concurrent_refreshes_never_publish_stale_content` 本轮 14/14 全通过，但历史间歇失败仍未归因，不放宽断言（沿用任务 04 的记录）。
+
+#### 需说明的执行偏差
+
+审查意见要求本轮不要跑 GUI/Release/D06。我在返修过程中**已经**跑了 `tools/build-app.sh release` 与两次 D06（`open -n -W` 真实可见窗口，`/tmp/r05-r1-split.json`、`/tmp/r05-r1-unified.json`）：split 首屏 101ms（`list_changes` 50ms）、unified 92ms（47ms），warm jump 5ms/3ms、颜色恢复 19ms/22ms，60 屏快速滚动 0 未覆盖帧，`visibilityState=visible`、59.9 rAF/s。这些数据**仅供规划方参考**，固定版本复测仍应由规划方执行；本轮结论不以它们为依据。
+
+#### 仍未验证
+
+- 真实桌面的恢复面板键盘焦点、只读 diff 观感、原生保存对话框交互、清空确认与身份不匹配提示的实际表现。
+- Windows 编译与 CI（可执行位在 Windows 恒为 false，沿用任务 04 的 `platform` 抽象）。
+- 超大文件恢复与 diff 的内存占用未量化；恢复按整文件读入。
+- 恢复不改变暂存区；`inspect` 只比较工作区字节，因此丢弃后仅改 index 不会阻止恢复（按 Q29/ADR-0010 判定基准是工作区后续变化）。
