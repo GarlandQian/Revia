@@ -890,3 +890,23 @@ REVIA_TASK05_FIXTURE_BASE=/private/tmp \
 #### 边界
 
 仍是**数据准备辅助，不是桌面验收通过**：只证明清单字段是标准 SHA-256、删除记录的 before/after 描述与实际一致；桌面界面行为、恢复交互与 D06/CI 仍需规划方用固定 Release（`de89796`）验证。
+
+
+### 2026-10-24 / Codex 规划方：桌面夹具限定返修复核通过
+
+固定`git diff 56a142500f72a3826b95ed10d7b8711dc650f70b...8e8a16bd94dc02bc898883d4d0647d8774622331`，含eb0926c审查归档、8e8a16b test-only修复，不重审产品。
+
+#### Standards（独立结论：0项硬违规，0项Fowler判断性建议）
+
+R05-F1-ST1/ST2闭合：tests:2480标准SHA-256直接散列原字节，清单调用该helper；删除before不存在、after存在25字节及恢复删除已正确追加说明。默认ignored、生产入口保存及原Fixture生命周期未退化。
+
+#### Spec（独立结论：0项新增或残留发现）
+
+R05-F1-SP1/SP2闭合：标准内容SHA与既有shasum交叉日志5/5相符；删除存在状态和恢复含义符合T08。五类记录、独立目录/当前时钟、仅新fixture登记和保留均未退化，无范围扩张。
+
+#### 证据与边界
+
+- [本轮原始8文件](../evidence/task05-fixture-review02/manifest.json)已逐字节归档。检查前源码SHA`a7088d60264609b6b622fca021ec4e08302b679e8866a3ba7e14405663f62c53`与8e8a16b一致，显式ignored入口原始1 passed/70 filtered/exit0；规划方另用标准hashlib核对5份实际文件与清单一致。旧fixture及7份证据原件未改写。
+- 两轴只静态核对及读取原有证据，未重跑；这只放行桌面数据准备，不构成真实恢复验收。新fixture为`/private/tmp/revia-task05-desktop-46oHkH`，数据`revia-data`，隔离HOME`home`。
+- 同会话Pi返修中出现1次上游Cloudflare524，提供方自动重试后正常交付；600秒wait超时不当第二次渠道错误，没有切模型或接管。
+- 固定de89796 Release的[四组性能自动测量](../task05-perf01.md)均通过，24份原始文件已核验归档。普通UI滚动及任务05功能桌面、最新双平台CI尚待完成，任务仍ready-for-human，M2未完成。

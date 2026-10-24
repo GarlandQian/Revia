@@ -4,6 +4,7 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务05验收准备：de89796固定Release已重新打包，SHA`05316c294400392019e7215cd1f329041d48082fd8d9f527e178a026fed20268`；[四组可见窗口自动测量](./task05-perf01.md)均ok，标准首屏117/111ms、真冷文字DOM5/7ms，60屏无未覆盖，保留23ms慢帧。Pi生产入口桌面夹具在8e8a16b限定两轴0/0，新清单5份原字节SHA一致；原错误证据保留。普通UI/恢复功能桌面和对应双平台CI未完成，仍ready-for-human，不替代任务11最终Q98长测。
 - 任务05最新：`ready-for-human`。固定`7e5a2c8...e217c1f`第七轮限定复核Standards0/Spec0；此前外部结果留存和门禁实际持有者问题静态闭合。App.tsx检查前SHA匹配e217c1f，tsc/lint/build原始退出0，13份日志已[归档核验](./evidence/task05-review07/manifest.json)。将固定Release版本进入真实桌面/D06/对应双平台CI，尚未done；未以静态或类型检查替代运行时验收。
 - 任务05最新：`ready-for-agent`。固定`69d6527...7e5a2c8`第六轮两轴各1项P2：目标已有写入时另存被拒绝，但finally误清他人前端门禁；后端锁仍在，不冒称并发写已发生。外部结果留存原问题静态闭合，继续原Pi限定返修。Pi先前临时日志路径有误，真实目录1792800590的13份原件已在f7f5b4归档，规划方核对SHA及tsc/lint/build退出0。未Release/桌面/D06/CI。详见[任务05 Comments](./issues/05-safe-recovery.md#comments)。
 - 任务05最新：`ready-for-agent`。固定`73791d6...69d6527`第五轮独立复核：Standards1项P2、Spec1项P2，均为合法外部另存没有App级结果留存，关闭面板后迟到失败/待核对丢失；继续交原Pi限定返修。已登记目标归属贯通、返回列表busy、完成journal同步失败三项原路径静态闭合。7份检查前源码hash匹配69d6527，原始日志可核Rust70+94及tsc/lint/build通过；敏感性实验只有实施方叙述，不冒称已独立核实。未构建Release、未桌面/D06/CI，M2未完成。详见[任务05 Comments](./issues/05-safe-recovery.md#comments)及[原始检查](./evidence/task05-review05/manifest.json)。
