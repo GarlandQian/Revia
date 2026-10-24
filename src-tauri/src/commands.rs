@@ -822,6 +822,11 @@ pub async fn command_log_snapshot(state: State<'_, AppState>) -> Result<Vec<Comm
 pub struct MeasureConfig {
     /// 是否启用前端诊断日志（只有设置 REVIA_MEASURE_LOG 时为真）。
     pub logging: bool,
+    /// 是否处于测量/冒烟/长测模式（任务 12：普通启动不显示测量面板）。
+    ///
+    /// 普通隔离的 acceptance 实例仍是普通模式：它只设置 REVIA_ACCEPTANCE(_DIR)，
+    /// 不设置下面这些测量变量，因此这里是 false。
+    pub measurement_mode: bool,
     pub auto_run: bool,
     pub only: Option<Vec<String>>,
     pub output_path: Option<String>,
@@ -890,9 +895,15 @@ fn minimal_soak_logging() -> bool {
 
 #[tauri::command]
 pub async fn measure_config() -> Result<MeasureConfig> {
+    let logging = std::env::var("REVIA_MEASURE_LOG").is_ok();
+    let auto_run = is_measure_auto_run();
+    let smoke = std::env::var("REVIA_SMOKE").is_ok();
+    let soak = soak_seconds().is_some();
     Ok(MeasureConfig {
-        logging: std::env::var("REVIA_MEASURE_LOG").is_ok(),
-        auto_run: is_measure_auto_run(),
+        logging,
+        // 三种测量入口任一开启即视为测量模式；普通启动三者都不成立。
+        measurement_mode: logging || auto_run || smoke || soak,
+        auto_run,
         only: std::env::var("REVIA_MEASURE_ONLY").ok().map(|value| {
             value
                 .split(',')
@@ -903,7 +914,7 @@ pub async fn measure_config() -> Result<MeasureConfig> {
         output_path: std::env::var("REVIA_MEASURE_LOG").ok(),
         repo_path: std::env::var("REVIA_MEASURE_REPO").ok(),
         target_path: std::env::var("REVIA_MEASURE_PATH").ok(),
-        smoke: std::env::var("REVIA_SMOKE").is_ok(),
+        smoke,
         soak_seconds: soak_seconds(),
         soak_diagnostic: soak_diagnostic(),
         minimal_soak_logging: minimal_soak_logging(),

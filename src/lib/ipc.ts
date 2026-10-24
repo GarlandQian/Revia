@@ -142,6 +142,8 @@ export const ipc = {
   measureConfig: () =>
     invoke<{
       logging: boolean;
+      /** 测量/冒烟/长测模式（普通启动为 false）。 */
+      measurementMode: boolean;
       autoRun: boolean;
       only: string[] | null;
       outputPath: string | null;

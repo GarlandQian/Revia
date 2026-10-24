@@ -53,6 +53,8 @@ import {
 } from "@/lib/measure";
 
 interface MeasureConfig {
+  /** 测量/冒烟/长测模式（任务 12：普通启动不显示测量面板）。 */
+  measurementMode: boolean;
   smoke: boolean;
   autoRun: boolean;
   only: string[] | null;
@@ -111,6 +113,14 @@ export function App() {
   const [fontSize, setFontSize] = useState(12);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  /**
+   * 状态文案。任务 12 起不再显示在工具栏（工具栏只保留日常操作），
+   * 但仍由测量/长测诊断写入并在测量面板与日志里使用，因此保留采集。
+   */
+  /**
+   * 状态文案。任务 12 起不再显示在工具栏（工具栏只保留日常操作），
+   * 但仍由测量/长测诊断写入，并在测量模式下作为面板标题栏的状态显示。
+   */
   const [status, setStatus] = useState("");
   const [worktreeErrors, setWorktreeErrors] = useState<Record<string, AppErrorPayload | null>>({});
   const [globalError, setGlobalError] = useState<AppErrorPayload | null>(null);
@@ -157,6 +167,8 @@ export function App() {
   }, [worktreeId]);
 
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  /** 是否处于测量/冒烟/长测模式：只有这些模式才显示测量面板（任务 12、D08）。 */
+  const [measurementMode, setMeasurementMode] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [bootstrapDone, setBootstrapDone] = useState(false);
 
@@ -586,9 +598,10 @@ export function App() {
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
         setLoggingEnabled(config.logging && !config.minimalSoakLogging);
-        if (!config.logging) {
-          setPanelOpen(false);
-        }
+        // 测量面板只在测量/冒烟/长测模式显示；普通启动（含普通 acceptance 实例）不显示。
+        // 注意：这里只控制界面，不关闭任何测量/冒烟/长测的结果采集与 IPC 流程。
+        setMeasurementMode(config.measurementMode);
+        setPanelOpen(config.measurementMode);
         // 先让界面进入可交互状态，再跑自动测量：测量需要真正的 diff 视图存在。
         setBootstrapDone(true);
         if (config.soakSeconds && config.soakSeconds > 0) {
@@ -2111,10 +2124,7 @@ export function App() {
           view={view}
           onView={(next) => void switchView(next)}
           onRefresh={() => void refresh()}
-          onFontSize={(delta) => void changeFontSize(delta)}
           busy={busy}
-          status={status}
-          environment={info}
           selectedEntry={selectedEntry}
           isWriting={isWriting}
           onStage={(entry) => void stageFile(entry)}
@@ -2177,12 +2187,15 @@ export function App() {
             </ErrorBoundary>
           )}
         </div>
-        <MeasurePanel
-          open={panelOpen}
-          onToggle={() => setPanelOpen((value) => !value)}
-          measurements={measurements}
-          onClear={() => setMeasurements([])}
-        />
+        {measurementMode ? (
+          <MeasurePanel
+            open={panelOpen}
+            status={status}
+            onToggle={() => setPanelOpen((value) => !value)}
+            measurements={measurements}
+            onClear={() => setMeasurements([])}
+          />
+        ) : null}
       </main>
       {discardConfirmation ? (
         <DiscardDialog path={discardConfirmation.target.path} worktree={discardConfirmation.worktree} section={discardConfirmation.section}
@@ -2239,10 +2252,7 @@ function Toolbar({
   view,
   onView,
   onRefresh,
-  onFontSize,
   busy,
-  status,
-  environment,
   selectedEntry,
   isWriting,
   onStage,
@@ -2257,10 +2267,7 @@ function Toolbar({
   view: ViewMode;
   onView: (view: ViewMode) => void;
   onRefresh: () => void;
-  onFontSize: (delta: number) => void;
   busy: boolean;
-  status: string;
-  environment: WorktreeSessionInfo | null;
   selectedEntry: ChangeEntry | null;
   isWriting: boolean;
   onStage?: (entry: ChangeEntry) => void;
@@ -2304,13 +2311,6 @@ function Toolbar({
         <ToggleGroupItem value="split">{messages.diff.split}</ToggleGroupItem>
         <ToggleGroupItem value="unified">{messages.diff.unified}</ToggleGroupItem>
       </ToggleGroup>
-      <Separator orientation="vertical" className="h-5" />
-      <Button variant="ghost" size="sm" onClick={() => onFontSize(-1)}>
-        A−
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => onFontSize(1)}>
-        A+
-      </Button>
       <Separator orientation="vertical" className="h-5" />
       <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>
         {messages.changes.refresh}
@@ -2360,9 +2360,7 @@ function Toolbar({
           {messages.changes.watchUnavailable}
         </Badge>
       ) : null}
-      <span className={`${watch.error ? "" : "ml-auto "}truncate text-xs text-muted-foreground`}>
-        {environment ? `${environment.gitVersion} · ${status}` : status}
-      </span>
+
     </div>
   );
 }
@@ -2391,11 +2389,14 @@ function ErrorBanner({ error, onDismiss }: { error: AppErrorPayload; onDismiss: 
 
 function MeasurePanel({
   open,
+  status,
   onToggle,
   measurements,
   onClear,
 }: {
   open: boolean;
+  /** 测量/长测诊断写入的状态文案（普通界面不再显示）。 */
+  status: string;
   onToggle: () => void;
   measurements: Measurement[];
   onClear: () => void;
@@ -2427,6 +2428,7 @@ function MeasurePanel({
           {messages.measure.clear}
         </Button>
         <span className="ml-auto text-muted-foreground">
+          {status ? `${status} · ` : ""}
           {latest ? `${latest.label} · ${latest.startedAt}` : ""}
         </span>
       </header>
