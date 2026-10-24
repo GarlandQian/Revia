@@ -34,7 +34,7 @@ import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
-import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
+import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -98,6 +98,13 @@ export function App() {
   /** 选择上下文门与写结果门：与 refreshGate 中的实现共用，便于确定性测试。 */
   const selectionGateRef = useRef(new SelectionGate());
   const operationGateRef = useRef(new OperationResultGate(gateRef.current));
+  /**
+   * 本地已成功的审阅变更（R07-D1）：较早读取不能回退它们。
+   *
+   * 读取请求发起时记 `baseline()`，快照交付时只叠加「发起之后」且版本仍一致的变更；
+   * 版本真的变了则不叠加，标记按后端结果失效。
+   */
+  const reviewOverlayRef = useRef(new ReviewOverlay());
   const [watchState, setWatchState] = useState<{ active: boolean; error: string | null }>({
     active: false,
     error: null,
@@ -406,12 +413,18 @@ export function App() {
    * 返回是否被接受，调用方据此决定后续动作。
    */
   const acceptSnapshot = useCallback(
-    (token: { activation: number; worktreeId: string | null }, snap: ChangesSnapshot): boolean => {
+    (
+      token: { activation: number; worktreeId: string | null },
+      snap: ChangesSnapshot,
+      reviewBaseline: number,
+    ): boolean => {
       if (!gateRef.current.accept(token, { worktreeId: snap.worktreeId, revision: snap.revision })) {
         debugLog(`丢弃过期快照：${snap.worktreeId}@${snap.revision}（当前激活 ${gateRef.current.current().worktreeId}）`);
         return false;
       }
-      applyRefreshedSnapshot(snap);
+      // 较新的本地审阅变更不能被这次（较早发起的）读取回退（R07-D1）。
+      const merged = reviewOverlayRef.current.apply(snap, reviewBaseline);
+      applyRefreshedSnapshot(merged);
       setStatus(snap.entries.length > 0 ? `${snap.entries.length} 个文件` : messages.changes.empty);
       return true;
     },
@@ -422,8 +435,10 @@ export function App() {
   const readAndAccept = useCallback(
     async (targetWorktreeId: string): Promise<boolean> => {
       const token = gateRef.current.token();
+      // 读取**发起时**取分界：之后发生的本地审阅变更才会叠加到这次结果上。
+      const reviewBaseline = reviewOverlayRef.current.baseline();
       const snap = await ipc.listChanges(targetWorktreeId);
-      return acceptSnapshot(token, snap);
+      return acceptSnapshot(token, snap, reviewBaseline);
     },
     [acceptSnapshot],
   );
@@ -454,10 +469,11 @@ export function App() {
   const refreshTarget = useCallback(async (targetWorktreeId: string) => {
     const token = gateRef.current.token();
     try {
+      const reviewBaseline = reviewOverlayRef.current.baseline();
       const snap = await ipc.listChanges(targetWorktreeId);
       if (token.activation === gateRef.current.token().activation
         && gateRef.current.current().worktreeId === targetWorktreeId) {
-        acceptSnapshot(token, snap);
+        acceptSnapshot(token, snap, reviewBaseline);
       }
     } catch (caught) {
       if (token.activation === gateRef.current.token().activation
@@ -810,7 +826,7 @@ export function App() {
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       if (operationGateRef.current.acceptSuccess(opToken, next)
-        && acceptSnapshot(opToken, next)) {
+        && acceptSnapshot(opToken, next, reviewOverlayRef.current.baseline())) {
         setAppError(null, opWorktreeId);
       } else {
         debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);
@@ -1010,6 +1026,13 @@ export function App() {
           entries: current.entries.map((item) => ({ ...item, reviewed: reviewed.has(item.path) })),
         };
       });
+      // 记录这次**已成功**的本地变更：比它更早发起的读取不能把它回退（R07-D1）。
+      reviewOverlayRef.current.record(
+        targetWorktreeId,
+        entry.path,
+        { head: entry.headVersion ?? null, worktree: entry.worktreeVersion ?? null },
+        marked,
+      );
       setAppError(null, targetWorktreeId);
       return marks;
     } catch (caught) {

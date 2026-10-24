@@ -542,7 +542,11 @@ fn packed_refs_symbolic_branch_switch_invalidates_submodule_mark() {
 
     // 真实 submodule add：父仓库 gitlink 记录的是**基线提交**。
     run(&source, &["checkout", "main"]);
-    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source.to_str().unwrap(), "sub"]);
+    // 传给外部 Git 的本地源路径必须去掉 Windows verbatim 前缀（`\\?\C:\...`）：
+    // Git 会把它当成主机名解析并报 `hostname contains invalid characters`。
+    // Rust 内部的 canonical 身份不受影响。
+    let source_arg = revia_lib::platform::external_path(&source);
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source_arg.to_str().unwrap(), "sub"]);
     f.commit();
     run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
     let sub_dir = f.repo.join("sub");
@@ -870,7 +874,11 @@ fn deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed() {
     run(&source, &["add", "--all"]);
     run(&source, &["commit", "-m", "one"]);
 
-    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source.to_str().unwrap(), "sub"]);
+    // 传给外部 Git 的本地源路径必须去掉 Windows verbatim 前缀（`\\?\C:\...`）：
+    // Git 会把它当成主机名解析并报 `hostname contains invalid characters`。
+    // Rust 内部的 canonical 身份不受影响。
+    let source_arg = revia_lib::platform::external_path(&source);
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source_arg.to_str().unwrap(), "sub"]);
     f.commit();
     run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
     // 让父仓库里的 gitlink 相对基线产生改动：子模块里新提交并暂存到父仓库，
@@ -1083,7 +1091,11 @@ fn submodule_with_directory_git_dir_tracks_real_version() {
 
     // 真实 submodule add（gitlink 指向基线）。
     run(&source, &["checkout", "main"]);
-    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source.to_str().unwrap(), "sub"]);
+    // 传给外部 Git 的本地源路径必须去掉 Windows verbatim 前缀（`\\?\C:\...`）：
+    // Git 会把它当成主机名解析并报 `hostname contains invalid characters`。
+    // Rust 内部的 canonical 身份不受影响。
+    let source_arg = revia_lib::platform::external_path(&source);
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source_arg.to_str().unwrap(), "sub"]);
     f.commit();
     run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
     let sub_dir = f.repo.join("sub");

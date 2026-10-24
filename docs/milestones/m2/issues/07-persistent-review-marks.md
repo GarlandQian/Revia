@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -579,3 +579,84 @@ ST07-R3-1至ST07-R3-3的后端原触发路径静态闭合，未见新增生产�
 [原始证据](../evidence/task07-desktop01/manifest.json)包含固定构建/准备/启动、前后快照、3份review副本及capture/显式deliver收据。原5文件、HEAD、语义index和5条回收记录完全相同，唯一外部工作区新增是本次自建probe；hold全部显式释放，无errors/超时，PID24560正常Cmd-Q退出。单次首次点击未显示的早期观察保留，但未确认焦点根因，不与受控场景冒称同根。
 
 07退ready-for-agent，所有复选仍未勾。05恢复/清空、07完整桌面、12剩余桌面、D06和最终长测未完成。已按用户要求通过原SSH成功推送8f95c26，最新[CI40060420970](https://github.com/GarlandQian/Revia/actions/runs/40060420970)结果另行留证；其成功也不能关闭本桌面缺陷。未合并main。
+
+### 2026-10-24 / Pi 实现：R07-D1 桌面返修（旧读取不得回退较新的审阅变更）
+
+只修 R07-D1；未重构已闭合的 05/12/后端身份与测试，未扩 08/13。
+
+#### 缺陷与契约
+
+真实桌面观察（固定 `8f95c26` Release、PID 24560）：`list_changes` 已在生产侧完成并拿到 revision 9，
+验收接缝把它暂缓交付；期间用户点击新 probe 文件的勾选**成功**（界面 3/3、`review.json` 3 条）；
+显式释放旧刷新后，界面回退 2/3、probe 取消勾选，而 `review.json` 逐字节不变。
+即：较早读取覆盖了较新的同版本审阅结果，持久记录本身没有丢。
+
+#### 修复（复用既有门禁，最小改动）
+
+新增 `ReviewOverlay`（`src/lib/refreshGate.ts`），与 `SnapshotGate` / `OperationResultGate` 同一层：
+记录**已成功**的本地审阅变更，带当时的 HEAD/工作区版本与单调序号；读取请求**发起时**取 `baseline()`；
+快照交付时只叠加「发起之后」且**版本仍一致**的变更。
+
+接入点（都是既有生产入口，没有旁路）：
+- `acceptSnapshot(token, snap, reviewBaseline)`：过完 `SnapshotGate` 后先 `apply` 再 `applyRefreshedSnapshot`；
+- `readAndAccept`（自动刷新/手动刷新/回前台共用）、`refreshTarget`（写后真实重读）、
+  以及写结果快照分支：都在 `ipc.listChanges` **之前**取 baseline；
+- `setReviewMark` 成功分支：`record(...)` 记录这次成功变更。
+
+明确保留：不按路径盲合并 bool（要求版本一致）；未停用刷新；`SnapshotGate` 的激活/revision 隔离、
+选择恢复、导航顺序、未知版本门禁、较新错误留存都没改。版本真的变化时 override 不生效，
+标记仍按后端结果失效。
+
+#### 回归（接入真实生产入口）
+
+在既有 `tools/test-refresh-gate.mjs` 体系内新增 5 项，共 24 项通过：
+旧读取晚于新增（3/3 不被回退）、旧读取晚于取消（不被勾回）、文件版本变化仍失效、
+比读取更早的变更不叠加，以及一项直接读 `src/App.tsx` 断言三个生产调用点真的接入了叠加层
+（不是只测未接入的 helper）。
+
+#### R07-CI01（Windows 测试夹具路径）
+
+CI [40060420970](https://github.com/GarlandQian/Revia/actions/runs/40060420970)（head `8f95c26`）：
+macOS 前端 + Rust 253 通过/1 ignored + release 成功；Windows 前端通过，`review_marks` 16 通过/3 失败，release 跳过。
+三项失败（`deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed`、
+`packed_refs_symbolic_branch_switch_invalidates_submodule_mark`、
+`submodule_with_directory_git_dir_tracks_real_version`）都发生在夹具
+`git -c protocol.file.allow=always submodule add <本次临时源目录> sub`：
+Windows 的 `canonicalize` 给出 verbatim `\\?\C:\...`，Git 报 `hostname contains invalid characters`。
+这是传给外部 Git 的本地源路径形态问题，不是 origin/网络，也不是生产子模块版本缺陷。
+
+修复：三处 `submodule add` 的源参数改用既有 `revia_lib::platform::external_path`
+（`src-tauri/src/platform.rs`，与 `discard_recovery.rs` 同一用法），Rust 内部 canonical 身份不变。
+同文件的其余 Git 参数都是仓库内相对分支/提交名，不含外部路径，无需转换。
+未跳过测试、未放宽断言、未改生产身份或用户 Git 配置。真实子模块、第三基线、packed 无 loose refs、
+目录型 `.git`、真实 git 版本等原断言全部保留。
+
+#### 实际执行的检查
+
+日志目录（最终源码）：`/private/tmp/revia-task07-r7c-gqdxcj`
+
+- 基线：`4915f6df3f01e90a5053b5da481a754976d2fa6b`
+- 检查前源码 SHA-256（检查后复核未变）：
+```
+24e6b25bc7bb2db5913d605899dc545dc25b7a7db2660246202a70e201e16ce0  src/lib/refreshGate.ts
+62795e6ff10877ad1317adece7b1a3d29ba3ef218310fa23ff470eec895f4076  src/App.tsx
+b5a1556a143e80e0c9253f00de665cfaf64f9f734ed789d91bf3d37e2f9cdcc8  tools/test-refresh-gate.mjs
+8607ff59e028dd19fdbea5ad1d1bd18893222666b9310cfef9ca452675c55c60  src-tauri/tests/review_marks.rs
+```
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | 24 项通过 |
+| `cargo test --test review_marks` | 0 | 21 项通过 |
+
+日志目录历史（含我删掉的初始目录）见该目录 `MANIFEST.md`。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：R07-D1 的修复未在真实 UI 上重放同一时序（规划方复验）。
+- R07-D1 的 Node 回归是**一次通过**，没有先红后绿的失败记录，不冒称已做敏感性对照。
+- **Windows 未验证**：R07-CI01 只能由规划方下一轮 SSH 推送的新 CI 证明；本机 macOS 无法复现该失败。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。

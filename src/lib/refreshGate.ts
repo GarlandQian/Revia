@@ -221,3 +221,121 @@ export class SelectionGate {
     return current.path === context.path && current.changes === context.changes;
   }
 }
+
+/**
+ * 审阅变更叠加层（R07-D1）：较早的读取不能回退较新的本地审阅结果。
+ *
+ * 场景：`list_changes` 已在后端完成（拿到 revision N），用户随后点击勾选并**成功**；
+ * 之后这个 revision N 的快照才被交付。若直接采用快照里的 `reviewed`，
+ * 界面会回退到标记前，而持久记录仍是对的（真实桌面已观察到）。
+ *
+ * 规则：
+ * - 每次本地成功的标记/取消都记一条 override，带**当时的文件版本**与单调序号；
+ * - 读取请求发起时取 `baseline()`，只有序号**大于** baseline 的变更才会叠加；
+ * - 叠加前要求版本仍一致：HEAD 或工作区版本真的变了，override 不生效，
+ *   快照（以及后端已失效的标记）说了算——不会把已失效的标记勾回来。
+ */
+export interface ReviewVersionsLike {
+  head: string | null;
+  worktree: string | null;
+}
+
+export interface ReviewOverride {
+  path: string;
+  versions: ReviewVersionsLike;
+  reviewed: boolean;
+  seq: number;
+}
+
+export interface ReviewMarkEntryLike {
+  path: string;
+  reviewed: boolean;
+  headVersion?: string | null;
+  worktreeVersion?: string | null;
+}
+
+export interface ReviewStateLike {
+  paths: string[];
+  reviewed: string[];
+  total: number;
+  reviewedCount: number;
+}
+
+export interface ReviewSnapshotLike<E extends ReviewMarkEntryLike> {
+  worktreeId: string;
+  entries: E[];
+  review: ReviewStateLike;
+}
+
+export class ReviewOverlay {
+  private seq = 0;
+  private readonly overrides = new Map<string, ReviewOverride>();
+  /** 上限：只保留最近若干条，避免长时间使用后无界增长。 */
+  private readonly limit: number;
+
+  constructor(limit = 1024) {
+    this.limit = limit;
+  }
+
+  private static key(worktreeId: string, path: string): string {
+    return `${worktreeId}\u0000${path}`;
+  }
+
+  /** 记录一次**已成功**的本地审阅变更，返回它的序号。 */
+  record(worktreeId: string, path: string, versions: ReviewVersionsLike, reviewed: boolean): number {
+    this.seq += 1;
+    this.overrides.set(ReviewOverlay.key(worktreeId, path), {
+      path,
+      versions: { head: versions.head, worktree: versions.worktree },
+      reviewed,
+      seq: this.seq,
+    });
+    if (this.overrides.size > this.limit) {
+      const oldest = [...this.overrides.entries()].sort((a, b) => a[1].seq - b[1].seq)[0];
+      if (oldest) this.overrides.delete(oldest[0]);
+    }
+    return this.seq;
+  }
+
+  /** 读取请求**发起时**调用；返回当前序号，作为「这次读取之后发生的变更」的分界。 */
+  baseline(): number {
+    return this.seq;
+  }
+
+  /** 该路径当前记录的本地状态（诊断与测试用）。 */
+  get(worktreeId: string, path: string): ReviewOverride | undefined {
+    return this.overrides.get(ReviewOverlay.key(worktreeId, path));
+  }
+
+  /**
+   * 把 `baseline` 之后、且版本仍匹配的本地变更叠加到快照上。
+   *
+   * 只改 `reviewed` 与派生进度，不动其他字段；不修改传入对象。
+   */
+  apply<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S, baseline: number): S {
+    let changed = false;
+    const entries = snapshot.entries.map((entry) => {
+      const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
+      if (!override || override.seq <= baseline) return entry;
+      const head = entry.headVersion ?? null;
+      const worktree = entry.worktreeVersion ?? null;
+      if (override.versions.head !== head || override.versions.worktree !== worktree) {
+        // 版本真的变了：本地记录不再适用，标记按后端结果失效。
+        return entry;
+      }
+      if (entry.reviewed === override.reviewed) return entry;
+      changed = true;
+      return { ...entry, reviewed: override.reviewed };
+    });
+    if (!changed) return snapshot;
+
+    const reviewedSet = new Set(entries.filter((entry) => entry.reviewed).map((entry) => entry.path));
+    const reviewed = snapshot.review.paths.filter((path) => reviewedSet.has(path));
+    // 展开保留快照的全部字段（`apply` 只覆盖 `entries` 与派生进度）。
+    return {
+      ...snapshot,
+      entries,
+      review: { ...snapshot.review, reviewed, reviewedCount: reviewed.length },
+    } as S;
+  }
+}

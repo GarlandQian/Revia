@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, SelectionGate, WatchEventGate } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -293,4 +293,92 @@ test("选择门：当前激活代号变化后旧上下文失效", () => {
   const context = gate.begin("wt-a", "a.txt", "unstaged", 1);
   assert.equal(gate.isValid(context, 1), true);
   assert.equal(gate.isValid(context, 2), false, "外部激活代号已变，旧上下文必须失效");
+});
+
+// ---------------- R07-D1：旧读取不能回退较新的审阅变更 ----------------
+
+function reviewSnapshot(overrides = {}) {
+  return {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2 },
+    ...overrides,
+  };
+}
+
+test("旧读取晚于新增：较早发起的读取不能把已成功的标记回退", () => {
+  const overlay = new ReviewOverlay();
+  // 读取发起时先取分界（此时还没有任何本地变更）。
+  const baseline = overlay.baseline();
+  // 用户随后成功勾选 probe（真实调用点会记录这次成功）。
+  overlay.record("wt-a", "probe.txt", { head: null, worktree: "w-p" }, true);
+  // 那次较早的读取现在才交付：里面 probe 仍是未审阅。
+  const merged = overlay.apply(reviewSnapshot(), baseline);
+  const probe = merged.entries.find((entry) => entry.path === "probe.txt");
+  assert.equal(probe.reviewed, true, "旧读取不能回退已成功的标记");
+  assert.equal(merged.review.reviewedCount, 3, "进度必须保持 3/3");
+  assert.deepEqual(merged.review.reviewed, ["a.txt", "b.txt", "probe.txt"]);
+});
+
+test("旧读取晚于取消：较早发起的读取不能把已取消的标记勾回", () => {
+  const overlay = new ReviewOverlay();
+  const baseline = overlay.baseline();
+  overlay.record("wt-a", "b.txt", { head: "h-b", worktree: "w-b" }, false);
+  const merged = overlay.apply(reviewSnapshot(), baseline);
+  const b = merged.entries.find((entry) => entry.path === "b.txt");
+  assert.equal(b.reviewed, false, "旧读取不能把已取消的标记勾回");
+  assert.equal(merged.review.reviewedCount, 1);
+});
+
+test("文件版本变化时本地记录不生效，标记仍按后端结果失效", () => {
+  const overlay = new ReviewOverlay();
+  const baseline = overlay.baseline();
+  overlay.record("wt-a", "probe.txt", { head: null, worktree: "w-old" }, true);
+  // 工作区版本真的变了：后端快照里 probe 未审阅且版本是新的。
+  const merged = overlay.apply(
+    reviewSnapshot({
+      entries: [
+        { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+        { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+        { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-new" },
+      ],
+    }),
+    baseline,
+  );
+  const probe = merged.entries.find((entry) => entry.path === "probe.txt");
+  assert.equal(probe.reviewed, false, "版本变化后不能沿用旧记录把标记勾回");
+  assert.equal(merged.review.reviewedCount, 2);
+});
+
+test("比读取更早的本地变更不叠加（读取已经包含它们）", () => {
+  const overlay = new ReviewOverlay();
+  // 先有本地变更，再发起读取：这次读取本来就应该反映它。
+  overlay.record("wt-a", "probe.txt", { head: null, worktree: "w-p" }, true);
+  const baseline = overlay.baseline();
+  // 快照里已经是 3/3（后端已包含），叠加与否结果一致。
+  const merged = overlay.apply(
+    reviewSnapshot({
+      entries: [
+        { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+        { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+        { path: "probe.txt", reviewed: true, headVersion: null, worktreeVersion: "w-p" },
+      ],
+      review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt", "probe.txt"], total: 3, reviewedCount: 3 },
+    }),
+    baseline,
+  );
+  assert.equal(merged.review.reviewedCount, 3);
+  assert.equal(merged.entries.find((entry) => entry.path === "probe.txt").reviewed, true);
+});
+
+test("生产入口真的接入了叠加层：acceptSnapshot 用 baseline、setReviewMark 记录成功变更", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /reviewOverlayRef\.current\.apply\(/, "acceptSnapshot 必须叠加本地审阅变更");
+  assert.match(app, /reviewOverlayRef\.current\.baseline\(\)/, "读取发起时必须取 baseline");
+  assert.match(app, /reviewOverlayRef\.current\.record\(/, "成功的标记变更必须被记录");
 });
