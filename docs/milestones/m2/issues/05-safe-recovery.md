@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 固定 `234f248` 的 Windows CI 有 5 项 `discard_recovery` 失败，已在 R05-CI01 修复根因（`prepare_destination` 的 Windows verbatim 路径 component 拼接、两处 fixture 平台不兼容），macOS 240 项全通过。**Windows 真实 CI 与桌面验收仍未完成**，任务未 done。
+> R05-CI02 已补足身份回归敏感性（重建身份时保持目标为丢弃后基线，显式断言新旧身份不匹配、错误来自身份，并保留未写入断言）。**Windows 真实 CI 与桌面验收仍未完成**，任务未 done。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -1079,3 +1079,43 @@ Rust 合计 **240 项**：lib 99、`discard_recovery` **71**（1 ignored 桌面�
 - Windows五项是否实际修复及精确路径故障解释仍须新CI验证，不能将本机通过或静态推理当Windows结论。未构建Release、未GUI/D06/长测。
 - 05退回`ready-for-agent`。原Pi正在07返修，待该轮交付后单独修本条，避免混任务提交。仅必要测试/断言变更，先全部修改再集中运行受影响检查，不重跑无关前端、Release或桌面。
 - 不用另写临时客户端或放宽断言。保留精确命令、原始stdout/stderr/真实退出码、检查前后源码hash；提交m2后再固定增量两轴复核。全部复核过后才按Q97新CI及规划方桌面，不标done。
+
+### 2026-10-24 / Pi：R05-CI02 身份回归补足（测试证明缺口）
+
+只补 05 的身份回归断言；未动 07 代码与状态，未做 08/12/13，未改产品恢复逻辑。
+
+#### 问题（两轴同一处）
+
+`publish_rechecks_identity_instead_of_reusing_captured_one` 重建 `.git` 的同时把目标字节改成 `b"new repo content\n"`，于是「未发布路径必须仍等于丢弃后基线」这条内容检查也会拒绝；测试只断言通用 `Rejected`，**即使身份核对退化成复用旧身份也能通过**。这是测试证明缺口，不是已发现的生产身份校验失效。
+
+#### 修复
+
+`src-tauri/tests/discard_recovery.rs` 的该用例改为：
+
+1. 重建 `.git`（Windows 兼容：删目录 + 同路径 `git init`，不做目录 rename），**把目标文件写回丢弃完成后的基线字节**，让内容检查无法拒绝；
+2. 在重建后捕获新身份，显式断言 `!old_identity.confirmed_match(&new_identity)` 且 `filesystem_ids` 确实变化；
+3. 断言错误 `kind == Rejected` 且 **message 含「身份」**，排除字节/路径/冲突等其他拒绝原因；
+4. 保留「拒绝前后数据未被恢复写入」：目标仍是丢弃后基线、不是丢弃前内容，且 `attempt.written` 为空。
+
+#### 敏感性对照（证明不再被兜底）
+
+临时注释掉 `verify_publish` 里的身份核对后重跑该用例：**失败**，恢复被成功执行（`RestoreAttempt { state: Completed, written: ["target.ts"] }`）。随后把实现按原字节恢复。对照前后实现一致（`history/recovery.rs.original.bak` 为对照前副本）。
+
+#### 实际执行的检查
+
+日志目录（实际路径）：`/private/tmp/revia-task05-ci03-IaNg8P`
+
+- 基线：`ebe9f921cede1b5dd07da04f327b7180572b230a`
+- 检查前源码 SHA-256（检查后复核未变）：`f09e13412dd046480aed23f2c90dcc82ea82c6fd496073fd0b46d0c64fb7e635  src-tauri/tests/discard_recovery.rs`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --test discard_recovery` | 0 | `discard_recovery.out` / `.err` / `.exit`（71 passed, 1 ignored） |
+
+本轮只改测试，未改产品代码；按交接要求未重跑前端与完整 Rust 套件。
+
+#### 未验证（必须保留）
+
+- **Windows 未验证**：本机（macOS）通过不等于 Windows 通过；Windows 五项是否真的修好仍需真实 CI。
+- 未构建 Release、未操作 GUI、未跑 D06/长测。
+- 05 仍保留未完成的桌面验收与最新双平台 CI，任务不 done。

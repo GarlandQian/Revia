@@ -1654,7 +1654,12 @@ fn publish_refuses_real_unmerged_conflict_target() {
     assert!(attempt.written.is_empty(), "冲突时不得写入：{attempt:?}");
 }
 
-/// R05-R2-ST1/SP1：原 worktree 被换成新身份后，发布前重新捕获会拒绝。
+/// R05-R2-ST1/SP1 + R05-CI02：原 worktree 被换成新身份后，发布前重新捕获会拒绝。
+///
+/// 这条用例必须证明**身份**这一层在起作用，不能被内容保护兜底：
+/// 重建身份时把目标文件写回**丢弃完成后的基线字节**，因此
+/// 「未发布路径必须仍等于 after」这一条依然成立；只有身份核对能拒绝它。
+/// 同时显式断言新旧身份不满足 `confirmed_match`，并要求错误来自身份。
 #[test]
 fn publish_rechecks_identity_instead_of_reusing_captured_one() {
     let f = Fixture::new();
@@ -1664,7 +1669,15 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
     discard(&session, &target, &store).unwrap();
     let id = store.list(None).unwrap()[0].id.clone();
     let inspection = session.inspect_record(&id, &store).unwrap();
-    let expected_after = f.read("target.ts");
+    // 丢弃完成后的基线：重建身份后必须保持它不变，否则内容检查会先拒绝。
+    let baseline_after_discard = f.read("target.ts");
+    let before_discard = text(&[(10, 1010), (80, 1080), (140, 1140)]);
+    assert_ne!(baseline_after_discard, before_discard, "夹具应保留可恢复的丢弃前内容");
+
+    let old_identity = WorktreeIdentity::capture(&session.git).unwrap();
+    let new_identity = Arc::new(std::sync::Mutex::new(None::<WorktreeIdentity>));
+    let captured = new_identity.clone();
+    let baseline = baseline_after_discard.clone();
 
     // 真实身份变化：删掉 `.git` 并在同一路径重新初始化（worktree 目录本身不动，
     // 避免 Windows 上目录 rename 被占用句柄拒绝）。文件系统标识与 gitDir 都会变化。
@@ -1680,14 +1693,35 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
                     .output()
                     .unwrap();
                 assert!(output.status.success(), "重新初始化失败：{output:?}");
-                fs::write(f.repo.join("target.ts"), b"new repo content\n").unwrap();
+                // 关键：把目标写回丢弃后基线，让内容检查无法拒绝，只剩身份检查。
+                fs::write(f.repo.join("target.ts"), &baseline).unwrap();
+                let identity = WorktreeIdentity::capture(&session.git).unwrap();
+                *captured.lock().unwrap() = Some(identity);
             }
             Ok(())
         })
         .unwrap_err();
+
+    // 1) 身份确实变了，且新旧身份不能 `confirmed_match`。
+    let new_identity = new_identity.lock().unwrap().clone().expect("必须捕获到新身份");
+    assert!(!old_identity.confirmed_match(&new_identity), "重建后新旧身份必须不匹配");
+    assert_ne!(
+        old_identity.filesystem_ids, new_identity.filesystem_ids,
+        "重建 `.git` 必须改变文件系统标识"
+    );
+
+    // 2) 拒绝来自身份核对，而不是字节/路径/冲突。
     assert_eq!(error.kind, ErrorKind::Rejected, "身份改变必须拒绝：{error:?}");
-    assert_eq!(f.read("target.ts"), b"new repo content\n", "新身份目录不得被写入");
-    assert_ne!(f.read("target.ts"), expected_after, "拒绝时不得写入恢复内容");
+    assert!(
+        error.message.contains("身份"),
+        "拒绝原因必须是身份，不能是内容保护兜底：{error:?}"
+    );
+
+    // 3) 拒绝前后数据未被恢复写入：仍是丢弃后基线，不是丢弃前内容。
+    assert_eq!(f.read("target.ts"), baseline_after_discard, "拒绝时不得写入恢复内容");
+    assert_ne!(f.read("target.ts"), before_discard, "不得写入丢弃前内容");
+    let attempt = store.latest_attempt(&id).unwrap().expect("必须留下尝试");
+    assert!(attempt.written.is_empty(), "身份拒绝时不得写入任何路径：{attempt:?}");
 }
 
 /// R05-R2-ST2/SP3：恢复历史进入生产查看（列表 + 详情），重启后仍显示待核对。
