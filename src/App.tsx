@@ -35,7 +35,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
-import { mergePublishedReview, publishReviewSuccess, readThroughReview } from "@/lib/refreshGate";
+import { mergePublishedReview, publishReviewSuccess, readThroughReview, reviewedSetForNavigation } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -266,8 +266,6 @@ export function App() {
       // 未跟踪文件的内容与行数在后端首次取行时才统计；先取一次空范围补全元数据，
       // 否则行数为 0 会被当成空文件，永远不挂载 diff 视图（任务 02 桌面验收）。
       if (entry.changes === "untracked" && !entry.metricsLoaded && !entry.readonlyReason) {
-        // 分界同样在请求发起前取：补元数据的响应可能晚于用户勾选（SP07-R7-3）。
-        const metricsRead = reviewOverlayRef.current.beginRead();
         const slice = await ipc.getRows({ worktreeId: target.worktreeId, path: entry.path, changes: entry.changes,
           view: target.view, from: 0, to: 0 });
         // 迟到的未跟踪元数据不得把选择拉回旧文件（含同 worktree U→V 与 A→B→A）。
@@ -281,27 +279,27 @@ export function App() {
         }
         // 不能用旧 entry **整条**替换：那会连带把同版本已成功的审阅状态勾回去，
         // 而进度仍保留，出现两处状态分裂（SP07-R7-3）。只合并审阅字段并重算进度。
-        const boundary = metricsRead.boundaryOf();
         const overlay = reviewOverlayRef.current;
-        // getRows 也是读取：必须比较**可信水位**，否则「失效已超越的旧成功」
-        // 会在补元数据时把勾选复活（ST07-R11-3 / SP07-R11-3）。
-        // 水位取当前快照的审阅序号（后端已经观察到哪一事件）与这次读取携带的
-        // 快照版本中的较大者。
-        const observedSeq = Math.max(
-          snapshotRef.current?.review.seq ?? 0,
-          loaded.snapshotRevision === entry.snapshotRevision ? (snapshotRef.current?.review.seq ?? 0) : 0,
-        );
+        // getRows 也是读取：用**后端这次实际读到**的审阅水位（`slice.reviewSeq`），
+        // 不能用界面 revision 或快照 seq 去猜（ST07-R12-2）。
+        const loadedSeq = slice.reviewSeq;
         const candidate = snapshotRef.current?.entries.find((item) =>
           item.path === loaded.path && item.changes === loaded.changes
           && item.snapshotRevision === loaded.snapshotRevision);
-        entry = overlay.mergeEntry(target.worktreeId, loaded, candidate, boundary, observedSeq);
+        const currentSeq = snapshotRef.current?.review.seq ?? 0;
+        entry = overlay.mergeEntry(target.worktreeId, loaded, loadedSeq, candidate, currentSeq);
         setSnapshot((current) => {
           if (!current) return current;
           // 与发布路径一致：只在 `current` 上改这条匹配条目的审阅字段。
-          const merged = overlay.mergeEntry(target.worktreeId, loaded, current.entries.find((item) =>
-            item.path === loaded.path && item.changes === loaded.changes
-            && item.snapshotRevision === loaded.snapshotRevision), boundary,
-            Math.max(current.review.seq ?? 0, observedSeq));
+          const merged = overlay.mergeEntry(
+            target.worktreeId,
+            loaded,
+            loadedSeq,
+            current.entries.find((item) =>
+              item.path === loaded.path && item.changes === loaded.changes
+              && item.snapshotRevision === loaded.snapshotRevision),
+            Math.max(current.review.seq ?? 0, currentSeq),
+          );
           return overlay.syncProgress({
             ...current,
             entries: current.entries.map((item) =>
@@ -1138,9 +1136,15 @@ export function App() {
       && `${selectedRef.current.changes}:${selectedRef.current.path}` === activeKey;
     if (!stillSameContext()) return;
 
-    // 用**成功响应**计算哪些已审阅，不依赖 React 是否已经 render 出新快照。
-    const reviewedFromServer = new Set(marks ? marks.reviewed : current.review.reviewed);
-    if (activeEntry && !activeEntry.reviewed) reviewedFromServer.add(activeEntry.path);
+    // 用**成功响应**里的合成真值计算哪些已审阅，不依赖 React 是否已经 render 出新快照。
+    //
+    // 不能无条件把发起时的当前文件补成已审：它可能已经被更晚的操作取消
+    // （⌥⌘R 标 A → B 的结果先显示 → 用户取消 A → 旧 A 回执释放，合成真值是 A 未审）。
+    // 那样会误报「全部已审阅」并跳过真正的未审文件（SP07-R12-1）。
+    const reviewedFromServer = marks
+      ? reviewedSetForNavigation({ view: marks, navigation: marks })
+      : new Set(current.review.reviewed);
+    if (!reviewedFromServer) return;
     const from = unique.findIndex((entry) => entry.path === active.path);
     for (let offset = 1; offset <= unique.length; offset += 1) {
       const index = (Math.max(from, 0) + offset) % unique.length;

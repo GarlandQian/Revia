@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1293,3 +1293,78 @@ Rust 原先只为「本次取消目标」补 false，正标记之外的未审状
 - 15份敏感性输出保留：首轮A是编译失败、无测试汇总，不计行为敏感性；首轮C为55/0、第二轮C为57/0未触发。第三轮C为55通过/2失败，其中一项是辅助源码断言；D-getrows-no-watermark最终只有辅助源码接入断言失败，不冒称已动态证明所有getRows时序。其余按manifest逐份实际汇总保留，不用重复试验数字代替生产证明。
 - 上轮四个最短触发路径已静态接上，继续原Pi只修本轮两项相关完整链。导航必须消费真实合成结果，元数据必须区分当前UI状态与后端同次读取状态；用既有Node/Rust覆盖上面两条，不新框架、不扩重复外部客户端。
 - 全部修改后集中最小检查，精确暂存、新增提交，保留原件和失败，不amend。07退ready-for-agent，05/12不done。无新版Release/桌面/D06/CI/长测；全部复核通过后规划方才桌面和仅SSH双平台CI，最终11同进程30分钟Q98不省略。
+
+### 2026-10-24 / Pi 实现：任务07 第十二轮限定返修（导航真值与真实读取水位）
+
+只修第十二轮两项；第十一轮已闭合的完整负状态聚合、发布与点击代际分离、React current 上只合并审阅字段、
+四读取入口、跨组、纯暂存保留、重启、未知门禁、activation/revision/选择与新错误留存全部保留。
+
+#### SP07-R12-1（导航强行把已取消的目标补成已审）
+
+`reviewNextFile` 原先无条件 `reviewedFromServer.add(activeEntry.path)`：把发起 ⌥⌘R 时的当前文件
+当成已审，即使它已经被更晚的操作取消。
+
+现在只消费**合成真值**：新增 `reviewedSetForNavigation(published)`，用 `publishReviewSuccess`
+返回的 `navigation.reviewed` 构造集合；未发布（上下文失效）时返回 `null`，调用方终止过时导航。
+不再有任何「补 true」的路径，因此「A 被更晚取消」时进度是真实的 1/2，不会误报全部已审。
+
+#### SP07-R12-2（元数据入口用 UI 水位冒充读取水位）
+
+`RowSlice` 增加 `review_seq`：与 `entry` **同一次加锁读取**，精确描述「这份 entry 的审阅状态新到哪一步」。
+`mergeEntry` 签名改为 `(worktreeId, loaded, loadedSeq, current, currentSeq)`：
+
+1. 版本不一致 → 一律用 `loaded`；
+2. 版本一致 → 取**水位更大**的一侧作底座（真值按真实执行先后，不看谁先到界面）；
+3. 再叠加**比底座更新**的本地记录（`seq` 严格更大、版本一致）。
+
+`openEntry` 的元数据补全改用 `slice.reviewSeq`，不再用 `snapshotRef.review.seq` 猜。
+这样「列表旧未审 + 后端读到已审」和「v1→v2→v1 旧成功」两个方向都正确：
+前者以水位 1 的后端真值胜出，后者被水位 2 挡住。
+
+#### 回归
+
+- **Rust 真实 Git**：**30 项通过**。新增 `row_slice_reports_the_review_seq_it_read`
+  （读取水位必须等于快照 seq，并在标记后跟上新序号、entry 同步已审）、
+  `row_slice_review_seq_tracks_invalidation`（失效推进水位后取行必须报新水位）。
+- **Node**：**65 项通过**。新增/重写覆盖：导航消费合成真值（目标被更晚取消时不补 true、
+  进度 1/2）、上下文失效终止导航、正常导航用真实进度、
+  getRows 双水位（后端更新 / 界面更新 / 无 override 变体）、原 v1→v2→v1 仍被挡住。
+- `cargo test --lib` 100 项通过；`git diff --check` 退出 0。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail |
+| --- | --- | --- | --- | --- |
+| 导航把目标补成已审 | 1 | 64 | 63 | 1 |
+| mergeEntry 无条件优先 current（首轮） | 0 | 64 | 64 | **0（未触发）** |
+| 同上，补「回执尚未到达」变体后 | 1 | 65 | 64 | 1 |
+| 忽略后端读取水位 | 1 | 64 | 62 | 2 |
+| RowSlice 不报真实读取水位（恒 0） | 101 | — | 28 | 2 |
+
+首轮 `B-current-wins` 未触发（当时用例里 override 恰好纠正了结果），原件保留；
+补上「回执尚未到达」这条真实可达路径后同一回退才失败，两次都保留，不删不改。
+
+#### 实际执行的检查（最终实现）
+
+日志目录（唯一，原件保留）：`/private/tmp/revia-task07-r13-S4CiKi`
+
+- 基线：`c195f6ae8e4e05f4a3a61ebe812814799afa8e5a`
+- 最终检查前取 `source-sha256-before-check.txt`，跑完取 `source-sha256-after-check.txt`，
+  两者逐行一致（已 diff 验证）。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm bindings` | 0 | 生成并清理行尾空白 |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 65 / pass 65 / fail 0 |
+| `cargo test --test review_marks` | 0 | 30 passed |
+| `cargo test --lib` | 0 | 100 passed |
+| `git diff --check` | 0 | — |
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：两条场景都未在真实 UI 重放（由规划方复验）。
+- **Windows 未验证**：仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。

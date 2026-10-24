@@ -143,6 +143,11 @@ pub struct RowSlice {
     pub revision: u64,
     /// 该文件最新的列表元数据（未跟踪文件在此时才补全）。
     pub entry: ChangeEntry,
+    /// 这次读取**实际观察到**的审阅水位：`entry.reviewed` 对应的真实提交序号。
+    ///
+    /// 与 `entry` 在同一把锁内取出，所以它精确描述「这份 entry 的审阅状态新到哪一步」。
+    /// 前端不能用界面上的 revision 或快照 seq 去猜（ST07-R12-2）。
+    pub review_seq: u64,
 }
 
 /// 环境检查项（Q36：环境问题在窗口顶部提示）。
@@ -567,6 +572,8 @@ impl WorktreeSession {
             fingerprint: snapshot.fingerprint.clone(),
             revision: snapshot.generation,
             entry,
+            // 与 `entry` 同一次加锁读取：快照的审阅状态就是这个序号对应的真值。
+            review_seq: snapshot.review.seq,
         })
     }
 

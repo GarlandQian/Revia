@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use revia_lib::git::{CommandLog, status::ChangesKind};
 use revia_lib::review::ReviewStore;
+use revia_lib::git::rows::ViewMode;
 use revia_lib::session::{ChangeEntry, WorktreeSession};
 use revia_lib::shell::{EnvCaptureInfo, ShellEnv};
 
@@ -1369,4 +1370,52 @@ fn negative_state_binds_the_version_it_confirmed() {
         .and_then(|entry| entry.worktree_version.clone())
         .unwrap();
     assert_ne!(b_after, b_version, "版本必须变化");
+}
+
+/// ST07-R12-2 / SP07-R12-2：`RowSlice` 必须携带与 `entry` **同一次加锁读取**的
+/// 真实审阅水位 `review_seq`，前端据此合并，不能用界面 revision 猜。
+#[test]
+fn row_slice_reports_the_review_seq_it_read() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    let session = f.session();
+    let before = session.refresh().unwrap();
+    assert_eq!(before.review.seq, 0, "初始没有审阅事件");
+
+    // 未触发任何审阅写入时，取行应报同一水位。
+    let slice = session.rows("a.txt", ChangesKind::Unstaged, ViewMode::Unified, 0, 1).unwrap();
+    assert_eq!(slice.review_seq, before.review.seq, "读取水位必须与快照一致");
+    assert!(!slice.entry.reviewed);
+
+    // 标记成功推进序号后，再取行必须报**新的**水位，且 entry 也是已审。
+    let marked = session.set_review_mark("a.txt", true, None).unwrap();
+    assert!(marked.seq > 0);
+    let after = session.rows("a.txt", ChangesKind::Unstaged, ViewMode::Unified, 0, 1).unwrap();
+    assert_eq!(after.review_seq, marked.seq, "读取水位必须跟上真实写入");
+    assert!(after.entry.reviewed, "同一次读取里的 entry 必须反映该水位");
+}
+
+/// 失效清理推进水位后，取行报的 `review_seq` 也必须跟上：
+/// 旧成功回执不能借着更小的水位在补元数据时复活。
+#[test]
+fn row_slice_review_seq_tracks_invalidation() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    let session = f.session();
+    session.refresh().unwrap();
+    let marked = session.set_review_mark("a.txt", true, None).unwrap();
+
+    // 外部改文件 → 标记失效，水位前进。
+    f.write("a.txt", b"changed again\n");
+    let after = session.refresh().unwrap();
+    assert_eq!(after.review.reviewed_count, 0);
+    assert!(after.review.seq > marked.seq);
+
+    let slice = session.rows("a.txt", ChangesKind::Unstaged, ViewMode::Unified, 0, 1).unwrap();
+    assert_eq!(slice.review_seq, after.review.seq, "取行必须报失效后的水位");
+    assert!(!slice.entry.reviewed, "失效后 entry 未审");
 }

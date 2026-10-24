@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -480,7 +480,8 @@ test("未跟踪元数据补全不整条替换：同版本已成功的勾选保�
   // 交付的 entry 是旧读取：未审阅、行数才刚补上。
   const loaded = { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p", metricsLoaded: true };
   const current = { path: "probe.txt", reviewed: true, headVersion: null, worktreeVersion: "w-p", metricsLoaded: false };
-  const merged = overlay.mergeEntry("wt-a", loaded, current, metricsRead.boundaryOf());
+  // loaded 是后端这次读到的（水位 0，未审）；current 是界面（水位 1，已审）。
+  const merged = overlay.mergeEntry("wt-a", loaded, 0, current, 1);
   assert.equal(merged.reviewed, true, "补元数据不能把已成功的勾选勾回去");
   assert.equal(merged.metricsLoaded, true, "元数据本身仍要补上");
   // 进度也必须跟着勾选，而不是保持旧值。
@@ -499,7 +500,7 @@ test("未跟踪元数据补全时版本变了就不沿用旧勾选", () => {
   const metricsRead = overlay.beginRead();
   const loaded = { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-new", metricsLoaded: true };
   const current = { path: "probe.txt", reviewed: true, headVersion: null, worktreeVersion: "w-old", metricsLoaded: false };
-  const merged = overlay.mergeEntry("wt-a", loaded, current, metricsRead.boundaryOf());
+  const merged = overlay.mergeEntry("wt-a", loaded, 0, current, 1);
   assert.equal(merged.reviewed, false, "版本不同不能沿用旧状态");
 });
 
@@ -1007,24 +1008,43 @@ test("getRows 水位：失效已超越的旧成功不能在补元数据时复活
   const overlay = new ReviewOverlay();
   // 旧 v1 成功 seq=1，回执暂缓。
   overlay.record("wt-a", "U", { head: null, worktree: "w-v1" }, true, 1);
-  // 补元数据的读取发起（boundary 在记录之后取，模拟「旧成功在读取之后才释放」）。
-  const metricsRead = overlay.beginRead();
-  // 当前真值水位 2（v2 失效已推进），版本回到 v1。
+  // 后端这次读到的是未审、水位 2（v2 失效已推进），版本回到 v1。
   const loaded = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: true };
   const current = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: false };
-  const merged = overlay.mergeEntry("wt-a", loaded, current, metricsRead.boundaryOf(), 2);
+  const merged = overlay.mergeEntry("wt-a", loaded, 2, current, 2);
   assert.equal(merged.reviewed, false, "水位 2 已超越 seq=1，旧成功不能复活");
   assert.equal(merged.metricsLoaded, true, "元数据本身仍要补上");
 });
 
-test("getRows 水位：比水位更新的成功仍然生效", () => {
+test("getRows 水位：比读取水位更新的成功仍然生效", () => {
   const overlay = new ReviewOverlay();
-  const metricsRead = overlay.beginRead();
+  // 更晚的成功 seq=3，后端这次读到的是水位 2（未审）。
   overlay.record("wt-a", "U", { head: null, worktree: "w-v1" }, true, 3);
   const loaded = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: true };
   const current = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: false };
-  const merged = overlay.mergeEntry("wt-a", loaded, current, metricsRead.boundaryOf(), 2);
-  assert.equal(merged.reviewed, true, "比水位更新的成功必须生效");
+  const merged = overlay.mergeEntry("wt-a", loaded, 2, current, 2);
+  assert.equal(merged.reviewed, true, "比读取水位更新的成功必须生效");
+});
+
+test("getRows 用后端读取水位：后端已读到已审时，旧界面未审不能覆盖它（ST07-R12-2）", () => {
+  const overlay = new ReviewOverlay();
+  // 列表 L 在 seq=0 捕获 B 未审；B 标记成功 seq=1（回执暂缓）。
+  overlay.record("wt-a", "B", { head: null, worktree: "w-b" }, true, 1);
+  // getRows 从后端读到 **已审**、水位 1（后端真值），界面仍是未审（水位 0）。
+  const loaded = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  const current = { path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, 1, current, 0);
+  assert.equal(merged.reviewed, true, "后端读取到已审，旧界面未审不能覆盖它");
+  assert.equal(merged.metricsLoaded, true);
+});
+
+test("getRows 用后端读取水位：界面更新时仍以水位大的一侧为准", () => {
+  const overlay = new ReviewOverlay();
+  // 界面水位 2 已审，后端这次读到的是水位 1 未审（更旧）。
+  const loaded = { path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  const current = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, 1, current, 2);
+  assert.equal(merged.reviewed, true, "水位更大的界面真值胜出");
 });
 
 test("React 发布只在 current 上合并审阅字段，不覆盖已排队的元数据补全（SP07-R11-4）", async () => {
@@ -1071,6 +1091,108 @@ test("生产入口接入：发布与错误清理分开、getRows 传水位（辅
   const { readFile } = await import("node:fs/promises");
   const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
   assert.match(app, /epochMatches: reviewEpochRef\.current === epoch/, "epoch 只作为上下文事实传入");
-  assert.match(app, /mergeEntry\([^)]*observedSeq\)/s, "getRows 的合并必须传水位");
+  // getRows 必须用后端 `RowSlice.reviewSeq`（真实读取水位），不能用界面 revision 猜。
+  assert.match(app, /const loadedSeq = slice\.reviewSeq;/, "getRows 必须取后端读取水位");
+  assert.match(app, /mergeEntry\(target\.worktreeId, loaded, loadedSeq,/, "合并必须传后端读取水位");
   assert.doesNotMatch(app, /entries: view\.entries/, "发布不能整批覆盖 entries");
+});
+
+// ---------------- 第十二轮：导航真值与真实读取水位 ----------------
+
+test("导航消费合成真值：目标被更晚取消时不能补 true，也不能误报全部已审（SP07-R12-1）", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "A", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "B", reviewed: false, headVersion: "h-b", worktreeVersion: "w-b" },
+    ],
+    review: { paths: ["A", "B"], reviewed: [], total: 2, reviewedCount: 0, seq: 0 },
+  };
+  // 1) ⌥⌘R 标 A：seq1（回执暂缓）。
+  overlay.record("wt-a", "A", { head: "h-a", worktree: "w-a" }, true, 1);
+  // 2) B 的 seq2 结果先显示 A+B 已审。
+  // 3) 用户取消 A：seq3 成功。
+  overlay.record("wt-a", "A", { head: "h-a", worktree: "w-a" }, false, 3);
+  // 4) 旧 A 回执（seq1）释放：合成真值应是 A 未审 / B 已审。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["A", "B"],   // 旧回执的正标记集合
+    marks: marksOf(["A", "h-a", "w-a"], ["B", "h-b", "w-b"]),
+    seq: 1,
+    snapshot: current,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: false },
+  });
+  assert.equal(reviewedOf(published.view, "A"), false, "合成真值里 A 已被取消");
+  assert.equal(reviewedOf(published.view, "B"), true);
+  const reviewed = reviewedSetForNavigation(published);
+  assert.equal(reviewed.has("A"), false, "导航不能把已取消的 A 补成已审");
+  assert.equal(reviewed.size, 1, "真实进度是 1/2，不能误报 2/2");
+});
+
+test("导航：上下文失效（未发布）时终止过时导航", () => {
+  const overlay = new ReviewOverlay();
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["A"],
+    marks: marksOf(["A", "h-a", "w-a"]), seq: 1, snapshot: null,
+    context: { worktreeMatches: false, activationMatches: true, revisionMatches: true, epochMatches: true },
+  });
+  assert.equal(reviewedSetForNavigation(published), null, "未发布时导航必须终止");
+});
+
+test("导航：正常情况下使用合成后的真实进度", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "A", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "B", reviewed: false, headVersion: "h-b", worktreeVersion: "w-b" },
+    ],
+    review: { paths: ["A", "B"], reviewed: [], total: 2, reviewedCount: 0, seq: 0 },
+  };
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["A", "B"],
+    marks: marksOf(["A", "h-a", "w-a"], ["B", "h-b", "w-b"]), seq: 1, snapshot: current,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: true },
+  });
+  const reviewed = reviewedSetForNavigation(published);
+  assert.deepEqual([...reviewed].sort(), ["A", "B"]);
+});
+
+test("getRows 真实读取水位：列表旧未审 + 后端读到已审时以水位大的一侧为准（SP07-R12-2 完整链）", () => {
+  const overlay = new ReviewOverlay();
+  // 列表 L 捕获 B 未审（水位 0），被 hold。
+  // B 勾选成功 seq1，回执被 hold（请求绑定前端 r0）。
+  overlay.record("wt-a", "B", { head: null, worktree: "w-b" }, true, 1);
+  // 释放 L：显示 B 未审（水位 0 的旧真值）。
+  // 打开未跟踪 B：getRows 从后端读到 **已审**，`reviewSeq = 1`。
+  const loaded = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  const current = { path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, 1, current, 0);
+  assert.equal(merged.reviewed, true, "后端读取到的已审不能被旧界面覆盖");
+  // 最后释放 B 的回执：它绑定的版本/水位不匹配当前 revision，展示被拒；但真值已经是已审。
+  assert.equal(overlay.get("wt-a", "B").reviewed, true, "持久真值已审，重启也一致");
+});
+
+test("getRows 真实读取水位：原 v1→v2→v1 旧成功仍被水位挡住", () => {
+  const overlay = new ReviewOverlay();
+  // 旧 v1 成功 seq1（回执暂缓）。
+  overlay.record("wt-a", "U", { head: null, worktree: "w-v1" }, true, 1);
+  // v2 失效推进到 seq2，回到 v1 仍未审；getRows 读到未审、水位 2。
+  const loaded = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: true };
+  const current = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, 2, current, 2);
+  assert.equal(merged.reviewed, false, "水位 2 已超越旧成功 seq1");
+});
+
+test("getRows 真实读取水位：回执尚未到达时也必须以后端读取为准（ST07-R12-2 无 override 变体）", () => {
+  const overlay = new ReviewOverlay();
+  // 列表 L 在 seq=0 捕获 B 未审并 hold。
+  // B 的标记已在后端成功（seq=1），但**回执还没到达前端**，所以叠加层里没有记录。
+  // getRows 从后端读到已审、`reviewSeq = 1`；界面仍是水位 0 的未审。
+  const loaded = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  const current = { path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, 1, current, 0);
+  assert.equal(merged.reviewed, true,
+    "后端读取水位更大，旧界面未审不能覆盖它（否则界面与磁盘长期不一致）");
 });

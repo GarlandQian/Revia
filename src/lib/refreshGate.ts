@@ -384,25 +384,39 @@ export class ReviewOverlay {
 
   /**
    * 用同路径的当前条目与本地记录修正一条被**整体替换**的条目（未跟踪元数据补全用）。
+   *
+   * 两个候选都带**它自己已确认的审阅水位**（`loadedSeq` 来自后端的 `RowSlice.reviewSeq`，
+   * `currentSeq` 来自界面快照的 `review.seq`）。合并规则：
+   *
+   * 1. 版本不一致 → 一律用 `loaded`（新读取适用于新版本）。
+   * 2. 版本一致 → 取**水位更大**的那一侧作为底座：真值按真实执行先后判定，
+   *    不看谁先到达界面（ST07-R12-2）。旧界面（水位小）不能覆盖后端新读取（水位大），
+   *    反过来也一样。
+   * 3. 再叠加**比底座更新**的本地记录（`seq` 严格更大、版本一致），
+   *    让真正更晚的成功仍然生效。
    */
   mergeEntry<E extends ReviewMarkEntryLike>(
     worktreeId: string,
     loaded: E,
+    loadedSeq: number,
     current: E | undefined,
-    boundary: number,
-    /** 读取/当前真值已经观察到的水位；不小于记录序号时旧成功不生效（ST07-R11-3）。 */
-    observedSeq = 0,
+    currentSeq: number,
   ): E {
     const head = loaded.headVersion ?? null;
     const worktree = loaded.worktreeVersion ?? null;
     let reviewed = loaded.reviewed;
+    let baseSeq = loadedSeq;
     if (current
       && (current.headVersion ?? null) === head
       && (current.worktreeVersion ?? null) === worktree) {
-      reviewed = current.reviewed;
+      // 版本一致：水位更大的一侧才是更新的真值。
+      if (currentSeq > loadedSeq) {
+        reviewed = current.reviewed;
+        baseSeq = currentSeq;
+      }
     }
     const override = this.overrides.get(ReviewOverlay.key(worktreeId, loaded.path));
-    if (override && override.commitSeq > boundary && observedSeq < override.seq
+    if (override && override.seq > baseSeq
       && override.versions.head === head && override.versions.worktree === worktree) {
       reviewed = override.reviewed;
     }
@@ -720,4 +734,22 @@ export function mergePublishedReview<S extends ReviewSnapshotLike<ReviewMarkEntr
     review: { ...view.review, seq },
     entries,
   } as S;
+}
+
+/**
+ * 连续审阅导航要用的「已审阅集合」。
+ *
+ * **只**用合成后的真值（`published` 里的进度），不把发起时的当前文件强行补成已审：
+ * 它可能已经被更晚的操作取消（⌥⌘R 标 A → B 的结果先显示 → 用户取消 A →
+ * 旧 A 回执释放，合成真值是 A 未审）。强行补 true 会误报「全部已审阅」
+ * 并跳过真正未审的文件（SP07-R12-1）。
+ *
+ * `navigation` 的 `paths` 为空（上下文失效、未发布）时返回 `null`，
+ * 调用方应终止这次过时导航。
+ */
+export function reviewedSetForNavigation(
+  published: { view: unknown; navigation: ReviewStateLike } | null,
+): Set<string> | null {
+  if (!published || !published.view) return null;
+  return new Set(published.navigation.reviewed);
 }
