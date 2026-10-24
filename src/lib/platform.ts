@@ -50,6 +50,17 @@ export function isReviewShortcut(event: KeyboardEvent | React.KeyboardEvent): bo
   return isPrimaryModifier(event) && isAltModifier(event) && event.code === "KeyR";
 }
 
+/**
+ * 判断焦点是否落在按钮上。
+ *
+ * 按钮有自己的键盘行为（空格/回车激活、勾选框切换）：全局快捷键不能穿透到后台文件操作，
+ * 但也不能抢走按钮本身的默认行为（Q93、spec 决策 7）。
+ */
+export function isButtonTarget(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  return target.closest("button, [role='checkbox'], [role='button']") !== null;
+}
+
 /** 判断是否在输入类控件（<input>, <textarea>, [contenteditable]）或弹窗内，让出快捷键避免穿透（Q93、审查意见 6）。 */
 export function isTextInputOrDialog(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;

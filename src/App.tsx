@@ -9,6 +9,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
+import type { ReviewMarks } from "@/types/bindings/ReviewMarks";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
@@ -32,7 +33,7 @@ import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
@@ -947,18 +948,36 @@ export function App() {
    * 切换某个文件的审阅标记（任务 07）。
    *
    * 勾选框只切换、不改变选择；⌥⌘R 复用同一个写入路径。
-   * 迟到的响应按 worktree 与代际判定，不污染其他 worktree 或新的文件版本。
+   * - 请求带上**用户所见**的 HEAD + 工作区版本，后端不一致即拒绝（Q20、Q89）；
+   * - 迟到响应同时校验 worktree、activation 与快照版本，不污染其他 worktree 或新版本；
+   * - 成功时返回后端确认过的进度，导航直接用它，不依赖 React 先 render。
    */
-  const setReviewMark = useCallback(async (entry: ChangeEntry, marked: boolean): Promise<boolean> => {
+  const setReviewMark = useCallback(async (
+    entry: ChangeEntry,
+    marked: boolean,
+  ): Promise<ReviewMarks | null> => {
     const targetWorktreeId = worktreeIdRef.current;
-    if (!targetWorktreeId) return false;
+    const targetSnapshot = snapshotRef.current;
+    if (!targetWorktreeId || !targetSnapshot) return null;
+    const targetActivation = gateRef.current.token().activation;
+    const targetRevision = targetSnapshot.revision;
     const epoch = ++reviewEpochRef.current;
     const isCurrent = () => reviewEpochRef.current === epoch
       && worktreeIdRef.current === targetWorktreeId
-      && gateRef.current.token().worktreeId === targetWorktreeId;
+      && gateRef.current.token().worktreeId === targetWorktreeId
+      && gateRef.current.token().activation === targetActivation
+      && snapshotRef.current?.revision === targetRevision;
     try {
-      const marks = await ipc.setReviewMark({ worktreeId: targetWorktreeId, path: entry.path, marked });
-      if (!isCurrent()) return false;
+      const marks = await ipc.setReviewMark({
+        worktreeId: targetWorktreeId,
+        path: entry.path,
+        marked,
+        expectedVersions: {
+          head: entry.headVersion ?? null,
+          worktree: entry.worktreeVersion ?? null,
+        },
+      });
+      if (!isCurrent()) return null;
       setSnapshot((current) => {
         if (!current || current.worktreeId !== targetWorktreeId) return current;
         const reviewed = new Set(marks.reviewed);
@@ -969,11 +988,11 @@ export function App() {
         };
       });
       setAppError(null, targetWorktreeId);
-      return true;
+      return marks;
     } catch (caught) {
       // 持久化失败如实展示，不伪称保存成功。
       if (isCurrent()) setAppError(toAppError(caught), targetWorktreeId);
-      return false;
+      return null;
     }
   }, [setAppError]);
 
@@ -985,39 +1004,58 @@ export function App() {
   const reviewNextFile = useCallback(async () => {
     const current = snapshotRef.current;
     const active = selectedRef.current;
-    if (!current || !active || !worktreeId) return;
+    const targetWorktreeId = worktreeId;
+    if (!current || !active || !targetWorktreeId) return;
+    const targetActivation = gateRef.current.token().activation;
+    const targetRevision = current.revision;
+    const activeKey = `${active.changes}:${active.path}`;
     setReviewNotice(null);
-    const order = getDisplayOrderEntries(current);
-    const seen = new Set<string>();
-    const unique: ChangeEntry[] = [];
-    for (const entry of order) {
-      if (seen.add(entry.path)) unique.push(entry);
-    }
+
+    // 去重后的显示顺序（`has` 判断后 `add`，`Set.add` 的返回值是 Set，不能当布尔用）。
+    const uniqueEntries = (entries: ChangeEntry[]): ChangeEntry[] => {
+      const seen = new Set<string>();
+      const unique: ChangeEntry[] = [];
+      for (const entry of entries) {
+        if (seen.has(entry.path)) continue;
+        seen.add(entry.path);
+        unique.push(entry);
+      }
+      return unique;
+    };
+
+    const unique = uniqueEntries(getDisplayOrderEntries(current));
     if (unique.length === 0) return;
     const activeEntry = unique.find((entry) => entry.path === active.path);
-    // 当前文件本身未审阅：先标记它，然后从它之后继续找。
+
+    // 当前文件本身未审阅：先标记它；标记失败则不导航（错误已经显示）。
+    let marks: ReviewMarks | null = null;
     if (activeEntry && !activeEntry.reviewed) {
-      const saved = await setReviewMark(activeEntry, true);
-      if (!saved) return;
-      // 标记失败时不跳转（错误已经显示）。
+      marks = await setReviewMark(activeEntry, true);
+      if (!marks) return;
     }
-    const refreshed = snapshotRef.current;
-    if (!refreshed || refreshed.worktreeId !== worktreeId) return;
-    const refreshedOrder = getDisplayOrderEntries(refreshed);
-    const refreshedSeen = new Set<string>();
-    const refreshedUnique: ChangeEntry[] = [];
-    for (const entry of refreshedOrder) {
-      if (refreshedSeen.add(entry.path)) refreshedUnique.push(entry);
-    }
-    const from = refreshedUnique.findIndex((entry) => entry.path === active.path);
-    for (let offset = 1; offset <= refreshedUnique.length; offset += 1) {
-      const index = (Math.max(from, 0) + offset) % refreshedUnique.length;
-      const candidate = refreshedUnique[index];
-      if (!candidate.reviewed) {
-        if (candidate.collapsed) setExpanded((values) => new Set(values).add(`${candidate.changes}:${candidate.path}`));
-        await openEntry(candidate, { view: viewRef.current, worktreeId });
-        return;
+
+    // 导航必须绑定发起时的上下文：等待期间切换 worktree、刷新或另选文件都作废。
+    const stillSameContext = () => worktreeIdRef.current === targetWorktreeId
+      && gateRef.current.token().activation === targetActivation
+      && snapshotRef.current?.revision === targetRevision
+      && selectedRef.current !== null
+      && `${selectedRef.current.changes}:${selectedRef.current.path}` === activeKey;
+    if (!stillSameContext()) return;
+
+    // 用**成功响应**计算哪些已审阅，不依赖 React 是否已经 render 出新快照。
+    const reviewedFromServer = new Set(marks ? marks.reviewed : current.review.reviewed);
+    if (activeEntry && !activeEntry.reviewed) reviewedFromServer.add(activeEntry.path);
+    const from = unique.findIndex((entry) => entry.path === active.path);
+    for (let offset = 1; offset <= unique.length; offset += 1) {
+      const index = (Math.max(from, 0) + offset) % unique.length;
+      const candidate = unique[index];
+      if (reviewedFromServer.has(candidate.path)) continue;
+      if (!stillSameContext()) return;
+      if (candidate.collapsed) {
+        setExpanded((values) => new Set(values).add(`${candidate.changes}:${candidate.path}`));
       }
+      await openEntry(candidate, { view: viewRef.current, worktreeId: targetWorktreeId });
+      return;
     }
     // 全部已审阅：留在当前文件并提示。
     setReviewNotice(messages.review.allReviewed);
@@ -1087,6 +1125,8 @@ export function App() {
 
       if (isReviewShortcut(event)) {
         // 必须在 ⌘R 刷新分支之前处理，否则会被刷新吞掉（Q93、D04）。
+        // 焦点在按钮/勾选框上时不穿透：那类控件用自己的键盘行为（spec 决策 7）。
+        if (isButtonTarget(event.target)) return;
         event.preventDefault();
         void reviewNextFile();
         return;
@@ -2019,11 +2059,6 @@ export function App() {
         </Button>
         <p className="text-xs text-muted-foreground">{messages.firstRun.dragHint}</p>
         {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
-        {reviewNotice ? (
-          <div role="status" className="mx-3 mt-1 rounded border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
-            {reviewNotice}
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -2079,6 +2114,11 @@ export function App() {
           watch={watchState}
         />
         {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+        {reviewNotice ? (
+          <div role="status" className="border-b bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+            {reviewNotice}
+          </div>
+        ) : null}
         {watchState.error ? (
           <div className="border-b bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
             {messages.changes.watchUnavailableHint}

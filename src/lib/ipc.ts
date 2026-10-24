@@ -103,7 +103,13 @@ export const ipc = {
   stopWatch: () => invoke<WatchStatusPayload>("stop_watch"),
   watchStatus: () => invoke<WatchSnapshotPayload>("watch_status"),
   /** 切换审阅标记（任务 07）：标记按 worktree 身份 + HEAD/工作区版本记录。 */
-  setReviewMark: (request: { worktreeId: string; path: string; marked: boolean }) =>
+  setReviewMark: (request: {
+    worktreeId: string;
+    path: string;
+    marked: boolean;
+    /** 用户所见版本；后端不一致即拒绝，避免把没看过的内容标成已审阅。 */
+    expectedVersions: { head: string | null; worktree: string | null };
+  }) =>
     invoke<ReviewMarks>("set_review_mark", { request }),
   listChanges: (worktreeId: string) =>
     invoke<ChangesSnapshot>("list_changes", { request: { worktreeId } }),

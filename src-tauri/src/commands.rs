@@ -339,6 +339,8 @@ pub struct ReviewMarkRequest {
     pub path: String,
     /// true = 标记已审阅，false = 取消标记。
     pub marked: bool,
+    /// 用户在界面上看到的 HEAD + 工作区版本；执行时必须一致，否则拒绝（Q20、Q89）。
+    pub expected_versions: crate::review::ReviewVersions,
 }
 
 /// 切换某个文件的审阅标记（任务 07）。
@@ -346,7 +348,7 @@ pub struct ReviewMarkRequest {
 /// 标记按 worktree 身份 + HEAD 版本 + 工作区版本记录；持久化失败如实返回错误。
 pub fn set_review_mark_impl(state: &AppState, request: &ReviewMarkRequest) -> Result<crate::review::ReviewMarks> {
     let session = state.session(&request.worktree_id)?;
-    session.set_review_mark(&request.path, request.marked)
+    session.set_review_mark(&request.path, request.marked, Some(request.expected_versions.clone()))
 }
 
 #[tauri::command]
@@ -354,8 +356,11 @@ pub async fn set_review_mark(state: State<'_, AppState>, request: ReviewMarkRequ
     let session = state.session(&request.worktree_id)?;
     let path = request.path.clone();
     let marked = request.marked;
+    let expected = request.expected_versions.clone();
     let worktree_id = request.worktree_id.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || session.set_review_mark(&path, marked))
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.set_review_mark(&path, marked, Some(expected))
+    })
         .await
         .map_err(|error| AppError::internal(format!("保存审阅标记失败：{error}")))?;
     deliver(state.acceptance.as_ref(), "set_review_mark", &worktree_id, None, result).await

@@ -49,6 +49,31 @@ impl WorktreeIdentity {
     pub fn confirmed_match(&self, other: &Self) -> bool {
         self.filesystem_ids.iter().all(Option::is_some) && self == other
     }
+
+    /// 重新确认这个身份**现在仍然成立**（不启动任何 Git 进程）。
+    ///
+    /// 只重读文件系统标识：同一路径被删除重建后标识会变，此时不能继续沿用旧身份
+    /// 认领审阅标记（Q87、ADR-0010）。读不到任何一项就视为身份不明确。
+    pub fn revalidate(&self) -> Option<Self> {
+        let filesystem_ids = [&self.worktree_path, &self.git_dir, &self.common_dir]
+            .into_iter()
+            .map(|path| platform::directory_identity(path).ok().flatten())
+            .collect::<Vec<_>>();
+        if filesystem_ids.iter().any(Option::is_none) {
+            return None;
+        }
+        let refreshed = Self {
+            worktree_path: self.worktree_path.clone(),
+            git_dir: self.git_dir.clone(),
+            common_dir: self.common_dir.clone(),
+            filesystem_ids,
+        };
+        // 路径相同但标识变了：身份不明确，不能认领。
+        if !self.confirmed_match(&refreshed) {
+            return None;
+        }
+        Some(refreshed)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

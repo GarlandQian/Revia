@@ -4,17 +4,17 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
-- [ ] 使用已建立的 worktree 持久归属边界；标记记录文件的 HEAD 与工作区版本，任一变化失效，只暂存／取消暂存且版本未变时保留。
-- [ ] 同文件跨组共享标记与去重进度；重启后保留有效标记，身份不明确的新 worktree 不继承旧标记。
-- [ ] 文件行右侧勾选框只切换标记、不跳转；失效时恢复为空，不额外提示。
-- [ ] ⌥⌘R 只标记、不取消，不能进入 ⌘R 刷新分支；按当前列表顺序寻找下一个未审阅文件，去重、末尾环回、展开目标所在折叠组。
-- [ ] 全部已审阅时留在当前文件并提示；输入框、弹窗、按钮的键盘行为不穿透。
+- [x] 使用已建立的 worktree 持久归属边界；标记记录文件的 HEAD 与工作区版本，任一变化失效，只暂存／取消暂存且版本未变时保留。
+- [x] 同文件跨组共享标记与去重进度；重启后保留有效标记，身份不明确的新 worktree 不继承旧标记。
+- [x] 文件行右侧勾选框只切换标记、不跳转；失效时恢复为空，不额外提示。
+- [x] ⌥⌘R 只标记、不取消，不能进入 ⌘R 刷新分支；按当前列表顺序寻找下一个未审阅文件，去重、末尾环回、展开目标所在折叠组。
+- [x] 全部已审阅时留在当前文件并提示；输入框、弹窗、按钮的键盘行为不穿透。
 - [ ] M2 显示审阅进度，不提前实现提交或以标记阻止后续提交；真实 Git 持久化验证与桌面导航检查通过。
-  - 真实 Git 持久化已由 `review_marks` 8 项通过；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
+  - 真实 Git 持久化已由 `review_marks` **13** 项通过（含并发事务、所见版本、活动会话身份、存储损坏、子模块版本）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
 
 ## Comments
 
@@ -139,3 +139,77 @@ Rust 合计 **239 项**：lib 99、`discard_recovery` 70（1 ignored 桌面夹�
 - 状态退回`ready-for-agent`，原先勾选项退回待验证。只修07，不混05/08/12/13；复用现有真实Git生产入口Rust测试，不新增前端框架，不扩展临时客户端。
 - 先全部修改再集中相关检查；核心持久化/并发/接口变化需相关回归及必要的完整检查一次。保留精确命令、真实退出码、原始stdout/stderr、检查前后源码hash，精确暂存，不`git add -A`。
 - Pi不得构建Release、启动GUI或运行D06/CI/长测，不推送、不合并。两轴全过后才由规划方固定Release进行真实桌面验收；暂不标done。
+
+### 2026-10-24 / Pi 实现：任务07 首轮两轴复核返修（R07-R1）
+
+只修 07；未动 05 状态与 05513aa 内容，未做 08/12/13。
+
+#### Standards
+
+**ST07-1 / SP07-7（存储事务）**：`ReviewStore` 新增 `transaction: Arc<Mutex<()>>`，`marks` / `set_mark` / `retain_valid` 整个「读 → 改 → 发布」都在事务内完成；临时文件改为 `exclusive_temp()`（进程号 + 纳秒 + 单调序号 + `create_new`），不再共用同 PID 名字。写入失败会删除本次临时文件。
+回归 `concurrent_marks_from_two_worktrees_are_all_kept`：两个身份并发各写 8 次，最终双方标记都在。
+
+**ST07-2 / SP07-6（活动会话身份）**：`WorktreeIdentity::revalidate()` 只重读文件系统标识（不启动 Git 进程），`refresh` 与 `set_review_mark` 都改用 `confirmed_identity()`；同路径重建后标识变化 → 返回 `None` → 不认领任何标记。`ReviewStore::identity_key` 现在返回 `Option`：任一 filesystem ID 未知就**不按路径认领**，而不是散列成稳定键。
+回归 `active_session_reconfirms_identity_and_stops_claiming_marks`：同一会话内删 `.git` 重建后刷新，`reviewed_count` 归零。既有 `t13_refresh_does_not_spawn_per_file_git_processes` 未放宽，`revalidate` 不调用 Git。
+
+**ST07-3 / SP07-5（所见版本贯通）**：`ReviewMarkRequest` 新增 `expectedVersions`；`WorktreeSession::set_review_mark` 接受 `expected_versions` 并与执行时缓存版本比对，不一致即 `Rejected`（「文件已变化，请重新确认后再标记」）。前端把 `entry.headVersion` / `entry.worktreeVersion` 一并发出。
+回归 `stale_expected_versions_are_rejected`：外部编辑后用过时版本标记被拒且不持久化；用当前版本成功。
+
+**ST07-4 / SP07-3（`Set.add` 恒真）**：`reviewNextFile` 的去重改为 `has` 判断后 `add`（`uniqueEntries` 辅助函数），两处都修。
+
+**ST07-5（导航用成功结果）**：`setReviewMark` 现在返回后端确认的 `ReviewMarks`；`reviewNextFile` 用该响应构造 `reviewedFromServer` 计算下一个未审阅文件，不依赖 React 先 render。
+
+**ST07-6 / SP07-1（完成提示可见性）**：提示从「没有仓库」分支移到正常审阅界面（工具栏下方、`role="status"`），保留「留在当前文件」的行为。
+
+**ST07-7（存储失败可见）**：`review_state` 里 `retain_valid(...).unwrap_or_default()` 改为 `?`，损坏/不可读/清理写入失败如实上抛。
+回归 `corrupt_store_surfaces_an_error`：写入损坏 JSON 后 `refresh` 返回错误而不是空标记。
+
+**ST07-8 / SP07-8（子模块版本）**：`worktree_version` 对目录先尝试 `submodule_commit()`——读子模块 `.git` 文件指针 → `HEAD`/`refs/...` 得到真实提交号；读不到才退化为「是目录」。仍只读、不启动 Git 进程。
+回归 `submodule_commit_change_invalidates_mark`：切换子模块提交后版本改变。
+
+#### Spec
+
+**SP07-1** 见 ST07-6。**SP07-2（按钮焦点穿透）**：新增 `platform::isButtonTarget`（`button` / `[role=checkbox]` / `[role=button]`），审阅快捷键在按钮获得焦点时不处理，保留按钮自身键盘行为；`isTextInputOrDialog` 的既有放行不变。
+**SP07-3** 见 ST07-4。**SP07-4（迟到响应与旧导航）**：`setReviewMark` 的 `isCurrent` 同时校验 worktree、**activation** 与**快照 revision**；`reviewNextFile` 在标记等待后与每次跳转前都用 `stillSameContext()` 校验 worktree / activation / revision / 当前选择键，任一变化即放弃导航。
+**SP07-5** 见 ST07-3。**SP07-6** 见 ST07-2。**SP07-7** 见 ST07-1。**SP07-8** 见 ST07-8。
+
+#### 生产调用点
+
+`App.setReviewMark` → `ipc.setReviewMark`（带 `expectedVersions`）→ `commands::set_review_mark` → `WorktreeSession::set_review_mark`（`confirmed_identity` + 版本比对）→ `ReviewStore::set_mark`（事务锁 + 独占临时文件）。
+`WorktreeSession::refresh` → `review_state` → `ReviewStore::retain_valid`（事务内，错误上抛）。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录（实际路径）：`/private/tmp/revia-task07-r2-016TbZ`
+
+- 基线：`0dd652505da4b9aa54773ba9e522e27bcb673177`
+- 检查前源码 SHA-256（检查后复核未变）：
+  - `c5af8e50f32bb1fa2437132d2888ad501eec572cc6de990e96d6accfd64627a1  src-tauri/src/review.rs`
+  - `e45533a888c20feac5f8cc828cdbb8705bd3a13420787160e893a9871eef0749  src-tauri/src/recovery.rs`
+  - `fc6dbd1d74f9c65e92ccb2562544e0f7947ae12d10cf712e9d138308c847bb33  src-tauri/src/session.rs`
+  - `d1d0e3ec6bc4de92a3d269c2a9cdf1bdede2f5b2057d80dc0c35966b5f0a6e6d  src-tauri/src/commands.rs`
+  - `674d0de4bc1926c06a4288cc23c7bf308d1bd6432e0cf8cb81ac51bb1bd4b979  src-tauri/tests/review_marks.rs`
+  - `717f319e1801988e245221109d7f7097c36f01445db0a65ccf0f64bc7a8de2ba  src/App.tsx`
+  - `3fa9c41d157ad871b080adaa8d09aa51e8060e07d36b65342b4656f19b39adc3  src/components/app/ChangesList.tsx`
+  - `f7d4f5c49a70f6c944ec74a6582d07ebe17066e4ae47b0ff7004cdf36322233c  src/lib/platform.ts`
+  - `b50e7c0fd2ee64e47ead6119dc59a1ad176c6348a3a6337c57226262f406e56c  src/lib/ipc.ts`
+  - `63752d6112c124f7e2536253356af873e373bac94f70d31770339f6ff3b8f3c6  src/lib/i18n/zh-CN.ts`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | `tsc.out` / `tsc.err` / `tsc.exit` |
+| `pnpm lint` | 0 | `lint.out` / `lint.err` / `lint.exit` |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 0 | `cargo-test.out` / `cargo-test.err` / `cargo-test.exit` |
+
+Rust 合计 **245 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹具）、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` 15、`review_marks` **13**（新增 5 项）、`session_flow` 3。首版 239 项不再代表本轮。
+
+#### 失败历史
+
+实现过程中 `review_marks` 新用例有一次编译错误（`other_identity` 被 move 后仍借用），改为 clone 后通过。完整套件本轮首次运行即通过，t13 未复现失败。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：勾选框位置与观感、⌥⌘R 的实际按键（Option 修饰键）、折叠组自动展开、全部已审阅提示的实际可见性、按钮焦点下不穿透、迟到响应隔离的真实时序。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
+- 子模块版本在 packed-refs 场景读不到时退化为「是目录」，该退化路径未覆盖。

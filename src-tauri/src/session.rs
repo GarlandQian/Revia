@@ -418,9 +418,11 @@ impl WorktreeSession {
             }
         }
 
-        // 用打开会话时捕获的身份：不在每次刷新里多起 Git 进程。
-        let (review, versions) = match &self.identity {
-            Some(identity) => self.review_state(identity, &entries)?,
+        // 用打开会话时捕获的身份，但每次刷新都**重新确认它现在仍然成立**：
+        // 同路径重建后文件系统标识会变，此时不能继续认领旧标记（Q87、ST07-2）。
+        // `revalidate` 只重读文件系统标识，不启动 Git 进程（既有性能断言不变）。
+        let (review, versions) = match self.confirmed_identity() {
+            Some(identity) => self.review_state(&identity, &entries)?,
             None => (self.empty_review(&entries), HashMap::new()),
         };
         let reviewed: std::collections::HashSet<&str> =
@@ -1003,11 +1005,10 @@ impl WorktreeSession {
         let mut reviewed: Vec<String> = Vec::new();
         if let Some(store) = store {
             // 只清理确实失效的标记；有效的保留。
-            let valid = store
-                .retain_valid(identity, |mark| {
-                    versions.get(&mark.path).is_some_and(|current| *current == mark.versions)
-                })
-                .unwrap_or_default();
+            // 存储损坏/不可读/清理写入失败都如实向上报错，不能伪装成「全部未审阅」（Q36）。
+            let valid = store.retain_valid(identity, |mark| {
+                versions.get(&mark.path).is_some_and(|current| *current == mark.versions)
+            })?;
             let reviewed_set: std::collections::HashSet<&str> =
                 valid.iter().map(|mark| mark.path.as_str()).collect();
             reviewed = paths
@@ -1024,6 +1025,11 @@ impl WorktreeSession {
             reviewed_count: reviewed.len() as u32,
         };
         Ok((marks, versions))
+    }
+
+    /// 当前仍然成立的身份；不成立（同路径重建、路径消失、标识未知）时返回 None。
+    fn confirmed_identity(&self) -> Option<WorktreeIdentity> {
+        self.identity.as_ref()?.revalidate()
     }
 
     /// 身份不可用时的审阅状态：全部未审阅，进度按去重路径统计。
@@ -1047,7 +1053,12 @@ impl WorktreeSession {
     /// 切换某个文件的审阅标记（勾选框与 ⌥⌘R 共用）。
     ///
     /// 返回更新后的审阅进度；持久化失败时返回错误，不会伪称保存成功。
-    pub fn set_review_mark(&self, path: &str, marked: bool) -> Result<ReviewMarks> {
+    pub fn set_review_mark(
+        &self,
+        path: &str,
+        marked: bool,
+        expected_versions: Option<ReviewVersions>,
+    ) -> Result<ReviewMarks> {
         let store = self
             .review_store
             .as_ref()
@@ -1063,11 +1074,17 @@ impl WorktreeSession {
             )
         };
         let versions = versions.ok_or_else(|| AppError::rejected("文件不在当前改动列表中"))?;
+        // 用户看到的版本必须与执行时一致：刷新先发布了新版本时拒绝，
+        // 不能把用户没看过的内容持久标成已审阅（ST07-3、SP07-5）。
+        if let Some(expected) = &expected_versions {
+            if expected != &versions {
+                return Err(AppError::rejected("文件已变化，请重新确认后再标记"));
+            }
+        }
         let identity = self
-            .identity
-            .as_ref()
-            .ok_or_else(|| AppError::internal("worktree 身份不可用，无法保存审阅标记"))?;
-        store.set_mark(identity, path, versions, marked)?;
+            .confirmed_identity()
+            .ok_or_else(|| AppError::internal("worktree 身份不明确，无法保存审阅标记"))?;
+        store.set_mark(&identity, path, versions, marked)?;
 
         // 更新内存快照里的审阅状态，避免为一次勾选重跑整轮 diff。
         let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
