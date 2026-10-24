@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 第五轮两轴各剩1项P2：外部另存关闭面板后迟到结果丢失，继续交Pi限定返修。其余原触发路径静态闭合；全部复核通过后再固定版本做真实桌面与CI验收。
+> 勾选仅代表自动化与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R5 限定返修已完成，等待规划方复核。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -648,3 +648,45 @@ Spec 本轮为静态审查，未运行测试、GUI 或构建；无范围扩张�
 - 本轮只修合法外部另存的 App 级结果留存及相关文档；已登记目标仍沿既有 worktree 结果通道，外部目标不误归当前界面、不新增 worktree 锁或队列。面板关闭、返回列表、切换后，迟到失败及待核对仍可见；多个外部请求的旧完成不得清掉较新错误。
 - 注意 `setAppError(err, null)` 目前会通过 `targetWorktreeId ?? worktreeId` 回落到当前 worktree，并不表示全局错误。用明确的独立 App 结果归属处理，勿把“无归属”又保存到当前 worktree。解析目标阶段的错误也应落在可保留的 App 通道，不能只依赖面板。
 - 这是前端结果分支修复；全部改完后集中跑 tsc/lint/build，保留检查前源码hash、精确命令、真实退出码、完整输出即可。除非实际改动核心契约，不扩展Rust/刷新或新建测试框架。精确提交m2后再复核；仍不Release、GUI、D06、CI或长测。
+
+### 2026-10-24 / Pi 实现：第五轮限定返修（R05-R5，外部另存结果留存）
+
+只修本轮唯一实质残留与必要文档。纯前端结果分支修复：未改 Rust、未扩展刷新、未新增前端测试框架；未构建 Release、未操作 GUI、未跑 D06/CI/长测，未推送/合并/发布。
+
+#### R05-R5-ST1 / SP1：无归属（合法外部路径）的另存结果进 App 级通道
+
+问题：`performSaveAs` 只在 `ownerId` 非空时把失败登记到 App；另存到合法外部新路径时归属为 `null`，错误只 `throw` 给面板，面板关闭/返回列表后 `RecoveryDialogs` 按代际丢弃旧响应，失败与待核对结果随之消失。归属解析阶段失败同样没有留存。
+
+修复（`src/App.tsx`）：
+
+- 新增独立的 App 级无归属结果状态 `externalResult: { seq, error }` 与序号 `externalSeqRef`；**序号在解析归属之前就分配**，因此归属解析失败也落在同一个可保留的通道。
+- `recordExternalResult(seq, err)` 保证顺序：较旧请求的完成不会覆盖或清除较新的错误；成功只有在不比现有错误更旧时才清除它（`prev.seq >= seq`）。
+- `performSaveAs` 的分支：
+  - `ownerId` 非空 → 仍走既有 worktree 通道：全局写门禁、`OperationResultGate`、`setAppError(err, ownerId)`、`await refreshTarget(ownerId)`（未变）；
+  - `ownerId` 为空 → **不**进入任何 worktree 的门禁、不加 worktree 锁、不排队，结果写 `recordExternalResult(seq, err)`，成功时 `recordExternalResult(seq, null)`。
+- `error` 的展示优先级改为 `当前 worktree 错误 ?? globalError ?? externalResult.error`，所以外部另存的失败在当前 worktree 没有错误时照样显示在 App 级横幅；`dismissError` 一并清除该通道。
+- 不再用 `setAppError(err, null)` 表达「无归属」：那个调用会经 `targetWorktreeId ?? worktreeId` 回落到当前 worktree，本轮没有使用它。
+
+生产调用点：`App.performSaveAs`（由 `RecoveryDialog` 的 `onSaveAs` 注入）→ `ipc.recoverySaveAsOwner` / `ipc.saveRecoveryAs` → `recordExternalResult` → App 级错误横幅。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录：`/private/tmp/revia-task05-r5-1792802843`（`MANIFEST.md`、`base-sha.txt`、`pre-change.diff`、`source-sha256-before-check.txt`）。检查后复核 `src/App.tsx` 哈希未变。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | 通过 |
+| `pnpm lint` | 0 | 通过 |
+| `pnpm build` | 0 | 通过 |
+
+按交接要求本轮为纯前端分支修复，**未**运行 Rust 测试与 Node/Python 工具测试，也未重跑上一轮的 `discard_recovery` / lib 结果；那些数字保留为历史，不代表本轮重跑。
+
+#### 未做敏感性实验
+
+本轮没有为「旧完成覆盖较新错误」构造可运行对照；序号比较的正确性仅来自实现与类型检查，属实施方观察，未作为已核实运行证据。面板关闭后仍显示迟到失败的观感需规划方在真实桌面验证。
+
+#### 仍未验证（留给规划方）
+
+- 真实桌面的面板键盘焦点、只读 diff 观感、原生保存对话框、外部另存失败横幅的实际显示与关闭面板后的留存。
+- Windows 编译与 CI。
+- 超大文件恢复/对比的内存占用未量化。

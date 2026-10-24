@@ -34,6 +34,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isDiscardFileShortcut, isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
+import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
 import {
@@ -112,7 +113,19 @@ export function App() {
   const [status, setStatus] = useState("");
   const [worktreeErrors, setWorktreeErrors] = useState<Record<string, AppErrorPayload | null>>({});
   const [globalError, setGlobalError] = useState<AppErrorPayload | null>(null);
-  const error = (worktreeId ? worktreeErrors[worktreeId] : null) ?? globalError;
+  /**
+   * 无归属操作（另存到合法外部路径）的 App 级结果。
+   *
+   * 外部目标不属于任何 worktree：结果既不能借用当前 worktree 的错误槽
+   * （`setAppError(err, null)` 会回落到当前选择），也不能只抛给面板
+   * （面板关闭/返回列表后迟到结果会被丢弃）。这里用独立的序号通道保留，
+   * 并保证旧请求的完成不会清掉较新的错误（Q90、Q91）。
+   */
+  const [externalResult, setExternalResult] = useState<{ seq: number; error: AppErrorPayload } | null>(null);
+  const externalSeqRef = useRef(0);
+  const externalResultRef = useRef(externalResult);
+  externalResultRef.current = externalResult;
+  const error = (worktreeId ? worktreeErrors[worktreeId] : null) ?? globalError ?? externalResult?.error ?? null;
 
   const setAppError = useCallback((err: AppErrorPayload | null, targetWorktreeId?: string | null) => {
     const wtId = targetWorktreeId ?? worktreeId;
@@ -123,11 +136,23 @@ export function App() {
     }
   }, [worktreeId]);
 
+  /** 记录一次无归属操作的结果；`seq` 用来拒绝旧完成覆盖较新的错误。 */
+  const recordExternalResult = useCallback((seq: number, err: AppErrorPayload | null) => {
+    setExternalResult((prev) => {
+      if (err === null) {
+        // 只有比当前错误更新的成功才能清除它。
+        return prev && prev.seq >= seq ? prev : null;
+      }
+      return prev && prev.seq > seq ? prev : { seq, error: err };
+    });
+  }, []);
+
   const dismissError = useCallback(() => {
     if (worktreeId) {
       setWorktreeErrors((prev) => ({ ...prev, [worktreeId]: null }));
     }
     setGlobalError(null);
+    setExternalResult(null);
   }, [worktreeId]);
 
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -832,26 +857,32 @@ export function App() {
    * - 发起写入前先解析归属，再按该归属进入全局写门禁与 `OperationResultGate`；
    * - 错误按该归属 worktree 保存，面板关闭后仍留在原目标；
    * - 完成后对**该归属** worktree 真实重读，界面是否接收由 `refreshTarget` 判断；
-   * - 外部新路径（无归属）合法，只是不进入某个 worktree 的门禁。
+   * - 外部新路径（无归属）合法：不进入任何 worktree 的门禁、不加强制锁，
+   *   但结果走**独立的 App 级无归属通道**，面板关闭/返回列表/切换后仍保留（Q90、Q91）。
    */
   const performSaveAs = useCallback(async (request: {
     recordId: string;
     path: string;
     destination: string;
   }) => {
-    // 后端解析真实归属；解析失败按普通错误抛给调用方，不猜路径。
-    const owner = await ipc.recoverySaveAsOwner(request.destination);
-    const ownerId = owner.worktreeId;
-    if (ownerId) {
-      if (writingWorktreesRef.current.has(ownerId)) {
-        throw { kind: "rejected", message: messages.recovery.busy };
-      }
-      writingWorktreesRef.current.add(ownerId);
-      setWritingWorktrees(new Set(writingWorktreesRef.current));
-    }
-    const opToken = ownerId ? operationGateRef.current.begin(ownerId) : null;
-    if (ownerId) setAppError(null, ownerId);
+    // 无归属操作的序号：解析阶段就分配，保证「解析失败」也能落到可保留的通道，
+    // 并且旧请求的完成不会清掉较新的错误。
+    const seq = ++externalSeqRef.current;
+    let ownerId: string | null = null;
+    let opToken: OperationContext | null = null;
     try {
+      // 后端解析真实归属；解析失败同样落到 App 级结果通道，不猜路径、不借用当前 worktree。
+      const owner = await ipc.recoverySaveAsOwner(request.destination);
+      ownerId = owner.worktreeId;
+      if (ownerId) {
+        if (writingWorktreesRef.current.has(ownerId)) {
+          throw { kind: "rejected", message: messages.recovery.busy };
+        }
+        writingWorktreesRef.current.add(ownerId);
+        setWritingWorktrees(new Set(writingWorktreesRef.current));
+        opToken = operationGateRef.current.begin(ownerId);
+        setAppError(null, ownerId);
+      }
       const bytes = await ipc.saveRecoveryAs({
         worktreeId: ownerId,
         expectedOwner: ownerId,
@@ -859,16 +890,24 @@ export function App() {
         path: request.path,
         destination: owner.resolvedDestination,
       });
-      if (ownerId && opToken && operationGateRef.current.canRecord(opToken)) {
-        setAppError(null, ownerId);
+      if (ownerId && opToken) {
+        if (operationGateRef.current.canRecord(opToken)) setAppError(null, ownerId);
         await refreshTarget(ownerId);
+      } else if (!ownerId) {
+        // 外部目标：成功只清除不比它更新的外部错误。
+        recordExternalResult(seq, null);
       }
       return bytes;
     } catch (caught) {
       const err = toAppError(caught);
-      if (ownerId && opToken && operationGateRef.current.canRecord(opToken)) {
-        setAppError(err, ownerId);
+      if (ownerId) {
+        // 归属 worktree：结果按它保存，并对它真实重读（切走也要读）。
+        if (!opToken || operationGateRef.current.canRecord(opToken)) setAppError(err, ownerId);
         await refreshTarget(ownerId);
+      } else {
+        // 外部目标（含归属解析阶段失败）：保留在 App 级无归属通道，
+        // 不写进当前 worktree 的错误槽。
+        recordExternalResult(seq, err);
       }
       throw err;
     } finally {
@@ -877,7 +916,7 @@ export function App() {
         setWritingWorktrees(new Set(writingWorktreesRef.current));
       }
     }
-  }, [refreshTarget, setAppError]);
+  }, [recordExternalResult, refreshTarget, setAppError]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
