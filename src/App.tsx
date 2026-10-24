@@ -32,7 +32,7 @@ import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isDiscardFileShortcut, isPrimaryModifier, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
@@ -763,6 +763,10 @@ export function App() {
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
   const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  /** 审阅进度提示（全部已审阅时留在原地提示）。 */
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  /** 审阅请求代际：迟到的标记响应不能污染其他 worktree 或新文件版本（Q88、Q89）。 */
+  const reviewEpochRef = useRef(0);
 
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
@@ -939,6 +943,87 @@ export function App() {
     return performWrite({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
   }, [performWrite, worktreeId]);
 
+  /**
+   * 切换某个文件的审阅标记（任务 07）。
+   *
+   * 勾选框只切换、不改变选择；⌥⌘R 复用同一个写入路径。
+   * 迟到的响应按 worktree 与代际判定，不污染其他 worktree 或新的文件版本。
+   */
+  const setReviewMark = useCallback(async (entry: ChangeEntry, marked: boolean): Promise<boolean> => {
+    const targetWorktreeId = worktreeIdRef.current;
+    if (!targetWorktreeId) return false;
+    const epoch = ++reviewEpochRef.current;
+    const isCurrent = () => reviewEpochRef.current === epoch
+      && worktreeIdRef.current === targetWorktreeId
+      && gateRef.current.token().worktreeId === targetWorktreeId;
+    try {
+      const marks = await ipc.setReviewMark({ worktreeId: targetWorktreeId, path: entry.path, marked });
+      if (!isCurrent()) return false;
+      setSnapshot((current) => {
+        if (!current || current.worktreeId !== targetWorktreeId) return current;
+        const reviewed = new Set(marks.reviewed);
+        return {
+          ...current,
+          review: marks,
+          entries: current.entries.map((item) => ({ ...item, reviewed: reviewed.has(item.path) })),
+        };
+      });
+      setAppError(null, targetWorktreeId);
+      return true;
+    } catch (caught) {
+      // 持久化失败如实展示，不伪称保存成功。
+      if (isCurrent()) setAppError(toAppError(caught), targetWorktreeId);
+      return false;
+    }
+  }, [setAppError]);
+
+  /**
+   * ⌥⌘R：只标记、不取消；按当前列表顺序（未暂存 → 未跟踪 → 已暂存）去重，
+   * 从当前文件之后找第一个未审阅文件，末尾环回；必要时展开折叠组。
+   * 全部已审阅时留在当前文件并提示（Q37、Q94、D04）。
+   */
+  const reviewNextFile = useCallback(async () => {
+    const current = snapshotRef.current;
+    const active = selectedRef.current;
+    if (!current || !active || !worktreeId) return;
+    setReviewNotice(null);
+    const order = getDisplayOrderEntries(current);
+    const seen = new Set<string>();
+    const unique: ChangeEntry[] = [];
+    for (const entry of order) {
+      if (seen.add(entry.path)) unique.push(entry);
+    }
+    if (unique.length === 0) return;
+    const activeEntry = unique.find((entry) => entry.path === active.path);
+    // 当前文件本身未审阅：先标记它，然后从它之后继续找。
+    if (activeEntry && !activeEntry.reviewed) {
+      const saved = await setReviewMark(activeEntry, true);
+      if (!saved) return;
+      // 标记失败时不跳转（错误已经显示）。
+    }
+    const refreshed = snapshotRef.current;
+    if (!refreshed || refreshed.worktreeId !== worktreeId) return;
+    const refreshedOrder = getDisplayOrderEntries(refreshed);
+    const refreshedSeen = new Set<string>();
+    const refreshedUnique: ChangeEntry[] = [];
+    for (const entry of refreshedOrder) {
+      if (refreshedSeen.add(entry.path)) refreshedUnique.push(entry);
+    }
+    const from = refreshedUnique.findIndex((entry) => entry.path === active.path);
+    for (let offset = 1; offset <= refreshedUnique.length; offset += 1) {
+      const index = (Math.max(from, 0) + offset) % refreshedUnique.length;
+      const candidate = refreshedUnique[index];
+      if (!candidate.reviewed) {
+        if (candidate.collapsed) setExpanded((values) => new Set(values).add(`${candidate.changes}:${candidate.path}`));
+        await openEntry(candidate, { view: viewRef.current, worktreeId });
+        return;
+      }
+    }
+    // 全部已审阅：留在当前文件并提示。
+    setReviewNotice(messages.review.allReviewed);
+    debugLog(`审阅：${messages.review.allReviewed}`);
+  }, [openEntry, setReviewMark, worktreeId]);
+
   const changeHunk = useCallback((action: HunkAction) => {
     const current = selectedRef.current;
     const entry = snapshotRef.current?.entries.find(
@@ -1000,6 +1085,13 @@ export function App() {
         return;
       }
 
+      if (isReviewShortcut(event)) {
+        // 必须在 ⌘R 刷新分支之前处理，否则会被刷新吞掉（Q93、D04）。
+        event.preventDefault();
+        void reviewNextFile();
+        return;
+      }
+
       if (isStageFileShortcut(event)) {
         event.preventDefault();
         if (selectedEntry && !isWriting && !selectedEntry.readonlyReason) {
@@ -1038,7 +1130,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, discardFile, focusNextFile, isWriting, jumpToHunk, refresh, selectedEntry, stageFile, unstageFile]);
+  }, [changeFontSize, chooseRepo, discardFile, focusNextFile, isWriting, jumpToHunk, refresh, reviewNextFile, selectedEntry, stageFile, unstageFile]);
 
   // ---------------- 测量 ----------------
 
@@ -1927,6 +2019,11 @@ export function App() {
         </Button>
         <p className="text-xs text-muted-foreground">{messages.firstRun.dragHint}</p>
         {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+        {reviewNotice ? (
+          <div role="status" className="mx-3 mt-1 rounded border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+            {reviewNotice}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1954,6 +2051,7 @@ export function App() {
             onStage={(entry) => void stageFile(entry)}
             onUnstage={(entry) => void unstageFile(entry)}
             isWriting={isWriting}
+            onToggleReview={(entry, marked) => void setReviewMark(entry, marked)}
           />
         ) : (
           <div className="p-3 text-xs text-muted-foreground">{messages.changes.loading}</div>

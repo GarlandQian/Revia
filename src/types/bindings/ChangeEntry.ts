@@ -27,4 +27,16 @@ fingerprint: string,
 /**
  * 每次刷新都会变化，不能用内容相同代替 hunk 目标仍然有效。
  */
-snapshotRevision: string, };
+snapshotRevision: string, 
+/**
+ * 该文件当前是否已审阅（按 HEAD + 工作区版本判定，跨组共享）。
+ */
+reviewed: boolean, 
+/**
+ * HEAD 中的文件版本（审阅标记的失效依据）。
+ */
+headVersion: string | null, 
+/**
+ * 工作区中的文件版本（审阅标记的失效依据）。
+ */
+worktreeVersion: string | null, };

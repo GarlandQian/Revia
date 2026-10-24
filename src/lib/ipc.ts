@@ -14,6 +14,7 @@ import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
 import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
 import type { SaveAsOwner } from "@/types/bindings/SaveAsOwner";
+import type { ReviewMarks } from "@/types/bindings/ReviewMarks";
 import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
@@ -101,6 +102,9 @@ export const ipc = {
     invoke<WatchStatusPayload>("watch_worktree", { request: { worktreeId, activation } }),
   stopWatch: () => invoke<WatchStatusPayload>("stop_watch"),
   watchStatus: () => invoke<WatchSnapshotPayload>("watch_status"),
+  /** 切换审阅标记（任务 07）：标记按 worktree 身份 + HEAD/工作区版本记录。 */
+  setReviewMark: (request: { worktreeId: string; path: string; marked: boolean }) =>
+    invoke<ReviewMarks>("set_review_mark", { request }),
   listChanges: (worktreeId: string) =>
     invoke<ChangesSnapshot>("list_changes", { request: { worktreeId } }),
   getRows: (request: {

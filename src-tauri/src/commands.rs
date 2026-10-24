@@ -31,6 +31,8 @@ pub struct AppState {
     pub watch_events: Arc<Mutex<WatchEvents>>,
     pub acceptance: Option<Arc<Acceptance>>,
     pub recovery: RecoveryStore,
+    /// 审阅标记存储（任务 07，持久化在 Revia 数据目录）。
+    pub review: Arc<crate::review::ReviewStore>,
 }
 
 impl AppState {
@@ -38,6 +40,7 @@ impl AppState {
         let command_log = Arc::new(CommandLog::default());
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
+            review: Arc::new(crate::review::ReviewStore::new(data_dir.clone())),
             registry: Mutex::new(Registry::load(data_dir, command_log.clone())),
             sessions: Mutex::new(HashMap::new()),
             command_log,
@@ -70,7 +73,13 @@ impl AppState {
         };
         let home = crate::shell::home_dir()?;
         let shell_env = crate::shell::resolve(&home, &path);
-        let session = WorktreeSession::open(worktree_id, &path, shell_env, self.command_log.clone())?;
+        let session = WorktreeSession::open_with_review(
+            worktree_id,
+            &path,
+            shell_env,
+            self.command_log.clone(),
+            Some(self.review.clone()),
+        )?;
         sessions.insert(worktree_id.to_string(), session.clone());
         Ok(session)
     }
@@ -321,6 +330,35 @@ fn chrono_like_stamp() -> String {
         .map(|duration| duration.as_millis())
         .unwrap_or_default();
     format!("[rust {now}]")
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewMarkRequest {
+    pub worktree_id: String,
+    pub path: String,
+    /// true = 标记已审阅，false = 取消标记。
+    pub marked: bool,
+}
+
+/// 切换某个文件的审阅标记（任务 07）。
+///
+/// 标记按 worktree 身份 + HEAD 版本 + 工作区版本记录；持久化失败如实返回错误。
+pub fn set_review_mark_impl(state: &AppState, request: &ReviewMarkRequest) -> Result<crate::review::ReviewMarks> {
+    let session = state.session(&request.worktree_id)?;
+    session.set_review_mark(&request.path, request.marked)
+}
+
+#[tauri::command]
+pub async fn set_review_mark(state: State<'_, AppState>, request: ReviewMarkRequest) -> Result<crate::review::ReviewMarks> {
+    let session = state.session(&request.worktree_id)?;
+    let path = request.path.clone();
+    let marked = request.marked;
+    let worktree_id = request.worktree_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || session.set_review_mark(&path, marked))
+        .await
+        .map_err(|error| AppError::internal(format!("保存审阅标记失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "set_review_mark", &worktree_id, None, result).await
 }
 
 #[tauri::command]

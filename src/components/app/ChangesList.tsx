@@ -27,9 +27,11 @@ interface ChangesListProps {
   onStage?: (entry: ChangeEntry) => void;
   onUnstage?: (entry: ChangeEntry) => void;
   isWriting?: boolean;
+  /** 切换审阅标记：只切换，不改变当前选择（Q37）。 */
+  onToggleReview?: (entry: ChangeEntry, marked: boolean) => void;
 }
 
-export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, isWriting }: ChangesListProps) {
+export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, isWriting, onToggleReview }: ChangesListProps) {
   const [untrackedOpen, setUntrackedOpen] = useState(false);
   const prevSelectedRef = useRef<string | null>(null);
 
@@ -77,6 +79,9 @@ export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, 
           {snapshot.branch ?? "（detached HEAD）"}
         </span>
         <span className="ml-auto tabular-nums">{snapshot.entries.length}</span>
+        <span className="tabular-nums text-muted-foreground" title={messages.review.progress(snapshot.review.reviewedCount, snapshot.review.total)}>
+          {messages.review.progress(snapshot.review.reviewedCount, snapshot.review.total)}
+        </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         <Group
@@ -87,6 +92,7 @@ export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, 
           onStage={onStage}
           onUnstage={onUnstage}
           isWriting={isWriting}
+          onToggleReview={onToggleReview}
         />
         <Group
           title={messages.changes.untracked}
@@ -96,6 +102,7 @@ export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, 
           onStage={onStage}
           onUnstage={onUnstage}
           isWriting={isWriting}
+          onToggleReview={onToggleReview}
           collapsible
           open={untrackedOpen}
           onToggle={() => setUntrackedOpen((value) => !value)}
@@ -108,6 +115,7 @@ export function ChangesList({ snapshot, selected, onSelect, onStage, onUnstage, 
           onStage={onStage}
           onUnstage={onUnstage}
           isWriting={isWriting}
+          onToggleReview={onToggleReview}
         />
         {snapshot.entries.length === 0 ? (
           <div className="p-4 text-xs text-muted-foreground">{messages.changes.empty}</div>
@@ -125,6 +133,7 @@ function Group({
   onStage,
   onUnstage,
   isWriting,
+  onToggleReview,
   collapsible,
   open = true,
   onToggle,
@@ -136,6 +145,7 @@ function Group({
   onStage?: (entry: ChangeEntry) => void;
   onUnstage?: (entry: ChangeEntry) => void;
   isWriting?: boolean;
+  onToggleReview?: (entry: ChangeEntry, marked: boolean) => void;
   collapsible?: boolean;
   open?: boolean;
   onToggle?: () => void;
@@ -171,6 +181,7 @@ function Group({
           onStage={onStage}
           onUnstage={onUnstage}
           isWriting={isWriting}
+          onToggleReview={onToggleReview}
         />
       ) : null}
     </section>
@@ -185,6 +196,7 @@ function VirtualRows({
   onStage,
   onUnstage,
   isWriting,
+  onToggleReview,
 }: {
   entries: ChangeEntry[];
   selected: Selection | null;
@@ -192,6 +204,7 @@ function VirtualRows({
   onStage?: (entry: ChangeEntry) => void;
   onUnstage?: (entry: ChangeEntry) => void;
   isWriting?: boolean;
+  onToggleReview?: (entry: ChangeEntry, marked: boolean) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -258,6 +271,28 @@ function VirtualRows({
                   {statusLetter(entry)}
                 </span>
               </button>
+              {onToggleReview ? (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={entry.reviewed}
+                  aria-label={entry.reviewed ? messages.review.unmark : messages.review.mark}
+                  title={entry.reviewed ? messages.review.unmark : messages.review.mark}
+                  tabIndex={-1}
+                  className={`h-4 w-4 shrink-0 rounded-sm border text-[10px] leading-none ${
+                    entry.reviewed
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-muted-foreground/40 text-transparent hover:border-muted-foreground"
+                  }`}
+                  onClick={(e) => {
+                    // 只切换标记，不改变当前选择，也不触发暂存（Q37）。
+                    e.stopPropagation();
+                    onToggleReview(entry, !entry.reviewed);
+                  }}
+                >
+                  ✓
+                </button>
+              ) : null}
               {readonlyDesc ? (
                 <span
                   className="shrink-0 px-1 text-[10px] text-muted-foreground/60 select-none"

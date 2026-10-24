@@ -40,6 +40,16 @@ export function isDiscardFileShortcut(event: KeyboardEvent | React.KeyboardEvent
   return isPrimaryModifier(event) && isAltModifier(event) && event.code === "KeyZ";
 }
 
+/**
+ * 判断是否触发了「标记已审阅并跳到下一个」快捷键（⌥⌘R / Alt+Ctrl+R，Q37、Q94）。
+ *
+ * 同样用 `event.code`：macOS 按住 Option 时 `event.key` 会变成 "®"。
+ * 调用方必须在 ⌘R 刷新分支**之前**处理它，否则会被刷新吞掉。
+ */
+export function isReviewShortcut(event: KeyboardEvent | React.KeyboardEvent): boolean {
+  return isPrimaryModifier(event) && isAltModifier(event) && event.code === "KeyR";
+}
+
 /** 判断是否在输入类控件（<input>, <textarea>, [contenteditable]）或弹窗内，让出快捷键避免穿透（Q93、审查意见 6）。 */
 export function isTextInputOrDialog(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;

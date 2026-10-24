@@ -20,6 +20,7 @@ use crate::git::status::{self, ChangesKind, FileStatus, ReadonlyReason, StatusEn
 use crate::git::{self, Git};
 use crate::shell::{self, ShellEnv};
 use crate::recovery::{self, DiscardOutcome, DiscardPhase, RecoverySource, RecoveryStore, WorktreeIdentity};
+use crate::review::{self, ReviewMarks, ReviewStore, ReviewVersions};
 
 static NEXT_SESSION_INSTANCE: AtomicU64 = AtomicU64::new(1);
 
@@ -89,6 +90,12 @@ pub struct ChangeEntry {
     pub fingerprint: String,
     /// 每次刷新都会变化，不能用内容相同代替 hunk 目标仍然有效。
     pub snapshot_revision: String,
+    /// 该文件当前是否已审阅（按 HEAD + 工作区版本判定，跨组共享）。
+    pub reviewed: bool,
+    /// HEAD 中的文件版本（审阅标记的失效依据）。
+    pub head_version: Option<String>,
+    /// 工作区中的文件版本（审阅标记的失效依据）。
+    pub worktree_version: Option<String>,
 }
 
 /// 一次状态读取的结果。
@@ -110,6 +117,8 @@ pub struct ChangesSnapshot {
     pub untracked_count: u32,
     /// 读取状态与解析 diff 的耗时（毫秒）。
     pub elapsed_ms: u64,
+    /// 审阅进度：按文件去重（同一文件跨组只算一次）。
+    pub review: review::ReviewMarks,
 }
 
 /// 一段显示行。
@@ -170,6 +179,10 @@ struct FileModelCache {
 struct Snapshot {
     fingerprint: String,
     entries: Vec<ChangeEntry>,
+    /// 当前快照的审阅进度（按文件去重）。
+    review: ReviewMarks,
+    /// 每个路径的两个版本，用于判定标记是否仍然有效（Q20、T12）。
+    versions: HashMap<String, ReviewVersions>,
     /// key: `<changes>/<path>`
     models: HashMap<String, FileModelCache>,
     /// 显示行排版缓存：key 为 `<changes>/<path>/<view>`。
@@ -194,6 +207,13 @@ pub struct WorktreeSession {
     instance_id: u64,
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
     writing: Mutex<bool>,
+    /// 审阅标记存储（None 表示未配置，此时界面不显示勾选框）。
+    review_store: Option<Arc<ReviewStore>>,
+    /// 打开会话时捕获的持久身份：审阅标记的归属依据。
+    ///
+    /// 只在这里捕获一次，避免每次刷新都多起 `git rev-parse` 进程（既有性能边界）。
+    /// worktree 被移动/重建后需要重新打开会话，届时身份会重新捕获（Q87）。
+    identity: Option<WorktreeIdentity>,
 }
 
 /// 发给高亮线程的内容版本记录：同一文档只在版本不同时重发内容。
@@ -216,6 +236,17 @@ impl<'a> Drop for WriteGuard<'a> {
 
 impl WorktreeSession {
     pub fn open(id: &str, path: &Path, shell_env: ShellEnv, command_log: Arc<git::CommandLog>) -> Result<Arc<Self>> {
+        Self::open_with_review(id, path, shell_env, command_log, None)
+    }
+
+    /// 带审阅存储打开会话（生产命令层用这个）。
+    pub fn open_with_review(
+        id: &str,
+        path: &Path,
+        shell_env: ShellEnv,
+        command_log: Arc<git::CommandLog>,
+        review_store: Option<Arc<ReviewStore>>,
+    ) -> Result<Arc<Self>> {
         let git = Git::new(path, &shell_env, command_log)?;
         let git_version = git.version()?;
         let (major, minor) = git::parse_version(&git_version).unwrap_or((0, 0));
@@ -248,6 +279,8 @@ impl WorktreeSession {
             checks,
         };
 
+        // 身份在这里捕获一次，供审阅标记使用（不在每次刷新里重跑 Git）。
+        let identity = WorktreeIdentity::capture(&git).ok();
         Ok(Arc::new(Self {
             id: id.to_string(),
             path: path.to_path_buf(),
@@ -261,6 +294,8 @@ impl WorktreeSession {
             generation_counter: Mutex::new(0),
             instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             writing: Mutex::new(false),
+            review_store,
+            identity: identity.clone(),
         }))
     }
 
@@ -363,6 +398,9 @@ impl WorktreeSession {
                 readonly_reason,
                 fingerprint,
                 snapshot_revision: String::new(),
+                reviewed: false,
+                head_version: head_version_for(entry),
+                worktree_version: review::worktree_version(&self.path, &entry.path).ok().flatten(),
             });
         }
 
@@ -380,6 +418,17 @@ impl WorktreeSession {
             }
         }
 
+        // 用打开会话时捕获的身份：不在每次刷新里多起 Git 进程。
+        let (review, versions) = match &self.identity {
+            Some(identity) => self.review_state(identity, &entries)?,
+            None => (self.empty_review(&entries), HashMap::new()),
+        };
+        let reviewed: std::collections::HashSet<&str> =
+            review.reviewed.iter().map(String::as_str).collect();
+        for entry in &mut entries {
+            entry.reviewed = reviewed.contains(entry.path.as_str());
+        }
+
         let snapshot = ChangesSnapshot {
             worktree_id: self.id.clone(),
             worktree_path: self.path.display().to_string(),
@@ -392,10 +441,13 @@ impl WorktreeSession {
             untracked_count: count(&entries, ChangesKind::Untracked),
             entries: entries.clone(),
             elapsed_ms: started.elapsed().as_millis() as u64,
+            review: review.clone(),
         };
         *guard = Some(Snapshot {
             fingerprint,
             entries,
+            review,
+            versions,
             models,
             layouts: HashMap::new(),
             generation,
@@ -924,6 +976,133 @@ impl WorktreeSession {
             .collect()
     }
 
+    /// 计算当前快照的审阅状态：去重路径、仍然有效的标记、进度。
+    ///
+    /// 有效性判定用**HEAD 版本 + 工作区版本**：任一变化即失效（Q20、T12）。
+    /// 只暂存/取消暂存不改变这两个版本，因此标记保留。
+    fn review_state(
+        &self,
+        identity: &WorktreeIdentity,
+        entries: &[ChangeEntry],
+    ) -> Result<(ReviewMarks, HashMap<String, ReviewVersions>)> {
+        let mut paths: Vec<String> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let mut versions: HashMap<String, ReviewVersions> = HashMap::new();
+        for entry in entries {
+            if seen.insert(entry.path.clone()) {
+                paths.push(entry.path.clone());
+            }
+            // 同一文件跨组共享：两组的 head/worktree 版本相同，取一次即可。
+            versions.entry(entry.path.clone()).or_insert_with(|| ReviewVersions {
+                head: entry.head_version.clone(),
+                worktree: entry.worktree_version.clone(),
+            });
+        }
+
+        let store = self.review_store.as_ref();
+        let mut reviewed: Vec<String> = Vec::new();
+        if let Some(store) = store {
+            // 只清理确实失效的标记；有效的保留。
+            let valid = store
+                .retain_valid(identity, |mark| {
+                    versions.get(&mark.path).is_some_and(|current| *current == mark.versions)
+                })
+                .unwrap_or_default();
+            let reviewed_set: std::collections::HashSet<&str> =
+                valid.iter().map(|mark| mark.path.as_str()).collect();
+            reviewed = paths
+                .iter()
+                .filter(|path| reviewed_set.contains(path.as_str()))
+                .cloned()
+                .collect();
+        }
+        let marks = ReviewMarks {
+            worktree_id: self.id.clone(),
+            paths: paths.clone(),
+            reviewed: reviewed.clone(),
+            total: paths.len() as u32,
+            reviewed_count: reviewed.len() as u32,
+        };
+        Ok((marks, versions))
+    }
+
+    /// 身份不可用时的审阅状态：全部未审阅，进度按去重路径统计。
+    fn empty_review(&self, entries: &[ChangeEntry]) -> ReviewMarks {
+        let mut paths: Vec<String> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for entry in entries {
+            if seen.insert(entry.path.clone()) {
+                paths.push(entry.path.clone());
+            }
+        }
+        ReviewMarks {
+            worktree_id: self.id.clone(),
+            total: paths.len() as u32,
+            paths,
+            reviewed: Vec::new(),
+            reviewed_count: 0,
+        }
+    }
+
+    /// 切换某个文件的审阅标记（勾选框与 ⌥⌘R 共用）。
+    ///
+    /// 返回更新后的审阅进度；持久化失败时返回错误，不会伪称保存成功。
+    pub fn set_review_mark(&self, path: &str, marked: bool) -> Result<ReviewMarks> {
+        let store = self
+            .review_store
+            .as_ref()
+            .ok_or_else(|| AppError::internal("审阅标记存储不可用"))?;
+        let _read = self.read_lock.lock().map_err(|_| AppError::internal("读取锁失败"))?;
+        let (versions, snapshot_paths, current_review) = {
+            let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+            let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+            (
+                snapshot.versions.get(path).cloned(),
+                snapshot.review.paths.clone(),
+                snapshot.review.clone(),
+            )
+        };
+        let versions = versions.ok_or_else(|| AppError::rejected("文件不在当前改动列表中"))?;
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or_else(|| AppError::internal("worktree 身份不可用，无法保存审阅标记"))?;
+        store.set_mark(identity, path, versions, marked)?;
+
+        // 更新内存快照里的审阅状态，避免为一次勾选重跑整轮 diff。
+        let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        if let Some(snapshot) = guard.as_mut() {
+            let mut reviewed = snapshot.review.reviewed.clone();
+            if marked {
+                if !reviewed.iter().any(|item| item == path) {
+                    reviewed.push(path.to_string());
+                }
+            } else {
+                reviewed.retain(|item| item != path);
+            }
+            // 保持界面显示顺序。
+            let ordered: Vec<String> = snapshot_paths
+                .iter()
+                .filter(|item| reviewed.iter().any(|kept| kept == *item))
+                .cloned()
+                .collect();
+            let reviewed_set: std::collections::HashSet<&str> =
+                ordered.iter().map(String::as_str).collect();
+            for entry in &mut snapshot.entries {
+                entry.reviewed = reviewed_set.contains(entry.path.as_str());
+            }
+            snapshot.review = ReviewMarks {
+                worktree_id: self.id.clone(),
+                paths: snapshot_paths,
+                reviewed_count: ordered.len() as u32,
+                total: current_review.total,
+                reviewed: ordered,
+            };
+            return Ok(snapshot.review.clone());
+        }
+        Ok(current_review)
+    }
+
     fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {
         if !supports_hunk_actions(entry, file) {
             return Vec::new();
@@ -1198,10 +1377,22 @@ fn is_collapsed(path: &str, file: &git::diff::FileChange) -> bool {
     file.old_lines.max(file.new_lines) > LARGE_FILE_LINES
 }
 
+/// HEAD 中的文件版本：用 Git 给出的 blob OID（新增/未跟踪文件为 None）。
+///
+/// 只暂存或取消暂存不改变 HEAD 的 OID，因此审阅标记仍然有效（Q20、T12）。
+fn head_version_for(entry: &StatusEntry) -> Option<String> {
+    let oid = entry.oid_head.as_deref()?;
+    if oid.is_empty() || oid.bytes().all(|byte| byte == b'0') {
+        return None;
+    }
+    Some(format!("blob:{}", oid))
+}
+
 /// 计算单个文件变更条目的 diff 指纹（Q80、ADR-0009）。
 ///
 /// 指纹来自展示所用的同一份 Git 输出切片（diff_bytes），列表刷新时不启动额外 Git 进程。
-pub fn compute_file_fingerprint_from_patch(
+
+fn compute_file_fingerprint_from_patch(
     entry: &StatusEntry,
     diff_bytes: &[u8],
     worktree_path: &Path,

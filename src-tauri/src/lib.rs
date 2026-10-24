@@ -8,6 +8,7 @@ pub mod error;
 pub mod git;
 pub mod platform;
 pub mod recovery;
+pub mod review;
 pub mod session;
 pub mod settings;
 pub mod shell;
@@ -104,6 +105,7 @@ pub fn run() {
             commands::stop_watch,
             commands::watch_status,
             commands::list_changes,
+            commands::set_review_mark,
             commands::get_rows,
             commands::highlight_range,
             commands::row_index_for_line,

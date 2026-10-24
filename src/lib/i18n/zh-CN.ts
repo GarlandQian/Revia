@@ -64,7 +64,16 @@ export const zhCN = {
       stageFile: "暂存文件（⌥⌘A 或空格）",
       unstageFile: "取消暂存文件（⌥⌘A 或空格）",
       discardFile: "丢弃当前文件的未暂存改动（⌥⌘Z）",
+      review: "标记已审阅（⌥⌘R）",
+      reviewNext: "标记并跳到下一个未审阅文件（⌥⌘R）",
     },
+  },
+  review: {
+    mark: "标记为已审阅",
+    unmark: "取消审阅标记",
+    progress: (reviewed: number, total: number) => `已审阅 ${reviewed}/${total}`,
+    allReviewed: "全部文件都已审阅",
+    saveFailed: "审阅标记保存失败",
   },
   recovery: {
     title: "回收区",
