@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -308,3 +308,32 @@ Rust 合计 **247 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹�
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
 - 子模块场景只覆盖 `submodule status` 能读到的情况；工作区里未初始化的子模块（`-` 前缀）不在本轮验证范围。
 - 多进程同时共享同一数据目录不在本任务范围（仅进程内互斥）。
+
+### 2026-10-24 / 规划方：任务07第三轮固定两轴复核，仍需返修
+
+固定 `ed0f9b8eca4046fe934464b57e0607507794d487...ff2fc640d3a6fa771d1d6b8a5514a3d7471ab347`，唯一实施提交 ff2fc64。两轴独立静态审查；以下行号均为该固定提交，不随任务12后续修改漂移。
+
+#### Standards：4项P2，Fowler判断性建议0项
+
+1. **ST07-R3-1 / P2 / 未确认版本仍可当场保存为已审阅**：`src-tauri/src/session.rs:1011`仍把未知版本放入快照 `versions`；`:1089`只查该映射，`:1105`直接持久化并计入进度。未登记为子模块的嵌套仓库等目录即使 `worktreeVersionConfirmed=false`，仍可经现有入口勾选，仅下次刷新才删除。违反Q20及上一轮“未知不能认领”的契约。生产标记入口须拒绝未知版本的新增认领，前端勾选和快捷键同步处理；已有标记的取消能力保留，不能只在刷新时清除。
+2. **ST07-R3-2 / P2 / 未初始化子模块被冒充为已确认检出版本**：`src-tauri/src/review.rs:301`直接剥掉 `submodule status` 的 `-` / `U` 前缀。`-` 表示未初始化，所给OID来自暂存区而非当前检出。暂存gitlink变化后deinit、标记、再init同OID，空目录变成实际内容却保留标记，违反Q20。须保留并识别Git状态，未知或冲突不能当作已确认提交；Comments的“未验证范围”不缩减既定行为。
+3. **ST07-R3-3 / P2 / 共享身份捕获新增内嵌换行路径歧义**：`src-tauri/src/recovery.rs:44`把两条路径按 `lines()` 拆分。Unix合法仓库根如 `/tmp/revia\nrepo`（内嵌换行，不是反斜杠字面量）会被拆成错误的gitDir/commonDir，随后canonicalize失败，同时影响05恢复与07标记。原来单字段命令没有这种跨字段拆分歧义。违反 `docs/technical-direction.md:41` 的机器可读、无歧义解析边界。使用可靠字段边界，沿用生产Git调用，不维护第二套Git语义；不得放宽既有性能断言来掩盖回归。
+4. **ST07-R3-4 / P2 / packed-refs回归没有触发声称的旧缺陷**：`src-tauri/tests/review_marks.rs:529`、`:546`均checkout具体SHA，HEAD始终detached；`:538`执行pack-refs未进入旧符号引用解析路径，旧手工实现本来也能直接读取两个OID。`:540`检查还在作为指针文件的 `.git/refs` 下，OR条件恒真，也没构造目录型 `.git`。违反针对性真实回归要求。应检出真实符号分支、确认对应loose ref已消失，再经生产标记/刷新入口验证packed引用变化使标记失效；目录型 `.git` 的覆盖须真实构造，不能靠注释声称。
+
+规范来源：`docs/product-direction.md:64`、`docs/technical-direction.md:41`、`docs/agents/local-validation.md:8`、ADR-0002、Q20及07前轮Comments。四项均为确定行为或验证缺口，不是Fowler风格建议。
+
+#### Spec：2项P2、1项P3；未发现范围扩张
+
+1. **SP07-R3-1 / P2 / 未知版本仍可持久化**：`src-tauri/src/session.rs:1011`仍把未知版本加入快照；`:1094`仅比较版本，`:1105`直接持久化，未检查 `worktree_version_confirmed`。现有勾选可提交 `worktree:null` 并立即计进度，刷新后才清除。违反本任务前轮说明“这类路径的审阅标记一律不可认领”及 `spec.md:107` 版本契约。生产入口拒绝，前端同步禁用，保留取消能力。
+2. **SP07-R3-2 / P2 / 未初始化子模块不是工作区检出版本**：`src-tauri/src/review.rs:301`无条件剥离 `-`，把暂存区OID当作实际检出版本，违反 `spec.md:107`“HEAD中的文件版本＋工作区中的文件版本”及未知版本保守处理。应区分未初始化/无法确认状态。
+3. **SP07-R3-3 / P3 / packed-refs用例不足以证明所称修复**：`src-tauri/tests/review_marks.rs:529`、`:546`均checkout裸OID，`:540`断言因 `.git` 为文件而恒真。不能支撑本任务前轮“手工解析实现会失败”的陈述。使用仅存于packed-refs的真实分支，并通过生产标记/刷新入口断言失效；不再为此另写临时客户端。
+
+两轴结论分别保留：Standards4项P2，Spec2项P2和1项P3，不以一轴数量覆盖另一轴。Spec轴对共享身份捕获未报告确定新增回归；Standards轴的换行路径发现独立保留并须处理。
+
+#### 已闭合与证据边界
+
+- 上轮实际 `.git` 归属重解析、selectionEpoch/选择gate防旧导航、原worktree失败留存、完成提示归属的原触发路径已静态闭合，不反复重构。单应用共享事务及生产IPC必填所见版本结论不变；多进程并发仍非本任务已确认要求。
+- [原始检查及中断历史](../evidence/task07-review03/manifest.json)归档原检查与续跑两个目录，5份检查前源码SHA独立匹配ff2fc64，两个目录哈希列表一致；tsc/lint复用原目录的真实退出0，续跑build和完整Rust退出0（247通过、1夹具ignored）。原build无退出码、cargo未产日志，不能倒填为成功。
+- 两处敏感性实验仅实施叙述和实现副本，没有独立stdout/stderr/exit。`recovery.rs`副本匹配固定源码，`review.rs`副本仅事务锁注释与最终版不同，manifest如实记录；副本不证明packed-refs旧故障真正被触发，不采纳叙述中“可核对照确实失败”为独立运行证据。
+- 07退回 `ready-for-agent`，验收项保持未勾。仍交原Pi只修上述残留，通过现有Rust真实Git/生产会话入口回归，保存精确命令、真实退出码、原始输出及检查前后源码SHA。先完成相关修改后集中检查，失败只重跑受影响项，精确暂存。
+- 尚未Release、GUI、D06、新双平台CI或长测；不能用247项通过替代上述行为或桌面验收，全部复核通过后再固定版本验收，不标done。

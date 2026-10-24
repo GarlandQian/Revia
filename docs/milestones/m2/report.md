@@ -4,6 +4,10 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务12已交付4848265，限定独立两轴静态复核Standards0/Spec0；[16份检查原件](./evidence/task12-review01/manifest.json)已归档、3份源码SHA匹配，tsc/lint/build与Rust247项通过/1夹具ignored。仍ready-for-human，普通/测量模式、字号记忆、环境错误、D06及新版双平台CI尚待07复核全过后统一固定版本验收，不标done。
+
+- 任务07第三轮复核仍未通过：固定`ed0f9b8...ff2fc64`，Standards4项P2、Spec2项P2和1项P3，分别保留在[07 Comments](./issues/07-persistent-review-marks.md#comments)。未知版本新增标记、未初始化子模块、共享身份的内嵌换行路径解析及packed-refs真实回归仍待原Pi修复；旧身份重解析、选择代际、错误留存、完成提示原路径已静态闭合。[原检查与续跑证据](./evidence/task07-review03/manifest.json)已归档，5份源码hash匹配ff2fc64，tsc/lint/build与Rust247通过属该版；保留原build中断、敏感性无独立输出边界。仍未Release/桌面/D06/新双平台CI/长测，07退ready-for-agent。
+
 - 任务05限定身份测试返修`ebe9f92...3d70aa8`两轴0/0，测试证明缺口静态闭合；[7份原件](./evidence/task05-ci03/manifest.json)已核验，macOS discard_recovery71通过/1ignored，敏感性实验只叙述不冒称独立证据。仍ready-for-human，Windows和完整桌面/D06未完成；待07复核全过再固定新版本统一CI/Release。
 
 - 任务07再次退回`ready-for-agent`：固定`0dd6525...84a17a8`第二轮独立复核Standards5项P2、Spec3项P2；子模块真实Git版本、实际身份指向、新选择代际、原worktree失败留存和完成提示归属仍待原Pi返修。正常单应用跨worktree事务已闭合，不扩成未确认多进程要求。[16份原始检查](./evidence/task07-review02/manifest.json)已归档，10份源码hash匹配84a17a8，tsc/lint/build与Rust245项通过仅属该版；未做Release/桌面/D06/Windows/长测。详见[07 Comments](./issues/07-persistent-review-marks.md#comments)。
