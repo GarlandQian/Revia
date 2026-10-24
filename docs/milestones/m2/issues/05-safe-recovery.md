@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 第六轮两轴各1项P2：另存目标正忙的拒绝分支会误释放他人门禁，继续交Pi限定返修。外部结果留存已静态闭合；全部复核通过后才桌面验收。
+> 勾选仅代表自动化与静态实现检查通过；真实桌面键盘/焦点、Windows 编译与 CI 仍待规划方执行。R05-R6 限定返修已完成，等待规划方复核。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -713,3 +713,51 @@ R05-R5-ST1静态闭合：外部另存及归属解析失败进入独立App通道�
 - Pi交付的临时日志路径写错，并非原始检查文件丢失：报告写`/private/tmp/revia-task05-r5-1792802843`，实际为`/private/tmp/revia-task05-r5-1792800590`。已由Pi在`f7f5b4`按原字节归档[13份原始文件](../evidence/task05-r5-implementation/manifest.json)，规划方逐份核对原件/存储SHA、字节一致，检查前App.tsx SHA与固定7e5a2c8一致；tsc/lint/build原始退出码均0。该检查不证明上述运行时门禁分支正确，也不是桌面验收。
 - 只修本次请求实际持有门禁的生命周期；归属解析成功不等于门禁取得成功。已忙拒绝不取新门禁/结果令牌，不释放正在执行的请求；正常成功、执行错误、刷新错误路径仍须释放本请求取得的门禁。保留外部App结果通道及已登记目标归属，不扩展Rust/刷新或新框架。
 - 全部相关修改后集中跑tsc/lint/build；检查前记录所测源码hash，保留精确命令/真实退出码/完整输出，交付从实际存在目录读取的路径，勿手写猜测时间戳。精确提交m2，交规划方复核；本轮仍不Release/GUI/D06/CI/长测。
+
+### 2026-10-24 / Pi 实现：第六轮限定返修（R05-R6，拒绝分支不得释放他人门禁）
+
+只修本轮唯一实质回归与必要文档。纯前端门禁生命周期修复：未改 Rust、未扩展刷新、未新增测试框架；未构建 Release、未操作 GUI、未跑 D06/CI/长测，未推送/合并/发布。
+
+#### R05-R6-ST1 / SP1：只有本次真正取得的门禁才可释放
+
+问题：`performSaveAs` 在拿到 `ownerId` 后、`try` 内检测 `writingWorktreesRef.current.has(ownerId)` 并 `throw` 忙碌；此时本请求**还没有** `add` 门禁，但 `finally` 只要 `ownerId` 非空就 `delete(ownerId)`，把另一笔仍在执行的操作的门禁清掉，原操作未结束就重新启用写入口（违反 Q90 同 worktree 写期间禁用其他写入口）。
+
+修复（`src/App.tsx` 的 `performSaveAs`）：
+
+- 新增 `let heldGateId: string | null = null;`，语义是「本次请求**实际取得**的写门禁」。
+- 取得门禁的同一处（`writingWorktreesRef.current.add(ownerId)` 之后）立即 `heldGateId = ownerId;`。
+- 忙碌分支在 `add` **之前** `throw`，因此 `heldGateId` 仍为 `null`，`finally` 不会 `delete` 任何东西，也不会取新的 `OperationResultGate` 令牌（`opToken` 的赋值在 `add` 之后）。
+- `finally` 改为 `if (heldGateId) { delete(heldGateId); ... }`。正常成功、写错误、刷新错误三条路径都仍在 `finally` 释放本次取得的门禁。
+- 外部 App 结果通道（`externalResult` / `recordExternalResult`）、后端 `expectedOwner` 复核、已登记目标的归属与真实重读都保持原样。
+
+生产调用点：`RecoveryDialog` 的 `onSaveAs` → `App.performSaveAs` → `ipc.recoverySaveAsOwner` / `ipc.saveRecoveryAs`。
+
+静态核对：同一缺陷只在 `performSaveAs` 存在。`performWrite` 与 `performRestore` 的忙碌判断都在 `try` **之前**，`finally` 不会执行，不存在同类问题。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录（从文件读取的实际路径，非手写）：`/private/tmp/revia-task05-r6-XYwa6d`
+
+- 基线：`1c753caf2847c4c8b91346c56b0058ceabc6b722`
+- 检查前 `src/App.tsx` SHA-256：`7bc6f3cff867efd236fc5bac5551913a6d3809d3b72bb336bc61dc778ac41f2f`（检查后复核未变）
+- 改动前完整 diff：`pre-change.diff`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | `tsc.out` / `tsc.err` / `tsc.exit` |
+| `pnpm lint` | 0 | `lint.out` / `lint.err` / `lint.exit` |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+
+`tsc` 与 `lint` 的 stdout 为空；`build` 的 stderr 只有既有的 Vite `configLoader` 提示。
+
+按交接要求本轮为纯前端分支修复，**未**运行 Rust 测试与 Node/Python 工具测试，也未重跑前几轮的 `discard_recovery` / lib 结果；那些数字保留为历史。
+
+#### 未做敏感性实验
+
+本轮没有为「忙碌拒绝后误删他人门禁」构造可运行对照。该分支的正确性来自实现与类型检查，属实施方观察，未作为已核实运行证据；真实桌面上的门禁观感需规划方验证。
+
+#### 仍未验证（留给规划方）
+
+- 真实桌面的写入口禁用状态、外部另存失败横幅、面板键盘焦点与只读 diff 观感。
+- Windows 编译与 CI。
+- 超大文件恢复/对比的内存占用未量化。

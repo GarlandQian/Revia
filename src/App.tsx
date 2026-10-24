@@ -869,6 +869,13 @@ export function App() {
     // 并且旧请求的完成不会清掉较新的错误。
     const seq = ++externalSeqRef.current;
     let ownerId: string | null = null;
+    /**
+     * 本次请求**实际取得**的写门禁。
+     *
+     * 只有它才允许在 `finally` 释放：目标已经忙时本请求没有取得门禁，
+     * 释放会把另一笔仍在执行的操作的门禁清掉（Q90）。
+     */
+    let heldGateId: string | null = null;
     let opToken: OperationContext | null = null;
     try {
       // 后端解析真实归属；解析失败同样落到 App 级结果通道，不猜路径、不借用当前 worktree。
@@ -876,9 +883,11 @@ export function App() {
       ownerId = owner.worktreeId;
       if (ownerId) {
         if (writingWorktreesRef.current.has(ownerId)) {
+          // 目标已有在途写操作：本请求没有取得门禁，也不取新的结果令牌。
           throw { kind: "rejected", message: messages.recovery.busy };
         }
         writingWorktreesRef.current.add(ownerId);
+        heldGateId = ownerId;
         setWritingWorktrees(new Set(writingWorktreesRef.current));
         opToken = operationGateRef.current.begin(ownerId);
         setAppError(null, ownerId);
@@ -911,8 +920,10 @@ export function App() {
       }
       throw err;
     } finally {
-      if (ownerId) {
-        writingWorktreesRef.current.delete(ownerId);
+      // 只释放本次真正取得的门禁：成功、写错误、刷新错误都会走到这里；
+      // 被忙碌拒绝（没有取得门禁）的请求不碰别人的占用。
+      if (heldGateId) {
+        writingWorktreesRef.current.delete(heldGateId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
       }
     }
