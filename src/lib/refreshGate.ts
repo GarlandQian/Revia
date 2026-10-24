@@ -252,6 +252,8 @@ export interface ReviewMarkEntryLike {
   reviewed: boolean;
   headVersion?: string | null;
   worktreeVersion?: string | null;
+  /** 版本是否可确认；未确认的条目不能新增认领，也不参与批量记账。 */
+  worktreeVersionConfirmed?: boolean;
 }
 
 export interface ReviewStateLike {
@@ -281,7 +283,13 @@ export class ReviewOverlay {
     return `${worktreeId}\u0000${path}`;
   }
 
-  /** 记录一次**已成功**的本地审阅变更，返回它的序号。 */
+  /**
+   * 记录一次**已成功**的本地审阅变更，返回它的序号。
+   *
+   * **必须在拿到成功结果后无条件调用**，不能被展示代际（`isCurrent`）挡住：
+   * 后端已经持久化，迟到响应只是不该更新界面，不能让后续旧读取把这条真实变更回退
+   * （ST07-R7-3 / SP07-R7-2）。版本校验在 `apply`/`mergeEntry` 里做，所以乱序也安全。
+   */
   record(worktreeId: string, path: string, versions: ReviewVersionsLike, reviewed: boolean): number {
     this.seq += 1;
     this.overrides.set(ReviewOverlay.key(worktreeId, path), {
@@ -297,9 +305,14 @@ export class ReviewOverlay {
     return this.seq;
   }
 
-  /** 读取请求**发起时**调用；返回当前序号，作为「这次读取之后发生的变更」的分界。 */
-  baseline(): number {
-    return this.seq;
+  /**
+   * 读取/写请求**发起前**调用，拿到这次请求的审阅分界（ST07-R7-1 / SP07-R7-1 / SP07-R7-4）。
+   *
+   * 返回的句柄同时承担交付时的合并，所以「先取分界、后交付」由类型强制：
+   * 拿不到句柄就无法交付，而句柄只在请求发起处创建。
+   */
+  beginRead(): ReviewReadRequest {
+    return new ReviewReadRequest(this, this.seq);
   }
 
   /** 该路径当前记录的本地状态（诊断与测试用）。 */
@@ -337,5 +350,147 @@ export class ReviewOverlay {
       entries,
       review: { ...snapshot.review, reviewed, reviewedCount: reviewed.length },
     } as S;
+  }
+
+  /**
+   * 用同路径的当前条目与本地记录修正一条被**整体替换**的条目（未跟踪元数据补全用）。
+   *
+   * `loaded` 是较早读取拿到的条目，`current` 是界面当前同组条目。
+   * 只调整 `reviewed`：版本一致时沿用当前条目/较新的本地记录，
+   * 补元数据不能把已成功的标记勾回去，也不会凭空勾上（版本不一致一律用 `loaded`）。
+   */
+  mergeEntry<E extends ReviewMarkEntryLike>(
+    worktreeId: string,
+    loaded: E,
+    current: E | undefined,
+    boundary: number,
+  ): E {
+    const head = loaded.headVersion ?? null;
+    const worktree = loaded.worktreeVersion ?? null;
+    let reviewed = loaded.reviewed;
+    if (current
+      && (current.headVersion ?? null) === head
+      && (current.worktreeVersion ?? null) === worktree) {
+      reviewed = current.reviewed;
+    }
+    const override = this.overrides.get(ReviewOverlay.key(worktreeId, loaded.path));
+    if (override && override.seq > boundary
+      && override.versions.head === head && override.versions.worktree === worktree) {
+      reviewed = override.reviewed;
+    }
+    return reviewed === loaded.reviewed ? loaded : { ...loaded, reviewed };
+  }
+
+  /**
+   * 按条目重算进度，保证 `reviewed` / `reviewedCount` 与勾选一致（SP07-R7-3）。
+   *
+   * 只在 `review.paths`（后端给出的去重路径集合）内统计，不凭空扩大总数。
+   */
+  syncProgress<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S): S {
+    const reviewedSet = new Set(snapshot.entries.filter((entry) => entry.reviewed).map((entry) => entry.path));
+    const reviewed = snapshot.review.paths.filter((path) => reviewedSet.has(path));
+    const same = reviewed.length === snapshot.review.reviewedCount
+      && reviewed.length === snapshot.review.reviewed.length
+      && reviewed.every((path, index) => path === snapshot.review.reviewed[index]);
+    if (same) return snapshot;
+    return { ...snapshot, review: { ...snapshot.review, reviewed, reviewedCount: reviewed.length } } as S;
+  }
+}
+
+/**
+ * 一次读取/写请求的审阅分界句柄。
+ *
+ * 只由 `ReviewOverlay.beginRead()` 在**请求发起处**创建；`deliver` 在结果到达时合并，
+ * 因此「分界取晚」在类型上就写不出来（ST07-R7-1 / SP07-R7-4）。
+ */
+export class ReviewReadRequest {
+  private readonly overlay: ReviewOverlay;
+  private readonly boundary: number;
+
+  constructor(overlay: ReviewOverlay, boundary: number) {
+    this.overlay = overlay;
+    this.boundary = boundary;
+  }
+
+  /** 这次请求的分界序号（需要逐条合并时用，例如未跟踪元数据补全）。 */
+  boundaryOf(): number {
+    return this.boundary;
+  }
+
+  /** 交付结果：把这次请求发起之后、版本仍匹配的本地审阅变更叠加进去。 */
+  deliver<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S): S {
+    return this.overlay.apply(snapshot, this.boundary);
+  }
+}
+
+/**
+ * 生产入口的统一读取方式：**先取分界，再发请求**，结果到达时合并交付。
+ *
+ * `src/App.tsx` 的 `readAndAccept`、`refreshTarget`、`openWorktree` 与写结果分支
+ * 都必须经这里，否则「分界取晚」会重新出现（ST07-R7-1 / SP07-R7-1 / SP07-R7-4）。
+ * 分界与请求的先后在函数体内固定，调用方无法传反。
+ */
+export async function readThroughReview<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
+  overlay: ReviewOverlay,
+  read: () => Promise<S>,
+): Promise<S> {
+  const request = overlay.beginRead();
+  const snapshot = await read();
+  return request.deliver(snapshot);
+}
+
+/** 一次成功的标记结果要记哪些账。 */
+export interface ReviewResultPlan {
+  /** 需要写入叠加层的条目（含本次目标与同批被后端一并改变的其他文件）。 */
+  records: Array<{ path: string; versions: ReviewVersionsLike; reviewed: boolean }>;
+  /** 后端返回的完整已审阅集合，用于更新界面。 */
+  reviewed: Set<string>;
+}
+
+/**
+ * 计算一次**已成功**的标记结果要记录的全部变更（ST07-R7-3 / SP07-R7-2）。
+ *
+ * 后端返回的 `reviewed` 是完整集合：A/B 并发时 B 的结果可能已经包含 A，
+ * 因此除本次目标外，界面当前条目中「状态确实被改变且版本可确认」的也要一并记账，
+ * 否则 A 迟到被展示门禁拒收后就漏账，旧读取仍会把 A 回退。
+ *
+ * 版本随每条记录一起保存，`apply`/`mergeEntry` 再按版本校验，乱序也安全。
+ */
+export function planReviewResult<E extends ReviewMarkEntryLike>(input: {
+  worktreeId: string;
+  path: string;
+  versions: ReviewVersionsLike;
+  reviewed: Iterable<string>;
+  entries: readonly E[];
+}): ReviewResultPlan {
+  const reviewed = new Set(input.reviewed);
+  const records: ReviewResultPlan["records"] = [{
+    path: input.path,
+    versions: { head: input.versions.head, worktree: input.versions.worktree },
+    reviewed: reviewed.has(input.path),
+  }];
+  for (const entry of input.entries) {
+    if (entry.path === input.path) continue;
+    if (!entry.worktreeVersionConfirmed) continue;
+    const nowReviewed = reviewed.has(entry.path);
+    if (nowReviewed === entry.reviewed) continue;
+    records.push({
+      path: entry.path,
+      versions: { head: entry.headVersion ?? null, worktree: entry.worktreeVersion ?? null },
+      reviewed: nowReviewed,
+    });
+  }
+  return { records, reviewed };
+}
+
+/**
+ * 把计划**无条件**写进叠加层。
+ *
+ * 必须在展示门禁（`isCurrent`）之前调用：后端已经持久化，迟到响应只是不该更新界面，
+ * 不能让后续旧读取把这条真实变更回退。
+ */
+export function commitReviewResult(overlay: ReviewOverlay, worktreeId: string, plan: ReviewResultPlan): void {
+  for (const record of plan.records) {
+    overlay.record(worktreeId, record.path, record.versions, record.reviewed);
   }
 }

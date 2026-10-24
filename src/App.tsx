@@ -35,6 +35,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
+import { commitReviewResult, planReviewResult, readThroughReview } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -265,6 +266,8 @@ export function App() {
       // 未跟踪文件的内容与行数在后端首次取行时才统计；先取一次空范围补全元数据，
       // 否则行数为 0 会被当成空文件，永远不挂载 diff 视图（任务 02 桌面验收）。
       if (entry.changes === "untracked" && !entry.metricsLoaded && !entry.readonlyReason) {
+        // 分界同样在请求发起前取：补元数据的响应可能晚于用户勾选（SP07-R7-3）。
+        const metricsRead = reviewOverlayRef.current.beginRead();
         const slice = await ipc.getRows({ worktreeId: target.worktreeId, path: entry.path, changes: entry.changes,
           view: target.view, from: 0, to: 0 });
         // 迟到的未跟踪元数据不得把选择拉回旧文件（含同 worktree U→V 与 A→B→A）。
@@ -276,13 +279,20 @@ export function App() {
           || loaded.fingerprint !== entry.fingerprint || loaded.snapshotRevision !== entry.snapshotRevision) {
           throw { kind: "rejected", message: messages.changes.fileChanged };
         }
-        entry = loaded;
-        setSnapshot((current) => current && {
+        // 不能用旧 entry **整条**替换：那会连带把同版本已成功的审阅状态勾回去，
+        // 而进度仍保留，出现两处状态分裂（SP07-R7-3）。只合并审阅字段并重算进度。
+        const boundary = metricsRead.boundaryOf();
+        const overlay = reviewOverlayRef.current;
+        const candidate = snapshotRef.current?.entries.find((item) =>
+          item.path === loaded.path && item.changes === loaded.changes
+          && item.snapshotRevision === loaded.snapshotRevision);
+        entry = overlay.mergeEntry(target.worktreeId, loaded, candidate, boundary);
+        setSnapshot((current) => current && overlay.syncProgress({
           ...current,
-          entries: current.entries.map((candidate) =>
-            candidate.path === loaded.path && candidate.changes === loaded.changes
-              && candidate.snapshotRevision === loaded.snapshotRevision ? loaded : candidate),
-        });
+          entries: current.entries.map((item) =>
+            item.path === loaded.path && item.changes === loaded.changes
+              && item.snapshotRevision === loaded.snapshotRevision ? entry : item),
+        }));
       }
       if (superseded()) {
         return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
@@ -362,7 +372,9 @@ export function App() {
         }
 
         const startedAt = performance.now();
-        const rawSnapshot = await ipc.listChanges(id);
+        // 重开仓库（再次添加当前仓库会走到这里）同样要按请求前分界合并，
+        // 不能把 rawSnapshot 直接发布而回退期间的审阅变更（SP07-R7-4）。
+        const rawSnapshot = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(id));
         if (!gateRef.current.accept(myToken, { worktreeId: rawSnapshot.worktreeId, revision: rawSnapshot.revision })) {
           debugLog(`丢弃非当前激活或过期的快照：${rawSnapshot.worktreeId}@${rawSnapshot.revision}`);
           return null;
@@ -416,15 +428,12 @@ export function App() {
     (
       token: { activation: number; worktreeId: string | null },
       snap: ChangesSnapshot,
-      reviewBaseline: number,
     ): boolean => {
       if (!gateRef.current.accept(token, { worktreeId: snap.worktreeId, revision: snap.revision })) {
         debugLog(`丢弃过期快照：${snap.worktreeId}@${snap.revision}（当前激活 ${gateRef.current.current().worktreeId}）`);
         return false;
       }
-      // 较新的本地审阅变更不能被这次（较早发起的）读取回退（R07-D1）。
-      const merged = reviewOverlayRef.current.apply(snap, reviewBaseline);
-      applyRefreshedSnapshot(merged);
+      applyRefreshedSnapshot(snap);
       setStatus(snap.entries.length > 0 ? `${snap.entries.length} 个文件` : messages.changes.empty);
       return true;
     },
@@ -435,10 +444,9 @@ export function App() {
   const readAndAccept = useCallback(
     async (targetWorktreeId: string): Promise<boolean> => {
       const token = gateRef.current.token();
-      // 读取**发起时**取分界：之后发生的本地审阅变更才会叠加到这次结果上。
-      const reviewBaseline = reviewOverlayRef.current.baseline();
-      const snap = await ipc.listChanges(targetWorktreeId);
-      return acceptSnapshot(token, snap, reviewBaseline);
+      // 共享生产入口：先取分界再发请求，交付时合并（ST07-R7-1）。
+      const snap = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
+      return acceptSnapshot(token, snap);
     },
     [acceptSnapshot],
   );
@@ -469,11 +477,10 @@ export function App() {
   const refreshTarget = useCallback(async (targetWorktreeId: string) => {
     const token = gateRef.current.token();
     try {
-      const reviewBaseline = reviewOverlayRef.current.baseline();
-      const snap = await ipc.listChanges(targetWorktreeId);
+      const snap = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
       if (token.activation === gateRef.current.token().activation
         && gateRef.current.current().worktreeId === targetWorktreeId) {
-        acceptSnapshot(token, snap, reviewBaseline);
+        acceptSnapshot(token, snap);
       }
     } catch (caught) {
       if (token.activation === gateRef.current.token().activation
@@ -812,6 +819,8 @@ export function App() {
     try {
       const unstaging = target.changes === "staged";
       let next: ChangesSnapshot;
+      // 写结果的审阅分界必须在**请求发起前**取（ST07-R7-1 / SP07-R7-1）。
+      const reviewRead = reviewOverlayRef.current.beginRead();
       if (discard) {
         if (!("snapshotRevision" in target)) throw { kind: "rejected", message: messages.changes.fileChanged };
         const discardRequest = { ...request, snapshotRevision: target.snapshotRevision };
@@ -826,7 +835,7 @@ export function App() {
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       if (operationGateRef.current.acceptSuccess(opToken, next)
-        && acceptSnapshot(opToken, next, reviewOverlayRef.current.baseline())) {
+        && acceptSnapshot(opToken, reviewRead.deliver(next))) {
         setAppError(null, opWorktreeId);
       } else {
         debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);
@@ -1016,23 +1025,29 @@ export function App() {
           worktree: entry.worktreeVersion ?? null,
         },
       });
+      // 记账**先于**展示门禁：后端已经持久化，即使这次响应迟到被拒收（A/B 并发时
+      // A 的响应晚于 B），它的真实结果也必须被记录，否则后续旧读取会把 A 回退
+      // （ST07-R7-3 / SP07-R7-2）。版本随记录一起保存，乱序也安全。
+      // 记账**先于**展示门禁（ST07-R7-3 / SP07-R7-2）：后端已经持久化，
+      // 迟到响应只是不该更新界面，不能让后续旧读取把这条真实变更回退。
+      const plan = planReviewResult({
+        worktreeId: targetWorktreeId,
+        path: entry.path,
+        versions: { head: entry.headVersion ?? null, worktree: entry.worktreeVersion ?? null },
+        reviewed: marks.reviewed,
+        entries: snapshotRef.current?.worktreeId === targetWorktreeId ? snapshotRef.current.entries : [],
+      });
+      commitReviewResult(reviewOverlayRef.current, targetWorktreeId, plan);
+      const reviewedSet = plan.reviewed;
       if (!isCurrent()) return null;
       setSnapshot((current) => {
         if (!current || current.worktreeId !== targetWorktreeId) return current;
-        const reviewed = new Set(marks.reviewed);
         return {
           ...current,
           review: marks,
-          entries: current.entries.map((item) => ({ ...item, reviewed: reviewed.has(item.path) })),
+          entries: current.entries.map((item) => ({ ...item, reviewed: reviewedSet.has(item.path) })),
         };
       });
-      // 记录这次**已成功**的本地变更：比它更早发起的读取不能把它回退（R07-D1）。
-      reviewOverlayRef.current.record(
-        targetWorktreeId,
-        entry.path,
-        { head: entry.headVersion ?? null, worktree: entry.worktreeVersion ?? null },
-        marked,
-      );
       setAppError(null, targetWorktreeId);
       return marks;
     } catch (caught) {
