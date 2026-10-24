@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务05退回`ready-for-agent`：固定`1056557...05513aa`的Windows返修增量两轴各1项P2，均为身份回归同时改字节、仅通用Rejected，可被内容保护兜底；不是已证明生产身份校验失败。[7份检查原件](./evidence/task05-ci02/manifest.json)已归档、3份源码hash匹配05513aa，macOS Rust240通过；Windows仍未验证。待当前07返修交付后原Pi单独补此用例，复核过后再新CI/桌面，不提前done。详见[05 Comments](./issues/05-safe-recovery.md#comments)。
+
 - 任务07退回`ready-for-agent`：固定`234f248...d892bae`首轮独立两轴复核Standards8项P2、Spec8项P2，分别列在[任务07 Comments](./issues/07-persistent-review-marks.md#comments)。共享存储事务、活动/未知身份、所见版本与迟到响应、去重/导航、按钮焦点、完成提示、错误可见及子模块版本尚待原Pi返修。首版15份[原始检查](./evidence/task07-review01/manifest.json)已归档，10份源码hash匹配d892bae，tsc/lint/build及Rust239项通过只属于首版；首次t13失败仅实施叙述、无原始输出，不冒称独立核实。未做07 Release/桌面/D06/CI，复核全过才桌面。
 
 - 任务05当前`ready-for-agent`：固定234f248的[CI40048580349](https://github.com/GarlandQian/Revia/actions/runs/40048580349) macOS全部通过，Windows有5项回收测试失败、release跳过，[完整日志](./evidence/task05-ci01/manifest.json)保留。第二次[普通桌面局部观察](./task05-desktop02.md)已确认R05-D1标签、两次二进制原生另存及旧确认失效；未执行恢复/清空，未完成D06/完整功能验收。07交付后仍交原Pi单独修复CI，复核通过前不继续功能桌面，不以旧版结果补位。

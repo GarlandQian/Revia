@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 > 固定 `234f248` 的 Windows CI 有 5 项 `discard_recovery` 失败，已在 R05-CI01 修复根因（`prepare_destination` 的 Windows verbatim 路径 component 拼接、两处 fixture 平台不兼容），macOS 240 项全通过。**Windows 真实 CI 与桌面验收仍未完成**，任务未 done。
 
@@ -1058,3 +1058,24 @@ Rust 合计 **240 项**：lib 99、`discard_recovery` **71**（1 ignored 桌面�
 - **Windows 未验证**：本轮在 macOS 上运行，只证明 macOS 未回归。五项是否在 Windows 上真的修好，需要规划方推送后由真实 CI 判定；本地通过不等于 Windows 通过。
 - 未构建 Release、未操作 GUI、未跑 D06/长测。
 - 05 仍保留未完成的桌面验收与最新双平台 CI，任务不 done。
+
+### 2026-10-24 / 规划方：R05-CI01返修的固定两轴复核，仍需补足身份回归
+
+固定范围`1056557c338137de6a61d81ca48212dd57d40d75...05513aae522c596a86dbac55dc540f9a265bf016`，仅05513aa；两轴独立静态复核，不随07返修HEAD漂移。以下行号均指固定05513aa。
+
+#### Standards：1项P2，Fowler判断性建议0项
+
+- **ST05-CI02-1 / P2 / 身份回归被内容保护兜底**：`src-tauri/tests/discard_recovery.rs:1683`重建`.git`后也改变目标字节，`:1688`只断言通用`Rejected`。即使发布前身份核对退化为复用旧身份，`recovery.rs:371`仍会因字节不等于丢弃后基线而拒绝，测试照样通过。违反`docs/agents/local-validation.md`的真实受控验证要求，尚不能独立证明Q87/ADR-0010。最小修复：重建身份后保持目标完整状态等于丢弃后基线，明确断言新旧真实身份不匹配，并要求错误来自身份核对；保留原数据未被恢复写入的断言。这是测试证明缺口，不是已证明生产身份保护失效。
+
+#### Spec：1项P2，无范围扩张
+
+- **SP05-CI02-1 / P2 / T10身份用例缺乏敏感性**：`src-tauri/tests/discard_recovery.rs:1683,1688`同时改变身份和文件内容，仅断言`Rejected`；删除身份保护也可被内容拒绝兜底。没有独立证明T10“同路径重建后身份不明确时不直接恢复”，也未满足本任务上一轮R05-CI01“身份fixture确实验证身份而非别的拒绝”的要求。重建时保持目标状态与after一致，并显式确认身份变化及身份拒绝原因。
+
+两轴各1项P2分别保留，不合并计数。其他限定增量未发现确定新增生产缺陷：祖先链仍逐级检查链接及真实Git元数据，create_new和目标worktree互斥未变；准备内容同步后关闭句柄，发布前真实复核仍在；外部路径转换集中在platform，仅当前测试调用。
+
+#### 检查证据与下一步
+
+- 7份原始检查文件已[归档](../evidence/task05-ci02/manifest.json)，3份检查前源码hash匹配05513aa；日志可核macOS完整Rust240项通过、1个桌面夹具ignored，退出0。前端未改，未重复前端检查；原始失败CI保留。
+- Windows五项是否实际修复及精确路径故障解释仍须新CI验证，不能将本机通过或静态推理当Windows结论。未构建Release、未GUI/D06/长测。
+- 05退回`ready-for-agent`。原Pi正在07返修，待该轮交付后单独修本条，避免混任务提交。仅必要测试/断言变更，先全部修改再集中运行受影响检查，不重跑无关前端、Release或桌面。
+- 不用另写临时客户端或放宽断言。保留精确命令、原始stdout/stderr/真实退出码、检查前后源码hash；提交m2后再固定增量两轴复核。全部复核过后才按Q97新CI及规划方桌面，不标done。
