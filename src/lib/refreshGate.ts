@@ -390,6 +390,8 @@ export class ReviewOverlay {
     loaded: E,
     current: E | undefined,
     boundary: number,
+    /** 读取/当前真值已经观察到的水位；不小于记录序号时旧成功不生效（ST07-R11-3）。 */
+    observedSeq = 0,
   ): E {
     const head = loaded.headVersion ?? null;
     const worktree = loaded.worktreeVersion ?? null;
@@ -400,7 +402,7 @@ export class ReviewOverlay {
       reviewed = current.reviewed;
     }
     const override = this.overrides.get(ReviewOverlay.key(worktreeId, loaded.path));
-    if (override && override.commitSeq > boundary
+    if (override && override.commitSeq > boundary && observedSeq < override.seq
       && override.versions.head === head && override.versions.worktree === worktree) {
       reviewed = override.reviewed;
     }
@@ -443,26 +445,36 @@ export class ReviewOverlay {
   /**
    * 按**真实执行进度**合成一次成功回执要展示的状态。
    *
-   * 直接用后端返回的 `reviewed` 会忽略更晚的其它成功操作：先点 A 再 B 时，
-   * B 的序号更小但回执可能更晚到，直接发布它的集合会让界面倒退
-   * （ST07-R10-2 / SP07-R10-2）。
+   * 底座不是「当前界面」，而是这次回执带来的**完整已确认真值**（`confirmed`）：
+   * 后端对每个可确认路径都给出了这一刻的 true/false 与绑定版本，缺席路径的旧状态
+   * 不能继续当真（ST07-R11-1 / SP07-R11-2）。只返回正标记会让 B 的取消丢失，
+   * 于是界面继续显示 B 已审，而磁盘上它已经取消。
    *
-   * 以当前条目为底，把所有本地记录里「序号不小于这次回执、且版本与当前条目一致」
-   * 的状态叠加进去，再按路径重算进度。返回值就是可安全展示与导航的状态。
+   * 在底座上再叠加**序号严格更大**的本地记录（更晚的真实事件），
+   * 这样「B 取消 seq1、A 标记 seq2 但 A 回执先到」时两者都能正确显示。
+   *
+   * 版本一律按条目自身版本匹配，不匹配就不叠加。
    */
   composeState<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
     snapshot: S,
+    confirmed: ReadonlyArray<ReviewMarkLike>,
     observedSeq: number,
   ): S {
+    const confirmedByPath = new Map(confirmed.map((mark) => [mark.path, mark]));
     const entries = snapshot.entries.map((entry) => {
-      const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
-      if (!override) return entry;
-      if (override.seq < observedSeq) return entry;
+      const base = confirmedByPath.get(entry.path);
       const head = entry.headVersion ?? null;
       const worktree = entry.worktreeVersion ?? null;
-      if (override.versions.head !== head || override.versions.worktree !== worktree) return entry;
-      if (entry.reviewed === override.reviewed) return entry;
-      return { ...entry, reviewed: override.reviewed };
+      // 底座：回执确认的版本必须与当前条目一致，否则这条回执不适用于当前版本。
+      let reviewed = entry.reviewed;
+      if (base && base.head === head && base.worktree === worktree) reviewed = base.reviewed;
+      // 叠加比这次回执更晚、且版本一致的本地记录。
+      const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
+      if (override && override.seq > observedSeq
+        && override.versions.head === head && override.versions.worktree === worktree) {
+        reviewed = override.reviewed;
+      }
+      return reviewed === entry.reviewed ? entry : { ...entry, reviewed };
     });
     return this.syncProgress({ ...snapshot, entries });
   }
@@ -609,7 +621,103 @@ export function applyReviewSuccessAndCompose<S extends ReviewSnapshotLike<Review
   });
   const snapshot = input.snapshot;
   const view = snapshot && snapshot.worktreeId === input.worktreeId
-    ? input.overlay.composeState(snapshot, input.seq)
+    ? input.overlay.composeState(snapshot, input.marks, input.seq)
     : null;
   return { plan, view };
+}
+
+/**
+ * 一次成功回执的**完整发布决策**（生产唯一入口）。
+ *
+ * 把「记账 → 上下文判定 → 基于 current 发布/返回导航状态」这条链收在一个函数里，
+ * 让 Node 回归能直接驱动真实生产路径，而不是只测各个 helper：
+ *
+ * - 记账与合成**先做**（后端已持久化，迟到不该丢账）；
+ * - 发布只要求 `context` 仍有效（同 worktree / activation / revision），
+ *   **不含点击代际**：更晚执行的真实成功不能被旧点击丢掉（ST07-R11-2）；
+ * - 错误清理单独用 `clearError` 判定（仍按点击代际，较新的拒绝不能被清掉）；
+ * - 发布结果由 `merge` 在**调用方当前的快照**上只合并审阅字段，
+ *   不用捕获的整批 entries 覆盖已排队的元数据（SP07-R11-4）。
+ */
+export interface ReviewPublishInput<S extends ReviewSnapshotLike<ReviewMarkEntryLike>> {
+  overlay: ReviewOverlay;
+  worktreeId: string;
+  reviewed: Iterable<string>;
+  marks: ReadonlyArray<ReviewMarkLike>;
+  seq: number;
+  /** 合成时使用的快照（发起请求时看到的界面状态）。 */
+  snapshot: S | null | undefined;
+  /**
+   * 发起请求时记下的上下文事实。判定由本函数统一做，调用方不能自己拼。
+   *
+   * `epochMatches` 是**点击代际**，只用于错误清理——不参与发布判定
+   * （ST07-R11-2：更晚执行的真实成功不能被旧点击丢掉）。
+   */
+  context: {
+    worktreeMatches: boolean;
+    activationMatches: boolean;
+    revisionMatches: boolean;
+    epochMatches: boolean;
+  };
+}
+
+export interface ReviewPublishResult<S extends ReviewSnapshotLike<ReviewMarkEntryLike>> {
+  /** 合成后的状态；`null` 表示上下文已失效、不发布。 */
+  view: S | null;
+  /** 导航应使用的审阅进度（上下文失效时为后端这次返回的集合）。 */
+  navigation: ReviewStateLike;
+  /** 是否应该清理错误提示。 */
+  clearError: boolean;
+}
+
+export function publishReviewSuccess<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
+  input: ReviewPublishInput<S>,
+): ReviewPublishResult<S> {
+  const { worktreeMatches, activationMatches, revisionMatches, epochMatches } = input.context;
+  // 发布只看「这条真值是否还属于当前视图」：worktree / activation / revision。
+  const contextValid = worktreeMatches && activationMatches && revisionMatches;
+  const clearError = epochMatches && contextValid;
+  const { plan, view } = applyReviewSuccessAndCompose({
+    overlay: input.overlay,
+    worktreeId: input.worktreeId,
+    reviewed: input.reviewed,
+    marks: input.marks,
+    seq: input.seq,
+    snapshot: input.snapshot,
+  });
+  if (!contextValid || !view) {
+    // 上下文失效：不发布，但记账已经完成（迟到的真实成功不丢账）。
+    return {
+      view: null,
+      navigation: { paths: [], reviewed: [...plan.reviewed], total: 0, reviewedCount: plan.reviewed.size, seq: plan.seq },
+      clearError: false,
+    };
+  }
+  return { view, navigation: view.review, clearError };
+}
+
+/**
+ * 在调用方**当前**快照上合并一次已合成的审阅结果。
+ *
+ * 只改 `reviewed` 与进度，其余字段（metricsLoaded、行数等）一律保留 `current` 的值：
+ * 同 revision 的元数据补全可能已经排队但还没 render，整批覆盖会把它们退回旧值
+ * （SP07-R11-4）。
+ */
+export function mergePublishedReview<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
+  current: S,
+  view: ReviewSnapshotLike<ReviewMarkEntryLike>,
+  seq: number,
+): S {
+  const reviewedByPath = new Map(view.entries.map((entry) => [entry.path, entry.reviewed]));
+  const entries = current.entries.map((entry) => {
+    const reviewed = reviewedByPath.get(entry.path);
+    return reviewed === undefined || reviewed === entry.reviewed
+      ? entry
+      : { ...entry, reviewed };
+  });
+  return {
+    ...current,
+    review: { ...view.review, seq },
+    entries,
+  } as S;
 }

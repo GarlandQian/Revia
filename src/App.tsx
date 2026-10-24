@@ -35,7 +35,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
-import { applyReviewSuccessAndCompose, readThroughReview } from "@/lib/refreshGate";
+import { mergePublishedReview, publishReviewSuccess, readThroughReview } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -283,16 +283,32 @@ export function App() {
         // 而进度仍保留，出现两处状态分裂（SP07-R7-3）。只合并审阅字段并重算进度。
         const boundary = metricsRead.boundaryOf();
         const overlay = reviewOverlayRef.current;
+        // getRows 也是读取：必须比较**可信水位**，否则「失效已超越的旧成功」
+        // 会在补元数据时把勾选复活（ST07-R11-3 / SP07-R11-3）。
+        // 水位取当前快照的审阅序号（后端已经观察到哪一事件）与这次读取携带的
+        // 快照版本中的较大者。
+        const observedSeq = Math.max(
+          snapshotRef.current?.review.seq ?? 0,
+          loaded.snapshotRevision === entry.snapshotRevision ? (snapshotRef.current?.review.seq ?? 0) : 0,
+        );
         const candidate = snapshotRef.current?.entries.find((item) =>
           item.path === loaded.path && item.changes === loaded.changes
           && item.snapshotRevision === loaded.snapshotRevision);
-        entry = overlay.mergeEntry(target.worktreeId, loaded, candidate, boundary);
-        setSnapshot((current) => current && overlay.syncProgress({
-          ...current,
-          entries: current.entries.map((item) =>
+        entry = overlay.mergeEntry(target.worktreeId, loaded, candidate, boundary, observedSeq);
+        setSnapshot((current) => {
+          if (!current) return current;
+          // 与发布路径一致：只在 `current` 上改这条匹配条目的审阅字段。
+          const merged = overlay.mergeEntry(target.worktreeId, loaded, current.entries.find((item) =>
             item.path === loaded.path && item.changes === loaded.changes
-              && item.snapshotRevision === loaded.snapshotRevision ? entry : item),
-        }));
+            && item.snapshotRevision === loaded.snapshotRevision), boundary,
+            Math.max(current.review.seq ?? 0, observedSeq));
+          return overlay.syncProgress({
+            ...current,
+            entries: current.entries.map((item) =>
+              item.path === loaded.path && item.changes === loaded.changes
+                && item.snapshotRevision === loaded.snapshotRevision ? merged : item),
+          });
+        });
       }
       if (superseded()) {
         return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
@@ -1010,11 +1026,12 @@ export function App() {
     }
     const targetActivation = gateRef.current.token().activation;
     const targetRevision = targetSnapshot.revision;
-    const isCurrent = () => reviewEpochRef.current === epoch
-      && worktreeIdRef.current === targetWorktreeId
-      && gateRef.current.token().worktreeId === targetWorktreeId
-      && gateRef.current.token().activation === targetActivation
-      && snapshotRef.current?.revision === targetRevision;
+    /**
+     * 发布与错误清理的判定**全部交给共享生产入口**（`publishReviewSuccess`）。
+     *
+     * 这里只负责如实提供上下文事实；`epoch`（点击代际）只用于错误清理，
+     * 不参与发布判定（ST07-R11-2：更晚执行的真实成功不能被旧点击丢掉）。
+     */
     try {
       const marks = await ipc.setReviewMark({
         worktreeId: targetWorktreeId,
@@ -1032,28 +1049,33 @@ export function App() {
       // 记账 + 合成展示状态都走同一个生产入口：展示**不能**直接用这次回执的集合，
       // 更晚的其它成功操作可能已经记账（B 先执行 seq1、A 后执行 seq2 但 A 的回执先到）
       // （ST07-R10-2 / SP07-R10-2）。错误清理与展示分开，不清掉更新的错误。
-      const { view } = applyReviewSuccessAndCompose({
+      // 记账 → 上下文判定 → 发布/导航，全部走同一个生产入口：
+      // 发布只看上下文（不含点击代际），错误清理仍按点击代际（ST07-R11-2、Q36）。
+      const published = publishReviewSuccess({
         overlay: reviewOverlayRef.current,
         worktreeId: targetWorktreeId,
         reviewed: marks.reviewed,
         marks: marks.marks,
         seq: marks.seq,
         snapshot: snapshotRef.current,
+        context: {
+          worktreeMatches: worktreeIdRef.current === targetWorktreeId,
+          activationMatches: gateRef.current.token().worktreeId === targetWorktreeId
+            && gateRef.current.token().activation === targetActivation,
+          revisionMatches: snapshotRef.current?.revision === targetRevision,
+          epochMatches: reviewEpochRef.current === epoch,
+        },
       });
-      if (!isCurrent()) return null;
-      if (view) {
-        setSnapshot((current) => {
-          if (!current || current.worktreeId !== targetWorktreeId) return current;
-          return {
-            ...current,
-            review: { ...view.review, seq: marks.seq },
-            entries: view.entries,
-          };
-        });
-      }
-      setAppError(null, targetWorktreeId);
+      if (!published.view) return null;
+      const view = published.view;
+      setSnapshot((current) => current && current.worktreeId === targetWorktreeId
+        // 只在 `current` 上合并审阅字段，不覆盖已排队的元数据补全（SP07-R11-4）。
+        ? mergePublishedReview(current, view, marks.seq)
+        : current);
+      if (published.clearError) setAppError(null, targetWorktreeId);
       // 导航与进度用**合成后**的状态，不用后端这次返回的原始集合。
-      return view ? view.review : marks;
+      // `marks` 字段保留后端这次确认的完整状态（含负状态），供调用方诊断。
+      return { ...marks, ...published.navigation };
     } catch (caught) {
       // 失败**始终**记到发起它的 worktree（Q36、Q90）：切走或刷新只影响当前展示，
       // 不能把真实错误丢掉；成功响应才按激活状态隔离。

@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, planReviewResult, readThroughReview } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -536,11 +536,18 @@ test("生产入口真的接入了分界与记账（辅助定位，不当作时�
   const reads = app.match(/readThroughReview\(/g) ?? [];
   assert.ok(reads.length >= 3, `读取入口都要经共享函数，实际 ${reads.length} 处`);
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
-  assert.match(app, /applyReviewSuccessAndCompose\(/, "成功回执必须经唯一记账+合成入口");
-  // 记账必须在展示门禁之前，否则迟到成功会漏账。
-  const recordIndex = app.indexOf("applyReviewSuccessAndCompose({");
-  const gateIndex = app.indexOf("if (!isCurrent()) return null;");
-  assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于展示门禁");
+  assert.match(app, /publishReviewSuccess\(/, "成功回执必须经唯一发布入口");
+  // 发布判定在共享入口里，只取 worktree/activation/revision；epoch 只用于错误清理。
+  assert.match(app, /epochMatches: reviewEpochRef\.current === epoch/, "epoch 只作为上下文事实传入");
+  const gate = await readFile(new URL("../src/lib/refreshGate.ts", import.meta.url), "utf8");
+  const publish = gate.slice(gate.indexOf("export function publishReviewSuccess"), gate.indexOf("export function mergePublishedReview"));
+  assert.match(publish, /const contextValid = worktreeMatches && activationMatches && revisionMatches;/,
+    "发布判定不能含 epochMatches");
+  assert.match(publish, /const clearError = epochMatches && contextValid;/, "错误清理仍按点击代际");
+  // 记账必须在发布门禁之前，否则迟到成功会漏账。
+  const recordIndex = app.indexOf("publishReviewSuccess({");
+  const gateIndex = app.indexOf("if (!published.view) return null;");
+  assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于发布门禁");
   // 写结果也必须用请求前分界，不能在交付时才取。
   const writeIndex = app.indexOf("const reviewRead = reviewOverlayRef.current.beginRead();");
   const writeCall = app.indexOf("await (unstaging ? ipc.unstageHunk : ipc.stageHunk)");
@@ -695,9 +702,9 @@ test("生产入口真的接入：版本取后端 marks、先后取后端 seq（�
   const reads = app.match(/readThroughReview\(/g) ?? [];
   assert.ok(reads.length >= 3, `四个读取入口都要经共享函数，实际 ${reads.length} 处`);
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
-  const recordIndex = app.indexOf("applyReviewSuccessAndCompose({");
-  const gateIndex = app.indexOf("if (!isCurrent()) return null;");
-  assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于展示门禁");
+  const recordIndex = app.indexOf("publishReviewSuccess({");
+  const gateIndex = app.indexOf("if (!published.view) return null;");
+  assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于发布门禁");
 });
 
 // ---------------- 第十轮：取消真值、展示合成、读取水位 ----------------
@@ -764,22 +771,23 @@ test("展示按真实进度合成：B(seq1) 回执晚到不能把 A(seq2) 的已
     review: { paths: ["a.txt", "b.txt", "probe.txt", "other.txt"], reviewed: ["a.txt", "b.txt"], total: 4, reviewedCount: 2, seq: 0 },
   };
   // A 后执行（seq=2，含 A+B 已审），回执先到并记账。
+  const later = marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"],
+    ["probe.txt", null, "w-p"], ["other.txt", "h-o", "w-o"]);
   applyReviewSuccess({
     overlay, worktreeId: "wt-a",
     reviewed: ["a.txt", "b.txt", "probe.txt", "other.txt"],
-    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"],
-      ["probe.txt", null, "w-p"], ["other.txt", "h-o", "w-o"]),
-    seq: 2,
+    marks: later, seq: 2,
   });
-  // B 先执行（seq=1，只含 B），回执后到：直接发布它的集合会把 A 显示成未审。
+  // B 先执行（seq=1，只含 B），回执后到：它的完整确认集合把其余路径都标为未审。
+  const earlier = marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"],
+    cancelled("probe.txt", null, "w-p"), cancelled("other.txt", "h-o", "w-o"));
   applyReviewSuccess({
     overlay, worktreeId: "wt-a",
     reviewed: ["a.txt", "b.txt"],
-    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"]),
-    seq: 1,
+    marks: earlier, seq: 1,
   });
   // 展示必须按真实进度合成：seq2 的结果仍生效。
-  const view = overlay.composeState(current, 1);
+  const view = overlay.composeState(current, earlier, 1);
   assert.equal(reviewedOf(view, "probe.txt"), true, "更晚执行的成功不能被更早的回执显示掉");
   assert.equal(reviewedOf(view, "other.txt"), true);
   assert.equal(view.review.reviewedCount, 4, "导航用的进度也必须按合成结果");
@@ -805,7 +813,8 @@ test("展示合成不回退更晚的取消", () => {
     overlay, worktreeId: "wt-a", reviewed: ["a.txt", "probe.txt"],
     marks: marksOf(["a.txt", "h-a", "w-a"], ["probe.txt", null, "w-p"]), seq: 1,
   });
-  const view = overlay.composeState(current, 1);
+  const confirmedEarlier = marksOf(["a.txt", "h-a", "w-a"], ["probe.txt", null, "w-p"]);
+  const view = overlay.composeState(current, confirmedEarlier, 1);
   assert.equal(reviewedOf(view, "probe.txt"), false, "更晚的取消必须保持");
 });
 
@@ -868,4 +877,200 @@ test("读取水位：版本变化后旧成功同样不生效", () => {
     review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2, seq: 1 },
   }));
   assert.equal(reviewedOf(merged, "probe.txt"), false, "版本变化后旧成功不生效");
+});
+
+// ---------------- 第十一轮：完整聚合负状态、发布代际、getRows 水位 ----------------
+
+test("非目标取消聚合：B 取消(seq1)回执暂缓，A(seq2)回执只含正 A 时 B 仍必须显示未审（ST07-R11-1）", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "a.txt", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+    ],
+    review: { paths: ["a.txt", "b.txt"], reviewed: ["b.txt"], total: 2, reviewedCount: 1, seq: 0 },
+  };
+  // B 的取消 seq=1 已记账（回执暂缓，界面还没更新）。
+  overlay.record("wt-a", "b.txt", bVersions, false, 1);
+  // A 的回执 seq=2 现在到达，它的**完整确认集合**把 B 标为未审。
+  const confirmed = marksOf(["a.txt", "h-a", "w-a"], cancelled("b.txt", "h-b", "w-b"));
+  const { view } = applyReviewSuccessAndCompose({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["a.txt"],           // 后端只列正标记
+    marks: confirmed,
+    seq: 2,
+    snapshot: current,
+  });
+  assert.equal(reviewedOf(view, "b.txt"), false,
+    "完整确认集合里的未审状态必须生效，不能因为它是负状态就忽略");
+  assert.equal(reviewedOf(view, "a.txt"), true);
+  assert.equal(view.review.reviewedCount, 1);
+});
+
+test("非目标取消：即使 B 的 false 记录比 A 的回执序号更小，也不能回退成已审（ST07-R11-1）", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "a.txt", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+    ],
+    review: { paths: ["a.txt", "b.txt"], reviewed: ["b.txt"], total: 2, reviewedCount: 1, seq: 0 },
+  };
+  // B 取消 seq=1 先到并记账。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: [],
+    marks: marksOf(["a.txt", "h-a", "w-a"], cancelled("b.txt", "h-b", "w-b")), seq: 1,
+  });
+  // A 的回执 seq=2 只列正标记 A，聚合集合里 B 也是 false。
+  const confirmed = marksOf(["a.txt", "h-a", "w-a"], cancelled("b.txt", "h-b", "w-b"));
+  const view = overlay.composeState(current, confirmed, 2);
+  assert.equal(reviewedOf(view, "b.txt"), false, "seq 门槛不能把更早的取消丢掉");
+});
+
+test("发布门禁：更晚执行的成功即使点击代际更旧也必须能发布（ST07-R11-2）", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "a.txt", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+    ],
+    review: { paths: ["a.txt", "b.txt"], reviewed: ["b.txt"], total: 2, reviewedCount: 1, seq: 0 },
+  };
+  // B 先执行 seq1 并已显示。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["b.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"]), seq: 1,
+  });
+  // A 后执行 seq2，回执晚到：它的确认集合里 A+B 都已审。
+  const confirmed = marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"]);
+  // 生产入口：contextValid 为真（同 worktree/activation/revision），
+  // clearError 为假（这次点击代际已旧，不能清掉更新的错误）。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["a.txt", "b.txt"],
+    marks: confirmed, seq: 2, snapshot: current,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: false },
+  });
+  assert.equal(reviewedOf(published.view, "a.txt"), true, "更晚执行的真实成功必须能发布");
+  assert.equal(published.view.review.reviewedCount, 2);
+  assert.equal(published.clearError, false, "旧点击不能清掉更新的错误");
+});
+
+test("发布门禁：上下文失效时不发布，但记账仍然完成（不丢真实成功）", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [{ path: "a.txt", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a" }],
+    review: { paths: ["a.txt"], reviewed: [], total: 1, reviewedCount: 0, seq: 0 },
+  };
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["a.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"]), seq: 3, snapshot: current,
+    context: { worktreeMatches: false, activationMatches: true, revisionMatches: true, epochMatches: true },
+  });
+  assert.equal(published.view, null, "上下文失效不发布");
+  assert.equal(published.clearError, false, "上下文失效也不清错误");
+  // 记账已完成：后续读取会被这条记录保护。
+  assert.equal(overlay.get("wt-a", "a.txt").reviewed, true);
+});
+
+test("发布只在 current 上合并审阅字段（生产入口 mergePublishedReview）", () => {
+  const overlay = new ReviewOverlay();
+  const base = {
+    worktreeId: "wt-a",
+    revision: 7,
+    entries: [
+      { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-p", metricsLoaded: false, rowCountSplit: 0 },
+    ],
+    review: { paths: ["U"], reviewed: [], total: 1, reviewedCount: 0, seq: 0 },
+  };
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["U"],
+    marks: marksOf(["U", null, "w-p"]), seq: 1, snapshot: base,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: true },
+  });
+  // React 先排入元数据补全，再应用发布。
+  const current = {
+    ...base,
+    entries: base.entries.map((item) => ({ ...item, metricsLoaded: true, rowCountSplit: 12 })),
+  };
+  const merged = mergePublishedReview(current, published.view, 1);
+  const u = merged.entries.find((item) => item.path === "U");
+  assert.equal(u.metricsLoaded, true, "已排队的元数据补全不能被覆盖");
+  assert.equal(u.rowCountSplit, 12);
+  assert.equal(u.reviewed, true, "审阅字段仍然发布");
+});
+
+test("getRows 水位：失效已超越的旧成功不能在补元数据时复活（ST07-R11-3）", () => {
+  const overlay = new ReviewOverlay();
+  // 旧 v1 成功 seq=1，回执暂缓。
+  overlay.record("wt-a", "U", { head: null, worktree: "w-v1" }, true, 1);
+  // 补元数据的读取发起（boundary 在记录之后取，模拟「旧成功在读取之后才释放」）。
+  const metricsRead = overlay.beginRead();
+  // 当前真值水位 2（v2 失效已推进），版本回到 v1。
+  const loaded = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: true };
+  const current = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, current, metricsRead.boundaryOf(), 2);
+  assert.equal(merged.reviewed, false, "水位 2 已超越 seq=1，旧成功不能复活");
+  assert.equal(merged.metricsLoaded, true, "元数据本身仍要补上");
+});
+
+test("getRows 水位：比水位更新的成功仍然生效", () => {
+  const overlay = new ReviewOverlay();
+  const metricsRead = overlay.beginRead();
+  overlay.record("wt-a", "U", { head: null, worktree: "w-v1" }, true, 3);
+  const loaded = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: true };
+  const current = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: false };
+  const merged = overlay.mergeEntry("wt-a", loaded, current, metricsRead.boundaryOf(), 2);
+  assert.equal(merged.reviewed, true, "比水位更新的成功必须生效");
+});
+
+test("React 发布只在 current 上合并审阅字段，不覆盖已排队的元数据补全（SP07-R11-4）", async () => {
+  // 复现真实 updater 语义：先排入 getRows 的元数据补全，再排入 mark 的发布。
+  const overlay = new ReviewOverlay();
+  const revision = 7;
+  const before = {
+    worktreeId: "wt-a",
+    revision,
+    entries: [
+      { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-p", metricsLoaded: false, rowCountSplit: 0 },
+      { path: "a.txt", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a", metricsLoaded: true, rowCountSplit: 5 },
+    ],
+    review: { paths: ["U", "a.txt"], reviewed: [], total: 2, reviewedCount: 0, seq: 0 },
+  };
+  // mark 回执在**旧快照**上合成（此时 U 的元数据还没补全）。
+  const confirmed = marksOf(["U", null, "w-p"], ["a.txt", "h-a", "w-a"]);
+  const { view } = applyReviewSuccessAndCompose({
+    overlay, worktreeId: "wt-a", reviewed: ["U", "a.txt"],
+    marks: confirmed, seq: 1, snapshot: before,
+  });
+  // React 依次应用：先元数据补全，再发布（发布只改审阅字段）。
+  let current = {
+    ...before,
+    entries: before.entries.map((item) => item.path === "U"
+      ? { ...item, metricsLoaded: true, rowCountSplit: 12 } : item),
+  };
+  const reviewedByPath = new Map(view.entries.map((item) => [item.path, item.reviewed]));
+  current = {
+    ...current,
+    review: { ...view.review, seq: 1 },
+    entries: current.entries.map((item) => {
+      const reviewed = reviewedByPath.get(item.path);
+      return reviewed === undefined || reviewed === item.reviewed ? item : { ...item, reviewed };
+    }),
+  };
+  const u = current.entries.find((item) => item.path === "U");
+  assert.equal(u.metricsLoaded, true, "已排队的元数据补全不能被旧整批 entries 覆盖");
+  assert.equal(u.rowCountSplit, 12, "行数补全不能被覆盖成 0");
+  assert.equal(u.reviewed, true, "审阅字段仍然要正确发布");
+});
+
+test("生产入口接入：发布与错误清理分开、getRows 传水位（辅助定位）", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /epochMatches: reviewEpochRef\.current === epoch/, "epoch 只作为上下文事实传入");
+  assert.match(app, /mergeEntry\([^)]*observedSeq\)/s, "getRows 的合并必须传水位");
+  assert.doesNotMatch(app, /entries: view\.entries/, "发布不能整批覆盖 entries");
 });

@@ -1299,3 +1299,74 @@ fn invalidation_advances_review_seq() {
     assert_eq!(back.review.reviewed_count, 0, "回到 v1 也不复活旧标记");
     assert!(back.review.seq >= after_invalidation.review.seq, "序号不能倒退");
 }
+
+/// ST07-R11-1 / SP07-R11-2：标记回执必须是**完整**的已确认真值——
+/// 当前改动列表里每个可确认路径都给出它这一刻的 reviewed 与绑定版本，
+/// 而不只是本次目标或正标记。否则「聚合回执里某个路径已经未审」这件事会丢失。
+#[test]
+fn mark_reply_confirms_every_path_with_state_and_versions() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.write("b.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    f.write("b.txt", b"changed\n");
+    let session = f.session();
+    session.refresh().unwrap();
+
+    // 先把 B 标记为已审，再取消它（模拟「B 取消回执暂缓」）。
+    session.set_review_mark("b.txt", true, None).unwrap();
+    let cancelled = session.set_review_mark("b.txt", false, None).unwrap();
+    let b_negative = cancelled
+        .marks
+        .iter()
+        .find(|mark| mark.path == "b.txt")
+        .expect("取消目标必须显式出现");
+    assert!(!b_negative.reviewed);
+
+    // 现在标记 A：回执必须同时确认 B 是未审，并带上 B 的绑定版本。
+    let reply = session.set_review_mark("a.txt", true, None).unwrap();
+    let a = reply.marks.iter().find(|mark| mark.path == "a.txt").expect("A 必须在回执里");
+    let b = reply.marks.iter().find(|mark| mark.path == "b.txt")
+        .expect("非目标路径 B 也必须在完整回执里");
+    assert!(a.reviewed, "A 已审");
+    assert!(!b.reviewed, "B 的未审状态必须出现在完整回执里");
+    assert!(b.versions.worktree.is_some(), "B 的负状态必须绑定真实版本");
+    assert_eq!(reply.reviewed, vec!["a.txt".to_string()], "已审集合只列正标记");
+    assert!(reply.seq > cancelled.seq, "序号继续单调递增");
+}
+
+/// 完整回执里的负状态绑定的是**执行时**的版本：之后文件变化，
+/// 这条负状态不能再适用于新版本（版本一变即失效）。
+#[test]
+fn negative_state_binds_the_version_it_confirmed() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.write("b.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    f.write("b.txt", b"changed\n");
+    let session = f.session();
+    let before = session.refresh().unwrap();
+    let b_version = before
+        .entries
+        .iter()
+        .find(|entry| entry.path == "b.txt")
+        .and_then(|entry| entry.worktree_version.clone())
+        .expect("B 必须有工作区版本");
+
+    let reply = session.set_review_mark("a.txt", true, None).unwrap();
+    let b = reply.marks.iter().find(|mark| mark.path == "b.txt").unwrap();
+    assert_eq!(b.versions.worktree.as_deref(), Some(b_version.as_str()));
+
+    // 外部改动 B → 版本变化 → 旧的负状态不再适用。
+    f.write("b.txt", b"changed again\n");
+    let after = session.refresh().unwrap();
+    let b_after = after
+        .entries
+        .iter()
+        .find(|entry| entry.path == "b.txt")
+        .and_then(|entry| entry.worktree_version.clone())
+        .unwrap();
+    assert_ne!(b_after, b_version, "版本必须变化");
+}

@@ -1124,12 +1124,14 @@ impl WorktreeSession {
             .as_ref()
             .ok_or_else(|| AppError::internal("审阅标记存储不可用"))?;
         let _read = self.read_lock.lock().map_err(|_| AppError::internal("读取锁失败"))?;
-        let (versions, snapshot_paths, current_review, confirmed) = {
+        let (versions, snapshot_paths, snapshot_versions, unconfirmed, current_review, confirmed) = {
             let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
             let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
             (
                 snapshot.versions.get(path).cloned(),
                 snapshot.review.paths.clone(),
+                snapshot.versions.clone(),
+                snapshot.unconfirmed.clone(),
                 snapshot.review.clone(),
                 !snapshot.unconfirmed.contains(path),
             )
@@ -1183,20 +1185,27 @@ impl WorktreeSession {
             // 不能是请求时快照或界面当前条目（ST07-R9-3 / SP07-R9-2）。
             let ordered_set: std::collections::HashSet<&str> =
                 ordered.iter().map(String::as_str).collect();
-            let mut marks_out: Vec<review::ReviewMark> = saved
-                .into_iter()
-                .filter(|mark| ordered_set.contains(mark.path.as_str()))
+            // 回执必须是**完整**的已确认真值：对当前改动列表里的每个可确认路径，
+            // 都给出它这一刻的 reviewed（true/false）与执行时绑定的版本
+            // （ST07-R11-1 / SP07-R11-2）。
+            //
+            // 只报正标记会让「聚合回执里某个路径已经未审」这件事丢失：
+            // B 的取消回执被暂缓时，A 的回执只含正标记 A，前端仍以为 B 已审，
+            // 即使 B 的取消已经持久化。取消目标同理（ST07-R10-1）。
+            let marks_out: Vec<review::ReviewMark> = snapshot_paths
+                .iter()
+                .filter(|item| !unconfirmed.contains(*item))
+                .filter_map(|item| {
+                    let versions = snapshot_versions.get(item)?.clone();
+                    Some(review::ReviewMark {
+                        path: item.clone(),
+                        reviewed: ordered_set.contains(item.as_str()),
+                        versions,
+                    })
+                })
                 .collect();
-            // 取消之后目标已从存储删除，必须**显式**返回它这次确认的 false 与版本，
-            // 否则前端拿不到取消的真值，旧读取就能把它重新勾上
-            // （ST07-R10-1 / SP07-R10-1）。
-            if !marked {
-                marks_out.push(review::ReviewMark {
-                    path: path.to_string(),
-                    reviewed: false,
-                    versions: versions.clone(),
-                });
-            }
+            // `saved` 只用于确认写入成功；真值以当前快照 + 版本表为准。
+            drop(saved);
             snapshot.review = ReviewMarks {
                 worktree_id: self.id.clone(),
                 paths: snapshot_paths,

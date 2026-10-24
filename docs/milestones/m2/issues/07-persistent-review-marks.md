@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1171,3 +1171,104 @@ A 等待执行期间 B 可以从 v1 变到 v2 并被标记，旧回执会把 B �
 - 固定本轮产品范围diff-check已独立通过。绑定空白后处理静态可用，未把格式问题算两轴代码发现。
 - 继续同Pi集中修以上链，特别是**完整聚合负状态、成功真值与点击代际分离、getRows水位、React current上只改审阅字段**。回归必须接真实Rust输出和完整生产发布路径，不仅helper。保留新错误/选择/activation/revision隔离与四读取入口；所有改完后集中最小检查、精确暂存、新增提交，禁止未授权amend。
 - 本轮无新版Release/桌面/D06/CI/长测，07退ready-for-agent，05/12不done。全部复核通过后规划方才桌面及仅SSH双平台CI；最终任务11同进程30分钟Q98不省略。
+
+### 2026-10-24 / Pi 实现：任务07 第十一轮限定返修（完整发布链）
+
+只修第十一轮四条；第十轮已闭合的取消 false / 失效推进 seq / 全量读取 apply 水位、四读取入口、跨组、纯暂存保留、重启、未知门禁、activation/revision/选择与新错误留存全部保留。
+
+#### 完整数据流（先核对再改）
+
+```
+Rust set_review_mark（read_lock 内）
+  ├─ store.set_mark / retain_valid → 磁盘
+  ├─ bump_review_seq()            → 真实序号（新增 / 取消 / 失效）
+  └─ ReviewMarks { seq, marks[] } → **完整**：当前改动列表里每个可确认路径
+                                     都有 reviewed(true/false) + 它绑定的版本
+前端 publishReviewSuccess（唯一发布入口）
+  ├─ 记账：record(...)                    ← 含负状态
+  ├─ 合成：composeState(快照, confirmed, seq)
+  │        底座 = 回执的完整确认真值，再叠加 seq 严格更大的本地记录
+  ├─ 发布判定：worktree + activation + revision（**不含点击代际**）
+  └─ 错误清理：epochMatches && contextValid（仍按点击代际）
+React updater → mergePublishedReview(current, view)
+  只在 current 上合并 reviewed 与进度，其余字段（metricsLoaded / 行数）保持 current
+getRows 入口 → mergeEntry(..., boundary, observedSeq)
+  observedSeq = max(current.review.seq, ...)：水位已超越的旧成功不复活
+```
+
+#### ST07-R11-1 / SP07-R11-2（非目标取消聚合仍丢）
+
+Rust 原先只为「本次取消目标」补 false，正标记之外的未审状态一律不返回。
+于是 B 的取消回执被暂缓时，A 的回执只含正标记 A，前端仍以为 B 已审。
+
+现在 `set_review_mark` 的回执是**完整**的：遍历当前改动列表的可确认路径，
+每条都给出这一刻的 `reviewed`（true/false）与**执行时绑定的版本**（取自会话快照的版本表）。
+前端 `composeState` 的底座从「当前界面」改为「回执的完整确认真值」，再叠加序号严格更大的本地记录，
+所以「B 取消 seq1、A 标记 seq2 但 A 回执先到」两者都能正确显示；seq 门槛也不会把更早的取消丢掉。
+
+#### ST07-R11-2 / SP07-R11-1（真实较晚成功仍被点击 epoch 丢掉）
+
+`App` 原先用同一个 `isCurrent()`（含点击代际）挡发布。现在判定收进共享入口
+`publishReviewSuccess`：发布只看 `worktreeMatches && activationMatches && revisionMatches`，
+`epochMatches` **只**参与错误清理。先点 A 再点 B、A 后执行成功但回执晚到时，A 的真实成功照常发布，
+而较新的拒绝提示不会被这次成功清掉。
+
+#### ST07-R11-3 / SP07-R11-3（getRows 仍无水位）
+
+`mergeEntry` 增加 `observedSeq` 参数；`openEntry` 的元数据补全传入
+`max(当前快照 review.seq, …)`。水位已超越的记录不再生效，所以
+「v1 成功 → v2 失效（seq 前进）→ 回 v1 → getRows 捕获未审」时旧成功不会复活。
+
+#### SP07-R11-4（React 整批 entries 覆盖元数据）
+
+新增 `mergePublishedReview(current, view, seq)`：只按路径合并 `reviewed` 与进度，
+其余字段一律保留 `current` 的值。同 revision 已排队的 `metricsLoaded` / 行数补全不会被退回旧值。
+
+#### 回归
+
+- **Rust 真实 Git**：**28 项通过**。新增
+  `mark_reply_confirms_every_path_with_state_and_versions`（非目标路径的负状态必须出现在完整回执里并带版本）、
+  `negative_state_binds_the_version_it_confirmed`（负状态绑定执行时版本）。
+- **Node**：**57 项通过**。新增 9 项覆盖：非目标取消聚合（回执暂缓 / 记录更早两种）、
+  发布门禁不受点击代际限制、上下文失效时记账仍完成、`mergePublishedReview` 只合并审阅字段、
+  React 已排队元数据不被覆盖、getRows 水位（失效超越 / 更新仍生效）、生产入口接入。
+- `cargo test --lib` 100 项通过；`git diff --check` 退出 0。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail |
+| --- | --- | --- | --- | --- |
+| Rust 回执退回只给正标记 + 本次目标 | 101 | — | 26 | 2 |
+| 合成以当前 UI 为底 | 1 | 57 | 52 | 5 |
+| 发布判定加回点击代际 | 1 | 57 | 55 | 2 |
+| getRows 不传水位 | 1 | 57 | 56 | 1 |
+| 发布整批覆盖 entries | 1 | 57 | 56 | 1 |
+
+**第一轮「发布判定加回点击代际」未触发**（当时判定还在 App 里，测试走不到），
+把判定收进共享入口 `publishReviewSuccess` 后重跑才真实失败；两次原件都保留。
+另有一轮 Rust 回退因 `saved`/`drop` 冲突编译失败（pass/fail 无汇总行），也如实保留。
+
+#### 实际执行的检查（最终实现）
+
+日志目录（唯一，原件保留）：`/private/tmp/revia-task07-r12-gQYJ2L`
+
+- 基线：`55a134f17de28a5c851326eb316eb38972fd6ecf`
+- 实现阶段与最终检查阶段分开：最终检查前取 `source-sha256-before-check.txt`，
+  跑完取 `source-sha256-after-check.txt`，两者逐行一致（已 diff 验证）。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm bindings` | 0 | 生成并清理行尾空白 |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 57 / pass 57 / fail 0 |
+| `cargo test --test review_marks` | 0 | 28 passed |
+| `cargo test --lib` | 0 | 100 passed |
+| `git diff --check` | 0 | — |
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：四条场景都未在真实 UI 重放（由规划方复验）。
+- **Windows 未验证**：仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
