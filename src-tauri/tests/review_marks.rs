@@ -1151,3 +1151,84 @@ fn submodule_with_directory_git_dir_tracks_real_version() {
     assert_ne!(second_version, after_entry.worktree_version, "版本必须变化");
     assert_eq!(after.review.reviewed_count, 0, "目录型 .git 下标记也必须失效");
 }
+
+/// ST07-R9-1 / SP07-R9-3：后端返回的**真实提交序号**必须随每次成功写入单调递增，
+/// 且与持久化先后一致；前端据此判定同路径谁最新，不再靠点击次序或回执到达次序。
+#[test]
+fn review_seq_advances_with_real_writes() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.write("b.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    f.write("b.txt", b"changed\n");
+    let session = f.session();
+    session.refresh().unwrap();
+
+    let first = session.set_review_mark("a.txt", true, None).unwrap();
+    let second = session.set_review_mark("b.txt", true, None).unwrap();
+    let third = session.set_review_mark("a.txt", false, None).unwrap();
+    assert!(first.seq > 0, "首次写入必须拿到真实序号");
+    assert!(second.seq > first.seq, "序号必须单调递增");
+    assert!(third.seq > second.seq, "取消同样是一次真实写入");
+
+    // 序号最大的那次写入（取消 a.txt）就是持久状态。
+    assert_eq!(third.reviewed, vec!["b.txt".to_string()]);
+    let reopened = f.session();
+    assert_eq!(
+        reopened.refresh().unwrap().review.reviewed,
+        vec!["b.txt".to_string()],
+        "界面用最大序号显示的状态必须与磁盘一致"
+    );
+}
+
+/// ST07-R9-2 / SP07-R9-1：已有 explicit 记录（取消）后，后来的成功写入
+/// 必须能覆盖它——覆盖只看真实序号，不存在「来源优先级」永久压制。
+#[test]
+fn later_success_overrides_earlier_record_by_real_seq() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    let session = f.session();
+    session.refresh().unwrap();
+
+    let cancel = session.set_review_mark("a.txt", false, None).unwrap();
+    assert!(cancel.reviewed.is_empty());
+    let mark = session.set_review_mark("a.txt", true, None).unwrap();
+    assert!(mark.seq > cancel.seq, "后来的成功写入序号更大");
+    assert_eq!(mark.reviewed, vec!["a.txt".to_string()], "后来的成功必须生效");
+    assert_eq!(session.refresh().unwrap().review.reviewed_count, 1);
+}
+
+/// ST07-R9-3 / SP07-R9-2：返回的 `marks` 必须带**每条标记实际绑定的版本**，
+/// 而不是界面当前或请求时的版本。外部改文件后旧标记失效，返回的版本随之消失。
+#[test]
+fn review_marks_report_their_own_bound_versions() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    let session = f.session();
+    let entry = f.entry(&session, "a.txt");
+    let seen = revia_lib::review::ReviewVersions {
+        head: entry.head_version.clone(),
+        worktree: entry.worktree_version.clone(),
+    };
+    let marks = session.set_review_mark("a.txt", true, Some(seen.clone())).unwrap();
+    let mark = marks
+        .marks
+        .iter()
+        .find(|mark| mark.path == "a.txt")
+        .expect("必须返回已保存的标记");
+    assert_eq!(mark.versions, seen, "返回的版本必须就是这次实际绑定的版本");
+
+    // 外部改文件 → 版本变化 → 标记失效，返回值里不再有它。
+    f.write("a.txt", b"changed again\n");
+    let after = session.refresh().unwrap();
+    assert_eq!(after.review.reviewed_count, 0);
+    assert!(
+        after.review.marks.iter().all(|mark| mark.path != "a.txt"),
+        "失效标记不能出现在 marks 里"
+    );
+}

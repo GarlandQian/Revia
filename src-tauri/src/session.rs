@@ -218,6 +218,11 @@ pub struct WorktreeSession {
     writing: Mutex<bool>,
     /// 审阅标记存储（None 表示未配置，此时界面不显示勾选框）。
     review_store: Option<Arc<ReviewStore>>,
+    /// 审阅标记的**真实提交序号**：每次成功写入在会话内单调递增。
+    ///
+    /// 前端只用它决定同路径谁是最新持久状态，不用点击次序或回执到达次序
+    /// （ST07-R9-1 / SP07-R9-3）。递增发生在 `read_lock` 内，与真实写入同序。
+    review_seq: Mutex<u64>,
     /// 打开会话时捕获的持久身份：审阅标记的归属依据。
     ///
     /// 只在这里捕获一次，避免每次刷新都多起 `git rev-parse` 进程（既有性能边界）。
@@ -304,6 +309,7 @@ impl WorktreeSession {
             instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             writing: Mutex::new(false),
             review_store,
+            review_seq: Mutex::new(0),
             identity: identity.clone(),
         }))
     }
@@ -1024,6 +1030,7 @@ impl WorktreeSession {
 
         let store = self.review_store.as_ref();
         let mut reviewed: Vec<String> = Vec::new();
+        let mut marks_out: Vec<review::ReviewMark> = Vec::new();
         if let Some(store) = store {
             // 只清理确实失效的标记；有效的保留。
             // 存储损坏/不可读/清理写入失败都如实向上报错，不能伪装成「全部未审阅」（Q36）。
@@ -1039,13 +1046,22 @@ impl WorktreeSession {
                 .filter(|path| reviewed_set.contains(path.as_str()))
                 .cloned()
                 .collect();
+            // 只报**仍然有效**的标记，并带上它自己实际绑定的版本：
+            // 前端记账用这些版本，不能拿界面当前条目的版本补（ST07-R9-3）。
+            marks_out = paths
+                .iter()
+                .filter_map(|path| valid.iter().find(|mark| mark.path == *path).cloned())
+                .collect();
         }
+        let seq = *self.review_seq.lock().map_err(|_| AppError::internal("审阅序号锁失败"))?;
         let marks = ReviewMarks {
             worktree_id: self.id.clone(),
             paths: paths.clone(),
             reviewed: reviewed.clone(),
             total: paths.len() as u32,
             reviewed_count: reviewed.len() as u32,
+            seq,
+            marks: marks_out,
         };
         Ok((marks, versions, unconfirmed))
     }
@@ -1064,12 +1080,15 @@ impl WorktreeSession {
                 paths.push(entry.path.clone());
             }
         }
+        let seq = self.review_seq.lock().map(|seq| *seq).unwrap_or_default();
         ReviewMarks {
             worktree_id: self.id.clone(),
             total: paths.len() as u32,
             paths,
             reviewed: Vec::new(),
             reviewed_count: 0,
+            seq,
+            marks: Vec::new(),
         }
     }
 
@@ -1115,7 +1134,14 @@ impl WorktreeSession {
         let identity = self
             .confirmed_identity()
             .ok_or_else(|| AppError::internal("worktree 身份不明确，无法保存审阅标记"))?;
-        store.set_mark(&identity, path, versions, marked)?;
+        let saved = store.set_mark(&identity, path, versions.clone(), marked)?;
+        // 真实提交序号：在 `read_lock` 内、写入成功之后递增，因此序号大小
+        // 与磁盘上的持久化先后严格一致（ST07-R9-1 / SP07-R9-3）。
+        let seq = {
+            let mut seq = self.review_seq.lock().map_err(|_| AppError::internal("审阅序号锁失败"))?;
+            *seq += 1;
+            *seq
+        };
 
         // 更新内存快照里的审阅状态，避免为一次勾选重跑整轮 diff。
         let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
@@ -1139,16 +1165,26 @@ impl WorktreeSession {
             for entry in &mut snapshot.entries {
                 entry.reviewed = reviewed_set.contains(entry.path.as_str());
             }
+            // 每条标记都带它**实际保存的版本**：聚合路径的版本来源只能是这里，
+            // 不能是请求时快照或界面当前条目（ST07-R9-3 / SP07-R9-2）。
+            let ordered_set: std::collections::HashSet<&str> =
+                ordered.iter().map(String::as_str).collect();
+            let marks_out: Vec<review::ReviewMark> = saved
+                .into_iter()
+                .filter(|mark| ordered_set.contains(mark.path.as_str()))
+                .collect();
             snapshot.review = ReviewMarks {
                 worktree_id: self.id.clone(),
                 paths: snapshot_paths,
                 reviewed_count: ordered.len() as u32,
                 total: current_review.total,
                 reviewed: ordered,
+                seq,
+                marks: marks_out,
             };
             return Ok(snapshot.review.clone());
         }
-        Ok(current_review)
+        Ok(ReviewMarks { seq, ..current_review })
     }
 
     fn hunk_actions(&self, entry: &ChangeEntry, file: &git::diff::FileChange) -> Vec<HunkAction> {

@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -915,3 +915,98 @@ Rust 源码本轮未改动，未重跑。
 - 5组敏感性汇总逐项核验：两组A-order各39/38/1，B2-wrong-entry40/39/1；两组B-current-version-fill各39/39/0。后二者是**未触发失败**，不因参数改名或包装函数就说此错误“类型上无法写出”；类型仍接收同结构entries。现有对照和契约后果用例不证明回执版本实际来源。原件和实施叙述均保留，以上为规划方更正边界。
 - 本轮只读静态审查，未另做动态实验或桌面交错。继续原Pi修这三个根契约；允许必要的最小后端/类型调整和受影响真实Git回归，或有等价证明的前端方案。不能用另一组来源优先级、请求序号或参数名替代执行先后和逐路径版本确认。保留不同文件成功不漏账、原四入口、activation/revision/选择、新错误和未知门禁。
 - 全部相关修改后集中受影响检查，失败只重跑相关项，唯一日志保留全部原件，精确暂存/提交m2。07退ready-for-agent、验收未勾；静态全过才规划方固定Release、桌面/D06和SSH双平台CI。05/12不done，最终11长测仍必须执行。
+
+### 2026-10-24 / Pi 实现：任务07 第九轮限定返修（贯通成功回执契约）
+
+只修第九轮三项（两轴各自表述同一批因果）；第七/八轮已闭合的四读取入口、跨组、版本失效、未知门禁、错误留存都保留，未重开 05/12、后端身份与 Windows 路径。
+
+#### 端到端契约（先写清，再实现）
+
+每条被展示或叠加的成功状态，必须能回答三件事：
+
+| 问题 | 第九轮之前 | 第九轮之后 |
+| --- | --- | --- |
+| 由哪次**真实执行**确认 | 前端按点击次序推测 | 后端返回**真实提交序号 `seq`** |
+| 绑定哪个**实际文件版本** | 请求时快照 / 当前条目 | 后端返回的 `marks[].{head,worktree}`（每条标记自己绑定的版本） |
+| 如何阻止旧执行/旧回执倒退 | 固定的 explicit > aggregate 优先级 | 覆盖只看 `seq`：序号更小一律不生效 |
+
+#### ST07-R9-1 / SP07-R9-3（点击次序不是后端执行次序）
+
+`App` 的点击 order 从未进入 Rust，`commands.rs` 各自 `spawn_blocking`，`session.rs` 的锁只串行不保证 FIFO。
+于是两个同文件操作可以乱序执行：后执行的取消成功、先执行的勾选最后落盘为 true，而前端把那次回执当「旧结果」拒记 → 界面 false、重启 true。
+
+现在：`WorktreeSession` 新增 `review_seq: Mutex<u64>`，在 `read_lock` 内、**写入成功之后**递增，
+所以序号大小与磁盘持久化先后严格一致。`ReviewMarks` 增加 `seq` 字段返回给前端。
+前端 `ReviewOverlay.record` 只按 `seq` 决定覆盖，不再有点击次序、也不再有「到达次序」。
+
+#### ST07-R9-2 / SP07-R9-1（来源优先级重新造成漏账）
+
+原先「explicit 永久压 aggregate」：已有 B 取消记录时，后来的聚合确认（A 的全量回执里 B=true）被永久挡住，
+旧读取交付后又把 B 回退成 false。
+
+现在覆盖**只看真实序号**，`source` 概念整体删除：谁真的后执行成功，谁就是最终状态；
+固定优先级不再参与判定。已有 explicit 历史与第一次标记走同一条规则。
+
+#### ST07-R9-3 / SP07-R9-2（请求版本不是聚合确认版本）
+
+原先聚合路径的版本取自 `entriesAtRequest`，但后端只校验目标路径的版本，
+A 等待执行期间 B 可以从 v1 变到 v2 并被标记，旧回执会把 B 记成 v1。
+
+现在 `ReviewMark` 导出到 TS（`src/types/bindings/ReviewMark.ts`），`ReviewMarks.marks` 返回
+**仍然有效的标记及其实际绑定的版本**（只报有效项，失效的不出现）。前端记账只用这份数据，
+请求时快照与当前条目都不再参与版本判定。
+
+#### 改动范围
+
+- Rust：`review.rs`（`ReviewMark` 加 TS 导出、`ReviewMarks` 加 `seq`/`marks`）、
+  `session.rs`（`review_seq`、写入后递增、返回实际绑定标记）。
+- 类型：新增 `src/types/bindings/ReviewMark.ts`，`ReviewMarks.ts` 重新生成。
+- 前端：`refreshGate.ts`（删 `beginMark`/`order`/`source`，`record` 按 `seq`；
+  `planReviewResult`/`applyReviewSuccess` 只接受后端 `reviewed`/`marks`/`seq`）、
+  `App.tsx`（记账改为透传后端返回值）。
+
+#### 回归
+
+- **Node**（`tools/test-refresh-gate.mjs`）：**41 项通过**。第九轮新增/重写：
+  逆序回执（后执行的取消不被迟到的勾选回执覆盖）、顺序回执、来源优先级已取消
+  （已有 explicit 记录时后来的聚合确认仍生效）、聚合版本来自后端 marks（v2 不能被认领成 v1）、
+  同版本时正常生效、版本来源错误的契约后果、跨组去重、生产入口接入（版本取 `marks`、先后取 `seq`，
+  且断言不再有 `entriesAtRequest`/`beginMark`）。
+- **Rust**（`tests/review_marks.rs`，真实 Git）：**24 项通过**。第九轮新增 3 项：
+  `review_seq_advances_with_real_writes`（序号单调递增且与持久化/重启一致）、
+  `later_success_overrides_earlier_record_by_real_seq`（后来的成功覆盖更早的记录）、
+  `review_marks_report_their_own_bound_versions`（返回版本就是实际绑定版本，外部改文件后失效项消失）。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail | 失败用例 |
+| --- | --- | --- | --- | --- | --- |
+| 前端改回按回执到达次序覆盖 | 1 | 41 | 40 | 1 | 逆序回执（ST07-R9-1） |
+| 后端序号不递增（恒 0） | 101 | — | 22 | 2 | `later_success_overrides_earlier_record_by_real_seq`、`review_seq_advances_with_real_writes` |
+| `marks` 返回占位版本 | 101 | — | 23 | 1 | `review_marks_report_their_own_bound_versions` |
+
+三次回退后都恢复了原实现，最终源码 SHA 与检查前一致。
+
+#### 实际执行的检查
+
+日志目录（唯一，原件保留）：`/private/tmp/revia-task07-r10-9TqWoR`
+
+- 基线：`90bcc1955e5ec7e804eaf92055476a2ff470929e`
+- 检查前源码 SHA-256（检查后复核未变）见该目录 `source-sha256-before-check.txt`（8 个文件）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 41 / pass 41 / fail 0 |
+| `cargo test --test review_marks` | 0 | 24 passed / 0 failed |
+
+改了 Rust 核心与共享类型，所以按影响范围跑了受影响真实 Git 套件与前端检查；未跑其它无关 Rust 套件。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：三条场景都未在真实 UI 重放（由规划方复验）。
+- **Windows 未验证**：本轮未触碰 CI01 路径，仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+- r9 的两组 `B-current-version-fill` fail0 原件按规划方要求保留，未改写历史。

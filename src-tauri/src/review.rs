@@ -31,9 +31,14 @@ pub struct ReviewVersions {
     pub worktree: Option<String>,
 }
 
-/// 一条已保存的标记。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// 一条已保存的标记：路径 + **它自己实际绑定的**两个版本。
+///
+/// 前端记账必须用这里返回的版本，不能拿界面当前条目的版本去补
+/// （ST07-R9-3 / SP07-R9-2）：聚合回执里的其它路径，后端只按它们各自
+/// 已保存的版本确认过，请求时快照里的版本不是证据。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct ReviewMark {
     pub path: String,
     #[serde(flatten)]
@@ -54,6 +59,13 @@ pub struct ReviewMarks {
     pub reviewed: Vec<String>,
     pub total: u32,
     pub reviewed_count: u32,
+    /// 这次结果对应的**真实提交序号**：每次成功写入标记在会话内单调递增。
+    ///
+    /// 前端只用它判断先后，不用点击次序或回执到达次序（ST07-R9-1 / SP07-R9-3）：
+    /// 序号最大的那次写入就是持久化的最终状态，界面显示与磁盘一致。
+    pub seq: u64,
+    /// 仍然有效的标记及其**实际绑定的版本**（聚合路径的版本来源，ST07-R9-3）。
+    pub marks: Vec<ReviewMark>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
