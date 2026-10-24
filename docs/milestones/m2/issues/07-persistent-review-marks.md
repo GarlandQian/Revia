@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1574,3 +1574,25 @@ this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
 - **桌面未验证**：容量边界只在生产函数层验证（由规划方复验）。
 - **Windows 未验证**：仍需新 CI。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：任务07第十五轮限定两轴复核，不通过
+
+固定`30faf96cc2afcf8a41ea7b41084cc50516325ea8...fb468c23944f764d7c8fc01ec1ada2e2066e4daa`，唯一实施提交fb468c2。两轴独立只读；原1025条新seq2后旧seq1的成功发布回退静态闭合，但生产读取与重新核对尚未贯通。
+
+#### Standards：确定缺陷2项P2，Fowler判断性建议0项
+
+1. **ST07-R15-1 / P2 / 读取未拒收**：`src/lib/refreshGate.ts:409`不可信读取直接返回传入旧snapshot，readThroughReview继续正常交付；App接收门只比较revision，同revision旧seq0读取可在1025条seq2发布后覆盖新审阅状态。违反`docs/technical-direction.md:53`旧响应隔离。须明确拒收并重新核对，不能用原样返回表示拒绝；逐路径读取也需遵守相同可信度契约。
+2. **ST07-R15-2 / P2 / 刷新信号未接线**：`src/App.tsx:1067`因view为空直接返回，完全未消费needsRefresh。例如旧激活请求后执行seq2、先到账抬高淘汰水位；当前激活请求seq1随后被拒，真实成功不显示也不重读。违反R07-CAP-1明确要求的“拒绝过时发布并重新读取”。接入原目标真实读取通道并保留activation/版本/新错误隔离。
+
+#### Spec：部分实现1项P2，错误实现1项P2，范围扩张0项
+
+1. **SP07-R15-1 / P2 / 部分实现**：R07-CAP-1要求“拒绝过时发布并重新读取”，但`src/App.tsx:1067`遇view:null直接返回，未消费`refreshGate.ts:772`返回的needsRefresh:true。容量后仅拒绝回执，没有真实核对。按原目标调度读取，不能等未来恰有watcher事件才能收敛。
+2. **SP07-R15-2 / P2 / 错误实现**：`src/lib/refreshGate.ts:409`识别读取低于淘汰水位却返回旧snapshot，`:572`继续交付，`src/App.tsx:462`正常接收。旧seq0读取hold→seq2成功覆盖1025路径并淘汰→释放旧读取；同revision门禁仍接收，true回退false。违反`spec.md:116`“旧请求返回不能使内容倒退”。不可信读取必须是明确拒收结果并贯穿调用者。
+
+#### 证据与返修
+
+- [38份原件](../evidence/task07-review15/manifest.json)：32份Pi检查（最终2源码前后SHA一致且匹配fb468c2；Node79、tsc/lint/build、原容量四组复跑退出0），加规划方6份固定fb468c2、默认1025路径的生产readThroughReview/publish/SnapshotGate失败原件，真实退出1、旧读取被门禁接收且finalReviewed=false。没有Git/用户数据/GUI操作，不冒称桌面验收。
+- 敏感性A=78项73过/5失、B首次78/0未触发、C=74/4；补record层用例后B=79项78过/1失。首次null崩溃原件已被Pi删除，仅留实施叙述，不能重建或冒称已保存。后续所有失败日志保留，使用新前缀/目录，不再覆盖或删除初轮原件。
+- 两轴分别2项P2，不合并掩盖。07退ready-for-agent，05/12不变；只修07完整生产接线，全部修改后集中最小检查。现有Node回归须覆盖实际读取→拒收→原目标重读的完整路径，不只断言needsRefresh字段；包括同revision旧读取、逐路径读取和成功回执的接入边界，不写新的外部Git客户端。
+- 仍不Release/GUI/D06/CI/长测/推送/合并。全部复核通过后规划方再固定新版验收，推送仅现有SSH origin。
