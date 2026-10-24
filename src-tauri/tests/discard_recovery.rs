@@ -28,7 +28,19 @@ impl Fixture {
     }
 
     fn new() -> Self {
-        let temp = tempfile::tempdir().unwrap();
+        Self::from_temp(tempfile::tempdir().unwrap())
+    }
+
+    /// 在指定目录下新建 fixture（用于需要保留的桌面数据准备）。
+    fn with_base(base: &Path) -> Self {
+        let temp = tempfile::Builder::new()
+            .prefix("revia-task05-desktop-")
+            .tempdir_in(base)
+            .unwrap();
+        Self::from_temp(temp)
+    }
+
+    fn from_temp(temp: tempfile::TempDir) -> Self {
         let repo = temp.path().join("repo");
         let home = temp.path().join("home");
         fs::create_dir_all(&repo).unwrap();
@@ -2459,4 +2471,217 @@ fn save_as_rejects_stale_expected_owner() {
     .unwrap();
     assert_eq!(bytes, 13);
     assert_eq!(fs::read(&outside).unwrap(), b"saved change\n");
+}
+
+// ---------------- 桌面验收数据准备入口（默认 ignored） ----------------
+
+/// 桌面验收数据准备入口：**只用生产入口**生成可供桌面恢复的回收记录。
+///
+/// 默认 `#[ignore]`，仅显式调用：
+/// `cargo test --test discard_recovery -- --ignored --exact --nocapture prepare_task05_desktop_fixture`
+///
+/// - 自建全新临时 Git 仓库 + 隔离 HOME + 独立 Revia 数据目录，不接受任何外部仓库输入；
+/// - 记录全部由 `WorktreeSession::discard_file` / `discard_hunk` 与 `RecoveryStore` 产生，
+///   不手工伪造 `saved.json` / `outcome.json` / 身份；
+/// - 记录使用**当前时间**（`RecoveryStore::new`），不会在桌面验收前过期；
+/// - 结束时用 `TempDir::keep` 保留本次 fixture，并打印 JSON（路径、身份、记录关联、初始工作区与 index）。
+///
+/// 这是数据准备辅助，**不是验收通过**：只证明数据由生产入口准备，桌面行为尚未验证。
+#[test]
+#[ignore = "桌面验收数据准备入口，仅在显式 --ignored 时运行"]
+fn prepare_task05_desktop_fixture() {
+    // 可选的保留位置（仅测试用）：`REVIA_TASK05_FIXTURE_BASE` 指定后在其下建目录，
+    // 否则用系统临时目录。数据与路径只属于本次创建的 fixture。
+    let base = match std::env::var_os("REVIA_TASK05_FIXTURE_BASE") {
+        Some(value) => PathBuf::from(value),
+        None => std::env::temp_dir(),
+    };
+    fs::create_dir_all(&base).expect("fixture 保留位置必须可创建");
+    let f = Fixture::with_base(&base);
+    let root = f.root();
+    let data_dir = root.join("revia-data");
+    fs::create_dir_all(&data_dir).unwrap();
+
+    // 单 hunk：三段改动，只丢弃中间那一段，记录里保存完整文件。
+    let hunk_path = "src/hunk.ts";
+    f.write(hunk_path, &text(&[]));
+    // 部分暂存：先暂存一段改动，再在工作区继续改，丢弃未暂存部分。
+    let partial_path = "src/partial.ts";
+    f.write(partial_path, &text(&[]));
+    // 二进制。
+    let binary_path = "assets/blob.bin";
+    f.write(binary_path, b"\0old\xff\x01");
+    // 删除状态。
+    let deleted_path = "docs/removed.txt";
+    f.write(deleted_path, b"deleted original content\n");
+    // 可执行位：提交时不可执行，之后只改权限位。
+    let mode_path = "scripts/run.sh";
+    f.write(mode_path, b"#!/bin/sh\ntrue\n");
+    platform::set_executable(&f.repo.join(mode_path), false).unwrap();
+    f.commit();
+
+    // --- 制造未暂存改动（全部走真实工作区写入） ---
+    f.write(hunk_path, &text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    f.write(partial_path, &text(&[(10, 2010)]));
+    f.git(&["add", "--", partial_path]);
+    f.write(partial_path, &text(&[(10, 2010), (80, 2080)]));
+    f.write(binary_path, b"\0new\xfe\x02");
+    fs::remove_file(f.repo.join(deleted_path)).unwrap();
+    platform::set_executable(&f.repo.join(mode_path), true).unwrap();
+
+    let session = f.session();
+    let identity = WorktreeIdentity::capture(&session.git).unwrap();
+    // 当前时间，不用会到期的固定时钟。
+    let store = RecoveryStore::new(data_dir.clone());
+
+    let mut records: Vec<serde_json::Value> = Vec::new();
+
+    // 1) 单 hunk 丢弃：记录保存的是完整文件。
+    {
+        let entry = entry(&session, hunk_path);
+        let rows = session
+            .rows(hunk_path, ChangesKind::Unstaged, ViewMode::Unified, 0, 400)
+            .unwrap();
+        let actions: Vec<_> = rows.rows.iter().filter_map(|row| row.hunk_action.as_ref()).collect();
+        assert_eq!(actions.len(), 3, "hunk 夹具应有 3 段改动");
+        session
+            .discard_hunk(hunk_path, &entry.fingerprint, &entry.snapshot_revision, &actions[1].hunk_id, &store)
+            .expect("单 hunk 丢弃应成功");
+        records.push(serde_json::json!({ "kind": "hunk", "target": hunk_path }));
+    }
+
+    // 2) 部分暂存 + 整文件丢弃未暂存部分。
+    {
+        let entry = entry(&session, partial_path);
+        discard(&session, &entry, &store).expect("部分暂存的整文件丢弃应成功");
+        records.push(serde_json::json!({ "kind": "partialStagedFile", "target": partial_path }));
+    }
+
+    // 3) 二进制整文件丢弃。
+    {
+        let entry = entry(&session, binary_path);
+        discard(&session, &entry, &store).expect("二进制丢弃应成功");
+        records.push(serde_json::json!({ "kind": "binaryFile", "target": binary_path }));
+    }
+
+    // 4) 删除状态：丢弃后文件重新出现。
+    {
+        let entry = entry(&session, deleted_path);
+        discard(&session, &entry, &store).expect("删除状态丢弃应成功");
+        records.push(serde_json::json!({ "kind": "deletedFile", "target": deleted_path }));
+    }
+
+    // 5) 可执行位：丢弃后权限位回到提交时的状态。
+    {
+        let entry = entry(&session, mode_path);
+        discard(&session, &entry, &store).expect("可执行位丢弃应成功");
+        records.push(serde_json::json!({ "kind": "executableMode", "target": mode_path }));
+    }
+
+    // 用生产读取路径取回记录（不是自己拼的 JSON）。
+    let summaries = store.list(Some(&identity)).expect("应能列出本次记录");
+    assert_eq!(summaries.len(), 5, "应生成 5 条回收记录");
+    let mut record_index: Vec<serde_json::Value> = Vec::new();
+    for summary in &summaries {
+        let (record, outcome) = store.read(&summary.id).expect("应能读取记录");
+        let after = match &outcome {
+            Some(DiscardOutcome::Completed { after }) => after.clone(),
+            other => panic!("记录 {} 缺少可信完成回执：{other:?}", summary.id),
+        };
+        assert!(summary.identity_confirmed, "记录身份必须与当前 worktree 匹配");
+        let describe = |files: &[revia_lib::recovery::SavedFile]| -> Vec<serde_json::Value> {
+            files
+                .iter()
+                .map(|file| {
+                    serde_json::json!({
+                        "path": file.path,
+                        "exists": file.content.is_some(),
+                        "bytes": file.content.as_ref().map(|bytes| bytes.len()).unwrap_or(0),
+                        "executable": file.executable,
+                    })
+                })
+                .collect()
+        };
+        record_index.push(serde_json::json!({
+            "recordId": summary.id,
+            "target": record.target,
+            "source": match record.source {
+                RecoverySource::DiscardFile => "discardFile",
+                RecoverySource::DiscardHunk => "discardHunk",
+            },
+            "createdAtMs": record.created_at_ms,
+            "paths": summary.paths,
+            "before": describe(&record.before),
+            "after": describe(&after),
+            "status": "completed",
+        }));
+    }
+
+    // 只登记本次 fixture 的仓库。
+    {
+        let mut registry = revia_lib::settings::Registry::load(
+            data_dir.clone(),
+            Arc::new(CommandLog::default()),
+        );
+        let entry = registry.add(f.repo.to_str().unwrap()).expect("应能登记本次 fixture");
+        assert_eq!(entry.path, identity.worktree_path.display().to_string());
+        let listed = registry.list();
+        assert_eq!(listed.len(), 1, "settings 只登记本次 fixture");
+        assert_eq!(listed[0].path, identity.worktree_path.display().to_string());
+    }
+
+    // 初始工作区与 index 的可还原清单。
+    let worktree_files: Vec<serde_json::Value> = ["src/hunk.ts", "src/partial.ts", "assets/blob.bin", "docs/removed.txt", "scripts/run.sh"]
+        .iter()
+        .map(|path| {
+            let full = f.repo.join(path);
+            let meta = fs::symlink_metadata(&full).expect("工作区文件应存在");
+            let bytes = fs::read(&full).expect("工作区文件应可读");
+            serde_json::json!({
+                "path": path,
+                "exists": true,
+                "bytes": bytes.len(),
+                "sha256": revia_lib::git::fingerprint(&[&bytes]),
+                "executable": platform::executable(&meta),
+            })
+        })
+        .collect();
+    let index_listing = String::from_utf8(f.git(&["ls-files", "--stage"])).unwrap();
+    let head_commit = String::from_utf8(f.git(&["rev-parse", "HEAD"])).unwrap().trim().to_string();
+    let status_now = String::from_utf8(f.git(&["status", "--porcelain=v2"])).unwrap();
+
+    // 保留本次自建 fixture（TempDir::keep），之后所有路径都是真实存在的外部路径。
+    let kept_root = f.temp.keep();
+    let kept_root = fs::canonicalize(&kept_root).unwrap_or(kept_root);
+    let kept_repo = kept_root.join("repo");
+    let kept_data = kept_root.join("revia-data");
+
+    let manifest = serde_json::json!({
+        "purpose": "任务05 桌面验收数据准备（仅生产入口准备；桌面行为尚未验证，不构成验收通过）",
+        "preparedBy": "prepare_task05_desktop_fixture (test-only, #[ignore])",
+        "fixtureRoot": kept_root.display().to_string(),
+        "repositoryPath": kept_repo.display().to_string(),
+        "reviaDataDirectory": kept_data.display().to_string(),
+        "isolatedHome": kept_root.join("home").display().to_string(),
+        "worktreeId": revia_lib::session::id_for_path(&kept_repo),
+        "worktreeIdentity": {
+            "worktreePath": identity.worktree_path.display().to_string(),
+            "gitDir": identity.git_dir.display().to_string(),
+            "commonDir": identity.common_dir.display().to_string(),
+        },
+        "gitVersion": session.info.git_version,
+        "headCommit": head_commit,
+        "indexListing": index_listing,
+        "worktreeFiles": worktree_files,
+        "gitStatusPorcelainV2": status_now,
+        "recoveryRecords": record_index,
+        "desktopSteps": [
+            "启动已构建的 Release 应用，并把数据目录指向 reviaDataDirectory（REVIA_ACCEPTANCE=1 + REVIA_ACCEPTANCE_DIR）",
+            "仓库应显示为唯一登记的 fixture；回收区应列出 5 条 completed 记录",
+            "对每条记录核对：详情两侧状态、单 hunk 记录提示恢复的是完整文件、二进制只显示信息",
+            "按 indexListing 与 worktreeFiles 的 sha256/可执行位还原初始工作区后再重复验证"
+        ],
+        "boundary": "只证明记录由生产入口生成且身份匹配；未验证桌面行为、未做 D06/CI/长测，不构成任务验收。",
+    });
+    println!("REVIA_TASK05_DESKTOP_FIXTURE {}", serde_json::to_string_pretty(&manifest).unwrap());
 }

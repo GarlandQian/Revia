@@ -779,3 +779,50 @@ R05-R6-SP1静态闭合：`src/App.tsx:885`在取得门禁前拒绝忙碌请求�
 - [第六轮Pi原始检查13份文件](../evidence/task05-review07/manifest.json)已按字节归档。规划方核对检查前App.tsx SHA-256与固定e217c1f一致，tsc/lint/build原始退出码均0；gzip还原和每文件原始/存储SHA均通过。上轮实际日志目录更正及13份原件见[原始证据](../evidence/task05-r5-implementation/manifest.json)。
 - 两轴仅静态审查，未改文件、未执行测试/构建/GUI。门禁修复尚无独立运行时对照，不将类型检查冒充交互验收。前轮Rust70+94等仍是各自固定版本的历史检查，不声称本轮全部重跑。
 - 任务保持ready-for-human；接下来规划方固定源码/Release二进制SHA，用新建隔离Git fixture与应用数据做真实桌面：恢复与暂存区不变、后续修改对比/二进制原生另存、旧确认、返回列表busy、跨worktree门禁及迟到错误、重启留证/清理提示等；并完成受影响D06及对应最新双平台CI。全部通过后才done，最终任务11的Q98长测仍单独执行。
+
+### 2026-10-24 / Pi：任务05 桌面验收数据准备入口（test-only）
+
+只新增一个默认 `#[ignore]` 的夹具准备入口，未改产品行为、未改前端、未新增外部客户端。
+
+#### 入口
+
+`src-tauri/tests/discard_recovery.rs::prepare_task05_desktop_fixture`，仅显式调用：
+
+```
+REVIA_TASK05_FIXTURE_BASE=/private/tmp \
+/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml --test discard_recovery \
+  -- --ignored --exact --nocapture prepare_task05_desktop_fixture
+```
+
+- 沿用既有真实 Git `Fixture`（新增 `with_base` 构造，常规测试仍用自动清理的 `Fixture::new`，生命周期未变），隔离 `HOME` / `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_NOSYSTEM`。
+- 独立 Revia 数据目录 `revia-data/`，`RecoveryStore::new` 用**当前时间**（不用会到期的固定时钟）。
+- 5 条记录全部由生产入口 `WorktreeSession::discard_hunk` / `discard_file` 生成，未手工伪造 `saved.json` / `outcome.json` / 身份：
+  1. `src/hunk.ts` — 单 hunk 丢弃（`discardHunk`，记录里是完整文件，5117 → 5115 字节）；
+  2. `src/partial.ts` — 先 `git add` 一段改动再继续改，整文件丢弃未暂存部分（5116 → 5114）；
+  3. `assets/blob.bin` — 二进制（6 → 6 字节，`before`/`after` 内容不同）；
+  4. `docs/removed.txt` — 删除状态（`before` 存在 25 字节，`after` 不存在）；
+  5. `scripts/run.sh` — 可执行位（`before` `executable: true`，`after` `false`）。
+- 用生产读取路径 `store.list` / `store.read` 校验：5 条记录、`identity_confirmed` 全部为真、`outcome` 为 `Completed`。
+- `Registry::load(...).add(repo)` 只登记本次 fixture，`settings.json` 的 `repos` 只有一条。
+- 结束时 `TempDir::keep()` 保留本次 fixture，并打印 `REVIA_TASK05_DESKTOP_FIXTURE {...}` JSON：`fixtureRoot`、`repositoryPath`、`reviaDataDirectory`、`isolatedHome`、`worktreeId`、`worktreeIdentity`（worktree/gitDir/commonDir）、`gitVersion`、`headCommit`、`indexListing`（`git ls-files --stage`）、`worktreeFiles`（路径/字节/SHA-256/可执行位）、`gitStatusPorcelainV2`、`recoveryRecords`（recordId/来源/before/after 关联）与桌面验收步骤。
+- 不接受任何外部仓库输入：路径全部来自本次新建的临时目录。
+
+#### 本次保留的 fixture（实际路径，从 `fixture.json` 读取）
+
+- fixture 根：`/private/tmp/revia-task05-desktop-QsnQlq`
+- 仓库：`/private/tmp/revia-task05-desktop-QsnQlq/repo`
+- Revia 数据目录：`/private/tmp/revia-task05-desktop-QsnQlq/revia-data`
+- worktreeId：`f6ae088e27b40a84`
+
+#### 实际执行的检查
+
+日志目录（从文件读取的实际路径）：`/private/tmp/revia-task05-desktop-prep-WPwb8N`
+
+- 基线：`de8979655f44ceb7531d64e13b6a12a97f7c0417`
+- 检查前 `src-tauri/tests/discard_recovery.rs` SHA-256：`7c5ef012d1d572da1e01c8cb50407797b38215b365c0edc3b281bcbad7f4f132`（运行前后一致）
+- 命令：见上；退出码 `0`，原始输出 `fixture.out` / `fixture.err` / `fixture.exit`，解析出的清单 `fixture.json`
+- 仅运行该 ignored 入口与最小必要编译（`cargo build --tests`），**未**重跑产品/Rust 全套、前端检查、Release、GUI、D06、CI 或长测。
+
+#### 边界
+
+这是**数据准备辅助，不是验收通过**：只证明记录由生产入口生成、身份匹配、数据目录独立且未过期；桌面上的界面行为、恢复交互与 D06/CI 仍待规划方用已有 Release 验证。常规测试仍自动清理临时目录，未改变其默认生命周期。
