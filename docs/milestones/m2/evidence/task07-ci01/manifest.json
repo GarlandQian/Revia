@@ -1,0 +1,218 @@
+{
+  "sourceCommit": "8f95c26c33a4c2883043a0d4041b87c00c763cc6",
+  "ciRun": 40060420970,
+  "url": "https://github.com/GarlandQian/Revia/actions/runs/40060420970",
+  "result": "failure",
+  "actualRustOutputTotals": {
+    "Windows x64 (msvc)": {
+      "passed": 221,
+      "failed": 3,
+      "ignored": 1
+    },
+    "macOS Apple Silicon (arm64)": {
+      "passed": 253,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "failedTests": [
+    "deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed",
+    "packed_refs_symbolic_branch_switch_invalidates_submodule_mark",
+    "submodule_with_directory_git_dir_tracks_real_version"
+  ],
+  "boundary": "Exact8f95c26 compile-only CI: macOS all steps passed; Windows3 review_marks fixtures failed during submodule add with verbatim local source path, release skipped. Windows test execution stops before later suites;221 is observed partial passed count, not whole-suite completion. SSH retry succeeded; prior SSH and HTTPS attempts failed. No persistent Git configuration change. Not desktop acceptance or R07-D1 fix verification.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/full.exit",
+      "stored": "full.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/full.log",
+      "stored": "full.log.gz",
+      "sourceBytes": 240959,
+      "storedBytes": 40583,
+      "sourceSha256": "d97ab5edf66e77a778f2082433143628df21bf29d9b11d5825d0ddb2becf546b",
+      "storedSha256": "345224f642429279d364f3afb971d01ba110974d97bd706dddcf9c230ca46cad"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/full.stderr",
+      "stored": "full.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/https-push-command.json",
+      "stored": "https-push-command.json.gz",
+      "sourceBytes": 399,
+      "storedBytes": 260,
+      "sourceSha256": "a5dfa12571dc73e59a9bc72b4d6824cf21dc5efa9180ac0fb627f6c964a7a617",
+      "storedSha256": "26157825598104761a4186af77674d849531951b8ef386e205087cdf7904dfee"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/https-push.exit",
+      "stored": "https-push.exit.gz",
+      "sourceBytes": 4,
+      "storedBytes": 24,
+      "sourceSha256": "56292515f7d3a7110811eb8de26b3f75f82a0766aa5a1fd66ebcfcb84fe6d5ff",
+      "storedSha256": "b3048637b84e2f4e1be8adc3438eab6b1fe52337568760fb82e6b4bc3240ad2c"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/https-push.stderr",
+      "stored": "https-push.stderr.gz",
+      "sourceBytes": 314,
+      "storedBytes": 241,
+      "sourceSha256": "fd140fb7d582bdac8dd565e1826c0cb7dedf88426153b089c79917b716bc5da6",
+      "storedSha256": "17ea432f9537356cf66218f3331592ca432ea3d551e1c2bcfaa596b2318d232a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/https-push.stdout",
+      "stored": "https-push.stdout.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/push.exit",
+      "stored": "push.exit.gz",
+      "sourceBytes": 4,
+      "storedBytes": 24,
+      "sourceSha256": "56292515f7d3a7110811eb8de26b3f75f82a0766aa5a1fd66ebcfcb84fe6d5ff",
+      "storedSha256": "b3048637b84e2f4e1be8adc3438eab6b1fe52337568760fb82e6b4bc3240ad2c"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/push.stderr",
+      "stored": "push.stderr.gz",
+      "sourceBytes": 314,
+      "storedBytes": 241,
+      "sourceSha256": "fd140fb7d582bdac8dd565e1826c0cb7dedf88426153b089c79917b716bc5da6",
+      "storedSha256": "17ea432f9537356cf66218f3331592ca432ea3d551e1c2bcfaa596b2318d232a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/push.stdout",
+      "stored": "push.stdout.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/source.json",
+      "stored": "source.json.gz",
+      "sourceBytes": 169,
+      "storedBytes": 150,
+      "sourceSha256": "0cc13964de4ff0a13e8d9761f1987be290d329896141c52648a32987b87f878c",
+      "storedSha256": "c5ab8e54c8680bded3b4f44320b51b1223d5b108aa7e8ca01723f1489f986f60"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-initial-status.exit",
+      "stored": "ssh-initial-status.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-initial-status.json",
+      "stored": "ssh-initial-status.json.gz",
+      "sourceBytes": 3,
+      "storedBytes": 23,
+      "sourceSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "storedSha256": "abc129be8d26e8d4afe9ce45f9d5a73c8ed9aa62810ca24ee789fe4581dc4a80"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-initial-status.stderr",
+      "stored": "ssh-initial-status.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-retry-command.json",
+      "stored": "ssh-retry-command.json.gz",
+      "sourceBytes": 256,
+      "storedBytes": 209,
+      "sourceSha256": "b3bff4877db19d97ad391de05d9735a55b8dd7be9de523870c079da07f49cd03",
+      "storedSha256": "a1629d5ec8f695d5598f6db804ed0365abf06b17093e5895c4b24f2dd7da6b5d"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-retry.exit",
+      "stored": "ssh-retry.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-retry.stderr",
+      "stored": "ssh-retry.stderr.gz",
+      "sourceBytes": 66,
+      "storedBytes": 83,
+      "sourceSha256": "cee4b6ee0b68106596e7efe447e0f46c1ccf5415baf5983a3a92ef203d0e72f1",
+      "storedSha256": "632310dc0d17421ba6deb27d63f799d4f44f612fdce3a92e4633b0ddcf4eeb06"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/ssh-retry.stdout",
+      "stored": "ssh-retry.stdout.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/status01.exit",
+      "stored": "status01.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/status01.json",
+      "stored": "status01.json.gz",
+      "sourceBytes": 284,
+      "storedBytes": 228,
+      "sourceSha256": "1085465e9b378c4f366a1b1a32a392a11c9f2c9d45eff943e17854dfb94edb48",
+      "storedSha256": "8bfd78381f21af73e4f241553d650bfabd6ac6565565d37721294a21247e2e50"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/status01.stderr",
+      "stored": "status01.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/status02.exit",
+      "stored": "status02.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/status02.json",
+      "stored": "status02.json.gz",
+      "sourceBytes": 6164,
+      "storedBytes": 783,
+      "sourceSha256": "33d25dd615ed0bcc6f294736bbe77b700070d1b48286cdda9474f2ac764088fc",
+      "storedSha256": "f183b68998e6ad025026c360d009d702d2c4a8f7ef93aae52548a7c5143b434f"
+    },
+    {
+      "source": "/private/tmp/revia-m2-0512-ci-23ts21nh/status02.stderr",
+      "stored": "status02.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

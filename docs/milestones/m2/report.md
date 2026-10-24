@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07第七轮限定复核仍需返修：固定`4915f6d...f93fd2e`，Standards3项P2、Spec4项P2，分别保留[07 Comments](./issues/07-persistent-review-marks.md#comments)。写结果分界过晚、成功变更漏记、未跟踪元数据及重开读取旁路仍可使同版本审阅回退；继续原Pi修，07退ready-for-agent。最终r7c四份源码SHA匹配、五项检查退出0（Node24/Rust21），[38份检查原件](./evidence/task07-review07/manifest.json)含前版r7b且明确不算最终版验证；初始元数据目录已不存在，内容无法独立追溯。[CI40060420970的24份原件](./evidence/task07-ci01/manifest.json)已归档：旧8f95c26 macOS253通过/1ignored及release成功，Windows观察到221通过/3失败/1ignored、后续套件未跑且release跳过。路径转换只是静态闭合，仍需新版CI；后续推送仅用现有SSH origin，不切HTTPS/配置。05/12状态不变，无新版Release/桌面/D06/长测，不done、不合main。
+
 - 任务07真实桌面未通过，退ready-for-agent：固定8f95c26/Release SHA bed7f329，显式hold真实刷新、UI审阅成功3/3后释放，旧刷新回退2/3但持久3标记不变（R07-D1）。[实际观察](./task07-desktop01.md)及[构建/准备/快照/收据](./evidence/task07-desktop01/manifest.json)已归档；原文件/index/回收记录不变，仅声明的新probe，PID24560正常退出、hold显式释放。继续原Pi修交错，复核后重建补验；05/12未done、D06/长测未做。只按用户要求用原SSH成功推送8f95c26，[CI40060420970](https://github.com/GarlandQian/Revia/actions/runs/40060420970)不替代桌面结论。
 
 - 任务07第六轮极小限定复核通过：固定`26947d2...86b26aa`，Standards0/Spec0；本地拒绝也推进代际，旧成功清除新错误的ST07-R5-1静态闭合。[13份前端原件](./evidence/task07-review06/manifest.json)已核验，App源码SHA匹配、tsc/lint/build真实退出0；交错尚未动态复现。07保持ready-for-human、所有验收项未勾；05/07/12静态复核已过，下一步统一固定版本Release、新夹具、真实桌面/D06与最新双平台CI，尚未done、未合并。

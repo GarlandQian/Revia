@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -660,3 +660,36 @@ b5a1556a143e80e0c9253f00de665cfaf64f9f734ed789d91bf3d37e2f9cdcc8  tools/test-ref
 - R07-D1 的 Node 回归是**一次通过**，没有先红后绿的失败记录，不冒称已做敏感性对照。
 - **Windows 未验证**：R07-CI01 只能由规划方下一轮 SSH 推送的新 CI 证明；本机 macOS 无法复现该失败。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：任务07第七轮限定两轴复核，继续返修
+
+固定`4915f6df3f01e90a5053b5da481a754976d2fa6b...f93fd2e281fcd6bd1644c782258bce02758777c5`，唯一提交f93fd2e；只复核R07-D1叠加层/实际接入和R07-CI01夹具路径，不重开先前已闭合05/07/12代码。两轴各自保留结论，不合并计数。
+
+#### Standards：3项P2硬规范/确定缺陷；Fowler建议0项
+
+以下均违反`docs/technical-direction.md:53`的Q89/Q90旧响应隔离及R07-D1契约。
+
+1. **ST07-R7-1 / P2 / 写结果分界取晚**：`src/App.tsx:829`在写结果返回时才取baseline，已有override全被排除。暂存结果延迟交付期间成功勾选，随后仍回退；应在请求发起前保存分界。
+2. **ST07-R7-2 / P2 / 旁路未贯通**：`src/App.tsx:280`直接以旧loaded entry替换未跟踪元数据。getRows等待期间勾选成功，再交付同revision响应，会复位勾选而进度仍保留。`:365`/`:370`重开仓库入口也绕过Overlay；应贯通入口并保留版本校验。
+3. **ST07-R7-3 / P2 / 成功记账受展示代际吞掉**：`src/App.tsx:1019`在record前丢弃较早成功。A/B并发标记时，A成功被丢弃，B响应可显示两者已审阅但只记录B；再交付较早刷新，A仍回退。成功变更记账应与当前展示门禁分离，并保留请求顺序保护。
+
+CI01三处复用`external_path`静态未见违规，Windows仍待新CI。此轴只读固定源码，未运行测试或GUI。
+#### Spec：4项P2
+
+(a)/(c)仍有以下4项缺失或实现错误；(b)未发现范围扩张。共同依据为`spec.md:116`“旧请求返回不能使内容倒退”、实现决策5，以及本任务R07-D1已确认的同版本新增/取消保护。
+
+1. **SP07-R7-1 / P2 / 写结果分界取晚**：固定`src/App.tsx:829`在写结果交付时才取baseline。暂存/取消暂存快照已捕获，再完成同版本审阅变更后释放写结果，此时override序号不大于baseline，仍被回退。应在操作发起前捕获分界并传到结果分支。
+2. **SP07-R7-2 / P2 / 全量成功结果未完整留存**：`src/App.tsx:1019`会拒收较早A的响应；B响应可包含已持久化的A+B，`:1026`显示两者，但`:1030`仅登记B。旧list随后交付只保护B，A仍回退。应按已确认版本保护完整成功变化，保持activation/revision与较新错误隔离，不能简单让所有迟到成功直接改UI。
+3. **SP07-R7-3 / P2 / 未跟踪元数据旁路**：`src/App.tsx:280`用`slice.entry`整条替换同revision的candidate。getRows捕获旧状态，再勾选成功后交付，选择门仍有效，旧entry会回退勾选而进度不回退。仅补需要的元数据，或经同版本审阅合并，避免两处状态分裂。
+4. **SP07-R7-4 / P2 / 重开读取旁路**：`src/App.tsx:370`直接发布rawSnapshot。再次添加当前同一仓库可进入此路径（`settings.rs:96`返回已有登记，`App.tsx:591`重开），旧list捕获、勾选/取消成功、释放读取后仍回退。此入口也应在请求前捕获分界，发布时统一合并。
+
+普通刷新/写后重读的直接路径、版本匹配与跨组叠加静态成立；Windows三处`external_path`转换保留原断言。以上是固定`f93fd2e`静态可达因果，未另做动态实验；helper单测和源码字符串断言不证明生产交错已通过，Windows与桌面仍需复验。
+
+#### 检查原件、CI与返修门槛
+
+- [38份检查原件](../evidence/task07-review07/manifest.json)包含历史r7b的19份与最终r7c的19份；最终四源码SHA逐项匹配f93fd2e，tsc/lint/build、Node24、Rust review_marks21真实退出0。r7b不冒充最终版验证。Pi报告初始r7目录仅元数据且被删除；实查该目录已不存在，无法独立恢复/核实其全部内容。后续运行均保存唯一目录原件。
+- [CI40060420970的24份原件](../evidence/task07-ci01/manifest.json)固定旧8f95c26：macOS253通过/1ignored及release成功；Windows实际已观察221通过/3失败/1ignored，review_marks失败后后续套件未跑、release跳过。三失败均为临时submodule源verbatim路径，修复需新Windows CI确认，不以Mac通过代替。
+- 原SSH首试和HTTPS尝试失败均保留；用户纠正后原SSH重试成功。以后仅用`git@github.com:GarlandQian/Revia.git`的现有origin正常推送m2，不改HTTPS、凭据或持久Git配置。
+- 继续原Pi只修以上生产交错。用现有Node体系验证实际共享生产路径/时序，包括写结果、新增/取消并发成功、未跟踪元数据、重开；保留版本真变化失效、跨组、activation/revision、选择和新错误保护。源码字符串断言只能辅助定位，不当作这些时序的动态证明；不新增框架或重复临时客户端。
+- 07退ready-for-agent、验收复选均未勾。全部相关修改后集中最小检查、精确日志和源码SHA、精确暂存，交回复核；静态全部通过后规划方才重建Release、真实重放/D06及新SSH双平台CI。05/12、最终任务11的同进程30分钟Q98长测不以本轮代替。
