@@ -973,6 +973,10 @@ export function App() {
     const targetWorktreeId = worktreeIdRef.current;
     const targetSnapshot = snapshotRef.current;
     if (!targetWorktreeId || !targetSnapshot) return null;
+    // 代际推进必须在**任何**返回路径之前：本地拒绝也算一次较新的请求，
+    // 否则先前那次请求（例如对 A 的勾选）返回时会通过 `isCurrent`，
+    // 把这里刚显示的更新错误清掉（ST07-R5-1、Q36/Q90）。
+    const epoch = ++reviewEpochRef.current;
     // 版本无法确认时本地就阻止新增认领（SP07-R4-1）：后端也会拒绝，但不必先发一次请求。
     // 取消已有标记不受限制，保留清理能力。
     if (marked && !entry.worktreeVersionConfirmed) {
@@ -981,7 +985,6 @@ export function App() {
     }
     const targetActivation = gateRef.current.token().activation;
     const targetRevision = targetSnapshot.revision;
-    const epoch = ++reviewEpochRef.current;
     const isCurrent = () => reviewEpochRef.current === epoch
       && worktreeIdRef.current === targetWorktreeId
       && gateRef.current.token().worktreeId === targetWorktreeId

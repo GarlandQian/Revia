@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -507,3 +507,43 @@ ST07-R3-1至ST07-R3-3的后端原触发路径静态闭合，未见新增生产�
 - [16份检查原件](../evidence/task07-review05/manifest.json)按原字节归档，4份检查前源码SHA独立匹配88fe98e；tsc/lint/build、Rust review_marks真实退出0，21项通过。未重跑完整Rust；上一轮完整252通过/1ignored只属于b0e27fb。初始失败只有历史叙述，不当作独立动态证明。
 - 07再次退`ready-for-agent`，只交原Pi修ST07-R5-1，避免重构已闭合部分。全部相关修改后仅集中前端tsc/lint/build，保留精确命令、原始stdout/stderr/退出码和源码SHA；纯前端修复不新增测试框架、不重跑无关Rust。
 - 05/12保持原状态；仍未新Release、GUI、D06、新双平台CI或长测。复核全过后才由规划方固定版本验收，不标done。
+
+### 2026-10-24 / Pi 实现：任务07 第五轮限定返修（ST07-R5-1）
+
+只修 ST07-R5-1；第四轮已静态闭合项未重做，未动 05/12/08/13。
+
+#### ST07-R5-1（P2）：本地拒绝也必须进入请求代际
+
+问题（固定源码的确定时序）：`setReviewMark` 里对未知版本的本地拒绝发生在 `++reviewEpochRef.current` **之前**。
+选中未知版本 B 时点击 A 的勾选框（不改变选择），A 的响应尚未返回就对 B 按 ⌥⌘R —— B 在本地报错但没有推进代际，
+随后 A 的成功响应仍通过 `isCurrent`，把 B 这条**较新**的拒绝提示清掉。
+
+修复（`src/App.tsx`，最小改动、只调顺序）：把 `const epoch = ++reviewEpochRef.current;` 提到函数内**所有返回路径之前**（紧跟 worktree/快照可用性检查），本地拒绝分支在其之后。
+这样本地拒绝同样占一个新代际，先前那次请求返回时 `isCurrent()` 为 false，不会清掉新错误。
+
+保持不变：
+- 仍然**不发出**未知版本的新增认领请求（本地直接返回）；
+- 取消已有标记不受限制；
+- 导航顺序、归属、快照/激活隔离、后端契约都未改；
+- 未引入前端测试框架。
+
+#### 实际执行的检查
+
+日志目录（实际路径）：`/private/tmp/revia-task07-r6-lozxBz`
+
+- 基线：`26947d2d5e84c58b7b45ab01e4e344bb5ac60ee0`
+- 检查前 `src/App.tsx` SHA-256（检查后复核未变）：`fdb8e4f15e479d0c110f7155bb172fdc4fd6690c2530420b588062861ba9116a`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | `tsc.out` / `tsc.err` / `tsc.exit` |
+| `pnpm lint` | 0 | `lint.out` / `lint.err` / `lint.exit` |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+
+纯前端修复，按交接要求只跑前端三项；未重跑 Rust、未新增前端测试框架。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：该时序在真实界面上的表现（A 勾选 pending 时对未知 B 按 ⌥⌘R，B 的拒绝提示是否稳定保留）未实测。
+- 本轮**没有**为该时序构造可运行对照，只有静态因果与顺序调整；不冒称已做动态复现或敏感性实验。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
