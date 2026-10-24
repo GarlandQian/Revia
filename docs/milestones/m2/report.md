@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07第四轮复核仍需返修：固定`acdc981...b0e27fb`，Standards1项P2、Spec1项P2和2项P3，分别追加[07 Comments](./issues/07-persistent-review-marks.md#comments)。后端未知门禁、deinit、身份重解析/换行边界已静态闭合；前端禁用未知新增、packed-refs两次留在列表、目录型.git和不同HEAD但目标不变回归仍待原Pi补齐。[17份原始检查](./evidence/task07-review04/manifest.json)已归档、4份源码hash匹配，tsc/lint/build退出0，Rust原始**252通过/1ignored**（实施方251合计算术有误，此处更正、保留历史）。固定临时目录先清理的范围问题已如实记录并收紧唯一分配规则；无法回溯确认原内容。07退ready-for-agent；05/12状态不变，未新Release/桌面/D06/双平台CI/长测。
+
 - 任务12已交付4848265，限定独立两轴静态复核Standards0/Spec0；[16份检查原件](./evidence/task12-review01/manifest.json)已归档、3份源码SHA匹配，tsc/lint/build与Rust247项通过/1夹具ignored。仍ready-for-human，普通/测量模式、字号记忆、环境错误、D06及新版双平台CI尚待07复核全过后统一固定版本验收，不标done。
 
 - 任务07第三轮复核仍未通过：固定`ed0f9b8...ff2fc64`，Standards4项P2、Spec2项P2和1项P3，分别保留在[07 Comments](./issues/07-persistent-review-marks.md#comments)。未知版本新增标记、未初始化子模块、共享身份的内嵌换行路径解析及packed-refs真实回归仍待原Pi修复；旧身份重解析、选择代际、错误留存、完成提示原路径已静态闭合。[原检查与续跑证据](./evidence/task07-review03/manifest.json)已归档，5份源码hash匹配ff2fc64，tsc/lint/build与Rust247通过属该版；保留原build中断、敏感性无独立输出边界。仍未Release/桌面/D06/新双平台CI/长测，07退ready-for-agent。

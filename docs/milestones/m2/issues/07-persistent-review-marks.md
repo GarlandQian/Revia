@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -398,3 +398,31 @@ Rust 合计 **251 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹�
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
 - 未初始化子模块在 Windows 上的 `submodule status` 输出格式未验证。
 - 多进程共享数据目录不在本任务范围。
+
+
+### 2026-10-24 / 规划方：任务07第四轮固定两轴复核，仍需返修
+
+固定 `acdc9817aa36549af5e76df7ac4c8c3933122037...b0e27fbe9a667b3f1233673b0c7b4ab8681936af`，唯一实施提交 b0e27fb。两轴独立静态审查；下列行号均指该固定提交。后端未知版本门禁已闭合，不等于前端同步禁用已完成。
+
+#### Standards：1项P2，Fowler判断性建议0项
+
+1. **ST07-R4-1 / P2 / R3-ST4的针对性回归仍未闭合**：`src-tauri/tests/review_marks.rs:533`将branch-b登记为父仓库gitlink基线，`:571`切回branch-b后sub退出改动列表；`:575`只验进度归零，旧恒定版本实现也能通过。应使用第三个gitlink基线，让两次检出都偏离它，切换前后均断言sub仍在列表、版本不同，再验证标记失效。`:547`仅证明gitDir为目录，子模块`.git`仍是指针文件，不能声称已覆盖目录型`.git`。违反`docs/agents/local-validation.md`执行2和完成条件，以及第三轮ST07-R3-4的明确回归要求。
+
+ST07-R3-1至ST07-R3-3的后端原触发路径静态闭合，未见新增生产缺陷；t13的`<=4`断言未放宽。本轴不将测试缺口当作已复现的生产故障。
+
+#### Spec：1项P2、2项P3；未发现范围扩张
+
+1. **SP07-R4-1 / P2 / 未知版本的前端入口未同步禁用**：`src/components/app/ChangesList.tsx:275`勾选按钮没有基于`worktreeVersionConfirmed`的disabled，`src/App.tsx`的`setReviewMark`与`reviewNextFile`也无对应新增认领门禁。后端会拒绝，但用户仍可反复触发请求和错误；不满足第三轮SP07-R3-1“前端同步禁用，保留取消能力”（本任务Comments:327）。在真实按钮和快捷键/共用入口阻止未知版本新增认领，已有标记仍可取消。不要通过跳过未知文件、改变导航顺序等额外行为绕开本轮要求。
+2. **SP07-R4-2 / P3 / packed-refs断言被离开列表兜底**：`src-tauri/tests/review_marks.rs:533`的父仓库基线就是branch-b；`:571`切回该提交后文件离开列表，reviewedCount为0不足以证明版本变化导致失效，与第三轮返修“两个检出提交都相对gitlink基线保持改动”的说明不符。构造第三基线，并同时断言两次均在列表、版本不同及失效；保持生产session入口。
+3. **SP07-R4-3 / P3 / 两个声称覆盖的场景未真正构造**：`src-tauri/tests/review_marks.rs:537`仍只是指针型`.git`，不是要求的目录型`.git`；`:945`两分支指向同一提交，仅更换引用，未验证“无关HEAD提交变化而目标blob不变”。分别构造真实目录型子模块`.git`，以及两个不同HEAD提交（仅其他文件变化、目标HEAD blob和工作区版本均相同），通过生产标记/刷新验证。对应第三轮及前轮Comments的真实回归要求、`spec.md:107`的文件级版本契约。
+
+两轴分别保留：Standards1项P2；Spec1项P2和2项P3，不合并计数、不互相掩盖。未知版本后端拒绝、deinit识别、gitDir/commonDir双路径重新解析及换行路径边界本轮静态闭合；不反复重构这些生产代码，不把全局HEAD提交号并入文件版本。
+
+#### 原始检查、统计更正与范围
+
+- [17份原始检查及历史](../evidence/task07-review04/manifest.json)已按原字节归档，逐文件源/存储SHA与gzip还原核验；4份检查前源码SHA独立匹配b0e27fb。tsc/lint/build及完整Rust真实退出0。
+- **统计更正**：原始Rust输出实际为**252 passed、1 ignored**（99+71+20+24+15+20+3）；实施方上文、report及原始MANIFEST合计251是算术误述。历史叙述和原始日志保留，此处更正，不重写原件。
+- 新用例初始失败仅有实施方历史叙述，没有独立原始失败输出，不冒称敏感性对照或修复前后动态证明。最终成功日志不补足上述场景设计缺口。
+- Pi上轮先清理再创建`/tmp/t-deinit`和`/tmp/nl-test`，不符合只操作本次创建fixture的范围。无法回溯证明原目录为空；现场保留。后续按[本地验证规范](../../../agents/local-validation.md)先独占创建唯一临时根，只操作有本次创建证据的目录，不清理固定名字路径。
+- 07退回`ready-for-agent`，所有验收项仍未勾。继续原Pi限定返修；先完成相关修改再集中运行最小相关检查（前端tsc/lint/build与Rust review_marks；若确有共享生产变动再按影响范围扩大）。保存精确命令、真实退出码、原始输出和检查前后源码SHA，逐条回复两轴ID，精确暂存。
+- 未构建新Release、未GUI、未D06、新双平台CI或长测。05和12保持原状态，等全部静态复核通过再由规划方固定版本桌面验收；不提前done。
