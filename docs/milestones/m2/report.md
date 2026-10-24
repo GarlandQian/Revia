@@ -4,6 +4,7 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务05当前`ready-for-agent`：固定234f248的[CI40048580349](https://github.com/GarlandQian/Revia/actions/runs/40048580349) macOS全部通过，Windows有5项回收测试失败、release跳过，[完整日志](./evidence/task05-ci01/manifest.json)保留。第二次[普通桌面局部观察](./task05-desktop02.md)已确认R05-D1标签、两次二进制原生另存及旧确认失效；未执行恢复/清空，未完成D06/完整功能验收。07交付后仍交原Pi单独修复CI，复核通过前不继续功能桌面，不以旧版结果补位。
 - 任务05最新`ready-for-human`：804d88d恢复/清空确认标签R05-D1限定两轴0/0，13份原始检查已[归档](./evidence/task05-desktop01-fix/manifest.json)，tsc/lint/build退出0。接着重新构建固定Release与桌面/最新双平台CI；旧de89796测量保留为历史，不倒填到新构建，不据静态标签修复关闭任务。
 - 任务05当前退回`ready-for-agent`：固定de89796 Release普通UI首轮发现恢复/清空最终确认按钮误写“保存到回收区并丢弃”（R05-D1），仅观察后取消、未执行写入，前后工作区/暂存区语义项/记录不变。已[归档原始证据](./evidence/task05-desktop01/manifest.json)，继续原Pi限定修复，复核后再桌面。此前四组自动性能与夹具0/0结论保留，不冒称功能验收完成。
 - 任务05验收准备：de89796固定Release已重新打包，SHA`05316c294400392019e7215cd1f329041d48082fd8d9f527e178a026fed20268`；[四组可见窗口自动测量](./task05-perf01.md)均ok，标准首屏117/111ms、真冷文字DOM5/7ms，60屏无未覆盖，保留23ms慢帧。Pi生产入口桌面夹具在8e8a16b限定两轴0/0，新清单5份原字节SHA一致；原错误证据保留。普通UI/恢复功能桌面和对应双平台CI未完成，仍ready-for-human，不替代任务11最终Q98长测。

@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
-> R05-D1限定两轴复核均0项，tsc/lint/build原始退出0。等待重新构建Release后继续功能桌面及最新双平台CI；任务未done。
+> R05-D1文案已在234f248固定Release桌面复验；该版Windows五项回收测试失败，交Pi返修。局部另存/确认失效通过不等于功能或CI完成，任务未done。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -982,3 +982,22 @@ RecoveryDialogs.tsx:413/455绑定各自准确最终动作，L44的真正丢弃�
 
 - [Pi原始13文件](../evidence/task05-desktop01-fix/manifest.json)逐字节归档并核验。两份源码SHA对应804d88d；原始tsc/lint/build退出码均0，不为纯文案重跑Rust或新增测试框架。
 - 两轴只静态复核及读取已有日志，未运行检查/GUI。修后真实标签、键盘交互及恢复/另存/清空等仍未桌面复验。规划方接着固定新Release、完成对应双平台CI和桌面；旧de89796四组性能仅属于旧二进制，不能倒填为新构建测量。
+
+### 2026-10-24 / Codex：固定234f248的双平台CI结果，Windows未通过
+
+实际推送的提交为`234f248175ada05d44dbf639655e07a2957a9dac`，对应[Compile Check #40048580349](https://github.com/GarlandQian/Revia/actions/runs/40048580349)。macOS Apple Silicon的类型、lint、build、226项Rust测试和release编译通过；Windows类型、lint、build通过，Rust单元93项通过，但`discard_recovery`为52 passed、5 failed、1 ignored，后续测试与release步骤未执行。不能把它写成Windows编译验收通过，也不能引用旧版CI补位。
+
+Windows五项实际失败（下列行号固定于234f248，不跟随正在实施的07漂移）：
+
+1. `publish_rechecks_identity_instead_of_reusing_captured_one`：`src-tauri/tests/discard_recovery.rs:1674`的临时仓库目录rename返回OS code5 / PermissionDenied，尚未运行到预期的身份拒绝断言。日志只能证明fixture操作失败，不能据此推断生产身份校验已失败或已通过。
+2. `save_as_belongs_to_the_target_worktree_and_respects_its_lock`：`Fixture::git`第73行，`git worktree add -b other`收到Windows verbatim路径`\\?\C:\...\linked`，Git返回`Invalid argument`，未运行到目标锁断言。
+3. `save_as_protects_the_target_repository_metadata`：第2180行，合法普通工作区新路径另存也失败。需要保留Git元数据拒绝规则并修复合法目标，不得把所有路径都拒绝当作安全通过。
+4. `save_as_rejects_stale_expected_owner`：第2471行收到`Rejected: 另存路径的上级目录不可访问`。
+5. `save_recovery_command_locks_the_target_worktree`：第2253行收到相同错误。
+
+固定源码`RecoveryStore::prepare_destination`逐个`parent.components()`拼接后立即`symlink_metadata`，需要核对Windows路径prefix与根的完整性；这是定位线索，不能未经Windows实际验证直接宣布根因。复用平台路径边界，保持真实目标归属、逐级链接拒绝、Git真实gitDir/commonDir保护、create_new与写锁，不为过CI跳过Windows用例或放宽断言。测试fixture使用Git接受的真实路径；目录切换场景在Windows必须真的构造身份变化并验证未写入，不把fixture权限失败冒充通过。
+
+原始status和完整双平台日志已取得：`/private/tmp/revia-task05-ci01-61W9Ut`；原字节已[归档](../evidence/task05-ci01/manifest.json)，包含完整双平台日志，不删失败项。当前Pi正在按已满足依赖的任务07实施，规划方不同时改其源码或report。07交付后，将这组CI失败单独交同一Pi会话修复，再做固定增量两轴复核和对应版本CI；05保持未完成，未合并main。
+
+
+固定Release第二次桌面局部结果与限制见[观察报告](../task05-desktop02.md)和[原始证据](../evidence/task05-desktop02/manifest.json)。恢复/清空标签及两次二进制原生另存成功、旧确认失效已实际观察；未执行恢复或清空。PID17852正常退出，唯一工作区变化为预定的外部blob编辑，暂存区和5条回收记录不变。
