@@ -276,10 +276,24 @@ function VirtualRows({
                   type="button"
                   role="checkbox"
                   aria-checked={entry.reviewed}
-                  aria-label={entry.reviewed ? messages.review.unmark : messages.review.mark}
-                  title={entry.reviewed ? messages.review.unmark : messages.review.mark}
+                  aria-label={
+                    entry.reviewed
+                      ? messages.review.unmark
+                      : entry.worktreeVersionConfirmed
+                        ? messages.review.mark
+                        : messages.review.unconfirmed
+                  }
+                  title={
+                    entry.reviewed
+                      ? messages.review.unmark
+                      : entry.worktreeVersionConfirmed
+                        ? messages.review.mark
+                        : messages.review.unconfirmed
+                  }
+                  // 版本无法确认时不能新增认领（SP07-R4-1）；已有标记仍可取消。
+                  disabled={!entry.reviewed && !entry.worktreeVersionConfirmed}
                   tabIndex={-1}
-                  className={`h-4 w-4 shrink-0 rounded-sm border text-[10px] leading-none ${
+                  className={`h-4 w-4 shrink-0 rounded-sm border text-[10px] leading-none disabled:cursor-not-allowed disabled:opacity-40 ${
                     entry.reviewed
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-muted-foreground/40 text-transparent hover:border-muted-foreground"

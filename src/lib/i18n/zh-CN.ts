@@ -74,6 +74,7 @@ export const zhCN = {
     progress: (reviewed: number, total: number) => `已审阅 ${reviewed}/${total}`,
     allReviewed: "全部文件都已审阅",
     saveFailed: "审阅标记保存失败",
+    unconfirmed: "这个文件的版本无法确认，不能标记为已审阅",
   },
   recovery: {
     title: "回收区",

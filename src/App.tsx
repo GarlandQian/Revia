@@ -973,6 +973,12 @@ export function App() {
     const targetWorktreeId = worktreeIdRef.current;
     const targetSnapshot = snapshotRef.current;
     if (!targetWorktreeId || !targetSnapshot) return null;
+    // 版本无法确认时本地就阻止新增认领（SP07-R4-1）：后端也会拒绝，但不必先发一次请求。
+    // 取消已有标记不受限制，保留清理能力。
+    if (marked && !entry.worktreeVersionConfirmed) {
+      setAppError({ kind: "rejected", message: messages.review.unconfirmed }, targetWorktreeId);
+      return null;
+    }
     const targetActivation = gateRef.current.token().activation;
     const targetRevision = targetSnapshot.revision;
     const epoch = ++reviewEpochRef.current;
@@ -1046,6 +1052,7 @@ export function App() {
     const activeEntry = unique.find((entry) => entry.path === active.path);
 
     // 当前文件本身未审阅：先标记它；标记失败则不导航（错误已经显示）。
+    // 版本无法确认时 `setReviewMark` 会在本地拒绝，这里不跳过、不改导航顺序。
     let marks: ReviewMarks | null = null;
     if (activeEntry && !activeEntry.reviewed) {
       marks = await setReviewMark(activeEntry, true);

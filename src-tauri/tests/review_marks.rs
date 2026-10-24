@@ -510,34 +510,55 @@ fn packed_refs_symbolic_branch_switch_invalidates_submodule_mark() {
         String::from_utf8_lossy(&output.stdout).into_owned()
     };
 
-    // 子模块源仓库：main 上一个提交，branch-b 上是另一个提交。
+    // 子模块源仓库：**三个**提交。branch-a 与 branch-b 都不同于父仓库的 gitlink 基线，
+    // 因此两次检出都相对基线保持改动，`sub` 会一直留在改动列表里
+    // （不能靠「切回基线后文件离开列表」让 reviewedCount 归零，那证明不了版本失效）。
     let source = f.root().join("submodule-source");
     fs::create_dir_all(&source).unwrap();
     run(&source, &["init", "-b", "main"]);
     run(&source, &["config", "user.name", "Sub"]);
     run(&source, &["config", "user.email", "sub@example.invalid"]);
     run(&source, &["config", "commit.gpgsign", "false"]);
-    fs::write(source.join("file.txt"), b"one\n").unwrap();
+    fs::write(source.join("file.txt"), b"baseline\n").unwrap();
     run(&source, &["add", "--all"]);
-    run(&source, &["commit", "-m", "one"]);
-    let first_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
-    run(&source, &["checkout", "-b", "branch-b"]);
-    fs::write(source.join("file.txt"), b"two\n").unwrap();
-    run(&source, &["add", "--all"]);
-    run(&source, &["commit", "-m", "two"]);
-    let second_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
-    assert_ne!(first_commit, second_commit);
+    run(&source, &["commit", "-m", "baseline"]);
+    let baseline_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
 
-    // 真实 submodule add，并检出**符号分支**（不是 detached SHA）。
+    run(&source, &["checkout", "-b", "branch-a"]);
+    fs::write(source.join("file.txt"), b"branch a\n").unwrap();
+    run(&source, &["add", "--all"]);
+    run(&source, &["commit", "-m", "a"]);
+    let a_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
+
+    run(&source, &["checkout", "main"]);
+    run(&source, &["checkout", "-b", "branch-b"]);
+    fs::write(source.join("file.txt"), b"branch b\n").unwrap();
+    run(&source, &["add", "--all"]);
+    run(&source, &["commit", "-m", "b"]);
+    let b_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
+    assert_ne!(baseline_commit, a_commit);
+    assert_ne!(baseline_commit, b_commit);
+    assert_ne!(a_commit, b_commit);
+
+    // 真实 submodule add：父仓库 gitlink 记录的是**基线提交**。
+    run(&source, &["checkout", "main"]);
     run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source.to_str().unwrap(), "sub"]);
     f.commit();
     run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
     let sub_dir = f.repo.join("sub");
-    run(&sub_dir, &["checkout", "main"]);
+    let gitlink = run(&f.repo, &["rev-parse", "HEAD:sub"]).trim().to_string();
+    assert_eq!(gitlink, baseline_commit, "父仓库 gitlink 必须是基线提交");
+
+    // 子模块 clone 里创建两个分支（都指向源仓库里不同的提交），
+    // 并检出**符号分支** branch-a（不是 detached SHA）。
+    run(&sub_dir, &["fetch", "--all", "--tags"]);
+    run(&sub_dir, &["branch", "--force", "branch-a", a_commit.as_str()]);
+    run(&sub_dir, &["branch", "--force", "branch-b", b_commit.as_str()]);
+    run(&sub_dir, &["checkout", "branch-a"]);
     let head_text = fs::read_to_string(sub_dir.join(".git")).unwrap();
     assert!(
         head_text.trim().starts_with("gitdir:"),
-        "子模块的 .git 应是指针文件：{head_text:?}"
+        "指针型子模块的 .git 应是指针文件：{head_text:?}"
     );
     let sub_git_dir = {
         let raw = head_text.trim().strip_prefix("gitdir:").unwrap().trim();
@@ -547,33 +568,51 @@ fn packed_refs_symbolic_branch_switch_invalidates_submodule_mark() {
     assert!(sub_git_dir.is_dir(), "子模块的 gitDir 必须是真实目录");
     let sub_head = fs::read_to_string(sub_git_dir.join("HEAD")).unwrap();
     assert!(
-        sub_head.trim().starts_with("ref: refs/heads/"),
+        sub_head.trim().starts_with("ref: refs/heads/branch-a"),
         "子模块 HEAD 必须是符号引用：{sub_head:?}"
     );
 
     // 打包引用，并确认 loose ref 真的消失。
     run(&sub_dir, &["pack-refs", "--all"]);
-    let loose_main = sub_git_dir.join("refs").join("heads").join("main");
-    let loose_b = sub_git_dir.join("refs").join("heads").join("branch-b");
-    assert!(!loose_main.exists(), "pack-refs 后 loose ref 必须消失：{}", loose_main.display());
-    assert!(!loose_b.exists(), "pack-refs 后 loose ref 必须消失：{}", loose_b.display());
+    for name in ["branch-a", "branch-b", "main"] {
+        let loose = sub_git_dir.join("refs").join("heads").join(name);
+        assert!(!loose.exists(), "pack-refs 后 loose ref 必须消失：{}", loose.display());
+    }
     let packed = fs::read_to_string(sub_git_dir.join("packed-refs")).unwrap();
-    assert!(packed.contains("refs/heads/main"), "main 必须进入 packed-refs");
-    assert!(packed.contains("refs/heads/branch-b"), "branch-b 必须进入 packed-refs");
+    for name in ["refs/heads/branch-a", "refs/heads/branch-b"] {
+        assert!(packed.contains(name), "{name} 必须进入 packed-refs");
+    }
 
-    // 生产入口：标记。
+    // 生产入口：标记。两个检出都偏离基线，因此 `sub` 必须始终在改动列表里。
     let session = f.session();
-    assert!(session.refresh().unwrap().entries.iter().any(|e| e.path == "sub"));
+    let before = session.refresh().unwrap();
+    let before_entry = before
+        .entries
+        .iter()
+        .find(|e| e.path == "sub")
+        .expect("branch-a 检出应让 sub 留在改动列表");
+    assert!(before_entry.worktree_version_confirmed, "branch-a 版本必须可确认");
+    let a_version = before_entry.worktree_version.clone();
     session.set_review_mark("sub", true, None).unwrap();
     assert_eq!(session.refresh().unwrap().review.reviewed_count, 1, "标记应生效");
 
-    // 切到另一个同样只存在于 packed-refs 的分支。
+    // 切到另一个同样只存在于 packed-refs 的分支（也偏离基线）。
     run(&sub_dir, &["checkout", "branch-b"]);
     assert!(!sub_git_dir.join("refs").join("heads").join("branch-b").exists());
     let after = session.refresh().unwrap();
+    let after_entry = after
+        .entries
+        .iter()
+        .find(|e| e.path == "sub")
+        .expect("branch-b 检出同样应让 sub 留在改动列表");
+    assert!(after_entry.worktree_version_confirmed, "branch-b 版本必须可确认");
+    assert_ne!(
+        a_version, after_entry.worktree_version,
+        "两个 packed 分支的工作区版本必须不同"
+    );
     assert_eq!(
         after.review.reviewed_count, 0,
-        "packed 分支切换后标记必须失效（不能退化常量版本）"
+        "packed 分支切换后标记必须失效（此时 sub 仍在列表，排除离开列表兜底）"
     );
 }
 
@@ -933,29 +972,170 @@ fn unconfirmed_directory_cannot_be_claimed_but_can_be_unmarked() {
 
 /// Q20：标记按**该文件**的 HEAD 版本 + 工作区版本判定。
 ///
-/// 只切换分支、HEAD 提交变了，但这个文件的两个版本都没变时，标记必须**保留**
-/// （不能因为全局 HEAD 变化就失效，那会偏离既有的文件级版本定义）。
+/// 用两个**真实不同**的 HEAD 提交：只改其他文件，目标文件的 HEAD blob 与工作区字节都没变。
+/// 此时标记必须保留——不能因为全局 HEAD 变化就失效（文件级版本定义，未并入 HEAD 提交号）。
 #[test]
 fn unrelated_head_change_keeps_mark_when_file_versions_unchanged() {
     let f = Fixture::new();
     f.write("a.txt", b"base\n");
-    f.write("b.txt", b"base\n");
+    f.write("other.txt", b"one\n");
     f.commit();
-    // 两个分支指向同一提交（内容完全相同）。
-    f.git(&["branch", "alias"]);
-    f.write("a.txt", b"changed\n");
+    let first_head = f.git(&["rev-parse", "HEAD"]).trim().to_string();
 
+    // 只改 other.txt 并提交（用 pathspec 只提交它，避免把 a.txt 的改动一起提交）：
+    // HEAD 提交变了，但 a.txt 的两个版本都没变。
+    f.write("other.txt", b"two\n");
+    f.git(&["add", "--", "other.txt"]);
+    f.git(&["commit", "-m", "other two"]);
+    let second_head = f.git(&["rev-parse", "HEAD"]).trim().to_string();
+    assert_ne!(first_head, second_head, "必须真的产生两个不同提交");
+
+    // a.txt 的 HEAD blob 在两次提交里相同。
+    let blob_first = f.git(&["rev-parse", &format!("{first_head}:a.txt")]).trim().to_string();
+    let blob_second = f.git(&["rev-parse", &format!("{second_head}:a.txt")]).trim().to_string();
+    assert_eq!(blob_first, blob_second, "a.txt 的 HEAD blob 必须相同");
+
+    // 制造 a.txt 的未暂存改动并标记。
+    f.write("a.txt", b"changed\n");
     let session = f.session();
-    assert!(session.refresh().unwrap().entries.iter().any(|e| e.path == "a.txt"));
+    let entry = session
+        .refresh()
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|e| e.path == "a.txt")
+        .expect("a.txt 应有未暂存改动");
     session.set_review_mark("a.txt", true, None).unwrap();
     assert_eq!(session.refresh().unwrap().review.reviewed_count, 1);
 
-    // 切到另一个分支：HEAD 引用变了，但 a.txt 的 HEAD blob 与工作区字节都没变。
-    f.git(&["checkout", "alias"]);
+    // 再提交一次（同样只提交 other.txt）：HEAD 又变了，a.txt 两版本仍未变。
+    f.write("other.txt", b"three\n");
+    f.git(&["add", "--", "other.txt"]);
+    f.git(&["commit", "-m", "other three"]);
+    let third_head = f.git(&["rev-parse", "HEAD"]).trim().to_string();
+    assert_ne!(second_head, third_head);
+
     let after = session.refresh().unwrap();
+    let after_entry = after
+        .entries
+        .iter()
+        .find(|e| e.path == "a.txt")
+        .expect("a.txt 改动仍在");
+    assert_eq!(after_entry.head_version, entry.head_version, "HEAD 文件版本必须相同");
+    assert_eq!(after_entry.worktree_version, entry.worktree_version, "工作区版本必须相同");
     assert_eq!(
         after.review.reviewed_count, 1,
         "目标文件两个版本都没变时，标记必须保留"
     );
-    assert!(after.entries.iter().find(|e| e.path == "a.txt").unwrap().reviewed);
+}
+
+/// ST07-R4-1 / SP07-R4-3：子模块 `.git` 是**真实目录**时，版本也必须随检出的提交变化。
+///
+/// 指针型 `.git`（`gitdir:` 文件）已有覆盖；这里用 `git submodule add --separate-git-dir`
+/// 之外的标准方式构造：`git -c protocol.file.allow=always submodule add` 之后，
+/// 把子模块的 `.git` 指针**替换为真实目录**（把 gitDir 内容移入 `sub/.git` 并修正 core.worktree）。
+/// 这样父仓库仍把它当子模块（gitlink 条目），而子模块自身用的是目录型 `.git`。
+#[test]
+fn submodule_with_directory_git_dir_tracks_real_version() {
+    let f = Fixture::new();
+    f.write("outer.txt", b"base\n");
+    f.commit();
+
+    let run = |dir: &Path, args: &[&str]| -> String {
+        let output = Command::new("git")
+            .current_dir(dir)
+            .env_clear()
+            .envs(&f.vars)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} 失败：{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).into_owned()
+    };
+
+    let source = f.root().join("dir-git-source");
+    fs::create_dir_all(&source).unwrap();
+    run(&source, &["init", "-b", "main"]);
+    run(&source, &["config", "user.name", "Sub"]);
+    run(&source, &["config", "user.email", "sub@example.invalid"]);
+    run(&source, &["config", "commit.gpgsign", "false"]);
+    fs::write(source.join("f.txt"), b"baseline\n").unwrap();
+    run(&source, &["add", "--all"]);
+    run(&source, &["commit", "-m", "baseline"]);
+    let baseline = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
+    // 两个都偏离基线的提交。
+    for (branch, content) in [("second", "second\n"), ("third", "third\n")] {
+        run(&source, &["checkout", "main"]);
+        run(&source, &["checkout", "-b", branch]);
+        fs::write(source.join("f.txt"), content.as_bytes()).unwrap();
+        run(&source, &["add", "--all"]);
+        run(&source, &["commit", "-m", branch]);
+    }
+    let second = run(&source, &["rev-parse", "second"]).trim().to_string();
+    let third = run(&source, &["rev-parse", "third"]).trim().to_string();
+    assert_ne!(baseline, second);
+    assert_ne!(baseline, third);
+    assert_ne!(second, third);
+
+    // 真实 submodule add（gitlink 指向基线）。
+    run(&source, &["checkout", "main"]);
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source.to_str().unwrap(), "sub"]);
+    f.commit();
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
+    let sub_dir = f.repo.join("sub");
+    let pointer = fs::read_to_string(sub_dir.join(".git")).unwrap();
+    assert!(pointer.trim().starts_with("gitdir:"), "初始应是指针型 .git");
+
+    // 把指针型 `.git` 换成**真实目录**：把 gitDir 内容搬进 `sub/.git` 并修正 core.worktree。
+    let git_dir = {
+        let raw = pointer.trim().strip_prefix("gitdir:").unwrap().trim();
+        let candidate = PathBuf::from(raw);
+        if candidate.is_absolute() { candidate } else { sub_dir.join(candidate) }
+    };
+    let moved = f.root().join("moved-submodule-git");
+    copy_dir(&git_dir, &moved);
+    fs::remove_file(sub_dir.join(".git")).unwrap();
+    copy_dir(&moved, &sub_dir.join(".git"));
+    assert!(sub_dir.join(".git").is_dir(), "子模块 .git 必须是真实目录");
+    assert!(!sub_dir.join(".git").is_file());
+    // 目录型 .git 里 core.worktree 不能指回旧路径。
+    let config = sub_dir.join(".git").join("config");
+    let text = fs::read_to_string(&config).unwrap_or_default();
+    let filtered: String = text
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("worktree ="))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    fs::write(&config, filtered).unwrap();
+
+    // 检出 second（偏离基线，sub 仍在改动列表）。
+    run(&sub_dir, &["checkout", second.as_str()]);
+    let session = f.session();
+    let before = session.refresh().unwrap();
+    let before_entry = before
+        .entries
+        .iter()
+        .find(|e| e.path == "sub")
+        .expect("second 检出应让 sub 留在改动列表");
+    assert!(before_entry.worktree_version_confirmed, "目录型 .git 的版本必须可确认");
+    let second_version = before_entry.worktree_version.clone();
+
+    session.set_review_mark("sub", true, None).unwrap();
+    assert_eq!(session.refresh().unwrap().review.reviewed_count, 1);
+
+    // 切到 third（同样偏离基线）：版本变化 → 标记失效，且 sub 仍在列表。
+    run(&sub_dir, &["checkout", third.as_str()]);
+    let after = session.refresh().unwrap();
+    let after_entry = after
+        .entries
+        .iter()
+        .find(|e| e.path == "sub")
+        .expect("third 检出同样应让 sub 留在改动列表");
+    assert!(after_entry.worktree_version_confirmed);
+    assert_ne!(second_version, after_entry.worktree_version, "版本必须变化");
+    assert_eq!(after.review.reviewed_count, 0, "目录型 .git 下标记也必须失效");
 }

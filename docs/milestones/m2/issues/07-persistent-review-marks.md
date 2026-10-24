@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -14,7 +14,7 @@
 - [ ] ⌥⌘R 只标记、不取消，不能进入 ⌘R 刷新分支；按当前列表顺序寻找下一个未审阅文件，去重、末尾环回、展开目标所在折叠组。
 - [ ] 全部已审阅时留在当前文件并提示；输入框、弹窗、按钮的键盘行为不穿透。
 - [ ] M2 显示审阅进度，不提前实现提交或以标记阻止后续提交；真实 Git 持久化验证与桌面导航检查通过。
-  - 真实 Git 持久化已由 `review_marks` **20** 项通过（含真实符号分支 + packed-refs 子模块、deinit/init、gitDir 与 commonDir 改指、换行路径身份、未确认版本拒绝、并发事务、所见版本、存储损坏）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
+  - 真实 Git 持久化已由 `review_marks` **21** 项通过（含真实符号分支 + packed-refs 子模块、deinit/init、gitDir 与 commonDir 改指、换行路径身份、未确认版本拒绝、并发事务、所见版本、存储损坏）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
 
 ## Comments
 
@@ -426,3 +426,63 @@ ST07-R3-1至ST07-R3-3的后端原触发路径静态闭合，未见新增生产�
 - Pi上轮先清理再创建`/tmp/t-deinit`和`/tmp/nl-test`，不符合只操作本次创建fixture的范围。无法回溯证明原目录为空；现场保留。后续按[本地验证规范](../../../agents/local-validation.md)先独占创建唯一临时根，只操作有本次创建证据的目录，不清理固定名字路径。
 - 07退回`ready-for-agent`，所有验收项仍未勾。继续原Pi限定返修；先完成相关修改再集中运行最小相关检查（前端tsc/lint/build与Rust review_marks；若确有共享生产变动再按影响范围扩大）。保存精确命令、真实退出码、原始输出和检查前后源码SHA，逐条回复两轴ID，精确暂存。
 - 未构建新Release、未GUI、未D06、新双平台CI或长测。05和12保持原状态，等全部静态复核通过再由规划方固定版本桌面验收；不提前done。
+
+### 2026-10-24 / Pi 实现：任务07 第四轮复核返修（R07-R4）
+
+只修本轮 4 条；未动 05/12/08/13。已闭合的后端未知门禁、deinit 识别、身份双路径/换行解析、选择代际、错误留存、完成提示均未反复重构。
+
+#### ST07-R4-1 / SP07-R4-2（P2/P3）：packed-refs 回归真正触发目标情形
+
+原用例把 branch-b 当作父仓库 gitlink 基线，切回去后 `sub` 离开改动列表，`reviewedCount=0` 无法证明版本失效。
+
+现在改为**三个提交 + 第三个 gitlink 基线**：源仓库有 baseline / branch-a / branch-b 三个提交，父仓库 gitlink 记录 baseline；子模块 clone 里 `fetch` 后 `branch --force` 建出两个分支（都不同于 baseline），检出符号分支 branch-a → `pack-refs --all` → 断言三条 loose ref 全部消失且两条分支都在 `packed-refs` 里 → 生产 `set_review_mark` 标记 → 切到 branch-b。
+断言：
+- 标记**前**：`sub` 在改动列表、`worktreeVersionConfirmed=true`、记录 a 版本；
+- 切换**后**：`sub` **仍在**改动列表（两个检出都偏离基线）、`worktreeVersionConfirmed=true`、b 版本与 a 版本**不同**；
+- 最后才是 `reviewedCount == 0`。
+
+这样「离开列表」这条兜底被排除，只有版本解析真正变化才能通过。
+
+#### ST07-R4-1 / SP07-R4-3（P3）：目录型子模块 `.git` 与真实不同 HEAD 提交
+
+- `submodule_with_directory_git_dir_tracks_real_version`：真实 `submodule add` 后，把指针型 `.git` 指向的 gitDir **内容搬进 `sub/.git`** 成为**真实目录**（并清掉 `core.worktree`），断言 `sub/.git` 是目录、不是文件；再检出两个都偏离父仓库 gitlink 基线的提交（second → third），经生产 session 标记与刷新，断言版本可确认、版本变化、标记失效，且 `sub` 两次都在改动列表。保留原有指针型覆盖，未写第二套 Git 语义（版本仍由 `git submodule status` 提供）。
+- `unrelated_head_change_keeps_mark_when_file_versions_unchanged`：改为**两个真实不同提交**（只 `git add -- other.txt` 后提交，`a.txt` 的改动不被带走）。断言两次 HEAD 提交号不同、`a.txt` 的 HEAD blob 相同、`head_version` 与 `worktree_version` 都相同、标记**保留**。未把全局 HEAD 提交号并入文件版本。
+
+#### SP07-R4-1（P2）：未知版本的前端入口同步禁用
+
+- `ChangesList` 勾选框：`disabled={!entry.reviewed && !entry.worktreeVersionConfirmed}`，并加 `disabled:cursor-not-allowed disabled:opacity-40`；label/title 在不可认领时显示新增的集中文案 `messages.review.unconfirmed`（「这个文件的版本无法确认，不能标记为已审阅」）。**已有标记仍可取消**。
+- `App.setReviewMark`：`marked && !entry.worktreeVersionConfirmed` 时**本地**就 `setAppError` 并返回 `null`，不发请求。⌥⌘R 走同一个 `setReviewMark`，因此同样被本地阻止；导航契约未改（不跳过未知文件、不改顺序），只是标记失败时不导航。
+
+#### 实际执行的检查
+
+日志目录（实际路径）：`/private/tmp/revia-task07-r5-DuKxL1`
+
+- 基线：`4f5cb0835cb8ff11f5114455c44daec49f968b70`
+- 检查前源码 SHA-256（检查后复核未变）：
+
+  - `5358ed6ffb5f35aae6ea60964369f8ec5c083c6f34af22f41c172b8e12c064a6  src/App.tsx`
+  - `cb2a851f9d79d9f163c0f5240abf5981328fc1fb1c31a3f3568f7dbbc0f45b6a  src/components/app/ChangesList.tsx`
+  - `1fe07cf3f4b2bddc36de3a58d5a8d4ecbfaaa6df03c9379ec8c0f2b122f9672a  src/lib/i18n/zh-CN.ts`
+  - `e668991fef6315d2a96866ded4fefa594ce8661e30471d59e687bca15eb1811d  src-tauri/tests/review_marks.rs`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | `tsc.out` / `tsc.err` / `tsc.exit` |
+| `pnpm lint` | 0 | `lint.out` / `lint.err` / `lint.exit` |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+| `cargo test --manifest-path src-tauri/Cargo.toml --test review_marks` | 0 | `review_marks.out` / `.err` / `.exit`（**21 passed**） |
+
+本轮未改共享生产代码（只改前端入口与测试），因此按交接要求只跑 `review_marks` 与前端三项，未重跑完整 Rust。
+**统计更正**：上一轮完整 Rust 原始输出为 **252 passed / 1 ignored**（99+71+20+24+15+20+3），我上轮报告里的 251 是算术误述，以原始日志为准。
+
+#### 失败历史
+
+本轮三处新用例先失败、随后修好，原因都是**用例设计**而非产品缺陷（详见 `MANIFEST.md`）：
+`f.commit()` 把目标文件改动一起提交导致离开列表；检出基线提交与 gitlink 一致导致离开列表、以及用普通 clone 替换后父仓库不再视为子模块；`pack-refs --all` 前分支还没在子模块 clone 里创建。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：勾选框禁用态的实际观感与 tooltip、⌥⌘R 在未知版本文件上的实际行为、其余既有桌面项。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
+- 未初始化子模块在 Windows 上的 `submodule status` 输出格式未验证。
+- 多进程共享数据目录不在本任务范围。
