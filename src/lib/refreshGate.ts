@@ -419,7 +419,15 @@ export class ReviewOverlay {
     if (override && override.seq > baseSeq
       && override.versions.head === head && override.versions.worktree === worktree) {
       reviewed = override.reviewed;
+      baseSeq = override.seq;
     }
+    // **持有**这次已接受的真值（ST07-R13-1 / SP07-R13-1）。
+    //
+    // 只把结果写回界面布尔值是不够的：之后的 `composeState`/`apply` 需要知道
+    // 「这条路径已经观察到哪一步」，否则一份更旧的全量回执会用它自己的底座
+    // 把这次读取到的状态覆盖回去。记录带**该路径**的版本与真实序号，
+    // 所以它只影响这条路径，不会把单文件水位当成整快照已确认。
+    this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
     return reviewed === loaded.reviewed ? loaded : { ...loaded, reviewed };
   }
 

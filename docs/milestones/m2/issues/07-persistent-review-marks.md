@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1388,3 +1388,82 @@ Rust 原先只为「本次取消目标」补 false，正标记之外的未审状
 - 5份敏感性输出实际为Node63/1、64/0未触发、64/1、62/2和Rust28/2。未触发的首轮B-current-wins保留；补无override变体后才真实触发，不将首轮未触发抹掉或算成通过敏感性。
 - 继续原Pi仅修读取真值的跨入口持有：不只让mergeEntry取对值，还要让后续compose/最终发布知道它已观察到哪一步。两种方向（已读到true/false）及旧v1→v2→v1失效均保留，注意单文件水位不能冒充整个快照的确认进度。用现有Node/Rust生产入口回归，不新框架/重复外部客户端。
 - 全部修改后集中最小检查、精确暂存、新增提交、保留失败和前后最终SHA，不amend。07退ready-for-agent，05/12不done。无新版Release/桌面/D06/CI/长测，复核全过后规划方才桌面与仅SSH双平台CI；最终11同进程30分钟Q98仍必需。
+
+### 2026-10-24 / Pi 实现：任务07 第十三轮限定返修（持有已接受的逐路径读取真值）
+
+只修第十三轮一项（两轴是同一缺口的两个方向）；导航强补、`RowSlice` 同锁 `review_seq`、
+一次 `mergeEntry` 双水位等已闭合项未重做。
+
+#### 缺口
+
+`mergeEntry` 之前只把结果**写回界面布尔值**，没有把「这条路径已经观察到哪一步」留下来。
+于是之后的 `composeState`/`apply` 仍以旧回执的底座为准：
+
+- **true 方向**：A 的 seq1 完整回执（含 B=false）hold → B 新增 seq2 hold →
+  打开未跟踪 B，getRows 读到 B=true/seq2 并显示 → 旧 A 释放，合成又用 B=false(seq1) 覆盖它。
+- **false 方向**：U 新增 seq1 hold → A 的 seq2 先显示（含 U=true）→ U 取消 seq3 hold →
+  首次打开 U，getRows 读到 false/seq3 并取消 UI → 旧 seq1 释放后重新合成 true。
+
+#### 修复
+
+`mergeEntry` 在算出这条路径的最终真值后，**把它持有到同一层带版本的真值里**：
+
+```ts
+this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
+```
+
+`baseSeq` 是这一侧实际确认的水位（`loadedSeq` / `currentSeq` / 更晚 override 的 `seq` 三者中真正胜出的那个）。
+记录带**该路径**的版本与真实序号，所以：
+
+- 后续 `composeState` 以回执确认真值为底时，会比这条记录与回执的 `seq`，
+  更旧的回执不能把它改回去；
+- `apply` 仍然按**快照**水位判断（`observedSeq >= override.seq` 就不叠加），
+  单文件水位不会被当成整快照已确认——别的路径仍按各自真值走；
+- 更晚的有效写结果（`seq` 更大）照常胜出，不是固定优先级。
+
+#### 回归
+
+- **Node**：**70 项通过**。第十三轮新增 5 项，全部走真实生产入口
+  （先 `mergeEntry` 接受真实 getRows 结果，再 `publishReviewSuccess` 交付更旧的全量成功）：
+  true 方向、false 方向、单文件水位不冒充整快照（B 读到 seq5 而 C 未被读，seq4 回执仍对 C 生效）、
+  更晚有效写结果仍覆盖读取观察、v1→v2→v1 失效仍不被旧成功复活。
+- **Rust 真实 Git**：**31 项通过**。新增 `row_slice_review_seq_is_per_path_not_whole_snapshot`：
+  只标记 a 后读取 b，`review_seq` 报快照进度但 b 的 entry 仍是未审；读取 a 则已审；
+  取消后两条读取都跟到新水位。
+- `cargo test --lib` 100 项通过；`git diff --check` 退出 0。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail |
+| --- | --- | --- | --- | --- |
+| 不持有读取真值（只写回 UI 布尔值） | 1 | 70 | 67 | 3 |
+| 持有但用 0 当水位 | 1 | 70 | 67 | 3 |
+| 持有记录绕过快照水位判断（单文件水位冒充整快照） | 1 | 70 | 69 | 1 |
+
+第三组证明：把单文件水位提升成整快照水位会破坏原有的全量语义，所以本轮的持有记录
+只按路径比较，不改 `apply` 的快照水位判定。
+
+#### 实际执行的检查（最终实现）
+
+日志目录（唯一，原件保留）：`/private/tmp/revia-task07-r14-doYTox`
+
+- 基线：`574660444e385f641df93c89d083acacbe1ecd7f`
+- 最终检查前后源码 SHA 逐行一致（`source-sha256-before-check.txt` / `-after-check.txt`）。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 70 / pass 70 / fail 0 |
+| `cargo test --test review_marks` | 0 | 31 passed |
+| `cargo test --lib` | 0 | 100 passed |
+| `git diff --check` | 0 | — |
+
+本轮未改 Rust 生产代码与绑定，未重跑 `pnpm bindings`。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：两个方向都未在真实 UI 重放（由规划方复验）。
+- **Windows 未验证**：仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。

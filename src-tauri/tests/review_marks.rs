@@ -1419,3 +1419,40 @@ fn row_slice_review_seq_tracks_invalidation() {
     assert_eq!(slice.review_seq, after.review.seq, "取行必须报失效后的水位");
     assert!(!slice.entry.reviewed, "失效后 entry 未审");
 }
+
+/// ST07-R13-1 / SP07-R13-1：`RowSlice` 携带的 `review_seq` 必须是**该路径**的真实
+/// 审阅进度——它可以让前端持有「这条路径已观察到哪一步」，
+/// 但不能被当成整个快照都已确认（其它路径未必被读过）。
+#[test]
+fn row_slice_review_seq_is_per_path_not_whole_snapshot() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.write("b.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    f.write("b.txt", b"changed\n");
+    let session = f.session();
+    session.refresh().unwrap();
+
+    // 只标记 a.txt：序号 1。
+    let marked = session.set_review_mark("a.txt", true, None).unwrap();
+    let seq_a = marked.seq;
+
+    // 读取 b.txt：它的 entry 未审，`review_seq` 报的是快照当前进度（含 a 的写入），
+    // 但**不能**据此认为 b 已被确认到该序号——b 自己的状态由 `entry.reviewed` 决定。
+    let slice_b = session.rows("b.txt", ChangesKind::Unstaged, ViewMode::Unified, 0, 1).unwrap();
+    assert_eq!(slice_b.review_seq, seq_a, "读取水位反映快照进度");
+    assert!(!slice_b.entry.reviewed, "但 b 自己的状态仍是未审");
+
+    // 读取 a.txt：同一水位，entry 已审。
+    let slice_a = session.rows("a.txt", ChangesKind::Unstaged, ViewMode::Unified, 0, 1).unwrap();
+    assert_eq!(slice_a.review_seq, seq_a);
+    assert!(slice_a.entry.reviewed);
+
+    // 再取消 a：序号前进，两条路径的读取都跟到新水位。
+    let cancelled = session.set_review_mark("a.txt", false, None).unwrap();
+    assert!(cancelled.seq > seq_a);
+    let after = session.rows("a.txt", ChangesKind::Unstaged, ViewMode::Unified, 0, 1).unwrap();
+    assert_eq!(after.review_seq, cancelled.seq);
+    assert!(!after.entry.reviewed, "取消后 entry 未审");
+}

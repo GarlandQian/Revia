@@ -1196,3 +1196,132 @@ test("getRows 真实读取水位：回执尚未到达时也必须以后端读取
   assert.equal(merged.reviewed, true,
     "后端读取水位更大，旧界面未审不能覆盖它（否则界面与磁盘长期不一致）");
 });
+
+// ---------------- 第十三轮：持有已接受的逐路径读取真值 ----------------
+// 两个方向都必须「先接受真实 getRows 结果，再交付更旧的全量成功」。
+
+test("读取真值持有（true 方向）：getRows 读到 B 已审后，旧全量回执不能把它改回未审（SP07-R13-1）", () => {
+  const overlay = new ReviewOverlay();
+  const snapshot = {
+    worktreeId: "wt-a",
+    revision: 9,
+    entries: [
+      { path: "A", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false },
+    ],
+    review: { paths: ["A", "B"], reviewed: ["A"], total: 2, reviewedCount: 1, seq: 0 },
+  };
+  // 打开未跟踪 B：后端 getRows 实际读到 **已审**，reviewSeq = 2（B 的标记 seq2）。
+  const loaded = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  const current = snapshot.entries.find((entry) => entry.path === "B");
+  const merged = overlay.mergeEntry("wt-a", loaded, 2, current, 0);
+  assert.equal(merged.reviewed, true, "getRows 读到的已审必须先被接受");
+  // 旧 A 回执（seq1，完整状态里 B 是 false）现在才交付。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["A"],
+    marks: marksOf(["A", "h-a", "w-a"], cancelled("B", null, "w-b")),
+    seq: 1,
+    snapshot,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: false },
+  });
+  assert.equal(reviewedOf(published.view, "B"), true,
+    "已接受的读取真值（B 已审、seq2）不能被更旧的回执（seq1）改回未审");
+});
+
+test("读取真值持有（false 方向）：getRows 读到 U 已取消后，旧全量回执不能把它改回已审（ST07-R13-1）", () => {
+  const overlay = new ReviewOverlay();
+  const snapshot = {
+    worktreeId: "wt-a",
+    revision: 9,
+    entries: [
+      { path: "U", reviewed: true, headVersion: "h-u", worktreeVersion: "w-u", metricsLoaded: false },
+      { path: "A", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+    ],
+    review: { paths: ["U", "A"], reviewed: ["U", "A"], total: 2, reviewedCount: 2, seq: 2 },
+  };
+  // U 的新增 seq1 回执 hold；A 的 seq2 先发布（完整状态含 Utrue）。
+  overlay.record("wt-a", "U", { head: "h-u", worktree: "w-u" }, true, 2);
+  overlay.record("wt-a", "A", { head: "h-a", worktree: "w-a" }, true, 2);
+  // U 取消 seq3 回执 hold（前端还没拿到）。
+  // 首次打开 U：后端 getRows 读到 **未审**，reviewSeq = 3。
+  const loaded = { path: "U", reviewed: false, headVersion: "h-u", worktreeVersion: "w-u", metricsLoaded: true };
+  const current = snapshot.entries.find((entry) => entry.path === "U");
+  const merged = overlay.mergeEntry("wt-a", loaded, 3, current, 2);
+  assert.equal(merged.reviewed, false, "getRows 读到的取消必须先被接受");
+  // 旧 seq1 回执（Utrue）现在才交付。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["U"],
+    marks: marksOf(["U", "h-u", "w-u"]),
+    seq: 1,
+    snapshot,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: false },
+  });
+  assert.equal(reviewedOf(published.view, "U"), false,
+    "已接受的读取真值（U 已取消、seq3）不能被更旧的回执（seq1）改回已审");
+});
+
+test("读取真值持有：读取水位不能冒充整快照已确认（别的路径仍按各自真值）", () => {
+  const overlay = new ReviewOverlay();
+  const snapshot = {
+    worktreeId: "wt-a",
+    revision: 9,
+    entries: [
+      { path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false },
+      { path: "C", reviewed: false, headVersion: "h-c", worktreeVersion: "w-c" },
+    ],
+    review: { paths: ["B", "C"], reviewed: [], total: 2, reviewedCount: 0, seq: 0 },
+  };
+  // 只读了 B（seq 5 已审）；C 从未被读过。
+  const loaded = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  overlay.mergeEntry("wt-a", loaded, 5, snapshot.entries[0], 0);
+  // 一份 seq 4 的回执说 C 已审 —— C 没有更晚的读取，回执仍应生效。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["B", "C"],
+    marks: marksOf(["B", null, "w-b"], ["C", "h-c", "w-c"]), seq: 4, snapshot,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: true },
+  });
+  assert.equal(reviewedOf(published.view, "B"), true, "B 的读取真值（seq5）胜出");
+  assert.equal(reviewedOf(published.view, "C"), true, "C 没有更晚的读取，回执照常生效");
+});
+
+test("读取真值持有：更晚的有效写结果仍能覆盖读取观察（不是固定优先级）", () => {
+  const overlay = new ReviewOverlay();
+  const snapshot = {
+    worktreeId: "wt-a",
+    revision: 9,
+    entries: [{ path: "B", reviewed: false, headVersion: null, worktreeVersion: "w-b", metricsLoaded: false }],
+    review: { paths: ["B"], reviewed: [], total: 1, reviewedCount: 0, seq: 0 },
+  };
+  // 读取观察到 B 已审（seq2）。
+  const loaded = { path: "B", reviewed: true, headVersion: null, worktreeVersion: "w-b", metricsLoaded: true };
+  overlay.mergeEntry("wt-a", loaded, 2, snapshot.entries[0], 0);
+  // 之后真的发生了更晚的取消（seq3）并成功交付。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: [],
+    marks: marksOf(cancelled("B", null, "w-b")), seq: 3, snapshot,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: true },
+  });
+  assert.equal(reviewedOf(published.view, "B"), false, "更晚的真实写结果必须胜出");
+});
+
+test("读取真值持有：v1→v2→v1 失效仍不被旧成功复活", () => {
+  const overlay = new ReviewOverlay();
+  const snapshot = {
+    worktreeId: "wt-a",
+    revision: 9,
+    entries: [{ path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: false }],
+    review: { paths: ["U"], reviewed: [], total: 1, reviewedCount: 0, seq: 0 },
+  };
+  // 读取观察到未审、水位 2（v2 失效已推进，回到 v1）。
+  const loaded = { path: "U", reviewed: false, headVersion: null, worktreeVersion: "w-v1", metricsLoaded: true };
+  overlay.mergeEntry("wt-a", loaded, 2, snapshot.entries[0], 0);
+  // 旧 v1 成功（seq1）现在才交付。
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["U"],
+    marks: marksOf(["U", null, "w-v1"]), seq: 1, snapshot,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: false },
+  });
+  assert.equal(reviewedOf(published.view, "U"), false, "失效后的读取真值必须挡住旧成功");
+});
