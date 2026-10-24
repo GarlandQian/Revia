@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -14,7 +14,7 @@
 - [ ] ⌥⌘R 只标记、不取消，不能进入 ⌘R 刷新分支；按当前列表顺序寻找下一个未审阅文件，去重、末尾环回、展开目标所在折叠组。
 - [ ] 全部已审阅时留在当前文件并提示；输入框、弹窗、按钮的键盘行为不穿透。
 - [ ] M2 显示审阅进度，不提前实现提交或以标记阻止后续提交；真实 Git 持久化验证与桌面导航检查通过。
-  - 真实 Git 持久化已由 `review_marks` **15** 项通过（含子模块 packed-refs、gitDir 改指、并发事务、所见版本、存储损坏）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
+  - 真实 Git 持久化已由 `review_marks` **20** 项通过（含真实符号分支 + packed-refs 子模块、deinit/init、gitDir 与 commonDir 改指、换行路径身份、未确认版本拒绝、并发事务、所见版本、存储损坏）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
 
 ## Comments
 
@@ -337,3 +337,64 @@ Rust 合计 **247 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹�
 - 两处敏感性实验仅实施叙述和实现副本，没有独立stdout/stderr/exit。`recovery.rs`副本匹配固定源码，`review.rs`副本仅事务锁注释与最终版不同，manifest如实记录；副本不证明packed-refs旧故障真正被触发，不采纳叙述中“可核对照确实失败”为独立运行证据。
 - 07退回 `ready-for-agent`，验收项保持未勾。仍交原Pi只修上述残留，通过现有Rust真实Git/生产会话入口回归，保存精确命令、真实退出码、原始输出及检查前后源码SHA。先完成相关修改后集中检查，失败只重跑受影响项，精确暂存。
 - 尚未Release、GUI、D06、新双平台CI或长测；不能用247项通过替代上述行为或桌面验收，全部复核通过后再固定版本验收，不标done。
+
+### 2026-10-24 / Pi 实现：任务07 第三轮复核返修（R07-R3）
+
+只修 07 本轮残留；未动 05、未扩 12 功能、未做 08/13。已闭合的真实 Git 归属、选择代际、错误留存、完成提示、单应用事务未反复重构。
+
+#### Standards
+
+**ST07-R3-1 / SP07-R3-1（未确认版本不能当场保存）**：`Snapshot` 新增 `unconfirmed` 集合，`set_review_mark` 在**新增认领**前检查 `!snapshot.unconfirmed.contains(path)`，未知版本直接 `Rejected`（「这个文件的版本无法确认，不能标记为已审阅」）；**取消**已有标记不要求版本确认，保留清理能力。前端勾选与 ⌥⌘R 走同一个 `setReviewMark`，因此同步被拒并把错误显示在原 worktree。
+回归 `unconfirmed_directory_cannot_be_claimed_but_can_be_unmarked`：真实嵌套仓库（未登记为子模块）出现在改动列表且 `worktreeVersionConfirmed=false`，新增认领被拒、不计进度；正常文件仍可标记；取消仍然成功。
+
+**ST07-R3-2 / SP07-R3-2（未初始化子模块）**：`submodule_commit` 不再无条件剥掉状态前缀，而是按 Git 语义区分：只有 `" "`（已初始化且与索引一致）与 `"+"`（检出版本与索引不同，但仍是真实检出）返回提交号；`-`（未初始化，OID 来自索引 gitlink）与 `U`（冲突）一律返回 `None` → 版本无法确认 → 不能认领。
+回归 `deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed`：真实 `submodule add` + 父仓库 gitlink 改动（保证子模块稳定在改动列表里）→ 标记成功 → `submodule deinit -f` 后 `submodule status` 确认为 `-` 前缀、`worktree_version` 返回 `None`、刷新后标记失效、新增认领被拒；重新 `update --init` 后也不会凭空恢复旧标记。
+
+**ST07-R3-3（换行路径歧义）**：`resolve_git_dirs` 用无歧义边界——一次 `rev-parse` 请求两字段时，输出是「每字段一行 + 末尾结束符」；只有**恰好两行**才拆分（两行 ⟺ 两个路径都不含换行），否则退回两次单字段调用。结束符只去掉 Git 实际追加的**一个 LF**（`strip_one_terminator`），不再把路径自带的 `\r`/换行一并剥掉。
+回归 `identity_capture_handles_newline_in_repository_path`：真实仓库根目录名含换行，`capture` 得到的 gitDir 必须精确等于 `<root>/.git`、`revalidate` 成功、生产标记与刷新正常。
+
+**ST07-R3-4 / SP07-R3-3（packed-refs 回归）**：用例改为**真实子模块** fixture——子模块里建两个指向**不同提交**的分支、检出**符号分支**（断言 HEAD 是 `ref: refs/heads/...`）、`pack-refs --all` 后断言 loose ref 真的消失且两条分支都在 `packed-refs` 里、同时断言子模块 `.git` 是**指针文件**而其 gitDir 是**真实目录**；然后经父仓库生产 session 标记子模块路径，再切到另一个同样只在 packed-refs 里的分支，生产 `refresh` 后标记失效。两个检出提交都相对父仓库 gitlink 基线保持改动，避免「文件离开改动列表」兜底。
+另加 `unrelated_head_change_keeps_mark_when_file_versions_unchanged`：只切分支、HEAD 引用变了但目标文件两个版本都没变时，标记**保留**——固定 Q20 的文件级版本定义，本轮没有把全局 HEAD 提交号并入版本。
+
+#### Spec
+
+**SP07-R3-1** 见 ST07-R3-1。**SP07-R3-2** 见 ST07-R3-2。**SP07-R3-3** 见 ST07-R3-4。
+
+#### 身份补充（并入本轮，同一契约）
+
+`WorktreeIdentity::revalidate` 现在**同时**重新解析 gitDir 与 commonDir（`resolve_git_dirs`）再比对，不再只重解析 gitDir + stat 旧 commonDir：linked worktree 的 `.git` 指针不变、但 `commondir` 指向另一个**仍然存在**的 commonDir 时也会判为身份不明确。
+回归 `commondir_repointed_while_gitdir_unchanged_invalidates_identity`：gitDir 不变、`commondir` 改指复制的另一现存目录、旧 commonDir 仍在，刷新后 `reviewedCount` 归零。
+进程数：`resolve_git_dirs` 在常规路径只用**一次** Git 调用，`t13_refresh_does_not_spawn_per_file_git_processes` 的 `<=4` 断言未改动、未跳过。
+
+#### 实际执行的检查
+
+日志目录（实际路径）：`/private/tmp/revia-task07-r4-rh57Pq`
+
+- 基线：`acdc9817aa36549af5e76df7ac4c8c3933122037`
+- 检查前源码 SHA-256（检查后复核未变）：
+
+  - `ad67e025ceca12e8c3df24788d3f92f3790c23d55f5d08c11a744914a728c07d  src-tauri/src/recovery.rs`
+  - `9912606d006f6816eb98d1046897e38d514e081d6c3a6d1daaac14f7cec35cc3  src-tauri/src/review.rs`
+  - `b3bbe261e7ab416925730ac8ad312c7325abdaf9b71be956894395a69d35457f  src-tauri/src/session.rs`
+  - `3d371c05505860647938e95d79ece4ff5235883d152578b53c2e31c95908fd0e  src-tauri/tests/review_marks.rs`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | `tsc.out` / `tsc.err` / `tsc.exit` |
+| `pnpm lint` | 0 | `lint.out` / `lint.err` / `lint.exit` |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 0 | `cargo-test.out` / `cargo-test.err` / `cargo-test.exit` |
+
+Rust 合计 **251 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹具）、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` 15、`review_marks` **20**（新增 5 项）、`session_flow` 3。
+
+#### 失败历史与实验边界
+
+- 新用例先失败后修好的三处原因见 `MANIFEST.md`「失败历史」：packed-refs 用例最初设计错（父仓库同提交别名分支）、`submodule_commit` 的 `trim()` 吃掉状态空格、未确认版本用例选了 Git 不单列的普通目录。
+- 本轮在 `/tmp/t-deinit` 与 `/tmp/nl-test` 用过**固定名字**实验目录（先 `rm -rf` 再建），不符合「只影响本任务创建数据」的范围要求；已如实记录、不再动它们，后续改用 `mktemp -d`。无法回溯证明这些固定路径原先为空。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：勾选框观感、⌥⌘R 实际按键、折叠展开、完成提示、按钮焦点不穿透、选择代际的真实时序。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
+- 未初始化子模块在 Windows 上的 `submodule status` 输出格式未验证。
+- 多进程共享数据目录不在本任务范围。

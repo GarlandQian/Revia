@@ -188,6 +188,10 @@ struct Snapshot {
     review: ReviewMarks,
     /// 每个路径的两个版本，用于判定标记是否仍然有效（Q20、T12）。
     versions: HashMap<String, ReviewVersions>,
+    /// 版本**无法确认**的路径（例如未初始化子模块、未登记为子模块的嵌套仓库）。
+    ///
+    /// 这些路径不允许新增认领；已有标记只能取消（ST07-R3-1、SP07-R3-1）。
+    unconfirmed: std::collections::HashSet<String>,
     /// key: `<changes>/<path>`
     models: HashMap<String, FileModelCache>,
     /// 显示行排版缓存：key 为 `<changes>/<path>/<view>`。
@@ -433,9 +437,9 @@ impl WorktreeSession {
         // 用打开会话时捕获的身份，但每次刷新都**重新确认它现在仍然成立**：
         // 同路径重建后文件系统标识会变，此时不能继续认领旧标记（Q87、ST07-2）。
         // `revalidate` 只重读文件系统标识，不启动 Git 进程（既有性能断言不变）。
-        let (review, versions) = match self.confirmed_identity() {
+        let (review, versions, unconfirmed) = match self.confirmed_identity() {
             Some(identity) => self.review_state(&identity, &entries)?,
-            None => (self.empty_review(&entries), HashMap::new()),
+            None => (self.empty_review(&entries), HashMap::new(), std::collections::HashSet::new()),
         };
         let reviewed: std::collections::HashSet<&str> =
             review.reviewed.iter().map(String::as_str).collect();
@@ -462,6 +466,7 @@ impl WorktreeSession {
             entries,
             review,
             versions,
+            unconfirmed,
             models,
             layouts: HashMap::new(),
             generation,
@@ -998,7 +1003,7 @@ impl WorktreeSession {
         &self,
         identity: &WorktreeIdentity,
         entries: &[ChangeEntry],
-    ) -> Result<(ReviewMarks, HashMap<String, ReviewVersions>)> {
+    ) -> Result<(ReviewMarks, HashMap<String, ReviewVersions>, std::collections::HashSet<String>)> {
         let mut paths: Vec<String> = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let mut versions: HashMap<String, ReviewVersions> = HashMap::new();
@@ -1042,7 +1047,7 @@ impl WorktreeSession {
             total: paths.len() as u32,
             reviewed_count: reviewed.len() as u32,
         };
-        Ok((marks, versions))
+        Ok((marks, versions, unconfirmed))
     }
 
     /// 当前仍然成立的身份；不成立（同路径重建、路径消失、标识未知）时返回 None。
@@ -1082,16 +1087,24 @@ impl WorktreeSession {
             .as_ref()
             .ok_or_else(|| AppError::internal("审阅标记存储不可用"))?;
         let _read = self.read_lock.lock().map_err(|_| AppError::internal("读取锁失败"))?;
-        let (versions, snapshot_paths, current_review) = {
+        let (versions, snapshot_paths, current_review, confirmed) = {
             let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
             let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
             (
                 snapshot.versions.get(path).cloned(),
                 snapshot.review.paths.clone(),
                 snapshot.review.clone(),
+                !snapshot.unconfirmed.contains(path),
             )
         };
         let versions = versions.ok_or_else(|| AppError::rejected("文件不在当前改动列表中"))?;
+        // 版本无法确认的路径：不能新增认领（Q20）。取消已有标记仍然允许，
+        // 否则用户无法清理旧记录（ST07-R3-1、SP07-R3-1）。
+        if marked && !confirmed {
+            return Err(AppError::rejected(
+                "这个文件的版本无法确认，不能标记为已审阅",
+            ));
+        }
         // 用户看到的版本必须与执行时一致：刷新先发布了新版本时拒绝，
         // 不能把用户没看过的内容持久标成已审阅（ST07-3、SP07-5）。
         if let Some(expected) = &expected_versions {

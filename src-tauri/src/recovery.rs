@@ -32,18 +32,50 @@ pub struct WorktreeIdentity {
     pub filesystem_ids: Vec<Option<String>>,
 }
 
+/// 去掉 Git 输出末尾的**一个**记录结束符（`\n` 或 `\r\n`）。
+///
+/// 不能 `trim_end_matches` 一类地剥掉全部尾随换行/回车：Unix 路径本身可以以换行结尾，
+/// 那是路径字节的一部分，只有 Git 追加的那一个结束符才是格式（ST07-R3-3）。
+fn strip_one_terminator(text: &str) -> &str {
+    // 只去掉 Git 实际追加的那一个 LF（`rev-parse` 用 `printf("%s\n")` 输出）。
+    // 不把路径自带的 CR 当结束符一并剥掉：Unix 上 `\r` 是合法路径字节。
+    // Windows 上是否出现 CRLF 以实际 Git 输出为准，这里不猜测统一 trim。
+    text.strip_suffix('\n').unwrap_or(text)
+}
+
+/// 用现有 Git CLI 解析**当前实际**的 gitDir 与 commonDir（ADR-0002，不手工解释 Git 语义）。
+///
+/// 无歧义边界：一次 `rev-parse` 同时请求两个字段时，输出是「每字段一行 + 末尾结束符」。
+/// 若某条路径自身含换行（Unix 合法文件名），行数会多于 2；因此只有**恰好两行**时
+/// 拆分才精确。其余情况退回两次单字段调用，每次只去掉 Git 追加的一个结束符，
+/// 路径自身的字节完整保留。
+fn resolve_git_dirs(git: &Git) -> Result<(PathBuf, PathBuf)> {
+    let combined = git.run_ok(
+        &["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
+        "读取 worktree 身份",
+    )?;
+    let text = combined.stdout_lossy();
+    let body = strip_one_terminator(&text);
+    let parts: Vec<&str> = body.split('\n').collect();
+    if parts.len() == 2 && parts.iter().all(|part| !part.is_empty()) {
+        return Ok((PathBuf::from(parts[0]), PathBuf::from(parts[1])));
+    }
+    // 含换行的路径：退回单字段调用，避免跨字段拆分歧义。
+    let read_one = |flag: &str| -> Result<PathBuf> {
+        let output = git.run_ok(&["rev-parse", "--path-format=absolute", flag], "读取 worktree 身份")?;
+        let text = output.stdout_lossy();
+        let value = strip_one_terminator(&text);
+        if value.is_empty() {
+            return Err(AppError::internal("Git 未返回身份路径"));
+        }
+        Ok(PathBuf::from(value))
+    };
+    Ok((read_one("--git-dir")?, read_one("--git-common-dir")?))
+}
+
 impl WorktreeIdentity {
     pub fn capture(git: &Git) -> Result<Self> {
-        // 一次 `rev-parse` 同时拿 gitDir 与 commonDir：刷新会重新确认身份，
-        // 必须保持「刷新不按文件起 Git 进程」的既有性能边界（t13）。
-        let output = git.run_ok(
-            &["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
-            "读取 worktree 身份",
-        )?;
-        let text = output.stdout_lossy();
-        let mut lines = text.lines().map(str::trim).filter(|line| !line.is_empty());
-        let git_dir = PathBuf::from(lines.next().ok_or_else(|| AppError::internal("Git 未返回 gitDir"))?);
-        let common_dir = PathBuf::from(lines.next().ok_or_else(|| AppError::internal("Git 未返回 commonDir"))?);
+        let (git_dir, common_dir) = resolve_git_dirs(git)?;
         let worktree_path = fs::canonicalize(&git.directory)?;
         let git_dir = fs::canonicalize(git_dir)?;
         let common_dir = fs::canonicalize(common_dir)?;

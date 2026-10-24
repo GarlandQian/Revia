@@ -293,13 +293,23 @@ pub fn worktree_version(git: Option<&Git>, root: &Path, path: &str) -> Result<Op
 /// 失败（非子模块、Git 报错、输出为空）一律返回 `None`。
 fn submodule_commit(git: Option<&Git>, path: &str) -> Option<String> {
     let git = git?;
-    // `git submodule status -- <path>` 输出「<sha> <path> (<describe>)」，
-    // 第一列是子模块**当前检出的**提交号；由 Git 自己解析 packed-refs、目录型 `.git`、
-    // detached HEAD 等情况，不在 Rust 里维护第二套引用语义（ADR-0002）。
+    // `git submodule status -- <path>` 输出「<status><sha> <path> (<describe>)」，
+    // 由 Git 自己解析 packed-refs、目录型 `.git`、detached HEAD 等情况（ADR-0002）。
+    //
+    // 首字符是**状态**，不能一律剥掉（ST07-R3-2、SP07-R3-2）：
+    // - `-`：子模块**未初始化**，输出的是索引里的 gitlink OID，不是当前检出版本；
+    // - `U`：有未解决的冲突；
+    // - `+`：检出版本与索引记录不一致（仍是真实检出，可以使用）。
+    // 只有确认「确实检出」的情况才返回提交号，其余返回 None（调用方视为无法确认）。
     let output = git.try_run(&["submodule", "status", "--", path])?;
     let line = output.lines().next()?;
-    let commit = line.trim().trim_start_matches(['-', '+', 'U', ' ']);
-    let commit = commit.split_whitespace().next()?;
+    // 只去掉行尾：首字符可能是**空格**（已初始化且与索引一致），不能被 trim 掉。
+    let trimmed = line.trim_end();
+    let (status, rest) = trimmed.split_at(1);
+    if !matches!(status, " " | "+") {
+        return None;
+    }
+    let commit = rest.trim().split_whitespace().next()?;
     (!commit.is_empty()).then(|| commit.to_string())
 }
 
