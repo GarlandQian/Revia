@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "只开放文件夹选择与保存对话框（回收区另存）、窗口关闭/销毁（写入期间的安全关闭/退出，任务 08），以及核心 API；不开放任何命令执行能力。",
+  "description": "只开放文件夹选择与保存对话框（回收区另存）、窗口关闭/销毁（写入期间的安全关闭/退出，任务 08）、拖动主工具栏移动窗口（任务 13），以及核心 API；不开放任何命令执行能力。",
   "windows": [
     "main"
   ],
@@ -9,6 +9,7 @@
     "core:default",
     "core:window:allow-close",
     "core:window:allow-destroy",
+    "core:window:allow-start-dragging",
     "dialog:allow-open",
     "dialog:allow-save"
   ]

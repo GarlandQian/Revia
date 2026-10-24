@@ -4,10 +4,28 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * 外观照 Rebased（JetBrains 新版界面）的岛屿面板与配色（Q107）：
+ * 窗口底色（frame）上放两块岛屿面板——“变更”工具窗口（tool）和 diff 编辑区（island）。
+ * shadcn 的语义色名保留，组件自动跟随；JetBrains 专有的颜色另起名字。
+ */
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-    --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+    --color-frame: var(--frame);
+    --color-island: var(--island);
+    --color-tool: var(--tool);
+    --color-edge: var(--edge);
+    --color-fg-2: var(--fg-2);
+    --color-fg-3: var(--fg-3);
+    --color-icon: var(--icon);
+    --color-hover: var(--hover);
+    --color-row-hover: var(--row-hover);
+    --color-sel: var(--sel);
+    --color-sel-inactive: var(--sel-inactive);
+    --color-link: var(--link);
+    --color-btn-edge: var(--btn-edge);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,116 +66,182 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Islands Light */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --frame: #ebecf0;
+    --island: #ffffff;
+    --tool: #f7f8fa;
+    --edge: #dfe1e5;
+    --fg-2: #6c707e;
+    --fg-3: #a8adbd;
+    --icon: #6c707e;
+    --hover: #dfe1e5;
+    --row-hover: #edeef2;
+    --sel: #d4e2ff;
+    --sel-inactive: #dfe1e5;
+    --link: #2e6ae1;
+    --btn-edge: #c9ccd6;
+    --badge: #e8794a;
+    --banner-info: #edf3ff;
+    --banner-info-edge: #c2d6fc;
+    --banner-info-icon: #3574f0;
+    --banner-warn: #fff6de;
+    --banner-warn-edge: #fed277;
+    --banner-warn-icon: #e5a213;
+    --banner-error: #fff7f7;
+    --banner-error-edge: #fad4d8;
+    --banner-error-icon: #db3b4b;
+
+    --background: #ffffff;
+    --foreground: #1e1f22;
+    --card: #ffffff;
+    --card-foreground: #1e1f22;
+    --popover: #ffffff;
+    --popover-foreground: #1e1f22;
+    --primary: #3574f0;
+    --primary-foreground: #ffffff;
+    --secondary: #f7f8fa;
+    --secondary-foreground: #1e1f22;
+    --muted: #f2f3f5;
+    --muted-foreground: #6c707e;
+    --accent: #dfe1e5;
+    --accent-foreground: #1e1f22;
+    --destructive: #db3b4b;
+    --border: #ebecf0;
+    --input: #c9ccd6;
+    --ring: #3574f0;
+    --chart-1: #c9ccd6;
+    --chart-2: #a8adbd;
+    --chart-3: #6c707e;
+    --chart-4: #494b57;
+    --chart-5: #1e1f22;
+    --radius: 0.375rem;
+    --sidebar: #f7f8fa;
+    --sidebar-foreground: #1e1f22;
+    --sidebar-primary: #3574f0;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #dfe1e5;
+    --sidebar-accent-foreground: #1e1f22;
+    --sidebar-border: #ebecf0;
+    --sidebar-ring: #3574f0;
     /* 模态遮罩：跟随主题，不写死颜色（Q50、technical-direction）。 */
-    --overlay: oklch(0 0 0 / 35%);
+    --overlay: rgb(0 0 0 / 16%);
 }
 
-/* 跟随系统深浅色（Q50）；也保留 .dark 类以便以后加手动覆盖。 */
+/* Islands Dark：跟随系统深浅色（Q50）；也保留 .dark 类以便以后加手动覆盖。 */
 @media (prefers-color-scheme: dark) {
   :root {
+    --frame: #141519;
+    --island: #1e1f22;
+    --tool: #1e1f22;
+    --edge: #2b2d30;
+    --fg-2: #868a91;
+    --fg-3: #5a5d63;
+    --icon: #a9acb3;
+    --hover: #2b2d30;
+    --row-hover: #26282b;
+    --sel: #2e436e;
+    --sel-inactive: #393b40;
+    --link: #548af7;
+    --btn-edge: #4e5157;
+    --badge: #c76a3f;
+    --banner-info: #25324d;
+    --banner-info-edge: #35538f;
+    --banner-info-icon: #548af7;
+    --banner-warn: #3d3223;
+    --banner-warn-edge: #5e4d33;
+    --banner-warn-icon: #f2c55c;
+    --banner-error: #402929;
+    --banner-error-edge: #5e3838;
+    --banner-error-icon: #f75464;
 
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: #1e1f22;
+    --foreground: #dfe1e5;
+    --card: #2b2d30;
+    --card-foreground: #dfe1e5;
+    --popover: #2b2d30;
+    --popover-foreground: #dfe1e5;
+    --primary: #3574f0;
+    --primary-foreground: #ffffff;
+    --secondary: #2b2d30;
+    --secondary-foreground: #dfe1e5;
+    --muted: #2b2d30;
+    --muted-foreground: #868a91;
+    --accent: #2b2d30;
+    --accent-foreground: #dfe1e5;
+    --destructive: #f75464;
+    --border: #2b2d30;
+    --input: #4e5157;
+    --ring: #548af7;
+    --chart-1: #4e5157;
+    --chart-2: #5a5d63;
+    --chart-3: #868a91;
+    --chart-4: #a9acb3;
+    --chart-5: #dfe1e5;
+    --sidebar: #1e1f22;
+    --sidebar-foreground: #dfe1e5;
+    --sidebar-primary: #3574f0;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #2b2d30;
+    --sidebar-accent-foreground: #dfe1e5;
+    --sidebar-border: #2b2d30;
+    --sidebar-ring: #548af7;
     /* 深色下遮罩更重，保证对比。 */
-    --overlay: oklch(0 0 0 / 55%);
+    --overlay: rgb(0 0 0 / 45%);
   }
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-    --overlay: oklch(0 0 0 / 55%);
+    --frame: #141519;
+    --island: #1e1f22;
+    --tool: #1e1f22;
+    --edge: #2b2d30;
+    --fg-2: #868a91;
+    --fg-3: #5a5d63;
+    --icon: #a9acb3;
+    --hover: #2b2d30;
+    --row-hover: #26282b;
+    --sel: #2e436e;
+    --sel-inactive: #393b40;
+    --link: #548af7;
+    --btn-edge: #4e5157;
+    --badge: #c76a3f;
+    --banner-info: #25324d;
+    --banner-info-edge: #35538f;
+    --banner-info-icon: #548af7;
+    --banner-warn: #3d3223;
+    --banner-warn-edge: #5e4d33;
+    --banner-warn-icon: #f2c55c;
+    --banner-error: #402929;
+    --banner-error-edge: #5e3838;
+    --banner-error-icon: #f75464;
+    --background: #1e1f22;
+    --foreground: #dfe1e5;
+    --card: #2b2d30;
+    --card-foreground: #dfe1e5;
+    --popover: #2b2d30;
+    --popover-foreground: #dfe1e5;
+    --primary: #3574f0;
+    --primary-foreground: #ffffff;
+    --secondary: #2b2d30;
+    --secondary-foreground: #dfe1e5;
+    --muted: #2b2d30;
+    --muted-foreground: #868a91;
+    --accent: #2b2d30;
+    --accent-foreground: #dfe1e5;
+    --destructive: #f75464;
+    --border: #2b2d30;
+    --input: #4e5157;
+    --ring: #548af7;
+    --sidebar: #1e1f22;
+    --sidebar-foreground: #dfe1e5;
+    --sidebar-primary: #3574f0;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #2b2d30;
+    --sidebar-accent-foreground: #dfe1e5;
+    --sidebar-border: #2b2d30;
+    --sidebar-ring: #548af7;
+    --overlay: rgb(0 0 0 / 45%);
 }
 
 
@@ -176,93 +260,343 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-frame text-foreground;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
     }
   html {
     @apply font-sans;
     }
 }
-/* ---------- diff 视图与语法配色（浅色 / 深色两套，Q50） ---------- */
+
+/* ---------- 窗口框架：主工具栏、工具窗口图标条、岛屿面板、状态栏（Q107） ---------- */
+/* 放在 components 层，让 Tailwind 工具类（如 pl-7、size-[30px]）能覆盖。 */
+@layer components {
+  .project-badge {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: var(--badge);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* 工具栏里的组件、图标按钮：无边框，悬停时出底色。 */
+  .toolbar-widget,
+  .icon-action {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 5px;
+    color: var(--foreground);
+    white-space: nowrap;
+    outline: none;
+  }
+
+  .toolbar-widget {
+    height: 28px;
+    gap: 6px;
+    padding: 0 8px;
+    font-weight: 500;
+  }
+
+  .icon-action {
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: var(--icon);
+  }
+
+  .toolbar-widget:hover,
+  .icon-action:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  .toolbar-widget:focus-visible,
+  .icon-action:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ring);
+  }
+
+  .icon-action:disabled {
+    color: var(--fg-3);
+    cursor: default;
+  }
+
+  .icon-action[aria-pressed="true"] {
+    background: var(--hover);
+    color: var(--foreground);
+  }
+
+  /* 视图下拉、worktree 下拉：用原生 select 弹出菜单，外观收成组件样式。 */
+  .widget-select {
+    appearance: none;
+    height: 26px;
+    padding: 0 22px 0 8px;
+    border-radius: 5px;
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5' fill='none' stroke='%236c707e' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 4px center / 12px;
+    color: var(--foreground);
+    font: inherit;
+    cursor: default;
+    outline: none;
+  }
+
+  .widget-select:hover {
+    background-color: var(--hover);
+  }
+
+  .widget-select:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ring);
+  }
+
+  .island {
+    min-height: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px var(--edge);
+  }
+
+  /* 文件列表：键盘焦点在列表里时用强调色选中，否则用灰色（JetBrains 的列表选中态）。 */
+  .change-row {
+    background: transparent;
+  }
+
+  .change-row:hover {
+    background: var(--row-hover);
+  }
+
+  .change-row[data-selected="true"] {
+    background: var(--sel-inactive);
+  }
+
+  .change-list:focus-within .change-row[data-selected="true"] {
+    background: var(--sel);
+  }
+
+  .review-check {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px var(--btn-edge);
+    background: var(--island);
+    color: transparent;
+  }
+
+  .review-check[aria-checked="true"] {
+    background: var(--primary);
+    box-shadow: none;
+    color: var(--primary-foreground);
+  }
+
+  .review-check:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .review-check:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+  }
+
+  /* 编辑区的单个文件标签：底部强调色下划线（不做多标签，Q16）。 */
+  .editor-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    box-shadow: inset 0 -2px 0 var(--primary);
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  /* 编辑区顶部提示条：信息、警告、错误三种底色（JetBrains 的编辑器通知）。 */
+  .editor-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 12.5px;
+    line-height: 18px;
+    background: var(--banner-bg);
+    box-shadow: inset 0 -1px 0 var(--banner-edge);
+  }
+
+  .editor-banner[data-tone="info"] {
+    --banner-bg: var(--banner-info);
+    --banner-edge: var(--banner-info-edge);
+    --banner-icon: var(--banner-info-icon);
+  }
+
+  .editor-banner[data-tone="warn"] {
+    --banner-bg: var(--banner-warn);
+    --banner-edge: var(--banner-warn-edge);
+    --banner-icon: var(--banner-warn-icon);
+  }
+
+  .editor-banner[data-tone="error"] {
+    --banner-bg: var(--banner-error);
+    --banner-edge: var(--banner-error-edge);
+    --banner-icon: var(--banner-error-icon);
+  }
+
+  .editor-banner > svg {
+    flex: none;
+    margin-top: 1px;
+    color: var(--banner-icon);
+  }
+
+  .banner-link {
+    color: var(--link);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .banner-link:hover {
+    text-decoration: underline;
+  }
+
+  .warn-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+    background: var(--banner-warn);
+    box-shadow: inset 0 0 0 1px var(--banner-warn-edge);
+  }
+
+  .warn-chip > svg,
+  .status-warn > svg {
+    color: var(--banner-warn-icon);
+  }
+}
+
+/* ---------- diff 视图与语法配色（浅色 / 深色两套，Q50；配色照 JetBrains，Q107） ---------- */
 
 :root {
-  --diff-bg: var(--background);
+  --diff-bg: var(--island);
   --diff-row-height: 18px;
-  --diff-gutter-fg: #9aa0a6;
-  --diff-gutter-border: color-mix(in oklab, var(--border) 70%, transparent);
-  --diff-add-bg: #e6ffec;
-  --diff-del-bg: #ffebe9;
-  --diff-hunk-bg: #f6f8fa;
-  --diff-hunk-fg: #57606a;
+  /* 行号栏宽度；并排视图两半之间另有一条分隔栏。 */
+  --diff-gutter: 52px;
+  --diff-mid: 12px;
+  --diff-gutter-fg: #a8adbd;
+  --diff-gutter-border: #ebecf0;
+  --diff-mid-bg: #f7f8fa;
+  --diff-ins-bg: #e4f5e6;
+  --diff-ins-gutter: #c9ebcf;
+  --diff-del-bg: #eeeff2;
+  --diff-del-gutter: #dcdee3;
+  --diff-mod-bg: #e5eefe;
+  --diff-mod-gutter: #cadcfd;
+  --diff-hunk-bg: #f2f3f5;
+  --diff-hunk-fg: #8c90a0;
   /* 并排视图里一侧没有对应行。 */
-  --diff-empty-bg: #fafbfc;
+  --diff-empty-bg: #f9fafb;
   /* 数据还没到的行：要和白底明显区分，快速滚动时不能看起来像“空白”（Q46）。 */
-  --diff-placeholder-bg: #eef1f4;
-  --diff-placeholder-gutter: #e4e8ec;
-  --diff-placeholder-line: #dde1e6;
-  --diff-marker-fg: #8b949e;
-  --diff-scrollbar-thumb: rgb(0 0 0 / 0.28);
-  --diff-scrollbar-thumb-hover: rgb(0 0 0 / 0.45);
-  --diff-selection: color-mix(in oklab, var(--primary) 12%, transparent);
+  --diff-placeholder-bg: #eef0f3;
+  --diff-placeholder-gutter: #e4e6eb;
+  --diff-placeholder-line: #dde0e5;
+  --diff-scrollbar-thumb: rgb(0 0 0 / 0.24);
+  --diff-scrollbar-thumb-hover: rgb(0 0 0 / 0.4);
+  --diff-selection: color-mix(in oklab, var(--primary) 18%, transparent);
 
-  --syntax-plain: #24292f;
-  --syntax-comment: #6a737d;
-  --syntax-string: #0a3069;
-  --syntax-number: #0550ae;
-  --syntax-constant: #0550ae;
-  --syntax-keyword: #cf222e;
-  --syntax-function: #8250df;
-  --syntax-type: #953800;
-  --syntax-variable: #953800;
-  --syntax-parameter: #24292f;
-  --syntax-tag: #116329;
-  --syntax-attribute: #0550ae;
-  --syntax-punctuation: #57606a;
-  --syntax-operator: #cf222e;
-  --syntax-invalid: #82071e;
+  /* IntelliJ Light */
+  --syntax-plain: #080808;
+  --syntax-comment: #8c8c8c;
+  --syntax-string: #067d17;
+  --syntax-number: #1750eb;
+  --syntax-constant: #871094;
+  --syntax-keyword: #0033b3;
+  --syntax-function: #00627a;
+  --syntax-type: #000000;
+  --syntax-variable: #871094;
+  --syntax-parameter: #080808;
+  --syntax-tag: #0033b3;
+  --syntax-attribute: #174ad4;
+  --syntax-punctuation: #080808;
+  --syntax-operator: #080808;
+  --syntax-invalid: #f50000;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --diff-add-bg: color-mix(in oklab, #2ea043 18%, transparent);
-    --diff-del-bg: color-mix(in oklab, #f85149 16%, transparent);
-    --diff-hunk-bg: color-mix(in oklab, var(--foreground) 8%, transparent);
-    --diff-hunk-fg: #8b949e;
-    --diff-empty-bg: color-mix(in oklab, var(--foreground) 4%, transparent);
-    --diff-placeholder-bg: color-mix(in oklab, var(--foreground) 7%, var(--background));
-    --diff-placeholder-gutter: color-mix(in oklab, var(--foreground) 10%, var(--background));
-    --diff-placeholder-line: color-mix(in oklab, var(--foreground) 13%, var(--background));
-    --diff-marker-fg: #8b949e;
-    --diff-scrollbar-thumb: rgb(255 255 255 / 0.3);
-    --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.5);
+    --diff-gutter-fg: #4b5059;
+    --diff-gutter-border: #2b2d30;
+    --diff-mid-bg: #1b1c1f;
+    --diff-ins-bg: #253a2b;
+    --diff-ins-gutter: #2f4a35;
+    --diff-del-bg: #34363a;
+    --diff-del-gutter: #404247;
+    --diff-mod-bg: #24344d;
+    --diff-mod-gutter: #2e4466;
+    --diff-hunk-bg: #25272b;
+    --diff-hunk-fg: #6f737a;
+    --diff-empty-bg: #212226;
+    --diff-placeholder-bg: #24262a;
+    --diff-placeholder-gutter: #2a2c30;
+    --diff-placeholder-line: #303237;
+    --diff-scrollbar-thumb: rgb(255 255 255 / 0.26);
+    --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.45);
 
-    --syntax-plain: #e6edf3;
-    --syntax-comment: #8b949e;
-    --syntax-string: #a5d6ff;
-    --syntax-number: #79c0ff;
-    --syntax-constant: #79c0ff;
-    --syntax-keyword: #ff7b72;
-    --syntax-function: #d2a8ff;
-    --syntax-type: #ffa657;
-    --syntax-variable: #ffa657;
-    --syntax-parameter: #e6edf3;
-    --syntax-tag: #7ee787;
-    --syntax-attribute: #79c0ff;
-    --syntax-punctuation: #c9d1d9;
-    --syntax-operator: #ff7b72;
-    --syntax-invalid: #ffa198;
+    /* New UI Dark */
+    --syntax-plain: #bcbec4;
+    --syntax-comment: #7a7e85;
+    --syntax-string: #6aab73;
+    --syntax-number: #2aacb8;
+    --syntax-constant: #c77dbb;
+    --syntax-keyword: #cf8e6d;
+    --syntax-function: #56a8f5;
+    --syntax-type: #bcbec4;
+    --syntax-variable: #c77dbb;
+    --syntax-parameter: #bcbec4;
+    --syntax-tag: #d5b778;
+    --syntax-attribute: #bababa;
+    --syntax-punctuation: #bcbec4;
+    --syntax-operator: #bcbec4;
+    --syntax-invalid: #f75464;
   }
 }
 
 .dark {
-  --diff-add-bg: color-mix(in oklab, #2ea043 18%, transparent);
-  --diff-del-bg: color-mix(in oklab, #f85149 16%, transparent);
-  --diff-hunk-bg: color-mix(in oklab, var(--foreground) 8%, transparent);
-  --diff-empty-bg: color-mix(in oklab, var(--foreground) 4%, transparent);
-  --diff-placeholder-bg: color-mix(in oklab, var(--foreground) 7%, var(--background));
-  --diff-placeholder-gutter: color-mix(in oklab, var(--foreground) 10%, var(--background));
-  --diff-placeholder-line: color-mix(in oklab, var(--foreground) 13%, var(--background));
-  --diff-scrollbar-thumb: rgb(255 255 255 / 0.3);
-  --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.5);
+  --diff-gutter-fg: #4b5059;
+  --diff-gutter-border: #2b2d30;
+  --diff-mid-bg: #1b1c1f;
+  --diff-ins-bg: #253a2b;
+  --diff-ins-gutter: #2f4a35;
+  --diff-del-bg: #34363a;
+  --diff-del-gutter: #404247;
+  --diff-mod-bg: #24344d;
+  --diff-mod-gutter: #2e4466;
+  --diff-hunk-bg: #25272b;
+  --diff-hunk-fg: #6f737a;
+  --diff-empty-bg: #212226;
+  --diff-placeholder-bg: #24262a;
+  --diff-placeholder-gutter: #2a2c30;
+  --diff-placeholder-line: #303237;
+  --diff-scrollbar-thumb: rgb(255 255 255 / 0.26);
+  --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.45);
+  --syntax-plain: #bcbec4;
+  --syntax-comment: #7a7e85;
+  --syntax-string: #6aab73;
+  --syntax-number: #2aacb8;
+  --syntax-constant: #c77dbb;
+  --syntax-keyword: #cf8e6d;
+  --syntax-function: #56a8f5;
+  --syntax-type: #bcbec4;
+  --syntax-variable: #c77dbb;
+  --syntax-parameter: #bcbec4;
+  --syntax-tag: #d5b778;
+  --syntax-attribute: #bababa;
+  --syntax-punctuation: #bcbec4;
+  --syntax-operator: #bcbec4;
+  --syntax-invalid: #f75464;
 }
 
 .diff-scroll {
@@ -290,7 +624,7 @@
   background-repeat: repeat-y;
 }
 
-/* 自绘滚动条（ADR-0008）：覆盖在内容右侧，样式接近 macOS 的叠加式滚动条。 */
+/* 自绘滚动条（ADR-0008）：覆盖在内容右侧。 */
 .diff-scrollbar {
   position: absolute;
   top: 0;
@@ -305,7 +639,7 @@
   position: absolute;
   top: 0;
   left: 3px;
-  right: 3px;
+  right: 2px;
   border-radius: 4px;
   background: var(--diff-scrollbar-thumb);
 }
@@ -314,18 +648,23 @@
   background: var(--diff-scrollbar-thumb-hover);
 }
 
-/* 底图的行号栏与真实行的列宽一致：统一视图两栏共 112px，并排视图左右各 56px。 */
+/* 底图的行号栏与真实行的列宽一致：统一视图两栏，并排视图左右各一栏、中间一条分隔栏。 */
 .diff-canvas-unified {
-  --diff-canvas-gutters: linear-gradient(to right, var(--diff-placeholder-gutter) 0 112px, transparent 112px);
+  --diff-canvas-gutters: linear-gradient(
+    to right,
+    var(--diff-placeholder-gutter) 0 calc(var(--diff-gutter) * 2),
+    transparent calc(var(--diff-gutter) * 2)
+  );
 }
 
 .diff-canvas-split {
   --diff-canvas-gutters: linear-gradient(
     to right,
-    var(--diff-placeholder-gutter) 0 56px,
-    transparent 56px 50%,
-    var(--diff-placeholder-gutter) 50% calc(50% + 56px),
-    transparent calc(50% + 56px)
+    var(--diff-placeholder-gutter) 0 var(--diff-gutter),
+    transparent var(--diff-gutter) calc(50% - var(--diff-mid) / 2),
+    var(--diff-mid-bg) calc(50% - var(--diff-mid) / 2) calc(50% + var(--diff-mid) / 2),
+    var(--diff-placeholder-gutter) calc(50% + var(--diff-mid) / 2) calc(50% + var(--diff-mid) / 2 + var(--diff-gutter)),
+    transparent calc(50% + var(--diff-mid) / 2 + var(--diff-gutter))
   );
 }
 
@@ -343,23 +682,23 @@
 }
 
 .row-unified {
-  grid-template-columns: 56px 56px minmax(0, 1fr);
+  grid-template-columns: var(--diff-gutter) var(--diff-gutter) minmax(0, 1fr);
 }
 
 .row-split {
-  grid-template-columns: 56px minmax(0, 1fr) 56px minmax(0, 1fr);
+  grid-template-columns: var(--diff-gutter) minmax(0, 1fr) var(--diff-mid) var(--diff-gutter) minmax(0, 1fr);
 }
 
 .row-hunk {
   display: flex;
+  align-items: center;
   gap: 8px;
-  padding-left: 8px;
+  padding-left: 12px;
   padding-right: 16px;
   color: var(--diff-hunk-fg);
-  /* 深色模式下 hunk 底色是半透明的，叠在行的不透明底色上，不能直接透出底图。 */
+  font-size: 0.95em;
+  /* 深色模式下 hunk 底色叠在行的不透明底色上，不能直接透出底图。 */
   background-image: linear-gradient(var(--diff-hunk-bg), var(--diff-hunk-bg));
-  border-top: 1px solid var(--diff-gutter-border);
-  border-bottom: 1px solid var(--diff-gutter-border);
 }
 
 .hunk-section {
@@ -369,32 +708,42 @@
   text-overflow: ellipsis;
 }
 
+/* hunk 操作照 JetBrains 写成链接样式；仍是可聚焦的按钮（Q93）。 */
 .hunk-action {
   flex: none;
   height: 16px;
-  padding: 0 5px;
-  border: 1px solid var(--diff-gutter-border);
-  border-radius: 2px;
-  color: var(--foreground);
-  font: 11px/14px var(--font-sans);
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--link);
+  font: 12px/16px var(--font-sans);
   cursor: pointer;
 }
 
+.hunk-action + .hunk-action::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--fg-3);
+}
+
 .hunk-action:hover:not(:disabled) {
-  background: var(--accent);
+  text-decoration: underline;
 }
 
 .hunk-action:focus-visible {
-  outline: 1px solid var(--ring);
-  outline-offset: -2px;
+  outline: 2px solid var(--ring);
+  outline-offset: 0;
 }
 
 .hunk-action:disabled {
-  opacity: 0.45;
+  color: var(--fg-3);
   cursor: default;
 }
 
 .recovery-dialog {
+  /* Tailwind 的 preflight 把所有元素的 margin 清零，模态对话框要靠 margin: auto 才会居中。 */
+  margin: auto;
   width: min(640px, calc(100vw - 40px));
   max-height: calc(100vh - 40px);
   overflow: auto;
@@ -407,32 +756,40 @@
 .gutter {
   color: var(--diff-gutter-fg);
   text-align: right;
-  padding-right: 8px;
-  border-right: 1px solid var(--diff-gutter-border);
+  padding-right: 10px;
+  font-size: 0.95em;
   user-select: none;
 }
 
+.mid {
+  align-self: stretch;
+  background: var(--diff-mid-bg);
+  box-shadow: inset 1px 0 0 var(--diff-gutter-border), inset -1px 0 0 var(--diff-gutter-border);
+}
+
 .cell {
-  padding-left: 4px;
+  padding-left: 6px;
   overflow: hidden;
 }
 
-.cell.empty {
-  background: var(--diff-empty-bg);
-}
+/* 修改块蓝、纯新增绿、纯删除灰（JetBrains diff 配色）；修改块由 Rust 按并排视图的配对规则判断。 */
+.cell-ins { background: var(--diff-ins-bg); }
+.cell-del { background: var(--diff-del-bg); }
+.cell-mod { background: var(--diff-mod-bg); }
+.cell.empty { background: var(--diff-empty-bg); }
+.gutter-ins, .mid-ins { background: var(--diff-ins-gutter); }
+.gutter-del, .mid-del { background: var(--diff-del-gutter); }
+.gutter-mod, .mid-mod { background: var(--diff-mod-gutter); }
+.gutter-ins, .gutter-del, .gutter-mod { color: var(--fg-2); }
+.gutter-none { background: var(--diff-empty-bg); }
 
-.cell-addition {
-  background: var(--diff-add-bg);
-}
-
-.cell-deletion {
-  background: var(--diff-del-bg);
-}
-
+/* 不显示 +/- 标记列：增删由底色表示（JetBrains 的做法）。标记仍留在 DOM 里，读屏可读。 */
 .marker {
-  display: inline-block;
-  width: 10px;
-  color: var(--diff-marker-fg);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .tok-plain { color: var(--syntax-plain); }
@@ -451,7 +808,7 @@
 .tok-operator { color: var(--syntax-operator); }
 .tok-invalid { color: var(--syntax-invalid); }
 
-/* Git 状态色（Q31：只有状态字母上色，文件名保持正常颜色） */
+/* Git 状态色（Q31：只有状态字母上色，文件名保持正常颜色；颜色照 JetBrains 文件状态色，Q107） */
 .status-M { color: var(--status-modified); }
 .status-A { color: var(--status-added); }
 .status-D { color: var(--status-deleted); }
@@ -461,21 +818,21 @@
 .status-untracked { color: var(--status-untracked); }
 
 :root {
-  --status-modified: #9a6700;
-  --status-added: #1a7f37;
-  --status-deleted: #cf222e;
-  --status-renamed: #0969da;
-  --status-conflict: #bf3989;
-  --status-untracked: #57606a;
+  --status-modified: #2f65ca;
+  --status-added: #3e8a42;
+  --status-deleted: #7f838e;
+  --status-renamed: #2f65ca;
+  --status-conflict: #d02e2e;
+  --status-untracked: #b4462b;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --status-modified: #d29922;
-    --status-added: #3fb950;
-    --status-deleted: #f85149;
-    --status-renamed: #58a6ff;
-    --status-conflict: #db61a2;
-    --status-untracked: #8b949e;
+    --status-modified: #548af7;
+    --status-added: #73bd79;
+    --status-deleted: #868a91;
+    --status-renamed: #548af7;
+    --status-conflict: #f75464;
+    --status-untracked: #d1675a;
   }
 }

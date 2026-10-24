@@ -514,13 +514,14 @@ const RowView = memo(function RowView({
   if (view === "unified") {
     const version: FileVersion = row.lineKind === "addition" ? "new" : "old";
     const line = row.lineKind === "addition" ? row.newLine : row.oldLine;
+    const tone = toneOf(row.lineKind, row.modified);
     return (
       <div className="row row-unified" style={style}>
-        <span className="gutter">{row.oldLine ?? ""}</span>
-        <span className="gutter">{row.newLine ?? ""}</span>
+        <span className={gutterClass(tone)}>{row.oldLine ?? ""}</span>
+        <span className={gutterClass(tone)}>{row.newLine ?? ""}</span>
         <Cell
           text={row.text ?? ""}
-          kind={row.lineKind ?? "context"}
+          tone={tone}
           marker={markerFor(row.lineKind)}
           tokens={getTokens(version, line)}
           highlights={highlights}
@@ -529,23 +530,41 @@ const RowView = memo(function RowView({
     );
   }
 
+  const leftTone = toneOf(row.left?.kind, row.modified);
+  const rightTone = toneOf(row.right?.kind, row.modified);
   return (
     <div className="row row-split" style={style}>
-      <span className="gutter">{row.left?.line ?? ""}</span>
+      <span className={row.left ? gutterClass(leftTone) : "gutter gutter-none"}>{row.left?.line ?? ""}</span>
       <SplitCell
         cell={row.left}
+        tone={leftTone}
         highlights={highlights}
         tokens={getTokens("old", row.left?.line)}
       />
-      <span className="gutter">{row.right?.line ?? ""}</span>
+      <span className={`mid${leftTone || rightTone ? ` mid-${row.modified ? "mod" : (rightTone ?? leftTone)}` : ""}`} />
+      <span className={row.right ? gutterClass(rightTone) : "gutter gutter-none"}>{row.right?.line ?? ""}</span>
       <SplitCell
         cell={row.right}
+        tone={rightTone}
         highlights={highlights}
         tokens={getTokens("new", row.right?.line)}
       />
     </div>
   );
 });
+
+/** 行的着色：修改块蓝、纯新增绿、纯删除灰（JetBrains diff 配色，Q107）。 */
+type LineTone = "mod" | "ins" | "del" | null;
+
+function toneOf(kind: RenderRow["lineKind"] | RowCell["kind"] | undefined, modified: boolean): LineTone {
+  if (kind === "addition") return modified ? "mod" : "ins";
+  if (kind === "deletion") return modified ? "mod" : "del";
+  return null;
+}
+
+function gutterClass(tone: LineTone): string {
+  return tone ? `gutter gutter-${tone}` : "gutter";
+}
 
 function markerFor(kind?: RenderRow["lineKind"] | RowCell["kind"]): string {
   if (kind === "addition") return "+";
@@ -567,19 +586,19 @@ function tokensMatchText(tokens: ReturnType<HighlightStore["get"]>, text: string
 
 function Cell({
   text,
-  kind,
+  tone,
   marker,
   tokens,
   highlights,
 }: {
   text: string;
-  kind: RowCell["kind"];
+  tone: LineTone;
   marker: string;
   tokens: ReturnType<HighlightStore["get"]>;
   highlights: HighlightStore;
 }) {
   return (
-    <span className={`cell cell-${kind}`}>
+    <span className={tone ? `cell cell-${tone}` : "cell"}>
       <span className="marker">{marker}</span>
       {tokensMatchText(tokens, text)
         ? tokens!.map((token, index) => (
@@ -594,16 +613,18 @@ function Cell({
 
 function SplitCell({
   cell,
+  tone,
   highlights,
   tokens,
 }: {
   cell: RowCell | null;
+  tone: LineTone;
   highlights: HighlightStore;
   tokens: ReturnType<HighlightStore["get"]>;
 }) {
   if (!cell) return <span className="cell empty" />;
   return (
-    <span className={`cell cell-${cell.kind}`}>
+    <span className={tone ? `cell cell-${tone}` : "cell"}>
       <span className="marker">{markerFor(cell.kind)}</span>
       {tokensMatchText(tokens, cell.text)
         ? tokens!.map((token, index) => (

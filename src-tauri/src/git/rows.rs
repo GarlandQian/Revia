@@ -72,6 +72,8 @@ pub struct RenderRow {
     pub text: Option<String>,
     pub left: Option<RowCell>,
     pub right: Option<RowCell>,
+    /// 该行属于“先删后增”的修改块：同一块里既有删除行又有新增行。界面据此把修改与纯新增、纯删除分开着色。
+    pub modified: bool,
 }
 
 /// hunk 在某个视图里的位置，供 F7 / ⇧F7 跳转使用。
@@ -108,11 +110,13 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
             text: None,
             left: None,
             right: None,
+            modified: false,
         });
 
         match view {
             ViewMode::Unified => {
-                for line in &hunk.lines {
+                let modified = modified_lines(&hunk.lines);
+                for (line, modified) in hunk.lines.iter().zip(modified) {
                     rows.push(RenderRow {
                         kind: RowKind::Line,
                         hunk_index: hunk_index as u32,
@@ -124,6 +128,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                         text: Some(line.text.clone()),
                         left: None,
                         right: None,
+                        modified,
                     });
                 }
             }
@@ -147,6 +152,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                             right: line
                                 .new_line
                                 .map(|number| RowCell { line: number, kind: line.kind, text: line.text.clone() }),
+                            modified: false,
                         });
                         cursor += 1;
                         continue;
@@ -163,6 +169,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                         cursor += 1;
                     }
 
+                    let modified = !deletions.is_empty() && !additions.is_empty();
                     let count = deletions.len().max(additions.len());
                     for pair in 0..count {
                         let left_line = deletions.get(pair).map(|index| &hunk.lines[*index]);
@@ -190,6 +197,7 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
                                     text: line.text.clone(),
                                 })
                             }),
+                            modified,
                         });
                     }
                 }
@@ -197,6 +205,31 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
         }
     }
     rows
+}
+
+/// 按并排视图的配对规则（连续删除行 + 紧随的连续新增行为一块）标出每行是否属于修改块，
+/// 让统一视图与并排视图对同一行给出相同的判断。
+fn modified_lines(lines: &[crate::git::diff::DiffLine]) -> Vec<bool> {
+    let mut flags = vec![false; lines.len()];
+    let mut cursor = 0;
+    while cursor < lines.len() {
+        if lines[cursor].kind != LineKind::Deletion && lines[cursor].kind != LineKind::Addition {
+            cursor += 1;
+            continue;
+        }
+        let start = cursor;
+        while cursor < lines.len() && lines[cursor].kind == LineKind::Deletion {
+            cursor += 1;
+        }
+        let deletions_end = cursor;
+        while cursor < lines.len() && lines[cursor].kind == LineKind::Addition {
+            cursor += 1;
+        }
+        if deletions_end > start && cursor > deletions_end {
+            flags[start..cursor].fill(true);
+        }
+    }
+    flags
 }
 
 /// 每个 hunk 在两种视图里的行下标。
@@ -332,6 +365,44 @@ diff --git a/src/app.ts b/src/app.ts
             .find(|row| row.right.as_ref().is_some_and(|cell| cell.text == "const c = 4;"))
             .expect("找到第二条新增行");
         assert!(second.left.is_none(), "没有配对的删除行时左侧为空");
+    }
+
+    #[test]
+    fn modified_marks_only_blocks_with_both_kinds() {
+        let patch = "\
+diff --git a/x.ts b/x.ts
+--- a/x.ts
++++ b/x.ts
+@@ -1,5 +1,5 @@
+ keep();
+-old();
++new();
++extra();
+ keep();
+-gone();
+@@ -20,1 +20,2 @@
+ keep();
++only();
+";
+        let file = diff::parse(patch).files.into_iter().next().unwrap();
+        let unified = layout(&file, ViewMode::Unified);
+        let flag = |text: &str| unified.iter().find(|row| row.text.as_deref() == Some(text)).unwrap().modified;
+        assert!(flag("old();") && flag("new();") && flag("extra();"), "先删后增的整块都算修改");
+        assert!(!flag("keep();"), "上下文行不算修改");
+        assert!(!flag("gone();"), "纯删除不算修改");
+        assert!(!flag("only();"), "纯新增不算修改");
+        assert!(unified.iter().filter(|row| row.kind == RowKind::Hunk).all(|row| !row.modified));
+
+        let split = layout(&file, ViewMode::Split);
+        let pair = |text: &str| {
+            split
+                .iter()
+                .find(|row| [&row.left, &row.right].into_iter().flatten().any(|cell| cell.text == text))
+                .unwrap()
+                .modified
+        };
+        assert!(pair("old();") && pair("extra();"), "并排视图与统一视图对同一块给出相同判断");
+        assert!(!pair("gone();") && !pair("only();"));
     }
 
     #[test]

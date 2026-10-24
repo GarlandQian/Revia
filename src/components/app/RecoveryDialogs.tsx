@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { messages } from "@/lib/i18n/zh-CN";
 import { ipc } from "@/lib/ipc";
@@ -11,7 +12,8 @@ import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
 import type { RestoreAttempt } from "@/types/bindings/RestoreAttempt";
 import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 
-function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+/** `narrow` 用于确认类对话框；回收区面板需要更宽。 */
+function Modal({ title, children, onClose, narrow }: { title: string; children: ReactNode; onClose: () => void; narrow?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -19,9 +21,11 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
     return () => dialog?.close();
   }, []);
   return (
-    <dialog ref={ref} aria-label={title} className="recovery-dialog rounded-lg border bg-background p-5 text-foreground shadow-xl"
+    // JetBrains 样式的对话框：标题栏 + 内容，按钮靠右（Q107）。
+    <dialog ref={ref} aria-label={title} className="recovery-dialog rounded-[10px] border border-edge bg-popover px-4 pb-4 text-[13px] text-foreground shadow-2xl"
+      style={narrow ? { width: "min(420px, calc(100vw - 40px))" } : undefined}
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
-      <h2 className="mb-4 text-sm font-semibold">{title}</h2>
+      <h2 className="flex h-9 items-center font-semibold">{title}</h2>
       {children}
     </dialog>
   );
@@ -31,17 +35,20 @@ export function DiscardDialog({ path, worktree, section, valid, onConfirm, onClo
   path: string; worktree: string; section?: string; valid: boolean; onConfirm: () => void; onClose: () => void;
 }) {
   return (
-    <Modal title={section !== undefined ? messages.recovery.confirmHunk : messages.recovery.confirmFile} onClose={onClose}>
-      <div className="space-y-3 text-xs">
-        <p className="break-all font-mono font-semibold">{path}</p>
-        <p className="break-all text-muted-foreground">{worktree}</p>
-        {section !== undefined ? <pre className="whitespace-pre-wrap break-all font-mono">{section}</pre> : null}
-        <p className="leading-relaxed text-muted-foreground">{messages.recovery.safety}</p>
-        {!valid ? <p role="alert" className="text-destructive">{messages.recovery.changed}</p> : null}
+    <Modal title={messages.recovery.discardTitle} onClose={onClose} narrow>
+      <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 pt-1">
+        <TriangleAlert aria-hidden className="size-7 text-[var(--banner-warn-icon)]" strokeWidth={1.6} />
+        <div className="space-y-1.5">
+          <p className="font-semibold">{section !== undefined ? messages.recovery.confirmHunk : messages.recovery.confirmFile}</p>
+          <p className="break-all font-mono text-xs text-fg-2">{`${path} · ${worktree}`}</p>
+          {section !== undefined ? <pre className="whitespace-pre-wrap break-all font-mono text-xs">{section}</pre> : null}
+          <p className="text-[12.5px] leading-relaxed text-fg-2">{messages.recovery.safety}</p>
+          {!valid ? <p role="alert" className="text-[12.5px] text-destructive">{messages.recovery.changed}</p> : null}
+        </div>
       </div>
-      <div className="mt-5 flex justify-end gap-2">
-        <Button autoFocus variant="outline" size="sm" onClick={onClose}>{messages.recovery.cancel}</Button>
-        <Button variant="destructive" size="sm" disabled={!valid} onClick={onConfirm}>{messages.recovery.confirm}</Button>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button autoFocus variant="outline" onClick={onClose}>{messages.recovery.cancel}</Button>
+        <Button disabled={!valid} onClick={onConfirm}>{messages.recovery.confirm}</Button>
       </div>
     </Modal>
   );
@@ -481,7 +488,7 @@ export function CloseRequestDialog({ intent, writing, pending, onWait, onStay, o
 }) {
   const hasPending = pending.length > 0;
   return (
-    <Modal title={hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay}>
+    <Modal title={hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay} narrow>
       <div className="space-y-3 text-xs">
         <p className="leading-relaxed">
           {hasPending ? messages.close.pendingExplain : messages.close.explain}

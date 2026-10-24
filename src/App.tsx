@@ -2,7 +2,7 @@
  * 应用外壳：文件列表与只读 diff；M2 提供目标明确的整文件和 hunk 暂存操作。
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -17,11 +17,30 @@ import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
-import { Badge } from "@/components/ui/badge";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  CircleCheck,
+  CircleX,
+  Columns2,
+  GitBranch,
+  GitCommitHorizontal,
+  Inbox,
+  Loader2,
+  Lock,
+  Minus,
+  Plus,
+  RefreshCwOff,
+  RotateCw,
+  Rows3,
+  TriangleAlert,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChangesList, type Selection } from "@/components/app/ChangesList";
+import { FileTypeIcon } from "@/components/app/FileTypeIcon";
 import { CloseRequestDialog, DiscardDialog, RecoveryDialog } from "@/components/app/RecoveryDialogs";
 import { logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
@@ -34,7 +53,7 @@ import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog, MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import { CloseCoordinator, runReviewRecoveryBatch } from "@/lib/refreshGate";
@@ -1830,9 +1849,7 @@ export function App() {
           const anchorLine = lineOf(beforeAnchor);
 
           const clickView = (label: string) => {
-            const buttons = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'));
-            const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
-            button?.click();
+            selectViewInUi(label === messages.diff.unified ? "unified" : "split");
           };
           // 切换后等锚点行真正落到顶部（pendingAnchor 的定位是异步的）。
           const topLine = () => {
@@ -2000,13 +2017,10 @@ export function App() {
         };
         // 通过工具栏事件调用最新渲染闭包，避免长期任务持有旧的选中项。
         const clickView = async (label: string, rowCount: number) => {
-          const buttons = Array.from(
-            document.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
-          );
-          const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
-          if (!button) throw new Error(`找不到视图按钮：${label}`);
-          button.click();
-          if (!await waitForSoak(() => button.getAttribute("aria-pressed") === "true"
+          const target: ViewMode = label === messages.diff.unified ? "unified" : "split";
+          const select = selectViewInUi(target);
+          if (!select) throw new Error(`找不到视图下拉：${label}`);
+          if (!await waitForSoak(() => select.value === target
             && rowStore.rowCountValue === rowCount && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
             throw new Error(`视图切换未完成：${label}`);
           }
@@ -2456,38 +2470,61 @@ export function App() {
   }, [diffArea, selectedEntry]);
 
   if (!bootstrapDone) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">载入中…</div>;
+    return <div className="flex h-full items-center justify-center text-fg-2">载入中…</div>;
   }
 
   if (repos.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <h1 className="text-lg font-medium">{messages.firstRun.title}</h1>
-        <p className="max-w-md text-center text-sm text-muted-foreground">{messages.firstRun.description}</p>
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8" data-tauri-drag-region>
+        <h1 className="text-[15px] font-semibold">{messages.firstRun.title}</h1>
+        <p className="max-w-md text-center text-fg-2">{messages.firstRun.description}</p>
         <Button onClick={() => void chooseRepo()} disabled={busy}>
           {messages.firstRun.addButton}
         </Button>
-        <p className="text-xs text-muted-foreground">{messages.firstRun.dragHint}</p>
-        {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+        <p className="text-xs text-fg-2">{messages.firstRun.dragHint}</p>
+        {error ? (
+          <div className="island w-full max-w-lg">
+            <ErrorBanner error={error} onDismiss={dismissError} />
+          </div>
+        ) : null}
       </div>
     );
   }
 
   const collapsed = diffArea === "collapsed";
+  const allReviewed = !!reviewNotice
+    && reviewNotice.worktreeId === snapshot?.worktreeId
+    && !!snapshot?.review
+    && reviewNotice.total === snapshot.review.total
+    && reviewNotice.reviewedCount === snapshot.review.reviewedCount
+    && snapshot.review.total > 0
+    && snapshot.review.reviewedCount === snapshot.review.total;
 
-
+  // 布局照 Rebased（Q107）：主工具栏 / 图标条 + “变更”工具窗口 + diff 编辑区 / 状态栏。
   return (
-    <div className="grid h-full grid-cols-[300px_1fr] grid-rows-1 overflow-hidden">
-      <aside className="flex min-h-0 flex-col border-r bg-sidebar/60">
-        <div className="flex items-center gap-2 px-3 py-2">
-          <span className="truncate text-sm font-medium" title={activeRepo?.path}>
-            {activeRepo?.name ?? messages.app.name}
-          </span>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => void chooseRepo()}>
-            {messages.firstRun.addButton}
-          </Button>
-        </div>
-        <Separator />
+    <div className="grid h-full grid-cols-[40px_300px_minmax(0,1fr)] grid-rows-[40px_minmax(0,1fr)_24px] overflow-hidden">
+      <MainToolbar
+        repo={activeRepo}
+        worktrees={activeRepo?.worktrees ?? []}
+        activeWorktreeId={worktreeId}
+        onWorktree={(id) => void switchWorktree(id)}
+        onChooseRepo={() => void chooseRepo()}
+        busy={busy}
+        watchError={watchState.error}
+      />
+      <ToolStripe recoveryOpen={recoveryOpen} onRecovery={() => setRecoveryOpen(true)} />
+      <aside className="island mr-[3px] mb-1 flex flex-col bg-tool">
+        <div className="flex h-[34px] shrink-0 items-center px-3 font-semibold">{messages.changes.toolWindow}</div>
+        <ChangesToolbar
+          selectedEntry={selectedEntry}
+          isWriting={isWriting}
+          busy={busy}
+          review={snapshot?.review ?? null}
+          onRefresh={() => void refresh()}
+          onStage={(entry) => void stageFile(entry)}
+          onUnstage={(entry) => void unstageFile(entry)}
+          onDiscard={discardFile}
+        />
         {snapshot ? (
           <ChangesList
             snapshot={snapshot}
@@ -2499,61 +2536,61 @@ export function App() {
             onToggleReview={(entry, marked) => void setReviewMark(entry, marked)}
           />
         ) : (
-          <div className="p-3 text-xs text-muted-foreground">{messages.changes.loading}</div>
+          <div className="px-3 py-2 text-fg-2">{messages.changes.loading}</div>
         )}
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-        <Toolbar
-          view={view}
-          onView={(next) => void switchView(next)}
-          onRefresh={() => void refresh()}
-          busy={busy}
-          selectedEntry={selectedEntry}
-          isWriting={isWriting}
-          onStage={(entry) => void stageFile(entry)}
-          onUnstage={(entry) => void unstageFile(entry)}
-          onDiscard={discardFile}
-          onRecovery={() => setRecoveryOpen(true)}
-          worktrees={activeRepo?.worktrees ?? []}
-          activeWorktreeId={worktreeId}
-          onWorktree={(id) => void switchWorktree(id)}
-          watch={watchState}
-        />
+      <main className="island mr-1.5 mb-1 ml-[3px] flex min-w-0 flex-col bg-island">
+        {selectedEntry ? (
+          <EditorHeader
+            entry={selectedEntry}
+            view={view}
+            onView={(next) => void switchView(next)}
+            canNavigate={diffArea === "diff"}
+            onJump={jumpToHunk}
+            isWriting={isWriting}
+            onStage={(entry) => void stageFile(entry)}
+            onUnstage={(entry) => void unstageFile(entry)}
+            onDiscard={discardFile}
+          />
+        ) : null}
         {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
-        {reviewNotice
-          && reviewNotice.worktreeId === snapshot?.worktreeId
-          && snapshot?.review
-          && reviewNotice.total === snapshot.review.total
-          && reviewNotice.reviewedCount === snapshot.review.reviewedCount
-          && snapshot.review.total > 0
-          && snapshot.review.reviewedCount === snapshot.review.total ? (
-          <div role="status" className="border-b bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-            {messages.review.allReviewed}
-          </div>
+        {allReviewed ? (
+          <EditorBanner tone="info" icon={CircleCheck}>
+            <span className="font-semibold">{messages.review.allReviewed}</span>
+          </EditorBanner>
         ) : null}
         {watchState.error ? (
-          <div className="border-b bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-            {messages.changes.watchUnavailableHint}
-          </div>
+          <EditorBanner tone="warn" icon={RefreshCwOff} action={{ label: messages.changes.refresh, run: () => void refresh() }}>
+            <span className="mr-1.5 font-semibold">{messages.changes.watchUnavailable}</span>
+            {messages.changes.watchUnavailableDetail}
+          </EditorBanner>
+        ) : null}
+        {selectedEntry?.unmerged ? (
+          <EditorBanner tone="error" icon={TriangleAlert}>{messages.changes.conflict}</EditorBanner>
         ) : null}
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {!selectedEntry ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              {messages.changes.noSelection}
-            </div>
+            <Hint title={messages.changes.noSelection} />
           ) : selectedEntry.unmerged ? (
-            <Hint text={messages.changes.conflict} />
+            <Hint title={messages.changes.conflictTitle} />
           ) : diffArea === "readonly" && selectedEntry.readonlyReason ? (
-            <Hint text={messages.changes.readonlyReasons[selectedEntry.readonlyReason]} />
+            <Hint title={messages.changes.readonly} detail={messages.changes.readonlyReasons[selectedEntry.readonlyReason]} />
           ) : diffArea === "loading" ? (
-            <Hint text={messages.changes.loadingFile} />
+            <Hint title={messages.changes.loadingFile} />
           ) : collapsed ? (
-            <Hint text={messages.changes.collapsed} action={{ label: messages.changes.expand, run: () => expandEntry(selectedEntry) }} />
+            <Hint
+              title={messages.changes.collapsed}
+              detail={messages.changes.collapsedDetail}
+              action={{ label: messages.changes.expandDiff, run: () => expandEntry(selectedEntry) }}
+            />
           ) : selectedEntry.binary ? (
-            <Hint text={messages.changes.binary} />
+            <Hint
+              title={messages.changes.binary}
+              detail={selectedEntry.changes === "unstaged" ? messages.changes.binaryDetail : undefined}
+            />
           ) : selectedEntry.hunkCount === 0 ? (
-            <Hint text={messages.changes.emptyFile} />
+            <Hint title={messages.changes.emptyFile} detail={messages.changes.emptyFileDetail} />
           ) : (
             <ErrorBoundary>
               <DiffView
@@ -2581,6 +2618,13 @@ export function App() {
           />
         ) : null}
       </main>
+
+      <StatusBar
+        repoName={activeRepo?.name ?? messages.app.name}
+        branch={snapshot?.branch ?? null}
+        entry={selectedEntry}
+        watchError={watchState.error}
+      />
       {discardConfirmation ? (
         <DiscardDialog path={discardConfirmation.target.path} worktree={discardConfirmation.worktree} section={discardConfirmation.section}
           valid={confirmationValid(discardConfirmation)} onClose={() => setDiscardConfirmation(null)}
@@ -2654,133 +2698,298 @@ export function App() {
   }
 }
 
-function Hint({ text, action }: { text: string; action?: { label: string; run: () => void } }) {
+/** 测量与长测通过真实的视图下拉切换视图，走与用户相同的 onChange 路径。 */
+function selectViewInUi(view: ViewMode): HTMLSelectElement | null {
+  const select = document.querySelector<HTMLSelectElement>("select[data-view-select]");
+  if (!select) return null;
+  select.value = view;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  return select;
+}
+
+/** 编辑区中央的一句提示（JetBrains 的空状态写法）：标题、可选说明、可选链接。 */
+function Hint({ title, detail, action }: { title: string; detail?: string; action?: { label: string; run: () => void } }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-      <span>{text}</span>
+    <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center text-fg-2">
+      <span className="text-foreground">{title}</span>
+      {detail ? <span className="max-w-md">{detail}</span> : null}
       {action ? (
-        <Button variant="secondary" size="sm" onClick={action.run}>
+        <button type="button" className="banner-link mt-1" onClick={action.run}>
           {action.label}
-        </Button>
+        </button>
       ) : null}
     </div>
   );
 }
 
-function Toolbar({
+function IconAction({ icon: Icon, label, disabled, pressed, onClick }: {
+  icon: LucideIcon;
+  label: string;
+  disabled?: boolean;
+  pressed?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button type="button" className="icon-action" title={label} aria-label={label} aria-pressed={pressed}
+      disabled={disabled} onClick={onClick}>
+      <Icon aria-hidden className="size-4" strokeWidth={1.6} />
+    </button>
+  );
+}
+
+/** 主工具栏：仓库与 worktree 组件（Q107），空白处可拖动窗口。 */
+function MainToolbar({
+  repo,
+  worktrees,
+  activeWorktreeId,
+  onWorktree,
+  onChooseRepo,
+  busy,
+  watchError,
+}: {
+  repo: RepoEntry | null;
+  worktrees: WorktreeEntry[];
+  activeWorktreeId: string | null;
+  onWorktree: (worktreeId: string) => void;
+  onChooseRepo: () => void;
+  busy: boolean;
+  watchError: string | null;
+}) {
+  const active = worktrees.find((worktree) => worktree.id === activeWorktreeId);
+  const worktreeLabel = (worktree: WorktreeEntry) =>
+    `${worktree.branch ?? worktree.path}${worktree.isMain ? ` ${messages.changes.worktreeMain}` : ""}`;
+  const name = repo?.name ?? messages.app.name;
+  return (
+    <header data-tauri-drag-region className="col-span-3 flex items-center gap-0.5 pr-2.5" style={{ paddingLeft: MAIN_TOOLBAR_INSET }}>
+      <button type="button" className="toolbar-widget" disabled={busy} onClick={onChooseRepo}
+        title={repo ? `${repo.path}\n${messages.toolbar.chooseRepo}` : messages.toolbar.chooseRepo}>
+        <span aria-hidden className="project-badge">{name.slice(0, 1).toUpperCase()}</span>
+        <span>{name}</span>
+        <ChevronDown aria-hidden className="size-3 text-fg-2" strokeWidth={2} />
+      </button>
+      {active ? (
+        worktrees.length > 1 ? (
+          <label className="toolbar-widget relative has-[select:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]">
+            <GitBranch aria-hidden className="size-4 text-icon" strokeWidth={1.6} />
+            <span>{worktreeLabel(active)}</span>
+            <ChevronDown aria-hidden className="size-3 text-fg-2" strokeWidth={2} />
+            <select
+              aria-label={messages.changes.worktreeLabel}
+              className="absolute inset-0 cursor-default opacity-0"
+              value={activeWorktreeId ?? ""}
+              onChange={(event) => onWorktree(event.target.value)}
+            >
+              {worktrees.map((worktree) => (
+                <option key={worktree.id} value={worktree.id}>{worktreeLabel(worktree)}</option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="toolbar-widget">
+            <GitBranch aria-hidden className="size-4 text-icon" strokeWidth={1.6} />
+            <span>{worktreeLabel(active)}</span>
+          </span>
+        )
+      ) : null}
+      <span className="flex-1 self-stretch" data-tauri-drag-region />
+      {watchError ? (
+        <span className="warn-chip" title={watchError}>
+          <RefreshCwOff aria-hidden className="size-3.5" strokeWidth={1.8} />
+          {messages.changes.watchUnavailable}
+        </span>
+      ) : null}
+    </header>
+  );
+}
+
+/** 左侧工具窗口图标条：只有“变更”和“回收区”（不借此新增功能，Q100）。 */
+function ToolStripe({ recoveryOpen, onRecovery }: { recoveryOpen: boolean; onRecovery: () => void }) {
+  return (
+    <nav aria-label={messages.toolbar.toolWindows} className="flex flex-col items-center gap-1 pt-0.5">
+      <button type="button" className="icon-action size-[30px]" aria-pressed="true" title={messages.changes.toolWindow}
+        aria-label={messages.changes.toolWindow}
+        onClick={() => document.querySelector<HTMLElement>(".change-list")?.focus()}>
+        <GitCommitHorizontal aria-hidden className="size-[18px]" strokeWidth={1.6} />
+      </button>
+      <button type="button" className="icon-action size-[30px]" aria-pressed={recoveryOpen} title={messages.recovery.title}
+        aria-label={messages.recovery.title} onClick={onRecovery}>
+        <Inbox aria-hidden className="size-[18px]" strokeWidth={1.6} />
+      </button>
+    </nav>
+  );
+}
+
+/** “变更”工具窗口的图标工具条：刷新、暂存、取消暂存、丢弃，右侧是审阅进度。 */
+function ChangesToolbar({
+  selectedEntry,
+  isWriting,
+  busy,
+  review,
+  onRefresh,
+  onStage,
+  onUnstage,
+  onDiscard,
+}: {
+  selectedEntry: ChangeEntry | null;
+  isWriting: boolean;
+  busy: boolean;
+  review: ChangesSnapshot["review"] | null;
+  onRefresh: () => void;
+  onStage: (entry: ChangeEntry) => void;
+  onUnstage: (entry: ChangeEntry) => void;
+  onDiscard: (entry: ChangeEntry) => void;
+}) {
+  const writable = selectedEntry && !selectedEntry.readonlyReason && !isWriting ? selectedEntry : null;
+  return (
+    <div className="flex h-[30px] shrink-0 items-center gap-0.5 pr-2.5 pl-1.5">
+      <IconAction icon={RotateCw} label={messages.changes.refresh} disabled={busy} onClick={onRefresh} />
+      <span aria-hidden className="mx-1 h-4 w-px bg-border" />
+      <IconAction icon={Plus} label={messages.changes.shortcuts.stageFile}
+        disabled={!writable || writable.changes === "staged"} onClick={() => writable && onStage(writable)} />
+      <IconAction icon={Minus} label={messages.changes.shortcuts.unstageFile}
+        disabled={!writable || writable.changes !== "staged"} onClick={() => writable && onUnstage(writable)} />
+      <IconAction icon={Undo2} label={messages.changes.shortcuts.discardFile}
+        disabled={!writable || writable.changes !== "unstaged"} onClick={() => writable && onDiscard(writable)} />
+      {review ? (
+        <span className="ml-auto text-xs whitespace-nowrap text-fg-2 tabular-nums">
+          {messages.review.progress(review.reviewedCount, review.total)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** 编辑区顶部：单个文件标签（不做多标签，Q16）和 diff 工具条。 */
+function EditorHeader({
+  entry,
   view,
   onView,
-  onRefresh,
-  busy,
-  selectedEntry,
+  canNavigate,
+  onJump,
   isWriting,
   onStage,
   onUnstage,
   onDiscard,
-  onRecovery,
-  worktrees,
-  activeWorktreeId,
-  onWorktree,
-  watch,
 }: {
+  entry: ChangeEntry;
   view: ViewMode;
   onView: (view: ViewMode) => void;
-  onRefresh: () => void;
-  busy: boolean;
-  selectedEntry: ChangeEntry | null;
+  canNavigate: boolean;
+  onJump: (direction: 1 | -1) => void;
   isWriting: boolean;
-  onStage?: (entry: ChangeEntry) => void;
-  onUnstage?: (entry: ChangeEntry) => void;
+  onStage: (entry: ChangeEntry) => void;
+  onUnstage: (entry: ChangeEntry) => void;
   onDiscard: (entry: ChangeEntry) => void;
-  onRecovery: () => void;
-  worktrees: WorktreeEntry[];
-  activeWorktreeId: string | null;
-  onWorktree: (worktreeId: string) => void;
-  watch: { active: boolean; error: string | null };
+}) {
+  const slash = entry.path.lastIndexOf("/");
+  const name = entry.path.slice(slash + 1);
+  const dir = slash > 0 ? entry.path.slice(0, slash) : messages.changes.repoRoot;
+  const group = entry.changes === "staged"
+    ? messages.changes.staged
+    : entry.changes === "untracked" ? messages.changes.untracked : messages.changes.unstaged;
+  const ViewIcon = view === "unified" ? Rows3 : Columns2;
+  return (
+    <>
+      <div className="flex h-9 shrink-0 px-1.5 shadow-[inset_0_-1px_0_var(--border)]">
+        <div className="editor-tab" title={entry.path}>
+          <FileTypeIcon path={entry.path} symlink={entry.readonlyReason === "symlink"} />
+          <span className="truncate">{name}</span>
+          <span className="truncate text-xs text-fg-2">{`${dir} · ${group}`}</span>
+        </div>
+      </div>
+      <div className="flex h-8 shrink-0 items-center gap-0.5 px-2 shadow-[inset_0_-1px_0_var(--border)]">
+        <IconAction icon={ArrowUp} label={messages.diff.previousHunkShortcut} disabled={!canNavigate} onClick={() => onJump(-1)} />
+        <IconAction icon={ArrowDown} label={messages.diff.nextHunkShortcut} disabled={!canNavigate} onClick={() => onJump(1)} />
+        <span aria-hidden className="mx-1.5 h-4 w-px bg-border" />
+        <span className="relative inline-flex items-center">
+          <ViewIcon aria-hidden className="pointer-events-none absolute left-2 size-4 text-icon" strokeWidth={1.6} />
+          <select
+            data-view-select
+            aria-label={messages.diff.viewLabel}
+            className="widget-select pl-7"
+            value={view}
+            onChange={(event) => onView(event.target.value as ViewMode)}
+          >
+            <option value="split">{messages.diff.viewSplit}</option>
+            <option value="unified">{messages.diff.viewUnified}</option>
+          </select>
+        </span>
+        <span className="flex-1" />
+        {entry.readonlyReason ? (
+          <span className="inline-flex h-[22px] items-center gap-1 rounded px-2 text-xs text-fg-2 ring-1 ring-edge ring-inset"
+            title={messages.changes.readonlyReasons[entry.readonlyReason]}>
+            <Lock aria-hidden className="size-3.5" strokeWidth={1.6} />
+            {messages.changes.readonly}
+          </span>
+        ) : entry.changes === "staged" ? (
+          <Button variant="outline" size="sm" disabled={isWriting} onClick={() => onUnstage(entry)}
+            title={messages.changes.shortcuts.unstageFile}>
+            {isWriting ? <Loader2 aria-hidden className="animate-spin" /> : <Minus aria-hidden />}
+            {isWriting ? messages.changes.writing : messages.changes.unstageFile}
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" disabled={isWriting} onClick={() => onStage(entry)}
+            title={messages.changes.shortcuts.stageFile}>
+            {isWriting ? <Loader2 aria-hidden className="animate-spin" /> : <Plus aria-hidden />}
+            {isWriting ? messages.changes.writing : messages.changes.stageFile}
+          </Button>
+        )}
+        {entry.changes === "unstaged" && !entry.readonlyReason ? (
+          <Button variant="outline" size="sm" className="ml-1.5" disabled={isWriting} onClick={() => onDiscard(entry)}
+            title={messages.changes.shortcuts.discardFile}>
+            <Undo2 aria-hidden />
+            {messages.changes.discardShort}
+          </Button>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+/** 编辑区顶部提示条：信息、警告、错误三种（JetBrains 的编辑器通知）。 */
+function EditorBanner({ tone, icon: Icon, action, children }: {
+  tone: "info" | "warn" | "error";
+  icon: LucideIcon;
+  action?: { label: string; run: () => void };
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 border-b px-3 py-1.5">
-      {worktrees.length > 1 ? (
-        <>
-          <select
-            aria-label={messages.changes.worktreeLabel}
-            className="h-7 max-w-[220px] truncate rounded-md border bg-background px-2 text-xs"
-            value={activeWorktreeId ?? ""}
-            onChange={(event) => onWorktree(event.target.value)}
-          >
-            {worktrees.map((worktree) => (
-              <option key={worktree.id} value={worktree.id}>
-                {worktree.branch ?? worktree.path}
-                {worktree.isMain ? ` ${messages.changes.worktreeMain}` : ""}
-              </option>
-            ))}
-          </select>
-          <Separator orientation="vertical" className="h-5" />
-        </>
+    <div role={tone === "error" ? "alert" : "status"} className="editor-banner shrink-0" data-tone={tone}>
+      <Icon aria-hidden className="size-4" strokeWidth={1.8} />
+      <div className="min-w-0 flex-1">{children}</div>
+      {action ? (
+        <button type="button" className="banner-link" onClick={action.run}>
+          {action.label}
+        </button>
       ) : null}
-      <ToggleGroup
-        value={[view]}
-        onValueChange={(values) => {
-          const next = values[0];
-          if (next === "split" || next === "unified") onView(next);
-        }}
-        size="sm"
-        variant="outline"
-      >
-        <ToggleGroupItem value="split">{messages.diff.split}</ToggleGroupItem>
-        <ToggleGroupItem value="unified">{messages.diff.unified}</ToggleGroupItem>
-      </ToggleGroup>
-      <Separator orientation="vertical" className="h-5" />
-      <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>
-        {messages.changes.refresh}
-      </Button>
-      {selectedEntry ? (
-        <>
-          <Separator orientation="vertical" className="h-5" />
-          {selectedEntry.readonlyReason ? (
-            <Badge
-              variant="outline"
-              className="text-xs text-muted-foreground"
-              title={messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
-            >
-              {messages.changes.readonly}
-            </Badge>
-          ) : selectedEntry.changes === "staged" ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isWriting}
-              onClick={() => onUnstage?.(selectedEntry)}
-              title={messages.changes.shortcuts.unstageFile}
-            >
-              {isWriting ? messages.changes.writing : messages.changes.unstageFile}
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isWriting}
-              onClick={() => onStage?.(selectedEntry)}
-              title={messages.changes.shortcuts.stageFile}
-            >
-              {isWriting ? messages.changes.writing : messages.changes.stageFile}
-            </Button>
-          )}
-        </>
-      ) : null}
-      {selectedEntry?.changes === "unstaged" && !selectedEntry.readonlyReason ? (
-        <Button variant="outline" size="sm" disabled={isWriting} onClick={() => onDiscard(selectedEntry)} title={messages.changes.shortcuts.discardFile}>
-          {messages.changes.discardFile}
-        </Button>
-      ) : null}
-      <Button variant="ghost" size="sm" onClick={onRecovery}>{messages.recovery.title}</Button>
-      {watch.error ? (
-        <Badge variant="outline" className="ml-auto shrink-0 text-xs text-destructive" title={watch.error}>
-          {messages.changes.watchUnavailable}
-        </Badge>
-      ) : null}
-
     </div>
+  );
+}
+
+/** 底部状态栏：仓库 › 分支 › 当前文件路径；自动刷新不可用时常驻提示（Q95）。 */
+function StatusBar({ repoName, branch, entry, watchError }: {
+  repoName: string;
+  branch: string | null;
+  entry: ChangeEntry | null;
+  watchError: string | null;
+}) {
+  const crumbs = [repoName, branch ?? messages.changes.detachedHead, ...(entry ? entry.path.split("/") : [])];
+  return (
+    <footer className="col-span-3 flex items-center gap-1.5 overflow-hidden pr-3 pl-3.5 text-xs whitespace-nowrap text-fg-2">
+      {crumbs.map((crumb, index) => (
+        <Fragment key={index}>
+          {index ? <span aria-hidden className="text-fg-3">›</span> : null}
+          <span className="truncate">{crumb}</span>
+        </Fragment>
+      ))}
+      <span className="flex-1" />
+      {watchError ? (
+        <span className="status-warn inline-flex items-center gap-1.5 text-foreground" title={watchError}>
+          <RefreshCwOff aria-hidden className="size-3.5" strokeWidth={1.8} />
+          {messages.changes.watchUnavailable}
+        </span>
+      ) : null}
+    </footer>
   );
 }
 
@@ -2795,14 +3004,13 @@ function ErrorBanner({ error, onDismiss }: { error: AppErrorPayload; onDismiss: 
           : error.kind === "rejected"
             ? messages.errors.rejected
             : messages.errors.internal;
+  const warn = error.kind === "needsVerification" || error.kind === "environment";
   return (
-    <div className="flex items-start gap-3 border-b bg-destructive/10 px-3 py-2 text-xs text-destructive">
-      <strong className="shrink-0">{title}</strong>
-      <pre className="min-w-0 flex-1 whitespace-pre-wrap font-mono">{error.message}</pre>
-      <Button variant="ghost" size="sm" onClick={onDismiss}>
-        {messages.errors.dismiss}
-      </Button>
-    </div>
+    <EditorBanner tone={warn ? "warn" : "error"} icon={warn ? TriangleAlert : CircleX}
+      action={{ label: messages.errors.dismiss, run: onDismiss }}>
+      <strong className="mr-1.5 font-semibold">{title}</strong>
+      <span className={error.kind === "git" ? "font-mono text-xs whitespace-pre-wrap" : "whitespace-pre-wrap"}>{error.message}</span>
+    </EditorBanner>
   );
 }
 

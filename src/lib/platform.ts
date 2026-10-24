@@ -10,6 +10,12 @@ export const isMac =
     navigator.userAgent.toUpperCase().indexOf("MACINTOSH") >= 0);
 
 /**
+ * 主工具栏左侧留白（像素）：macOS 的红绿灯覆盖在主工具栏左端（titleBarStyle: Overlay），
+ * 其他平台用原生标题栏，主工具栏从窗口边缘开始（Q60）。
+ */
+export const MAIN_TOOLBAR_INSET = isMac ? 84 : 10;
+
+/**
  * 判断主修饰键（macOS 为 Command/Meta，Windows/Linux 为 Control）。
  *
  * 严格互斥：在 macOS 上 Ctrl 键绝不冒充 ⌘（Command），避免在 Mac 上按 Ctrl 触发 ⌘ 快捷键（审查意见 6）。

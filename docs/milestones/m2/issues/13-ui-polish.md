@@ -36,3 +36,16 @@
 ### 2026-10-24 / 规划方（Claude）：rev3 效果图经用户确认，由 Claude 接手实现
 
 用户不满意 rev1，要求 Claude 接手。macOS 原生风格的 rev2 两版（`13-mockups-rev2/`）用户未采用；按 Q107 改照 Rebased（JetBrains 新版界面）原样重画 rev3（`13-mockups-rev3/`），用户确认。实现在 `m2-ui` 分支（基于 m2 `be02cb7`），完成后合回 `m2`。
+
+### 2026-10-24 / 规划方（Claude）：按 rev3 实现完成，待桌面验收
+
+实现（`m2-ui` 分支）：
+
+- 布局照 Rebased：主工具栏（仓库与 worktree 组件，可拖动窗口）、工具窗口图标条（变更、回收区）、“变更”工具窗口（刷新／暂存／取消暂存／丢弃图标条与审阅进度，三组可折叠，未跟踪默认收起）、diff 编辑区（单个文件标签、上一处／下一处差异、并排／统一下拉、文件级操作、编辑器提示条）、状态栏（仓库 › 分支 › 路径，自动刷新不可用时常驻提示）。
+- 外观：JetBrains Islands Light／Dark 配色，Inter 与 JetBrains Mono 随应用打包（仅拉丁子集）；diff 修改块蓝、纯新增绿、纯删除灰。为此 Rust 显示行新增 `modified` 字段，按并排视图的配对规则判断，不改变 hunk 划分和写前指纹。
+- 测量与长测的视图切换改为通过 `select[data-view-select]` 走真实的 onChange 路径。
+- 顺带修复：模态对话框原先贴在左上角（Tailwind preflight 把 `<dialog>` 的 margin 清零），现已居中；确认类对话框收窄到 420px。
+
+已验证：`tsc -b`、`pnpm lint`（只有 tools 里原有的警告）、`pnpm build`、`cargo test`（265 项）、tools 下的 node 与 Python 测试全部通过；用 WebKit 加模拟 IPC 渲染了浅色、深色主界面和 9 种状态，与 rev3 一致。
+
+未完成：真实桌面截图、D06 实测（都需要前台可见的窗口，当前用户远程、屏幕不可截取）、Windows 仅编译 CI（未推送）。红绿灯位置 `trafficLightPosition` 也要在真实窗口里确认。
