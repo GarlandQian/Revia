@@ -850,3 +850,43 @@ REVIA_TASK05_FIXTURE_BASE=/private/tmp \
 
 - [夹具准备原始7文件](../evidence/task05-fixture-review01/manifest.json)已按字节归档，保留原错误字段及原说明，不篡改历史。产品Release仍固定de89796，二进制未变。
 - Pi仅修上述test-only清单字段和文档；仅重跑显式ignored准备入口，保存精确命令、真实退出码、源码hash与原始stdout/stderr，新清单逐文件用标准SHA-256核对。保留旧fixture和原证据，不把新的结果替换旧结果；不要重建Release、操作GUI、跑全套或开始其他任务。
+
+### 2026-10-24 / Pi：桌面夹具 test-only 增量返修（R05-F1）
+
+只改 `src-tauri/tests/discard_recovery.rs` 与本段说明；未改产品行为、未重建 Release、未操作 GUI、未跑全套/D06/CI/长测。
+
+#### R05-F1-ST1 / SP2：`sha256` 改为文件原始字节的标准 SHA-256
+
+原清单用 `revia_lib::git::fingerprint(&[&bytes])`，那会先散列 u64 长度前缀，是 Revia 的写操作指纹，不是内容哈希，用 `shasum -a 256` 必然对不上。现在新增测试内 helper `standard_sha256`（沿用既有 `sha2` 依赖，未新增框架），直接对文件原始字节计算 SHA-256。
+
+核对：对本次新 fixture 的 5 个文件逐个运行 `shasum -a 256`，与清单字段逐条比对，**5/5 全部一致**（原始输出见 `/private/tmp/revia-task05-desktop-prep2-vcN7wR/sha256-crosscheck.txt`）。
+
+#### R05-F1-ST2 / SP1：删除记录的 before/after 说明纠正
+
+上一段说明写反了。实际构造是：`docs/removed.txt` 提交时存在（25 字节），工作区把它删掉后产生未暂存删除，丢弃这条改动会让文件重新出现。因此记录里 **before 不存在、after 存在 25 字节**；对这记录执行恢复会**删除**丢弃后重新出现的文件，回到丢弃前的不存在状态。本次只在清单的 `desktopSteps` 里写清这一点，未改生产丢弃/恢复行为，也没有伪造记录。
+
+同时补了一条可执行位的对照说明：`scripts/run.sh` 的 before 是可执行、after 不可执行，恢复后应重新变为可执行。
+
+#### 本次重新运行（只该入口 + 最小编译）
+
+- 日志目录（从文件读取的实际路径）：`/private/tmp/revia-task05-desktop-prep2-vcN7wR`
+- 基线：`eb0926c991886d47c98266e72cdeb9e10b3007f1`
+- 检查前 `src-tauri/tests/discard_recovery.rs` SHA-256：`a7088d60264609b6b622fca021ec4e08302b679e8866a3ba7e14405663f62c53`（运行后复核未变）
+- 命令：`REVIA_TASK05_FIXTURE_BASE=/private/tmp /opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml --test discard_recovery -- --ignored --exact --nocapture prepare_task05_desktop_fixture`
+- 退出码：`0`；原始输出 `fixture.out` / `fixture.err` / `fixture.exit`；解析清单 `fixture.json`；标准哈希核对 `sha256-crosscheck.txt`
+
+本轮未执行 `cargo build --tests`，也未跑产品/Rust 全套、前端、Release、GUI、D06、CI 或长测。
+
+#### 本次保留的新 fixture（实际路径，从 `fixture.json` 读取）
+
+- fixture 根：`/private/tmp/revia-task05-desktop-46oHkH`
+- 仓库：`/private/tmp/revia-task05-desktop-46oHkH/repo`
+- Revia 数据目录：`/private/tmp/revia-task05-desktop-46oHkH/revia-data`
+- 隔离 HOME：`/private/tmp/revia-task05-desktop-46oHkH/home`
+- worktreeId：`a5a5ddc07ffd7aac`
+
+上一轮的 fixture（`/private/tmp/revia-task05-desktop-QsnQlq`）与旧日志目录保持原样，未被覆盖。
+
+#### 边界
+
+仍是**数据准备辅助，不是桌面验收通过**：只证明清单字段是标准 SHA-256、删除记录的 before/after 描述与实际一致；桌面界面行为、恢复交互与 D06/CI 仍需规划方用固定 Release（`de89796`）验证。

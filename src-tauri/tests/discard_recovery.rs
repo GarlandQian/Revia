@@ -2473,6 +2473,17 @@ fn save_as_rejects_stale_expected_owner() {
     assert_eq!(fs::read(&outside).unwrap(), b"saved change\n");
 }
 
+/// 文件原始字节的标准 SHA-256（与 `shasum -a 256` 输出一致）。
+///
+/// 不用 `git::fingerprint`：那个先散列长度前缀，是 Revia 的写操作指纹，
+/// 不是内容哈希，无法用标准工具核对。
+fn standard_sha256(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 // ---------------- 桌面验收数据准备入口（默认 ignored） ----------------
 
 /// 桌面验收数据准备入口：**只用生产入口**生成可供桌面恢复的回收记录。
@@ -2641,7 +2652,9 @@ fn prepare_task05_desktop_fixture() {
                 "path": path,
                 "exists": true,
                 "bytes": bytes.len(),
-                "sha256": revia_lib::git::fingerprint(&[&bytes]),
+                // 文件**原始字节**的标准 SHA-256（与 `shasum -a 256` 一致），
+                // 不是带长度前缀的 Revia 指纹，便于用标准工具逐文件核对。
+                "sha256": standard_sha256(&bytes),
                 "executable": platform::executable(&meta),
             })
         })
@@ -2679,7 +2692,9 @@ fn prepare_task05_desktop_fixture() {
             "启动已构建的 Release 应用，并把数据目录指向 reviaDataDirectory（REVIA_ACCEPTANCE=1 + REVIA_ACCEPTANCE_DIR）",
             "仓库应显示为唯一登记的 fixture；回收区应列出 5 条 completed 记录",
             "对每条记录核对：详情两侧状态、单 hunk 记录提示恢复的是完整文件、二进制只显示信息",
-            "按 indexListing 与 worktreeFiles 的 sha256/可执行位还原初始工作区后再重复验证"
+            "docs/removed.txt 的 before 是不存在、after 存在 25 字节；对这条记录执行恢复会把丢弃后重新出现的文件删除回丢弃前的不存在状态",
+            "scripts/run.sh 的 before 是可执行、after 不可执行；恢复后应重新变为可执行",
+            "按 indexListing 与 worktreeFiles 的 sha256（标准 SHA-256，可用 shasum -a 256 核对）与可执行位还原初始工作区后再重复验证"
         ],
         "boundary": "只证明记录由生产入口生成且身份匹配；未验证桌面行为、未做 D06/CI/长测，不构成任务验收。",
     });
