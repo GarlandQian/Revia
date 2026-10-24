@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> R05-D1文案已在234f248固定Release桌面复验；该版Windows五项回收测试失败，交Pi返修。局部另存/确认失效通过不等于功能或CI完成，任务未done。
+> 固定 `234f248` 的 Windows CI 有 5 项 `discard_recovery` 失败，已在 R05-CI01 修复根因（`prepare_destination` 的 Windows verbatim 路径 component 拼接、两处 fixture 平台不兼容），macOS 240 项全通过。**Windows 真实 CI 与桌面验收仍未完成**，任务未 done。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -1001,3 +1001,60 @@ Windows五项实际失败（下列行号固定于234f248，不跟随正在实施
 
 
 固定Release第二次桌面局部结果与限制见[观察报告](../task05-desktop02.md)和[原始证据](../evidence/task05-desktop02/manifest.json)。恢复/清空标签及两次二进制原生另存成功、旧确认失效已实际观察；未执行恢复或清空。PID17852正常退出，唯一工作区变化为预定的外部blob编辑，暂存区和5条回收记录不变。
+
+### 2026-10-24 / Pi：Windows CI 五项失败返修（R05-CI01）
+
+只修 05 的 Windows CI 回归；未动 07 内容与状态，未做 08/12/13。未构建 Release、未操作 GUI、未跑 D06/长测、未推送。
+
+CI 40048580349（固定 `234f248`）：macOS 全通过；Windows 前端检查与 lib 93 通过，`discard_recovery` 52 passed / 5 failed / 1 ignored，release 跳过。
+
+#### 根因：两处，不是五项同一原因
+
+**A. `prepare_destination` 手工拼接路径 component（影响失败 3/4/5）**
+
+原实现把 `parent.components()` 逐个 `push` 进空 `PathBuf` 再 `symlink_metadata`。Windows 上 `canonicalize`/`TempDir` 给出 verbatim 路径 `\\?\C:\Users\runneradmin\...`，其 components 是 prefix `\\?\C:` 与 root `\`；先 push prefix 再 push root 得到 `\\?\C:\\Users`（多一个分隔符），此后每一级 stat 都失败，于是**合法父目录**被报「另存路径的上级目录不可访问」。这正是失败 4（`save_as_rejects_stale_expected_owner`）与 5（`save_recovery_command_locks_the_target_worktree`）的直接错误，也是失败 3（`save_as_protects_the_target_repository_metadata`）里「合法普通工作区新路径也被拒绝」的原因。
+
+修复：改用 `parent.ancestors()`（直接给出完整前缀路径），反转后从最外层开始逐级核对。保留全部既有契约：逐级符号链接拒绝、`.git` 组件拒绝、真实 `gitDir`/`commonDir`（含 `--separate-git-dir`、嵌套仓库）保护、`create_new`、已存在目标不覆盖。
+
+**B. 测试 fixture 的两处平台不兼容（影响失败 1/2）**
+
+- 失败 1 `publish_rechecks_identity_instead_of_reusing_captured_one`：原来靠 `fs::rename(&f.repo, &moved)` 制造身份变化，Windows 上因目录被占用返回 `PermissionDenied`（code 5），**根本没有跑到身份拒绝断言**。改为删掉 `.git` 并在同一路径重新 `git init`：worktree 目录不动，但 `gitDir` 与文件系统标识都变了，是真实的身份变化。断言仍要求 `Rejected` 且目标内容未被写入。
+- 失败 2 `save_as_belongs_to_the_target_worktree_and_respects_its_lock`：`git worktree add` 收到 verbatim 路径 `\\?\C:\...`，Git 报 `fatal: ... Invalid argument`。新增平台函数 `platform::external_path`（Windows 去掉 verbatim 前缀，UNC 形式还原为 `\\server\share`；非 Windows 原样返回），测试在传给 Git CLI 前转换。真实 linked worktree 与锁断言保留。
+
+#### 顺带收紧：错误原因不再被 `is_err()` 掩盖
+
+失败 3 之所以在 CI 上「看似保护生效」，是因为断言只判 `store.save_as(...).is_err()`。现在改为断言拒绝原因包含「Git 元数据」（普通 `.git` 与 `--separate-git-dir` 两处），失败 4 断言原因包含「归属已变化」。这样路径检查自身出错不会再被当成保护通过。
+
+#### 新增回归
+
+`save_as_accepts_legal_parent_and_still_rejects_symlinked_ancestor`（unix）：深层合法目录 `a/b/c/out.txt` 必须成功；其中一级换成符号链接时必须因「符号链接」被拒且不穿透写入。固定「合法可用 + 链接仍拒绝」两端。
+
+#### 生产调用点
+
+- `RecoveryStore::save_as` → `prepare_destination`（路径检查）
+- `commands::save_recovery_as` / `save_recovery_as_impl` → `execute_save_as`（目标 worktree 非排队写锁）
+- 测试侧：`platform::external_path` 只用于把路径交给 Git CLI，Rust 内部仍用 canonicalize 结果比较身份。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录（实际路径）：`/private/tmp/revia-task05-ci02-AJvoza`
+
+- 基线：`1056557c338137de6a61d81ca48212dd57d40d75`
+- 检查前源码 SHA-256（检查后复核未变）：
+  - `81b268711e831b799b226e9a401f4240a8b0009ddabc134a9b4ba782b77a4f93  src-tauri/src/recovery.rs`
+  - `66235b97cf5539443a2f4b81494329e0c2806c51b57b115df835a94cc26f2294  src-tauri/src/platform.rs`
+  - `5871c181ec2cf79c51c032788fbd43ff0b2105b23683cd2726637190e5793090  src-tauri/tests/discard_recovery.rs`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 0 | `cargo-test.out` / `cargo-test.err` / `cargo-test.exit` |
+
+Rust 合计 **240 项**：lib 99、`discard_recovery` **71**（1 ignored 桌面夹具）、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` 15、`review_marks` 8、`session_flow` 3。
+
+前端本轮未改（只改 Rust 平台边界与测试），按交接要求未重复 `tsc`/`lint`/`build`。
+
+#### 未验证（必须保留）
+
+- **Windows 未验证**：本轮在 macOS 上运行，只证明 macOS 未回归。五项是否在 Windows 上真的修好，需要规划方推送后由真实 CI 判定；本地通过不等于 Windows 通过。
+- 未构建 Release、未操作 GUI、未跑 D06/长测。
+- 05 仍保留未完成的桌面验收与最新双平台 CI，任务不 done。

@@ -1666,13 +1666,12 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
     let inspection = session.inspect_record(&id, &store).unwrap();
     let expected_after = f.read("target.ts");
 
-    let moved = f.root().join("moved-repo");
+    // 真实身份变化：删掉 `.git` 并在同一路径重新初始化（worktree 目录本身不动，
+    // 避免 Windows 上目录 rename 被占用句柄拒绝）。文件系统标识与 gitDir 都会变化。
     let error = session
         .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |phase| {
             if phase == revia_lib::recovery::RestorePhase::BeforeWrite {
-                // 原目录整体移走，同路径换成另一个仓库（新身份）。
-                fs::rename(&f.repo, &moved).unwrap();
-                fs::create_dir_all(&f.repo).unwrap();
+                fs::remove_dir_all(f.repo.join(".git")).unwrap();
                 let output = Command::new("git")
                     .current_dir(&f.repo)
                     .env_clear()
@@ -1680,7 +1679,7 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
                     .args(["init", "-b", "main"])
                     .output()
                     .unwrap();
-                assert!(output.status.success());
+                assert!(output.status.success(), "重新初始化失败：{output:?}");
                 fs::write(f.repo.join("target.ts"), b"new repo content\n").unwrap();
             }
             Ok(())
@@ -1688,7 +1687,7 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
         .unwrap_err();
     assert_eq!(error.kind, ErrorKind::Rejected, "身份改变必须拒绝：{error:?}");
     assert_eq!(f.read("target.ts"), b"new repo content\n", "新身份目录不得被写入");
-    assert_eq!(fs::read(moved.join("target.ts")).unwrap(), expected_after, "原内容不得被改");
+    assert_ne!(f.read("target.ts"), expected_after, "拒绝时不得写入恢复内容");
 }
 
 /// R05-R2-ST2/SP3：恢复历史进入生产查看（列表 + 详情），重启后仍显示待核对。
@@ -1908,7 +1907,9 @@ fn save_as_belongs_to_the_target_worktree_and_respects_its_lock() {
 
     // 真实的 linked worktree 作为另存目标所在的 worktree。
     let linked = f.root().join("linked");
-    f.git(&["worktree", "add", "-b", "other", linked.to_str().unwrap()]);
+    // Git for Windows 不接受 verbatim 路径（`\\?\C:\...`），传给外部进程前转换。
+    let linked_arg = platform::external_path(&linked);
+    f.git(&["worktree", "add", "-b", "other", linked_arg.to_str().unwrap()]);
     let linked_session = f.session_at(&linked);
     let destination = linked.join("restored.txt");
 
@@ -2154,9 +2155,14 @@ fn save_as_protects_the_target_repository_metadata() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    // 普通 .git 目录。
+    // 普通 .git 目录。断言**拒绝原因**是 Git 元数据，而不是任意错误：
+    // 只判 `is_err()` 会把「路径检查本身出错」也当成保护生效（CI 上正是这样漏过的）。
     let inside_git = other.join(".git").join("restored.txt");
-    assert!(store.save_as(&id, "target.txt", &inside_git).is_err(), "不得写入另一仓库的 .git");
+    let error = store.save_as(&id, "target.txt", &inside_git).unwrap_err();
+    assert!(
+        error.message.contains("Git 元数据"),
+        "必须因 Git 元数据被拒，实际：{error:?}"
+    );
     assert!(!inside_git.exists());
     // --separate-git-dir：元数据目录不叫 .git。
     let separate = f.root().join("separate-repo");
@@ -2170,9 +2176,10 @@ fn save_as_protects_the_target_repository_metadata() {
         .unwrap();
     assert!(output.status.success());
     let inside_separate = metadata.join("restored.txt");
+    let error = store.save_as(&id, "target.txt", &inside_separate).unwrap_err();
     assert!(
-        store.save_as(&id, "target.txt", &inside_separate).is_err(),
-        "不得写入 --separate-git-dir 的元数据目录"
+        error.message.contains("Git 元数据"),
+        "必须因 Git 元数据被拒（separate-git-dir），实际：{error:?}"
     );
     assert!(!inside_separate.exists());
     // 该仓库里的普通工作区路径仍可另存（合法外部新路径）。
@@ -2449,6 +2456,10 @@ fn save_as_rejects_stale_expected_owner() {
     )
     .unwrap_err();
     assert_eq!(error.kind, ErrorKind::Rejected, "归属不一致必须拒绝：{error:?}");
+    assert!(
+        error.message.contains("归属已变化"),
+        "必须因归属变化被拒，而不是路径检查出错：{error:?}"
+    );
     assert!(!destination.exists(), "被拒绝时不得写入");
 
     // 归属解析接口返回真实归属（前端据此进门禁）。
@@ -2699,4 +2710,45 @@ fn prepare_task05_desktop_fixture() {
         "boundary": "只证明记录由生产入口生成且身份匹配；未验证桌面行为、未做 D06/CI/长测，不构成任务验收。",
     });
     println!("REVIA_TASK05_DESKTOP_FIXTURE {}", serde_json::to_string_pretty(&manifest).unwrap());
+}
+
+/// R05-CI01-SP1：另存路径检查必须接受合法父目录，并仍然逐级拒绝符号链接。
+///
+/// CI 上五个失败里有三个是「合法父目录被报上级目录不可访问」：`prepare_destination`
+/// 把 `components()` 逐个 `push` 进空 `PathBuf`，在 Windows verbatim 路径上
+/// （`\\?\C:\Users\...`）会把 prefix 与根拼成 `\\?\C:\\Users`，于是每一级都 stat 失败。
+/// 现在改用 `ancestors()`（完整前缀路径）。这个用例固定住「合法可用 + 链接仍拒绝」两端。
+#[cfg(unix)]
+#[test]
+fn save_as_accepts_legal_parent_and_still_rejects_symlinked_ancestor() {
+    let f = Fixture::new();
+    f.write("target.txt", b"base\n");
+    f.commit();
+    f.write("target.txt", b"saved change\n");
+    let session = f.session();
+    let target = entry(&session, "target.txt");
+    let store = f.store();
+    discard(&session, &target, &store).unwrap();
+    let id = store.list(None).unwrap()[0].id.clone();
+
+    // 深层合法目录：逐级都是真实目录，必须允许。
+    let deep = f.root().join("a").join("b").join("c");
+    fs::create_dir_all(&deep).unwrap();
+    let ok = deep.join("out.txt");
+    assert_eq!(store.save_as(&id, "target.txt", &ok).unwrap(), 13);
+    assert_eq!(fs::read(&ok).unwrap(), b"saved change\n");
+
+    // 其中一级换成符号链接：必须拒绝，且不穿透写入。
+    let real = f.root().join("real-dir");
+    fs::create_dir_all(&real).unwrap();
+    let link = f.root().join("link-dir");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    let blocked = link.join("nested").join("out.txt");
+    fs::create_dir_all(real.join("nested")).unwrap();
+    let error = store.save_as(&id, "target.txt", &blocked).unwrap_err();
+    assert!(
+        error.message.contains("符号链接"),
+        "必须因祖先符号链接被拒：{error:?}"
+    );
+    assert!(!real.join("nested").join("out.txt").exists());
 }

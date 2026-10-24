@@ -265,7 +265,10 @@ struct PreparedFile {
     path: String,
     full: PathBuf,
     /// Some：用临时文件原子替换；None：该路径原本不存在，发布就是删除。
-    temp: Option<(TempFile, File)>,
+    ///
+    /// 写入句柄在准备阶段就已关闭：Windows 上打开着的文件会阻止其所在目录被移动，
+    /// 恢复期间没有必要一直占着工作区里的句柄。
+    temp: Option<TempFile>,
     executable: bool,
     remove: bool,
 }
@@ -282,11 +285,10 @@ impl PreparedFile {
             }
             return Ok(());
         }
-        let (temp, handle) = self
+        let temp = self
             .temp
             .take()
             .ok_or_else(|| AppError::internal("恢复准备内容已失效"))?;
-        drop(handle);
         platform::set_executable(&temp.path, self.executable)?;
         fs::rename(&temp.path, &self.full)?;
         Ok(())
@@ -308,10 +310,12 @@ fn prepare_files(worktree: &Path, before: &[SavedFile]) -> Result<Vec<PreparedFi
                 let (temp, mut handle) = exclusive_temp_file(&full)?;
                 handle.write_all(bytes)?;
                 handle.sync_all()?;
+                // 立刻关闭：内容已落盘，之后发布只需要 rename。
+                drop(handle);
                 prepared.push(PreparedFile {
                     path: file.path.clone(),
                     full,
-                    temp: Some((temp, handle)),
+                    temp: Some(temp),
                     executable: file.executable,
                     remove: false,
                 });
@@ -1196,10 +1200,24 @@ impl RecoveryStore {
         if !parent.is_dir() {
             return Err(AppError::rejected("另存目录不存在"));
         }
-        let mut cursor = PathBuf::new();
-        for component in parent.components() {
-            cursor.push(component);
-            match fs::symlink_metadata(&cursor) {
+        // 逐级核对**原始路径**的每一级祖先：任一级是符号链接就拒绝。
+        //
+        // 用 `ancestors()` 而不是手工把 component 依次 `push` 进 `PathBuf`：
+        // Windows 的 verbatim 路径形如 `\\?\C:\Users\...`，prefix（`\\?\C:`）与根（`\`）
+        // 是两个 component，先 push prefix 再 push 根会得到 `\\?\C:\\Users`（多一个分隔符），
+        // 于是合法目录被误判成「上级目录不可访问」。`ancestors()` 直接给出完整前缀路径。
+        let mut chain: Vec<&Path> = parent.ancestors().collect();
+        chain.reverse(); // 从根开始，先查最外层
+        for cursor in chain {
+            if cursor.as_os_str().is_empty() {
+                continue;
+            }
+            if let Some(name) = cursor.file_name() {
+                if name.to_string_lossy().eq_ignore_ascii_case(".git") {
+                    return Err(AppError::rejected("不能写入 Git 元数据目录"));
+                }
+            }
+            match fs::symlink_metadata(cursor) {
                 Ok(meta) if meta.file_type().is_symlink() => {
                     return Err(AppError::rejected("另存路径的上级目录是符号链接，请选择真实目录"));
                 }

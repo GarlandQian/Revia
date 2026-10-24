@@ -3,7 +3,7 @@
 use std::fs;
 #[cfg(any(unix, windows))]
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::error::Result;
 
@@ -74,4 +74,29 @@ pub fn sync_directory(path: &Path) -> Result<()> {
     #[cfg(not(unix))]
     let _ = path;
     Ok(())
+}
+
+/// 把内部路径转换成**外部进程**（Git CLI）能接受的形式。
+///
+/// Windows 上 `std::fs::canonicalize` 会返回 verbatim 路径（`\\?\C:\...`），
+/// Git for Windows 不接受它作为 `worktree add` 的目标（`fatal: ... Invalid argument`）。
+/// 这里去掉 verbatim 前缀：`\\?\C:\x` → `C:\x`，UNC 形式 `\\?\UNC\server\share` → `\\server\share`。
+///
+/// 只用于传给外部进程；Rust 内部仍使用 canonicalize 的结果比较身份。
+pub fn external_path(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let text = path.as_os_str().to_string_lossy().into_owned();
+        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{rest}"));
+        }
+        if let Some(rest) = text.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+        path.to_path_buf()
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
+    }
 }
