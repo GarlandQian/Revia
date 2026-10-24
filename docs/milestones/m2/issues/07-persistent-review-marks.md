@@ -1467,3 +1467,22 @@ this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
 - **桌面未验证**：两个方向都未在真实 UI 重放（由规划方复验）。
 - **Windows 未验证**：仍需新 CI。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：任务07第十四轮限定两轴静态复核通过
+
+固定`574660444e385f641df93c89d083acacbe1ecd7f...fe171c30fff669ae25b6c43033f87c99b7e85d76`，生产增量仅mergeEntry的8行持有逻辑及相关既有Node/Rust回归。
+
+#### Standards：硬规范/确定缺陷0项；Fowler判断性建议0项
+
+上轮ST07-R13-1静态闭合：`src/lib/refreshGate.ts:430`将已接受路径、绑定版本、状态与胜出水位记录到overlay；较晚override胜出时同步baseSeq。较旧成功不再覆盖getRows已确认的true/false，新真实结果仍能覆盖，未把单路径水位升级为整快照，符合`docs/technical-direction.md:53`隔离契约。
+
+#### Spec：(a)缺失/部分0项；(b)范围扩张0项；(c)错误实现0项
+
+上轮SP07-R13-1静态闭合：`:422`同步较晚baseSeq，`:430`按路径/版本/真实水位保存；`:495`仍仅叠加更大seq且同版本的状态。App两处真实mergeEntry及最终发布链保留，版本不匹配不套用旧记录，原v1→v2→v1失效未见本次回归。符合`spec.md:107`任一版本变化失效和`:116`旧请求不倒退的限定契约。
+
+#### 已核证据与未验边界
+
+- [36份原始检查](../evidence/task07-review14/manifest.json)逐文件SHA/gzip还原验证；最终前后3份被改源码SHA一致且匹配fe171c3。Node70、Rust review_marks31、lib100、tsc/lint/build原始退出0。lib重生成绑定后按现有清理流程还原行尾空白，再跑tsc/Node70退出0；固定本轮产品diff-check独立通过。
+- 三份敏感性输出分别Node67通过/3失败、67/3、69/1。第三组只直接证明绕过快照watermark会使已有读取水位用例失败，不把其标签扩大成所有单路径/全量水位边界的动态证明；单文件不升级整快照的正向用例及代码另核。
+- 两轴均只固定源码静态复核，实施方检查与规划方桌面分开。07保持ready-for-human，复选未勾，不done；05/12亦不done。下一步规划方固定新版Release/source/binary SHA、独占fixture、真实桌面交错/D06及仅现有SSH origin的双平台CI。新版仍未桌面/Windows/D06/最终长测，不能用旧8f95c26构建和旧CI补位；11最后同进程可见窗口30分钟Q98不省略。
