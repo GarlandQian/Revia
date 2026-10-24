@@ -33,6 +33,11 @@ pub struct AppState {
     pub recovery: RecoveryStore,
     /// 审阅标记存储（任务 07，持久化在 Revia 数据目录）。
     pub review: Arc<crate::review::ReviewStore>,
+    /// 前端是否报告「有在途写操作，退出需要等待」（任务 08、Q96）。
+    ///
+    /// Rust 侧只在原生退出（macOS Quit / ⌘Q）时读它：为真则阻止退出并通知前端，
+    /// 由前端按用户选择决定何时真正退出。默认 `false`（放行），避免进程无法结束。
+    pub exit_blocked: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AppState {
@@ -47,7 +52,16 @@ impl AppState {
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
             acceptance: None,
+            exit_blocked: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
+    }
+
+    /// 前端报告「是否仍有在途写操作」。
+    ///
+    /// 原生退出（macOS Quit / ⌘Q）不经过窗口关闭监听，Rust 侧据此决定是否
+    /// 阻止退出并通知前端（任务 08、Q96）。只反映状态，不执行任何 Git 动作。
+    pub fn exit_blocked(&self) -> bool {
+        self.exit_blocked.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// 取出（必要时创建）某个 worktree 的会话。
@@ -981,4 +995,14 @@ pub async fn change_entry(
     )
     .await?;
     Ok(slice.entry)
+}
+
+/// 设置「有在途写操作，退出需等待」的标志（任务 08、Q96）。
+///
+/// 只记录状态：不取消写操作、不重跑任何命令。
+#[tauri::command]
+pub fn set_exit_blocked(state: State<'_, AppState>, blocked: bool) {
+    state
+        .exit_blocked
+        .store(blocked, std::sync::atomic::Ordering::SeqCst);
 }

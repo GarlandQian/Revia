@@ -157,6 +157,8 @@ export const ipc = {
     }>("measure_config"),
   writeMeasurement: (payload: unknown) => invoke<string | null>("write_measurement", { payload }),
   debugLog: (message: string) => invoke<void>("debug_log", { message }),
+  /** 报告是否有在途写操作：原生退出（⌘Q）据此决定是否先等待（任务 08）。 */
+  setExitBlocked: (blocked: boolean) => invoke<void>("set_exit_blocked", { blocked }),
   changeEntry: (request: {
     worktreeId: string;
     path: string;

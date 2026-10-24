@@ -184,7 +184,16 @@ export const zhCN = {
     writing: (count: number) => `正在执行 ${count} 个写操作`,
     pending: (count: number) => `另有 ${count} 个结果待核对，关闭前请先查看`,
     wait: "等待完成后关闭",
+    waitExit: "等待完成后退出",
     stay: "留在应用",
+    /** 前端监听安装失败必须可见，不能静默失去保护。 */
+    listenerFailed: (what: string, detail: string) => `${what}保护安装失败：${detail}`,
+    /** 待核对结果已展示后，用户的明确选择。 */
+    pendingTitle: "有结果待核对",
+    pendingExplain: "这些操作的结果无法确定，请先查看工作区真实状态，再决定是否关闭。",
+    pendingReviewed: "我已核对，继续关闭",
+    /** 提示「留在应用」后不会稍后自动关窗。 */
+    pendingStay: "留在应用",
   },
 } as const;
 

@@ -1893,16 +1893,20 @@ test("待核对结果先展示，不静默退出", () => {
   assert.equal(c.takeReadyIntent(), "close", "确认后才执行原请求");
 });
 
-test("待核对不会被下一次成功写入自动清除成假成功", () => {
+test("待核对不会被下一次写入自动清除（只有真实核对才清除，Q91）", () => {
   const c = new CloseCoordinator();
   c.beginWrite("wt-a");
   c.endWrite("wt-a", true);
   assert.deepEqual(c.pendingWorktrees(), ["wt-a"]);
-  // 下一次写入开始即清除该目标的待核对（新的写入基于重新读取的状态）。
+  // 下一次写入开始/成功**不会**清掉待核对：核对是独立动作。
   c.beginWrite("wt-a");
-  assert.deepEqual(c.pendingWorktrees(), []);
+  assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "开始新写入不能清 pending");
   c.endWrite("wt-a", false);
-  assert.equal(c.takeReadyIntent(), null);
+  assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "成功写入也不能代替核对");
+  assert.equal(c.takeReadyIntent(), null, "未核对前不执行关闭");
+  // 真实核对后才清除。
+  c.acknowledgePending("wt-a");
+  assert.deepEqual(c.pendingWorktrees(), []);
 });
 
 test("写操作进行中不重跑任何命令：编排只读状态", () => {
@@ -1913,4 +1917,152 @@ test("写操作进行中不重跑任何命令：编排只读状态", () => {
   assert.equal(typeof c.retry, "undefined");
   assert.equal(typeof c.rerun, "undefined");
   assert.deepEqual(c.writingWorktrees(), ["wt-a"]);
+});
+
+// ---------------- 整批首轮：共享批次晚加入不能重新取得资格 ----------------
+
+test("共享批次：第一读挂起 → 新错误 → 另一路加入 → 释放后不覆盖新错误（ST-B01-07-1 / SP-B01-07-1）", async () => {
+  const scheduler = new ReviewRecoveryScheduler(2);
+  let epoch = 0;
+  const shown = [];
+  let releaseFirst;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  let reads = 0;
+
+  // 生产编排：两路都经 runReviewRecoveryBatch（真实入口），共享同一批次。
+  const read = async () => {
+    reads += 1;
+    if (reads === 1) await firstGate;         // 第一读挂起
+    return { status: "error", error: new Error("temp") };
+  };
+  const beginEligibility = () => {
+    const batchEpoch = epoch;                  // 批次创建时只取一次
+    return () => epoch === batchEpoch;
+  };
+  const showFailure = () => shown.push("failure");
+
+  // 第一路发起（批次创建，取 epoch=0 的资格）。
+  const first = runReviewRecoveryBatch({ scheduler, worktreeId: "wt-a", read, beginEligibility, showFailure });
+  // 第一读仍在挂起时出现较新的错误（代际前进）。
+  epoch += 1;
+  // 另一路真实调用点加入同一批次（共享 inFlight，不应重新取资格）。
+  const second = runReviewRecoveryBatch({ scheduler, worktreeId: "wt-a", read, beginEligibility, showFailure });
+  releaseFirst();
+
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(a, b, "两路必须拿到同一个批次结果对象");
+  assert.equal(a.exhausted, true);
+  assert.equal(a.failureShown, false, "批次期间出现新错误 → 不得展示");
+  assert.deepEqual(shown, [], "晚加入者不能重新取得资格并展示失败");
+});
+
+test("共享批次：失败最多展示一次", async () => {
+  const scheduler = new ReviewRecoveryScheduler(1);
+  const shown = [];
+  const read = async () => ({ status: "error", error: new Error("temp") });
+  const beginEligibility = () => () => true;
+  const showFailure = () => shown.push("failure");
+  await Promise.all([
+    runReviewRecoveryBatch({ scheduler, worktreeId: "wt-a", read, beginEligibility, showFailure }),
+    runReviewRecoveryBatch({ scheduler, worktreeId: "wt-a", read, beginEligibility, showFailure }),
+  ]);
+  assert.deepEqual(shown, ["failure"], "同一批次只展示一次失败");
+});
+
+test("共享批次：不同 worktree 各自独立，不共享资格", async () => {
+  const scheduler = new ReviewRecoveryScheduler(1);
+  const shown = [];
+  const read = async () => ({ status: "error", error: new Error("temp") });
+  await Promise.all([
+    runReviewRecoveryBatch({ scheduler, worktreeId: "wt-a", read, beginEligibility: () => () => true, showFailure: () => shown.push("a") }),
+    runReviewRecoveryBatch({ scheduler, worktreeId: "wt-b", read, beginEligibility: () => () => true, showFailure: () => shown.push("b") }),
+  ]);
+  assert.deepEqual(shown.sort(), ["a", "b"], "两个 worktree 各自展示自己的失败");
+});
+
+// ---------------- 整批首轮：08 关闭/退出真实编排 ----------------
+
+test("没有原请求时，写操作结束绝不凭空关窗（ST-B01-08-2 / SP-B01-08-3）", () => {
+  const c = new CloseCoordinator();
+  // 两个 worktree 并行写，用户从未请求关闭。
+  c.beginWrite("wt-a");
+  c.beginWrite("wt-b");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), null, "没有请求就不能执行关闭");
+  c.endWrite("wt-b");
+  assert.equal(c.takeReadyIntent(), null, "最后一笔结束也不能凭空关窗");
+  assert.equal(c.pendingIntent(), null, "不得自行创建请求");
+});
+
+test("用户选「留在应用」后，写操作结束不会自动关窗", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  assert.equal(c.request("close").action, "ask");
+  c.resolveAsk("stay");                       // 用户选择留在应用
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), null, "Stay 之后不得稍后自动关窗");
+});
+
+test("用户选「等待」后才在全部写完成时执行原请求", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.beginWrite("wt-b");
+  assert.equal(c.request("exit").action, "ask");
+  // 仅展示询问不算授权：还没选等待时不能执行。
+  assert.equal(c.takeReadyIntent(), null);
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), null, "仍有 wt-b 在写");
+  c.endWrite("wt-b");
+  assert.equal(c.takeReadyIntent(), "exit", "全部完成且已授权 → 执行原退出请求");
+});
+
+test("重复关闭请求不会叠加或改变动作类型", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.request("close");
+  assert.equal(c.pendingIntent(), "close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), "close");
+  assert.equal(c.takeReadyIntent(), null, "只执行一次");
+});
+
+test("待核对必须先真实核对才清除，且核对后仍需用户明确继续", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);                   // 结果无法确定
+  const decision = c.request("close");
+  assert.equal(decision.action, "showPending");
+  assert.deepEqual(decision.pending, ["wt-a"]);
+  // 没有核对前不能关闭。
+  c.resolveAsk("wait");
+  assert.equal(c.takeReadyIntent(), null, "待核对未核对前不执行");
+  // 真实核对后清除 pending，并由用户明确「继续」。
+  c.acknowledgePending("wt-a");
+  c.confirmPendingContinue();
+  assert.equal(c.takeReadyIntent(), "close", "核对并确认后才执行");
+});
+
+test("另存生命周期：无归属占位键也计入在途，但不占用 worktree 写门禁", () => {
+  const c = new CloseCoordinator();
+  const external = "save-as:/tmp/outside.txt";
+  c.beginWrite(external);
+  assert.equal(c.hasWriting(), true, "外部另存也算在途写");
+  assert.equal(c.request("close").action, "ask");
+  c.resolveAsk("wait");
+  c.endWrite(external);
+  assert.equal(c.takeReadyIntent(), "close");
+  // 占位键与真实 worktree 键互不影响：另一个 worktree 的写不会被它阻塞。
+  c.beginWrite("wt-a");
+  assert.deepEqual(c.writingWorktrees(), ["wt-a"]);
+});
+
+test("另存的 needsVerification 如实保留为待核对", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);                   // 另存也可能返回 needsVerification
+  assert.deepEqual(c.pendingWorktrees(), ["wt-a"]);
+  assert.equal(c.request("exit").action, "showPending");
 });

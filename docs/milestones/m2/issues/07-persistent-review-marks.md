@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1901,3 +1901,36 @@ App 用既有错误语义展示（新增 i18n `review.recoveryExhausted`），**
 - **SP-B01-07-1 / P2**：同一时序违反上轮任务07“整批共同资格”要求（本文件`:1828`，固定82f392b）。按真实批次只取得一次资格、只发布一次失败，晚加入者不能重新认领。回归应挂起第一读、推进错误代际、从另一个真实调用点加入共享批次后释放，验证生产编排不覆盖新错误。
 
 [本批27份检查原件](../evidence/batch01-review/manifest.json)已核六源码前后SHA匹配82f392b、Node105和前端检查退出0；这些不证明并发加入正确。只做固定源码静态复核，未新跑检查/Release/GUI/CI。07退ready-for-agent；所有发现按Q106成批交原Pi，不逐小补丁放行。
+
+### 2026-10-24 / Pi 实现：整批首轮返修（共享真实批次只取一次资格）
+
+只修 ST-B01-07-1 / SP-B01-07-1；转发 ref、单次重试、dismiss 代际等已闭合项未回退。
+
+#### 缺口
+
+`runReviewRecoveryBatch` 每次调用都先 `beginEligibility()`，而 `ReviewRecoveryScheduler.run`
+会复用同一个 `inFlight`。于是「旧批次挂起 → 出现新错误 → 另一路调用加入旧批次」时，
+后加入者取了**新** epoch，耗尽时用它判定，仍能覆盖新错误。
+
+#### 修复
+
+资格与失败展示**移进真实共享批次内部**：
+
+- `ReviewRecoveryScheduler.run(worktreeId, read, hooks)` 在**批次创建时**取一次资格，
+  并在批次内完成唯一一次失败展示；
+- 同一 worktree 的并发调用直接返回同一个 promise（`inFlight`），
+  晚加入者不再执行 `beginEligibility`，因此不可能重新取得资格；
+- `runReviewRecoveryBatch` 变成纯委托，不再自己取资格。
+
+#### 回归（Node，同一生产编排入口）
+
+新增 3 项，全部经 `runReviewRecoveryBatch`：
+
+- **第一读挂起 → 新错误 → 另一路加入 → 释放**：两路拿到**同一个**结果对象，
+  `failureShown === false`，`shown === []`（晚加入者不能覆盖新错误）；
+- 失败最多展示一次（并发两路只产生一条失败提示）；
+- 不同 worktree 各自独立展示，不共享资格。
+
+#### 未验证
+
+桌面/Windows/Release/D06/CI/长测均未执行。

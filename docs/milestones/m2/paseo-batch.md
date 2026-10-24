@@ -58,3 +58,33 @@ Pi负责实现、检查和静态效果图源文件，不启动GUI、不跑Releas
 ## 整批首轮复核（2026-10-24）
 
 固定3199b29...82f392b：Standards6项（P1一/P2五），Spec6项（P1一/P2四/P3一），分别回写07/08/13/10 Comments。07转发和单调用错误代际已闭合；原生退出、无请求自动关闭、另存生命周期/未知结果、待核对闭环、共享批次晚加入资格、静态图越范围与10准备仍待修。全部交原Pi一起处理，不恢复逐项停等。当前两图不合范围，暂不提交用户确认；保留原稿，修订另存。六源码SHA及27份原件已核，Rust264/1ignored、Node105与前端检查exit0，不代表生产接线/桌面通过。M2未完成，无新Release/GUI/D06/CI/长测/推送。
+
+## 整批首轮复核返修（2026-10-24）
+
+| 项 | 状态 | 说明 |
+| --- | --- | --- |
+| 07 共享批次资格 | `ready-for-human` | 资格与失败展示移进真实共享批次内部，晚加入者不重新取得资格 |
+| 08 原生退出 | `ready-for-human` | Rust `RunEvent::ExitRequested` + `exit_blocked` + `revia://exit-requested`；监听失败可见 |
+| 08 无请求不关窗 | `ready-for-human` | 删除 `pendingIntent() ?? "close"` 兜底，只有用户选「等待」才执行原请求 |
+| 08 另存生命周期 | `ready-for-human` | 占位键登记在途（外部路径不加 worktree 锁），`needsVerification` 如实传递 |
+| 08 待核对闭环 | `ready-for-human` | 只有真实核对能清 pending，核对后由用户明确继续 |
+| 13 修订图 | **待用户确认** | `issues/13-mockups-rev1/`（移除未排期结构、状态分开展示）；原稿保留为历史 |
+| 10 矩阵与准备 | 已交付准备 | `issues/10-integration-matrix.md`：T01–T14 / D01–D08 映射、命令与真实结果、验收方法与未测边界 |
+
+### 检查（本批第二轮集中）
+
+日志：`/private/tmp/revia-batch02-8LEw43`
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 115 / pass 115 / fail 0 |
+| `cargo test`（完整） | 0 | 100 + 71(1 ignored) + 20 + 24 + 15 + 31 + 3 = 264 通过 / 1 ignored |
+| `pnpm bindings` | 0 | — |
+| `git diff --check` | 0 | 首次 exit=2（`refreshGate.ts` EOF 空行），修复后 0 |
+
+**失败原件保留**：`git-diff-check.out`（exit=2）与修复后的 `git-diff-check3.out`（exit=0）都在日志目录。
+
+未启动 GUI、未 Release、未跑 D06/CI/长测、未推送/合并。

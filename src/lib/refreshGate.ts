@@ -894,7 +894,7 @@ export interface ReviewRecoveryResult {
  * - 只重读（`runner` 由调用方实现为 listChanges 之类的读取），不重跑写命令。
  */
 export class ReviewRecoveryScheduler {
-  private readonly inFlight = new Map<string, Promise<ReviewRecoveryResult>>();
+  private readonly inFlight = new Map<string, Promise<ReviewRecoveryBatchOutcome>>();
   private readonly attempts = new Map<string, number>();
   private readonly maxAttempts: number;
 
@@ -915,33 +915,51 @@ export class ReviewRecoveryScheduler {
   /**
    * 跑一个恢复批次；返回本批次结果。
    *
-   * 同一 worktree 并发调用共享同一批次（单飞），批次结束即释放，
+   * 同一 worktree 并发调用共享**同一个批次**（单飞）：批次结束即释放，
    * 之后新的调用会开启新批次（不永久禁用）。
+   *
+   * 资格与失败展示都在**批次内部**完成，因此：
+   * - 晚加入者拿到的是同一个 promise，不会重新取得资格（ST-B01-07-1）；
+   * - 失败最多展示一次（`showFailure` 只在本批次内调用一次）。
    */
-  run(worktreeId: string, runner: () => Promise<ReviewReadAttempt>): Promise<ReviewRecoveryResult> {
+  run(
+    worktreeId: string,
+    read: () => Promise<ReviewReadAttempt>,
+    hooks?: {
+      beginEligibility?: () => () => boolean;
+      showFailure?: (failure: ReviewReadAttempt | null) => void;
+    },
+  ): Promise<ReviewRecoveryBatchOutcome> {
     const running = this.inFlight.get(worktreeId);
     if (running) return running;
-    const task = (async (): Promise<ReviewRecoveryResult> => {
+    const task = (async (): Promise<ReviewRecoveryBatchOutcome> => {
+      // 资格在**真实批次创建时**取一次；晚加入者共享本任务，不会再取。
+      const eligible = hooks?.beginEligibility?.() ?? (() => true);
       let lastFailure: ReviewReadAttempt | null = null;
       for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
         this.attempts.set(worktreeId, attempt);
         let result: ReviewReadAttempt;
         try {
-          result = await runner();
+          result = await read();
         } catch (error) {
           result = { status: "error", error };
         }
         if (result.status === "trusted") {
-          return { converged: true, attempts: attempt, exhausted: false, lastFailure: null };
+          return { converged: true, attempts: attempt, exhausted: false, lastFailure: null, failureShown: false };
         }
         lastFailure = result;
       }
-      return {
+      const exhausted: ReviewRecoveryBatchOutcome = {
         converged: false,
         attempts: this.maxAttempts,
         exhausted: true,
         lastFailure,
+        failureShown: false,
       };
+      if (!eligible()) return exhausted;
+      // 本批次唯一一次失败展示。
+      hooks?.showFailure?.(lastFailure);
+      return { ...exhausted, failureShown: true };
     })();
     this.inFlight.set(worktreeId, task);
     // 批次结束后释放单飞槽并清零计数：后续独立拒收能开新批次。
@@ -985,18 +1003,12 @@ export interface ReviewRecoveryBatchOutcome extends ReviewRecoveryResult {
 export async function runReviewRecoveryBatch(
   input: ReviewRecoveryBatchInput,
 ): Promise<ReviewRecoveryBatchOutcome> {
-  // 批次级资格：整个批次只取一次，重试不会重新获得覆盖新错误的资格。
-  const eligible = input.beginEligibility();
-  const result = await input.scheduler.run(input.worktreeId, () => input.read());
-  if (result.converged) {
-    return { ...result, failureShown: false };
-  }
-  if (!eligible()) {
-    // 批次期间出现了更新的错误（或被用户关闭）：不展示，但结果如实返回。
-    return { ...result, failureShown: false };
-  }
-  input.showFailure(result.lastFailure);
-  return { ...result, failureShown: true };
+  // 直接委托给**真实共享批次**：资格与失败展示都在批次内部完成，
+  // 晚加入者共享同一 promise，不会重新取得资格（ST-B01-07-1 / SP-B01-07-1）。
+  return input.scheduler.run(input.worktreeId, input.read, {
+    beginEligibility: input.beginEligibility,
+    showFailure: input.showFailure,
+  });
 }
 
 // ---------------- 写入期间的安全关闭/退出（任务 08，Q90/Q91/Q96）----------------
@@ -1013,40 +1025,46 @@ export type CloseDecision =
   /** 存在待核对结果：先展示，不静默退出（Q91、Q96）。 */
   | { action: "showPending"; writing: string[]; pending: string[] };
 
+/** 用户在询问对话框里的选择。 */
+export type CloseChoice = "wait" | "stay";
+
 /**
- * 写入期间的关闭/退出编排（任务 08）。
+ * 写入期间的关闭/退出编排（任务 08，Q90/Q91/Q96）。
  *
  * 只做决策，不执行任何 Git 或窗口动作：
- * - 不因关闭杀掉 Git（本类从不取消写操作）；
- * - 「留在应用」不改变写操作，也不把关闭改成退出（`keepOpen` 只清掉请求）；
- * - 正常完成后执行**原请求**（`pendingIntent` 原样返回，不升级为强退）；
- * - 待核对结果先展示（`showPending`），不静默退出、不自动续跑。
+ * - 不因关闭杀掉 Git（本类从不取消写操作、不重跑写命令）；
+ * - 「留在应用」不改变写操作，也不把关闭改成退出；
+ * - **只有用户明确选择「等待」**才会在全部写完成并记录结果后执行原请求；
+ * - 没有原请求、或用户已选「留在应用」时，**绝不凭空创建**关闭请求；
+ * - 待核对结果必须先展示并核对真值，之后由用户明确选择继续或留在应用。
  *
  * 写操作按 worktree 记录：切到别的 worktree 后仍在执行的操作也算在途（Q90）。
  */
 export class CloseCoordinator {
-  /** 在途写操作的 worktree 集合。 */
+  /** 在途写操作的 worktree 集合（含无归属另存使用的占位键）。 */
   private readonly writing = new Set<string>();
-  /** 结果待核对（`needsVerification`）的 worktree 集合。 */
+  /** 结果待核对的 worktree 集合。 */
   private readonly pending = new Set<string>();
-  /** 已请求但尚未执行的关闭/退出动作（原样保留，不升级）。 */
+  /** 用户已明确选择「等待完成」的原请求；`null` 表示没有授权。 */
   private intent: CloseIntent | null = null;
+  /** 当前是否正在向用户询问（避免重复弹窗）。 */
+  private asking = false;
 
-  /** 开始一个写操作。 */
+  /** 开始一个写操作（`worktreeId` 可为无归属另存的占位键）。 */
   beginWrite(worktreeId: string): void {
     this.writing.add(worktreeId);
-    this.pending.delete(worktreeId);
   }
 
   /**
    * 结束一个写操作。
    *
    * `needsVerification` 表示结果无法确定：保留待核对标记，供关闭时先展示。
+   * 注意：结束写操作**不会**自动清除该 worktree 的待核对标记——
+   * 只有真实核对（`acknowledgePending`）才会清除（Q91）。
    */
   endWrite(worktreeId: string, needsVerification = false): void {
     this.writing.delete(worktreeId);
     if (needsVerification) this.pending.add(worktreeId);
-    else this.pending.delete(worktreeId);
   }
 
   /** 待核对的 worktree（诊断与测试用）。 */
@@ -1069,52 +1087,80 @@ export class CloseCoordinator {
     return this.intent;
   }
 
+  /** 是否正在询问用户。 */
+  isAsking(): boolean {
+    return this.asking;
+  }
+
   /**
    * 请求关闭/退出；返回此刻应该做什么。
    *
-   * 有在途写操作时**保留**窗口与进程并把原请求记下来；否则立刻执行原请求。
+   * 有在途写操作或待核对时**保留**窗口与进程并把原请求记下来，
+   * 但只有用户之后明确选择「等待」才会真正执行（`resolveAsk("wait")`）。
    */
   request(intent: CloseIntent): CloseDecision {
-    if (this.writing.size > 0) {
-      // 原样保留请求：之后「等待完成后」执行的就是它，不会被改成别的动作。
+    const writing = [...this.writing];
+    const pending = [...this.pending];
+    if (writing.length > 0 || pending.length > 0) {
       this.intent = intent;
-      const writing = [...this.writing];
-      if (this.pending.size > 0) {
-        return { action: "showPending", writing, pending: [...this.pending] };
-      }
+      this.asking = true;
+      if (pending.length > 0) return { action: "showPending", writing, pending };
       return { action: "ask", writing };
     }
-    if (this.pending.size > 0) {
-      // 没有在途写入但有待核对结果：先展示，不静默退出。
-      this.intent = intent;
-      return { action: "showPending", writing: [], pending: [...this.pending] };
-    }
     this.intent = null;
+    this.asking = false;
     return { action: "proceed" };
   }
 
   /**
-   * 用户选择「留在应用」：清掉请求，**不取消**写操作、不改变动作类型。
+   * 用户的选择。
+   *
+   * - `wait`：确认等待——之后写操作全部完成且无待核对时才执行**原请求**；
+   * - `stay`：清掉请求，**不取消**写操作、不改变动作类型，也不会稍后自动关窗。
    */
-  keepOpen(): void {
-    this.intent = null;
+  resolveAsk(choice: CloseChoice): void {
+    this.asking = false;
+    if (choice === "stay") this.intent = null;
+    // `wait` 保留 intent，等 takeReadyIntent 在条件满足时取走。
   }
 
   /**
-   * 写操作全部完成（或被核对过）后调用：返回是否应立即执行原请求。
+   * 用户选择「留在应用」的便捷入口（等价于 `resolveAsk("stay")`）。
+   */
+  keepOpen(): void {
+    this.resolveAsk("stay");
+  }
+
+  /**
+   * 全部写操作完成且无待核对时，返回**用户已授权等待**的原请求。
    *
-   * 只有「没有在途写操作、没有待核对」时才返回原请求；否则返回 `null`，
-   * 调用方继续保留窗口。
+   * 没有原请求（从未请求过、或已选「留在应用」）时返回 `null`：
+   * 调用方**不得**据此凭空关窗。
    */
   takeReadyIntent(): CloseIntent | null {
     if (this.writing.size > 0 || this.pending.size > 0) return null;
     const intent = this.intent;
     this.intent = null;
+    this.asking = false;
     return intent;
   }
 
-  /** 待核对结果已被用户确认（展示过）：清除该 worktree 的待核对标记。 */
+  /**
+   * 待核对结果已经**真实核对**（重新读取了真值、或用户看过结果）：
+   * 清除该 worktree 的待核对标记。
+   *
+   * 这是清除 pending 的唯一生产入口——不允许用「下一次写操作」代替核对。
+   */
   acknowledgePending(worktreeId: string): void {
     this.pending.delete(worktreeId);
+  }
+
+  /**
+   * 用户已核对待核对结果并明确「继续」：清除 pending 并保留原请求，
+   * 之后由 `takeReadyIntent()` 在无在途写时执行。
+   */
+  confirmPendingContinue(): void {
+    this.pending.clear();
+    this.asking = false;
   }
 }

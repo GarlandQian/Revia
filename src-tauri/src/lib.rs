@@ -130,7 +130,29 @@ pub fn run() {
             commands::measure_config,
             commands::write_measurement,
             commands::debug_log,
+            commands::set_exit_blocked,
         ])
-        .run(tauri::generate_context!())
-        .expect("Revia 启动失败");
+        .build(tauri::generate_context!())
+        .expect("Revia 启动失败")
+        .run(|app, event| {
+            use tauri::{Emitter, Manager};
+            // 原生退出（macOS 默认菜单的 Quit / ⌘Q）不经过窗口关闭监听，
+            // 必须在这里统一保护（Q96、任务 08）。
+            //
+            // 前端负责判断「是否有在途写操作」并决定是否放行；Rust 只做一件事：
+            // 先把退出请求**交给前端**，由前端决定「等待完成后退出」或「留在应用」。
+            // 前端不可用时（例如窗口已销毁）不阻塞退出，避免进程无法结束。
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                let Some(window) = app.get_webview_window("main") else { return };
+                // 只有前端明确报告「有在途写」时才阻止；默认放行，避免死锁。
+                let blocked = app
+                    .try_state::<AppState>()
+                    .map(|state| state.exit_blocked())
+                    .unwrap_or(false);
+                if blocked {
+                    api.prevent_exit();
+                    let _ = window.emit("revia://exit-requested", ());
+                }
+            }
+        });
 }

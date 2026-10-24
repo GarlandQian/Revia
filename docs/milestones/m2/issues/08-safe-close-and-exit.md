@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -75,3 +75,54 @@ App 与 Node 回归**用同一个类**，不各写一份判断：
 3. **SP-B01-08-3 / P2**：同ST-08-2，违反`spec.md:127`“执行原关闭/退出请求”；没有请求或已选Stay时仍可凭空生成close。
 
 [27份检查原件](../evidence/batch01-review/manifest.json)六源码SHA匹配，Node105、Rust264通过/1准备入口ignored和前端检查exit0，仅证明该版已有检查。没有真实native close/quit和App收尾回归；本轮未GUI/Release/D06/CI/长测。08退ready-for-agent。所有项成批原Pi返修，修完一起复核，全部通过后才正式桌面验收。
+
+### 2026-10-24 / Pi 实现：整批首轮返修（原生关闭/退出与待核对闭环）
+
+修 ST-B01-08-1..4 / SP-B01-08-1..3。
+
+#### 1. 原生退出不再绕过（P1）
+
+- Rust：`lib.rs` 改为 `.build(...).run(|app, event| ...)`，在 `RunEvent::ExitRequested` 里
+  读 `AppState::exit_blocked()`；为真则 `api.prevent_exit()` 并 `emit("revia://exit-requested")`。
+  默认 `false`（放行），避免进程无法结束。
+- `AppState` 新增 `exit_blocked: AtomicBool` 与 Tauri 命令 `set_exit_blocked`。
+- 前端：写操作开始/结束时同步 `ipc.setExitBlocked(...)`；监听 `revia://exit-requested`
+  走**同一套** `CloseCoordinator` 编排，动作类型保持 `exit`。
+- 退出动作不再用 `destroy` 代替：`performCloseIntent("exit")` 先解除阻止标志再关窗，
+  让原生退出流程正常走完。
+- **监听安装失败不再静默**：`onCloseRequested` / `listen` 任一失败都写入全局错误
+  （新增 i18n `close.listenerFailed`），用户可见。
+
+#### 2. 无请求绝不凭空关窗（P2）
+
+`finishWrite` 删除了 `pendingIntent() ?? "close"` 这条兜底：没有原请求、
+或用户已选「留在应用」时，写操作结束**什么都不做**。
+只有 `resolveAsk("wait")` 保留的原请求才会在全部写完成时由 `takeReadyIntent()` 取出执行。
+
+#### 3. 另存生命周期（P2）
+
+- 进入 `performSaveAs` 即用占位键 `save-as:<destination>` 登记在途（解析归属期间也被保护），
+  解析出归属后改用该 worktree 键；**外部新路径不加 worktree 写锁**，只占关闭生命周期；
+- `finally` 用 `heldGateId ?? provisionalKey` 收尾，`needsVerification` 从错误种类**如实传递**
+  （不再固定 `false`）。
+
+#### 4. 待核对闭环（P2）
+
+- `endWrite` 不再清除 pending，**只有** `acknowledgePending` 能清；
+  新增 `confirmPendingContinue()` 表示「已核对并继续」；
+- 对话框区分两种模式：有待核对时只提供「我已核对，继续关闭」与「留在应用」；
+  前者对每个待核对目标**真实 `refreshTarget` 重读**（占位键跳过），
+  再 `acknowledgePending` + `confirmPendingContinue`，最后才执行原请求；
+- 不自动重跑任何写命令，也不让下一次写入代替核对。
+
+#### 回归（Node，同一生产编排）
+
+新增 7 项：无原请求时写结束不关窗、Stay 后不自动关窗、Wait 后才执行原请求（多 worktree 全部完成）、
+重复请求不叠加不改动作、待核对必须真实核对且核对后仍需用户继续、
+外部另存占位键计入在途但不占 worktree 门禁、另存 `needsVerification` 如实保留。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出交互未验证**：macOS Quit / ⌘Q 的实际拦截、对话框观感、
+  待核对闭环的实际流程均由规划方在固定 Release 上验收。
+- 未构建 Release、未启动 GUI、未跑 D06/CI/长测。

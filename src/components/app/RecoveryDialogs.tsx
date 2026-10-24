@@ -471,28 +471,42 @@ export function RecoveryDialog({
  *
  * 待核对结果先展示，不静默退出。
  */
-export function CloseRequestDialog({ writing, pending, onWait, onStay }: {
+export function CloseRequestDialog({ intent, writing, pending, onWait, onStay, onPendingReviewed }: {
+  intent: "close" | "exit";
   writing: string[];
   pending: string[];
   onWait: () => void;
   onStay: () => void;
+  onPendingReviewed: () => void;
 }) {
+  const hasPending = pending.length > 0;
   return (
-    <Modal title={messages.close.title} onClose={onStay}>
+    <Modal title={hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay}>
       <div className="space-y-3 text-xs">
-        <p className="leading-relaxed">{messages.close.explain}</p>
+        <p className="leading-relaxed">
+          {hasPending ? messages.close.pendingExplain : messages.close.explain}
+        </p>
         {writing.length > 0 ? (
           <p className="break-all text-muted-foreground">
             {messages.close.writing(writing.length)}
           </p>
         ) : null}
-        {pending.length > 0 ? (
-          <p role="alert" className="break-all text-destructive">{messages.close.pending(pending.length)}</p>
+        {hasPending ? (
+          <p role="alert" className="break-all text-destructive">
+            {messages.close.pending(pending.length)}
+          </p>
         ) : null}
       </div>
       <div className="mt-5 flex justify-end gap-2">
-        <Button autoFocus variant="outline" size="sm" onClick={onStay}>{messages.close.stay}</Button>
-        <Button size="sm" onClick={onWait}>{messages.close.wait}</Button>
+        <Button autoFocus variant="outline" size="sm" onClick={onStay}>{messages.close.pendingStay}</Button>
+        {hasPending ? (
+          // 待核对必须先真实核对，再由用户明确继续。
+          <Button size="sm" onClick={onPendingReviewed}>{messages.close.pendingReviewed}</Button>
+        ) : (
+          <Button size="sm" onClick={onWait}>
+            {intent === "exit" ? messages.close.waitExit : messages.close.wait}
+          </Button>
+        )}
       </div>
     </Modal>
   );

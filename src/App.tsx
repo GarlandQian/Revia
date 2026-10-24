@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
@@ -737,33 +738,60 @@ export function App() {
   /**
    * 关闭/退出请求（任务 08，Q96）。
    *
-   * 有在途写操作时**阻止**默认关闭、保留窗口与进程，并询问用户：
-   * 「等待完成后关闭/退出」或「留在应用」。从不杀 Git、不重跑写命令。
+   * 三个来源统一保护：
+   * - 窗口关闭（`onCloseRequested`，拦截后询问）；
+   * - 原生退出（macOS Quit / ⌘Q）：Rust 在 `RunEvent::ExitRequested` 里读
+   *   `exit_blocked`，为真则阻止退出并 emit `revia://exit-requested`，这里接住；
+   * - 前端监听安装失败**不能静默**：写入全局错误，让用户知道保护可能缺失。
    */
   useEffect(() => {
     let disposed = false;
-    let unlisten: (() => void) | null = null;
+    const stops: Array<() => void> = [];
+    const fail = (what: string) => (caught: unknown) => {
+      if (disposed) return;
+      setAppError(
+        { kind: "internal", message: messages.close.listenerFailed(what, getErrorMessage(caught)) },
+        null,
+      );
+    };
     void (async () => {
       try {
         const stop = await getCurrentWindow().onCloseRequested(async (event) => {
-          const coordinator = closeCoordinatorRef.current;
-          const decision = coordinator.request("close");
-          if (decision.action === "proceed") return;   // 没有在途写：正常关闭
-          // 有在途写或待核对：保留窗口，交给用户选择。
+          closeIntentRef.current = "close";
+          const decision = closeCoordinatorRef.current.request("close");
+          if (decision.action === "proceed") return;
           event.preventDefault();
           if (!disposed) setCloseRequest(decision);
         });
-        if (disposed) stop();
-        else unlisten = stop;
+        if (disposed) stop(); else stops.push(stop);
       } catch (caught) {
-        debugLog(`关闭请求监听失败：${getErrorMessage(caught)}`);
+        fail("窗口关闭")(caught);
+      }
+      try {
+        // 原生退出：Rust 已阻止退出并通知前端，这里按同一套编排询问用户。
+        const stop = await listen("revia://exit-requested", () => {
+          if (disposed) return;
+          closeIntentRef.current = "exit";
+          const decision = closeCoordinatorRef.current.request("exit");
+          if (decision.action === "proceed") {
+            void performCloseIntentRef.current?.("exit");
+            return;
+          }
+          setCloseRequest(decision);
+        });
+        if (disposed) stop(); else stops.push(stop);
+      } catch (caught) {
+        fail("原生退出")(caught);
       }
     })();
     return () => {
       disposed = true;
-      unlisten?.();
+      for (const stop of stops) stop();
     };
-  }, []);
+  }, [setAppError]);
+
+  /** 执行关闭/退出的入口（供原生退出事件复用，避免定义顺序问题）。 */
+  const performCloseIntentRef = useRef<((intent: CloseIntent) => Promise<void>) | null>(null);
 
   // ---------------- 添加仓库 ----------------
 
@@ -994,6 +1022,8 @@ export function App() {
   const closeCoordinatorRef = useRef(new CloseCoordinator());
   /** 当前需要用户选择的关闭/退出请求（`null` 表示没有）。 */
   const [closeRequest, setCloseRequest] = useState<CloseDecision | null>(null);
+  /** 当前询问对应的原动作（close / exit），只用于文案，不改动作类型。 */
+  const closeIntentRef = useRef<CloseIntent>("close");
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
   const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
@@ -1011,35 +1041,48 @@ export function App() {
    */
   const performCloseIntent = useCallback(async (intent: CloseIntent) => {
     try {
-      const appWindow = getCurrentWindow();
-      if (intent === "close") await appWindow.close();
-      else await appWindow.destroy();
+      // 关闭窗口与退出进程是两件事：退出必须先解除阻止标志，
+      // 否则原生 ExitRequested 会再次阻止，进程永远退不出去。
+      if (intent === "exit") {
+        await ipc.setExitBlocked(false);
+        await getCurrentWindow().close();
+        return;
+      }
+      await getCurrentWindow().close();
     } catch (caught) {
       setAppError(toAppError(caught), null);
     }
   }, [setAppError]);
 
+  performCloseIntentRef.current = performCloseIntent;
+
   /**
    * 一个写操作结束（成功或失败）后的收尾（任务 08）。
    *
    * - 把结束事件交给关闭编排，并标记结果是否待核对；
-   * - 若此时有被保留的关闭/退出请求且条件已满足，就执行**原请求**（不改成别的动作）。
+   * - **只有用户已明确选择「等待」**（`intent` 存在）且条件满足时，才执行**原请求**；
+   * - 没有原请求、或用户已选「留在应用」时，绝不凭空关窗（ST-B01-08-2）。
    */
+  /**
+   * 把「是否有在途写操作」同步给 Rust（原生退出用，任务 08）。
+   *
+   * 只同步状态，不触发任何 Git 动作；失败写进全局错误，不静默。
+   */
+  const syncExitBlocked = useCallback((blocked: boolean) => {
+    void ipc.setExitBlocked(blocked).catch((caught) => {
+      setAppError(toAppError(caught), null);
+    });
+  }, [setAppError]);
+
   const finishWrite = useCallback((worktreeId: string, needsVerification: boolean) => {
     const coordinator = closeCoordinatorRef.current;
     coordinator.endWrite(worktreeId, needsVerification);
+    syncExitBlocked(coordinator.hasWriting());
     const ready = coordinator.takeReadyIntent();
-    if (!ready) {
-      // 还有其它 worktree 的在途写或待核对：继续保留窗口。
-      if (coordinator.hasWriting() || coordinator.pendingWorktrees().length > 0) {
-        const decision = coordinator.request(coordinator.pendingIntent() ?? "close");
-        setCloseRequest(decision);
-      }
-      return;
-    }
+    if (!ready) return;
     setCloseRequest(null);
     void performCloseIntent(ready);
-  }, [performCloseIntent]);
+  }, [performCloseIntent, syncExitBlocked]);
 
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
@@ -1050,6 +1093,7 @@ export function App() {
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
     closeCoordinatorRef.current.beginWrite(opWorktreeId);
+    syncExitBlocked(true);
     setAppError(null, opWorktreeId);
     // 切换期间界面可能仍显示原目标；操作归属取真实写目标，不能取已前进的激活目标。
     const opToken = operationGateRef.current.begin(opWorktreeId);
@@ -1120,6 +1164,7 @@ export function App() {
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
     closeCoordinatorRef.current.beginWrite(opWorktreeId);
+    syncExitBlocked(true);
     setAppError(null, opWorktreeId);
     // 本次恢复的结果是否无法确定（Q91）：关闭时需先展示待核对。
     let needsVerification = false;
@@ -1173,6 +1218,12 @@ export function App() {
      * 释放会把另一笔仍在执行的操作的门禁清掉（Q90）。
      */
     let heldGateId: string | null = null;
+    let needsVerification = false;
+    // 进入即登记：解析归属期间也算在途，避免解析窗口内被关闭绕过。
+    // 无归属（外部新路径）用占位键，不为此路径强加 worktree 写锁。
+    const provisionalKey = `save-as:${request.destination}`;
+    closeCoordinatorRef.current.beginWrite(provisionalKey);
+    syncExitBlocked(true);
     let opToken: OperationContext | null = null;
     try {
       // 后端解析真实归属；解析失败同样落到 App 级结果通道，不猜路径、不借用当前 worktree。
@@ -1186,6 +1237,8 @@ export function App() {
         writingWorktreesRef.current.add(ownerId);
         heldGateId = ownerId;
         setWritingWorktrees(new Set(writingWorktreesRef.current));
+        // 有归属：改由该 worktree 承担关闭生命周期。
+        closeCoordinatorRef.current.endWrite(provisionalKey, false);
         closeCoordinatorRef.current.beginWrite(ownerId);
         opToken = operationGateRef.current.begin(ownerId);
         setAppError(null, ownerId);
@@ -1207,6 +1260,7 @@ export function App() {
       return bytes;
     } catch (caught) {
       const err = toAppError(caught);
+      needsVerification = err.kind === "needsVerification";
       if (ownerId) {
         // 归属 worktree：结果按它保存，并对它真实重读（切走也要读）。
         if (!opToken || operationGateRef.current.canRecord(opToken)) setAppError(err, ownerId);
@@ -1223,9 +1277,11 @@ export function App() {
       if (heldGateId) {
         writingWorktreesRef.current.delete(heldGateId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
-        // 另存失败同样可能是结果待核对：交给关闭编排，避免关闭时静默退出。
-        finishWrite(heldGateId, false);
       }
+      // 关闭生命周期收尾：有归属用 worktree 键，无归属用占位键；
+      // 错误种类如实传递，`needsVerification` 保留为待核对（Q91）。
+      closeCoordinatorRef.current.endWrite(heldGateId ?? provisionalKey, needsVerification);
+      syncExitBlocked(closeCoordinatorRef.current.hasWriting());
     }
   }, [finishWrite, recordExternalResult, refreshTarget, setAppError]);
 
@@ -2548,17 +2604,36 @@ export function App() {
       ) : null}
       {closeRequest && closeRequest.action !== "proceed" ? (
         <CloseRequestDialog
+          intent={closeIntentRef.current}
           writing={closeRequest.writing}
           pending={"pending" in closeRequest ? closeRequest.pending : []}
           onWait={() => {
-            // 保留原请求：等写操作正常完成后由 finishWrite 执行它（不杀 Git）。
-            closeCoordinatorRef.current.request("close");
+            // 用户明确选择「等待」：保留原请求，等全部写完成并记录结果后执行（不杀 Git）。
+            closeCoordinatorRef.current.resolveAsk("wait");
             setCloseRequest(null);
           }}
           onStay={() => {
-            // 留在应用：不取消写操作、不改变动作类型。
-            closeCoordinatorRef.current.keepOpen();
+            // 留在应用：不取消写操作、不改变动作类型，也不会稍后自动关窗。
+            closeCoordinatorRef.current.resolveAsk("stay");
             setCloseRequest(null);
+          }}
+          onPendingReviewed={() => {
+            // 待核对闭环：真实核对（重新读取真值）后清除 pending，再由用户明确继续。
+            // 不重跑任何写命令；占位键（无归属另存）没有 worktree 可读，直接确认。
+            const coordinator = closeCoordinatorRef.current;
+            const targets = coordinator.pendingWorktrees();
+            void (async () => {
+              for (const worktreeId of targets) {
+                if (!worktreeId.startsWith("save-as:")) {
+                  await refreshTarget(worktreeId).catch(() => undefined);
+                }
+                coordinator.acknowledgePending(worktreeId);
+              }
+              coordinator.confirmPendingContinue();
+              setCloseRequest(null);
+              const ready = coordinator.takeReadyIntent();
+              if (ready) void performCloseIntentRef.current?.(ready);
+            })();
           }}
         />
       ) : null}
