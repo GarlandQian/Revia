@@ -1,0 +1,309 @@
+{
+  "sourceCommit": "32b4c865a1930c227c67fe079b8efcc87c577aa6",
+  "reviewRange": "6dea47352fb927af082cf9c08f0287db7a0b8fd0...32b4c865a1930c227c67fe079b8efcc87c577aa6",
+  "sourceHashChecks": [
+    {
+      "path": "src/lib/refreshGate.ts",
+      "sha256": "9757943261730f7f8bee19827e22c06613fc4b93ebec4062847c08e9d7415005"
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "7745fa97a92ad2002e069819633fda6895c997991bd52f14bcc96642f1848907"
+    },
+    {
+      "path": "src/lib/i18n/zh-CN.ts",
+      "sha256": "b21dfa585c1a34d308a1e1c967c0ddf4f7be1a0909aa71b82e599250fe278153"
+    },
+    {
+      "path": "tools/test-refresh-gate.mjs",
+      "sha256": "95135bcc1c5d7883cf40107ffa3b9fe43c28a10769c6dd891443144a85841d84"
+    }
+  ],
+  "checkExitRecords": [
+    {
+      "source": "tsc.exit",
+      "record": "tsc exit=0"
+    },
+    {
+      "source": "lint.exit",
+      "record": "lint exit=0"
+    },
+    {
+      "source": "build.exit",
+      "record": "build exit=0"
+    },
+    {
+      "source": "refresh-gate.exit",
+      "record": "refresh-gate exit=0"
+    },
+    {
+      "source": "git-diff-check.exit",
+      "record": "diff-check exit=0"
+    }
+  ],
+  "sensitivityOutputSummaries": [
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/A-self-wait-shape.out",
+      "tests": 90,
+      "pass": 90,
+      "fail": 0,
+      "exit": "exit=0"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/A2-recursive-self-wait.out",
+      "tests": 90,
+      "pass": 89,
+      "fail": 1,
+      "exit": "exit=1"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/B-no-budget-reset.out",
+      "tests": 90,
+      "pass": 88,
+      "fail": 2,
+      "exit": "exit=1"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/C-silent-exhaust.out",
+      "tests": 90,
+      "pass": 87,
+      "fail": 3,
+      "exit": "exit=1"
+    }
+  ],
+  "boundary": "Independent limited static review Standards2 P2/Spec2 P2. Previous self-wait and permanent retry budget mechanisms close, but actual getRows recovery ref is never assigned and batch error eligibility is not preserved through retries/exhaustion/dismiss. Final four source hashes match commit, Node90/frontend exit0. Sensitivity first case changes comment shape and does not fail; preserved, not evidence of behavioral sensitivity. No new Release/GUI/D06/CI/long-run acceptance. Remaining work will use user-requested batch implementation and overall verification, Q106.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/MANIFEST.md",
+      "stored": "original/MANIFEST.md.gz",
+      "sourceBytes": 2151,
+      "storedBytes": 1229,
+      "sourceSha256": "bbd27f8fbed66875e4f3735ed4133e73a3964c5a0d5f06171a6cce8aeec918c8",
+      "storedSha256": "13095be27f3e85e0ff455e5f8a2ce82145e14b82304d3a9bedd989b77ccc010a"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/base-sha.txt",
+      "stored": "original/base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 60,
+      "sourceSha256": "5e902c6f7d0b94a95ae555fee0e5147b610e50e9120c09794e17652c70e2ffc4",
+      "storedSha256": "d58b7b6efc0b280ebc14497a92ad1598c6e7fe2af6990b394573ea0312ca25b5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/build.err",
+      "stored": "original/build.err.gz",
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/build.exit",
+      "stored": "original/build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/build.out",
+      "stored": "original/build.out.gz",
+      "sourceBytes": 352,
+      "storedBytes": 238,
+      "sourceSha256": "b3ba31c057009badc88c03dc4be6e7aac9ebee86773a027f9ec3ca317995077d",
+      "storedSha256": "27a926e656721d46be379d18a25503479c980906b0edb5e6ec3baa921766299a"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/changed-files.txt",
+      "stored": "original/changed-files.txt.gz",
+      "sourceBytes": 97,
+      "storedBytes": 89,
+      "sourceSha256": "b03eb2e231d6b84edea7185ccf0ee2929060aca681c092ce6e8930510ae63ceb",
+      "storedSha256": "73eae901bda363aa2ddb862d075c6461070b9a93dd441c40f7845a19ae2d9712"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/git-diff-check.exit",
+      "stored": "original/git-diff-check.exit.gz",
+      "sourceBytes": 18,
+      "storedBytes": 38,
+      "sourceSha256": "7676199b5c1053b6eb1616a03e84e739a3cecc5c963d0aa16286f97407279566",
+      "storedSha256": "6aba9c704391a38c6824a4d688f79a97eef3368d4199823e3f5395b818946000"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/git-diff-check.out",
+      "stored": "original/git-diff-check.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/lint.err",
+      "stored": "original/lint.err.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/lint.exit",
+      "stored": "original/lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/lint.out",
+      "stored": "original/lint.out.gz",
+      "sourceBytes": 1218,
+      "storedBytes": 239,
+      "sourceSha256": "709d6e9cda9b4754350142312204a04278e3de99c646a413676e63c95c80fc1a",
+      "storedSha256": "c04f922be85434160f9c893e60068f5750d01e2d8e9e56deef2cd54dba4f0cac"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/refresh-gate.err",
+      "stored": "original/refresh-gate.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/refresh-gate.exit",
+      "stored": "original/refresh-gate.exit.gz",
+      "sourceBytes": 20,
+      "storedBytes": 40,
+      "sourceSha256": "f835fe692be046a5de522b4ecdcae59a7f3761866077ccc3bc369c62d6642651",
+      "storedSha256": "aa98c27c5a4bef70b17a3de2eab8e2f161b684c501389e277a29bf4f1ac06ef5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/refresh-gate.out",
+      "stored": "original/refresh-gate.out.gz",
+      "sourceBytes": 8869,
+      "storedBytes": 3681,
+      "sourceSha256": "01368577d9e65fed05ef4bb7835015fe5fc7474fb92d32b737d23838423db316",
+      "storedSha256": "639c67a06a12914adbe4de0276a4af7c11b00d725f0caa0c476621d8fb8cf3fc"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/A-self-wait-shape.exit",
+      "stored": "original/sensitivity/A-self-wait-shape.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "storedSha256": "490f70fc729c412fb4530871885a3c7cbf7f6b871925c93ac664973d5efe5ebf"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/A-self-wait-shape.out",
+      "stored": "original/sensitivity/A-self-wait-shape.out.gz",
+      "sourceBytes": 8871,
+      "storedBytes": 3694,
+      "sourceSha256": "6ac515435473700ed02bb59c6cb5d4f2c27ed6a80d20ad83d9496c0efbd2cf02",
+      "storedSha256": "58b88292f81fbfb38b834720176ab81a2c9f004a8b7a0a4ae4fcbe4de8f234fc"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/A2-recursive-self-wait.exit",
+      "stored": "original/sensitivity/A2-recursive-self-wait.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/A2-recursive-self-wait.out",
+      "stored": "original/sensitivity/A2-recursive-self-wait.out.gz",
+      "sourceBytes": 9580,
+      "storedBytes": 4067,
+      "sourceSha256": "8ae3bdd99b1d56e18649c20b02ee8b33caec028cb12eb58783ad786ecb5e3bb5",
+      "storedSha256": "d4e9cca12e31a6219bdd2ce1aab7fe4c356c65c49d4418101afd53c18603b004"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/App.tsx.orig",
+      "stored": "original/sensitivity/App.tsx.orig.gz",
+      "sourceBytes": 127603,
+      "storedBytes": 33974,
+      "sourceSha256": "7745fa97a92ad2002e069819633fda6895c997991bd52f14bcc96642f1848907",
+      "storedSha256": "ae0e4125d6c09da6767f29b12d6d11a321690d99999b098471c7ce97071f9e0f"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/B-no-budget-reset.exit",
+      "stored": "original/sensitivity/B-no-budget-reset.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/B-no-budget-reset.out",
+      "stored": "original/sensitivity/B-no-budget-reset.out.gz",
+      "sourceBytes": 10225,
+      "storedBytes": 4128,
+      "sourceSha256": "6d5985d5c20828cd767e8f41015df383c8b76a0f37d2152881ed4fae96bd2249",
+      "storedSha256": "ef2f0248cd77e73e9e8a114bbb21d0852838aee98f3a6e201dfa7ce8b6956548"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/C-silent-exhaust.exit",
+      "stored": "original/sensitivity/C-silent-exhaust.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/C-silent-exhaust.out",
+      "stored": "original/sensitivity/C-silent-exhaust.out.gz",
+      "sourceBytes": 10855,
+      "storedBytes": 4156,
+      "sourceSha256": "216241099d81b59942904891b3f51bddcc19ba60e6ccd781b7b302509ec70139",
+      "storedSha256": "bef7f18f39c4be898c82d563e08a5f10d9c757b95efff7dcd74af8ddfa8649d2"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/sensitivity/refreshGate.ts.orig",
+      "stored": "original/sensitivity/refreshGate.ts.orig.gz",
+      "sourceBytes": 38430,
+      "storedBytes": 12444,
+      "sourceSha256": "9757943261730f7f8bee19827e22c06613fc4b93ebec4062847c08e9d7415005",
+      "storedSha256": "e8047f671477372419ecfeaf4f42430ace1e2c6c30f55bbee7e9e6ecc01e3655"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/source-sha256-after-check.txt",
+      "stored": "original/source-sha256-after-check.txt.gz",
+      "sourceBytes": 349,
+      "storedBytes": 260,
+      "sourceSha256": "e6588f72c5075494a585dbce151d4f41252558f24b7aacd0b309ddc0758e48fa",
+      "storedSha256": "a250f0d1ade659428267bb2a1f1045a5bee4b5aa90425fc650688cb885cca286"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/source-sha256-before-check.txt",
+      "stored": "original/source-sha256-before-check.txt.gz",
+      "sourceBytes": 349,
+      "storedBytes": 260,
+      "sourceSha256": "e6588f72c5075494a585dbce151d4f41252558f24b7aacd0b309ddc0758e48fa",
+      "storedSha256": "a250f0d1ade659428267bb2a1f1045a5bee4b5aa90425fc650688cb885cca286"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/tsc.err",
+      "stored": "original/tsc.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/tsc.exit",
+      "stored": "original/tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r17-aOGiOW/tsc.out",
+      "stored": "original/tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}
