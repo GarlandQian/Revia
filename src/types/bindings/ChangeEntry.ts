@@ -39,4 +39,11 @@ headVersion: string | null,
 /**
  * 工作区中的文件版本（审阅标记的失效依据）。
  */
-worktreeVersion: string | null, };
+worktreeVersion: string | null, 
+/**
+ * 工作区版本是否**确认**过。
+ *
+ * 子模块等目录若无法用 Git 读出真实版本，这里为 false：该路径的审阅标记
+ * 一律不可认领，不能因为「两次都读不到」就当作版本没变（Q20、ADR-0002）。
+ */
+worktreeVersionConfirmed: boolean, };

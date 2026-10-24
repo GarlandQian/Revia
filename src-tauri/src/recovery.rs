@@ -34,13 +34,19 @@ pub struct WorktreeIdentity {
 
 impl WorktreeIdentity {
     pub fn capture(git: &Git) -> Result<Self> {
-        let read_path = |flag| -> Result<PathBuf> {
-            let output = git.run_ok(&["rev-parse", "--path-format=absolute", flag], "读取 worktree 身份")?;
-            Ok(fs::canonicalize(output.stdout_lossy().trim())?)
-        };
+        // 一次 `rev-parse` 同时拿 gitDir 与 commonDir：刷新会重新确认身份，
+        // 必须保持「刷新不按文件起 Git 进程」的既有性能边界（t13）。
+        let output = git.run_ok(
+            &["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
+            "读取 worktree 身份",
+        )?;
+        let text = output.stdout_lossy();
+        let mut lines = text.lines().map(str::trim).filter(|line| !line.is_empty());
+        let git_dir = PathBuf::from(lines.next().ok_or_else(|| AppError::internal("Git 未返回 gitDir"))?);
+        let common_dir = PathBuf::from(lines.next().ok_or_else(|| AppError::internal("Git 未返回 commonDir"))?);
         let worktree_path = fs::canonicalize(&git.directory)?;
-        let git_dir = read_path("--git-dir")?;
-        let common_dir = read_path("--git-common-dir")?;
+        let git_dir = fs::canonicalize(git_dir)?;
+        let common_dir = fs::canonicalize(common_dir)?;
         let filesystem_ids = [&worktree_path, &git_dir, &common_dir].into_iter()
             .map(|path| platform::directory_identity(path)).collect::<Result<_>>()?;
         Ok(Self { worktree_path, git_dir, common_dir, filesystem_ids })
@@ -50,29 +56,20 @@ impl WorktreeIdentity {
         self.filesystem_ids.iter().all(Option::is_some) && self == other
     }
 
-    /// 重新确认这个身份**现在仍然成立**（不启动任何 Git 进程）。
+    /// 重新确认这个身份**现在仍然成立**。
     ///
-    /// 只重读文件系统标识：同一路径被删除重建后标识会变，此时不能继续沿用旧身份
-    /// 认领审阅标记（Q87、ADR-0010）。读不到任何一项就视为身份不明确。
-    pub fn revalidate(&self) -> Option<Self> {
-        let filesystem_ids = [&self.worktree_path, &self.git_dir, &self.common_dir]
-            .into_iter()
-            .map(|path| platform::directory_identity(path).ok().flatten())
-            .collect::<Vec<_>>();
-        if filesystem_ids.iter().any(Option::is_none) {
+    /// 只 stat 缓存的路径不够：linked worktree 的 `.git` 文件可以改指另一个**仍然存在**的
+    /// gitDir/commondir，旧目录也还在，路径与 ID 都没变，但真实归属已经变了（Q87、T10）。
+    /// 因此这里让 Git 重新解析当前实际归属，再与缓存身份逐项比对。
+    ///
+    /// 这是每次刷新一次，不是每文件一次：既有「刷新不按文件起 Git 进程」的断言不受影响。
+    pub fn revalidate(&self, git: &Git) -> Option<Self> {
+        let current = Self::capture(git).ok()?;
+        // 路径或文件系统标识任一变化都视为身份不明确，不能认领旧标记。
+        if !self.confirmed_match(&current) {
             return None;
         }
-        let refreshed = Self {
-            worktree_path: self.worktree_path.clone(),
-            git_dir: self.git_dir.clone(),
-            common_dir: self.common_dir.clone(),
-            filesystem_ids,
-        };
-        // 路径相同但标识变了：身份不明确，不能认领。
-        if !self.confirmed_match(&refreshed) {
-            return None;
-        }
-        Some(refreshed)
+        Some(current)
     }
 }
 

@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 use ts_rs::TS;
 
 use crate::error::{AppError, Result};
+use crate::git::Git;
 use crate::platform;
 use crate::recovery::WorktreeIdentity;
 
@@ -71,7 +72,9 @@ pub struct ReviewStore {
     directory: PathBuf,
     /// 存储级事务锁：整个「读 → 改 → 发布」串行，避免不同 worktree 成功保存互相覆盖（ST07-1、SP07-7）。
     ///
-    /// 用文件锁而不是进程内 Mutex：同一数据目录可能被多个会话（甚至多个进程）共用。
+    /// 实现是**进程内**互斥锁，不是文件锁：串行化同一应用实例里各 worktree 会话的读改写。
+    /// 单个 `AppState` 只创建一个 `ReviewStore` 并 clone 共享，因此各会话确实共用这把锁。
+    /// 多进程同时打开同一数据目录不在本任务范围（Q16/规格未要求），这里不冒充已支持。
     transaction: Arc<Mutex<()>>,
 }
 
@@ -255,8 +258,10 @@ impl ReviewStore {
 
 /// 工作区中某个路径的版本（内容 SHA-256；不存在为 None）。
 ///
-/// 符号链接按链接目标记录，子模块按提交号记录，避免把目录内容当文件读。
-pub fn worktree_version(root: &Path, path: &str) -> Result<Option<String>> {
+/// 符号链接按链接目标记录；**子模块用现有 Git CLI 读真实提交号**（ADR-0002：
+/// 不维护第二套 Git 语义，`packed-refs`、目录型 `.git` 都由 Git 自己解析）；
+/// 读不到真实版本时返回 `None`，调用方必须按「无法确认」保守处理，不能生成可认领的常量。
+pub fn worktree_version(git: Option<&Git>, root: &Path, path: &str) -> Result<Option<String>> {
     let full = root.join(path);
     let meta = match fs::symlink_metadata(&full) {
         Ok(meta) => meta,
@@ -269,15 +274,12 @@ pub fn worktree_version(root: &Path, path: &str) -> Result<Option<String>> {
         hasher.update(b"symlink:");
         hasher.update(target.to_string_lossy().as_bytes());
     } else if meta.is_dir() {
-        // 子模块：记录**真实 Git 版本**，切换提交后标记随之失效（ST07-8、SP07-8）。
-        // 非子模块的目录按内容哈希（不递归读用户文件），保持只读、不启动 Git 进程。
-        match submodule_commit(root, path) {
-            Some(commit) => {
-                hasher.update(b"submodule:");
-                hasher.update(commit.as_bytes());
-            }
-            None => hasher.update(b"dir:"),
-        }
+        // 子模块：必须拿到真实 Git 版本；拿不到就**不产生版本**，标记随之处失效。
+        let Some(commit) = submodule_commit(git, path) else {
+            return Ok(None);
+        };
+        hasher.update(b"submodule:");
+        hasher.update(commit.as_bytes());
     } else {
         hasher.update(b"file:");
         hasher.update(fs::read(&full)?);
@@ -285,32 +287,20 @@ pub fn worktree_version(root: &Path, path: &str) -> Result<Option<String>> {
     Ok(Some(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()))
 }
 
-/// 读取子模块当前检出的提交号（只读 `.git` 文件/目录，不启动 Git 进程）。
+/// 用现有 Git CLI 读取子模块当前检出的提交号。
 ///
-/// 子模块的 `.git` 是一个文件：`gitdir: ../.git/modules/<name>`；真实 HEAD 在
-/// `<gitdir>/HEAD` 或 `<gitdir>/refs/...`。读不出来就返回 None（调用方退化为「是目录」）。
-fn submodule_commit(root: &Path, path: &str) -> Option<String> {
-    let dot_git = root.join(path).join(".git");
-    let meta = fs::symlink_metadata(&dot_git).ok()?;
-    if !meta.is_file() {
-        return None;
-    }
-    let text = fs::read_to_string(&dot_git).ok()?;
-    let target = text.trim().strip_prefix("gitdir:")?.trim();
-    let git_dir = {
-        let candidate = PathBuf::from(target);
-        if candidate.is_absolute() { candidate } else { root.join(path).join(candidate) }
-    };
-    let head = fs::read_to_string(git_dir.join("HEAD")).ok()?;
-    let head = head.trim();
-    if let Some(reference) = head.strip_prefix("ref: ") {
-        // 分支引用：读 `refs/...`；打包引用（packed-refs）里的内容这里不解析，
-        // 读不到就返回 None，退化为「是目录」，不会伪造版本。
-        let value = fs::read_to_string(git_dir.join(reference)).ok()?;
-        let value = value.trim();
-        return (!value.is_empty()).then(|| value.to_string());
-    }
-    (!head.is_empty()).then(|| head.to_string())
+/// 只读：`rev-parse` 在仓库根上执行，`--` 之后是被审阅的路径。
+/// 失败（非子模块、Git 报错、输出为空）一律返回 `None`。
+fn submodule_commit(git: Option<&Git>, path: &str) -> Option<String> {
+    let git = git?;
+    // `git submodule status -- <path>` 输出「<sha> <path> (<describe>)」，
+    // 第一列是子模块**当前检出的**提交号；由 Git 自己解析 packed-refs、目录型 `.git`、
+    // detached HEAD 等情况，不在 Rust 里维护第二套引用语义（ADR-0002）。
+    let output = git.try_run(&["submodule", "status", "--", path])?;
+    let line = output.lines().next()?;
+    let commit = line.trim().trim_start_matches(['-', '+', 'U', ' ']);
+    let commit = commit.split_whitespace().next()?;
+    (!commit.is_empty()).then(|| commit.to_string())
 }
 
 #[cfg(test)]

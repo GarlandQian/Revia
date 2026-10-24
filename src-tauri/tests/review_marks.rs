@@ -63,6 +63,11 @@ impl Fixture {
         fixture
     }
 
+    /// 真实路径根（tempdir 在 macOS 上是 /var 别名）。
+    fn root(&self) -> PathBuf {
+        self.temp.path().canonicalize().unwrap()
+    }
+
     fn git(&self, args: &[&str]) -> String {
         let output = Command::new("git")
             .current_dir(&self.repo)
@@ -471,28 +476,168 @@ fn corrupt_store_surfaces_an_error() {
     );
 }
 
-/// ST07-8 / SP07-8：子模块提交变化使标记失效。
+/// ST07-R2-1 / SP07-R2-1：子模块版本走真实 Git CLI，覆盖 packed-refs 与目录型 `.git`。
+///
+/// 手工解释 `.git`/HEAD/refs 会漏掉 packed-refs 等真实 Git 情况（ADR-0002）。
+/// 这里用真实 `git submodule add` 建子模块，切换两次提交，并在切换前 `git pack-refs --all`
+/// 让引用进入 packed-refs，确认版本仍然随提交变化。
 #[test]
-fn submodule_commit_change_invalidates_mark() {
-    // 子模块目录只需是一个带 `.git` 指针文件的目录：版本读取走真实 Git 元数据。
+fn submodule_version_follows_real_git_including_packed_refs() {
     let f = Fixture::new();
     f.write("outer.txt", b"base\n");
     f.commit();
 
-    let modules = f.repo.join(".git").join("modules").join("sub");
-    fs::create_dir_all(modules.join("refs").join("heads")).unwrap();
-    fs::write(modules.join("HEAD"), "ref: refs/heads/main\n").unwrap();
-    let sub_dir = f.repo.join("sub");
-    fs::create_dir_all(&sub_dir).unwrap();
-    fs::write(sub_dir.join(".git"), format!("gitdir: {}\n", modules.display())).unwrap();
-
-    let write_commit = |value: &str| {
-        fs::write(modules.join("refs").join("heads").join("main"), format!("{value}\n")).unwrap();
+    // 真实子模块源仓库：两个提交。
+    let source = f.root().join("submodule-source");
+    fs::create_dir_all(&source).unwrap();
+    let run = |dir: &Path, args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(dir)
+            .env_clear()
+            .envs(&f.vars)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} 失败：{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).into_owned()
     };
-    write_commit("1111111111111111111111111111111111111111");
-    let first = revia_lib::review::worktree_version(&f.repo, "sub").unwrap();
-    write_commit("2222222222222222222222222222222222222222");
-    let second = revia_lib::review::worktree_version(&f.repo, "sub").unwrap();
-    assert_ne!(first, second, "子模块提交变化必须改变版本");
-    assert!(first.is_some() && second.is_some(), "必须读到真实子模块版本");
+    run(&source, &["init", "-b", "main"]);
+    run(&source, &["config", "user.name", "Sub"]);
+    run(&source, &["config", "user.email", "sub@example.invalid"]);
+    run(&source, &["config", "commit.gpgsign", "false"]);
+    fs::write(source.join("file.txt"), b"one\n").unwrap();
+    run(&source, &["add", "--all"]);
+    run(&source, &["commit", "-m", "one"]);
+    let first_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
+    fs::write(source.join("file.txt"), b"two\n").unwrap();
+    run(&source, &["add", "--all"]);
+    run(&source, &["commit", "-m", "two"]);
+    let second_commit = run(&source, &["rev-parse", "HEAD"]).trim().to_string();
+
+    // 真实 submodule add（需要 file 协议允许）。
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "add", source.to_str().unwrap(), "sub"]);
+    f.commit();
+    run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
+
+    // 子模块默认检出的是源仓库分支 HEAD（第二个提交）。先切回第一个提交，
+    // 让「切换提交」这一步真的改变检出。
+    let sub_dir = f.repo.join("sub");
+    run(&sub_dir, &["checkout", first_commit.as_str()]);
+
+    let session = f.session();
+    let first = revia_lib::review::worktree_version(Some(&session.git), &f.repo, "sub")
+        .unwrap()
+        .expect("必须读到真实子模块版本");
+    assert!(first.len() == 64, "版本应是内容哈希：{first}");
+
+    // 把引用打包：手工解析 loose refs 的实现会在这里失效。
+    run(&sub_dir, &["pack-refs", "--all"]);
+    assert!(
+        !sub_dir.join(".git").join("refs").join("heads").join("main").exists()
+            || sub_dir.join(".git").is_file(),
+        "pack-refs 后 loose ref 应被移除（或子模块 .git 是文件指针）"
+    );
+
+    // 切换到第二个提交（真实 checkout）。
+    run(&sub_dir, &["checkout", second_commit.as_str()]);
+    let second = revia_lib::review::worktree_version(Some(&session.git), &f.repo, "sub")
+        .unwrap()
+        .expect("packed-refs 之后仍必须读到真实版本");
+    assert_ne!(first, second, "子模块提交变化必须改变版本（packed-refs 也不能退化）");
+}
+
+/// ST07-R2-1：子模块目录拿不到真实版本时，不能生成可认领的常量版本。
+#[test]
+fn unreadable_submodule_version_is_not_claimable() {
+    let f = Fixture::new();
+    f.write("outer.txt", b"base\n");
+    f.commit();
+    // 普通目录（不是子模块）：目录本身没有 Git 版本可读。
+    fs::create_dir_all(f.repo.join("plain-dir")).unwrap();
+    let session = f.session();
+    let version = revia_lib::review::worktree_version(Some(&session.git), &f.repo, "plain-dir").unwrap();
+    assert!(version.is_none(), "读不到真实版本时必须返回 None，而不是常量：{version:?}");
+}
+
+/// ST07-R2-2 / SP07-R2-2：linked worktree 的 `.git` 改指另一个**仍存在**的 gitDir 后，
+/// 不能继续沿用旧身份认领标记（旧目录还在，只 stat 旧路径看不出来）。
+#[test]
+fn gitdir_repointed_to_existing_directory_invalidates_identity() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+
+    // 真实 linked worktree：`.git` 是指向主仓库 .git/worktrees/<name> 的文件指针。
+    let linked = f.root().join("linked");
+    let linked_arg = revia_lib::platform::external_path(&linked);
+    f.git(&["worktree", "add", "-b", "other", linked_arg.to_str().unwrap()]);
+
+    let linked_session = WorktreeSession::open_with_review(
+        "linked-review",
+        &linked,
+        ShellEnv {
+            vars: f.vars.clone(),
+            path: f.paths.clone(),
+            info: EnvCaptureInfo {
+                worktree: linked.display().to_string(),
+                shell: "fixture".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: true,
+                var_count: f.vars.len(),
+                path_entries: f.paths.clone(),
+                diagnostics: None,
+            },
+        },
+        Arc::new(CommandLog::default()),
+        Some(Arc::new(ReviewStore::new(f.data.clone()))),
+    )
+    .unwrap();
+
+    // 在 linked worktree 里制造改动并标记。
+    fs::write(linked.join("a.txt"), b"linked change\n").unwrap();
+    let snapshot = linked_session.refresh().unwrap();
+    assert!(snapshot.entries.iter().any(|e| e.path == "a.txt"));
+    linked_session.set_review_mark("a.txt", true, None).unwrap();
+    assert_eq!(linked_session.refresh().unwrap().review.reviewed_count, 1);
+
+    // 把 linked worktree 的 `.git` 指向**另一个仍然存在**的 gitDir：
+    // 复制一份主仓库的 .git/worktrees/<name> 目录，再把指针改过去。
+    let pointer = linked.join(".git");
+    let original = fs::read_to_string(&pointer).unwrap();
+    let original_dir = {
+        let raw = original.trim().strip_prefix("gitdir:").unwrap().trim();
+        let candidate = PathBuf::from(raw);
+        if candidate.is_absolute() { candidate } else { linked.join(candidate) }
+    };
+    let other_dir = original_dir.parent().unwrap().join("other-identity");
+    assert!(!other_dir.exists(), "目标目录名不应已存在");
+    copy_dir(&original_dir, &other_dir);
+    // 让 gitDir 的 commondir 指回同一个真实仓库：路径变了、归属其实也变了。
+    fs::write(&pointer, format!("gitdir: {}\n", other_dir.display())).unwrap();
+
+    // 同一个会话继续刷新：Git 现在解析出的是另一个 gitDir，旧身份不得继续认领标记。
+    let after = linked_session.refresh().unwrap();
+    assert_eq!(
+        after.review.reviewed_count, 0,
+        "gitDir 改指另一个现存目录后不得继承旧标记"
+    );
+}
+
+fn copy_dir(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), &target).unwrap();
+        }
+    }
 }

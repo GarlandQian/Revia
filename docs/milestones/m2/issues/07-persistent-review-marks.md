@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -14,7 +14,7 @@
 - [ ] ⌥⌘R 只标记、不取消，不能进入 ⌘R 刷新分支；按当前列表顺序寻找下一个未审阅文件，去重、末尾环回、展开目标所在折叠组。
 - [ ] 全部已审阅时留在当前文件并提示；输入框、弹窗、按钮的键盘行为不穿透。
 - [ ] M2 显示审阅进度，不提前实现提交或以标记阻止后续提交；真实 Git 持久化验证与桌面导航检查通过。
-  - 真实 Git 持久化已由 `review_marks` **13** 项通过（含并发事务、所见版本、活动会话身份、存储损坏、子模块版本）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
+  - 真实 Git 持久化已由 `review_marks` **15** 项通过（含子模块 packed-refs、gitDir 改指、并发事务、所见版本、存储损坏）；**桌面导航检查未验证**（本轮未启动 GUI），因此本项不勾选。
 
 ## Comments
 
@@ -244,3 +244,67 @@ Rust 合计 **245 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹�
 - 07退回`ready-for-agent`，未证明项取消勾选。仍交原Pi只修07；复用现有生产会话、Git、选择gate和原worktree错误通道，不再用手工Git解释或不完整上下文字段子集替代既有边界。
 - 先所有修改后集中检查；精确命令、真实退出码、原始stdout/stderr和检查前后源码hash，精确暂存。不新增前端测试框架或重复临时客户端，不改已确认决策/性能断言。
 - 未Release、GUI、D06、双平台CI或长测。245项不是这些遗漏路径的证明，两轴全部通过后再固定Release和真实桌面，不标done。
+
+### 2026-10-24 / Pi 实现：任务07 第二轮复核返修（R07-R2）
+
+只修 07；未动 05 状态与内容，未做 08/12/13。首轮已闭合项未反复重构。
+
+#### Standards
+
+**ST07-R2-1 / SP07-R2-1（子模块真实 Git 版本）**：删除 `review.rs` 里手工解释 `.git`/`HEAD`/loose refs 的第二套 Git 语义（ADR-0002），改为经现有 Git CLI：`git submodule status -- <path>`，由 Git 自己解析 packed-refs、目录型 `.git`、detached HEAD。读不到真实版本时 `worktree_version` 返回 `None`，并新增 `ChangeEntry.worktreeVersionConfirmed=false`：这类路径的审阅标记**一律不可认领**，不再退化成恒定目录版本。
+回归 `submodule_version_follows_real_git_including_packed_refs`：真实 `git submodule add`，先 `checkout` 到第一个提交，再 `git pack-refs --all`，再切到第二个提交——版本随之变化（手工解析实现会失败，见敏感性对照）。`unreadable_submodule_version_is_not_claimable`：普通目录拿不到版本时返回 `None`。
+
+**ST07-R2-2 / SP07-R2-2（实际归属）**：`WorktreeIdentity::revalidate` 不再只 stat 缓存路径，改为让 Git 重新解析当前实际归属（`capture`）后与缓存身份做 `confirmed_match`；linked worktree 的 `.git` 改指另一个**仍存在**的 gitDir 时也会被判为身份不明确。
+为保持既有性能断言，`capture` 合并为**一次** `rev-parse --git-dir --git-common-dir`（原来两次），`t13_refresh_does_not_spawn_per_file_git_processes` 仍通过、断言未放宽。
+回归 `gitdir_repointed_to_existing_directory_invalidates_identity`：真实 linked worktree，标记后把 `.git` 指针改到复制的另一 gitDir（旧目录仍在），同一会话刷新后 `reviewedCount` 归零。
+
+**ST07-R2-3 / SP07-R2-3（选择代际）**：`reviewNextFile` 的 `stillSameContext()` 增加 `selectionEpochRef` 与 `selectionGateRef.currentContext().epoch` 比对（复用既有 gate，不新增字段子集）。点击尚未加载指标的 B（`openEntry` 已递增代际但 `selectedRef` 仍是 A）以及 A→B→A，都会让旧导航立即失效。
+
+**ST07-R2-4（失败留存）**：`setReviewMark` 的 catch 不再受 `isCurrent()` 限制，失败**始终** `setAppError(err, targetWorktreeId)` 记到发起它的 worktree；成功响应仍按激活/版本隔离。
+
+**ST07-R2-5（完成提示归属）**：提示状态改为 `{ worktreeId, reviewedCount, total }`，渲染时要求与当前快照的 worktree、`total`、`reviewedCount` 全部一致且确实全部完成；切 B、取消标记或刷新失效后不再显示旧「全部已审阅」。
+
+另：更正 `ReviewStore.transaction` 的注释——它是**进程内**互斥锁，不是文件锁；多进程共享数据目录不在本任务范围，注释不再冒充已支持。
+
+#### Spec
+
+**SP07-R2-1** 见 ST07-R2-1。**SP07-R2-2** 见 ST07-R2-2。**SP07-R2-3** 见 ST07-R2-3（`selectionEpoch` + 选择 gate，覆盖 A→B→A 与「B 尚未显示」）。
+
+#### 生产调用点
+
+`WorktreeSession::refresh` → `confirmed_identity()` → `WorktreeIdentity::revalidate(&self.git)`（Git 重新解析归属）→ `review_state`（`retain_valid` 过滤不可确认版本）。
+`WorktreeSession::set_review_mark` → `confirmed_identity()` + 版本比对 → `ReviewStore::set_mark`。
+`review::worktree_version(Some(&self.git), …)` → `submodule_commit` → `git submodule status`。
+
+#### 实际执行的检查
+
+日志目录（实际路径）：`/private/tmp/revia-task07-r3b-gkOB0F`（旧的 `/private/tmp/revia-task07-r3-hCxSBf` 原样保留，见 `NOTE-aborted-run.md`）
+
+- 基线：`ed0f9b8eca4046fe934464b57e0607507794d487`
+- 检查前源码 SHA-256（检查后复核未变）：
+  - `bf058efc9e9f2c7c7bd1572e1e8c270edb91f59a233048150d6ce9e9ec47d2b7  src-tauri/src/review.rs`
+  - `4625d629efa4217f452d1de8775fd16dd789221a32603987f7f442e08ae69898  src-tauri/src/recovery.rs`
+  - `3415f58e86acd62e02e107382faf7a0d2c71e36e30df211d1e0b9ed8bcabe9a5  src-tauri/src/session.rs`
+  - `d5a4414d83ff69cc0c4b360e6ea60d0a5f0875531a31b6324fd2d6157231bdeb  src-tauri/tests/review_marks.rs`
+  - `624fb867f5a14ad0e4d0dc039f97af7e51644b31d1917d3f5d9edb869a5a09b7  src/App.tsx`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | 复用 `/private/tmp/revia-task07-r3-hCxSBf/tsc.*`（源码未变） |
+| `pnpm lint` | 0 | 复用 `/private/tmp/revia-task07-r3-hCxSBf/lint.*`（源码未变） |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 0 | `cargo-test.out` / `.err` / `.exit` |
+
+Rust 合计 **247 项**：lib 99、`discard_recovery` 71（1 ignored 桌面夹具）、`file_staging` 20、`hunk_staging` 24、`refresh_isolation` 15、`review_marks` **15**（新增 2 项）、`session_flow` 3。
+
+#### 中断与敏感性证据边界
+
+- 上一轮检查目录 `/private/tmp/revia-task07-r3-hCxSBf` 的 `build` 在 `transforming` 阶段中断、**没有 `build.exit`**；`cargo` 未产出日志。该目录原样保留，本轮在其外新建目录重跑 build 与完整 Rust。
+- 两处敏感性对照（移除子模块真实版本、退回只 stat 缓存身份）**实际运行过并使对应用例失败**，但只保留终端摘要与实现副本（`history/sensitivity.md`、`history/*.bak`），没有独立归档的 stdout/stderr；不冒称完整原始结果。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：勾选框观感、⌥⌘R 实际按键、折叠组展开、完成提示归属、按钮焦点不穿透、迟到响应与选择代际的真实时序。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测。
+- 子模块场景只覆盖 `submodule status` 能读到的情况；工作区里未初始化的子模块（`-` 前缀）不在本轮验证范围。
+- 多进程同时共享同一数据目录不在本任务范围（仅进程内互斥）。

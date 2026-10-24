@@ -96,6 +96,11 @@ pub struct ChangeEntry {
     pub head_version: Option<String>,
     /// 工作区中的文件版本（审阅标记的失效依据）。
     pub worktree_version: Option<String>,
+    /// 工作区版本是否**确认**过。
+    ///
+    /// 子模块等目录若无法用 Git 读出真实版本，这里为 false：该路径的审阅标记
+    /// 一律不可认领，不能因为「两次都读不到」就当作版本没变（Q20、ADR-0002）。
+    pub worktree_version_confirmed: bool,
 }
 
 /// 一次状态读取的结果。
@@ -378,6 +383,12 @@ impl WorktreeSession {
                 readonly_reason = Some(ReadonlyReason::Unreadable);
             }
 
+            // 工作区版本：普通文件按内容、符号链接按目标、子模块按 Git 真实提交号。
+            // 目录（子模块）拿不到真实版本时视为「无法确认」，不生成可认领的版本。
+            let worktree_version = review::worktree_version(Some(&self.git), &self.path, &entry.path).ok().flatten();
+            let worktree_version_confirmed = worktree_version.is_some()
+                || !self.path.join(&entry.path).is_dir();
+
             entries.push(ChangeEntry {
                 path: entry.path.clone(),
                 original_path: entry.original_path.clone(),
@@ -400,7 +411,8 @@ impl WorktreeSession {
                 snapshot_revision: String::new(),
                 reviewed: false,
                 head_version: head_version_for(entry),
-                worktree_version: review::worktree_version(&self.path, &entry.path).ok().flatten(),
+                worktree_version: worktree_version.clone(),
+                worktree_version_confirmed: worktree_version_confirmed,
             });
         }
 
@@ -990,6 +1002,7 @@ impl WorktreeSession {
         let mut paths: Vec<String> = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let mut versions: HashMap<String, ReviewVersions> = HashMap::new();
+        let mut unconfirmed: std::collections::HashSet<String> = std::collections::HashSet::new();
         for entry in entries {
             if seen.insert(entry.path.clone()) {
                 paths.push(entry.path.clone());
@@ -999,6 +1012,9 @@ impl WorktreeSession {
                 head: entry.head_version.clone(),
                 worktree: entry.worktree_version.clone(),
             });
+            if !entry.worktree_version_confirmed {
+                unconfirmed.insert(entry.path.clone());
+            }
         }
 
         let store = self.review_store.as_ref();
@@ -1007,7 +1023,9 @@ impl WorktreeSession {
             // 只清理确实失效的标记；有效的保留。
             // 存储损坏/不可读/清理写入失败都如实向上报错，不能伪装成「全部未审阅」（Q36）。
             let valid = store.retain_valid(identity, |mark| {
-                versions.get(&mark.path).is_some_and(|current| *current == mark.versions)
+                // 版本无法确认的路径一律不可认领。
+                !unconfirmed.contains(&mark.path)
+                    && versions.get(&mark.path).is_some_and(|current| *current == mark.versions)
             })?;
             let reviewed_set: std::collections::HashSet<&str> =
                 valid.iter().map(|mark| mark.path.as_str()).collect();
@@ -1029,7 +1047,7 @@ impl WorktreeSession {
 
     /// 当前仍然成立的身份；不成立（同路径重建、路径消失、标识未知）时返回 None。
     fn confirmed_identity(&self) -> Option<WorktreeIdentity> {
-        self.identity.as_ref()?.revalidate()
+        self.identity.as_ref()?.revalidate(&self.git)
     }
 
     /// 身份不可用时的审阅状态：全部未审阅，进度按去重路径统计。

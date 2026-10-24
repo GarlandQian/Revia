@@ -765,7 +765,8 @@ export function App() {
   const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   /** 审阅进度提示（全部已审阅时留在原地提示）。 */
-  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  /** 完成提示绑定 worktree 与当时的进度：切 worktree、取消标记或刷新失效后不再显示旧提示。 */
+  const [reviewNotice, setReviewNotice] = useState<{ worktreeId: string; reviewedCount: number; total: number } | null>(null);
   /** 审阅请求代际：迟到的标记响应不能污染其他 worktree 或新文件版本（Q88、Q89）。 */
   const reviewEpochRef = useRef(0);
 
@@ -990,8 +991,9 @@ export function App() {
       setAppError(null, targetWorktreeId);
       return marks;
     } catch (caught) {
-      // 持久化失败如实展示，不伪称保存成功。
-      if (isCurrent()) setAppError(toAppError(caught), targetWorktreeId);
+      // 失败**始终**记到发起它的 worktree（Q36、Q90）：切走或刷新只影响当前展示，
+      // 不能把真实错误丢掉；成功响应才按激活状态隔离。
+      setAppError(toAppError(caught), targetWorktreeId);
       return null;
     }
   }, [setAppError]);
@@ -1008,6 +1010,9 @@ export function App() {
     if (!current || !active || !targetWorktreeId) return;
     const targetActivation = gateRef.current.token().activation;
     const targetRevision = current.revision;
+    // 绑定已有的选择代际与选择 gate：新选择一发起（哪怕还没显示）旧导航立即失效。
+    const targetSelectionEpoch = selectionEpochRef.current;
+    const targetSelection = selectionGateRef.current.currentContext();
     const activeKey = `${active.changes}:${active.path}`;
     setReviewNotice(null);
 
@@ -1038,6 +1043,10 @@ export function App() {
     const stillSameContext = () => worktreeIdRef.current === targetWorktreeId
       && gateRef.current.token().activation === targetActivation
       && snapshotRef.current?.revision === targetRevision
+      // 选择代际：点击尚未加载指标的 B、或 A→B→A，都会在这里被判为失效。
+      && selectionEpochRef.current === targetSelectionEpoch
+      && targetSelection !== null
+      && selectionGateRef.current.currentContext()?.epoch === targetSelection.epoch
       && selectedRef.current !== null
       && `${selectedRef.current.changes}:${selectedRef.current.path}` === activeKey;
     if (!stillSameContext()) return;
@@ -1057,8 +1066,12 @@ export function App() {
       await openEntry(candidate, { view: viewRef.current, worktreeId: targetWorktreeId });
       return;
     }
-    // 全部已审阅：留在当前文件并提示。
-    setReviewNotice(messages.review.allReviewed);
+    // 全部已审阅：留在当前文件并提示，并记下归属 worktree 与当时的进度。
+    setReviewNotice({
+      worktreeId: targetWorktreeId,
+      reviewedCount: reviewedFromServer.size,
+      total: unique.length,
+    });
     debugLog(`审阅：${messages.review.allReviewed}`);
   }, [openEntry, setReviewMark, worktreeId]);
 
@@ -2114,9 +2127,15 @@ export function App() {
           watch={watchState}
         />
         {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
-        {reviewNotice ? (
+        {reviewNotice
+          && reviewNotice.worktreeId === snapshot?.worktreeId
+          && snapshot?.review
+          && reviewNotice.total === snapshot.review.total
+          && reviewNotice.reviewedCount === snapshot.review.reviewedCount
+          && snapshot.review.total > 0
+          && snapshot.review.reviewedCount === snapshot.review.total ? (
           <div role="status" className="border-b bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-            {reviewNotice}
+            {messages.review.allReviewed}
           </div>
         ) : null}
         {watchState.error ? (
