@@ -826,3 +826,27 @@ REVIA_TASK05_FIXTURE_BASE=/private/tmp \
 #### 边界
 
 这是**数据准备辅助，不是验收通过**：只证明记录由生产入口生成、身份匹配、数据目录独立且未过期；桌面上的界面行为、恢复交互与 D06/CI 仍待规划方用已有 Release 验证。常规测试仍自动清理临时目录，未改变其默认生命周期。
+
+
+### 2026-10-24 / Codex 规划方：桌面夹具 test-only 增量复核，交 Pi 修正
+
+固定 `git diff de8979655f44ceb7531d64e13b6a12a97f7c0417...56a142500f72a3826b95ed10d7b8711dc650f70b`，唯一提交56a1425。仅审夹具入口和对应说明，不重审已通过的产品实现。产品保持ready-for-human，本次数据准备尚未通过复核。
+
+#### Standards（独立结论：2项硬违规，0项Fowler判断性建议）
+
+- **R05-F1-ST1 / P2** `src-tauri/tests/discard_recovery.rs:2644`：`git::fingerprint(&[&bytes])`先散列u64长度前缀，不是文件原始内容SHA-256，却标为`sha256`。按标准工具核对必不匹配；应直接计算文件原字节SHA-256。违反本地验证规范的证据须对应实际结果要求。
+- **R05-F1-ST2 / P3** 本任务上一段删除记录说明写反：原始输出及源码是before不存在、after存在25字节，恢复应重新删除丢弃后出现的文件。修正文案，符合Q85与实际结果。
+
+默认ignored、新建隔离fixture、生产入口保存及常规Fixture自动清理未见问题。原始测试源码hash相符，输出1 passed、70 filtered、exit0；`cargo build --tests`只有清单叙述，无独立原始输出，不当已核。
+
+#### Spec（独立结论：2项）
+
+- **R05-F1-SP1 / P2** 本任务删除记录说明将before/after写反，与T08恢复丢弃前存在状态相反。应明确before不存在、after存在25字节；恢复此记录会删除重新出现的文件。
+- **R05-F1-SP2 / P2** `src-tauri/tests/discard_recovery.rs:2644`的`sha256`实际上是带长度前缀的Revia指纹，后续桌面步骤却要求按SHA-256核对，不满足派发要求的可核验初始工作区/index清单。应输出真实文件SHA-256，并通过标准哈希验证。
+
+其余限定要求满足：默认ignored、全新隔离fixture、当前时钟、生产入口生成五类记录、仅本次fixture保留和登记，常规生命周期未变，无范围扩张。两轴仅静态复核，未构建或操作GUI，不构成桌面验收。
+
+#### 原始证据与返修范围
+
+- [夹具准备原始7文件](../evidence/task05-fixture-review01/manifest.json)已按字节归档，保留原错误字段及原说明，不篡改历史。产品Release仍固定de89796，二进制未变。
+- Pi仅修上述test-only清单字段和文档；仅重跑显式ignored准备入口，保存精确命令、真实退出码、源码hash与原始stdout/stderr，新清单逐文件用标准SHA-256核对。保留旧fixture和原证据，不把新的结果替换旧结果；不要重建Release、操作GUI、跑全套或开始其他任务。
