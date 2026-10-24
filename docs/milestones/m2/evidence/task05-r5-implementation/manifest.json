@@ -1,0 +1,138 @@
+{
+  "task": "M2 任务05 第五轮限定返修（R05-R5）实现方原始检查证据",
+  "implementedCommit": "7e5a2c81190461e375ccc02fc6c29b63955d8085",
+  "implementedCommitSubject": "05：第五轮限定返修（R05-R5 外部另存结果留存）",
+  "baseCommit": "186e6de495a83e9829eeefd545977cb108dff7fe",
+  "sourceDirectoryNote": {
+    "reportedInSummary": "/private/tmp/revia-task05-r5-1792802843",
+    "actualExistingDirectory": "/private/tmp/revia-task05-r5-1792800590",
+    "explanation": "实施方在交付说明里写错了目录名（1792802843），真实目录是 1792800590。两个路径中只有 1792800590 存在；本次按实际存在的目录逐字节复制，未从摘要重建任何日志。"
+  },
+  "correspondence": {
+    "checkedSourceFile": "src/App.tsx",
+    "checkedSourceSha256": "9e455a51cee6a7558d7b3adf1f87066694c24d851b62c7d20faf9a08083f760a",
+    "committedBlobSha1AtFixedSource": "3e27c8d1077124897aff3f6e51e19e143b992ce4",
+    "committedBlobSha256AtFixedSource": "9e455a51cee6a7558d7b3adf1f87066694c24d851b62c7d20faf9a08083f760a",
+    "statement": "检查前记录的 src/App.tsx SHA-256 与固定源码 7e5a2c8 中该文件的 blob 内容 SHA-256 完全一致；工作区该文件当前也一致，说明本轮 tsc/lint/build 跑的就是 7e5a2c8 里的这份 App.tsx。"
+  },
+  "files": [
+    {
+      "name": "MANIFEST.md",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/MANIFEST.md",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/MANIFEST.md",
+      "bytes": 794,
+      "originalSha256": "6b607611be3744cc6dbea70a823a1d91e96638fb0ed853ff79ee7961ca80031c",
+      "storedSha256": "6b607611be3744cc6dbea70a823a1d91e96638fb0ed853ff79ee7961ca80031c",
+      "byteIdentical": true
+    },
+    {
+      "name": "base-sha.txt",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/base-sha.txt",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/base-sha.txt",
+      "bytes": 41,
+      "originalSha256": "7bcb00f08122a2ad21e86cfa92e0700b1e4e66d5bdddbf357ffdf4a0a9f360d2",
+      "storedSha256": "7bcb00f08122a2ad21e86cfa92e0700b1e4e66d5bdddbf357ffdf4a0a9f360d2",
+      "byteIdentical": true
+    },
+    {
+      "name": "build.err",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/build.err",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/build.err",
+      "bytes": 327,
+      "originalSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "byteIdentical": true
+    },
+    {
+      "name": "build.exit",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/build.exit",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/build.exit",
+      "bytes": 13,
+      "originalSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "byteIdentical": true
+    },
+    {
+      "name": "build.out",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/build.out",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/build.out",
+      "bytes": 352,
+      "originalSha256": "21d0c591f4397ed9708e9db13ebc587ad2f595e625045857559ab8158edaa985",
+      "storedSha256": "21d0c591f4397ed9708e9db13ebc587ad2f595e625045857559ab8158edaa985",
+      "byteIdentical": true
+    },
+    {
+      "name": "lint.err",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/lint.err",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/lint.err",
+      "bytes": 9,
+      "originalSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "byteIdentical": true
+    },
+    {
+      "name": "lint.exit",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/lint.exit",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/lint.exit",
+      "bytes": 12,
+      "originalSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "byteIdentical": true
+    },
+    {
+      "name": "lint.out",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/lint.out",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/lint.out",
+      "bytes": 0,
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byteIdentical": true
+    },
+    {
+      "name": "pre-change.diff",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/pre-change.diff",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/pre-change.diff",
+      "bytes": 6951,
+      "originalSha256": "b0befe2ab12d202b5ce7c1a2249537bdd41388feaa61b5ad8e66aa279dc6c3c2",
+      "storedSha256": "b0befe2ab12d202b5ce7c1a2249537bdd41388feaa61b5ad8e66aa279dc6c3c2",
+      "byteIdentical": true
+    },
+    {
+      "name": "source-sha256-before-check.txt",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/source-sha256-before-check.txt",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/source-sha256-before-check.txt",
+      "bytes": 78,
+      "originalSha256": "1f63129b3324522c1d1e067b73f39f83d95e0531aaa540b6f0a5f4dff8af5d49",
+      "storedSha256": "1f63129b3324522c1d1e067b73f39f83d95e0531aaa540b6f0a5f4dff8af5d49",
+      "byteIdentical": true
+    },
+    {
+      "name": "tsc.err",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/tsc.err",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/tsc.err",
+      "bytes": 0,
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byteIdentical": true
+    },
+    {
+      "name": "tsc.exit",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/tsc.exit",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/tsc.exit",
+      "bytes": 11,
+      "originalSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "byteIdentical": true
+    },
+    {
+      "name": "tsc.out",
+      "originalPath": "/private/tmp/revia-task05-r5-1792800590/tsc.out",
+      "storedPath": "docs/milestones/m2/evidence/task05-r5-implementation/raw/tsc.out",
+      "bytes": 0,
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byteIdentical": true
+    }
+  ],
+  "missing": []
+}
