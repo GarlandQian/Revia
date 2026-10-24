@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1596,3 +1596,96 @@ this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
 - 敏感性A=78项73过/5失、B首次78/0未触发、C=74/4；补record层用例后B=79项78过/1失。首次null崩溃原件已被Pi删除，仅留实施叙述，不能重建或冒称已保存。后续所有失败日志保留，使用新前缀/目录，不再覆盖或删除初轮原件。
 - 两轴分别2项P2，不合并掩盖。07退ready-for-agent，05/12不变；只修07完整生产接线，全部修改后集中最小检查。现有Node回归须覆盖实际读取→拒收→原目标重读的完整路径，不只断言needsRefresh字段；包括同revision旧读取、逐路径读取和成功回执的接入边界，不写新的外部Git客户端。
 - 仍不Release/GUI/D06/CI/长测/推送/合并。全部复核通过后规划方再固定新版验收，推送仅现有SSH origin。
+
+### 2026-10-24 / Pi 实现：任务07 第十五轮限定返修（读取拒收与重新核对贯通）
+
+只修第十五轮两项（两轴各自表述同一缺口）；fb468c2 的容量淘汰水位与 79 绿保留。
+
+#### ST07-R15-1 / SP07-R15-2（读取未拒收）
+
+`apply` 原先在不可信时**原样返回旧快照**，`readThroughReview` 继续交付，App 同 revision 接受 —— 真实回退。
+
+现在读取结果改为可辨识联合：
+
+```ts
+type ReviewReadOutcome<S> =
+  | { ok: true; snapshot: S }
+  | { ok: false; reason: "untrusted"; worktreeId: string; observedSeq: number };
+```
+
+- `apply` / `deliver` / `readThroughReview` 在 `observedSeq` 严格旧于淘汰水位时返回 `ok: false`，
+  并带上**被拒读取所属 worktree**（重新核对要按原目标发起）；
+- `mergeEntry` 同样返回 `ReviewEntryOutcome`，逐路径读取（getRows）遵守同一契约。
+
+#### ST07-R15-2 / SP07-R15-1（刷新信号未接线）
+
+新增 `ReviewRecoveryScheduler`（共享层）并接进 App 的**全部真实调用者**：
+
+| 入口 | 拒收后的动作 |
+| --- | --- |
+| `openWorktree` 完整读取 | `scheduleReviewRecovery(read.worktreeId)` |
+| `readAndAccept`（自动/手动/回前台） | 同上 |
+| `refreshTarget`（写后真实重读） | 同上，并按 `read.worktreeId` 而非当前界面目标 |
+| `performWrite` 写结果 | 同上（原写目标） |
+| `openEntry` 的 getRows 逐路径合并 | 同上 |
+| `setReviewMark` 发布（`needsRefresh`） | 同上 |
+
+调度器约束：**按 worktree 单飞**（同一目标并发拒收只发起一次重读）、**有界**
+（`REVIEW_RECOVERY_MAX_ATTEMPTS = 3`，不前进就停，不产生请求风暴）、**归属不变**
+（只重读传入的 `worktreeId`）、收敛后清零计数。重读走既有 `refreshTarget`
+（按原目标真实读、按激活状态决定是否更新界面），保留 activation/revision、
+选择与新错误隔离。
+
+`refreshTarget` 改为返回 `boolean`（是否收敛），供调度器判断。
+
+#### 回归（Node，生产入口）
+
+**85 项通过**。新增 6 项：
+- 完整快照读取：旧 seq0 明确 `ok: false` 并带原目标 → 调度真实重读 → 经 `SnapshotGate`
+  接收更新快照（`accepted === [10]`）→ 收敛后计数清零；
+- 重读按**原目标归属**（`wt-original`），不借用当前界面目标；
+- 重读**有界**（10 次调度只真实重读 3 次）；
+- 重读**单飞**（并发拒收只发起一次）；
+- 逐路径读取（getRows）不可信时同样明确拒收；
+- `needsRefresh: true` 真的触发一次原目标重读。
+
+既有 1024/1025、true/false、版本失效、v1→v2→v1、元数据 current 合并、
+导航与错误/选择/activation/revision 边界全部保留。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail |
+| --- | --- | --- | --- | --- |
+| 不可信读取原样返回（回到 fb468c2） | 1 | 85 | 84 | 1 |
+| 逐路径读取不检查可信度 | 1 | 85 | 84 | 1 |
+| 调度器不设上限 | 1 | 85 | 84 | 1 |
+
+#### 实际执行的检查
+
+日志目录（最终实现）：`/private/tmp/revia-task07-r16b-CcozFw`
+
+- 基线：`9afef4890fddf24884a3e53b3207d06093d2f319`
+- 最终源码前后 SHA 逐行一致。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 85 / pass 85 / fail 0 |
+| `git diff --check` | 0 | — |
+
+#### 过程记录（如实，不冒称已保存）
+
+1. 本轮先在 `/private/tmp/revia-task07-r16-Bocje8` 跑过一轮完整检查（同样 85/85），
+   之后为清理 lint 告警用脚本批量删除「未使用声明」，**误删仍在使用的变量**，12 项失败。
+   为回到可用状态执行了 `git checkout tools/test-refresh-gate.mjs`，
+   **丢弃了本轮对测试文件的改动**，随后按原内容重新应用并跑通 85/85。
+2. 该目录原件保留未删；批量删除后的失败输出与 checkout 后的中间状态在同一工作区被覆盖，
+   **没有单独留档**，这里如实说明。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：拒收 → 重读 → 接收的闭环只在生产函数层验证（由规划方复验）。
+- **Windows 未验证**：仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。

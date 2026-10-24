@@ -290,6 +290,28 @@ export interface ReviewMarkLike {
   worktree: string | null;
 }
 
+/**
+ * 一次读取交付的结果（ST07-R15-1）。
+ *
+ * 不可信的读取**不能**用「原样返回快照」冒充成功：调用方会把旧状态当成新真值
+ * 接受并覆盖界面。这里用可辨识联合明确区分，`ok: false` 时必须重新核对。
+ */
+export type ReviewReadOutcome<S> =
+  | { ok: true; snapshot: S }
+  | {
+      ok: false;
+      reason: "untrusted";
+      /** 被拒收的读取所属 worktree：重新核对要按**原目标**发起。 */
+      worktreeId: string;
+      /** 这次读取自报的审阅水位（低于淘汰水位，无法安全合成）。 */
+      observedSeq: number;
+    };
+
+/** 一次逐路径读取合并的结果：不可信时明确拒收，调用方重新核对。 */
+export type ReviewEntryOutcome<E> =
+  | { ok: true; entry: E; observedSeq: number }
+  | { ok: false; reason: "untrusted"; worktreeId: string; observedSeq: number };
+
 export class ReviewOverlay {
   /** 写入叠加层的次序（读取分界用）。 */
   private commitSeq = 0;
@@ -402,11 +424,17 @@ export class ReviewOverlay {
    *
    * 只改 `reviewed` 与派生进度，不动其他字段；不修改传入对象。
    */
-  apply<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S, boundary: number): S {
+  apply<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
+    snapshot: S,
+    boundary: number,
+  ): ReviewReadOutcome<S> {
     const observedSeq = snapshot.review.seq ?? 0;
-    // 这次读取的序号不大于淘汰水位：它可能早于已被丢弃的更新真值，
-    // 用它合成会让界面倒退（R07-CAP-1）。调用方应重新读取。
-    if (!this.isTrustworthy(snapshot.worktreeId, observedSeq)) return snapshot;
+    // 这次读取的序号严格旧于淘汰水位：它可能早于已被丢弃的更新真值。
+    // **明确拒收**（不是原样返回冒充成功），调用方必须重新核对真实状态
+    // （ST07-R15-1 / SP07-R15-2）。
+    if (!this.isTrustworthy(snapshot.worktreeId, observedSeq)) {
+      return { ok: false, reason: "untrusted", worktreeId: snapshot.worktreeId, observedSeq };
+    }
     let changed = false;
     const entries = snapshot.entries.map((entry) => {
       const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
@@ -423,8 +451,8 @@ export class ReviewOverlay {
       changed = true;
       return { ...entry, reviewed: override.reviewed };
     });
-    if (!changed) return snapshot;
-    return this.syncProgress({ ...snapshot, entries });
+    if (!changed) return { ok: true, snapshot };
+    return { ok: true, snapshot: this.syncProgress({ ...snapshot, entries }) };
   }
 
   /**
@@ -446,7 +474,12 @@ export class ReviewOverlay {
     loadedSeq: number,
     current: E | undefined,
     currentSeq: number,
-  ): E {
+  ): ReviewEntryOutcome<E> {
+    // 逐路径读取也必须遵守同一可信度契约：这次读取的序号严格旧于淘汰水位时，
+    // 可能早于已被丢弃的更新真值，不能拿它合成（ST07-R15-1）。
+    if (!this.isTrustworthy(worktreeId, loadedSeq)) {
+      return { ok: false, reason: "untrusted", worktreeId, observedSeq: loadedSeq };
+    }
     const head = loaded.headVersion ?? null;
     const worktree = loaded.worktreeVersion ?? null;
     let reviewed = loaded.reviewed;
@@ -473,7 +506,11 @@ export class ReviewOverlay {
     // 把这次读取到的状态覆盖回去。记录带**该路径**的版本与真实序号，
     // 所以它只影响这条路径，不会把单文件水位当成整快照已确认。
     this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
-    return reviewed === loaded.reviewed ? loaded : { ...loaded, reviewed };
+    return {
+      ok: true,
+      entry: reviewed === loaded.reviewed ? loaded : { ...loaded, reviewed },
+      observedSeq: baseSeq,
+    };
   }
 
   /**
@@ -568,7 +605,7 @@ export class ReviewReadRequest {
   }
 
   /** 交付结果：叠加这次请求发起之后、比读取水位更新、且版本仍匹配的本地状态。 */
-  deliver<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S): S {
+  deliver<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S): ReviewReadOutcome<S> {
     return this.overlay.apply(snapshot, this.boundary);
   }
 }
@@ -582,7 +619,7 @@ export class ReviewReadRequest {
 export async function readThroughReview<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
   overlay: ReviewOverlay,
   read: () => Promise<S>,
-): Promise<S> {
+): Promise<ReviewReadOutcome<S>> {
   const request = overlay.beginRead();
   const snapshot = await read();
   return request.deliver(snapshot);
@@ -820,4 +857,53 @@ export function reviewedSetForNavigation(
 ): Set<string> | null {
   if (!published || !published.view) return null;
   return new Set(published.navigation.reviewed);
+}
+
+/**
+ * 不可信读取的**重新核对调度器**（ST07-R15-2 / SP07-R15-1）。
+ *
+ * 生产调用方（完整快照读取、写结果、getRows、setReviewMark 发布）在收到
+ * `ok: false` / `needsRefresh: true` 时都经这里安排一次真实重读：
+ * - 按 **worktree** 单飞，同一目标同时只有一次重读（不产生请求风暴）；
+ * - 有界：同一目标连续 `maxAttempts` 次没有进展就停止（不无界重试）；
+ * - 归属不变：只重读传入的 `worktreeId`，不借用当前界面目标；
+ * - 正常情况一次重读就拿到更新的后端真值，`succeeded` 会清零计数。
+ */
+export class ReviewRecoveryScheduler {
+  private readonly inFlight = new Map<string, Promise<boolean>>();
+  private readonly attempts = new Map<string, number>();
+  private readonly maxAttempts: number;
+
+  constructor(maxAttempts = 3) {
+    this.maxAttempts = maxAttempts;
+  }
+
+  /** 该 worktree 已连续尝试的次数（诊断与测试用）。 */
+  attemptsFor(worktreeId: string): number {
+    return this.attempts.get(worktreeId) ?? 0;
+  }
+
+  /**
+   * 安排一次重读；返回是否**收敛**（重读后拿到了可信结果）。
+   *
+   * `reread` 必须做真实重读并返回它的可信度；返回 `true` 表示已收敛。
+   */
+  schedule(worktreeId: string, reread: () => Promise<boolean>): Promise<boolean> {
+    const running = this.inFlight.get(worktreeId);
+    if (running) return running;
+    const attempt = (this.attempts.get(worktreeId) ?? 0) + 1;
+    if (attempt > this.maxAttempts) return Promise.resolve(false);
+    this.attempts.set(worktreeId, attempt);
+    const task = (async () => {
+      try {
+        const converged = await reread();
+        if (converged) this.attempts.delete(worktreeId);
+        return converged;
+      } finally {
+        this.inFlight.delete(worktreeId);
+      }
+    })();
+    this.inFlight.set(worktreeId, task);
+    return task;
+  }
 }

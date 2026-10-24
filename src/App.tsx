@@ -35,7 +35,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
-import { mergePublishedReview, publishReviewSuccess, readThroughReview, reviewedSetForNavigation } from "@/lib/refreshGate";
+import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -79,6 +79,14 @@ const DEFAULT_VIEWPORT_ROWS = 45;
 function debugLog(message: string) {
   logToBackend(message);
 }
+
+/**
+ * 不可信读取的重新核对次数上限（ST07-R15-2）。
+ *
+ * 正常情况一次重读就能拿到更新的后端真值（序号前进）；连续多次都不前进说明
+ * 后端也没有更新的状态，继续重试只会造成请求风暴，所以有界停止。
+ */
+const REVIEW_RECOVERY_MAX_ATTEMPTS = 3;
 
 export function App() {
   const [repos, setRepos] = useState<RepoEntry[]>([]);
@@ -251,6 +259,16 @@ export function App() {
     }
   }, [bindDiffTarget, selectedEntry, snapshot?.worktreeId, view, worktreeId]);
 
+  /**
+   * `scheduleReviewRecovery` 的转发：`openEntry` 定义在它之前，
+   * 用 ref 避免定义顺序上的循环依赖（调用时一定已赋值）。
+   */
+  const scheduleRecoveryRef = useRef<((worktreeId: string) => Promise<void>) | null>(null);
+  const requestReviewRecovery = useCallback(
+    (worktreeId: string) => scheduleRecoveryRef.current?.(worktreeId) ?? Promise.resolve(),
+    [],
+  );
+
   const openEntry = useCallback(
     async (requested: ChangeEntry, target: { view: ViewMode; worktreeId: string; expand?: boolean }) => {
       // 本次选择独占一个上下文：期间又选了别的文件或切走，本次结果一律作废（Q88）。
@@ -287,11 +305,18 @@ export function App() {
           item.path === loaded.path && item.changes === loaded.changes
           && item.snapshotRevision === loaded.snapshotRevision);
         const currentSeq = snapshotRef.current?.review.seq ?? 0;
-        entry = overlay.mergeEntry(target.worktreeId, loaded, loadedSeq, candidate, currentSeq);
+        const mergedEntry = overlay.mergeEntry(target.worktreeId, loaded, loadedSeq, candidate, currentSeq);
+        if (!mergedEntry.ok) {
+          // 逐路径读取不可信：明确拒收并按**原目标**重新核对（ST07-R15-1）。
+          debugLog(`元数据读取不可信，重新核对：${mergedEntry.worktreeId}@${mergedEntry.observedSeq}`);
+          await requestReviewRecovery(mergedEntry.worktreeId);
+          return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
+        }
+        entry = mergedEntry.entry;
         setSnapshot((current) => {
           if (!current) return current;
           // 与发布路径一致：只在 `current` 上改这条匹配条目的审阅字段。
-          const merged = overlay.mergeEntry(
+          const inner = overlay.mergeEntry(
             target.worktreeId,
             loaded,
             loadedSeq,
@@ -300,11 +325,12 @@ export function App() {
               && item.snapshotRevision === loaded.snapshotRevision),
             Math.max(current.review.seq ?? 0, currentSeq),
           );
+          if (!inner.ok) return current;
           return overlay.syncProgress({
             ...current,
             entries: current.entries.map((item) =>
               item.path === loaded.path && item.changes === loaded.changes
-                && item.snapshotRevision === loaded.snapshotRevision ? merged : item),
+                && item.snapshotRevision === loaded.snapshotRevision ? inner.entry : item),
           });
         });
       }
@@ -388,7 +414,15 @@ export function App() {
         const startedAt = performance.now();
         // 重开仓库（再次添加当前仓库会走到这里）同样要按请求前分界合并，
         // 不能把 rawSnapshot 直接发布而回退期间的审阅变更（SP07-R7-4）。
-        const rawSnapshot = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(id));
+        const openRead = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(id));
+        if (!openRead.ok) {
+          // 读取不可信（叠加层容量淘汰后信息不足）：必须按**原目标**重新核对，
+          // 不能拿旧快照冒充成功（ST07-R15-1）。
+          debugLog(`重开读取不可信，重新核对：${openRead.worktreeId}`);
+          await scheduleReviewRecovery(openRead.worktreeId);
+          return null;
+        }
+        const rawSnapshot = openRead.snapshot;
         if (!gateRef.current.accept(myToken, { worktreeId: rawSnapshot.worktreeId, revision: rawSnapshot.revision })) {
           debugLog(`丢弃非当前激活或过期的快照：${rawSnapshot.worktreeId}@${rawSnapshot.revision}`);
           return null;
@@ -454,13 +488,41 @@ export function App() {
     [applyRefreshedSnapshot],
   );
 
+  /**
+   * 不可信读取的**重新核对**调度（ST07-R15-2 / SP07-R15-1）。
+   *
+   * 叠加层在容量边界淘汰过更新记录时，仅凭现有信息无法安全合成；必须真实重读。
+   * 约束：
+   * - 按 **worktree** 单飞：同一个 worktree 同时只有一次重读，避免请求风暴；
+   * - 有界：连续重读若水位不前进就停止（不无界重试）；
+   * - 归属不变：重读只针对传入的 `worktreeId`，不借用当前界面目标。
+   */
+  /** 不可信读取的重新核对调度（按 worktree 单飞、有界、归属不变）。 */
+  const reviewRecoverySchedulerRef = useRef(new ReviewRecoveryScheduler(REVIEW_RECOVERY_MAX_ATTEMPTS));
+  /** 重读入口由 refreshTarget 提供（避免定义顺序上的循环依赖）。 */
+  const reviewRecoveryRunnerRef = useRef<((worktreeId: string) => Promise<boolean>) | null>(null);
+
+  const scheduleReviewRecovery = useCallback(async (worktreeId: string): Promise<void> => {
+    await reviewRecoverySchedulerRef.current.schedule(worktreeId, async () => {
+      const runner = reviewRecoveryRunnerRef.current;
+      if (!runner) return false;
+      return runner(worktreeId);
+    });
+  }, []);
+
   /** 读取并接收一次快照；自动刷新、手动刷新与回到前台共用同一条路径。 */
   const readAndAccept = useCallback(
     async (targetWorktreeId: string): Promise<boolean> => {
       const token = gateRef.current.token();
       // 共享生产入口：先取分界再发请求，交付时合并（ST07-R7-1）。
-      const snap = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
-      return acceptSnapshot(token, snap);
+      const read = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
+      if (!read.ok) {
+        // 不可信读取：明确拒收并按**原目标**重新核对，不返回旧快照。
+        debugLog(`读取不可信，重新核对：${read.worktreeId}@${read.observedSeq}`);
+        await scheduleReviewRecovery(read.worktreeId);
+        return false;
+      }
+      return acceptSnapshot(token, read.snapshot);
     },
     [acceptSnapshot],
   );
@@ -488,21 +550,33 @@ export function App() {
    * 写操作的结果归属原目标：即使已经切走，也要对原目标真实读一次，
    * 不能因为当前选择变了就跳过核对；但只有它仍是激活目标时才更新界面。
    */
-  const refreshTarget = useCallback(async (targetWorktreeId: string) => {
+  const refreshTarget = useCallback(async (targetWorktreeId: string): Promise<boolean> => {
     const token = gateRef.current.token();
     try {
-      const snap = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
+      const read = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
+      if (!read.ok) {
+        // 原目标归属不变：按 read.worktreeId 重新核对（不是当前界面目标）。
+        debugLog(`原目标读取不可信，重新核对：${read.worktreeId}@${read.observedSeq}`);
+        await scheduleReviewRecovery(read.worktreeId);
+        return false;
+      }
       if (token.activation === gateRef.current.token().activation
         && gateRef.current.current().worktreeId === targetWorktreeId) {
-        acceptSnapshot(token, snap);
+        acceptSnapshot(token, read.snapshot);
       }
+      return true;
     } catch (caught) {
       if (token.activation === gateRef.current.token().activation
         && gateRef.current.current().worktreeId === targetWorktreeId) {
         setAppError(toAppError(caught), targetWorktreeId);
       }
+      return false;
     }
-  }, [acceptSnapshot, setAppError]);
+  }, [acceptSnapshot, scheduleReviewRecovery, setAppError]);
+
+  // 重新核对走真实重读通道：`refreshTarget` 是既有入口（按原目标读、按激活状态决定是否更新界面）。
+  reviewRecoveryRunnerRef.current = refreshTarget;
+  scheduleRecoveryRef.current = scheduleReviewRecovery;
 
   // 自动刷新协调器：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
   const refreshCoordinator = useMemo(
@@ -847,9 +921,16 @@ export function App() {
           : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
       }
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
+      const written = reviewRead.deliver(next);
+      if (!written.ok) {
+        // 写结果里的读取不可信：明确拒收并按**原写目标**重新核对（ST07-R15-1）。
+        debugLog(`写结果读取不可信，重新核对：${written.worktreeId}@${written.observedSeq}`);
+        await scheduleReviewRecovery(written.worktreeId);
+        return;
+      }
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, opWorktreeId);
       if (operationGateRef.current.acceptSuccess(opToken, next)
-        && acceptSnapshot(opToken, reviewRead.deliver(next))) {
+        && acceptSnapshot(opToken, written.snapshot)) {
         setAppError(null, opWorktreeId);
       } else {
         debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);
@@ -866,7 +947,7 @@ export function App() {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
     }
-  }, [acceptSnapshot, refresh, setAppError]);
+  }, [acceptSnapshot, refresh, scheduleReviewRecovery, setAppError]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -1064,7 +1145,15 @@ export function App() {
           epochMatches: reviewEpochRef.current === epoch,
         },
       });
-      if (!published.view) return null;
+      if (!published.view) {
+        // 发布被拒（`needsRefresh`）：叠加层容量淘汰后信息不足，必须按**原目标**
+        // 真实重新核对，不能等未来恰好有 watcher 事件（ST07-R15-2 / SP07-R15-1）。
+        if (published.needsRefresh) {
+          debugLog(`审阅发布不可信，重新核对：${targetWorktreeId}`);
+          await scheduleReviewRecovery(targetWorktreeId);
+        }
+        return null;
+      }
       const view = published.view;
       setSnapshot((current) => current && current.worktreeId === targetWorktreeId
         // 只在 `current` 上合并审阅字段，不覆盖已排队的元数据补全（SP07-R11-4）。
@@ -1080,7 +1169,7 @@ export function App() {
       setAppError(toAppError(caught), targetWorktreeId);
       return null;
     }
-  }, [setAppError]);
+  }, [scheduleReviewRecovery, setAppError]);
 
   /**
    * ⌥⌘R：只标记、不取消；按当前列表顺序（未暂存 → 未跟踪 → 已暂存）去重，
