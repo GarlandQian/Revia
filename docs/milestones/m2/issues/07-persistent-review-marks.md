@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1486,3 +1486,16 @@ this.record(worktreeId, loaded.path, { head, worktree }, reviewed, baseSeq);
 - [36份原始检查](../evidence/task07-review14/manifest.json)逐文件SHA/gzip还原验证；最终前后3份被改源码SHA一致且匹配fe171c3。Node70、Rust review_marks31、lib100、tsc/lint/build原始退出0。lib重生成绑定后按现有清理流程还原行尾空白，再跑tsc/Node70退出0；固定本轮产品diff-check独立通过。
 - 三份敏感性输出分别Node67通过/3失败、67/3、69/1。第三组只直接证明绕过快照watermark会使已有读取水位用例失败，不把其标签扩大成所有单路径/全量水位边界的动态证明；单文件不升级整快照的正向用例及代码另核。
 - 两轴均只固定源码静态复核，实施方检查与规划方桌面分开。07保持ready-for-human，复选未勾，不done；05/12亦不done。下一步规划方固定新版Release/source/binary SHA、独占fixture、真实桌面交错/D06及仅现有SSH origin的双平台CI。新版仍未桌面/Windows/D06/最终长测，不能用旧8f95c26构建和旧CI补位；11最后同进程可见窗口30分钟Q98不省略。
+
+
+### 2026-10-24 / 规划方：额外容量边界集成检查，不通过
+
+固定产品源码`fe171c30fff669ae25b6c43033f87c99b7e85d76`，记录提交`adb6c1e`。这不是重写第十四轮限定两轴0/0，而是在构建前发现的新可复现边界；07退回ready-for-agent，继续原Pi修复，全部复核通过后才桌面。
+
+**R07-CAP-1 / P2 / 有界叠加层淘汰会丢失可信水位。** `src/lib/refreshGate.ts:333`逐路径record在超过默认1024条时淘汰最早项；一次完整回执本身就可能包含1025个文件。之后旧回执在commitReviewResult里重新插入旧状态，composeState失去更高水位的依据，最终mergePublishedReview将新状态回退。违反spec实现决策5、6的版本真值与“旧请求返回不能使内容倒退”，也不能为修复取消Q98的有界内存要求。
+
+直接调用生产`publishReviewSuccess`和`mergePublishedReview`、使用默认`new ReviewOverlay()`、同worktree/activation/revision及绑定版本：先交付seq2、后seq1。1024文件控制组两个方向均保留正确新状态；1025文件时新true回退false、新false回退true，目标在新回执后已经被淘汰。原始断言真实退出1；[6份脚本/命令/版本/输出原件](../evidence/task07-capacity01/manifest.json)含source SHA与Node版本，无Git/用户文件操作，不冒称真实桌面或后端验收。
+
+请修正完整发布链在容量淘汰时的可信度契约，不只是把1024改大或删除上限。完整快照水位、逐路径读取水位不可混用；不能让旧回执覆盖已接受真值。内存有界时如果信息不再足以安全合成，应明确拒绝过时发布并重新读取，而非猜测或重新认领旧状态。保留较新真实结果可发布、true/false、版本失效与跨worktree隔离。
+
+在现有Node生产入口回归中覆盖默认1024/1025两方向，以及已接受逐路径读取在容量边界后不被旧成功覆盖；检查跨worktree总量淘汰的隔离策略。不引新框架，不扩展外部验证客户端。先完成修改再集中最小相关检查，保留精确命令/真实退出码/原始stdout/stderr/前后源码SHA，精确暂存，只提交m2。Pi不Release/GUI/D06/CI/推送/长测；仍由规划方复核后验收。

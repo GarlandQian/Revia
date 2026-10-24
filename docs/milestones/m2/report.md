@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07额外容量集成检查不通过，退ready-for-agent：产品fe171c3使用默认1024叠加层，1024文件控制正确，1025文件时新true/false均被迟到seq1反转；[6份原始证据](./evidence/task07-capacity01/manifest.json)已归档。此项为新增集成发现，不改写上一轮限定两轴0/0。继续原Pi修复有界内存与旧响应保护，全部复核通过后才新Release/桌面/D06/仅SSH双平台CI。05/12未done，M2未合并。
+
 - 任务07第十四轮限定静态复核通过：固定`5746604...fe171c3`，Standards0/Spec0；已接受逐路径真值持有缺口静态闭合。[36份原件](./evidence/task07-review14/manifest.json)前后3源码SHA一致匹配，Node70/Rust31/lib100与前端检查退出0，绑定清理后tsc/Node复验0，固定产品diff-check过。07保持ready-for-human/未勾验收；05/07/12转入固定新版Release、独占fixture、真实桌面/D06与仅SSH双平台CI，尚未done、未合main，旧版验收不倒填。
 
 - 任务07第十三轮限定复核未过：固定`c195f6a...1d489fe`，Standards1项P2、Spec1项P2，均为getRows已接受的逐路径真值/水位未持有，后续旧成功仍可覆盖新true或false；导航强补与单次双水位路径已闭合，继续原Pi，07退ready-for-agent。[48份原件](./evidence/task07-review13/manifest.json)前后6源码SHA一致匹配，Node65/Rust30/lib100及前端检查退出0，5份敏感性含首次未触发保留。无新版Release/桌面/D06/CI/长测，05/12未done；后续仅SSH推m2，未合main。

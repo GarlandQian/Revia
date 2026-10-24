@@ -1,0 +1,131 @@
+{
+  "provenance": {
+    "head": "adb6c1e99a80f46d2dac08124e6ae9e0ff4566dd",
+    "productCommit": "fe171c30fff669ae25b6c43033f87c99b7e85d76",
+    "source": "src/lib/refreshGate.ts",
+    "sha256": "9e29f13b2a95ebb0b3d3a05658de3290054416a023ad2f2ecd57fda62c06443a",
+    "node": "v26.5.0",
+    "boundary": "Pure frontend production functions and default ReviewOverlay capacity; no Git operations, no repositories or user files modified."
+  },
+  "results": [
+    {
+      "count": 1024,
+      "newerA": true,
+      "before": true,
+      "after": true,
+      "retainedBefore": {
+        "path": "file-0000.txt",
+        "versions": {
+          "head": "h:file-0000.txt",
+          "worktree": "w:file-0000.txt"
+        },
+        "reviewed": true,
+        "seq": 2,
+        "commitSeq": 1
+      },
+      "retainedAfter": {
+        "path": "file-0000.txt",
+        "versions": {
+          "head": "h:file-0000.txt",
+          "worktree": "w:file-0000.txt"
+        },
+        "reviewed": true,
+        "seq": 2,
+        "commitSeq": 1
+      }
+    },
+    {
+      "count": 1025,
+      "newerA": true,
+      "before": true,
+      "after": false,
+      "retainedBefore": null,
+      "retainedAfter": null
+    },
+    {
+      "count": 1024,
+      "newerA": false,
+      "before": false,
+      "after": false,
+      "retainedBefore": {
+        "path": "file-0000.txt",
+        "versions": {
+          "head": "h:file-0000.txt",
+          "worktree": "w:file-0000.txt"
+        },
+        "reviewed": false,
+        "seq": 2,
+        "commitSeq": 1
+      },
+      "retainedAfter": {
+        "path": "file-0000.txt",
+        "versions": {
+          "head": "h:file-0000.txt",
+          "worktree": "w:file-0000.txt"
+        },
+        "reviewed": false,
+        "seq": 2,
+        "commitSeq": 1
+      }
+    },
+    {
+      "count": 1025,
+      "newerA": false,
+      "before": false,
+      "after": true,
+      "retainedBefore": null,
+      "retainedAfter": null
+    }
+  ],
+  "boundary": "Additional planner integration check, not a rewritten two-axis review. Pure frontend production functions, default 1024 capacity, actual 1024/1025 entries; no Rust/Git or desktop acceptance claim.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task07-capacity-j737sl5j/capacity.mjs",
+      "stored": "capacity.mjs.gz",
+      "sourceBytes": 1861,
+      "storedBytes": 782,
+      "sourceSha256": "2839bd7a23d0c6949eab622027a2d4cc9f7d6655b31ed809281c17590dee7e67",
+      "storedSha256": "87cc94efb05ab0d35853ff33a53a1e8c3f92b0b93a2924fb03c52cb01f5e581f"
+    },
+    {
+      "source": "/private/tmp/revia-task07-capacity-j737sl5j/command.json",
+      "stored": "command.json.gz",
+      "sourceBytes": 69,
+      "storedBytes": 83,
+      "sourceSha256": "e58c40cbbd5d5cf601c196d7296ce1d296b32c2b95ce3ee4fa82f3a4fd4dd678",
+      "storedSha256": "5584ab348bb47e5bc95717893e1ef894679260fbc6382c09eb8a7f155ed4a3e4"
+    },
+    {
+      "source": "/private/tmp/revia-task07-capacity-j737sl5j/exit.txt",
+      "stored": "exit.txt.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "storedSha256": "c28cc69d141393e44a931229323624ef7b8c5bde3ee047ca9b87332daef23c82"
+    },
+    {
+      "source": "/private/tmp/revia-task07-capacity-j737sl5j/provenance.json",
+      "stored": "provenance.json.gz",
+      "sourceBytes": 406,
+      "storedBytes": 300,
+      "sourceSha256": "68fde494c152cc95078c646b23bb779e961c1eed2ed756749fd1604a338f6c53",
+      "storedSha256": "cb681c7b689f7e0681c29cd2de8dceef3c8c21b020d5f2bdc867dd1ca10f3615"
+    },
+    {
+      "source": "/private/tmp/revia-task07-capacity-j737sl5j/stderr.txt",
+      "stored": "stderr.txt.gz",
+      "sourceBytes": 634,
+      "storedBytes": 408,
+      "sourceSha256": "0908db10fb601b9d846bd80f1e1729ff173082f4e85938faeb2d1a7840dce232",
+      "storedSha256": "3310ade288d662bdd14c8fbe82ede640e59fd12981b13e694255c9685ac56048"
+    },
+    {
+      "source": "/private/tmp/revia-task07-capacity-j737sl5j/stdout.txt",
+      "stored": "stdout.txt.gz",
+      "sourceBytes": 1363,
+      "storedBytes": 250,
+      "sourceSha256": "6a941aed4712e9b660742cfd488669733f97cfafe598e75c5524b12707d67ef9",
+      "storedSha256": "885206ffb52abfcddaefb2ffca914f01daa3f642823ea97e93ff5ce780d0e5b7"
+    }
+  ]
+}
