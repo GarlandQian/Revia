@@ -1,0 +1,117 @@
+{
+  "sourceCommit": "86b26aa5aaf63ef0d4e0ff92b54dccc8e0fcee28",
+  "reviewRange": "26947d2d5e84c58b7b45ab01e4e344bb5ac60ee0...86b26aa5aaf63ef0d4e0ff92b54dccc8e0fcee28",
+  "sourceHashChecks": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "fdb8e4f15e479d0c110f7155bb172fdc4fd6690c2530420b588062861ba9116a"
+    }
+  ],
+  "boundary": "Mac frontend implementation checks only. Sixth limited independent static review: Standards0, Spec0; ST07-R5-1 statically closed. No dynamic interleaving reproduction, Rust rerun, new Release, GUI, D06, new dual-platform CI or long run.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/MANIFEST.md",
+      "stored": "original/MANIFEST.md.gz",
+      "sourceBytes": 1158,
+      "storedBytes": 838,
+      "sourceSha256": "ada3b6e215b4a20513cc02cfb292b1cb06d0b90102ad8aa6f27a25dc98bb69b2",
+      "storedSha256": "327eee9680f3d03a722c7ff92c72078b230ac95fb8a2a2b02be3f5e5706a156c"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/base-sha.txt",
+      "stored": "original/base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "626d38f12f94996df6e2c70b4009fd5a334848e0276963c87daaefbeaec6eda5",
+      "storedSha256": "8e6432ca77fd98ff14ea357e810c38bce91122e167eea6620c0d58961d9c571e"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/build.err",
+      "stored": "original/build.err.gz",
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/build.exit",
+      "stored": "original/build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/build.out",
+      "stored": "original/build.out.gz",
+      "sourceBytes": 352,
+      "storedBytes": 238,
+      "sourceSha256": "72c3b3040e7b14c8d2e738200a5b7a819110ed558c9d89d9d471db27a92b3bb8",
+      "storedSha256": "52be4df35912f9b7d88434b6d42a0a6c8ef74c736a6afbeda71815d53af24495"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/changed-files.txt",
+      "stored": "original/changed-files.txt.gz",
+      "sourceBytes": 15,
+      "storedBytes": 35,
+      "sourceSha256": "a794e7a516e528f768a0b1e5476e17b47eec8e9c77cb7a89f74af1953de77292",
+      "storedSha256": "36ff77e8f403cc66beca2083329e13dcf642922ee19bb7320db74f02350412a5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/lint.err",
+      "stored": "original/lint.err.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/lint.exit",
+      "stored": "original/lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/lint.out",
+      "stored": "original/lint.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/source-sha256-before-check.txt",
+      "stored": "original/source-sha256-before-check.txt.gz",
+      "sourceBytes": 78,
+      "storedBytes": 89,
+      "sourceSha256": "3e53104b17bb6812c1fc07cccba96e264a2ad5449813bd117e8220c2023a09fa",
+      "storedSha256": "461d56a4cba43160f172f9e5ea5e581fd9ee4a194d2ddaae52e75e1fc03d361e"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/tsc.err",
+      "stored": "original/tsc.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/tsc.exit",
+      "stored": "original/tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r6-lozxBz/tsc.out",
+      "stored": "original/tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

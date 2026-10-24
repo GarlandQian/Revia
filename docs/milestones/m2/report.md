@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07第六轮极小限定复核通过：固定`26947d2...86b26aa`，Standards0/Spec0；本地拒绝也推进代际，旧成功清除新错误的ST07-R5-1静态闭合。[13份前端原件](./evidence/task07-review06/manifest.json)已核验，App源码SHA匹配、tsc/lint/build真实退出0；交错尚未动态复现。07保持ready-for-human、所有验收项未勾；05/07/12静态复核已过，下一步统一固定版本Release、新夹具、真实桌面/D06与最新双平台CI，尚未done、未合并。
+
 - 任务07第五轮限定复核：固定`4f5cb08...88fe98e`，Standards1项P2（旧成功可能清掉较新本地未知版本拒绝）、Spec0；第四轮全部原问题静态闭合。继续原Pi只修该代际增量，07退ready-for-agent。[16份原始检查](./evidence/task07-review05/manifest.json)已归档、4份源码SHA匹配，前端三项和Rust review_marks21项通过只属该版，不替代时序或桌面验证。05/12状态不变，未新Release/桌面/D06/双平台CI/长测；详见[07 Comments](./issues/07-persistent-review-marks.md#comments)。
 
 - 任务07第四轮复核仍需返修：固定`acdc981...b0e27fb`，Standards1项P2、Spec1项P2和2项P3，分别追加[07 Comments](./issues/07-persistent-review-marks.md#comments)。后端未知门禁、deinit、身份重解析/换行边界已静态闭合；前端禁用未知新增、packed-refs两次留在列表、目录型.git和不同HEAD但目标不变回归仍待原Pi补齐。[17份原始检查](./evidence/task07-review04/manifest.json)已归档、4份源码hash匹配，tsc/lint/build退出0，Rust原始**252通过/1ignored**（实施方251合计算术有误，此处更正、保留历史）。固定临时目录先清理的范围问题已如实记录并收紧唯一分配规则；无法回溯确认原内容。07退ready-for-agent；05/12状态不变，未新Release/桌面/D06/双平台CI/长测。
