@@ -36,6 +36,7 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
+import type { ReviewReadAttempt, ReviewRecoveryResult } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -154,9 +155,18 @@ export function App() {
   externalResultRef.current = externalResult;
   const error = (worktreeId ? worktreeErrors[worktreeId] : null) ?? globalError ?? externalResult?.error ?? null;
 
+  /**
+   * 每个 worktree 的错误代际：每次写入错误/清除错误都递增。
+   *
+   * 恢复读取用它判断「我发起时看到的那条错误是否还是最新的」，
+   * 从而避免旧恢复读的失败覆盖较新的错误（SP07-R16-2）。
+   */
+  const worktreeErrorEpochRef = useRef<Record<string, number>>({});
+
   const setAppError = useCallback((err: AppErrorPayload | null, targetWorktreeId?: string | null) => {
     const wtId = targetWorktreeId ?? worktreeId;
     if (wtId) {
+      worktreeErrorEpochRef.current[wtId] = (worktreeErrorEpochRef.current[wtId] ?? 0) + 1;
       setWorktreeErrors((prev) => ({ ...prev, [wtId]: err }));
     } else {
       setGlobalError(err);
@@ -497,18 +507,39 @@ export function App() {
    * - 有界：连续重读若水位不前进就停止（不无界重试）；
    * - 归属不变：重读只针对传入的 `worktreeId`，不借用当前界面目标。
    */
-  /** 不可信读取的重新核对调度（按 worktree 单飞、有界、归属不变）。 */
+  /** 不可信读取的批次式重新核对（单飞、按批有限、不递归等待自身）。 */
   const reviewRecoverySchedulerRef = useRef(new ReviewRecoveryScheduler(REVIEW_RECOVERY_MAX_ATTEMPTS));
-  /** 重读入口由 refreshTarget 提供（避免定义顺序上的循环依赖）。 */
-  const reviewRecoveryRunnerRef = useRef<((worktreeId: string) => Promise<boolean>) | null>(null);
+  /**
+   * 单次恢复读取：**只做一次**真实 listChanges 并报告可信度/失败。
+   *
+   * 它绝不回调调度器（那会形成 task→runner→schedule→task 自等待），
+   * 也不重跑任何写命令；后续要不要再试由外层批次决定（ST07-R16-1）。
+   * 归属固定为传入的 `worktreeId`（原目标），只有它仍是激活目标时才更新界面。
+   */
+  const recoveryReadOnceRef = useRef<((worktreeId: string) => Promise<ReviewReadAttempt>) | null>(null);
 
-  const scheduleReviewRecovery = useCallback(async (worktreeId: string): Promise<void> => {
-    await reviewRecoverySchedulerRef.current.schedule(worktreeId, async () => {
-      const runner = reviewRecoveryRunnerRef.current;
-      if (!runner) return false;
-      return runner(worktreeId);
-    });
-  }, []);
+  /**
+   * 对一个 worktree 跑一次恢复批次；耗尽时按现有错误语义展示，不静默。
+   *
+   * 返回本批次结果，所有分支都会 settle（不再有自等待）。
+   */
+  const scheduleReviewRecovery = useCallback(async (worktreeId: string): Promise<ReviewRecoveryResult> => {
+    const scheduler = reviewRecoverySchedulerRef.current;
+    const runner = recoveryReadOnceRef.current;
+    if (!runner) {
+      return { converged: false, attempts: 0, exhausted: true, lastFailure: null };
+    }
+    const result = await scheduler.run(worktreeId, () => runner(worktreeId));
+    if (!result.converged && result.exhausted) {
+      // 耗尽要可见：沿用现有错误展示（按原目标），不能静默停止。
+      debugLog(`审阅重新核对耗尽：${worktreeId}（${result.attempts} 次）`);
+      setAppError(
+        { kind: "rejected", message: messages.review.recoveryExhausted },
+        worktreeId,
+      );
+    }
+    return result;
+  }, [setAppError]);
 
   /** 读取并接收一次快照；自动刷新、手动刷新与回到前台共用同一条路径。 */
   const readAndAccept = useCallback(
@@ -574,9 +605,38 @@ export function App() {
     }
   }, [acceptSnapshot, scheduleReviewRecovery, setAppError]);
 
-  // 重新核对走真实重读通道：`refreshTarget` 是既有入口（按原目标读、按激活状态决定是否更新界面）。
-  reviewRecoveryRunnerRef.current = refreshTarget;
-  scheduleRecoveryRef.current = scheduleReviewRecovery;
+  /**
+   * 单次恢复读取（ST07-R16-1）：只做一次真实 listChanges，报告可信度或失败。
+   *
+   * 关键：它**不调用** `scheduleReviewRecovery`。runner 若递归等待调度器，
+   * 就会形成 task→runner→schedule→task 的自等待环，任务永不 settle。
+   *
+   * 错误按**原目标的错误代际**判定：恢复读在途期间若出现更新的错误，
+   * 这次失败不再覆盖它（SP07-R16-2）。
+   */
+  const recoveryReadOnce = useCallback(async (worktreeId: string): Promise<ReviewReadAttempt> => {
+    const token = gateRef.current.token();
+    const errorEpoch = worktreeErrorEpochRef.current[worktreeId] ?? 0;
+    try {
+      const read = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(worktreeId));
+      if (!read.ok) return { status: "untrusted", worktreeId: read.worktreeId, observedSeq: read.observedSeq };
+      if (token.activation === gateRef.current.token().activation
+        && gateRef.current.current().worktreeId === worktreeId) {
+        acceptSnapshot(token, read.snapshot);
+      }
+      return { status: "trusted" };
+    } catch (error) {
+      const unchanged = (worktreeErrorEpochRef.current[worktreeId] ?? 0) === errorEpoch;
+      if (unchanged
+        && token.activation === gateRef.current.token().activation
+        && gateRef.current.current().worktreeId === worktreeId) {
+        setAppError(toAppError(error), worktreeId);
+      }
+      return { status: "error", error };
+    }
+  }, [acceptSnapshot, setAppError]);
+
+  recoveryReadOnceRef.current = recoveryReadOnce;
 
   // 自动刷新协调器：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
   const refreshCoordinator = useMemo(
@@ -924,6 +984,7 @@ export function App() {
       const written = reviewRead.deliver(next);
       if (!written.ok) {
         // 写结果里的读取不可信：明确拒收并按**原写目标**重新核对（ST07-R15-1）。
+        // 批次一定会 settle，所以下面的 finally 一定会释放写门禁（ST07-R16-1）。
         debugLog(`写结果读取不可信，重新核对：${written.worktreeId}@${written.observedSeq}`);
         await scheduleReviewRecovery(written.worktreeId);
         return;

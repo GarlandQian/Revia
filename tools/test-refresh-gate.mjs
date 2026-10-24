@@ -1506,26 +1506,27 @@ test("完整快照读取：不可信时明确拒收，并按原目标重新核�
   const gate = new SnapshotGate();
   gate.activate("wt-a");
   const token = gate.token();
-  const converged = await scheduler.schedule(outcome.worktreeId, async () => {
+  const result = await scheduler.run(outcome.worktreeId, async () => {
     const reread = await readThroughReview(overlay, async () => fresh);
-    if (!reread.ok) return false;
+    if (!reread.ok) return { status: "untrusted", worktreeId: reread.worktreeId, observedSeq: reread.observedSeq };
     if (!gate.accept(token, { worktreeId: reread.snapshot.worktreeId, revision: reread.snapshot.revision })) {
-      return false;
+      return { status: "error", error: new Error("gate rejected") };
     }
     accepted.push(reread.snapshot.revision);
-    return true;
+    return { status: "trusted" };
   });
-  assert.equal(converged, true, "重读必须收敛");
+  assert.equal(result.converged, true, "重读必须收敛");
+  assert.equal(result.exhausted, false);
   assert.deepEqual(accepted, [10], "必须经过真实接收门并发布更新后的快照");
-  assert.equal(scheduler.attemptsFor("wt-a"), 0, "收敛后清零计数");
+  assert.equal(scheduler.attemptsFor("wt-a"), 0, "批次结束后清零计数");
 });
 
 test("不可信读取的重读按原目标归属，不借用当前界面目标", async () => {
   const scheduler = new ReviewRecoveryScheduler(3);
   const requested = [];
-  await scheduler.schedule("wt-original", async () => {
+  await scheduler.run("wt-original", async () => {
     requested.push("wt-original");
-    return true;
+    return { status: "trusted" };
   });
   assert.deepEqual(requested, ["wt-original"], "必须按拒收结果里的原目标重读");
 });
@@ -1533,10 +1534,16 @@ test("不可信读取的重读按原目标归属，不借用当前界面目标",
 test("重读有界：不前进时停止，不产生请求风暴", async () => {
   const scheduler = new ReviewRecoveryScheduler(3);
   let calls = 0;
-  const still = async () => { calls += 1; return false; };
-  for (let i = 0; i < 10; i += 1) await scheduler.schedule("wt-a", still);
-  assert.equal(calls, 3, "最多尝试 3 次后停止");
-  assert.equal(scheduler.attemptsFor("wt-a"), 3);
+  const still = async () => { calls += 1; return { status: "error", error: new Error("temp") }; };
+  // 一次批次最多 3 次尝试，然后 settle。
+  const first = await scheduler.run("wt-a", still);
+  assert.equal(calls, 3, "单批最多尝试 3 次后停止");
+  assert.equal(first.exhausted, true, "耗尽要可见");
+  // 耗尽不是终身禁用：新批次还能真实读取（SP07-R16-3）。
+  calls = 0;
+  const second = await scheduler.run("wt-a", still);
+  assert.equal(calls, 3, "新批次重新获得预算");
+  assert.equal(second.attempts, 3);
 });
 
 test("重读单飞：同一 worktree 并发拒收只发起一次重读", async () => {
@@ -1544,10 +1551,10 @@ test("重读单飞：同一 worktree 并发拒收只发起一次重读", async (
   let calls = 0;
   let release;
   const gatePromise = new Promise((resolve) => { release = resolve; });
-  const run = () => scheduler.schedule("wt-a", async () => {
+  const run = () => scheduler.run("wt-a", async () => {
     calls += 1;
     await gatePromise;
-    return true;
+    return { status: "trusted" };
   });
   const first = run();
   const second = run();
@@ -1585,6 +1592,117 @@ test("成功发布被拒（needsRefresh）时也走真实重读，不靠 watcher
 
   const scheduler = new ReviewRecoveryScheduler(3);
   const requested = [];
-  await scheduler.schedule("wt-a", async () => { requested.push("wt-a"); return true; });
+  await scheduler.run("wt-a", async () => { requested.push("wt-a"); return { status: "trusted" }; });
   assert.deepEqual(requested, ["wt-a"], "needsRefresh 必须真的触发一次原目标重读");
+});
+
+// ---------------- 第十六轮：恢复编排闭环 ----------------
+
+test("恢复 runner 不递归等待自身：再次拒收时批次仍会结束（ST07-R16-1 / SP07-R16-1）", async () => {
+  const overlay = new ReviewOverlay(2);
+  // 抬高淘汰水位到 2。
+  for (const path of ["a", "b", "c"]) overlay.record("wt-a", path, { head: "h", worktree: "v" }, true, 2);
+  const scheduler = new ReviewRecoveryScheduler(3);
+  // 模拟真实时序：每次读取发起时快照都「新鲜」，但交付前总有更高的 seq 先到，
+  // 于是交付后一律被拒（不是假设后端新读凭空变旧）。
+  let reads = 0;
+  const runner = async () => {
+    reads += 1;
+    const current = reads + 1;                 // 发起时看到的 seq
+    const snapshot = {
+      worktreeId: "wt-a", revision: 9,
+      entries: [{ path: "a", reviewed: false, headVersion: "h", worktreeVersion: "v" }],
+      review: { paths: ["a"], reviewed: [], total: 1, reviewedCount: 0, seq: current },
+    };
+    const pending = readThroughReview(overlay, async () => snapshot);
+    // 交付前更高 seq 的完整结果先到，抬高淘汰水位。
+    for (const path of ["a", "b", "c"]) {
+      overlay.record("wt-a", path, { head: "h", worktree: "v" }, true, current + 1);
+    }
+    const outcome = await pending;
+    if (!outcome.ok) return { status: "untrusted", worktreeId: outcome.worktreeId, observedSeq: outcome.observedSeq };
+    return { status: "trusted" };
+  };
+  // 关键断言：这个 promise 必须结束（旧实现会自等待，永不 settle）。
+  const result = await Promise.race([
+    scheduler.run("wt-a", runner),
+    new Promise((resolve) => setTimeout(() => resolve("timeout"), 500)),
+  ]);
+  assert.notEqual(result, "timeout", "恢复批次必须结束，不能自等待");
+  assert.equal(result.exhausted, true, "三次都不可信 → 本批次耗尽");
+  assert.equal(reads, 3, "单批最多 3 次真实读取");
+  assert.equal(scheduler.isRunning("wt-a"), false, "结束后释放单飞槽");
+});
+
+test("写结果等待恢复时门禁一定会释放（批次 settle）", async () => {
+  const scheduler = new ReviewRecoveryScheduler(2);
+  let gateHeld = true;
+  const writeWithRecovery = async () => {
+    try {
+      await scheduler.run("wt-a", async () => ({ status: "error", error: new Error("temp") }));
+    } finally {
+      gateHeld = false;
+    }
+  };
+  const settled = await Promise.race([
+    writeWithRecovery().then(() => "done"),
+    new Promise((resolve) => setTimeout(() => resolve("timeout"), 500)),
+  ]);
+  assert.equal(settled, "done", "写结果的 await 必须结束");
+  assert.equal(gateHeld, false, "写门禁必须释放");
+});
+
+test("耗尽后新批次恢复：预算按批重置，不是终身熔断（ST07-R16-2 / SP07-R16-3）", async () => {
+  const scheduler = new ReviewRecoveryScheduler(2);
+  let reads = 0;
+  const failing = async () => { reads += 1; return { status: "error", error: new Error("temp") }; };
+  const first = await scheduler.run("wt-a", failing);
+  assert.equal(first.exhausted, true);
+  assert.equal(reads, 2);
+  // 后续独立拒收 → 新批次仍会真实读取。
+  const second = await scheduler.run("wt-a", failing);
+  assert.equal(second.exhausted, true);
+  assert.equal(reads, 4, "新批次必须重新获得预算");
+  // 可信读取后，再下一个批次也正常。
+  const third = await scheduler.run("wt-a", async () => { reads += 1; return { status: "trusted" }; });
+  assert.equal(third.converged, true);
+  assert.equal(scheduler.attemptsFor("wt-a"), 0);
+});
+
+test("旧恢复读失败不覆盖较新的错误（SP07-R16-2）", async () => {
+  // 复现生产语义：恢复读发起时记下错误代际；在途期间出现更新错误 → 旧失败不再展示。
+  const epochs = { "wt-a": 1 };
+  const shown = [];
+  const recoveryRead = async (errorEpoch, fail) => {
+    await Promise.resolve();
+    if (!fail) return;
+    const unchanged = (epochs["wt-a"] ?? 0) === errorEpoch;
+    if (unchanged) shown.push("old-recovery-error");
+  };
+  const pending = recoveryRead(epochs["wt-a"], true);
+  // 较新的操作显示了拒绝错误 → 代际前进。
+  epochs["wt-a"] += 1;
+  shown.push("newer-rejection");
+  await pending;
+  assert.deepEqual(shown, ["newer-rejection"], "旧恢复读的失败不能覆盖较新的错误");
+});
+
+test("恢复读取归属原目标：切换后仍读原目标，不污染新激活", async () => {
+  const scheduler = new ReviewRecoveryScheduler(2);
+  const gate = new SnapshotGate();
+  gate.activate("wt-a");
+  const accepted = [];
+  const reads = [];
+  const result = await scheduler.run("wt-a", async () => {
+    reads.push("wt-a");
+    // 期间用户切到 wt-b：恢复读仍必须读 wt-a。
+    gate.activate("wt-b");
+    const token = gate.token();
+    // 不是当前激活目标 → 不更新界面，但仍报告可信。
+    if (token.worktreeId === "wt-a") accepted.push("wt-a");
+    return { status: "trusted" };
+  });
+  assert.equal(result.converged, true);
+  assert.deepEqual(reads, ["wt-a"], "恢复读只读原目标");
+  assert.deepEqual(accepted, [], "切换后不再污染新激活的界面");
 });

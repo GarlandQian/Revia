@@ -860,17 +860,41 @@ export function reviewedSetForNavigation(
 }
 
 /**
- * 不可信读取的**重新核对调度器**（ST07-R15-2 / SP07-R15-1）。
+ * 一次**单次**真实读取尝试的结果（ST07-R16-1）。
  *
- * 生产调用方（完整快照读取、写结果、getRows、setReviewMark 发布）在收到
- * `ok: false` / `needsRefresh: true` 时都经这里安排一次真实重读：
- * - 按 **worktree** 单飞，同一目标同时只有一次重读（不产生请求风暴）；
- * - 有界：同一目标连续 `maxAttempts` 次没有进展就停止（不无界重试）；
- * - 归属不变：只重读传入的 `worktreeId`，不借用当前界面目标；
- * - 正常情况一次重读就拿到更新的后端真值，`succeeded` 会清零计数。
+ * runner 只报告这一次读取的可信度或失败，**不递归等待调度器**：
+ * 后续要不要再试由外层批次决定，避免 task→runner→schedule→task 的自等待环。
+ */
+export type ReviewReadAttempt =
+  | { status: "trusted" }
+  | { status: "untrusted"; worktreeId: string; observedSeq: number }
+  | { status: "error"; error: unknown };
+
+/** 一个恢复批次的结果。 */
+export interface ReviewRecoveryResult {
+  /** 本批次是否拿到了可信结果。 */
+  converged: boolean;
+  /** 本批次实际尝试次数。 */
+  attempts: number;
+  /** 尝试用尽仍未收敛（调用方必须处理，不能静默）。 */
+  exhausted: boolean;
+  /** 本批次最后一次的失败原因（错误或不可信），用于错误展示。 */
+  lastFailure: ReviewReadAttempt | null;
+}
+
+/**
+ * 不可信读取的**批次式**重新核对（ST07-R16-1 / SP07-R16-2 / SP07-R16-3）。
+ *
+ * 设计要点：
+ * - `runner` 只做**一次**真实读取并返回它的可信度/失败，绝不回调本调度器，
+ *   所以不存在自等待；调用方的 await 一定会结束。
+ * - 预算按**批次**计算：每批最多 `maxAttempts` 次，批次结束后计数清零。
+ *   不是终身熔断——耗尽后新的显式核对（或可信读取）会开新批次。
+ * - 单飞按 worktree：同一目标并发请求共享同一批次，不产生请求风暴。
+ * - 只重读（`runner` 由调用方实现为 listChanges 之类的读取），不重跑写命令。
  */
 export class ReviewRecoveryScheduler {
-  private readonly inFlight = new Map<string, Promise<boolean>>();
+  private readonly inFlight = new Map<string, Promise<ReviewRecoveryResult>>();
   private readonly attempts = new Map<string, number>();
   private readonly maxAttempts: number;
 
@@ -878,32 +902,53 @@ export class ReviewRecoveryScheduler {
     this.maxAttempts = maxAttempts;
   }
 
-  /** 该 worktree 已连续尝试的次数（诊断与测试用）。 */
+  /** 当前批次已尝试的次数（空闲时为 0）。 */
   attemptsFor(worktreeId: string): number {
     return this.attempts.get(worktreeId) ?? 0;
   }
 
+  /** 是否有正在进行的批次。 */
+  isRunning(worktreeId: string): boolean {
+    return this.inFlight.has(worktreeId);
+  }
+
   /**
-   * 安排一次重读；返回是否**收敛**（重读后拿到了可信结果）。
+   * 跑一个恢复批次；返回本批次结果。
    *
-   * `reread` 必须做真实重读并返回它的可信度；返回 `true` 表示已收敛。
+   * 同一 worktree 并发调用共享同一批次（单飞），批次结束即释放，
+   * 之后新的调用会开启新批次（不永久禁用）。
    */
-  schedule(worktreeId: string, reread: () => Promise<boolean>): Promise<boolean> {
+  run(worktreeId: string, runner: () => Promise<ReviewReadAttempt>): Promise<ReviewRecoveryResult> {
     const running = this.inFlight.get(worktreeId);
     if (running) return running;
-    const attempt = (this.attempts.get(worktreeId) ?? 0) + 1;
-    if (attempt > this.maxAttempts) return Promise.resolve(false);
-    this.attempts.set(worktreeId, attempt);
-    const task = (async () => {
-      try {
-        const converged = await reread();
-        if (converged) this.attempts.delete(worktreeId);
-        return converged;
-      } finally {
-        this.inFlight.delete(worktreeId);
+    const task = (async (): Promise<ReviewRecoveryResult> => {
+      let lastFailure: ReviewReadAttempt | null = null;
+      for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+        this.attempts.set(worktreeId, attempt);
+        let result: ReviewReadAttempt;
+        try {
+          result = await runner();
+        } catch (error) {
+          result = { status: "error", error };
+        }
+        if (result.status === "trusted") {
+          return { converged: true, attempts: attempt, exhausted: false, lastFailure: null };
+        }
+        lastFailure = result;
       }
+      return {
+        converged: false,
+        attempts: this.maxAttempts,
+        exhausted: true,
+        lastFailure,
+      };
     })();
     this.inFlight.set(worktreeId, task);
+    // 批次结束后释放单飞槽并清零计数：后续独立拒收能开新批次。
+    void task.finally(() => {
+      this.inFlight.delete(worktreeId);
+      this.attempts.delete(worktreeId);
+    });
     return task;
   }
 }

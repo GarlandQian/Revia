@@ -75,6 +75,7 @@ export const zhCN = {
     allReviewed: "全部文件都已审阅",
     saveFailed: "审阅标记保存失败",
     unconfirmed: "这个文件的版本无法确认，不能标记为已审阅",
+    recoveryExhausted: "审阅状态核对未完成，请手动刷新后重试",
   },
   recovery: {
     title: "回收区",

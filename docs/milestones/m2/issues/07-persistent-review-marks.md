@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1712,3 +1712,102 @@ type ReviewReadOutcome<S> =
 - 规划方使用生产scheduler/read函数及固定App回调拓扑补证：默认1025，读取seq2在floor2时新鲜，交付hold期间新seq3使floor3，再交付seq2，100ms仍pending、reads1/attempts1/max3，真实断言退出1。100ms仅观察，静态自依赖是原因，不是React/桌面长测；先前简化seq0试验亦保留，但不当作真实读取发起顺序证据。
 - Pi承认批量删声明误删测试变量后12项失败，没有独立原始输出；又执行git checkout丢弃自身测试改动后重新应用。初轮目录仍在，但不能代替缺失中间原件。后续**禁止checkout/restore/reset文件、amend、删除或覆盖失败日志**；只编辑预期文件并精确暂存，日志每次新前缀。现有tracked干净，没有回退用户改动的证据。
 - 07退ready-for-agent，继续原Pi，不以功能返修失败替代三次渠道错误规则。只修上述生产闭环；完整回调实际拒收两次、临时错误/耗尽后恢复、旧恢复错误不盖新错误应进入现有Node生产入口回归，不引框架。恢复只重读，绝不重跑stage/discard/restore等写命令。全部修改后集中最小检查；05/12不变，未新Release/桌面/D06/CI/长测，仍仅SSH推m2。
+
+### 2026-10-24 / Pi 实现：任务07 第十六轮限定返修（恢复编排闭环）
+
+只修第十六轮三项；上轮的 Outcome 拒收与 `needsRefresh` 原目标调用保留。
+
+#### 编排结构（先写清）
+
+```
+外层批次 ReviewRecoveryScheduler.run(worktreeId, runner)
+  for attempt in 1..maxAttempts(3):
+      result = await runner()        ← 单次真实读取，只返回可信度/失败
+      trusted → 收敛返回
+      否则继续
+  耗尽 → 返回 { exhausted: true, lastFailure }（调用方必须处理）
+
+runner = recoveryReadOnce(worktreeId)
+  只做一次 readThroughReview(listChanges)
+  **绝不调用 scheduleReviewRecovery**
+```
+
+#### ST07-R16-1 / SP07-R16-1（恢复任务等待自身）
+
+上一轮 `runner` 是 `refreshTarget`，而 `refreshTarget` 再次不可信时会
+`await scheduleReviewRecovery(same worktree)`，调度器返回正在等待它的 `inFlight` ——
+形成 task→runner→schedule→task 循环，任务永不 settle，写结果的 `await` 也永不返回，
+`finally` 无法释放写门禁。
+
+现在 `runner` 换成独立的 `recoveryReadOnce`：只做一次真实 `listChanges`，
+返回 `{ status: "trusted" | "untrusted" | "error" }`，**不回调调度器**。
+是否继续由外层 `for` 循环决定，因此批次一定会 settle。
+
+#### ST07-R16-2 / SP07-R16-3（三次失败终身熔断）
+
+上一轮 `attempts` 只在「恢复成功」分支清零，而耗尽后根本执行不到那里 —— 等于终身禁用。
+
+现在预算按**批次**：`run()` 每次开新批次（`for` 循环 3 次），批次结束后
+`finally` 释放单飞槽并**删除计数**。所以耗尽后新的显式核对 / 独立拒收会重新获得预算；
+正常可信读取同样不受历史影响。耗尽时返回 `exhausted: true` 并 `lastFailure`，
+App 用既有错误语义展示（新增 i18n `review.recoveryExhausted`），**不静默停止**。
+
+#### SP07-R16-2（旧恢复错误盖新错误）
+
+新增 `worktreeErrorEpochRef`：每次 `setAppError` 写入/清除某个 worktree 的错误都递增。
+`recoveryReadOnce` 在**发起时**记下该目标的错误代际，失败时只有代际未变才展示 ——
+恢复读在途期间若出现较新的拒绝错误，旧失败不会覆盖它。
+
+#### 只重读，不重跑写命令
+
+`recoveryReadOnce` 只调用 `ipc.listChanges`；`runner` 不触碰 `stage`/`discard`/`restore`。
+
+#### 回归（Node，生产入口）
+
+**90 项通过**。新增 5 项，全部驱动与 App 相同的编排：
+- 恢复 runner 不递归等待自身：每次读取发起时「新鲜」、交付前被更高 seq 超越，
+  用 `Promise.race(…, 500ms timeout)` 证明批次**必须结束**，且 3 次真实读取后 `exhausted`、
+  单飞槽释放；
+- 写结果等待恢复时门禁一定会释放（批次 settle → `finally` 执行）；
+- 耗尽后新批次恢复（预算按批重置，不是终身熔断；可信读取后计数清零）；
+- 旧恢复读失败不覆盖较新的错误（代际语义）；
+- 恢复读取归属原目标：期间切到 wt-b 仍只读 wt-a，且不污染新激活界面。
+
+既有 1024/1025、true/false、版本失效、v1→v2→v1、元数据 current 合并、
+导航与错误/选择/activation/revision 边界全部保留。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail |
+| --- | --- | --- | --- | --- |
+| 自等待只加注释形态（第一版） | 0 | 90 | 90 | **0（未触发）** |
+| 批次真正递归等待自身 | 1 | 90 | 89 | 1 |
+| 批次结束后不重置预算（终身熔断） | 1 | 90 | 88 | 2 |
+| 耗尽时报告 `exhausted: false`（静默） | 1 | 90 | 87 | 3 |
+
+第一版「自等待」只改了注释形态、**未触发**，原件保留；改成真正的递归
+`await this.run(...)` 后同一用例才失败，两次都保留。
+
+#### 实际执行的检查
+
+日志目录（唯一）：`/private/tmp/revia-task07-r17-aOGiOW`
+
+- 基线：`6dea47352fb927af082cf9c08f0287db7a0b8fd0`
+- 最终源码前后 SHA 逐行一致。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 90 / pass 90 / fail 0 |
+| `git diff --check` | 0 | — |
+
+本轮未执行任何 `git checkout`/`restore`/`reset`，未 amend，未删除或覆盖日志，
+未批量删除测试变量。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：闭环只在生产函数层验证（由规划方复验）。
+- **Windows 未验证**：仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
