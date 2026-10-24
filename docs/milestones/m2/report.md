@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07第十六轮限定复核未过：固定9afef48...0600b81，Standards2项P2/Spec3项P2；明确拒收和needsRefresh已接上，但再次拒收自等待、三次失败永久熔断、旧恢复错误覆盖新错误仍需原Pi修。07退ready-for-agent。[56份原件](./evidence/task07-review16/manifest.json)最终3源码SHA匹配、Node85/前端退出0，seq2读取在途被seq3超越的生产回调拓扑真实失败补证保留；初轮非最终源码、中间12失败无独立输出、checkout丢自身测试后重建均如实记录。未新Release/桌面/D06/CI/长测，05/12未done，仍仅SSH推m2、不合main。
+
 - 任务07容量返修fb468c2第十五轮限定复核未过：Standards2项P2、Spec2项P2，原1025成功回执回退已挡住，但不可信读取仍原样交付并被同revision接收，App亦未消费needsRefresh做真实核对。07退ready-for-agent，继续原Pi。[38份原件](./evidence/task07-review15/manifest.json)含32份Pi检查与6份规划方默认1025生产读取链失败证据；最终2源码SHA匹配、Node79/前端检查退出0，不能替代缺失接线。首次中间崩溃日志被Pi删除仅保留叙述。未新Release/桌面/D06/CI/长测，05/12未done，仍仅SSH推m2、未合main。
 
 - 任务07额外容量集成检查不通过，退ready-for-agent：产品fe171c3使用默认1024叠加层，1024文件控制正确，1025文件时新true/false均被迟到seq1反转；[6份原始证据](./evidence/task07-capacity01/manifest.json)已归档。此项为新增集成发现，不改写上一轮限定两轴0/0。继续原Pi修复有界内存与旧响应保护，全部复核通过后才新Release/桌面/D06/仅SSH双平台CI。05/12未done，M2未合并。
