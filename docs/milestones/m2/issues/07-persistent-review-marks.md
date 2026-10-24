@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1886,3 +1886,18 @@ App 用既有错误语义展示（新增 i18n `review.recoveryExhausted`），**
 
 - **桌面未验证**；**Windows 未验证**（需新 CI）。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：整批首轮复核，任务07仍需返修
+
+固定`3199b29e84c2eadccc7a9800699e2506af9a31bb...82f392ba5b94c4e23f5e8040d1a4f4c35a41ca35`，整体交付后独立Standards/Spec并行审查。此前转发ref已接回，单调用内重试/耗尽以及dismiss代际静态闭合；不把这些已闭合项重复派发。
+
+#### Standards：确定缺陷1项P2，Fowler判断建议0项
+
+- **ST-B01-07-1 / P2**：`src/lib/refreshGate.ts:989`每次调用runReviewRecoveryBatch都重取展示资格，而`:923`的scheduler复用旧inFlight。旧批次挂起→新错误→第二次恢复取得新epoch并加入旧批次→耗尽，后加入者仍可覆盖新错误。违反旧响应隔离；资格与最终展示必须随真实共享批次单飞，不能只保护单个wrapper调用。
+
+#### Spec：错误实现1项P2，缺失/范围扩张0项
+
+- **SP-B01-07-1 / P2**：同一时序违反上轮任务07“整批共同资格”要求（本文件`:1828`，固定82f392b）。按真实批次只取得一次资格、只发布一次失败，晚加入者不能重新认领。回归应挂起第一读、推进错误代际、从另一个真实调用点加入共享批次后释放，验证生产编排不覆盖新错误。
+
+[本批27份检查原件](../evidence/batch01-review/manifest.json)已核六源码前后SHA匹配82f392b、Node105和前端检查退出0；这些不证明并发加入正确。只做固定源码静态复核，未新跑检查/Release/GUI/CI。07退ready-for-agent；所有发现按Q106成批交原Pi，不逐小补丁放行。

@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -55,3 +55,23 @@ App 与 Node 回归**用同一个类**，不各写一份判断：
 
 - **真实桌面关闭/退出交互未验证**（任务单明确由真实桌面检查）。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：整批首轮两轴复核，不通过
+
+固定`3199b29e84c2eadccc7a9800699e2506af9a31bb...82f392ba5b94c4e23f5e8040d1a4f4c35a41ca35`。以下均为真实App/native接线，不能以CloseCoordinator helper的绿色检查替代。
+
+#### Standards：确定缺陷4项（P1一项、P2三项），Fowler判断建议0项
+
+1. **ST-B01-08-1 / P1 / 原生退出绕过**：`src/App.tsx:748`只拦窗口关闭，全项目无生产exit请求，Rust `src-tauri/src/lib.rs:134`无原生退出拦截。锁定依赖默认macOS Quit/⌘Q走原生terminate通道，不经过窗口close监听。违反Q96；需要真实原生关闭与退出统一保护，保留原动作，不用destroy窗口代替退出进程。监听安装失败现在只debugLog，保护不能依赖静默失败的前端订阅。
+2. **ST-B01-08-2 / P2 / 无请求自动关闭**：`src/App.tsx:1035`在另一worktree仍写且无intent时使用`pendingIntent() ?? "close"`制造请求；最后一笔`:1041`自动关窗。A/B并行、用户未关窗，或已选Stay后，都可发生。违反Q96只执行原请求；无请求/已取消必须一直保持无请求，用户选择等待与仅展示询问也不能混为同一授权。
+3. **ST-B01-08-3 / P2 / 另存生命周期遗漏**：`:1181`外部owner=null另存不计关闭占用，有归属另存`:1227`固定finishWrite(false)，而`commands.rs:696`明确可返回needsVerification。违反Q91/Q96。全部应用写入须纳入关闭生命周期，但不要为外部新路径强加worktree锁；错误种类如实传递。
+4. **ST-B01-08-4 / P2 / 待核对无闭环**：`:2555`“等待”只重发request并藏对话框，`refreshGate.ts:1117` acknowledgePending无生产调用；查看/真实刷新后仍无法正常关闭，只能下一次write自动清pending。违反Q96。接通真实核对/结果查看后的明确继续或留在应用，不以新写入充当核对，不自动重跑。
+
+#### Spec：缺失/部分2项、错误实现1项（最严重P1），范围扩张0项
+
+1. **SP-B01-08-1 / P1**：同ST-08-1，违反`spec.md:126`“请求关闭窗口或退出先保留窗口和进程”；生产没有产生exit，Cmd-Q/默认菜单可直接绕过保护。
+2. **SP-B01-08-2 / P2**：同ST-08-4，违反`spec.md:127`“结果待核对则先展示、不静默退出”；结果已查看/真实刷新后仍无安全闭环，不能让新write自动删除pending作为唯一出口。
+3. **SP-B01-08-3 / P2**：同ST-08-2，违反`spec.md:127`“执行原关闭/退出请求”；没有请求或已选Stay时仍可凭空生成close。
+
+[27份检查原件](../evidence/batch01-review/manifest.json)六源码SHA匹配，Node105、Rust264通过/1准备入口ignored和前端检查exit0，仅证明该版已有检查。没有真实native close/quit和App收尾回归；本轮未GUI/Release/D06/CI/长测。08退ready-for-agent。所有项成批原Pi返修，修完一起复核，全部通过后才正式桌面验收。
