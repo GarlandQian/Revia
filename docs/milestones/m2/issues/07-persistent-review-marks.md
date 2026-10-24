@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1368,3 +1368,23 @@ Rust 原先只为「本次取消目标」补 false，正标记之外的未审状
 - **桌面未验证**：两条场景都未在真实 UI 重放（由规划方复验）。
 - **Windows 未验证**：仍需新 CI。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：任务07第十三轮限定两轴复核，已接受的单文件读取真值仍未持有
+
+固定`c195f6ae8e4e05f4a3a61ebe812814799afa8e5a...1d489fe3ede07e1c0a64d70971a5fc9cb3e75225`。导航不再强补已审、上下文失效终止导航，RowSlice同锁返回entry与reviewSeq，以及单次loaded/current双水位比较已静态闭合。以下两轴分别保留，均仅静态因果，未重放桌面。
+
+#### Standards：1项P2硬规范/确定缺陷；Fowler建议0项
+
+1. **ST07-R13-1 / P2 / 读取到的较新取消没有进入后续合成真值层**：`src/App.tsx:303`只发布getRows合并后的reviewed，不保留逐路径状态/版本/实际水位。U新增seq1回执hold→A新增seq2先发布（完整状态含Utrue）→U取消seq3回执hold→首次打开U，getRows读到false/seq3、UI正确取消，但overlay仍Utrue/seq2、快照seq仍2→释放旧seq1，`src/lib/refreshGate.ts:484`/`:489`重新合成true，旧成功覆盖已读取的false，revision/activation均未变。违反`docs/technical-direction.md:53`旧响应隔离；应持有路径+版本+状态+seq供后续发布比较，不能将单条读取水位当作整个快照都已确认。
+
+#### Spec：1项P2，(a)/(c)仍部分缺失；(b)无范围扩张
+
+1. **SP07-R13-1 / P2 / 读取到的较新新增也会被旧成功覆盖**：`src/App.tsx:303`未保存已接受条目的loadedSeq，后续`src/lib/refreshGate.ts:484`只要版本相同就用旧回执作底。A勾选seq1完整回执含Bfalse，hold→B勾选seq2回执hold→打开未跟踪B，getRows实际读到Btrue/reviewSeq2并先显示→释放旧A，当前worktree/activation/revision均相同、未登记Bseq2，旧回执把已显示Btrue改false。违反`spec.md:116`“旧请求返回不能使内容倒退”；任务答复“取水位更大”目前仅一次mergeEntry成立，尚未贯穿后续合成/最终发布。需持有已接受条目的状态、绑定版本与真实水位并比较；不能简单提升整个快照水位。
+
+#### 原件与后续
+
+- [48份检查原件](../evidence/task07-review13/manifest.json)逐文件SHA/gzip还原验证；最终检查前后6源码SHA逐行一致、匹配1d489fe。Node65、Rust review_marks30、lib100及bindings/tsc/lint/build、固定范围diff-check退出0；这些不代替上述多入口交错或桌面验收。
+- 5份敏感性输出实际为Node63/1、64/0未触发、64/1、62/2和Rust28/2。未触发的首轮B-current-wins保留；补无override变体后才真实触发，不将首轮未触发抹掉或算成通过敏感性。
+- 继续原Pi仅修读取真值的跨入口持有：不只让mergeEntry取对值，还要让后续compose/最终发布知道它已观察到哪一步。两种方向（已读到true/false）及旧v1→v2→v1失效均保留，注意单文件水位不能冒充整个快照的确认进度。用现有Node/Rust生产入口回归，不新框架/重复外部客户端。
+- 全部修改后集中最小检查、精确暂存、新增提交、保留失败和前后最终SHA，不amend。07退ready-for-agent，05/12不done。无新版Release/桌面/D06/CI/长测，复核全过后规划方才桌面与仅SSH双平台CI；最终11同进程30分钟Q98仍必需。
