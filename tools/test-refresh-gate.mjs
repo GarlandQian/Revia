@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, commitReviewResult, planReviewResult, readThroughReview } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, commitReviewResult, planReviewResult, readThroughReview } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -321,8 +321,9 @@ function reviewedOf(snapshot, path) {
 
 test("读取发起后才成功的标记，不会被这次读取回退", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
-  overlay.record("wt-a", "probe.txt", probe, true);
+  overlay.record("wt-a", "probe.txt", probe, true, { order: ++order, source: "explicit" });
   const merged = read.deliver(reviewSnapshot());
   assert.equal(reviewedOf(merged, "probe.txt"), true);
   assert.equal(merged.review.reviewedCount, 3);
@@ -330,8 +331,9 @@ test("读取发起后才成功的标记，不会被这次读取回退", () => {
 
 test("读取发起后才成功的取消，不会被这次读取勾回", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
-  overlay.record("wt-a", "b.txt", bVersions, false);
+  overlay.record("wt-a", "b.txt", bVersions, false, { order: ++order, source: "explicit" });
   const merged = read.deliver(reviewSnapshot());
   assert.equal(reviewedOf(merged, "b.txt"), false);
   assert.equal(merged.review.reviewedCount, 1);
@@ -339,8 +341,9 @@ test("读取发起后才成功的取消，不会被这次读取勾回", () => {
 
 test("文件版本真的变化时本地记录不生效，标记仍按后端结果失效", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
-  overlay.record("wt-a", "probe.txt", { head: null, worktree: "w-old" }, true);
+  overlay.record("wt-a", "probe.txt", { head: null, worktree: "w-old" }, true, { order: ++order, source: "explicit" });
   const merged = read.deliver(reviewSnapshot({
     entries: [
       { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
@@ -354,7 +357,8 @@ test("文件版本真的变化时本地记录不生效，标记仍按后端结�
 
 test("分界之前成功的变更不重复叠加（该读取本来就已经包含它）", () => {
   const overlay = new ReviewOverlay();
-  overlay.record("wt-a", "probe.txt", probe, true);
+  let order = 0;
+  overlay.record("wt-a", "probe.txt", probe, true, { order: ++order, source: "explicit" });
   const read = overlay.beginRead();
   const merged = read.deliver(reviewSnapshot({
     entries: [
@@ -369,10 +373,11 @@ test("分界之前成功的变更不重复叠加（该读取本来就已经包�
 
 test("较早的成功不会覆盖较新的相反操作（顺序由序号保证）", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
   // 先成功后取消：同一路径的最新操作是取消。
-  overlay.record("wt-a", "b.txt", bVersions, true);
-  overlay.record("wt-a", "b.txt", bVersions, false);
+  overlay.record("wt-a", "b.txt", bVersions, true, { order: ++order, source: "explicit" });
+  overlay.record("wt-a", "b.txt", bVersions, false, { order: ++order, source: "explicit" });
   const merged = read.deliver(reviewSnapshot({
     entries: [
       { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
@@ -385,6 +390,7 @@ test("较早的成功不会覆盖较新的相反操作（顺序由序号保证�
 
 test("写结果：经共享入口发起，期间成功的标记不被回退（ST07-R7-1）", async () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   // 生产入口是 readThroughReview：它在调用读取函数**之前**取分界。
   // 这里用延迟的读取函数模拟写结果/读取结果的迟到交付。
   let release;
@@ -394,7 +400,7 @@ test("写结果：经共享入口发起，期间成功的标记不被回退（ST
     return reviewSnapshot();
   });
   // 请求已发起（分界已取），结果还没交付，用户成功勾选。
-  overlay.record("wt-a", "probe.txt", probe, true);
+  overlay.record("wt-a", "probe.txt", probe, true, { order: ++order, source: "explicit" });
   release();
   const merged = await pending;
   assert.equal(reviewedOf(merged, "probe.txt"), true, "写结果不能回退期间的成功标记");
@@ -403,13 +409,14 @@ test("写结果：经共享入口发起，期间成功的标记不被回退（ST
 
 test("写结果期间取消同样保留（ST07-R7-1 反向）", async () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
   const pending = readThroughReview(overlay, async () => {
     await gate;
     return reviewSnapshot();
   });
-  overlay.record("wt-a", "a.txt", { head: "h-a", worktree: "w-a" }, false);
+  overlay.record("wt-a", "a.txt", { head: "h-a", worktree: "w-a" }, false, { order: ++order, source: "explicit" });
   release();
   const merged = await pending;
   assert.equal(reviewedOf(merged, "a.txt"), false);
@@ -418,6 +425,7 @@ test("写结果期间取消同样保留（ST07-R7-1 反向）", async () => {
 
 test("A/B 并发：只登记 B 会漏掉 A，按完整成功集合记账才不漏（ST07-R7-3 / SP07-R7-2）", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
   // B 的响应先到，且后端返回的完整集合已经包含 A+B。
   // 界面此刻仍是 A、probe 都未审阅（A 的响应还没被应用）。
@@ -426,14 +434,15 @@ test("A/B 并发：只登记 B 会漏掉 A，按完整成功集合记账才不�
     { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b", worktreeVersionConfirmed: true },
     { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p", worktreeVersionConfirmed: true },
   ];
-  const plan = planReviewResult({
+  applyReviewSuccess({
+    overlay,
     worktreeId: "wt-a",
     path: "b.txt",
     versions: bVersions,
     reviewed: ["a.txt", "b.txt", "probe.txt"],
-    entries: current,
+    entriesAtRequest: current,
+    order: ++order,
   });
-  commitReviewResult(overlay, "wt-a", plan);
   // A 的响应随后才到、被展示门禁拒收——但记账已在门禁之前完成。
   // 旧读取（分界早于两者）现在交付，A 与 B 都必须保留。
   const merged = read.deliver(reviewSnapshot());
@@ -444,9 +453,10 @@ test("A/B 并发：只登记 B 会漏掉 A，按完整成功集合记账才不�
 
 test("A/B 并发：只登记目标 B 时旧读取仍会把 A 回退（证明批量记账必要）", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
   // 只记本次目标（旧实现），A 就漏账了。
-  overlay.record("wt-a", "b.txt", bVersions, true);
+  overlay.record("wt-a", "b.txt", bVersions, true, { order: ++order, source: "explicit" });
   const merged = read.deliver(reviewSnapshot());
   assert.equal(reviewedOf(merged, "probe.txt"), false, "这正是只记 B 时的漏账表现");
   assert.equal(merged.review.reviewedCount, 2);
@@ -454,9 +464,10 @@ test("A/B 并发：只登记目标 B 时旧读取仍会把 A 回退（证明批�
 
 test("未跟踪元数据补全不整条替换：同版本已成功的勾选保留，进度一致（SP07-R7-3）", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const metricsRead = overlay.beginRead();
   // getRows 等待期间用户勾选成功。
-  overlay.record("wt-a", "probe.txt", probe, true);
+  overlay.record("wt-a", "probe.txt", probe, true, { order: ++order, source: "explicit" });
   // 交付的 entry 是旧读取：未审阅、行数才刚补上。
   const loaded = { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p", metricsLoaded: true };
   const current = { path: "probe.txt", reviewed: true, headVersion: null, worktreeVersion: "w-p", metricsLoaded: false };
@@ -474,6 +485,7 @@ test("未跟踪元数据补全不整条替换：同版本已成功的勾选保�
 
 test("未跟踪元数据补全时版本变了就不沿用旧勾选", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const metricsRead = overlay.beginRead();
   const loaded = { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-new", metricsLoaded: true };
   const current = { path: "probe.txt", reviewed: true, headVersion: null, worktreeVersion: "w-old", metricsLoaded: false };
@@ -483,13 +495,14 @@ test("未跟踪元数据补全时版本变了就不沿用旧勾选", () => {
 
 test("重开仓库（再次添加当前仓库）经共享入口，不能直接发布 rawSnapshot（SP07-R7-4）", async () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
   const pending = readThroughReview(overlay, async () => {
     await gate;
     return reviewSnapshot();
   });
-  overlay.record("wt-a", "probe.txt", probe, true);
+  overlay.record("wt-a", "probe.txt", probe, true, { order: ++order, source: "explicit" });
   release();
   const published = await pending;
   assert.equal(reviewedOf(published, "probe.txt"), true, "重开不能直接发布 rawSnapshot");
@@ -497,8 +510,9 @@ test("重开仓库（再次添加当前仓库）经共享入口，不能直接�
 
 test("不同 worktree 的本地记录互不影响", () => {
   const overlay = new ReviewOverlay();
+  let order = 0;
   const read = overlay.beginRead();
-  overlay.record("wt-b", "probe.txt", probe, true);
+  overlay.record("wt-b", "probe.txt", probe, true, { order: ++order, source: "explicit" });
   const merged = read.deliver(reviewSnapshot());
   assert.equal(reviewedOf(merged, "probe.txt"), false, "别的 worktree 的标记不能串过来");
 });
@@ -510,13 +524,173 @@ test("生产入口真的接入了分界与记账（辅助定位，不当作时�
   const reads = app.match(/readThroughReview\(/g) ?? [];
   assert.ok(reads.length >= 3, `读取入口都要经共享函数，实际 ${reads.length} 处`);
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
-  assert.match(app, /commitReviewResult\(/, "成功的标记变更必须记账");
+  assert.match(app, /applyReviewSuccess\(/, "成功的标记变更必须经唯一记账入口");
   // 记账必须在展示门禁之前，否则迟到成功会漏账。
-  const recordIndex = app.indexOf("commitReviewResult(reviewOverlayRef.current");
+  const recordIndex = app.indexOf("applyReviewSuccess({");
   const gateIndex = app.indexOf("if (!isCurrent()) return null;");
   assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于展示门禁");
+  // 版本来源只能是请求发起时的条目。
+  assert.match(app, /entriesAtRequest/, "必须保存请求发起时的条目快照");
+  // 先后来源只能是点击时分配的 order。
+  assert.match(app, /beginMark\(\)/, "先后必须在点击时分配");
+  assert.doesNotMatch(app, /entries: snapshotRef\.current\.entries/,
+    "不能把回执到达时的当前条目当作版本来源");
   // 写结果也必须用请求前分界，不能在交付时才取。
   const writeIndex = app.indexOf("const reviewRead = reviewOverlayRef.current.beginRead();");
   const writeCall = app.indexOf("await (unstaging ? ipc.unstageHunk : ipc.stageHunk)");
   assert.ok(writeIndex > 0 && writeCall > 0 && writeIndex < writeCall, "写结果的分界必须早于写请求");
+});
+
+// ---------------- 第八轮：成功回执的操作先后与版本来源 ----------------
+
+test("逆序回执：旧勾选回执晚于取消到达，不能把文件重新勾上（ST07-R8-1 / SP07-R8-1）", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  // 一次较早发起的读取：分界在两次操作之前。
+  const read = overlay.beginRead();
+
+  // 1) 用户点击勾选 A：点击时就分配先后（mark），回执暂缓。
+  const markA = overlay.beginMark();
+  // 2) 刷新把 A 显示为已审（后端已持久化，另一条路径的结果带回来了）。
+  //    这里直接用 record 模拟「刷新后界面显示已审」对应的本地状态。
+  overlay.record("wt-a", "probe.txt", probe, true, { order: markA.orderOf(), source: "explicit" });
+
+  // 3) 用户点击取消：新的操作，先后更晚，回执立刻到达。
+  const cancelA = overlay.beginMark();
+  const committed = overlay.record("wt-a", "probe.txt", probe, false, {
+    order: cancelA.orderOf(), source: "explicit",
+  });
+  assert.equal(committed, true, "较新的取消必须写入");
+
+  // 4) 旧勾选的**回执**现在才到达：它的 order 更早，不能覆盖已成功的取消。
+  const late = overlay.record("wt-a", "probe.txt", probe, true, {
+    order: markA.orderOf(), source: "explicit",
+  });
+  assert.equal(late, false, "旧回执不能覆盖较新的相反操作");
+
+  // 5) 释放那条在途读取：不能把文件重新勾上。
+  const merged = read.deliver(reviewSnapshot());
+  assert.equal(reviewedOf(merged, "probe.txt"), false, "旧读取不能把已取消的标记勾回");
+  assert.equal(merged.review.reviewedCount, 2);
+});
+
+test("逆序回执：对照——按到达次序覆盖会把文件错误勾回", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  const read = overlay.beginRead();
+  // 模拟旧实现：不看 order，后到的记录直接覆盖。
+  overlay.record("wt-a", "probe.txt", probe, false, { order: ++order, source: "explicit" });
+  overlay.record("wt-a", "probe.txt", probe, true, { order: ++order, source: "explicit" });
+  const merged = read.deliver(reviewSnapshot());
+  assert.equal(reviewedOf(merged, "probe.txt"), true, "这正是按到达次序覆盖时的错误表现");
+});
+
+test("版本来源：旧全量回执不能把外部改成新版本的路径认领为已审（ST07-R8-2 / SP07-R8-2）", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  const read = overlay.beginRead();
+
+  // 请求发起时的条目：B 还是 v1 且**尚未**审阅（这次回执才把它标为已审）。
+  const entriesAtRequest = [
+    { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a", worktreeVersionConfirmed: true },
+    { path: "b.txt", reviewed: false, headVersion: "h-b", worktreeVersion: "w-b-v1", worktreeVersionConfirmed: true },
+    { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p", worktreeVersionConfirmed: true },
+  ];
+  // 旧 A 回执的全量集合包含 B（在 v1 上已审）。走生产入口记账。
+  const plan = applyReviewSuccess({
+    overlay,
+    worktreeId: "wt-a",
+    path: "probe.txt",
+    versions: probe,
+    reviewed: ["a.txt", "b.txt", "probe.txt"],
+    entriesAtRequest,
+    order: ++order,
+  });
+  // 每条记录绑定的都是**请求时**的版本。
+  const bRecord = plan.records.find((record) => record.path === "b.txt");
+  assert.equal(bRecord.versions.worktree, "w-b-v1", "记录必须绑定回执实际确认的版本");
+
+  // 与此同时 B 被外部改成 v2，刷新后标记失效（v2 未审）。
+  const snapshotV2 = reviewSnapshot({
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: false, headVersion: "h-b", worktreeVersion: "w-b-v2" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt"], total: 3, reviewedCount: 1 },
+  });
+  const merged = read.deliver(snapshotV2);
+  assert.equal(reviewedOf(merged, "b.txt"), false, "用户没看过的 v2 不能被认领为已审");
+  // 本次目标 probe 版本未变，仍然保留；a.txt 本来已审。
+  assert.equal(reviewedOf(merged, "probe.txt"), true);
+  assert.equal(merged.review.reviewedCount, 2);
+});
+
+test("版本来源：请求时版本不可确认的路径不参与聚合记账", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  const plan = planReviewResult({
+    worktreeId: "wt-a",
+    path: "probe.txt",
+    versions: probe,
+    reviewed: ["a.txt", "nested/"],
+    entriesAtRequest: [
+      { path: "a.txt", reviewed: false, headVersion: "h-a", worktreeVersion: "w-a", worktreeVersionConfirmed: true },
+      { path: "nested/", reviewed: false, headVersion: null, worktreeVersion: null, worktreeVersionConfirmed: false },
+    ],
+    order: ++order,
+  });
+  assert.deepEqual(plan.records.map((record) => record.path), ["probe.txt", "a.txt"],
+    "版本不可确认的路径不能记");
+});
+
+test("聚合回执不覆盖用户对同一路径的明确操作（较新取消胜出）", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  // 用户对 b.txt 明确取消（较新）。
+  overlay.record("wt-a", "b.txt", bVersions, false, { order: ++order, source: "explicit" });
+  // 一个更早发起、现在才到达的聚合回执说 b.txt 已审。
+  const applied = overlay.record("wt-a", "b.txt", bVersions, true, { order: 1, source: "aggregate" });
+  assert.equal(applied, false, "聚合回执不能覆盖明确操作");
+  assert.equal(overlay.get("wt-a", "b.txt").reviewed, false);
+});
+
+test("A/B 不同文件：迟到的 A 仍被聚合回执保留（原漏账场景不回退）", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  const read = overlay.beginRead();
+  const entriesAtRequest = [
+    { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a", worktreeVersionConfirmed: true },
+    { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b", worktreeVersionConfirmed: true },
+    { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p", worktreeVersionConfirmed: true },
+  ];
+  // B 的回执先到，全量集合含 A+B。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", path: "b.txt", versions: bVersions,
+    reviewed: ["a.txt", "b.txt", "probe.txt"], entriesAtRequest, order: ++order,
+  });
+  const merged = read.deliver(reviewSnapshot());
+  assert.equal(reviewedOf(merged, "probe.txt"), true);
+  assert.equal(reviewedOf(merged, "b.txt"), true);
+  assert.equal(merged.review.reviewedCount, 3);
+});
+
+test("契约后果：若聚合记录错误绑定新版本，就会把用户没看过的版本勾上（证明版本来源必须正确）", () => {
+  const overlay = new ReviewOverlay();
+  let order = 0;
+  const read = overlay.beginRead();
+  // 故意按「错误来源」记账：把 B 的已审状态绑定到 v2（用户没看过的版本）。
+  overlay.record("wt-a", "b.txt", { head: "h-b", worktree: "w-b-v2" }, true, {
+    order: ++order, source: "aggregate",
+  });
+  const merged = read.deliver(reviewSnapshot({
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: false, headVersion: "h-b", worktreeVersion: "w-b-v2" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt"], total: 3, reviewedCount: 1 },
+  }));
+  assert.equal(reviewedOf(merged, "b.txt"), true,
+    "这正是版本来源错误时的后果：v2 被认领为已审。生产代码因此只能绑定请求时版本。");
 });

@@ -240,11 +240,44 @@ export interface ReviewVersionsLike {
   worktree: string | null;
 }
 
+/**
+ * 一条本地审阅记录。
+ *
+ * 两个先后来源必须分开（ST07-R8-1）：
+ * - `order`：用户在界面上**发起**这次标记操作的次序，由 `beginMark()` 在点击时分配。
+ *   同一路径的相反操作以它判定谁更新，绝不用回执到达次序。
+ * - `commitSeq`：写入叠加层的次序，只用于读取分界（判断某次读取能否观察到它）。
+ *
+ * `source` 区分「用户直接操作这条路径」与「后端全量结果顺带确认了这条路径」：
+ * 聚合回执不能覆盖用户对同一路径的明确操作。
+ */
 export interface ReviewOverride {
   path: string;
   versions: ReviewVersionsLike;
   reviewed: boolean;
-  seq: number;
+  order: number;
+  source: ReviewRecordSource;
+  commitSeq: number;
+}
+
+export type ReviewRecordSource = "explicit" | "aggregate";
+
+/**
+ * 一次标记操作的句柄：序号在**用户点击时**分配，回执到达时用它记账。
+ *
+ * 只由 `ReviewOverlay.beginMark()` 创建，调用方无法在回执到达时才决定先后。
+ */
+export class ReviewMarkRequest {
+  private readonly order: number;
+
+  constructor(order: number) {
+    this.order = order;
+  }
+
+  /** 这次操作的发起次序（1 起，单调递增）。 */
+  orderOf(): number {
+    return this.order;
+  }
 }
 
 export interface ReviewMarkEntryLike {
@@ -270,7 +303,10 @@ export interface ReviewSnapshotLike<E extends ReviewMarkEntryLike> {
 }
 
 export class ReviewOverlay {
-  private seq = 0;
+  /** 写入叠加层的次序（读取分界用）。 */
+  private commitSeq = 0;
+  /** 用户标记操作的发起次序。 */
+  private operationSeq = 0;
   private readonly overrides = new Map<string, ReviewOverride>();
   /** 上限：只保留最近若干条，避免长时间使用后无界增长。 */
   private readonly limit: number;
@@ -283,26 +319,58 @@ export class ReviewOverlay {
     return `${worktreeId}\u0000${path}`;
   }
 
+  /** 用户点击标记时分配操作次序（ST07-R8-1 的先后来源）。 */
+  beginMark(): ReviewMarkRequest {
+    this.operationSeq += 1;
+    return new ReviewMarkRequest(this.operationSeq);
+  }
+
   /**
-   * 记录一次**已成功**的本地审阅变更，返回它的序号。
+   * 记录一次**已成功**的本地审阅变更；返回是否真的写入了叠加层。
    *
-   * **必须在拿到成功结果后无条件调用**，不能被展示代际（`isCurrent`）挡住：
+   * **必须在拿到成功结果后调用**，不能被展示代际（`isCurrent`）挡住：
    * 后端已经持久化，迟到响应只是不该更新界面，不能让后续旧读取把这条真实变更回退
-   * （ST07-R7-3 / SP07-R7-2）。版本校验在 `apply`/`mergeEntry` 里做，所以乱序也安全。
+   * （ST07-R7-3 / SP07-R7-2）。
+   *
+   * 是否覆盖同路径已有记录**只取决于操作先后**（`order`），与回执到达次序无关：
+   * 迟到的旧勾选回执不能覆盖已成功的取消（ST07-R8-1 / SP07-R8-1）。
+   * 聚合回执（`source: "aggregate"`）不覆盖用户对同一路径的明确操作。
    */
-  record(worktreeId: string, path: string, versions: ReviewVersionsLike, reviewed: boolean): number {
-    this.seq += 1;
-    this.overrides.set(ReviewOverlay.key(worktreeId, path), {
+  record(
+    worktreeId: string,
+    path: string,
+    versions: ReviewVersionsLike,
+    reviewed: boolean,
+    meta: { order: number; source: ReviewRecordSource },
+  ): boolean {
+    const key = ReviewOverlay.key(worktreeId, path);
+    const existing = this.overrides.get(key);
+    if (existing) {
+      if (existing.source === "explicit") {
+        // 用户对这条路径的直接操作优先：聚合回执永远不覆盖它，
+        // 更早发起的明确操作也不能覆盖它。
+        if (meta.source === "aggregate") return false;
+        if (meta.order < existing.order) return false;
+      } else if (meta.source === "explicit") {
+        // 明确操作总能覆盖聚合回执。
+      } else if (meta.order < existing.order) {
+        return false;
+      }
+    }
+    this.commitSeq += 1;
+    this.overrides.set(key, {
       path,
       versions: { head: versions.head, worktree: versions.worktree },
       reviewed,
-      seq: this.seq,
+      order: meta.order,
+      source: meta.source,
+      commitSeq: this.commitSeq,
     });
     if (this.overrides.size > this.limit) {
-      const oldest = [...this.overrides.entries()].sort((a, b) => a[1].seq - b[1].seq)[0];
+      const oldest = [...this.overrides.entries()].sort((a, b) => a[1].commitSeq - b[1].commitSeq)[0];
       if (oldest) this.overrides.delete(oldest[0]);
     }
-    return this.seq;
+    return true;
   }
 
   /**
@@ -312,7 +380,7 @@ export class ReviewOverlay {
    * 拿不到句柄就无法交付，而句柄只在请求发起处创建。
    */
   beginRead(): ReviewReadRequest {
-    return new ReviewReadRequest(this, this.seq);
+    return new ReviewReadRequest(this, this.commitSeq);
   }
 
   /** 该路径当前记录的本地状态（诊断与测试用）。 */
@@ -329,7 +397,7 @@ export class ReviewOverlay {
     let changed = false;
     const entries = snapshot.entries.map((entry) => {
       const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
-      if (!override || override.seq <= baseline) return entry;
+      if (!override || override.commitSeq <= baseline) return entry;
       const head = entry.headVersion ?? null;
       const worktree = entry.worktreeVersion ?? null;
       if (override.versions.head !== head || override.versions.worktree !== worktree) {
@@ -374,7 +442,7 @@ export class ReviewOverlay {
       reviewed = current.reviewed;
     }
     const override = this.overrides.get(ReviewOverlay.key(worktreeId, loaded.path));
-    if (override && override.seq > boundary
+    if (override && override.commitSeq > boundary
       && override.versions.head === head && override.versions.worktree === worktree) {
       reviewed = override.reviewed;
     }
@@ -441,8 +509,13 @@ export async function readThroughReview<S extends ReviewSnapshotLike<ReviewMarkE
 
 /** 一次成功的标记结果要记哪些账。 */
 export interface ReviewResultPlan {
-  /** 需要写入叠加层的条目（含本次目标与同批被后端一并改变的其他文件）。 */
-  records: Array<{ path: string; versions: ReviewVersionsLike; reviewed: boolean }>;
+  /** 需要写入叠加层的条目，每条都带**它自己**被确认时的版本。 */
+  records: Array<{
+    path: string;
+    versions: ReviewVersionsLike;
+    reviewed: boolean;
+    source: ReviewRecordSource;
+  }>;
   /** 后端返回的完整已审阅集合，用于更新界面。 */
   reviewed: Set<string>;
 }
@@ -450,47 +523,103 @@ export interface ReviewResultPlan {
 /**
  * 计算一次**已成功**的标记结果要记录的全部变更（ST07-R7-3 / SP07-R7-2）。
  *
- * 后端返回的 `reviewed` 是完整集合：A/B 并发时 B 的结果可能已经包含 A，
- * 因此除本次目标外，界面当前条目中「状态确实被改变且版本可确认」的也要一并记账，
- * 否则 A 迟到被展示门禁拒收后就漏账，旧读取仍会把 A 回退。
+ * 两条硬约束：
  *
- * 版本随每条记录一起保存，`apply`/`mergeEntry` 再按版本校验，乱序也安全。
+ * 1. **版本来源**（ST07-R8-2 / SP07-R8-2）：每条记录的版本必须来自
+ *    **请求发起时**的条目（`entriesAtRequest`），也就是回执实际确认的那个版本。
+ *    绝不能用回执到达时的当前条目补版本——否则「B 在 v1 已审、外部改成 v2 后
+ *    旧回执到达」会被记成 B(v2, 已审)，把用户没看过的 v2 勾上。
+ *    请求时不存在或版本不可确认的路径，一律不记（宁可漏记，不可错记）。
+ *
+ * 2. **先后来源**（ST07-R8-1 / SP07-R8-1）：每条记录带这次操作的 `order`
+ *    （由 `beginMark()` 在点击时分配）。同路径的相反操作谁胜出只看 order，
+ *    与回执到达次序无关。
+ *
+ * 除本次目标外，后端全量集合里被改变的其它路径以 `aggregate` 记账：
+ * 它们确实已被后端持久化（A/B 并发时不能漏账），但不会覆盖用户对同一路径的明确操作。
  */
 export function planReviewResult<E extends ReviewMarkEntryLike>(input: {
   worktreeId: string;
   path: string;
+  /** 本次目标在**请求发起时**的版本（用户点击时看到的那一份）。 */
   versions: ReviewVersionsLike;
+  /** 后端返回的完整已审阅集合。 */
   reviewed: Iterable<string>;
-  entries: readonly E[];
+  /** **请求发起时**的条目快照，用于给聚合路径绑定其被确认的版本。 */
+  entriesAtRequest: readonly E[];
+  /** 本次操作的发起次序。 */
+  order: number;
 }): ReviewResultPlan {
   const reviewed = new Set(input.reviewed);
   const records: ReviewResultPlan["records"] = [{
     path: input.path,
     versions: { head: input.versions.head, worktree: input.versions.worktree },
     reviewed: reviewed.has(input.path),
+    source: "explicit",
   }];
-  for (const entry of input.entries) {
+  for (const entry of input.entriesAtRequest) {
     if (entry.path === input.path) continue;
-    if (!entry.worktreeVersionConfirmed) continue;
+    // 版本不可确认的路径无法绑定，宁可不记。
+    if (entry.worktreeVersionConfirmed === false) continue;
     const nowReviewed = reviewed.has(entry.path);
     if (nowReviewed === entry.reviewed) continue;
     records.push({
       path: entry.path,
+      // 版本取自**请求时**的这条条目，不是回执到达时的当前条目。
       versions: { head: entry.headVersion ?? null, worktree: entry.worktreeVersion ?? null },
       reviewed: nowReviewed,
+      source: "aggregate",
     });
   }
   return { records, reviewed };
 }
 
 /**
- * 把计划**无条件**写进叠加层。
+ * 把计划写进叠加层，带上这次操作的发起次序。
  *
  * 必须在展示门禁（`isCurrent`）之前调用：后端已经持久化，迟到响应只是不该更新界面，
  * 不能让后续旧读取把这条真实变更回退。
  */
-export function commitReviewResult(overlay: ReviewOverlay, worktreeId: string, plan: ReviewResultPlan): void {
+export function commitReviewResult(
+  overlay: ReviewOverlay,
+  worktreeId: string,
+  plan: ReviewResultPlan,
+  order: number,
+): void {
   for (const record of plan.records) {
-    overlay.record(worktreeId, record.path, record.versions, record.reviewed);
+    overlay.record(worktreeId, record.path, record.versions, record.reviewed, {
+      order,
+      source: record.source,
+    });
   }
+}
+
+/**
+ * 一次**已成功**的标记回执的完整记账入口（生产调用点唯一）。
+ *
+ * 参数刻意只收「**请求发起时**的条目快照」：版本来源只能是回执实际确认的那一份，
+ * 调用方无法把回执到达时的当前条目塞进来补版本（ST07-R8-2 / SP07-R8-2）。
+ * 先后来源是点击时分配的 `order`，与回执到达次序无关（ST07-R8-1 / SP07-R8-1）。
+ */
+export function applyReviewSuccess<E extends ReviewMarkEntryLike>(input: {
+  overlay: ReviewOverlay;
+  worktreeId: string;
+  path: string;
+  versions: ReviewVersionsLike;
+  reviewed: Iterable<string>;
+  /** 请求发起时的条目快照。 */
+  entriesAtRequest: readonly E[];
+  /** 点击时分配的发起次序。 */
+  order: number;
+}): ReviewResultPlan {
+  const plan = planReviewResult({
+    worktreeId: input.worktreeId,
+    path: input.path,
+    versions: input.versions,
+    reviewed: input.reviewed,
+    entriesAtRequest: input.entriesAtRequest,
+    order: input.order,
+  });
+  commitReviewResult(input.overlay, input.worktreeId, plan, input.order);
+  return plan;
 }

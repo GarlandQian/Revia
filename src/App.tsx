@@ -35,7 +35,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
-import { commitReviewResult, planReviewResult, readThroughReview } from "@/lib/refreshGate";
+import { applyReviewSuccess, readThroughReview } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -1008,6 +1008,10 @@ export function App() {
       setAppError({ kind: "rejected", message: messages.review.unconfirmed }, targetWorktreeId);
       return null;
     }
+    // 操作先后在**点击时**分配（ST07-R8-1）：迟到的旧回执不能覆盖之后发起的取消。
+    const markRequest = reviewOverlayRef.current.beginMark();
+    // 请求发起时的条目快照：回执的每条记录只能绑定它实际确认的版本（ST07-R8-2）。
+    const entriesAtRequest = targetSnapshot.entries;
     const targetActivation = gateRef.current.token().activation;
     const targetRevision = targetSnapshot.revision;
     const isCurrent = () => reviewEpochRef.current === epoch
@@ -1025,19 +1029,18 @@ export function App() {
           worktree: entry.worktreeVersion ?? null,
         },
       });
-      // 记账**先于**展示门禁：后端已经持久化，即使这次响应迟到被拒收（A/B 并发时
-      // A 的响应晚于 B），它的真实结果也必须被记录，否则后续旧读取会把 A 回退
-      // （ST07-R7-3 / SP07-R7-2）。版本随记录一起保存，乱序也安全。
       // 记账**先于**展示门禁（ST07-R7-3 / SP07-R7-2）：后端已经持久化，
       // 迟到响应只是不该更新界面，不能让后续旧读取把这条真实变更回退。
-      const plan = planReviewResult({
+      // 版本取自**请求发起时**的条目，先后取自**点击时**分配的 order。
+      const plan = applyReviewSuccess({
+        overlay: reviewOverlayRef.current,
         worktreeId: targetWorktreeId,
         path: entry.path,
         versions: { head: entry.headVersion ?? null, worktree: entry.worktreeVersion ?? null },
         reviewed: marks.reviewed,
-        entries: snapshotRef.current?.worktreeId === targetWorktreeId ? snapshotRef.current.entries : [],
+        entriesAtRequest,
+        order: markRequest.orderOf(),
       });
-      commitReviewResult(reviewOverlayRef.current, targetWorktreeId, plan);
       const reviewedSet = plan.reviewed;
       if (!isCurrent()) return null;
       setSnapshot((current) => {
