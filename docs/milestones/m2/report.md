@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07第九轮限定复核仍需返修：固定`8128f7a...3e29880`，Standards3项P2、Spec3项P2；点击order未贯通后端执行、explicit永久压aggregate重新漏账、请求快照仍不能证明非目标回执版本。继续原Pi修端到端契约，07退ready-for-agent。[31份原件](./evidence/task07-review09/manifest.json)中3源码SHA匹配，前端四项/Node40退出0；两组当前版本替换敏感性未触发失败，不能称参数改名即类型保障。旧最短路径已挡住但整体尚未闭合；无新版Release/桌面/D06/CI/长测，05/12状态不变，后续仅SSH推m2、不合main。
+
 - 任务07第八轮限定复核仍需返修：固定`3c8a0b8...a96d0e0`，Standards2项P2、Spec2项P2；写结果分界、getRows和重开原触发路径静态闭合，但旧成功按到达顺序覆盖新相反操作、旧全量集合借当前版本错误认领仍不安全，继续原Pi，07退ready-for-agent。[原件](./evidence/task07-review08/manifest.json)中3源码SHA匹配、tsc/lint/build与Node33退出0；敏感性实际fail3/1/1/1/1，三组仅源码字符串断言失败，已更正Pi重复计数，不能称生产时序动态全覆盖。05/12状态不变，无新版Release/桌面/D06/CI/长测；推送只用SSH，未合main。
 
 - 任务07第七轮限定复核仍需返修：固定`4915f6d...f93fd2e`，Standards3项P2、Spec4项P2，分别保留[07 Comments](./issues/07-persistent-review-marks.md#comments)。写结果分界过晚、成功变更漏记、未跟踪元数据及重开读取旁路仍可使同版本审阅回退；继续原Pi修，07退ready-for-agent。最终r7c四份源码SHA匹配、五项检查退出0（Node24/Rust21），[38份检查原件](./evidence/task07-review07/manifest.json)含前版r7b且明确不算最终版验证；初始元数据目录已不存在，内容无法独立追溯。[CI40060420970的24份原件](./evidence/task07-ci01/manifest.json)已归档：旧8f95c26 macOS253通过/1ignored及release成功，Windows观察到221通过/3失败/1ignored、后续套件未跑且release跳过。路径转换只是静态闭合，仍需新版CI；后续推送仅用现有SSH origin，不切HTTPS/配置。05/12状态不变，无新版Release/桌面/D06/长测，不done、不合main。
