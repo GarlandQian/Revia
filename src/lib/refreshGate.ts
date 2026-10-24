@@ -296,9 +296,41 @@ export class ReviewOverlay {
   private readonly overrides = new Map<string, ReviewOverride>();
   /** 上限：只保留最近若干条，避免长时间使用后无界增长。 */
   private readonly limit: number;
+  /**
+   * 每个 worktree 被**淘汰**过的最高真实序号（R07-CAP-1）。
+   *
+   * 内存必须有界，所以叠加层会丢弃最早写入的记录。一旦某条记录被丢弃，
+   * 「这条路径已确认到某个序号」这件事就**不再可知**：此时再来一份更旧的回执，
+   * 我们既不能证明它更旧（记录没了），也不能证明它更新。把它当成新真值重新写入，
+   * 就是让被淘汰的旧状态重新认领。
+   *
+   * 因此按 worktree 记住淘汰过的最高序号：任何 `seq <= 该水位` 的回执/读取都
+   * 视为**信息不足**，拒绝发布并要求重新读取（不猜、不重新认领）。
+   * 只在淘汰时升高，永不降低；按 worktree 分开，互不影响。
+   */
+  private readonly evictedHighSeq = new Map<string, number>();
 
   constructor(limit = 1024) {
     this.limit = limit;
+  }
+
+  /** 该 worktree 被淘汰过的最高序号；0 表示从未淘汰。 */
+  evictedWatermark(worktreeId: string): number {
+    return this.evictedHighSeq.get(worktreeId) ?? 0;
+  }
+
+  /**
+   * 这个序号是否还**可信**：不大于淘汰水位说明可能有更高序号的记录已被丢弃，
+   * 仅凭当前叠加层无法安全合成（R07-CAP-1）。
+   */
+  isTrustworthy(worktreeId: string, seq: number): boolean {
+    const evicted = this.evictedWatermark(worktreeId);
+    // 从未淘汰：现有记录就是全部真值，任何序号都能安全比较。
+    if (evicted === 0) return true;
+    // 淘汰水位记录的是「被丢弃记录的最大序号」。序号等于它说明这份回执本身
+    // 就是那一批（或更新），它的真值仍然完整可用；只有**严格更旧**的回执
+    // 才可能早于已被丢弃的更新真值，此时无法安全合成（R07-CAP-1）。
+    return seq >= evicted;
   }
 
   private static key(worktreeId: string, path: string): string {
@@ -323,6 +355,9 @@ export class ReviewOverlay {
     const key = ReviewOverlay.key(worktreeId, path);
     const existing = this.overrides.get(key);
     if (existing && seq <= existing.seq) return false;
+    // 路径已被淘汰、且这条回执**严格更旧**于淘汰水位：信息不足，
+    // 不能当新真值重新认领（同序号的记录属于同一批回执，不算过时）。
+    if (!existing && seq < this.evictedWatermark(worktreeId)) return false;
     this.commitSeq += 1;
     this.overrides.set(key, {
       path,
@@ -333,7 +368,14 @@ export class ReviewOverlay {
     });
     if (this.overrides.size > this.limit) {
       const oldest = [...this.overrides.entries()].sort((a, b) => a[1].commitSeq - b[1].commitSeq)[0];
-      if (oldest) this.overrides.delete(oldest[0]);
+      if (oldest) {
+        const evicted = oldest[1];
+        this.overrides.delete(oldest[0]);
+        // 记住这条 worktree 淘汰过的最高序号：之后任何不比它新的回执都不可信。
+        const evictedWorktree = oldest[0].slice(0, oldest[0].indexOf("\u0000"));
+        const current = this.evictedWatermark(evictedWorktree);
+        if (evicted.seq > current) this.evictedHighSeq.set(evictedWorktree, evicted.seq);
+      }
     }
     return true;
   }
@@ -362,6 +404,9 @@ export class ReviewOverlay {
    */
   apply<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S, boundary: number): S {
     const observedSeq = snapshot.review.seq ?? 0;
+    // 这次读取的序号不大于淘汰水位：它可能早于已被丢弃的更新真值，
+    // 用它合成会让界面倒退（R07-CAP-1）。调用方应重新读取。
+    if (!this.isTrustworthy(snapshot.worktreeId, observedSeq)) return snapshot;
     let changed = false;
     const entries = snapshot.entries.map((entry) => {
       const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
@@ -690,6 +735,11 @@ export interface ReviewPublishResult<S extends ReviewSnapshotLike<ReviewMarkEntr
   navigation: ReviewStateLike;
   /** 是否应该清理错误提示。 */
   clearError: boolean;
+  /**
+   * 叠加层信息不足（序号不大于淘汰水位），这次发布被拒绝。
+   * 调用方必须重新读取真实状态，不能拿回执的旧值猜（R07-CAP-1）。
+   */
+  needsRefresh: boolean;
 }
 
 export function publishReviewSuccess<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
@@ -707,15 +757,22 @@ export function publishReviewSuccess<S extends ReviewSnapshotLike<ReviewMarkEntr
     seq: input.seq,
     snapshot: input.snapshot,
   });
-  if (!contextValid || !view) {
-    // 上下文失效：不发布，但记账已经完成（迟到的真实成功不丢账）。
+  // 叠加层在容量边界淘汰过更新的记录（R07-CAP-1）：这份回执的序号不大于淘汰水位，
+  // 说明可能有更高序号的真值已被丢弃，仅凭现有信息无法安全合成。
+  // **拒绝发布**并要求重新读取——不猜、不让被淘汰的旧状态重新认领。
+  //
+  // 判定放在整份回执写完之后：写入过程中被淘汰的记录与本回执同序号，
+  // 它们被丢弃只说明「这条路径本回执确认过」，不构成信息不足。
+  const trustworthy = input.overlay.isTrustworthy(input.worktreeId, input.seq);
+  if (!contextValid || !view || !trustworthy) {
     return {
       view: null,
       navigation: { paths: [], reviewed: [...plan.reviewed], total: 0, reviewedCount: plan.reviewed.size, seq: plan.seq },
       clearError: false,
+      needsRefresh: !trustworthy,
     };
   }
-  return { view, navigation: view.review, clearError };
+  return { view, navigation: view.review, clearError, needsRefresh: false };
 }
 
 /**
@@ -727,9 +784,12 @@ export function publishReviewSuccess<S extends ReviewSnapshotLike<ReviewMarkEntr
  */
 export function mergePublishedReview<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
   current: S,
-  view: ReviewSnapshotLike<ReviewMarkEntryLike>,
+  view: ReviewSnapshotLike<ReviewMarkEntryLike> | null | undefined,
   seq: number,
 ): S {
+  // 发布被拒绝（`needsRefresh`，例如叠加层容量淘汰后信息不足）时调用方可能直接
+  // 传 `null`：此时**不改变界面**，等重新读取真实状态（R07-CAP-1）。
+  if (!view) return current;
   const reviewedByPath = new Map(view.entries.map((entry) => [entry.path, entry.reviewed]));
   const entries = current.entries.map((entry) => {
     const reviewed = reviewedByPath.get(entry.path);

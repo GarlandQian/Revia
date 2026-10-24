@@ -1325,3 +1325,143 @@ test("读取真值持有：v1→v2→v1 失效仍不被旧成功复活", () => {
   });
   assert.equal(reviewedOf(published.view, "U"), false, "失效后的读取真值必须挡住旧成功");
 });
+
+// ---------------- 容量边界（R07-CAP-1）----------------
+// 生产函数 + **默认** `new ReviewOverlay()`：一次完整回执本身就可能超过容量。
+
+function capacityFixture(count) {
+  const paths = Array.from({ length: count }, (_, i) => `file-${String(i).padStart(4, "0")}.txt`);
+  const entries = paths.map((path) => ({
+    path, reviewed: false, headVersion: `h:${path}`, worktreeVersion: `w:${path}`,
+  }));
+  return {
+    paths,
+    snapshot: {
+      worktreeId: "fixture-wt",
+      revision: 9,
+      entries,
+      review: { paths, reviewed: [], total: count, reviewedCount: 0, seq: 0 },
+    },
+  };
+}
+
+/** 目标路径（索引 0）按 `targetReviewed`，其余路径按 `othersReviewed`。 */
+function capacityMarks(paths, targetReviewed, othersReviewed = false) {
+  return paths.map((path, i) => ({
+    path,
+    reviewed: i === 0 ? targetReviewed : othersReviewed,
+    head: `h:${path}`,
+    worktree: `w:${path}`,
+  }));
+}
+
+function runCapacity(count, newerReviewed) {
+  const { paths, snapshot } = capacityFixture(count);
+  const overlay = new ReviewOverlay();   // 默认容量
+  const context = { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: true };
+  // 先交付完整 seq2。
+  const newer = publishReviewSuccess({
+    overlay, worktreeId: snapshot.worktreeId,
+    reviewed: capacityMarks(paths, newerReviewed).filter((m) => m.reviewed).map((m) => m.path),
+    marks: capacityMarks(paths, newerReviewed), seq: 2, snapshot, context,
+  });
+  let current = mergePublishedReview(snapshot, newer.view, 2);
+  const before = current.entries[0].reviewed;
+  // 再交付旧 seq1（相反状态）。
+  // 旧回执是相反状态，作用在**同一个目标路径**上。
+  const older = publishReviewSuccess({
+    overlay, worktreeId: snapshot.worktreeId,
+    reviewed: capacityMarks(paths, !newerReviewed).filter((m) => m.reviewed).map((m) => m.path),
+    marks: capacityMarks(paths, !newerReviewed), seq: 1, snapshot: current,
+    context: { ...context, epochMatches: false },
+  });
+  current = older.view ? mergePublishedReview(current, older.view, 1) : current;
+  return { before, after: current.entries[0].reviewed, newerReviewed, needsRefresh: older.needsRefresh };
+}
+
+for (const count of [1024, 1025]) {
+  for (const newerReviewed of [true, false]) {
+    test(`容量 ${count}：先 seq2 后旧 seq1，新状态 ${newerReviewed ? "已审" : "未审"} 不回退（R07-CAP-1）`, () => {
+      const result = runCapacity(count, newerReviewed);
+      assert.equal(result.before, newerReviewed, "seq2 先正确生效");
+      assert.equal(result.after, newerReviewed, "旧回执不能把新状态改回去");
+    });
+  }
+}
+
+test("容量 1025：旧回执被拒绝并要求重新读取（不是静默猜）", () => {
+  const result = runCapacity(1025, true);
+  assert.equal(result.needsRefresh, true, "超过容量后旧序号必须触发重新读取");
+});
+
+test("容量 1024：旧回执仍按序号正常拒绝，不需要重新读取", () => {
+  const result = runCapacity(1024, true);
+  assert.equal(result.needsRefresh, false, "未淘汰时按序号比较即可");
+});
+
+test("跨 worktree 容量隔离：A 淘汰不影响 B 的旧回执判定", () => {
+  const overlay = new ReviewOverlay();
+  const context = { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: true };
+  // 在 wt-a 写满并溢出，产生淘汰水位。
+  const { paths, snapshot } = capacityFixture(1025);
+  publishReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: paths.slice(0, 1),
+    marks: capacityMarks(paths, true), seq: 2,
+    snapshot: { ...snapshot, worktreeId: "wt-a" }, context,
+  });
+  assert.ok(overlay.evictedWatermark("wt-a") > 0, "wt-a 必须记录淘汰水位");
+  assert.equal(overlay.evictedWatermark("wt-b"), 0, "wt-b 不受影响");
+  // wt-b 的旧回执（seq1）仍然可信：别的 worktree 的淘汰不能波及它。
+  const b = capacityFixture(2);
+  const published = publishReviewSuccess({
+    overlay, worktreeId: "wt-b",
+    reviewed: [b.paths[0]],
+    marks: capacityMarks(b.paths, true), seq: 1,
+    snapshot: { ...b.snapshot, worktreeId: "wt-b" }, context,
+  });
+  assert.equal(published.needsRefresh, false, "跨 worktree 不能互相影响");
+  assert.equal(reviewedOf(published.view, b.paths[0]), true);
+});
+
+test("容量淘汰后，已接受的逐路径读取真值仍挡住旧回执", () => {
+  const { paths, snapshot } = capacityFixture(1025);
+  const overlay = new ReviewOverlay();
+  // 写满并溢出：路径 file-0000 的记录被淘汰，水位记为 2。
+  overlay.record("fixture-wt", paths[0], { head: `h:${paths[0]}`, worktree: `w:${paths[0]}` }, true, 2);
+  for (let i = 1; i <= 1024; i += 1) {
+    overlay.record("fixture-wt", paths[i], { head: `h:${paths[i]}`, worktree: `w:${paths[i]}` }, false, 2);
+  }
+  assert.ok(overlay.evictedWatermark("fixture-wt") >= 2, "必须有淘汰水位");
+  // 读取观察到 file-0001 已审、水位 3（比淘汰水位更新）。
+  const loaded = { path: paths[1], reviewed: true, headVersion: `h:${paths[1]}`, worktreeVersion: `w:${paths[1]}`, metricsLoaded: true };
+  const current = snapshot.entries[1];
+  overlay.mergeEntry("fixture-wt", loaded, 3, current, 0);
+  // 旧回执（seq1）现在交付：必须被拒绝，不能把已读到的 true 改回 false。
+  const older = publishReviewSuccess({
+    overlay, worktreeId: "fixture-wt",
+    reviewed: [],
+    marks: capacityMarks(paths, false),
+    seq: 1, snapshot,
+    context: { worktreeMatches: true, activationMatches: true, revisionMatches: true, epochMatches: false },
+  });
+  assert.equal(older.needsRefresh, true, "旧回执必须被拒绝");
+  assert.equal(older.view, null, "不发布任何基于旧信息的合成结果");
+});
+
+test("已淘汰路径的旧状态不能重新认领（record 层直接验证，R07-CAP-1）", () => {
+  const overlay = new ReviewOverlay(2);
+  // 写满并溢出：f0（seq5 已审）被淘汰，淘汰水位 = 5。
+  overlay.record("wt", "f0", { head: "h", worktree: "v" }, true, 5);
+  overlay.record("wt", "f1", { head: "h", worktree: "v" }, false, 5);
+  overlay.record("wt", "f2", { head: "h", worktree: "v" }, false, 5);
+  assert.equal(overlay.evictedWatermark("wt"), 5);
+  assert.equal(overlay.get("wt", "f0"), undefined, "f0 已被淘汰");
+  // 严格更旧的回执不能把 f0 重新插回来当作真值。
+  const reinserted = overlay.record("wt", "f0", { head: "h", worktree: "v" }, false, 4);
+  assert.equal(reinserted, false, "已淘汰路径的旧状态不能重新认领");
+  assert.equal(overlay.get("wt", "f0"), undefined, "不能被重新插入");
+  // 更新的回执仍然可以写入（不是永久封锁）。
+  const newer = overlay.record("wt", "f0", { head: "h", worktree: "v" }, true, 6);
+  assert.equal(newer, true, "比淘汰水位更新的回执仍可写入");
+});
