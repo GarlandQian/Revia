@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1143,3 +1143,31 @@ A 等待执行期间 B 可以从 v1 变到 v2 并被标记，旧回执会把 B �
 - **桌面未验证**：三条场景都未在真实 UI 重放（由规划方复验）。
 - **Windows 未验证**：仍需新 CI。
 - 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。
+
+
+### 2026-10-24 / 规划方：任务07第十一轮限定两轴复核，展示与元数据入口仍未闭合
+
+固定`fc57ab90bc47b93e828823c8dadab5777d52c532...47f23a6036b846971ca081b6613349bd3050ec62`。实际取消回执带false/版本/seq、失效清理推进seq、全量快照读取水位判断本身已静态闭合；不重复扩大旧开项。以下仅固定源码静态因果，未另运行交错或桌面。
+
+#### Standards：3项P2硬规范/确定缺陷；Fowler建议0项
+
+1. **ST07-R11-1 / P2 / 合成忽略较早的非目标取消**：`src/lib/refreshGate.ts:460`以当前UI为底、只应用seq不小于当前回执的记录。B原已审，取消B后立即点A；B取消seq1已记账但因点击epoch旧不展示。A成功seq2只返回正标记A，合成跳过Bfalse(seq1)，仍显示Btrue，尽管A回执完整集合已排除B。应以完整、版本化确认真值为底，再叠加更新状态，不能只靠正标记与当前界面。
+2. **ST07-R11-2 / P2 / 真正较晚的成功仍被点击代际拒展示**：`src/App.tsx:1043`，先点A后B，B先执行seq1且先显示，A后执行seq2、回执后到；helper已合成A+B，却因点击epoch旧直接返回，A持续未审。成功真值发布需按可信执行进度和有效上下文，与错误清理/导航代际分开，保留activation/revision/选择保护。前两项违反`docs/technical-direction.md:53`状态隔离契约。
+3. **ST07-R11-3 / P2 / getRows仍无读取水位**：`src/lib/refreshGate.ts:403`只按本地boundary和版本；`src/App.tsx:289`未传确认seq。未选中未跟踪U的旧v1成功回执hold→v2刷新失效seq2→回v1刷新未审→点U并hold getRows→释放旧成功seq1→释放getRows，仍按到达边界勾上U。违反`docs/product-direction.md:69`版本失效；需贯通元数据读取水位，不让失效真值已超越的记录复活。
+
+#### Spec：4项P2
+
+(a)/(c)以下仍部分缺失或实现错误；(b)无产品范围扩张。依据`spec.md:107`“任一版本变化即失效”、`:110`导航契约、`:116`“旧请求返回不能使内容倒退”。
+
+1. **SP07-R11-1 / P2 / 展示仍受点击epoch支配**：`src/App.tsx:1043`，A先点击后执行seq2、B后点击先执行seq1并展示；A回执即使合成正确仍被旧epoch拒绝，A持续未审。真值展示需按执行进度接收，错误清理与导航保持独立代际。
+2. **SP07-R11-2 / P2 / 聚合结果遗漏非目标取消**：`src-tauri/src/session.rs:1193`只为本次取消目标追加false，`src/lib/refreshGate.ts:457`合成又忽略完整已审集合中的缺席。B取消seq1回执hold→A标记seq2先返回不含Bfalse→仍显示Btrue；迟到B又因epoch旧不展示。聚合未审状态也须绑定确认版本，不只确认正标记。
+3. **SP07-R11-3 / P2 / getRows漏接失效水位**：`src/lib/refreshGate.ts:403`、`src/App.tsx:289`，同上述未跟踪U/v1→v2→v1/getRows链。全量读取apply的watermark修复不能代表此入口已覆盖；须拒绝读取/当前真值已经观察过的旧成功。
+4. **SP07-R11-4 / P2 / 捕获的整批条目覆盖React已排队元数据更新**：`src/App.tsx:1050`在函数式updater里写入较早由snapshotRef合成的`view.entries`，不基于`current.entries`。同revision getRows先排入metricsLoaded/行数补全、React尚未render，紧接mark回执从旧ref合成并排入更新，后者可把补全恢复成旧值，所选diff再绑定零行。旧实现只map current的审阅字段未有此覆盖；应在updater里只合并匹配版本的审阅字段，不覆盖其他元数据。
+
+#### 原始检查与后续要求
+
+- [103份原始检查](../evidence/task07-review11/manifest.json)逐份SHA/gzip还原验证，最终`source-sha256-final.txt`与`final2`相同，10份源码匹配47f23a6；原始Node48、Rust review_marks26、lib100及bindings/tsc/lint/build退出0。**初始before-check与最终并非全相同**：App/refreshGate/Node用例三份在收敛生产入口时变化，manifest“前后一致”不准确；本记录保留各阶段并更正，不把早期检查全算最终版本证据。
+- 敏感性8份输出实际为四份Rust25/1、一份Node48/0、三份Node47/1。首轮C-display-raw未触发已保留，第二轮改统一入口后触发；不据敏感性通过宣称完整App发布路径或元数据入口已闭合。
+- 固定本轮产品范围diff-check已独立通过。绑定空白后处理静态可用，未把格式问题算两轴代码发现。
+- 继续同Pi集中修以上链，特别是**完整聚合负状态、成功真值与点击代际分离、getRows水位、React current上只改审阅字段**。回归必须接真实Rust输出和完整生产发布路径，不仅helper。保留新错误/选择/activation/revision隔离与四读取入口；所有改完后集中最小检查、精确暂存、新增提交，禁止未授权amend。
+- 本轮无新版Release/桌面/D06/CI/长测，07退ready-for-agent，05/12不done。全部复核通过后规划方才桌面及仅SSH双平台CI；最终任务11同进程30分钟Q98不省略。

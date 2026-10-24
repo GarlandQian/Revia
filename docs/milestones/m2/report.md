@@ -4,6 +4,8 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务07第十一轮限定复核未过：固定`fc57ab9...47f23a6`，Standards3项P2、Spec4项P2。取消false和全量读取失效seq已接线，但非目标取消仍漏展示、真正较晚成功被点击epoch拒绝、getRows无水位，且整批view.entries发布新增元数据丢更新风险；继续同Pi，07退ready-for-agent。[103份原件](./evidence/task07-review11/manifest.json)最终10源码SHA匹配，Node48/Rust26/lib100及前端检查退出0；初始与最终3份源码不同已纠正，敏感性首次C未触发保留。固定产品diff-check过，无新版Release/桌面/D06/CI/长测，05/12未done；后续仅SSH推m2、未合main。
+
 - 任务07第十轮限定复核仍需返修：固定`90bcc19...04a05cf`，Standards3项P2、Spec3项P2；真实成功seq/保存版本静态成立，但取消无false回执、展示绕过seq、读取/失效水位仍可倒退。原Pi继续，07退ready-for-agent。[27份Pi及9份只读原件](./evidence/task07-review10/manifest.json)中8源码SHA匹配，tsc/lint/build、Node41与Rust24退出0；另diff-check真实退出2（生成绑定空白）。未授权amend补漏已如实留reflog，后续只新增独立提交。05/12状态不变，无新版Release/桌面/D06/CI/长测，后续仅SSH推m2、未合main。
 
 - 任务07第九轮限定复核仍需返修：固定`8128f7a...3e29880`，Standards3项P2、Spec3项P2；点击order未贯通后端执行、explicit永久压aggregate重新漏账、请求快照仍不能证明非目标回执版本。继续原Pi修端到端契约，07退ready-for-agent。[31份原件](./evidence/task07-review09/manifest.json)中3源码SHA匹配，前端四项/Node40退出0；两组当前版本替换敏感性未触发失败，不能称参数改名即类型保障。旧最短路径已挡住但整体尚未闭合；无新版Release/桌面/D06/CI/长测，05/12状态不变，后续仅SSH推m2、不合main。
