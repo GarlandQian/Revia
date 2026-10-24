@@ -4,6 +4,7 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务05最新`ready-for-human`：804d88d恢复/清空确认标签R05-D1限定两轴0/0，13份原始检查已[归档](./evidence/task05-desktop01-fix/manifest.json)，tsc/lint/build退出0。接着重新构建固定Release与桌面/最新双平台CI；旧de89796测量保留为历史，不倒填到新构建，不据静态标签修复关闭任务。
 - 任务05当前退回`ready-for-agent`：固定de89796 Release普通UI首轮发现恢复/清空最终确认按钮误写“保存到回收区并丢弃”（R05-D1），仅观察后取消、未执行写入，前后工作区/暂存区语义项/记录不变。已[归档原始证据](./evidence/task05-desktop01/manifest.json)，继续原Pi限定修复，复核后再桌面。此前四组自动性能与夹具0/0结论保留，不冒称功能验收完成。
 - 任务05验收准备：de89796固定Release已重新打包，SHA`05316c294400392019e7215cd1f329041d48082fd8d9f527e178a026fed20268`；[四组可见窗口自动测量](./task05-perf01.md)均ok，标准首屏117/111ms、真冷文字DOM5/7ms，60屏无未覆盖，保留23ms慢帧。Pi生产入口桌面夹具在8e8a16b限定两轴0/0，新清单5份原字节SHA一致；原错误证据保留。普通UI/恢复功能桌面和对应双平台CI未完成，仍ready-for-human，不替代任务11最终Q98长测。
 - 任务05最新：`ready-for-human`。固定`7e5a2c8...e217c1f`第七轮限定复核Standards0/Spec0；此前外部结果留存和门禁实际持有者问题静态闭合。App.tsx检查前SHA匹配e217c1f，tsc/lint/build原始退出0，13份日志已[归档核验](./evidence/task05-review07/manifest.json)。将固定Release版本进入真实桌面/D06/对应双平台CI，尚未done；未以静态或类型检查替代运行时验收。
