@@ -7,11 +7,11 @@ import type { RowKind } from "./RowKind";
 /**
  * 界面上的一个显示行。统一视图用 `lineKind`/`text`，并排视图用 `left`/`right`。
  */
-export type RenderRow = { kind: RowKind, hunkIndex: number, hunkAction: HunkAction | null, 
+export type RenderRow = { kind: RowKind, hunkIndex: number, hunkAction: HunkAction | null,
 /**
  * hunk 头显示的内容。
  */
-section: string | null, 
+section: string | null,
 /**
  * 统一视图：旧行号 / 新行号；并排视图：配对两侧的行号。
  */

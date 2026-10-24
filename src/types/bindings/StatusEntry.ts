@@ -3,15 +3,15 @@ import type { ChangesKind } from "./ChangesKind";
 import type { FileStatus } from "./FileStatus";
 import type { ReadonlyReason } from "./ReadonlyReason";
 
-export type StatusEntry = { path: string, 
+export type StatusEntry = { path: string,
 /**
  * 重命名的原路径。
  */
-originalPath: string | null, changes: ChangesKind, status: FileStatus, 
+originalPath: string | null, changes: ChangesKind, status: FileStatus,
 /**
  * 是否处于 unmerged（冲突）状态。
  */
-unmerged: boolean, 
+unmerged: boolean,
 /**
  * 只读限制原因，None 表示支持写操作。
  */

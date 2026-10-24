@@ -10,7 +10,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "tauri": "tauri",
-    "bindings": "cargo test --manifest-path src-tauri/Cargo.toml export_bindings"
+    "bindings": "cargo test --manifest-path src-tauri/Cargo.toml export_bindings && node tools/strip-binding-whitespace.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

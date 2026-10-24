@@ -35,7 +35,7 @@ import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
-import { applyReviewSuccess, readThroughReview } from "@/lib/refreshGate";
+import { applyReviewSuccessAndCompose, readThroughReview } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -1027,29 +1027,33 @@ export function App() {
       });
       // 记账**先于**展示门禁（ST07-R7-3 / SP07-R7-2）：后端已经持久化，
       // 迟到响应只是不该更新界面，不能让后续旧读取把这条真实变更回退。
-      // 版本取自**请求发起时**的条目，先后取自**点击时**分配的 order。
-      // 版本与先后**都来自后端返回值**（ST07-R9-2 / ST07-R9-3）：
-      // `marks` 里每条是它自己实际绑定的版本，`seq` 是真实提交序号。
-      // 前端不再用请求时快照或点击次序推断。
-      const plan = applyReviewSuccess({
+      // 状态、版本、先后**都来自后端返回值**：`marks` 每条自带 reviewed 与它绑定的版本
+      // （取消项是 false），`seq` 是真实提交序号。
+      // 记账 + 合成展示状态都走同一个生产入口：展示**不能**直接用这次回执的集合，
+      // 更晚的其它成功操作可能已经记账（B 先执行 seq1、A 后执行 seq2 但 A 的回执先到）
+      // （ST07-R10-2 / SP07-R10-2）。错误清理与展示分开，不清掉更新的错误。
+      const { view } = applyReviewSuccessAndCompose({
         overlay: reviewOverlayRef.current,
         worktreeId: targetWorktreeId,
         reviewed: marks.reviewed,
         marks: marks.marks,
         seq: marks.seq,
+        snapshot: snapshotRef.current,
       });
-      const reviewedSet = plan.reviewed;
       if (!isCurrent()) return null;
-      setSnapshot((current) => {
-        if (!current || current.worktreeId !== targetWorktreeId) return current;
-        return {
-          ...current,
-          review: marks,
-          entries: current.entries.map((item) => ({ ...item, reviewed: reviewedSet.has(item.path) })),
-        };
-      });
+      if (view) {
+        setSnapshot((current) => {
+          if (!current || current.worktreeId !== targetWorktreeId) return current;
+          return {
+            ...current,
+            review: { ...view.review, seq: marks.seq },
+            entries: view.entries,
+          };
+        });
+      }
       setAppError(null, targetWorktreeId);
-      return marks;
+      // 导航与进度用**合成后**的状态，不用后端这次返回的原始集合。
+      return view ? view.review : marks;
     } catch (caught) {
       // 失败**始终**记到发起它的 worktree（Q36、Q90）：切走或刷新只影响当前展示，
       // 不能把真实错误丢掉；成功响应才按激活状态隔离。

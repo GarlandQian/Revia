@@ -19,7 +19,7 @@ const imports = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, commitReviewResult, planReviewResult, readThroughReview } = await import("../src/lib/refreshGate.ts");
+const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, planReviewResult, readThroughReview } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -307,7 +307,8 @@ function reviewSnapshot(overrides = {}) {
       { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
       { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
     ],
-    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2 },
+    // `seq` 是后端真实水位：真实读取一定带它（`ReviewMarks.seq`）。
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2, seq: 0 },
     ...overrides,
   };
 }
@@ -535,9 +536,9 @@ test("生产入口真的接入了分界与记账（辅助定位，不当作时�
   const reads = app.match(/readThroughReview\(/g) ?? [];
   assert.ok(reads.length >= 3, `读取入口都要经共享函数，实际 ${reads.length} 处`);
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
-  assert.match(app, /applyReviewSuccess\(/, "成功的标记变更必须经唯一记账入口");
+  assert.match(app, /applyReviewSuccessAndCompose\(/, "成功回执必须经唯一记账+合成入口");
   // 记账必须在展示门禁之前，否则迟到成功会漏账。
-  const recordIndex = app.indexOf("applyReviewSuccess({");
+  const recordIndex = app.indexOf("applyReviewSuccessAndCompose({");
   const gateIndex = app.indexOf("if (!isCurrent()) return null;");
   assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于展示门禁");
   // 写结果也必须用请求前分界，不能在交付时才取。
@@ -551,9 +552,12 @@ test("生产入口真的接入了分界与记账（辅助定位，不当作时�
 // `marks`（每条标记自己实际绑定的版本）。前端不再有点击次序、请求时版本
 // 或来源优先级这些推测来源。
 
+// 后端 `ReviewMarks.marks` 的真实形状：path + reviewed + head + worktree。
+// 正标记 reviewed=true；取消时后端显式返回 reviewed=false（ST07-R10-1）。
 function marksOf(...items) {
-  return items.map(([path, head, worktree]) => ({ path, head, worktree }));
+  return items.map(([path, head, worktree, reviewed = true]) => ({ path, reviewed, head, worktree }));
 }
+const cancelled = (path, head, worktree) => [path, head, worktree, false];
 
 test("逆序回执：后执行成功的取消不会被先执行但迟到的勾选回执覆盖（ST07-R9-1）", () => {
   const overlay = new ReviewOverlay();
@@ -691,7 +695,177 @@ test("生产入口真的接入：版本取后端 marks、先后取后端 seq（�
   const reads = app.match(/readThroughReview\(/g) ?? [];
   assert.ok(reads.length >= 3, `四个读取入口都要经共享函数，实际 ${reads.length} 处`);
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
-  const recordIndex = app.indexOf("applyReviewSuccess({");
+  const recordIndex = app.indexOf("applyReviewSuccessAndCompose({");
   const gateIndex = app.indexOf("if (!isCurrent()) return null;");
   assert.ok(recordIndex > 0 && gateIndex > 0 && recordIndex < gateIndex, "记账必须先于展示门禁");
+});
+
+// ---------------- 第十轮：取消真值、展示合成、读取水位 ----------------
+
+test("生产取消回执带 false：读取捕获已审后取消成功，旧读取不能勾回（ST07-R10-1 / SP07-R10-1）", () => {
+  const overlay = new ReviewOverlay();
+  // 读取 R 发起时文件已审（后端 seq=1 的正标记）。
+  const read = overlay.beginRead();
+  // 取消成功：后端显式返回 reviewed=false 与它绑定的版本，seq=2。
+  const plan = applyReviewSuccess({
+    overlay,
+    worktreeId: "wt-a",
+    reviewed: ["a.txt", "b.txt"],   // 取消后只剩这两个
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"], cancelled("probe.txt", null, "w-p")),
+    seq: 2,
+  });
+  const cancelRecord = plan.records.find((record) => record.path === "probe.txt");
+  assert.equal(cancelRecord.reviewed, false, "取消必须产生一条 false 记录");
+  // 旧读取 R 交付：probe 仍是已审的旧真值，不能勾回。
+  const merged = read.deliver(reviewSnapshot({
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+      { path: "probe.txt", reviewed: true, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt", "probe.txt"], total: 3, reviewedCount: 3, seq: 1 },
+  }));
+  assert.equal(reviewedOf(merged, "probe.txt"), false, "取消成功后旧读取不能把它勾回");
+  assert.equal(merged.review.reviewedCount, 2);
+});
+
+test("取消也挡住更早的新增回执（旧新增回执晚到不能覆盖取消）", () => {
+  const overlay = new ReviewOverlay();
+  // 先执行：新增成功 seq=1（回执暂缓）。
+  // 后执行：取消成功 seq=2（回执先到）。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["a.txt", "b.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"], cancelled("probe.txt", null, "w-p")),
+    seq: 2,
+  });
+  // 旧新增回执现在才到（seq=1）。
+  const plan = applyReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["a.txt", "b.txt", "probe.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"], ["probe.txt", null, "w-p"]),
+    seq: 1,
+  });
+  assert.equal(plan.seq, 1);
+  assert.equal(overlay.get("wt-a", "probe.txt").reviewed, false,
+    "序号更小的新增回执不能覆盖取消");
+});
+
+test("展示按真实进度合成：B(seq1) 回执晚到不能把 A(seq2) 的已审显示掉（ST07-R10-2 / SP07-R10-2）", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+      { path: "other.txt", reviewed: false, headVersion: "h-o", worktreeVersion: "w-o" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt", "other.txt"], reviewed: ["a.txt", "b.txt"], total: 4, reviewedCount: 2, seq: 0 },
+  };
+  // A 后执行（seq=2，含 A+B 已审），回执先到并记账。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["a.txt", "b.txt", "probe.txt", "other.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"],
+      ["probe.txt", null, "w-p"], ["other.txt", "h-o", "w-o"]),
+    seq: 2,
+  });
+  // B 先执行（seq=1，只含 B），回执后到：直接发布它的集合会把 A 显示成未审。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a",
+    reviewed: ["a.txt", "b.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"]),
+    seq: 1,
+  });
+  // 展示必须按真实进度合成：seq2 的结果仍生效。
+  const view = overlay.composeState(current, 1);
+  assert.equal(reviewedOf(view, "probe.txt"), true, "更晚执行的成功不能被更早的回执显示掉");
+  assert.equal(reviewedOf(view, "other.txt"), true);
+  assert.equal(view.review.reviewedCount, 4, "导航用的进度也必须按合成结果");
+});
+
+test("展示合成不回退更晚的取消", () => {
+  const overlay = new ReviewOverlay();
+  const current = {
+    worktreeId: "wt-a",
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "probe.txt"], reviewed: ["a.txt"], total: 2, reviewedCount: 1, seq: 0 },
+  };
+  // 取消 seq=2 生效。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["a.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], cancelled("probe.txt", null, "w-p")), seq: 2,
+  });
+  // 更早的新增回执 seq=1 后到并请求展示。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["a.txt", "probe.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["probe.txt", null, "w-p"]), seq: 1,
+  });
+  const view = overlay.composeState(current, 1);
+  assert.equal(reviewedOf(view, "probe.txt"), false, "更晚的取消必须保持");
+});
+
+test("读取水位：读取已观察到该序号时，旧成功不能再覆盖它的真值（ST07-R10-3 / SP07-R10-3）", () => {
+  const overlay = new ReviewOverlay();
+  // v1 新增成功 seq=1，回执暂缓。
+  const pending = { marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"], ["probe.txt", null, "w-p"]), seq: 1 };
+  // v2 刷新：版本变化，标记失效，后端把失效也计入进度 → seq 前进。
+  // 回到 v1 再刷新：仍未审，水位已经是 2。
+  // 读取 L 在此时发起（观察到水位 2，probe 未审）。
+  const read = overlay.beginRead();
+  const notReviewed = reviewSnapshot({
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2, seq: 2 },
+  });
+  // 旧成功回执现在才释放：记账写入 seq=1。
+  applyReviewSuccess({ overlay, worktreeId: "wt-a", reviewed: pending.marks.map((m) => m.path), marks: pending.marks, seq: 1 });
+  // 再释放 L：读取的水位 2 已经观察到 seq=1，旧成功不能压过它。
+  const merged = read.deliver(notReviewed);
+  assert.equal(reviewedOf(merged, "probe.txt"), false, "读取已观察到的水位必须压过旧成功");
+  assert.equal(merged.review.reviewedCount, 2);
+});
+
+test("读取水位不阻止比它更新的成功", () => {
+  const overlay = new ReviewOverlay();
+  const read = overlay.beginRead();
+  // 读取时水位 1，之后成功 seq=2。
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["a.txt", "b.txt", "probe.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"], ["probe.txt", null, "w-p"]), seq: 2,
+  });
+  const merged = read.deliver(reviewSnapshot({
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-p" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2, seq: 1 },
+  }));
+  assert.equal(reviewedOf(merged, "probe.txt"), true, "比读取水位更新的成功必须生效");
+});
+
+test("读取水位：版本变化后旧成功同样不生效", () => {
+  const overlay = new ReviewOverlay();
+  const read = overlay.beginRead();
+  applyReviewSuccess({
+    overlay, worktreeId: "wt-a", reviewed: ["a.txt", "b.txt", "probe.txt"],
+    marks: marksOf(["a.txt", "h-a", "w-a"], ["b.txt", "h-b", "w-b"], ["probe.txt", null, "w-old"]), seq: 2,
+  });
+  const merged = read.deliver(reviewSnapshot({
+    entries: [
+      { path: "a.txt", reviewed: true, headVersion: "h-a", worktreeVersion: "w-a" },
+      { path: "b.txt", reviewed: true, headVersion: "h-b", worktreeVersion: "w-b" },
+      { path: "probe.txt", reviewed: false, headVersion: null, worktreeVersion: "w-new" },
+    ],
+    review: { paths: ["a.txt", "b.txt", "probe.txt"], reviewed: ["a.txt", "b.txt"], total: 3, reviewedCount: 2, seq: 1 },
+  }));
+  assert.equal(reviewedOf(merged, "probe.txt"), false, "版本变化后旧成功不生效");
 });

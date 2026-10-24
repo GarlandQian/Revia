@@ -3,15 +3,15 @@
 /**
  * 回收区维护状态：自动清理失败必须能被普通模式查询到，不能只写测量日志（Q9）。
  */
-export type RecoveryMaintenance = { 
+export type RecoveryMaintenance = {
 /**
  * 最近一次自动清理的时间；从未执行过为 None。
  */
-lastPurgeAtMs: number | null, 
+lastPurgeAtMs: number | null,
 /**
  * 最近一次自动清理删除的记录数。
  */
-lastPurgeRemoved: number, 
+lastPurgeRemoved: number,
 /**
  * 最近一次自动清理的失败原因；成功时清空。
  */

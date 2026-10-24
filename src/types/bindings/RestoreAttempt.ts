@@ -4,11 +4,11 @@ import type { RestoreAttemptState } from "./RestoreAttemptState";
 /**
  * 一次恢复尝试。历史按时间追加保留，最新一条是当前状态（Q91）。
  */
-export type RestoreAttempt = { atMs: number, state: RestoreAttemptState, 
+export type RestoreAttempt = { atMs: number, state: RestoreAttemptState,
 /**
  * 已发布到工作区的路径；部分完成时如实列出，不冒充全部完成。
  */
-written: Array<string>, 
+written: Array<string>,
 /**
  * 这次尝试核对时看到的记录版本。
  */

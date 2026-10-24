@@ -243,25 +243,20 @@ export interface ReviewVersionsLike {
 /**
  * 一条本地审阅记录。
  *
- * 两个先后必须分开，且**都不能由前端推测**：
- * - `seq`：后端返回的**真实提交序号**。每次成功写入标记在会话内单调递增，
- *   递增与真实写入同序（`read_lock` 内、写入成功之后），所以序号大小
- *   就是磁盘上的持久化先后（ST07-R9-1 / SP07-R9-3）。
- *   同路径的相反操作以它判定谁更新——不用点击次序，也不用回执到达次序。
- * - `commitSeq`：写入叠加层的次序，只用于读取分界（判断某次读取能否观察到它）。
- *
- * `versions` 是**后端返回的、这条标记实际绑定的**版本（ST07-R9-3 / SP07-R9-2）。
+ * - `seq`：后端返回的**真实提交序号**。所有改变审阅真值的事件（新增 / 取消 / 失效清理）
+ *   都在后端按真实执行先后推进它，所以序号大小就是磁盘上的持久化先后。
+ * - `commitSeq`：写入叠加层的次序，只用于「某次读取能不能观察到它」。
+ * - `versions`：**后端返回的、这条状态实际绑定的**版本。
+ * - `reviewed`：`false` 表示这次写入**确认取消**（ST07-R10-1）。
  */
 export interface ReviewOverride {
   path: string;
   versions: ReviewVersionsLike;
   reviewed: boolean;
-  /** 后端真实提交序号；0 表示尚未经过后端确认（只可能来自测试）。 */
+  /** 后端真实提交序号。 */
   seq: number;
   commitSeq: number;
 }
-
-
 
 export interface ReviewMarkEntryLike {
   path: string;
@@ -277,12 +272,22 @@ export interface ReviewStateLike {
   reviewed: string[];
   total: number;
   reviewedCount: number;
+  /** 读取时后端给出的真实提交序号：这条快照已经观察到哪一水位（ST07-R10-3）。 */
+  seq?: number;
 }
 
 export interface ReviewSnapshotLike<E extends ReviewMarkEntryLike> {
   worktreeId: string;
   entries: E[];
   review: ReviewStateLike;
+}
+
+/** 后端返回的一条已确认状态（`ReviewMark`：path + reviewed + 版本）。 */
+export interface ReviewMarkLike {
+  path: string;
+  reviewed: boolean;
+  head: string | null;
+  worktree: string | null;
 }
 
 export class ReviewOverlay {
@@ -301,16 +306,12 @@ export class ReviewOverlay {
   }
 
   /**
-   * 记录一次**已成功**的审阅变更；返回是否真的写入了叠加层。
+   * 记录一条**已成功**的后端确认状态；返回是否真的写入了叠加层。
    *
-   * 覆盖同路径已有记录**只看后端真实序号** `seq`：
-   * - 后端按真实执行先后递增序号，所以「后执行成功的那次」序号更大，
-   *   迟到的旧回执序号更小，无法覆盖较新的相反操作（ST07-R9-1 / SP07-R9-3）；
-   * - 不区分「明确操作」与「聚合确认」：谁真的后执行，谁就是最终状态。
-   *   固定来源优先级会让「已有 explicit 记录 + 后来的聚合确认」永久漏账
-   *   （ST07-R9-2 / SP07-R9-1）。
-   *
-   * 版本必须是**后端返回的这条标记实际绑定的版本**。
+   * 覆盖同路径已有记录**只看后端真实序号** `seq`（ST07-R9-1 / ST07-R10-3）：
+   * 序号更大的是更晚的真实事件（新增 / 取消 / 失效），更早的一律不生效。
+   * 取消同样是一条记录（`reviewed: false`），所以取消也能挡住旧的新增回执
+   * （ST07-R10-1）。
    */
   record(
     worktreeId: string,
@@ -338,10 +339,9 @@ export class ReviewOverlay {
   }
 
   /**
-   * 读取/写请求**发起前**调用，拿到这次请求的审阅分界（ST07-R7-1 / SP07-R7-1 / SP07-R7-4）。
+   * 读取/写请求**发起前**调用，拿到这次请求的审阅分界。
    *
-   * 返回的句柄同时承担交付时的合并，所以「先取分界、后交付」由类型强制：
-   * 拿不到句柄就无法交付，而句柄只在请求发起处创建。
+   * 返回的句柄同时承担交付时的合并，所以「先取分界、后交付」由类型强制。
    */
   beginRead(): ReviewReadRequest {
     return new ReviewReadRequest(this, this.commitSeq);
@@ -353,15 +353,21 @@ export class ReviewOverlay {
   }
 
   /**
-   * 把 `baseline` 之后、且版本仍匹配的本地变更叠加到快照上。
+   * 把这次读取之后发生、且版本仍匹配、且**比读取水位更新**的本地状态叠加到快照上。
+   *
+   * 「读取水位」是快照自带的 `review.seq`：后端在那次读取时已经观察到的事件，
+   * 读取本身就是更新的真值，不能被更早的本地记录覆盖（ST07-R10-3 / SP07-R10-3）。
    *
    * 只改 `reviewed` 与派生进度，不动其他字段；不修改传入对象。
    */
-  apply<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S, baseline: number): S {
+  apply<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S, boundary: number): S {
+    const observedSeq = snapshot.review.seq ?? 0;
     let changed = false;
     const entries = snapshot.entries.map((entry) => {
       const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
-      if (!override || override.commitSeq <= baseline) return entry;
+      if (!override) return entry;
+      if (override.commitSeq <= boundary) return entry;
+      if (observedSeq >= override.seq) return entry;
       const head = entry.headVersion ?? null;
       const worktree = entry.worktreeVersion ?? null;
       if (override.versions.head !== head || override.versions.worktree !== worktree) {
@@ -373,23 +379,11 @@ export class ReviewOverlay {
       return { ...entry, reviewed: override.reviewed };
     });
     if (!changed) return snapshot;
-
-    const reviewedSet = new Set(entries.filter((entry) => entry.reviewed).map((entry) => entry.path));
-    const reviewed = snapshot.review.paths.filter((path) => reviewedSet.has(path));
-    // 展开保留快照的全部字段（`apply` 只覆盖 `entries` 与派生进度）。
-    return {
-      ...snapshot,
-      entries,
-      review: { ...snapshot.review, reviewed, reviewedCount: reviewed.length },
-    } as S;
+    return this.syncProgress({ ...snapshot, entries });
   }
 
   /**
    * 用同路径的当前条目与本地记录修正一条被**整体替换**的条目（未跟踪元数据补全用）。
-   *
-   * `loaded` 是较早读取拿到的条目，`current` 是界面当前同组条目。
-   * 只调整 `reviewed`：版本一致时沿用当前条目/较新的本地记录，
-   * 补元数据不能把已成功的标记勾回去，也不会凭空勾上（版本不一致一律用 `loaded`）。
    */
   mergeEntry<E extends ReviewMarkEntryLike>(
     worktreeId: string,
@@ -414,7 +408,7 @@ export class ReviewOverlay {
   }
 
   /**
-   * 按条目重算进度，保证 `reviewed` / `reviewedCount` 与勾选一致（SP07-R7-3）。
+   * 按条目重算进度，保证 `reviewed` / `reviewedCount` 与勾选一致。
    *
    * 只在 `review.paths`（后端给出的去重路径集合）内统计，不凭空扩大总数。
    */
@@ -426,6 +420,51 @@ export class ReviewOverlay {
       && reviewed.every((path, index) => path === snapshot.review.reviewed[index]);
     if (same) return snapshot;
     return { ...snapshot, review: { ...snapshot.review, reviewed, reviewedCount: reviewed.length } } as S;
+  }
+
+  /**
+   * 把一批后端确认的状态（含取消）写进叠加层。
+   *
+   * `marks` 就是后端返回的 `ReviewMarks.marks`，每条自带 `reviewed` 与它绑定的版本；
+   * 取消项也在里面（`reviewed: false`），所以取消不需要前端另行推断（ST07-R10-1）。
+   */
+  commitMarks(worktreeId: string, marks: ReadonlyArray<ReviewMarkLike>, seq: number): void {
+    for (const mark of marks) {
+      this.record(
+        worktreeId,
+        mark.path,
+        { head: mark.head, worktree: mark.worktree },
+        mark.reviewed,
+        seq,
+      );
+    }
+  }
+
+  /**
+   * 按**真实执行进度**合成一次成功回执要展示的状态。
+   *
+   * 直接用后端返回的 `reviewed` 会忽略更晚的其它成功操作：先点 A 再 B 时，
+   * B 的序号更小但回执可能更晚到，直接发布它的集合会让界面倒退
+   * （ST07-R10-2 / SP07-R10-2）。
+   *
+   * 以当前条目为底，把所有本地记录里「序号不小于这次回执、且版本与当前条目一致」
+   * 的状态叠加进去，再按路径重算进度。返回值就是可安全展示与导航的状态。
+   */
+  composeState<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
+    snapshot: S,
+    observedSeq: number,
+  ): S {
+    const entries = snapshot.entries.map((entry) => {
+      const override = this.overrides.get(ReviewOverlay.key(snapshot.worktreeId, entry.path));
+      if (!override) return entry;
+      if (override.seq < observedSeq) return entry;
+      const head = entry.headVersion ?? null;
+      const worktree = entry.worktreeVersion ?? null;
+      if (override.versions.head !== head || override.versions.worktree !== worktree) return entry;
+      if (entry.reviewed === override.reviewed) return entry;
+      return { ...entry, reviewed: override.reviewed };
+    });
+    return this.syncProgress({ ...snapshot, entries });
   }
 }
 
@@ -449,7 +488,7 @@ export class ReviewReadRequest {
     return this.boundary;
   }
 
-  /** 交付结果：把这次请求发起之后、版本仍匹配的本地审阅变更叠加进去。 */
+  /** 交付结果：叠加这次请求发起之后、比读取水位更新、且版本仍匹配的本地状态。 */
   deliver<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(snapshot: S): S {
     return this.overlay.apply(snapshot, this.boundary);
   }
@@ -460,7 +499,6 @@ export class ReviewReadRequest {
  *
  * `src/App.tsx` 的 `readAndAccept`、`refreshTarget`、`openWorktree` 与写结果分支
  * 都必须经这里，否则「分界取晚」会重新出现（ST07-R7-1 / SP07-R7-1 / SP07-R7-4）。
- * 分界与请求的先后在函数体内固定，调用方无法传反。
  */
 export async function readThroughReview<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(
   overlay: ReviewOverlay,
@@ -473,9 +511,9 @@ export async function readThroughReview<S extends ReviewSnapshotLike<ReviewMarkE
 
 /** 一次成功的标记结果要记哪些账。 */
 export interface ReviewResultPlan {
-  /** 要写入叠加层的条目：路径 + **后端实际绑定的版本** + 状态。 */
+  /** 要写入叠加层的条目：路径 + **后端实际绑定的版本** + 状态（含取消的 false）。 */
   records: Array<{ path: string; versions: ReviewVersionsLike; reviewed: boolean }>;
-  /** 后端返回的完整已审阅集合，用于更新界面。 */
+  /** 后端返回的完整已审阅集合（仅用于诊断；展示必须走 `composeState`）。 */
   reviewed: Set<string>;
   /** 后端返回的真实提交序号。 */
   seq: number;
@@ -484,17 +522,17 @@ export interface ReviewResultPlan {
 /**
  * 计算一次**已成功**的标记结果要记录的全部变更。
  *
- * 两个来源都直接取自后端返回（ST07-R9-2 / ST07-R9-3）：
- * - **版本**：每条标记用 `marks` 里**它自己实际绑定**的版本。
- *   不用请求时快照，也不用回执到达时的当前条目——后端只校验目标路径的版本，
- *   其它路径的版本只有后端保存的那一份才是证据。
- * - **先后**：用后端返回的真实提交序号 `seq`，不用点击次序或到达次序。
+ * 三个来源都直接取自后端返回：
+ * - **状态**：`marks[].reviewed`，取消也在其中（`false`），不是「只遍历正标记」
+ *   （ST07-R10-1 / SP07-R10-1）。
+ * - **版本**：每条标记用**它自己实际绑定**的版本（ST07-R9-3）。
+ * - **先后**：后端真实提交序号 `seq`（ST07-R9-1）。
  */
 export function planReviewResult(input: {
   /** 后端返回的完整已审阅集合。 */
   reviewed: Iterable<string>;
-  /** 后端返回的仍然有效的标记（`ReviewMark` 扁平结构：path + head + worktree）。 */
-  marks: ReadonlyArray<{ path: string; head: string | null; worktree: string | null }>;
+  /** 后端返回的已确认状态（`ReviewMark` 扁平结构：path + reviewed + head + worktree）。 */
+  marks: ReadonlyArray<ReviewMarkLike>;
   /** 后端返回的真实提交序号。 */
   seq: number;
 }): ReviewResultPlan {
@@ -502,7 +540,8 @@ export function planReviewResult(input: {
   const records = input.marks.map((mark) => ({
     path: mark.path,
     versions: { head: mark.head, worktree: mark.worktree },
-    reviewed: reviewed.has(mark.path),
+    // 直接用后端给的状态：取消项是 false，不能被「已审阅集合里没有它」推断成「不用记」。
+    reviewed: mark.reviewed,
   }));
   return { records, reviewed, seq: input.seq };
 }
@@ -526,14 +565,14 @@ export function commitReviewResult(
 /**
  * 一次**已成功**的标记回执的完整记账入口（生产调用点唯一）。
  *
- * 只接受后端返回值：版本来自 `marks`（每条实际绑定的版本），
- * 先后来自 `seq`（真实提交序号）。调用方无法用界面条目或点击次序替代。
+ * 只接受后端返回值：状态与版本来自 `marks`，先后来自 `seq`。
+ * 调用方无法用界面条目、点击次序或「已审阅集合里有没有」替代。
  */
 export function applyReviewSuccess(input: {
   overlay: ReviewOverlay;
   worktreeId: string;
   reviewed: Iterable<string>;
-  marks: ReadonlyArray<{ path: string; head: string | null; worktree: string | null }>;
+  marks: ReadonlyArray<ReviewMarkLike>;
   seq: number;
 }): ReviewResultPlan {
   const plan = planReviewResult({
@@ -543,4 +582,34 @@ export function applyReviewSuccess(input: {
   });
   commitReviewResult(input.overlay, input.worktreeId, plan);
   return plan;
+}
+
+/**
+ * 一次成功回执的**完整生产入口**：记账 + 按真实执行进度合成展示/导航状态。
+ *
+ * `App` 只能通过它拿到要展示的审阅状态，不能直接用后端这次返回的 `reviewed`
+ * （ST07-R10-2 / SP07-R10-2：更晚的其它成功可能已经记账）。
+ * 返回 `null` 表示当前没有可展示的快照（调用方保持原状）。
+ */
+export function applyReviewSuccessAndCompose<S extends ReviewSnapshotLike<ReviewMarkEntryLike>>(input: {
+  overlay: ReviewOverlay;
+  worktreeId: string;
+  reviewed: Iterable<string>;
+  marks: ReadonlyArray<ReviewMarkLike>;
+  seq: number;
+  /** 界面当前快照；与回执不同 worktree 时返回 null。 */
+  snapshot: S | null | undefined;
+}): { plan: ReviewResultPlan; view: S | null } {
+  const plan = applyReviewSuccess({
+    overlay: input.overlay,
+    worktreeId: input.worktreeId,
+    reviewed: input.reviewed,
+    marks: input.marks,
+    seq: input.seq,
+  });
+  const snapshot = input.snapshot;
+  const view = snapshot && snapshot.worktreeId === input.worktreeId
+    ? input.overlay.composeState(snapshot, input.seq)
+    : null;
+  return { plan, view };
 }

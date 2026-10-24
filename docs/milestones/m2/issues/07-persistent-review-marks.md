@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1037,3 +1037,109 @@ A 等待执行期间 B 可以从 v1 变到 v2 并被标记，旧回执会把 B �
 - **提交流程纠正**：Pi先提交0e5d1eb后因漏暂存Node测试使用未授权`git commit --amend --no-edit`，形成04a05cf；规划方只读reflog已保存。当前代码按04a05cf固定复核，不再回退或改写。以后漏文件用独立补充提交，未经用户明确授权不amend。此为流程记录，不冒充两轴代码发现或渠道故障。
 - 继续原Pi修以上三项及绑定空白；不要只补helper伪造取消数据。用真实生产取消输出、实际执行/交付逆序、v1→v2失效→v1场景贯通既有Rust/Node验证，保留activation/revision/新错误/选择和四读取入口。全部修改后集中最小检查，精确暂存和独立提交，保存全部原件。
 - 本轮仅静态复核，无新桌面/Release/D06/CI/长测。07退ready-for-agent、复选未勾；05/12不done。全部复核通过后规划方才新桌面与SSH双平台CI，最终11同进程30分钟Q98不省略。
+
+### 2026-10-24 / Pi 实现：任务07 第十轮限定返修（取消、展示、读取水位）
+
+只修第十轮三项与生成绑定行尾空白；第九轮已闭合的真实序号、逐路径版本、四读取入口、跨组、纯暂存保留、重启、未知门禁、activation/revision/选择与新错误留存全部保留。
+
+#### 生产数据流（先写清）
+
+```
+用户操作 ──► Rust set_review_mark（read_lock 内）
+                ├─ store.set_mark / retain_valid  → 磁盘 review.json
+                ├─ bump_review_seq()              → 真实序号（新增 / 取消 / 失效都推进）
+                └─ ReviewMarks { seq, marks[] }   → marks 每条 { path, reviewed, head, worktree }
+                          │
+前端 applyReviewSuccessAndCompose
+                ├─ 记账：overlay.record(path, versions, reviewed, seq)   ← 取消项 reviewed=false
+                └─ 合成：composeState(当前快照, seq)                     ← 展示与导航都用它
+                          │
+读取（四入口）──► readThroughReview：请求前取分界，交付时按
+                  「分界之后 + 版本一致 + 比读取水位 review.seq 更新」叠加
+```
+
+每个展示值绑定：**状态**来自后端 `marks[].reviewed`（含取消的 false），
+**版本**来自后端 `marks[].{head,worktree}`，**先后**来自后端 `seq`。
+所有改变审阅真值的事件（新增 / 取消 / 失效清理）都在 `bump_review_seq()` 下推进同一个序号，
+所以序号大小就是磁盘持久化先后。每次读取确认到的水位是快照自带的 `review.seq`。
+
+#### ST07-R10-1 / SP07-R10-1（生产取消没有 false 记账）
+
+后端原先只返回「仍然存在的正标记」，取消后目标已从存储删除，前端拿不到 false 与版本。
+现在 `ReviewMark` 增加 `reviewed` 字段，`set_review_mark` 在取消时**显式**追加一条
+`reviewed: false` 且带它确认版本的记录；前端 `planReviewResult` 直接用 `marks[].reviewed`，
+不再用「已审阅集合里有没有」推断。旧数据缺字段时按已审阅读（`serde(default)`）。
+
+#### ST07-R10-2 / SP07-R10-2（展示绕过真实 seq）
+
+`App` 原先直接用这次回执的集合更新界面与导航。现在「记账 + 合成」收敛为唯一生产入口
+`applyReviewSuccessAndCompose`：记账后按 `composeState(当前快照, 回执 seq)` 合成——
+把序号不小于这次回执、且版本与当前条目一致的本地记录全部叠加，再按路径重算进度。
+错误清理与展示分开（`setAppError(null, …)` 仍在展示门禁之后），不清掉更新的错误。
+
+#### ST07-R10-3 / SP07-R10-3（失效没有可比较进度）
+
+`retain_valid` 现在返回「是否真的删除了失效标记」，`review_state` 在删除时调用
+`bump_review_seq()`，所以失效也推进真实序号。读取合并 `apply` 增加水位判断：
+若快照的 `review.seq >= 记录.seq`，说明这次读取已经观察到该事件，读取的真值更新，
+旧成功不得覆盖它。这就是「读取已观察过的旧成功不能覆盖它自己的真值」。
+
+#### 生成绑定行尾空白
+
+`git diff --check` 原先真实退出 2（`ReviewMark.ts:10,14`、`ReviewMarks.ts:17,24`）。
+根因是 ts-rs 的多行注释排版在行尾留空格，而且 `cargo test --lib` 也会重跑
+`export_bindings` 把绑定写回带空白版本。修法：新增 `tools/strip-binding-whitespace.mjs`
+并接进现有 `pnpm bindings`（`cargo test … export_bindings && node tools/strip-…`），
+没有放宽门槛。最终 `git diff --check` 退出 0。
+
+#### 回归
+
+- **Rust 真实 Git**（`tests/review_marks.rs`）：**26 项通过**。新增
+  `cancel_returns_confirmed_false_with_versions`（取消必须返回 false + 版本，且推进序号）、
+  `invalidation_advances_review_seq`（失效推进序号，回 v1 不复活）。
+- **Node**（`tools/test-refresh-gate.mjs`）：**48 项通过**。新增 7 项：
+  取消回执带 false 且旧读取不能勾回、取消挡住更早的新增回执、
+  展示按真实进度合成（B seq1 晚到不显示掉 A seq2）、合成不回退更晚的取消、
+  读取水位压过旧成功、水位不阻止更新的成功、版本变化后旧成功不生效。
+- `cargo test --lib` 100 项通过（改了 review.rs / session.rs）。
+
+#### 敏感性对照（实际执行，按汇总行计数）
+
+| 回退的修复 | exit | tests | pass | fail | 失败用例 |
+| --- | --- | --- | --- | --- | --- |
+| 取消不返回 false | 101 | — | 25 | 1 | `cancel_returns_confirmed_false_with_versions` |
+| 失效不推进序号 | 101 | — | 25 | 1 | `invalidation_advances_review_seq` |
+| 展示直接用原始集合 | 1 | 48 | 47 | 1 | 展示按真实进度合成（ST07-R10-2） |
+| 读取水位不参与合并 | 1 | 48 | 47 | 1 | 读取水位（ST07-R10-3） |
+
+**第一轮 `C-display-raw` 未触发**（当时合成逻辑内联在 App 里，测试没走真实入口，48/48 通过）。
+因此把「记账 + 合成」收敛为唯一生产入口 `applyReviewSuccessAndCompose`，重跑后 C 组真实失败。
+两次原件都保留在 `sensitivity/`，不删不改。
+
+#### 实际执行的检查
+
+日志目录（唯一，原件保留）：`/private/tmp/revia-task07-r11-vADNXa`
+
+- 基线：`fc57ab90bc47b93e828823c8dadab5777d52c532`
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm bindings` | 0 | 生成并清理行尾空白 |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 48 / pass 48 / fail 0 |
+| `cargo test --test review_marks` | 0 | 26 passed |
+| `cargo test --lib` | 0 | 100 passed |
+| `git diff --check` | 0 | 原始失败输出保留 |
+
+#### 流程说明
+
+上一轮（第九轮）因漏暂存 `tools/test-refresh-gate.mjs` 使用了 `git commit --amend`，
+未经用户授权，已留证。本轮起：漏文件另做补充提交，**不再 amend / 改写历史**。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**：三条场景都未在真实 UI 重放（由规划方复验）。
+- **Windows 未验证**：仍需新 CI。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。

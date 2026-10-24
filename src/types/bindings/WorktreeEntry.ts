@@ -3,11 +3,11 @@
 /**
  * 一个 worktree（来自 `git worktree list --porcelain`）。
  */
-export type WorktreeEntry = { 
+export type WorktreeEntry = {
 /**
  * 由规范路径推导的稳定 ID，前端用它引用该 worktree。
  */
-id: string, path: string, head: string | null, branch: string | null, bare: boolean, detached: boolean, 
+id: string, path: string, head: string | null, branch: string | null, bare: boolean, detached: boolean,
 /**
  * 是否是仓库的主目录。
  */

@@ -7,39 +7,39 @@ import type { ReadonlyReason } from "./ReadonlyReason";
 /**
  * 文件列表里的一行。
  */
-export type ChangeEntry = { path: string, originalPath: string | null, changes: ChangesKind, status: FileStatus, binary: boolean, added: number, deleted: number, hunkCount: number, rowCountUnified: number, rowCountSplit: number, language: string, 
+export type ChangeEntry = { path: string, originalPath: string | null, changes: ChangesKind, status: FileStatus, binary: boolean, added: number, deleted: number, hunkCount: number, rowCountUnified: number, rowCountSplit: number, language: string,
 /**
  * 默认收起：二进制、lock 文件、超大文件（Q32）。
  */
-collapsed: boolean, unmerged: boolean, 
+collapsed: boolean, unmerged: boolean,
 /**
  * 是否已经统计过增删行数（未跟踪文件在打开时才统计）。
  */
-metricsLoaded: boolean, hunks: Array<HunkAnchor>, 
+metricsLoaded: boolean, hunks: Array<HunkAnchor>,
 /**
  * 只读限制原因，None 表示支持写操作。
  */
-readonlyReason: ReadonlyReason | null, 
+readonlyReason: ReadonlyReason | null,
 /**
  * 文件级 diff 指纹（Q80、ADR-0009）：写操作校验依据。
  */
-fingerprint: string, 
+fingerprint: string,
 /**
  * 每次刷新都会变化，不能用内容相同代替 hunk 目标仍然有效。
  */
-snapshotRevision: string, 
+snapshotRevision: string,
 /**
  * 该文件当前是否已审阅（按 HEAD + 工作区版本判定，跨组共享）。
  */
-reviewed: boolean, 
+reviewed: boolean,
 /**
  * HEAD 中的文件版本（审阅标记的失效依据）。
  */
-headVersion: string | null, 
+headVersion: string | null,
 /**
  * 工作区中的文件版本（审阅标记的失效依据）。
  */
-worktreeVersion: string | null, 
+worktreeVersion: string | null,
 /**
  * 工作区版本是否**确认**过。
  *

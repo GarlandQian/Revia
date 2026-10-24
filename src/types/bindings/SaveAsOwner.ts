@@ -6,11 +6,11 @@
  * 前端在**发起写入之前**通过 `recovery_save_as_owner` 拿到这个结果，
  * 用它进入对应 worktree 的全局写门禁与结果通道；后端执行时再解析一次并要求一致（Q90）。
  */
-export type SaveAsOwner = { 
+export type SaveAsOwner = {
 /**
  * 归属 worktree 的 ID；外部路径为 None。
  */
-worktreeId: string | null, 
+worktreeId: string | null,
 /**
  * 后端解析出的真实目标路径（父目录已规范化）；前端只用它做展示，不做路径判断。
  */

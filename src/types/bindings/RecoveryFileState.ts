@@ -3,11 +3,11 @@
 /**
  * 单个路径在某一侧的状态摘要。
  */
-export type RecoveryFileState = { exists: boolean, bytes: number, executable: boolean, 
+export type RecoveryFileState = { exists: boolean, bytes: number, executable: boolean,
 /**
  * 是否按二进制处理（含 NUL 或不是合法 UTF-8）。
  */
-binary: boolean, 
+binary: boolean,
 /**
  * 文本内容，供只读对比；二进制为 None。
  */

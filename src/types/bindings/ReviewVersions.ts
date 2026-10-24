@@ -3,11 +3,11 @@
 /**
  * 文件的两个版本。任一侧变化都使标记失效。
  */
-export type ReviewVersions = { 
+export type ReviewVersions = {
 /**
  * HEAD 中的文件版本（未跟踪或新增文件为 None）。
  */
-head: string | null, 
+head: string | null,
 /**
  * 工作区中的文件版本（不存在为 None）。
  */

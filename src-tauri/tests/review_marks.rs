@@ -1232,3 +1232,70 @@ fn review_marks_report_their_own_bound_versions() {
         "失效标记不能出现在 marks 里"
     );
 }
+
+/// ST07-R10-1 / SP07-R10-1：取消成功后，后端必须在 `marks` 里**显式**返回
+/// 这次确认的 `reviewed = false` 与它绑定的版本，前端才能把取消真值进入记账链。
+#[test]
+fn cancel_returns_confirmed_false_with_versions() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    let session = f.session();
+    let entry = f.entry(&session, "a.txt");
+    let seen = revia_lib::review::ReviewVersions {
+        head: entry.head_version.clone(),
+        worktree: entry.worktree_version.clone(),
+    };
+
+    let marked = session.set_review_mark("a.txt", true, Some(seen.clone())).unwrap();
+    let positive = marked
+        .marks
+        .iter()
+        .find(|mark| mark.path == "a.txt")
+        .expect("新增后必须返回正标记");
+    assert!(positive.reviewed, "正标记的 reviewed 必须是 true");
+    assert_eq!(positive.versions, seen, "正标记必须带实际绑定版本");
+
+    let cancelled = session.set_review_mark("a.txt", false, Some(seen.clone())).unwrap();
+    assert!(cancelled.reviewed.is_empty(), "取消后已审阅集合为空");
+    let negative = cancelled
+        .marks
+        .iter()
+        .find(|mark| mark.path == "a.txt")
+        .expect("取消后必须显式返回该路径的 false 记录");
+    assert!(!negative.reviewed, "取消记录必须是 reviewed=false");
+    assert_eq!(negative.versions, seen, "取消记录必须带它确认的版本");
+    assert!(cancelled.seq > marked.seq, "取消也要推进真实序号");
+}
+
+/// ST07-R10-3 / SP07-R10-3：版本变化导致的**失效清理**必须推进真实序号，
+/// 这样失效之前发出的旧成功回执无法再覆盖失效后的真值。
+#[test]
+fn invalidation_advances_review_seq() {
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n");
+    f.commit();
+    f.write("a.txt", b"changed\n");
+    let session = f.session();
+    session.refresh().unwrap();
+    let marked = session.set_review_mark("a.txt", true, None).unwrap();
+    assert_eq!(marked.reviewed_count, 1);
+
+    // 外部把文件改成 v2：标记失效，清理必须推进序号。
+    f.write("a.txt", b"changed again\n");
+    let after_invalidation = session.refresh().unwrap();
+    assert_eq!(after_invalidation.review.reviewed_count, 0, "版本变化后标记必须失效");
+    assert!(
+        after_invalidation.review.seq > marked.seq,
+        "失效清理必须推进真实序号：{} 必须大于 {}",
+        after_invalidation.review.seq,
+        marked.seq
+    );
+
+    // 回到 v1：仍未审，序号不再倒退。
+    f.write("a.txt", b"changed\n");
+    let back = session.refresh().unwrap();
+    assert_eq!(back.review.reviewed_count, 0, "回到 v1 也不复活旧标记");
+    assert!(back.review.seq >= after_invalidation.review.seq, "序号不能倒退");
+}

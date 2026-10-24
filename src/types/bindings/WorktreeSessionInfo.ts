@@ -4,11 +4,11 @@ import type { EnvironmentCheck } from "./EnvironmentCheck";
 /**
  * 打开 worktree 的结果。
  */
-export type WorktreeSessionInfo = { worktreeId: string, worktreePath: string, gitPath: string, gitVersion: string, shell: string, 
+export type WorktreeSessionInfo = { worktreeId: string, worktreePath: string, gitPath: string, gitVersion: string, shell: string,
 /**
  * 登录 shell 解析耗时。
  */
-shellElapsedMs: number, 
+shellElapsedMs: number,
 /**
  * 是否回退到了最小环境。
  */

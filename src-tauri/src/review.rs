@@ -31,16 +31,26 @@ pub struct ReviewVersions {
     pub worktree: Option<String>,
 }
 
-/// 一条已保存的标记：路径 + **它自己实际绑定的**两个版本。
+/// 一次写入**确认过**的一条审阅状态：路径 + 状态 + **它自己实际绑定的**两个版本。
+///
+/// `reviewed == false` 表示这次写入**确认取消**了这条路径（ST07-R10-1 / SP07-R10-1）：
+/// 取消之后标记已从存储里删除，只返回「仍然存在的正标记」会让前端拿不到
+/// 取消的真值与版本，旧读取就能把文件重新勾上。
 ///
 /// 前端记账必须用这里返回的版本，不能拿界面当前条目的版本去补
-/// （ST07-R9-3 / SP07-R9-2）：聚合回执里的其它路径，后端只按它们各自
-/// 已保存的版本确认过，请求时快照里的版本不是证据。
+/// （ST07-R9-3 / SP07-R9-2）：其它路径的版本只有后端保存的那一份才是证据。
+fn default_reviewed() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ReviewMark {
     pub path: String,
+    /// 兼容旧数据：早先只保存正标记，没有这个字段，读到时按已审阅处理。
+    #[serde(default = "default_reviewed")]
+    pub reviewed: bool,
     #[serde(flatten)]
     pub versions: ReviewVersions,
 }
@@ -64,7 +74,11 @@ pub struct ReviewMarks {
     /// 前端只用它判断先后，不用点击次序或回执到达次序（ST07-R9-1 / SP07-R9-3）：
     /// 序号最大的那次写入就是持久化的最终状态，界面显示与磁盘一致。
     pub seq: u64,
-    /// 仍然有效的标记及其**实际绑定的版本**（聚合路径的版本来源，ST07-R9-3）。
+    /// 这次结果**确认过**的每条审阅状态及其实际绑定的版本。
+    ///
+    /// 读取时是所有仍然有效的标记（`reviewed == true`）；
+    /// 写入时还包含本次目标（取消时为 `reviewed == false`），
+    /// 这样取消的真值也能进入同一条记账/合并链（ST07-R10-1）。
     pub marks: Vec<ReviewMark>,
 }
 
@@ -220,7 +234,10 @@ impl ReviewStore {
         let mut file = self.read_file()?;
         let entry = file.worktrees.entry(key.clone()).or_default();
         if marked {
-            entry.insert(path.to_string(), ReviewMark { path: path.to_string(), versions });
+            entry.insert(
+                path.to_string(),
+                ReviewMark { path: path.to_string(), reviewed: true, versions },
+            );
         } else {
             entry.remove(path);
         }
@@ -237,18 +254,21 @@ impl ReviewStore {
     }
 
     /// 丢弃与当前版本不一致的标记（只清理确实失效的，不动仍然有效的）。
+    ///
+    /// 返回值第二项表示**是否真的删除了失效标记**：调用方据此把「失效」
+    /// 也算作一次改变真值的事件、推进可比较的进度（ST07-R10-3 / SP07-R10-3）。
     pub fn retain_valid(
         &self,
         identity: &WorktreeIdentity,
         valid: impl Fn(&ReviewMark) -> bool,
-    ) -> Result<Vec<ReviewMark>> {
+    ) -> Result<(Vec<ReviewMark>, bool)> {
         let _transaction = self.begin_transaction()?;
         let Some(key) = Self::identity_key(identity) else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         };
         let mut file = self.read_file()?;
         let Some(entry) = file.worktrees.get_mut(&key) else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         };
         let before = entry.len();
         entry.retain(|_, mark| valid(mark));
@@ -260,11 +280,13 @@ impl ReviewStore {
             self.write_file(&file)?;
         }
         // 已在事务内，直接返回内存结果（不能重入 `marks`，那会死锁）。
-        Ok(file
-            .worktrees
-            .get(&key)
-            .map(|marks| marks.values().cloned().collect())
-            .unwrap_or_default())
+        Ok((
+            file.worktrees
+                .get(&key)
+                .map(|marks| marks.values().cloned().collect())
+                .unwrap_or_default(),
+            removed,
+        ))
     }
 }
 

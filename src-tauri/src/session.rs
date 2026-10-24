@@ -1034,11 +1034,16 @@ impl WorktreeSession {
         if let Some(store) = store {
             // 只清理确实失效的标记；有效的保留。
             // 存储损坏/不可读/清理写入失败都如实向上报错，不能伪装成「全部未审阅」（Q36）。
-            let valid = store.retain_valid(identity, |mark| {
+            let (valid, removed) = store.retain_valid(identity, |mark| {
                 // 版本无法确认的路径一律不可认领。
                 !unconfirmed.contains(&mark.path)
                     && versions.get(&mark.path).is_some_and(|current| *current == mark.versions)
             })?;
+            // 失效也是一次改变真值的事件：推进可比较的进度，
+            // 让「失效之前发出的成功回执」无法再覆盖失效后的真值（ST07-R10-3 / SP07-R10-3）。
+            if removed {
+                self.bump_review_seq()?;
+            }
             let reviewed_set: std::collections::HashSet<&str> =
                 valid.iter().map(|mark| mark.path.as_str()).collect();
             reviewed = paths
@@ -1064,6 +1069,19 @@ impl WorktreeSession {
             marks: marks_out,
         };
         Ok((marks, versions, unconfirmed))
+    }
+
+    /// 推进并返回审阅的真实提交序号。
+    ///
+    /// 所有改变审阅真值的事件（新增 / 取消 / 失效清理）都必须经过它，
+    /// 这样序号大小始终等于磁盘上的持久化先后（ST07-R9-1、ST07-R10-3）。
+    fn bump_review_seq(&self) -> Result<u64> {
+        let mut seq = self
+            .review_seq
+            .lock()
+            .map_err(|_| AppError::internal("审阅序号锁失败"))?;
+        *seq += 1;
+        Ok(*seq)
     }
 
     /// 当前仍然成立的身份；不成立（同路径重建、路径消失、标识未知）时返回 None。
@@ -1137,11 +1155,7 @@ impl WorktreeSession {
         let saved = store.set_mark(&identity, path, versions.clone(), marked)?;
         // 真实提交序号：在 `read_lock` 内、写入成功之后递增，因此序号大小
         // 与磁盘上的持久化先后严格一致（ST07-R9-1 / SP07-R9-3）。
-        let seq = {
-            let mut seq = self.review_seq.lock().map_err(|_| AppError::internal("审阅序号锁失败"))?;
-            *seq += 1;
-            *seq
-        };
+        let seq = self.bump_review_seq()?;
 
         // 更新内存快照里的审阅状态，避免为一次勾选重跑整轮 diff。
         let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
@@ -1169,10 +1183,20 @@ impl WorktreeSession {
             // 不能是请求时快照或界面当前条目（ST07-R9-3 / SP07-R9-2）。
             let ordered_set: std::collections::HashSet<&str> =
                 ordered.iter().map(String::as_str).collect();
-            let marks_out: Vec<review::ReviewMark> = saved
+            let mut marks_out: Vec<review::ReviewMark> = saved
                 .into_iter()
                 .filter(|mark| ordered_set.contains(mark.path.as_str()))
                 .collect();
+            // 取消之后目标已从存储删除，必须**显式**返回它这次确认的 false 与版本，
+            // 否则前端拿不到取消的真值，旧读取就能把它重新勾上
+            // （ST07-R10-1 / SP07-R10-1）。
+            if !marked {
+                marks_out.push(review::ReviewMark {
+                    path: path.to_string(),
+                    reviewed: false,
+                    versions: versions.clone(),
+                });
+            }
             snapshot.review = ReviewMarks {
                 worktree_id: self.id.clone(),
                 paths: snapshot_paths,

@@ -4,7 +4,7 @@ import type { WorktreeEntry } from "./WorktreeEntry";
 /**
  * 登记过的一个仓库。
  */
-export type RepoEntry = { id: string, path: string, name: string, 
+export type RepoEntry = { id: string, path: string, name: string,
 /**
  * 路径当前是否还存在。
  */

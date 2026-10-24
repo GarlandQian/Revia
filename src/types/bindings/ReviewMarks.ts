@@ -6,23 +6,27 @@ import type { ReviewMark } from "./ReviewMark";
  *
  * `paths` 是当前改动列表里**去重后**的文件路径（同一文件跨组只算一次）。
  */
-export type ReviewMarks = { worktreeId: string, 
+export type ReviewMarks = { worktreeId: string,
 /**
  * 当前快照里的去重路径（按界面显示顺序）。
  */
-paths: Array<string>, 
+paths: Array<string>,
 /**
  * 仍然有效的已审阅路径。
  */
-reviewed: Array<string>, total: number, reviewedCount: number, 
+reviewed: Array<string>, total: number, reviewedCount: number,
 /**
  * 这次结果对应的**真实提交序号**：每次成功写入标记在会话内单调递增。
  *
  * 前端只用它判断先后，不用点击次序或回执到达次序（ST07-R9-1 / SP07-R9-3）：
  * 序号最大的那次写入就是持久化的最终状态，界面显示与磁盘一致。
  */
-seq: number, 
+seq: number,
 /**
- * 仍然有效的标记及其**实际绑定的版本**（聚合路径的版本来源，ST07-R9-3）。
+ * 这次结果**确认过**的每条审阅状态及其实际绑定的版本。
+ *
+ * 读取时是所有仍然有效的标记（`reviewed == true`）；
+ * 写入时还包含本次目标（取消时为 `reviewed == false`），
+ * 这样取消的真值也能进入同一条记账/合并链（ST07-R10-1）。
  */
 marks: Array<ReviewMark>, };

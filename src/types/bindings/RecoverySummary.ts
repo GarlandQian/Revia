@@ -3,11 +3,11 @@ import type { RecoverySource } from "./RecoverySource";
 import type { RecoveryStatus } from "./RecoveryStatus";
 import type { RestoreAttempt } from "./RestoreAttempt";
 
-export type RecoverySummary = { id: string, createdAtMs: number, source: RecoverySource, target: string, worktreePath: string, paths: Array<string>, bytes: number, status: RecoveryStatus, identityConfirmed: boolean, 
+export type RecoverySummary = { id: string, createdAtMs: number, source: RecoverySource, target: string, worktreePath: string, paths: Array<string>, bytes: number, status: RecoveryStatus, identityConfirmed: boolean,
 /**
  * 最近一次恢复尝试（没有则为 None）。重启后仍从这里如实展示，不用丢弃回执冒充。
  */
-restore: RestoreAttempt | null, 
+restore: RestoreAttempt | null,
 /**
  * 记录当前内容版本；确认恢复时绑定它，任何记录/回执/尝试变化都会使旧确认失效。
  */
