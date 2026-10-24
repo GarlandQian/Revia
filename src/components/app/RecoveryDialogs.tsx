@@ -410,7 +410,7 @@ export function RecoveryDialog({
               <p>{messages.recovery.confirmRestore}</p>
               <div className="mt-2 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setConfirming(null)}>{messages.recovery.cancel}</Button>
-                <Button variant="destructive" size="sm" disabled={busy || isWriting} onClick={restore}>{messages.recovery.confirm}</Button>
+                <Button variant="destructive" size="sm" disabled={busy || isWriting} onClick={restore}>{messages.recovery.confirmRestoreAction}</Button>
               </div>
             </div>
           ) : null}
@@ -452,7 +452,7 @@ export function RecoveryDialog({
               <p>{messages.recovery.confirmClear}</p>
               <div className="mt-2 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setConfirmingClear(false)}>{messages.recovery.cancel}</Button>
-                <Button variant="destructive" size="sm" disabled={busy} onClick={clear}>{messages.recovery.confirm}</Button>
+                <Button variant="destructive" size="sm" disabled={busy} onClick={clear}>{messages.recovery.confirmClearAction}</Button>
               </div>
             </div>
           ) : null}

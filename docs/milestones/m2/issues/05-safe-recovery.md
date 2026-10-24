@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-> 第七轮产品及夹具限定复核均0项；首轮真实桌面发现R05-D1恢复/清空确认按钮文案错误，交Pi返修。四组自动性能已通过但功能验收及最新双平台CI未完成，任务未done。
+> R05-D1 的恢复/清空确认按钮文案已修正，等待规划方复核与重新构建后的桌面确认。自动化仅 tsc/lint/build 通过；桌面未验证，任务未 done。
 
 依据：[M2 规格](../spec.md)实现决策 3、4，T08–T11、D02；Q29、Q85–Q87、Q91。
 
@@ -921,3 +921,47 @@ R05-F1-SP1/SP2闭合：标准内容SHA与既有shasum交叉日志5/5相符；删
 - 已做的非写入观察：列表显示五条生产记录、归属及来源；单hunk详情说明恢复完整文件，保存5117/当前5115字节，Ready。两次仅打开确认后Escape取消，未点击最终按钮；随后Cmd-Q退出，已确认无该进程。
 - [桌面原始启动、快照和观察](../evidence/task05-desktop01/manifest.json)逐文件归档，截图只在CUA会话，没有伪造本地PNG。前后5文件内容/存在/权限、HEAD、暂存区语义项及blob、5条回收记录均完全相同；这不能当恢复、另存或清理已通过。
 - 任务退回ready-for-agent；全部UI修改后集中跑tsc/lint/build并保留命令/真实退出码/源码hash/原始stdout和stderr，不为纯文案新增测试框架，不重跑Rust全套。由Pi精确提交，规划方限定两轴复核后重新构建并继续桌面，旧性能和本次不通过记录保留，不改写历史。最新双平台CI、普通UI滚动、实际恢复与另存/确认失效/门禁等仍未完成，任务不得done。
+
+### 2026-10-24 / Pi：R05-D1 恢复与清空确认按钮文案
+
+只改两处前端文案，未改后端、身份/锁/门禁/确认代际/写逻辑、样式布局；未做 12/13 或其他任务。
+
+#### 问题与修复
+
+固定 Release（`de89796`）桌面截图显示：恢复确认与清空确认的最终按钮都复用了 `messages.recovery.confirm`（“保存到回收区并丢弃”），与它们各自要执行的动作不符，尤其清空不可撤销。
+
+- `src/lib/i18n/zh-CN.ts` 在既有集中文案处新增两条动作标签：
+  - `confirmRestoreAction: "恢复完整文件"`
+  - `confirmClearAction: "清空全部记录"`
+- `src/components/app/RecoveryDialogs.tsx`：
+  - 恢复确认的最终按钮（`onClick={restore}`）改用 `confirmRestoreAction`；
+  - 清空确认的最终按钮（`onClick={clear}`）改用 `confirmClearAction`；
+  - 真正的丢弃确认（`DiscardDialog` 的 `onConfirm`）仍用原来的 `messages.recovery.confirm`，标签未变。
+
+生产调用点：`RecoveryDialog` 恢复确认块 / 清空确认块 → 上述两个新标签；`DiscardDialog` → 原 `confirm`。
+
+#### 实际执行的检查（改完后集中一次）
+
+日志目录（从文件读取的实际路径）：`/private/tmp/revia-task05-d1-3XVh2E`
+
+- 基线：`a588181651e29c90191a5c0cec0aa24678b94315`
+- 检查前源码 SHA-256（本轮仅这两个文件）：
+  - `5d0c5318f7a846aa374548c6282548d1378c034fe4e2b78e25588924e7c4b3d3  src/lib/i18n/zh-CN.ts`
+  - `dc9c41735d1e739e4d8fe210661529dd7987251d22237033a915afb18635e805  src/components/app/RecoveryDialogs.tsx`
+  - 检查后复核未变
+- 改动前完整 diff：`pre-change.diff`
+
+| 命令 | 退出码 | 原始输出 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | `tsc.out` / `tsc.err` / `tsc.exit` |
+| `pnpm lint` | 0 | `lint.out` / `lint.err` / `lint.exit` |
+| `pnpm build` | 0 | `build.out` / `build.err` / `build.exit` |
+
+`tsc` 与 `lint` 的 stdout 为空；`build` 的 stderr 只有既有的 Vite `configLoader` 提示。
+
+按交接要求**未**运行 Rust / Node / Python 测试，未构建 Release，未启动应用，未跑 D06/CI/长测。
+
+#### 未验证
+
+- **桌面未验证**：本轮没有启动应用，恢复确认与清空确认按钮在真实界面上的实际显示、以及它们与丢弃确认的区别，仍需规划方在重新构建后确认。
+- 文案之外的任何行为（恢复、清空、另存、门禁、确认失效）本轮均未改动，也未重新验证。
