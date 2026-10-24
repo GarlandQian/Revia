@@ -1,0 +1,12 @@
+{
+  "name": "test-visible-highlight-lines",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "node",
+    "tools/test-visible-highlight-lines.mjs"
+  ],
+  "startedAt": "2026-10-24T13:23:15.537457+00:00",
+  "expectedExit": 0,
+  "exit": 0,
+  "endedAt": "2026-10-24T13:23:15.601417+00:00"
+}

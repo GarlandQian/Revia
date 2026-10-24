@@ -1,0 +1,12 @@
+{
+  "name": "lint",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "pnpm",
+    "lint"
+  ],
+  "startedAt": "2026-10-24T13:23:12.149727+00:00",
+  "expectedExit": 0,
+  "exit": 0,
+  "endedAt": "2026-10-24T13:23:12.328663+00:00"
+}

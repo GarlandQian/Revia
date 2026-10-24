@@ -1,0 +1,12 @@
+{
+  "name": "diff-check",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "git",
+    "diff",
+    "--check"
+  ],
+  "startedAt": "2026-10-24T13:27:43.449272+00:00",
+  "exit": 0,
+  "endedAt": "2026-10-24T13:27:43.465758+00:00"
+}

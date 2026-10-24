@@ -1,0 +1,14 @@
+{
+  "name": "rust",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "/opt/homebrew/bin/cargo",
+    "test",
+    "--manifest-path",
+    "src-tauri/Cargo.toml"
+  ],
+  "startedAt": "2026-10-24T13:23:15.735681+00:00",
+  "expectedExit": 0,
+  "exit": 0,
+  "endedAt": "2026-10-24T13:23:46.131716+00:00"
+}

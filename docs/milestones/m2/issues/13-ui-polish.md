@@ -1,6 +1,6 @@
 # 13：界面美化
 
-**What to build:** 在已确认的 UI 方向内，把 M2 完成后的现有界面做成 macOS 原生质感、信息密度适合开发工具的样子，浅色、深色都成立，且不影响 diff 性能。
+**What to build:** 按已确认的 rev3 与 Q107，把 M2 现有界面改为 Rebased（JetBrains 新版界面）的布局与外观；浅色、深色都成立，且不影响 diff 性能。
 
 **Blocked by:** 03, 04, 05, 06, 07, 08, 12
 
@@ -49,3 +49,29 @@
 已验证：`tsc -b`、`pnpm lint`（只有 tools 里原有的警告）、`pnpm build`、`cargo test`（265 项）、tools 下的 node 与 Python 测试全部通过；用 WebKit 加模拟 IPC 渲染了浅色、深色主界面和 9 种状态，与 rev3 一致。
 
 未完成：真实桌面截图、D06 实测（都需要前台可见的窗口，当前用户远程、屏幕不可截取）、Windows 仅编译 CI（未推送）。红绿灯位置 `trafficLightPosition` 也要在真实窗口里确认。
+
+
+### 2026-10-24 / 规划方（Codex）：接手顺序与任务13首轮限定复核
+
+用户同意先在 `m2-ui` 复核、真实桌面与 D06 验收，通过后再合入 `m2`；明确“后续 ui 按现在的来”。已确认 rev3 / Q107 是当前外观基准，不再沿用此前被否定的 macOS 原生方案；必要修复不改变这个方向。目前未合并、未删除 worktree。
+
+固定 `be02cb7431af3f6587a82bebf6360fca73879b8b...35da167f8a2202b19a211ade2c311f5ff430cd90`，24 文件；两个独立轴仅静态审查，不把旧08缺陷计为本UI增量。
+
+#### Standards：确定问题3项（P2二、P3一），Fowler判断建议0项
+
+- **ST13-R1-1 / P2**：`DiffView.tsx:537/601/628` 新并排行有5节点，单元格类改为色调；`jumpDomProbe.ts:154/232-237` 仍要求旧语义类及4节点。普通行文字核验失败，使 sourceReady / 返回颜色恢复样本失效。违反规格实现决策9及D06测量链要求。同步语义 DOM 与准确位置，不放宽文字、行号、marker或高亮匹配。
+- **ST13-R1-2 / P2**：`App.tsx:2906` 新原生select未进入 `platform.ts:71` 焦点边界，焦点在视图下拉时按审阅快捷键会持久标记并导航；旧按钮有额外排除。违反规格实现决策7控件行为不穿透。
+- **ST13-R1-3 / P3**：`FileTypeIcon.tsx:9` 直接颜色表/fallback/SVG白字绕过CSS变量。违反technical-direction颜色集中规则；迁入变量并保持已确认图标视觉。
+
+#### Spec：缺失/部分1项P3、范围扩张0项、实现错误1项P2
+
+- **SP13-R1-1 / P3**：`ChangesList.tsx:260` 用真实枚举生成 `status-modified/added/deleted/renamed/conflict/typeChanged`，CSS却只定义字母后缀。除未跟踪外状态色未生效，不符合Q31和确认稿。本映射错误原已存在，不称为UI改版新引入的数据回归；本任务仍需兑现状态色。
+- **SP13-R1-2 / P2**：同视图select焦点穿透；违反本任务“已确认的键盘行为、焦点不穿透不变”和spec决策7。
+
+统计：Standards3，最严重P2；Spec2，最严重P2。修复与受影响检查、固定版本限定复核均未在本条提前声称通过；旧模拟IPC截图不替代真实桌面/D06，Windows仍待后续仅推m2的CI。
+
+### 2026-10-24 / 规划方：首轮修复与集中检查
+
+保留确认的 rev3 外观，完成上述 3/2 项对应修复：select 焦点隔离、diff 语义类和并排五节点探针对齐、图标颜色变量、状态色枚举映射。两份 Node 内置生产入口回归仅验证语义，不冒称浏览器或桌面。
+
+Rust 265 通过/1 ignored、Node 178、Python 20，以及 bindings/tsc/lint/build 均退出0；完整Rust最后再导出绑定空白使初次 diff-check 退出2，已用现有规范化工具处理，源码逐文件SHA恢复检查前原字节，受影响类型/两项新回归/diff-check复验退出0。原失败不删除。详见[检查说明](../task13-validation01.md)及[原始清单](../evidence/task13-review01/manifest.json)。尚待固定提交限定复核，未Release/真实桌面/D06/Windows/合并，暂不勾验收项。

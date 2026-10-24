@@ -269,6 +269,24 @@
     }
 }
 
+:root {
+  --file-typescript: #3178c6;
+  --file-javascript: #d6a514;
+  --file-rust: #c46a2f;
+  --file-json: #7a8291;
+  --file-yaml: #c9634f;
+  --file-toml: #9a6b3f;
+  --file-markdown: #5b8bd0;
+  --file-css: #8250df;
+  --file-html: #d4643a;
+  --file-sql: #d98e2b;
+  --file-shell: #4f9a5b;
+  --file-python: #3d7ab8;
+  --file-image: #9c6ade;
+  --file-default: #8c90a0;
+  --file-icon-label: #ffffff;
+}
+
 /* ---------- 窗口框架：主工具栏、工具窗口图标条、岛屿面板、状态栏（Q107） ---------- */
 /* 放在 components 层，让 Tailwind 工具类（如 pl-7、size-[30px]）能覆盖。 */
 @layer components {
@@ -809,12 +827,12 @@
 .tok-invalid { color: var(--syntax-invalid); }
 
 /* Git 状态色（Q31：只有状态字母上色，文件名保持正常颜色；颜色照 JetBrains 文件状态色，Q107） */
-.status-M { color: var(--status-modified); }
-.status-A { color: var(--status-added); }
-.status-D { color: var(--status-deleted); }
-.status-R { color: var(--status-renamed); }
-.status-U { color: var(--status-conflict); }
-.status-T { color: var(--status-modified); }
+.status-modified { color: var(--status-modified); }
+.status-added { color: var(--status-added); }
+.status-deleted { color: var(--status-deleted); }
+.status-renamed { color: var(--status-renamed); }
+.status-conflict { color: var(--status-conflict); }
+.status-typeChanged { color: var(--status-modified); }
 .status-untracked { color: var(--status-untracked); }
 
 :root {

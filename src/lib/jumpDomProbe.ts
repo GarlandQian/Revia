@@ -229,12 +229,13 @@ export function inspectJumpDom(options: ProbeOptions): JumpDomProbe {
     }
     if (!node.classList.contains(`row-${view}`)) continue;
     const children = Array.from(node.children);
-    const cells = view === "split" ? [children[1], children[3]] : [children[2]];
-    const gutterPositions = view === "split" ? [0, 2] : [0, 1];
+    const cells = view === "split" ? [children[1], children[4]] : [children[2]];
+    const gutterPositions = view === "split" ? [0, 3] : [0, 1];
     const lines = view === "split" ? [row.left?.line, row.right?.line] : [row.oldLine, row.newLine];
     const guttersMatch = gutterPositions.every((position, side) =>
       children[position]?.matches("span.gutter") && children[position].textContent === String(lines[side] ?? ""));
-    if (children.length !== (view === "split" ? 4 : 3) || !guttersMatch) continue;
+    const middleMatches = view !== "split" || children[2]?.matches("span.mid");
+    if (children.length !== (view === "split" ? 5 : 3) || !guttersMatch || !middleMatches) continue;
     const cellsMatch = expected.map((cell, side) => cellTextMatches(cells[side], cell));
     if (cellsMatch.every(Boolean)) result.matchedRows += 1;
     expected.forEach((cell, side) => {

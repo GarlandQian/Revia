@@ -6,29 +6,29 @@
 import { Link2 } from "lucide-react";
 
 const TYPES: Record<string, [color: string, label: string]> = {
-  ts: ["#3178c6", "TS"],
-  tsx: ["#3178c6", "TX"],
-  js: ["#d6a514", "JS"],
-  jsx: ["#d6a514", "JX"],
-  mjs: ["#d6a514", "JS"],
-  rs: ["#c46a2f", "RS"],
-  json: ["#7a8291", "{}"],
-  yaml: ["#c9634f", "Y"],
-  yml: ["#c9634f", "Y"],
-  toml: ["#9a6b3f", "T"],
-  md: ["#5b8bd0", "M"],
-  css: ["#8250df", "#"],
-  html: ["#d4643a", "<>"],
-  sql: ["#d98e2b", "SQ"],
-  sh: ["#4f9a5b", "$"],
-  py: ["#3d7ab8", "PY"],
-  png: ["#9c6ade", "P"],
-  jpg: ["#9c6ade", "P"],
-  jpeg: ["#9c6ade", "P"],
-  gif: ["#9c6ade", "P"],
-  svg: ["#9c6ade", "P"],
+  ts: ["var(--file-typescript)", "TS"],
+  tsx: ["var(--file-typescript)", "TX"],
+  js: ["var(--file-javascript)", "JS"],
+  jsx: ["var(--file-javascript)", "JX"],
+  mjs: ["var(--file-javascript)", "JS"],
+  rs: ["var(--file-rust)", "RS"],
+  json: ["var(--file-json)", "{}"],
+  yaml: ["var(--file-yaml)", "Y"],
+  yml: ["var(--file-yaml)", "Y"],
+  toml: ["var(--file-toml)", "T"],
+  md: ["var(--file-markdown)", "M"],
+  css: ["var(--file-css)", "#"],
+  html: ["var(--file-html)", "<>"],
+  sql: ["var(--file-sql)", "SQ"],
+  sh: ["var(--file-shell)", "$"],
+  py: ["var(--file-python)", "PY"],
+  png: ["var(--file-image)", "P"],
+  jpg: ["var(--file-image)", "P"],
+  jpeg: ["var(--file-image)", "P"],
+  gif: ["var(--file-image)", "P"],
+  svg: ["var(--file-image)", "P"],
 };
-const FALLBACK: [string, string] = ["#8c90a0", ""];
+const FALLBACK: [string, string] = ["var(--file-default)", ""];
 
 export function FileTypeIcon({ path, symlink }: { path: string; symlink?: boolean }) {
   if (symlink) return <Link2 aria-hidden className="size-4 shrink-0 text-icon" strokeWidth={1.6} />;
@@ -40,7 +40,7 @@ export function FileTypeIcon({ path, symlink }: { path: string; symlink?: boolea
       <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill={color} />
       {label ? (
         <text x="8" y="10.6" textAnchor="middle" fontSize={label.length > 1 ? 6.4 : 7.6} fontWeight={700}
-          fontFamily="Inter, sans-serif" fill="#ffffff">
+          fontFamily="Inter, sans-serif" fill="var(--file-icon-label)">
           {label}
         </text>
       ) : null}

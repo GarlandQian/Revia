@@ -1,0 +1,708 @@
+{
+  "base": "35da167f8a2202b19a211ade2c311f5ff430cd90",
+  "boundary": "Uncommitted task13 corrections captured by product.diff and source hashes; static/local checks only, no Release/desktop/D06/Windows/merge.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/base.txt",
+      "stored": "check01/base.txt",
+      "gzip": false,
+      "sourceBytes": 41,
+      "storedBytes": 41,
+      "sourceSha256": "790da77fb062cdc4eff91b827e706de9db06800ce98c94e36583b553319aa1a4",
+      "storedSha256": "790da77fb062cdc4eff91b827e706de9db06800ce98c94e36583b553319aa1a4"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/bindings.json",
+      "stored": "check01/bindings.json",
+      "gzip": false,
+      "sourceBytes": 257,
+      "storedBytes": 257,
+      "sourceSha256": "384a3818816f6704a79cbb1895ffda2a2465b1b44bd1ca3f05110105e021a634",
+      "storedSha256": "384a3818816f6704a79cbb1895ffda2a2465b1b44bd1ca3f05110105e021a634"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/bindings.stderr",
+      "stored": "check01/bindings.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 4637,
+      "storedBytes": 1374,
+      "sourceSha256": "e611204ecbea2077870f6475615ef625967a67dfd31c519bb8563e60d1b8751a",
+      "storedSha256": "5eb18b17d66b0b974e7bf91e474c59a33f394c00b40c940b1c2b31d854e1b60c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/bindings.stdout",
+      "stored": "check01/bindings.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 2865,
+      "storedBytes": 552,
+      "sourceSha256": "f039eb4b6751a25cf47cc2c52ce7917f9f58ac356f0464dd398da3a5d6ce9912",
+      "storedSha256": "2df77b26af47c4e181837d9ec42dc329b09e3feda3a90da5aee4b9138522e8f2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/build.json",
+      "stored": "check01/build.json",
+      "gzip": false,
+      "sourceBytes": 251,
+      "storedBytes": 251,
+      "sourceSha256": "642a2653ea886c2a1100a1eb6eb9d9f74a948b96c111f6d64d3967a6985de331",
+      "storedSha256": "642a2653ea886c2a1100a1eb6eb9d9f74a948b96c111f6d64d3967a6985de331"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/build.stderr",
+      "stored": "check01/build.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/build.stdout",
+      "stored": "check01/build.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 997,
+      "storedBytes": 402,
+      "sourceSha256": "c745e679fd401a95d79808dc26fae0a01fa8bfa898ec4f171277b462763b3ccc",
+      "storedSha256": "b00cb82513a7052601270738885e7e603702b06dc1f3151adf26db408f4bf054"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/commands.json",
+      "stored": "check01/commands.json.gz",
+      "gzip": true,
+      "sourceBytes": 4764,
+      "storedBytes": 740,
+      "sourceSha256": "a62df752231f7597e3193965533385894dbfa023734a7f153dd4227a08e9d75f",
+      "storedSha256": "6461dd377e641bb0b03be48bffe2a56cbd4e5d63e6de0c8b4512aa4979080214"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/diff-check.json",
+      "stored": "check01/diff-check.json",
+      "gzip": false,
+      "sourceBytes": 269,
+      "storedBytes": 269,
+      "sourceSha256": "756b864fe0a9065af01ca3843641216336e772b0e04f747bdd8431575b34ac7c",
+      "storedSha256": "756b864fe0a9065af01ca3843641216336e772b0e04f747bdd8431575b34ac7c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/diff-check.stderr",
+      "stored": "check01/diff-check.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/diff-check.stdout",
+      "stored": "check01/diff-check.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 6332,
+      "storedBytes": 1182,
+      "sourceSha256": "517c8b9b20bdcccfa63729ee2b8f5f74a9ef07a66872eb910b3b776d4e4ad0eb",
+      "storedSha256": "944d6dce9da0c7f622e9ad80617dce56a976aa9e6bd335c8b9a751b0e76e4759"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/jumpDomProbe-35da167.ts",
+      "stored": "check01/jumpDomProbe-35da167.ts.gz",
+      "gzip": true,
+      "sourceBytes": 11696,
+      "storedBytes": 3790,
+      "sourceSha256": "8723cd8fa4d7f24c3486063909761aef3263946949adadc7519109fd6b90abb3",
+      "storedSha256": "abfa88606f09c38377884b1ff9bd5406cce80a1d3909574a35be29ded2c975f2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/lint.json",
+      "stored": "check01/lint.json",
+      "gzip": false,
+      "sourceBytes": 249,
+      "storedBytes": 249,
+      "sourceSha256": "bc6990a950f599b9b40b9ce3cd7d54e50a5482c3063d33199657fc98e9498d1e",
+      "storedSha256": "bc6990a950f599b9b40b9ce3cd7d54e50a5482c3063d33199657fc98e9498d1e"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/lint.stderr",
+      "stored": "check01/lint.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/lint.stdout",
+      "stored": "check01/lint.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 1218,
+      "storedBytes": 239,
+      "sourceSha256": "73a2b7a73ba5c1a7243a183f65b7ec92b632abcbb12d128a2a01885a763e949d",
+      "storedSha256": "58f84af70bab1604bad09cc05a5390f981ee333239a90a4719bb9e73ed6067d3"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/platform-35da167.ts",
+      "stored": "check01/platform-35da167.ts",
+      "gzip": false,
+      "sourceBytes": 3456,
+      "storedBytes": 3456,
+      "sourceSha256": "64bd0df2a0dd28e55a7480ce96eb85a56e73e972fa576e26416ff8d8435b7236",
+      "storedSha256": "64bd0df2a0dd28e55a7480ce96eb85a56e73e972fa576e26416ff8d8435b7236"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/product.diff",
+      "stored": "check01/product.diff.gz",
+      "gzip": true,
+      "sourceBytes": 8100,
+      "storedBytes": 3061,
+      "sourceSha256": "dfbf45a3b9f75366aa3d1f733f378a4ee923393415cd4d415a391539f71e60ec",
+      "storedSha256": "55c5663637fc664b963d582bf03079568399fbfe94fa4d4c58daed83ffb9b6f2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/python.json",
+      "stored": "check01/python.json",
+      "gzip": false,
+      "sourceBytes": 334,
+      "storedBytes": 334,
+      "sourceSha256": "f90c39860e085e2fd71105df68637d2adaeee3bb30fa265e911884d71398a403",
+      "storedSha256": "f90c39860e085e2fd71105df68637d2adaeee3bb30fa265e911884d71398a403"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/python.stderr",
+      "stored": "check01/python.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 119,
+      "storedBytes": 55,
+      "sourceSha256": "8c045ab677caeeb30ddfc0affc95f6cfe0d4470f310af9f6ecdcda3c06dc8119",
+      "storedSha256": "a18e34e63bfada03e06e8e0efcddb0d1424b1b8df2b474ca385b96ce3379c64b"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/python.stdout",
+      "stored": "check01/python.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/rust.json",
+      "stored": "check01/rust.json",
+      "gzip": false,
+      "sourceBytes": 319,
+      "storedBytes": 319,
+      "sourceSha256": "45500cd6dcddc0d004824711fceda33ca997edce92b5cc79fb08c02a1244cdbd",
+      "storedSha256": "45500cd6dcddc0d004824711fceda33ca997edce92b5cc79fb08c02a1244cdbd"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/rust.stderr",
+      "stored": "check01/rust.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 3802,
+      "storedBytes": 1086,
+      "sourceSha256": "5e23525bf599ee2a7611c8d6f8cf7663e610316f6712e3e6dbfa3b58b98336ff",
+      "storedSha256": "ee03cba19dcd038b6b6e1dcd88ac27a2956bb34a8aa5610431f97979bdd4f0f9"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/rust.stdout",
+      "stored": "check01/rust.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 18092,
+      "storedBytes": 5144,
+      "sourceSha256": "58687d5a32749eed69b0b228cd78757a306219e4a2c471b08217f9d217e8c7a8",
+      "storedSha256": "7a4cac2b29d89102df9abf7466fc2f0ae8103e7fedd9bba9417e0e33e8303ac0"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-jump-dom-probe.json",
+      "stored": "check01/sensitivity-jump-dom-probe.json",
+      "gzip": false,
+      "sourceBytes": 340,
+      "storedBytes": 340,
+      "sourceSha256": "6b85d40ea75a6ef2965f1ef7da99bc1c255570e5d397c269352a7543e727bad6",
+      "storedSha256": "6b85d40ea75a6ef2965f1ef7da99bc1c255570e5d397c269352a7543e727bad6"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-jump-dom-probe.mjs",
+      "stored": "check01/sensitivity-jump-dom-probe.mjs.gz",
+      "gzip": true,
+      "sourceBytes": 4621,
+      "storedBytes": 1670,
+      "sourceSha256": "5b60d46218dde2a667ea33c806c700a8728018f9f033f8c48f43f509d3ed0b44",
+      "storedSha256": "081c9ebf5029d0f32a4f142cc99292191c50f3923e41c83093067e40f7a7ab48"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-jump-dom-probe.stderr",
+      "stored": "check01/sensitivity-jump-dom-probe.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-jump-dom-probe.stdout",
+      "stored": "check01/sensitivity-jump-dom-probe.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 4758,
+      "storedBytes": 856,
+      "sourceSha256": "56bff311c9778613bfc9abad67568a4dbac106f771f3ed36f7865150ac7c2a5d",
+      "storedSha256": "d90e21ec91e87b60b291d07ed698fa569ee9f429626441938908336833ee0206"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-ui-input.json",
+      "stored": "check01/sensitivity-ui-input.json",
+      "gzip": false,
+      "sourceBytes": 328,
+      "storedBytes": 328,
+      "sourceSha256": "8e52279bc6ae6f90e4b442ff9560fd7c5afbc97e5082abc788b936ae4ffb7d6d",
+      "storedSha256": "8e52279bc6ae6f90e4b442ff9560fd7c5afbc97e5082abc788b936ae4ffb7d6d"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-ui-input.mjs",
+      "stored": "check01/sensitivity-ui-input.mjs",
+      "gzip": false,
+      "sourceBytes": 1433,
+      "storedBytes": 1433,
+      "sourceSha256": "d0392e0b3a09a0709c097ce0089f60a25dc96f8b96c5e06d9f808cd5d8b2e0c0",
+      "storedSha256": "d0392e0b3a09a0709c097ce0089f60a25dc96f8b96c5e06d9f808cd5d8b2e0c0"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-ui-input.stderr",
+      "stored": "check01/sensitivity-ui-input.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-ui-input.stdout",
+      "stored": "check01/sensitivity-ui-input.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 1193,
+      "storedBytes": 628,
+      "sourceSha256": "6f4877bf2d73fb49736936cbeb77e72a7fa7e400d17cdb2f665afa7258a20e76",
+      "storedSha256": "e3b5e3d71ee68b5c68e77f8e8ed0888d81ca451a81df9344a1b8795483e42870"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/source-after.json",
+      "stored": "check01/source-after.json.gz",
+      "gzip": true,
+      "sourceBytes": 11288,
+      "storedBytes": 5513,
+      "sourceSha256": "4dfbaf3ec5e0e7368913c8b74ae1f1891b8858138f1520adfdfff8b601dc07e0",
+      "storedSha256": "b8b53b3bf70fb329e6db5d82a65e33ed555e34018ad75e9ef26cc0ef687cd3ea"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/source-before.json",
+      "stored": "check01/source-before.json.gz",
+      "gzip": true,
+      "sourceBytes": 11288,
+      "storedBytes": 5513,
+      "sourceSha256": "9c54d53343376e1946c9e36fae37d523a92f6400308b6dc093a2b2ed33269433",
+      "storedSha256": "8b014fc5032b80e654f1ea4bc7d22ea3db2998cf4f391d90bf80403ff10111d2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/summary.json",
+      "stored": "check01/summary.json",
+      "gzip": false,
+      "sourceBytes": 480,
+      "storedBytes": 480,
+      "sourceSha256": "f46671b6ca6e49bd89005ab44df02faded5168728e61a34bf5da05cc165e9c04",
+      "storedSha256": "f46671b6ca6e49bd89005ab44df02faded5168728e61a34bf5da05cc165e9c04"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-ipc-diagnostics.json",
+      "stored": "check01/test-ipc-diagnostics.json",
+      "gzip": false,
+      "sourceBytes": 291,
+      "storedBytes": 291,
+      "sourceSha256": "ec06cba9fbba11b41c00ef081a0fc096d8bbf00340e6d811ee74ac4d21e67982",
+      "storedSha256": "ec06cba9fbba11b41c00ef081a0fc096d8bbf00340e6d811ee74ac4d21e67982"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-ipc-diagnostics.stderr",
+      "stored": "check01/test-ipc-diagnostics.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-ipc-diagnostics.stdout",
+      "stored": "check01/test-ipc-diagnostics.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 1142,
+      "storedBytes": 631,
+      "sourceSha256": "eb5519276526a1508c64acc63a73f779c1e61c3a791090ee1ea5b0b9cc6ee122",
+      "storedSha256": "a9ead2ea705b47d16742e7b6653e57aae9893950213375867cf84266eb31bf0c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-jump-dom-probe.json",
+      "stored": "check01/test-jump-dom-probe.json",
+      "gzip": false,
+      "sourceBytes": 289,
+      "storedBytes": 289,
+      "sourceSha256": "c9899d5901947ccebd6ee411c676b64a7cde7c684fdbdc520c64926cd192885b",
+      "storedSha256": "c9899d5901947ccebd6ee411c676b64a7cde7c684fdbdc520c64926cd192885b"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-jump-dom-probe.stderr",
+      "stored": "check01/test-jump-dom-probe.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-jump-dom-probe.stdout",
+      "stored": "check01/test-jump-dom-probe.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 1086,
+      "storedBytes": 382,
+      "sourceSha256": "96b7910d1fca13d74b1f3802d827c09abb5e5933b867a16702032c50d4a3f64a",
+      "storedSha256": "334595ee9535d2b071cb80d8356ed6f78053a27f2b297ec5678e3bb189cc97a4"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-refresh-gate.json",
+      "stored": "check01/test-refresh-gate.json",
+      "gzip": false,
+      "sourceBytes": 285,
+      "storedBytes": 285,
+      "sourceSha256": "d37eac3458d1a3ecd709580236e2d9a4b3ec76f2111755e3392f5cfe0378a421",
+      "storedSha256": "d37eac3458d1a3ecd709580236e2d9a4b3ec76f2111755e3392f5cfe0378a421"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-refresh-gate.stderr",
+      "stored": "check01/test-refresh-gate.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-refresh-gate.stdout",
+      "stored": "check01/test-refresh-gate.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 11158,
+      "storedBytes": 4577,
+      "sourceSha256": "fe912156ec6cf0c954add423c7f5c4e84d3e3b834e41e6883698cb8d45086886",
+      "storedSha256": "7ac9c6bf48c040612c7b2d497a4e20e0b19e86dc6c22d08e84c729897299bdf9"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-row-window-store.json",
+      "stored": "check01/test-row-window-store.json",
+      "gzip": false,
+      "sourceBytes": 293,
+      "storedBytes": 293,
+      "sourceSha256": "a9074d6b01423338947b416f85337127ab9f41777ccac6e832a860055e923ff8",
+      "storedSha256": "a9074d6b01423338947b416f85337127ab9f41777ccac6e832a860055e923ff8"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-row-window-store.stderr",
+      "stored": "check01/test-row-window-store.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-row-window-store.stdout",
+      "stored": "check01/test-row-window-store.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 2383,
+      "storedBytes": 702,
+      "sourceSha256": "18c545426db48fe82c42c26cbcccc437be9a0893eb5fa8cd79f060621309c56f",
+      "storedSha256": "fbef2d8a8bb2cbfa3705b8a82c4c154d5ed0cf6c0a40a3f7e6a243e8555e7b0d"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-ui-input.json",
+      "stored": "check01/test-ui-input.json",
+      "gzip": false,
+      "sourceBytes": 277,
+      "storedBytes": 277,
+      "sourceSha256": "80059bf76432d9a7ef12201bf45696fc30ec4f0ab7aa654faeeef3180685bf9e",
+      "storedSha256": "80059bf76432d9a7ef12201bf45696fc30ec4f0ab7aa654faeeef3180685bf9e"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-ui-input.stderr",
+      "stored": "check01/test-ui-input.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-ui-input.stdout",
+      "stored": "check01/test-ui-input.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 373,
+      "storedBytes": 264,
+      "sourceSha256": "f15992fbb9100862f02cd7468fd777c4db8079291d080959bf720265a30874be",
+      "storedSha256": "4017f93f59ebd348752122a21c3d57a1b1ed80490f6717255babbcc83941234f"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-visible-highlight-lines.json",
+      "stored": "check01/test-visible-highlight-lines.json",
+      "gzip": false,
+      "sourceBytes": 307,
+      "storedBytes": 307,
+      "sourceSha256": "469c0f925c9b5f39e652fe80f0d538b1343a488ba92427e8161082f5e703c4c5",
+      "storedSha256": "469c0f925c9b5f39e652fe80f0d538b1343a488ba92427e8161082f5e703c4c5"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-visible-highlight-lines.stderr",
+      "stored": "check01/test-visible-highlight-lines.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/test-visible-highlight-lines.stdout",
+      "stored": "check01/test-visible-highlight-lines.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 1208,
+      "storedBytes": 544,
+      "sourceSha256": "75c2f326f4879fb7862129900213d1240a42266507b866feccf47264e5211793",
+      "storedSha256": "0ac41651ff3fa3a46806c008b96c993825134683ea6b03e987b2c97bc7a55f17"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/typecheck.json",
+      "stored": "check01/typecheck.json",
+      "gzip": false,
+      "sourceBytes": 275,
+      "storedBytes": 275,
+      "sourceSha256": "1e734cc16c66ff37f5ee5afbb9e5150d296c05def4794d7a5b707eef7cd786a8",
+      "storedSha256": "1e734cc16c66ff37f5ee5afbb9e5150d296c05def4794d7a5b707eef7cd786a8"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/typecheck.stderr",
+      "stored": "check01/typecheck.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01-ukzmi5rb/typecheck.stdout",
+      "stored": "check01/typecheck.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/diff-check.json",
+      "stored": "check02/diff-check.json",
+      "gzip": false,
+      "sourceBytes": 248,
+      "storedBytes": 248,
+      "sourceSha256": "e94f825b11d33149de22bf5a76d8970f8bdfd5842964b406145e994f6c657362",
+      "storedSha256": "e94f825b11d33149de22bf5a76d8970f8bdfd5842964b406145e994f6c657362"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/diff-check.stderr",
+      "stored": "check02/diff-check.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/diff-check.stdout",
+      "stored": "check02/diff-check.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/normalization-comparison.json",
+      "stored": "check02/normalization-comparison.json",
+      "gzip": false,
+      "sourceBytes": 3,
+      "storedBytes": 3,
+      "sourceSha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "storedSha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/normalize-bindings.json",
+      "stored": "check02/normalize-bindings.json",
+      "gzip": false,
+      "sourceBytes": 272,
+      "storedBytes": 272,
+      "sourceSha256": "4e6878335a08593a362b73fef8797c2b4566b636d84bc11c665135f51b561315",
+      "storedSha256": "4e6878335a08593a362b73fef8797c2b4566b636d84bc11c665135f51b561315"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/normalize-bindings.stderr",
+      "stored": "check02/normalize-bindings.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/normalize-bindings.stdout",
+      "stored": "check02/normalize-bindings.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 44,
+      "storedBytes": 67,
+      "sourceSha256": "bbee37ddfd264da8a0ddbbb515d6dca4b35d7f25d64fb456aefd10d55826746d",
+      "storedSha256": "f007b717702603fcd4f5e4ccf201c6bfdfce0364e6f8fd1960ee2ea69ebe8755"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/source-after.json",
+      "stored": "check02/source-after.json.gz",
+      "gzip": true,
+      "sourceBytes": 11288,
+      "storedBytes": 5513,
+      "sourceSha256": "9c54d53343376e1946c9e36fae37d523a92f6400308b6dc093a2b2ed33269433",
+      "storedSha256": "8b014fc5032b80e654f1ea4bc7d22ea3db2998cf4f391d90bf80403ff10111d2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/source-before-normalization.json",
+      "stored": "check02/source-before-normalization.json.gz",
+      "gzip": true,
+      "sourceBytes": 11288,
+      "storedBytes": 5513,
+      "sourceSha256": "4dfbaf3ec5e0e7368913c8b74ae1f1891b8858138f1520adfdfff8b601dc07e0",
+      "storedSha256": "b8b53b3bf70fb329e6db5d82a65e33ed555e34018ad75e9ef26cc0ef687cd3ea"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/summary.json",
+      "stored": "check02/summary.json",
+      "gzip": false,
+      "sourceBytes": 1826,
+      "storedBytes": 1826,
+      "sourceSha256": "e6d73b09c734b6ac67503ba6789e035288d51c23836fcbd8d7d2c72497452746",
+      "storedSha256": "e6d73b09c734b6ac67503ba6789e035288d51c23836fcbd8d7d2c72497452746"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/test-jump-dom-probe.json",
+      "stored": "check02/test-jump-dom-probe.json",
+      "gzip": false,
+      "sourceBytes": 268,
+      "storedBytes": 268,
+      "sourceSha256": "c8f725786409f7e6a00ac4eca5355e88161ba47e9b85dcac01a0564e4dc2afa2",
+      "storedSha256": "c8f725786409f7e6a00ac4eca5355e88161ba47e9b85dcac01a0564e4dc2afa2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/test-jump-dom-probe.stderr",
+      "stored": "check02/test-jump-dom-probe.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/test-jump-dom-probe.stdout",
+      "stored": "check02/test-jump-dom-probe.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 1084,
+      "storedBytes": 375,
+      "sourceSha256": "955cc1ed013246936c54a371bae86d8f31f03d568e42239f33a94044590a33b0",
+      "storedSha256": "767cf98d8d8dce63e9e30eeb6751ba98bcfee94f07127f9127b9d96c1d4a1d2a"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/test-ui-input.json",
+      "stored": "check02/test-ui-input.json",
+      "gzip": false,
+      "sourceBytes": 256,
+      "storedBytes": 256,
+      "sourceSha256": "68c0173300c27b6072edfb021a3920a978f3eccd81e1f8d15fad91944f948fcd",
+      "storedSha256": "68c0173300c27b6072edfb021a3920a978f3eccd81e1f8d15fad91944f948fcd"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/test-ui-input.stderr",
+      "stored": "check02/test-ui-input.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/test-ui-input.stdout",
+      "stored": "check02/test-ui-input.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 372,
+      "storedBytes": 266,
+      "sourceSha256": "a90ebc5570e5eb43c2367d936bc73ade36f9e623342dd0f56330623ba242ad9b",
+      "storedSha256": "db4380acc10695ebbaa3198e6f3add88e3e874474298bc55476d345fac024b4c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/typecheck.json",
+      "stored": "check02/typecheck.json",
+      "gzip": false,
+      "sourceBytes": 254,
+      "storedBytes": 254,
+      "sourceSha256": "04378b6f58dbf67f3920e5b11d8b538e70116c42c8a1fea6c521ab10a509b388",
+      "storedSha256": "04378b6f58dbf67f3920e5b11d8b538e70116c42c8a1fea6c521ab10a509b388"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/typecheck.stderr",
+      "stored": "check02/typecheck.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02-nsjuha75/typecheck.stdout",
+      "stored": "check02/typecheck.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-fix01.py",
+      "stored": "scripts/revia-task13-fix01.py.gz",
+      "gzip": true,
+      "sourceBytes": 8244,
+      "storedBytes": 3854,
+      "sourceSha256": "7c8196a1516bca1f2209440a867fe376d771a0fd3bc6f8e1c99468ec0e35c35c",
+      "storedSha256": "d1b89d958b8fb913c7c966ede67df90d85a7a2f9e5957bea0cf784d600afe9a4"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check01.py",
+      "stored": "scripts/revia-task13-check01.py",
+      "gzip": false,
+      "sourceBytes": 4091,
+      "storedBytes": 4091,
+      "sourceSha256": "4c9b666bf626fb5c68966d84ab8b555cf95d908ab2587f6a36fadf132d4fbf55",
+      "storedSha256": "4c9b666bf626fb5c68966d84ab8b555cf95d908ab2587f6a36fadf132d4fbf55"
+    },
+    {
+      "source": "/private/tmp/revia-task13-check02.py",
+      "stored": "scripts/revia-task13-check02.py",
+      "gzip": false,
+      "sourceBytes": 2456,
+      "storedBytes": 2456,
+      "sourceSha256": "347770c5b9718fb5060db23a52493a951c9e27049f7c1cb63a9b8348dbeefbc4",
+      "storedSha256": "347770c5b9718fb5060db23a52493a951c9e27049f7c1cb63a9b8348dbeefbc4"
+    },
+    {
+      "source": "/private/tmp/revia-task13-record01.py",
+      "stored": "scripts/revia-task13-record01.py.gz",
+      "gzip": true,
+      "sourceBytes": 7027,
+      "storedBytes": 3558,
+      "sourceSha256": "9d9904e4fe5353a055bb640690a3d9230fdbac47e9dcefab497f43e1d0426539",
+      "storedSha256": "e4e8a64fcea94a912438bbdefec1d9dfb6ad6d1e6b9dd1890d9e10825ea28ccd"
+    }
+  ]
+}

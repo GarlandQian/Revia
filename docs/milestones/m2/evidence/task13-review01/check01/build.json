@@ -1,0 +1,12 @@
+{
+  "name": "build",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "pnpm",
+    "build"
+  ],
+  "startedAt": "2026-10-24T13:23:12.329038+00:00",
+  "expectedExit": 0,
+  "exit": 0,
+  "endedAt": "2026-10-24T13:23:14.606605+00:00"
+}

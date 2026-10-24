@@ -1,0 +1,11 @@
+{
+  "name": "test-ui-input",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "node",
+    "tools/test-ui-input.mjs"
+  ],
+  "startedAt": "2026-10-24T13:27:43.313528+00:00",
+  "exit": 0,
+  "endedAt": "2026-10-24T13:27:43.378021+00:00"
+}

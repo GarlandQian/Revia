@@ -522,6 +522,7 @@ const RowView = memo(function RowView({
         <Cell
           text={row.text ?? ""}
           tone={tone}
+          kind={row.lineKind ?? "context"}
           marker={markerFor(row.lineKind)}
           tokens={getTokens(version, line)}
           highlights={highlights}
@@ -587,18 +588,20 @@ function tokensMatchText(tokens: ReturnType<HighlightStore["get"]>, text: string
 function Cell({
   text,
   tone,
+  kind,
   marker,
   tokens,
   highlights,
 }: {
   text: string;
   tone: LineTone;
+  kind: RowCell["kind"];
   marker: string;
   tokens: ReturnType<HighlightStore["get"]>;
   highlights: HighlightStore;
 }) {
   return (
-    <span className={tone ? `cell cell-${tone}` : "cell"}>
+    <span className={`cell cell-${kind}${tone ? ` cell-${tone}` : ""}`}>
       <span className="marker">{marker}</span>
       {tokensMatchText(tokens, text)
         ? tokens!.map((token, index) => (
@@ -624,7 +627,7 @@ function SplitCell({
 }) {
   if (!cell) return <span className="cell empty" />;
   return (
-    <span className={tone ? `cell cell-${tone}` : "cell"}>
+    <span className={`cell cell-${cell.kind}${tone ? ` cell-${tone}` : ""}`}>
       <span className="marker">{markerFor(cell.kind)}</span>
       {tokensMatchText(tokens, cell.text)
         ? tokens!.map((token, index) => (

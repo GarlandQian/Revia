@@ -67,12 +67,13 @@ export function isButtonTarget(target: EventTarget | null): boolean {
   return target.closest("button, [role='checkbox'], [role='button']") !== null;
 }
 
-/** 判断是否在输入类控件（<input>, <textarea>, [contenteditable]）或弹窗内，让出快捷键避免穿透（Q93、审查意见 6）。 */
+/** 输入、选择控件或弹窗保留自己的键盘行为，不触发后台操作（Q93）。 */
 export function isTextInputOrDialog(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
   const isInput =
     tag === "textarea" ||
+    tag === "select" ||
     (tag === "input" && !["button", "checkbox", "radio", "submit", "reset"].includes((target as HTMLInputElement).type)) ||
     target.isContentEditable;
   const inDialog = target.closest("[role='dialog']") !== null || target.closest("dialog") !== null;

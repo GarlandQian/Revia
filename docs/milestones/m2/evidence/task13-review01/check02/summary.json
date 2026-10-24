@@ -1,0 +1,66 @@
+{
+  "previous": "/private/tmp/revia-task13-check01-ukzmi5rb",
+  "sourceMatchesBeforeFullChecks": true,
+  "allChecksPassed": true,
+  "commands": [
+    {
+      "name": "normalize-bindings",
+      "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+      "command": [
+        "node",
+        "tools/strip-binding-whitespace.mjs"
+      ],
+      "startedAt": "2026-10-24T13:27:41.609811+00:00",
+      "exit": 0,
+      "endedAt": "2026-10-24T13:27:41.653010+00:00"
+    },
+    {
+      "name": "typecheck",
+      "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "-b"
+      ],
+      "startedAt": "2026-10-24T13:27:41.656974+00:00",
+      "exit": 0,
+      "endedAt": "2026-10-24T13:27:43.313068+00:00"
+    },
+    {
+      "name": "test-ui-input",
+      "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+      "command": [
+        "node",
+        "tools/test-ui-input.mjs"
+      ],
+      "startedAt": "2026-10-24T13:27:43.313528+00:00",
+      "exit": 0,
+      "endedAt": "2026-10-24T13:27:43.378021+00:00"
+    },
+    {
+      "name": "test-jump-dom-probe",
+      "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+      "command": [
+        "node",
+        "tools/test-jump-dom-probe.mjs"
+      ],
+      "startedAt": "2026-10-24T13:27:43.378409+00:00",
+      "exit": 0,
+      "endedAt": "2026-10-24T13:27:43.448801+00:00"
+    },
+    {
+      "name": "diff-check",
+      "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "startedAt": "2026-10-24T13:27:43.449272+00:00",
+      "exit": 0,
+      "endedAt": "2026-10-24T13:27:43.465758+00:00"
+    }
+  ],
+  "boundary": "Only ts-rs trailing whitespace normalized. Initial diff-check failure retained; no Rust rerun, Release, GUI, D06 or merge."
+}
