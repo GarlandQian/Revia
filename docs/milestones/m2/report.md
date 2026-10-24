@@ -4,6 +4,10 @@
 
 ## 当前进度（2026-10-23）
 
+- 任务05限定身份测试返修`ebe9f92...3d70aa8`两轴0/0，测试证明缺口静态闭合；[7份原件](./evidence/task05-ci03/manifest.json)已核验，macOS discard_recovery71通过/1ignored，敏感性实验只叙述不冒称独立证据。仍ready-for-human，Windows和完整桌面/D06未完成；待07复核全过再固定新版本统一CI/Release。
+
+- 任务07再次退回`ready-for-agent`：固定`0dd6525...84a17a8`第二轮独立复核Standards5项P2、Spec3项P2；子模块真实Git版本、实际身份指向、新选择代际、原worktree失败留存和完成提示归属仍待原Pi返修。正常单应用跨worktree事务已闭合，不扩成未确认多进程要求。[16份原始检查](./evidence/task07-review02/manifest.json)已归档，10份源码hash匹配84a17a8，tsc/lint/build与Rust245项通过仅属该版；未做Release/桌面/D06/Windows/长测。详见[07 Comments](./issues/07-persistent-review-marks.md#comments)。
+
 - 任务05退回`ready-for-agent`：固定`1056557...05513aa`的Windows返修增量两轴各1项P2，均为身份回归同时改字节、仅通用Rejected，可被内容保护兜底；不是已证明生产身份校验失败。[7份检查原件](./evidence/task05-ci02/manifest.json)已归档、3份源码hash匹配05513aa，macOS Rust240通过；Windows仍未验证。待当前07返修交付后原Pi单独补此用例，复核过后再新CI/桌面，不提前done。详见[05 Comments](./issues/05-safe-recovery.md#comments)。
 
 - 任务07退回`ready-for-agent`：固定`234f248...d892bae`首轮独立两轴复核Standards8项P2、Spec8项P2，分别列在[任务07 Comments](./issues/07-persistent-review-marks.md#comments)。共享存储事务、活动/未知身份、所见版本与迟到响应、去重/导航、按钮焦点、完成提示、错误可见及子模块版本尚待原Pi返修。首版15份[原始检查](./evidence/task07-review01/manifest.json)已归档，10份源码hash匹配d892bae，tsc/lint/build及Rust239项通过只属于首版；首次t13失败仅实施叙述、无原始输出，不冒称独立核实。未做07 Release/桌面/D06/CI，复核全过才桌面。

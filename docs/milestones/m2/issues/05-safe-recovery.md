@@ -1119,3 +1119,11 @@ Rust 合计 **240 项**：lib 99、`discard_recovery` **71**（1 ignored 桌面�
 - **Windows 未验证**：本机（macOS）通过不等于 Windows 通过；Windows 五项是否真的修好仍需真实 CI。
 - 未构建 Release、未操作 GUI、未跑 D06/长测。
 - 05 仍保留未完成的桌面验收与最新双平台 CI，任务不 done。
+
+### 2026-10-24 / 规划方：R05-CI02限定复核通过，Windows与桌面仍待验收
+
+固定`ebe9f921cede1b5dd07da04f327b7180572b230a...3d70aa8c2bcbbddddfe7bedb390e6ff51456ce88`，仅3d70aa8。Standards硬违规0、Fowler建议0；Spec0、无范围扩张，两轴分别通过。`discard_recovery.rs:1697`重建身份后保留丢弃后基线，`:1707`要求真实身份不匹配且文件系统ID变化，`:1714`明确身份原因Rejected，`:1721`及后续要求目标仍为after而非before、written为空；原测试证明缺口静态闭合，未改产品代码。
+
+7份[原始检查](../evidence/task05-ci03/manifest.json)已归档；测试检查前hash匹配3d70aa8，日志可核macOS discard_recovery71通过/1夹具ignored、退出0。原生产副本逐字节匹配3d70aa8的recovery.rs，说明实施恢复后的版本一致。敏感性对照无单独stdout/stderr/退出码，仅MANIFEST叙述与原副本，不能称已独立核实；本轮闭合不依赖该叙述。
+
+仍`ready-for-human`，待07全部复核通过后固定最新代码做真实双平台CI、Release、05完整桌面/D06；不以旧成功或本机检查替代Windows，不以静态通过关闭任务。
