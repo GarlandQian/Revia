@@ -461,3 +461,39 @@ export function RecoveryDialog({
     </Modal>
   );
 }
+
+/**
+ * 写入期间的关闭/退出询问（任务 08，Q96）。
+ *
+ * 有在途写操作或待核对结果时保留窗口，只提供两个动作：
+ * - 「等待完成后关闭」：保留原请求，等写操作正常结束再执行（不杀 Git）；
+ * - 「留在应用」：清掉请求，**不取消**写操作。
+ *
+ * 待核对结果先展示，不静默退出。
+ */
+export function CloseRequestDialog({ writing, pending, onWait, onStay }: {
+  writing: string[];
+  pending: string[];
+  onWait: () => void;
+  onStay: () => void;
+}) {
+  return (
+    <Modal title={messages.close.title} onClose={onStay}>
+      <div className="space-y-3 text-xs">
+        <p className="leading-relaxed">{messages.close.explain}</p>
+        {writing.length > 0 ? (
+          <p className="break-all text-muted-foreground">
+            {messages.close.writing(writing.length)}
+          </p>
+        ) : null}
+        {pending.length > 0 ? (
+          <p role="alert" className="break-all text-destructive">{messages.close.pending(pending.length)}</p>
+        ) : null}
+      </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button autoFocus variant="outline" size="sm" onClick={onStay}>{messages.close.stay}</Button>
+        <Button size="sm" onClick={onWait}>{messages.close.wait}</Button>
+      </div>
+    </Modal>
+  );
+}

@@ -175,6 +175,17 @@ export const zhCN = {
     uncovered: "滚动中未覆盖行数",
     frames: "帧间隔 p50 / p95",
   },
+  /**
+   * 写入期间的关闭/退出询问（任务 08，Q96）。
+   */
+  close: {
+    title: "仍有写操作在进行",
+    explain: "关闭前需要等待写操作结束。不会为了关闭而中断 Git。",
+    writing: (count: number) => `正在执行 ${count} 个写操作`,
+    pending: (count: number) => `另有 ${count} 个结果待核对，关闭前请先查看`,
+    wait: "等待完成后关闭",
+    stay: "留在应用",
+  },
 } as const;
 
 export type Messages = typeof zhCN;

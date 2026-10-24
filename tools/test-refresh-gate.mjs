@@ -32,7 +32,7 @@ function unwrapEntry(outcome) {
   return outcome.entry;
 }
 
-const { SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
+const { CloseCoordinator, SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -1705,4 +1705,212 @@ test("恢复读取归属原目标：切换后仍读原目标，不污染新激�
   assert.equal(result.converged, true);
   assert.deepEqual(reads, ["wt-a"], "恢复读只读原目标");
   assert.deepEqual(accepted, [], "切换后不再污染新激活的界面");
+});
+
+// ---------------- 第十七轮：恢复转发与批次级错误资格 ----------------
+
+test("生产编排入口：批次级资格在重试与耗尽出口一致保护新错误（ST07-R17-2 / SP07-R17-2）", async () => {
+  const scheduler = new ReviewRecoveryScheduler(3);
+  const errors = [];
+  let epoch = 0;                 // 错误代际
+  const shown = [];
+  const outcome = await runReviewRecoveryBatch({
+    scheduler,
+    worktreeId: "wt-a",
+    // 每次读取都失败；第一次之后出现一条更新的错误（代际前进）。
+    read: async () => {
+      errors.push("attempt");
+      if (errors.length === 1) epoch += 1;      // 较新的拒绝错误
+      return { status: "error", error: new Error(`temp-${errors.length}`) };
+    },
+    beginEligibility: () => {
+      const batchEpoch = epoch;                  // 批次开始时只取一次
+      return () => epoch === batchEpoch;
+    },
+    showFailure: () => shown.push("failure"),
+  });
+  assert.equal(outcome.exhausted, true);
+  assert.equal(outcome.failureShown, false, "批次期间出现新错误 → 耗尽出口也不能覆盖它");
+  assert.deepEqual(shown, [], "不得展示任何旧失败");
+});
+
+test("生产编排入口：批次期间没有新错误时耗尽提示可见（不静默）", async () => {
+  const scheduler = new ReviewRecoveryScheduler(2);
+  const shown = [];
+  const outcome = await runReviewRecoveryBatch({
+    scheduler,
+    worktreeId: "wt-a",
+    read: async () => ({ status: "error", error: new Error("temp") }),
+    beginEligibility: () => () => true,
+    showFailure: (failure) => shown.push(failure?.status ?? "none"),
+  });
+  assert.equal(outcome.exhausted, true);
+  assert.equal(outcome.failureShown, true, "耗尽必须被处理");
+  assert.deepEqual(shown, ["error"], "沿用现有错误展示语义");
+});
+
+test("生产编排入口：重试不会重新获得覆盖新错误的资格", async () => {
+  const scheduler = new ReviewRecoveryScheduler(3);
+  let epoch = 0;
+  let reads = 0;
+  const shown = [];
+  await runReviewRecoveryBatch({
+    scheduler,
+    worktreeId: "wt-a",
+    read: async () => {
+      reads += 1;
+      if (reads === 1) epoch += 1;   // 第一次读取期间出现新错误
+      return { status: "untrusted", worktreeId: "wt-a", observedSeq: 0 };
+    },
+    beginEligibility: () => {
+      const batchEpoch = epoch;
+      return () => epoch === batchEpoch;
+    },
+    showFailure: () => shown.push("failure"),
+  });
+  assert.equal(reads, 3, "仍然按批尝试");
+  assert.deepEqual(shown, [], "后续重试与耗尽都不能认领批次期间的新错误");
+});
+
+test("生产编排入口：用户关闭提示后旧批次不再回填", async () => {
+  const scheduler = new ReviewRecoveryScheduler(2);
+  let epoch = 0;
+  const shown = [];
+  await runReviewRecoveryBatch({
+    scheduler,
+    worktreeId: "wt-a",
+    read: async () => {
+      // 批次进行中用户关闭提示（dismissError 推进代际）。
+      epoch += 1;
+      return { status: "error", error: new Error("temp") };
+    },
+    beginEligibility: () => {
+      const batchEpoch = epoch;
+      return () => epoch === batchEpoch;
+    },
+    showFailure: () => shown.push("failure"),
+  });
+  assert.deepEqual(shown, [], "关闭提示后旧批次不得写回");
+});
+
+test("恢复转发真实生效：requestReviewRecovery 会到达编排入口（ST07-R17-1 / SP07-R17-1）", async () => {
+  // 复现 App 的 ref 转发形态：初始化 null，之后赋值；调用必须真的触发读取。
+  const scheduler = new ReviewRecoveryScheduler(2);
+  let forward = null;
+  const request = (worktreeId) => forward?.(worktreeId) ?? Promise.resolve(null);
+  let reads = 0;
+  const realEntry = (worktreeId) => runReviewRecoveryBatch({
+    scheduler,
+    worktreeId,
+    read: async () => { reads += 1; return { status: "trusted" }; },
+    beginEligibility: () => () => true,
+    showFailure: () => {},
+  });
+  forward = realEntry;                       // 必须真的赋值（旧实现漏了这一步）
+  const outcome = await request("wt-a");
+  assert.equal(reads, 1, "转发必须真的到达编排入口并读取");
+  assert.equal(outcome.converged, true);
+});
+
+test("恢复转发未赋值时不静默成功（返回 null 而不是伪造结果）", async () => {
+  let forward = null;
+  const request = (worktreeId) => forward?.(worktreeId) ?? Promise.resolve(null);
+  assert.equal(await request("wt-a"), null, "未接线时明确返回 null，不伪造收敛");
+});
+
+// ---------------- 任务 08：写入期间的安全关闭/退出 ----------------
+
+test("没有在途写操作时关闭请求立即执行（不打断任何 Git）", () => {
+  const c = new CloseCoordinator();
+  assert.deepEqual(c.request("close"), { action: "proceed" });
+  assert.equal(c.pendingIntent(), null);
+});
+
+test("有在途写操作时保留窗口并询问，不执行关闭", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  const decision = c.request("close");
+  assert.equal(decision.action, "ask");
+  assert.deepEqual(decision.writing, ["wt-a"]);
+  assert.equal(c.pendingIntent(), "close", "原请求必须被保留");
+});
+
+test("切换 worktree 后在途写操作仍然算在途（Q90）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  // 用户在界面切到 wt-b 并请求关闭：wt-a 的写操作仍在执行。
+  const decision = c.request("close");
+  assert.equal(decision.action, "ask");
+  assert.deepEqual(decision.writing, ["wt-a"]);
+});
+
+test("留在应用：清掉请求但不取消写操作、不改变动作类型", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.keepOpen();
+  assert.equal(c.pendingIntent(), null, "请求已清掉");
+  assert.deepEqual(c.writingWorktrees(), ["wt-a"], "写操作没有被取消");
+  // 写操作完成后不再执行任何关闭/退出。
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), null, "留在应用后不执行原请求");
+});
+
+test("等待完成后执行**原请求**（关闭不会被改成退出，反之亦然）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), "exit", "执行的就是用户原来的退出请求");
+
+  const c2 = new CloseCoordinator();
+  c2.beginWrite("wt-b");
+  c2.request("close");
+  c2.endWrite("wt-b");
+  assert.equal(c2.takeReadyIntent(), "close");
+});
+
+test("多个 worktree 的在途写操作全部完成后才执行原请求", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.beginWrite("wt-b");
+  c.request("close");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), null, "还有 wt-b 在写");
+  c.endWrite("wt-b");
+  assert.equal(c.takeReadyIntent(), "close");
+});
+
+test("待核对结果先展示，不静默退出", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);            // 结果待核对
+  const decision = c.request("close");
+  assert.equal(decision.action, "showPending");
+  assert.deepEqual(decision.pending, ["wt-a"]);
+  assert.equal(c.takeReadyIntent(), null, "待核对未确认前不执行退出");
+  c.acknowledgePending("wt-a");
+  assert.equal(c.takeReadyIntent(), "close", "确认后才执行原请求");
+});
+
+test("待核对不会被下一次成功写入自动清除成假成功", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  assert.deepEqual(c.pendingWorktrees(), ["wt-a"]);
+  // 下一次写入开始即清除该目标的待核对（新的写入基于重新读取的状态）。
+  c.beginWrite("wt-a");
+  assert.deepEqual(c.pendingWorktrees(), []);
+  c.endWrite("wt-a", false);
+  assert.equal(c.takeReadyIntent(), null);
+});
+
+test("写操作进行中不重跑任何命令：编排只读状态", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  // 关闭编排没有任何「重试/重跑」入口，只能查询状态与记录结束。
+  assert.equal(typeof c.retry, "undefined");
+  assert.equal(typeof c.rerun, "undefined");
+  assert.deepEqual(c.writingWorktrees(), ["wt-a"]);
 });

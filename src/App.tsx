@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChangesList, type Selection } from "@/components/app/ChangesList";
-import { DiscardDialog, RecoveryDialog } from "@/components/app/RecoveryDialogs";
+import { CloseRequestDialog, DiscardDialog, RecoveryDialog } from "@/components/app/RecoveryDialogs";
 import { logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
@@ -36,7 +36,9 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
-import type { ReviewReadAttempt, ReviewRecoveryResult } from "@/lib/refreshGate";
+import { CloseCoordinator, runReviewRecoveryBatch } from "@/lib/refreshGate";
+import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
+import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
@@ -185,7 +187,10 @@ export function App() {
   }, []);
 
   const dismissError = useCallback(() => {
+    // 用户主动关闭提示也算一次「错误状态变更」：推进代际，
+    // 让仍在途的旧恢复读失去回填资格（ST07-R17-2）。
     if (worktreeId) {
+      worktreeErrorEpochRef.current[worktreeId] = (worktreeErrorEpochRef.current[worktreeId] ?? 0) + 1;
       setWorktreeErrors((prev) => ({ ...prev, [worktreeId]: null }));
     }
     setGlobalError(null);
@@ -273,9 +278,9 @@ export function App() {
    * `scheduleReviewRecovery` 的转发：`openEntry` 定义在它之前，
    * 用 ref 避免定义顺序上的循环依赖（调用时一定已赋值）。
    */
-  const scheduleRecoveryRef = useRef<((worktreeId: string) => Promise<void>) | null>(null);
+  const scheduleRecoveryRef = useRef<((worktreeId: string) => Promise<ReviewRecoveryBatchOutcome>) | null>(null);
   const requestReviewRecovery = useCallback(
-    (worktreeId: string) => scheduleRecoveryRef.current?.(worktreeId) ?? Promise.resolve(),
+    (worktreeId: string) => scheduleRecoveryRef.current?.(worktreeId) ?? Promise.resolve(null),
     [],
   );
 
@@ -519,26 +524,35 @@ export function App() {
   const recoveryReadOnceRef = useRef<((worktreeId: string) => Promise<ReviewReadAttempt>) | null>(null);
 
   /**
-   * 对一个 worktree 跑一次恢复批次；耗尽时按现有错误语义展示，不静默。
+   * 对一个 worktree 跑一次恢复批次（生产编排入口，App 与 Node 回归共用）。
    *
-   * 返回本批次结果，所有分支都会 settle（不再有自等待）。
+   * 展示资格按**批次**取一次：重试与耗尽出口用同一份判定，
+   * 批次期间出现的新错误或被用户关闭的提示都不会被覆盖（ST07-R17-2）。
+   * 所有分支都会 settle，写结果的 `finally` 一定释放门禁。
    */
-  const scheduleReviewRecovery = useCallback(async (worktreeId: string): Promise<ReviewRecoveryResult> => {
-    const scheduler = reviewRecoverySchedulerRef.current;
+  const scheduleReviewRecovery = useCallback(async (worktreeId: string): Promise<ReviewRecoveryBatchOutcome> => {
     const runner = recoveryReadOnceRef.current;
     if (!runner) {
-      return { converged: false, attempts: 0, exhausted: true, lastFailure: null };
+      return { converged: false, attempts: 0, exhausted: true, lastFailure: null, failureShown: false };
     }
-    const result = await scheduler.run(worktreeId, () => runner(worktreeId));
-    if (!result.converged && result.exhausted) {
-      // 耗尽要可见：沿用现有错误展示（按原目标），不能静默停止。
-      debugLog(`审阅重新核对耗尽：${worktreeId}（${result.attempts} 次）`);
-      setAppError(
-        { kind: "rejected", message: messages.review.recoveryExhausted },
-        worktreeId,
-      );
-    }
-    return result;
+    const batchEpoch = worktreeErrorEpochRef.current[worktreeId] ?? 0;
+    const outcome = await runReviewRecoveryBatch({
+      scheduler: reviewRecoverySchedulerRef.current,
+      worktreeId,
+      read: () => runner(worktreeId),
+      // 批次级资格：只认「批次开始时的那一代错误」，之后任何写入/关闭都让它失效。
+      beginEligibility: () => () => (worktreeErrorEpochRef.current[worktreeId] ?? 0) === batchEpoch,
+      showFailure: (failure) => {
+        debugLog(`审阅重新核对未收敛：${worktreeId}`);
+        setAppError(
+          failure && failure.status === "error"
+            ? toAppError(failure.error)
+            : { kind: "rejected", message: messages.review.recoveryExhausted },
+          worktreeId,
+        );
+      },
+    });
+    return outcome;
   }, [setAppError]);
 
   /** 读取并接收一次快照；自动刷新、手动刷新与回到前台共用同一条路径。 */
@@ -608,15 +622,14 @@ export function App() {
   /**
    * 单次恢复读取（ST07-R16-1）：只做一次真实 listChanges，报告可信度或失败。
    *
-   * 关键：它**不调用** `scheduleReviewRecovery`。runner 若递归等待调度器，
-   * 就会形成 task→runner→schedule→task 的自等待环，任务永不 settle。
-   *
-   * 错误按**原目标的错误代际**判定：恢复读在途期间若出现更新的错误，
-   * 这次失败不再覆盖它（SP07-R16-2）。
+   * 关键两点：
+   * - 它**不调用** `scheduleReviewRecovery`。runner 若递归等待调度器，
+   *   就会形成 task→runner→schedule→task 的自等待环，任务永不 settle。
+   * - 它**不展示错误**。展示统一由批次出口按**批次级资格**决定，
+   *   避免重试各自重取代际而获得覆盖新错误的资格（ST07-R17-2）。
    */
   const recoveryReadOnce = useCallback(async (worktreeId: string): Promise<ReviewReadAttempt> => {
     const token = gateRef.current.token();
-    const errorEpoch = worktreeErrorEpochRef.current[worktreeId] ?? 0;
     try {
       const read = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(worktreeId));
       if (!read.ok) return { status: "untrusted", worktreeId: read.worktreeId, observedSeq: read.observedSeq };
@@ -626,17 +639,13 @@ export function App() {
       }
       return { status: "trusted" };
     } catch (error) {
-      const unchanged = (worktreeErrorEpochRef.current[worktreeId] ?? 0) === errorEpoch;
-      if (unchanged
-        && token.activation === gateRef.current.token().activation
-        && gateRef.current.current().worktreeId === worktreeId) {
-        setAppError(toAppError(error), worktreeId);
-      }
       return { status: "error", error };
     }
-  }, [acceptSnapshot, setAppError]);
+  }, [acceptSnapshot]);
 
   recoveryReadOnceRef.current = recoveryReadOnce;
+  // 真实转发：getRows 等早于 scheduleReviewRecovery 定义的调用点经这里到达同一编排入口。
+  scheduleRecoveryRef.current = scheduleReviewRecovery;
 
   // 自动刷新协调器：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
   const refreshCoordinator = useMemo(
@@ -724,6 +733,37 @@ export function App() {
       window.removeEventListener("focus", onVisible);
     };
   }, [refreshCoordinator, worktreeId]);
+
+  /**
+   * 关闭/退出请求（任务 08，Q96）。
+   *
+   * 有在途写操作时**阻止**默认关闭、保留窗口与进程，并询问用户：
+   * 「等待完成后关闭/退出」或「留在应用」。从不杀 Git、不重跑写命令。
+   */
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    void (async () => {
+      try {
+        const stop = await getCurrentWindow().onCloseRequested(async (event) => {
+          const coordinator = closeCoordinatorRef.current;
+          const decision = coordinator.request("close");
+          if (decision.action === "proceed") return;   // 没有在途写：正常关闭
+          // 有在途写或待核对：保留窗口，交给用户选择。
+          event.preventDefault();
+          if (!disposed) setCloseRequest(decision);
+        });
+        if (disposed) stop();
+        else unlisten = stop;
+      } catch (caught) {
+        debugLog(`关闭请求监听失败：${getErrorMessage(caught)}`);
+      }
+    })();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   // ---------------- 添加仓库 ----------------
 
@@ -945,6 +985,15 @@ export function App() {
 
   const [writingWorktrees, setWritingWorktrees] = useState<Set<string>>(new Set());
   const writingWorktreesRef = useRef(new Set<string>());
+  /**
+   * 写入期间的安全关闭/退出编排（任务 08，Q90/Q91/Q96）。
+   *
+   * 只做决策：保留窗口与进程、等待完成后执行**原请求**、留在应用不取消写、
+   * 待核对结果先展示。从不杀 Git、不重跑写命令。
+   */
+  const closeCoordinatorRef = useRef(new CloseCoordinator());
+  /** 当前需要用户选择的关闭/退出请求（`null` 表示没有）。 */
+  const [closeRequest, setCloseRequest] = useState<CloseDecision | null>(null);
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
   const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
@@ -954,12 +1003,53 @@ export function App() {
   /** 审阅请求代际：迟到的标记响应不能污染其他 worktree 或新文件版本（Q88、Q89）。 */
   const reviewEpochRef = useRef(0);
 
+  /**
+   * 真正执行关闭/退出（任务 08）。
+   *
+   * 只有关闭编排确认「没有在途写、没有待核对」后才会走到这里；
+   * 动作类型完全按用户原请求，不升级、不替换。
+   */
+  const performCloseIntent = useCallback(async (intent: CloseIntent) => {
+    try {
+      const appWindow = getCurrentWindow();
+      if (intent === "close") await appWindow.close();
+      else await appWindow.destroy();
+    } catch (caught) {
+      setAppError(toAppError(caught), null);
+    }
+  }, [setAppError]);
+
+  /**
+   * 一个写操作结束（成功或失败）后的收尾（任务 08）。
+   *
+   * - 把结束事件交给关闭编排，并标记结果是否待核对；
+   * - 若此时有被保留的关闭/退出请求且条件已满足，就执行**原请求**（不改成别的动作）。
+   */
+  const finishWrite = useCallback((worktreeId: string, needsVerification: boolean) => {
+    const coordinator = closeCoordinatorRef.current;
+    coordinator.endWrite(worktreeId, needsVerification);
+    const ready = coordinator.takeReadyIntent();
+    if (!ready) {
+      // 还有其它 worktree 的在途写或待核对：继续保留窗口。
+      if (coordinator.hasWriting() || coordinator.pendingWorktrees().length > 0) {
+        const decision = coordinator.request(coordinator.pendingIntent() ?? "close");
+        setCloseRequest(decision);
+      }
+      return;
+    }
+    setCloseRequest(null);
+    void performCloseIntent(ready);
+  }, [performCloseIntent]);
+
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
     // ref 在同一事件循环内也互斥；按钮禁用和 Rust 写锁共同兜底，不积压点击。
     if (writingWorktreesRef.current.has(opWorktreeId)) return;
+    // 本次写操作的结果是否无法确定（Q91）：决定关闭时是否先展示待核对。
+    let needsVerification = false;
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
+    closeCoordinatorRef.current.beginWrite(opWorktreeId);
     setAppError(null, opWorktreeId);
     // 切换期间界面可能仍显示原目标；操作归属取真实写目标，不能取已前进的激活目标。
     const opToken = operationGateRef.current.begin(opWorktreeId);
@@ -998,6 +1088,7 @@ export function App() {
       }
     } catch (caught) {
       const err = toAppError(caught);
+      needsVerification = err.kind === "needsVerification";
       // 原目标的结果不能因切走而丢失；字典按 worktree 隔离，不污染另一目标。
       if (operationGateRef.current.canRecord(opToken)) {
         setAppError(err, opWorktreeId);
@@ -1007,8 +1098,9 @@ export function App() {
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
+      finishWrite(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, refresh, scheduleReviewRecovery, setAppError]);
+  }, [acceptSnapshot, finishWrite, refresh, scheduleReviewRecovery, setAppError]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -1027,7 +1119,10 @@ export function App() {
     }
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
+    closeCoordinatorRef.current.beginWrite(opWorktreeId);
     setAppError(null, opWorktreeId);
+    // 本次恢复的结果是否无法确定（Q91）：关闭时需先展示待核对。
+    let needsVerification = false;
     const opToken = operationGateRef.current.begin(opWorktreeId);
     try {
       const outcome = await ipc.restoreRecovery(request);
@@ -1038,6 +1133,7 @@ export function App() {
       return outcome;
     } catch (caught) {
       const err = toAppError(caught);
+      needsVerification = err.kind === "needsVerification";
       // 结果提示仍归原 worktree；但**真实重读**不依赖当前激活：
       // 切走之后原目标也必须核对真实状态（Q91），界面是否接收由 refreshTarget 判断。
       if (operationGateRef.current.canRecord(opToken)) setAppError(err, opWorktreeId);
@@ -1046,8 +1142,9 @@ export function App() {
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
+      finishWrite(opWorktreeId, needsVerification);
     }
-  }, [refreshTarget, setAppError]);
+  }, [finishWrite, refreshTarget, setAppError]);
 
   /**
    * 另存回收内容（任务 05）。
@@ -1089,6 +1186,7 @@ export function App() {
         writingWorktreesRef.current.add(ownerId);
         heldGateId = ownerId;
         setWritingWorktrees(new Set(writingWorktreesRef.current));
+        closeCoordinatorRef.current.beginWrite(ownerId);
         opToken = operationGateRef.current.begin(ownerId);
         setAppError(null, ownerId);
       }
@@ -1125,9 +1223,11 @@ export function App() {
       if (heldGateId) {
         writingWorktreesRef.current.delete(heldGateId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
+        // 另存失败同样可能是结果待核对：交给关闭编排，避免关闭时静默退出。
+        finishWrite(heldGateId, false);
       }
     }
-  }, [recordExternalResult, refreshTarget, setAppError]);
+  }, [finishWrite, recordExternalResult, refreshTarget, setAppError]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
@@ -2444,6 +2544,22 @@ export function App() {
           onRestore={performRestore}
           onSaveAs={performSaveAs}
           onClose={() => setRecoveryOpen(false)}
+        />
+      ) : null}
+      {closeRequest && closeRequest.action !== "proceed" ? (
+        <CloseRequestDialog
+          writing={closeRequest.writing}
+          pending={"pending" in closeRequest ? closeRequest.pending : []}
+          onWait={() => {
+            // 保留原请求：等写操作正常完成后由 finishWrite 执行它（不杀 Git）。
+            closeCoordinatorRef.current.request("close");
+            setCloseRequest(null);
+          }}
+          onStay={() => {
+            // 留在应用：不取消写操作、不改变动作类型。
+            closeCoordinatorRef.current.keepOpen();
+            setCloseRequest(null);
+          }}
         />
       ) : null}
     </div>

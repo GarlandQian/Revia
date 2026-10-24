@@ -4,7 +4,7 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 5、7，T10、T12、D04；Q20、Q37、Q48、Q87、Q94。
 
@@ -1831,3 +1831,58 @@ App 用既有错误语义展示（新增 i18n `review.recoveryExhausted`），**
 
 - [29份原件](../evidence/task07-review17/manifest.json)逐文件SHA/gzip还原已核；最终4源码前后SHA一致匹配32b4c86，Node90、tsc/lint/build、diff-check真实退出0。敏感性分别90过/0失（仅注释、未触发）、89/1、88/2、87/3；不把helper敏感性当App真实接线证明。本轮仅静态复核，未测试/构建/GUI/新CI验收。
 - 07仍非done，退ready-for-agent。这两项加入用户新要求的剩余任务整包实现，不再要求仅修07后停等逐项验收；具体批次以Q106及[整包交接](../paseo-batch.md)为准。旧发现和原件保留，最终统一复核、真实桌面/D06/仅SSH双平台CI及任务11完整Q98长测。
+
+### 2026-10-24 / Pi 实现：任务07 第十七轮限定返修（恢复转发与批次错误资格）
+
+只修第十七轮两项；自等待、批次预算、Outcome 拒收等已闭合项未回退。
+
+#### ST07-R17-1 / SP07-R17-1（逐路径恢复转发丢失）
+
+上一轮替换 runner 时删掉了 `scheduleRecoveryRef.current` 的赋值，该 ref 一直是 `null`，
+于是 `openEntry` 的 getRows 拒收后 `requestReviewRecovery` 只是 `Promise.resolve()` —— 不实际重读。
+
+现在恢复真实转发：`scheduleRecoveryRef.current = scheduleReviewRecovery;`
+（紧随 `recoveryReadOnceRef.current` 赋值），类型同步为返回 `ReviewRecoveryBatchOutcome`。
+转发未接线时 `requestReviewRecovery` 返回 `null`（明确未执行），不伪造收敛。
+
+#### ST07-R17-2 / SP07-R17-2（批次错误归属未贯通）
+
+三个漏点：耗尽出口无条件 `setAppError`；每次重试重新捕获 epoch（重试后重新获得覆盖新错误的资格）；
+`dismissError` 不推进 epoch（旧读可回填已关闭的提示）。
+
+现在把编排收进共享生产入口 `runReviewRecoveryBatch`（App 与 Node 回归**用同一个函数**）：
+
+- `beginEligibility()` 在**批次开始时只调用一次**，返回本批共同的「仍可展示」判定；
+- `read()` 只做一次真实读取并返回可信度/失败，**不展示错误**；
+- 展示只发生在批次出口，且必须通过**同一份**资格判定；
+- 重试不再重新取 epoch，因此不会重新获得覆盖新错误的资格；
+- `dismissError` 现在推进 `worktreeErrorEpochRef`，用户关闭提示后旧批次自动失去资格。
+
+`recoveryReadOnce` 相应改为只读取与报告，不再自己 `setAppError`。
+
+#### 回归（Node，生产入口）
+
+**105 项通过**。第十七轮新增 6 项，全部驱动 `runReviewRecoveryBatch` 这条真实编排：
+批次期间出现新错误时耗尽出口也不覆盖、无新错误时耗尽提示可见、重试不重新获得资格、
+用户关闭提示后旧批次不回填、转发真实生效（`reads === 1`）、未接线时返回 `null`。
+
+#### 实际执行的检查（本批第一次集中检查，含 08 与效果图）
+
+日志目录：`/private/tmp/revia-batch01-sEGPJM`
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 105 / pass 105 / fail 0 |
+| `cargo test`（完整） | 0 | 100 + 71(1 ignored) + 20 + 24 + 15 + 31 + 3 |
+| `pnpm bindings` | 0 | — |
+| `git diff --check` | 0 | — |
+
+源码前后 SHA 逐行一致。
+
+#### 未验证（必须保留）
+
+- **桌面未验证**；**Windows 未验证**（需新 CI）。
+- 未构建 Release、未启动 GUI、未跑 D06/双平台 CI/长测；未推送/合并/发布。

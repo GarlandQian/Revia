@@ -23,3 +23,33 @@
 所有命令显式cd `/Users/garland/.codex/worktrees/revia-m2/Revia`，只提交m2，main/用户图标/`.codex/`/旧fixture保持原样。使用正常编辑、精确暂存和独立提交，保留全部失败日志，不checkout/restore/reset文件或amend。测试沿用现有体系，Git验证仅自建临时仓库及独立数据目录。
 
 Pi负责实现、检查和静态效果图源文件，不启动GUI、不跑Release/D06/CI/长测、不推送/合并。规划方推送仅现有SSH origin正常推m2，不HTTPS、不改凭据/Git配置。原Pi/原模型保持；连续三次渠道错误才由规划方接管，测试失败/等待超时不计。
+
+## 本批执行记录（2026-10-24）
+
+| 项 | 状态 | 说明 |
+| --- | --- | --- |
+| 07 第十七轮返修 | `ready-for-human` | 恢复转发重新接线；错误归属改为批次级资格，编排收进 `runReviewRecoveryBatch` |
+| 08 写入期间安全关闭/退出 | `ready-for-human` | 共享 `CloseCoordinator` + `onCloseRequested` + `CloseRequestDialog` + 窗口 close/destroy 能力 |
+| 05/12 集成缺陷 | 未发现确定缺陷 | 12 的三项（测量面板仅测量模式、无 Git 版本与文件数、无 A−/A+）已实现；未无故重做 |
+| 13 效果图 | **待用户确认** | 源文件在 `issues/13-mockups/`，未改生产代码 |
+| 10 矩阵与报告 | 未开始 | 依赖 13 实现完成 |
+
+### 检查（本批第一次集中）
+
+日志：`/private/tmp/revia-batch01-sEGPJM`
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 105 / pass 105 / fail 0 |
+| `cargo test`（完整） | 0 | 100 + 71(1 ignored) + 20 + 24 + 15 + 31 + 3 |
+| `pnpm bindings` | 0 | — |
+| `git diff --check` | 0 | — |
+
+源码前后 SHA 逐行一致。**未启动 GUI、未 Release、未跑 D06/CI/长测、未推送/合并**。
+
+### 下一步
+
+等待用户确认 `issues/13-mockups/` 的浅色/深色效果图。确认后同一会话继续 13 实现与 10 最终集成检查/报告。
