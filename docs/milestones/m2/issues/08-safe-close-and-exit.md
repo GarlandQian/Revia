@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -385,3 +385,85 @@ Stay 后不重弹已取消询问。
 **测试证据边界**：`test-refresh-gate.mjs:2239-2248`假Rust async函数内部没有await/defer，旧false在调用时已同步store，然后true才store；未实际制造“旧false晚到”，更未执行真实Rust `apply_exit_guard`。下一轮使用真实可控延迟的共享异步生产入口，不用测试手工补一步reconcile，Rust契约回归覆盖真实版本接收端；不新增框架。
 
 七份源码检查前后/固定提交/当前字节SHA一致；Node140、Rust264/1ignored、前端检查退出0原件已归档，详见[检查记录](../batch03-repair-validation.md)及[清单](../evidence/batch03-repair/manifest.json)。runner有cwd/命令但无逐调用环境，不扩大证据。所有缺陷成批交原Pi；08保持ready-for-agent，10/11/M2未完成，未新Release/桌面/D06/CI/长测/推送/合并。
+
+### 2026-10-25 / Pi 实现：整批 B04 返修（关闭保护的真实异步生产路径）
+
+起点 `f92c968`，实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`。
+逐项修 ST-B04-08-1..3 / SP-B04-08-1..3。
+
+#### ST-B04-08-1 / SP-B04-08-1（切 worktree 卸载在途保护）
+
+根因：`setAppError` 依赖 `worktreeId`，而关闭监听 effect 依赖 `setAppError`，
+切换 worktree 就卸载重装监听，在途写保护出现空档。
+
+- `setAppError` 改为**稳定身份**：worktreeId 经 `worktreeIdRefForError` ref 读取，
+  依赖数组为空；
+- 监听 effect 依赖数组改为 `[]`（**应用级生命周期**），不再随 worktree 变化重装；
+- 新增 `WriteGuardOrchestrator.begin()`：`await guard()` **之后**再复核一次
+  `guardsReady()`，保护建立期间发生卸载/重装/失败时回滚并拒绝执行 Git。
+
+未禁止浏览/切换 worktree，Q90 行为不变。
+
+#### ST-B04-08-2 / SP-B04-08-3（询问被提前隐藏）
+
+`reconcile()` 原先在「无在途写、无授权」时返回 `none`，App 据此隐藏对话框，
+但 `requested` 暗留，用户再也没有 Wait/Stay 可点。
+
+现在：无在途写但**仍有未授权的原请求**时返回 `ask`（保留对话框与原动作），
+用户可以真实点击 Wait/Stay。`none` 只在确实没有请求时出现。
+
+#### ST-B04-08-3 / SP-B04-08-2（rollback 未接生产 reconcile）
+
+新增共享类 `WriteGuardOrchestrator`（`refreshGate.ts`），App 的
+stage/unstage/discard、restore、save-as **全部经同一实例**：
+
+```
+begin(): guardsReady? → register → await guard()
+         失败 → rollback + reconcile（真实收尾）→ 抛出
+         成功后复核 guardsReady，不就绪则 rollback + reconcile 并返回 ok:false
+end():   endWrite + reconcile
+```
+
+保护失败时已授权的 Wait 请求在**当场**被 reconcile 处理，不留悬挂授权、
+不等下一笔无关写。三个入口都在 `finally` 里走 `orchestrator.end()`，
+不再有 `finally` 之外的提前 return/throw 绕过收尾。
+
+#### 回归（Node + Rust，真实异步）
+
+`tools/test-refresh-gate.mjs` **150 项通过**。B04 新增 11 项：
+
+- **真实乱序**：用 `makeDeferredReceiver()` 精确控制到达与应用顺序，
+  让**新的 true 先应用、旧的 false 后应用**，断言 Rust 侧状态仍为 true；
+- 新 false 在更高版本下正常释放；
+- 共享编排：切 worktree 不影响在途保护、`await` 期间监听被卸载则不执行 Git 并回滚、
+  保护失败时已 Wait 的请求即时收尾、三个写入口共用同一实例且都走真实 reconcile；
+- 询问不提前消失（最后写结束仍可 Wait）、Stay 后不自动关且不留暗请求、
+  无请求不产生询问、Wait 时已有 pending 展示核对。
+
+**Rust 真实版本接收端**（`commands.rs` 新增 `exit_guard_tests`，3 项）：
+新 true 后旧 false 被拒绝、新 false 正常释放、相同序号不重复生效。
+这不是把算法复制到 JS 假对象，而是在 Rust 侧验证真实接收语义。
+
+#### 检查（唯一日志目录）
+
+`/private/tmp/revia-b04-QMqsIw`（含 `runner.sh` 精确 argv/cwd、`tested-source-manifest.txt` 72 个受测源文件清单、
+各命令 `.out/.err/.exit`、前后源码 SHA）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 150 / pass 150 / fail 0 |
+| `cargo test --lib exit_guard` | 0 | 3 passed（版本接收端） |
+| `cargo test --lib` | 0 | 103 passed |
+| `git diff --check` | **首次 2** → 清理后 0 | 绑定行尾空白（`cargo test --lib` 会重跑 ts-rs 生成）；两份原件都保留 |
+
+源码前后 SHA 逐行一致。本轮改了 Rust 保护契约（新增接收端测试），
+按共享核心门槛跑了 `--lib`；未跑完整 Rust 集成套件（无相关契约变化）。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 实际拦截、切换 worktree 期间的真实观感、
+  待核对闭环流程，均需规划方在固定 Release 上验收。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。

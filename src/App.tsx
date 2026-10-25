@@ -37,7 +37,7 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
-import { CloseCoordinator, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch } from "@/lib/refreshGate";
+import { CloseCoordinator, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
 import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
 import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
@@ -166,15 +166,24 @@ export function App() {
    */
   const worktreeErrorEpochRef = useRef<Record<string, number>>({});
 
+  /**
+   * 当前 worktree id 的 ref：让 `setAppError` 的**身份保持稳定**。
+   *
+   * 关闭/退出保护监听的 effect 依赖 `setAppError`；如果它随 worktree 变化，
+   * 切换 worktree 就会卸载并重装监听，在途写保护出现空档（ST-B04-08-1）。
+   */
+  const worktreeIdRefForError = useRef<string | null>(null);
+  worktreeIdRefForError.current = worktreeId;
+
   const setAppError = useCallback((err: AppErrorPayload | null, targetWorktreeId?: string | null) => {
-    const wtId = targetWorktreeId ?? worktreeId;
+    const wtId = targetWorktreeId ?? worktreeIdRefForError.current;
     if (wtId) {
       worktreeErrorEpochRef.current[wtId] = (worktreeErrorEpochRef.current[wtId] ?? 0) + 1;
       setWorktreeErrors((prev) => ({ ...prev, [wtId]: err }));
     } else {
       setGlobalError(err);
     }
-  }, [worktreeId]);
+  }, []);
 
   /** 记录一次无归属操作的结果；`seq` 用来拒绝旧完成覆盖较新的错误。 */
   const recordExternalResult = useCallback((seq: number, err: AppErrorPayload | null) => {
@@ -799,7 +808,11 @@ export function App() {
       closeGuardsRef.current.dispose();
       for (const stop of stops) stop();
     };
-  }, [setAppError]);
+    // 依赖数组为空：这是**应用级**生命周期，不随 worktree 变化卸载重装。
+    // 所有可变输入都经 ref 读取，因此切换 worktree 不会在在途写期间出现保护空档
+    // （ST-B04-08-1 / SP-B04-08-1）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** 执行关闭/退出的入口（供原生退出事件复用，避免定义顺序问题）。 */
   const performCloseIntentRef = useRef<((intent: CloseIntent) => Promise<void>) | null>(null);
@@ -1097,30 +1110,6 @@ export function App() {
   }, []);
 
   /**
-   * 写操作开始前的保护前置条件（任务 08、Q96）。
-   *
-   * 三件事都必须**先成功**才允许继续写入（ST-B03-08-2 / SP-B03-08-1）：
-   * 1. 窗口关闭监听与原生退出监听都已安装成功（`guardsReady`）；
-   * 2. Rust 侧「阻止退出」标志已置位；
-   * 3. 在途写已登记。
-   *
-   * 任一步失败都回滚登记并抛出，调用方**不执行写命令**。
-   */
-  const beginProtectedWrite = useCallback(async (worktreeId: string): Promise<void> => {
-    const coordinator = closeCoordinatorRef.current;
-    if (!closeGuardsRef.current.ready) {
-      throw { kind: "internal", message: messages.close.guardUnavailable(messages.close.guardNotInstalled) };
-    }
-    coordinator.beginWrite(worktreeId);
-    try {
-      await syncExitBlocked(true);
-    } catch (caught) {
-      coordinator.rollbackWrite(worktreeId);
-      throw caught;
-    }
-  }, [syncExitBlocked]);
-
-  /**
    * 统一收尾：所有生命周期事件都走这里（任务 08）。
    *
    * 写结束、晚点 Wait、保护 begin 失败回滚、另存收尾、待核对成功/失败、
@@ -1156,12 +1145,29 @@ export function App() {
   reconcileCloseRef.current = reconcileClose;
 
   /**
-   * 一个写操作结束（成功或失败）后的收尾（任务 08）。
+   * 三个写入口共用的**共享异步编排**（任务 08）。
+   *
+   * 依赖全部经 ref/回调读取，所以实例稳定；App 与 Node 回归用同一个类。
    */
-  const finishWrite = useCallback((worktreeId: string, needsVerification: boolean) => {
-    closeCoordinatorRef.current.endWrite(worktreeId, needsVerification);
-    reconcileClose();
-  }, [reconcileClose]);
+  const writeOrchestratorRef = useRef<WriteGuardOrchestrator | null>(null);
+  if (writeOrchestratorRef.current === null) {
+    writeOrchestratorRef.current = new WriteGuardOrchestrator({
+      guardsReady: () => closeGuardsRef.current.ready,
+      guardBlockedReason: () => closeGuardsRef.current.blockedReason,
+      register: (worktreeId) => {
+        closeCoordinatorRef.current.beginWrite(worktreeId);
+      },
+      guard: () => syncExitBlocked(true),
+      rollback: (worktreeId) => {
+        closeCoordinatorRef.current.rollbackWrite(worktreeId);
+      },
+      reconcile: () => reconcileCloseRef.current?.(),
+      endWrite: (worktreeId, needsVerification) => {
+        closeCoordinatorRef.current.endWrite(worktreeId, needsVerification);
+      },
+    });
+  }
+  const writeOrchestrator = writeOrchestratorRef.current;
 
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
@@ -1172,7 +1178,17 @@ export function App() {
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
     try {
-      await beginProtectedWrite(opWorktreeId);
+      // 共享异步编排：登记 → await 保护 → 复核就绪；失败已回滚并真实收尾。
+      const started = await writeOrchestrator.begin(opWorktreeId);
+      if (!started.ok) {
+        writingWorktreesRef.current.delete(opWorktreeId);
+        setWritingWorktrees(new Set(writingWorktreesRef.current));
+        setAppError(
+          { kind: "internal", message: messages.close.guardUnavailable(started.reason) },
+          opWorktreeId,
+        );
+        return;
+      }
     } catch (caught) {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
@@ -1227,9 +1243,9 @@ export function App() {
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
-      finishWrite(opWorktreeId, needsVerification);
+      writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, beginProtectedWrite, finishWrite, refresh, scheduleReviewRecovery, setAppError]);
+  }, [acceptSnapshot, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -1249,12 +1265,17 @@ export function App() {
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
     try {
-      await beginProtectedWrite(opWorktreeId);
+      // 共享异步编排：失败时已回滚并真实收尾，这里只需如实抛出。
+      const started = await writeOrchestrator.begin(opWorktreeId);
+      if (!started.ok) {
+        writingWorktreesRef.current.delete(opWorktreeId);
+        setWritingWorktrees(new Set(writingWorktreesRef.current));
+        throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+      }
     } catch (caught) {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       setAppError(toAppError(caught), opWorktreeId);
-      // 保护建立不起来：不执行恢复，错误如实抛出给调用方（ST-B02-08-1）。
       throw caught;
     }
     setAppError(null, opWorktreeId);
@@ -1279,9 +1300,9 @@ export function App() {
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
-      finishWrite(opWorktreeId, needsVerification);
+      writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [beginProtectedWrite, finishWrite, refreshTarget, setAppError]);
+  }, [refreshTarget, setAppError, writeOrchestrator]);
 
   /**
    * 另存回收内容（任务 05）。
@@ -1315,9 +1336,12 @@ export function App() {
     // 无归属（外部新路径）用占位键，不为此路径强加 worktree 写锁。
     const provisionalKey = `save-as:${request.destination}`;
     try {
-      await beginProtectedWrite(provisionalKey);
+      // 共享异步编排：失败时已回滚并真实收尾。
+      const started = await writeOrchestrator.begin(provisionalKey);
+      if (!started.ok) {
+        throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+      }
     } catch (caught) {
-      // 保护建立不起来：不执行任何写入（ST-B02-08-1）。
       setAppError(toAppError(caught), null);
       throw caught;
     }
@@ -1378,9 +1402,9 @@ export function App() {
       // 关闭生命周期收尾：与其它写入口**完全一致**地走 finishWrite，
       // 这样「最后一笔另存」也会消费已授权的等待请求（ST-B02-08-3 / SP-B02-08-3）。
       // 有归属用 worktree 键，无归属用占位键；needsVerification 如实传递（Q91）。
-      finishWrite(heldGateId ?? provisionalKey, needsVerification);
+      writeOrchestrator.end(heldGateId ?? provisionalKey, needsVerification);
     }
-  }, [beginProtectedWrite, finishWrite, recordExternalResult, refreshTarget, setAppError]);
+  }, [recordExternalResult, refreshTarget, setAppError, writeOrchestrator]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;

@@ -32,7 +32,7 @@ function unwrapEntry(outcome) {
   return outcome.entry;
 }
 
-const { CloseCoordinator, CloseGuardGate, ExitGuardSync, SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
+const { CloseCoordinator, CloseGuardGate, ExitGuardSync, SnapshotGate, WriteGuardOrchestrator, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -2299,7 +2299,8 @@ test("晚点等待：写入已结束后点 Wait，reconcile 立即执行原动�
   c.beginWrite("wt-a");
   assert.equal(c.request("close").action, "ask");
   c.endWrite("wt-a");                      // 写入先结束
-  assert.equal(c.reconcile().kind, "none", "此时还没授权");
+  // 询问必须**继续存在**：用户还没选择，不能隐藏对话框（ST-B04-08-2）。
+  assert.equal(c.reconcile().kind, "ask", "未选择时询问仍然可见");
   c.resolveAsk("wait");                    // 用户晚点击
   assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" },
     "App 只需调用 reconcile 就能收尾，不需要等下一笔写");
@@ -2395,4 +2396,211 @@ test("Stay 后旧核对失败不会重弹已取消的询问（SP-B03-08-3）", (
   assert.notEqual(c.generation(), genBefore);
   // 旧核对失败分支在代际变化后必须直接返回：不展示、不授权。
   assert.equal(c.reconcile().kind, "none", "Stay 后不应弹任何询问");
+});
+
+// ---------------- 整批 B04：真实异步生产路径 ----------------
+
+/** 可精确控制「到达顺序」与「回包顺序」的版本化接收端（模拟 Rust apply_exit_guard）。 */
+function makeDeferredReceiver() {
+  const state = { seq: 0, blocked: false };
+  const arrivals = [];
+  const rejections = [];
+  const receive = (request) => {
+    // 到达即记录；实际应用由 resolve 控制，从而可制造「旧 false 晚应用」。
+    let resolve, reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    arrivals.push({
+      request,
+      resolve: (accepted) => {
+        // 模拟 Rust：只接受更大的 seq。
+        if (request.seq > state.seq) {
+          state.seq = request.seq;
+          state.blocked = request.blocked;
+          resolve(true);
+          return;
+        }
+        rejections.push(request);
+        resolve(false);
+      },
+      reject,
+    });
+    return promise;
+  };
+  return { state, arrivals, rejections, receive };
+}
+
+test("真实乱序：旧 false 的回包晚于新 true 应用，Rust 状态仍为 true（ST-B04-08-1）", async () => {
+  const receiver = makeDeferredReceiver();
+  const guard = new ExitGuardSync(receiver.receive);
+
+  const firstWrite = guard.set(false);            // 写结束 → false（先发起）
+  const secondWrite = guard.set(true);            // 新写开始 → true（后发起）
+
+  // 故意让**新的 true 先应用**，旧的 false 后应用（真正的乱序）。
+  receiver.arrivals[1].resolve(true);
+  await secondWrite;
+  receiver.arrivals[0].resolve(false);
+  await firstWrite;
+
+  assert.equal(receiver.state.blocked, true, "旧 false 晚到不得解除新 true");
+  assert.equal(guard.current(), true, "本地已知状态也保持 true");
+});
+
+test("真实乱序：新 false 在更高版本下正常释放", async () => {
+  const receiver = makeDeferredReceiver();
+  const guard = new ExitGuardSync(receiver.receive);
+  const on = guard.set(true);
+  receiver.arrivals[0].resolve(true);
+  await on;
+  const off = guard.set(false);
+  receiver.arrivals[1].resolve(true);
+  await off;
+  assert.equal(receiver.state.blocked, false);
+  assert.equal(guard.current(), false);
+});
+
+test("共享异步编排：切 worktree 不影响在途保护（保护不随 worktree 重装）", async () => {
+  // 模拟 App：监听闸门是应用级、worktree 切换不改变它。
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  let guardCalls = 0;
+  const orchestrator = new WriteGuardOrchestrator({
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: async () => { guardCalls += 1; },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => coordinator.reconcile(),
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  // A 写开始（保护建立）。
+  assert.deepEqual(await orchestrator.begin("wt-a"), { ok: true });
+  // 用户切到 wt-b（只是 UI 状态变化，不动 gate/coordinator）。
+  assert.equal(gate.ready, true, "切换 worktree 不卸载监听");
+  assert.deepEqual(coordinator.writingWorktrees(), ["wt-a"], "A 仍在途");
+  // A 结束。
+  orchestrator.end("wt-a", false);
+  assert.equal(guardCalls, 1);
+});
+
+test("共享异步编排：await 保护期间监听被卸载，则不执行 Git 并回滚", async () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  let guardResolve;
+  const guardPromise = new Promise((resolve) => { guardResolve = resolve; });
+  const orchestrator = new WriteGuardOrchestrator({
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: () => guardPromise,
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => coordinator.reconcile(),
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  const pending = orchestrator.begin("wt-a");
+  // 保护 await 期间监听卸载（模拟 effect 清理/安装失败）。
+  gate.dispose();
+  guardResolve();
+  const result = await pending;
+  assert.equal(result.ok, false, "await 后必须复核就绪");
+  assert.deepEqual(coordinator.writingWorktrees(), [], "必须回滚登记");
+});
+
+test("共享异步编排：保护失败时已 Wait 的请求即时收尾（ST-B04-08-3 / SP-B04-08-2）", async () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  const orchestrator = new WriteGuardOrchestrator({
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: async () => { throw new Error("保护 IPC 失败"); },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    // App 的 reconcile 回调就是「消费 decision」：这里记录它拿到什么。
+    reconcile: () => { observed.push(coordinator.reconcile()); },
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  const observed = [];
+  // 先有一笔在途写，用户此时请求关闭并选择等待。
+  coordinator.beginWrite("wt-existing");
+  coordinator.request("close");
+  coordinator.resolveAsk("wait");
+  // 保护建立失败（此时 wt-existing 仍在途）。
+  await assert.rejects(() => orchestrator.begin("wt-a"));
+  // 收尾：仍有在途写 → 继续询问（不擅自关窗），原动作保留。
+  assert.ok(observed.length >= 1, "保护失败必须触发真实 reconcile");
+  assert.equal(observed[observed.length - 1].kind, "ask", "仍有在途写 → 继续询问");
+  assert.equal(observed[observed.length - 1].intent, "close", "原动作保留");
+  // 在途写结束后，授权应当立即执行（不悬挂、不等下一笔无关写）。
+  coordinator.endWrite("wt-existing");
+  assert.deepEqual(coordinator.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("共享异步编排：三个写入口共用同一实例，保护失败都收尾", async () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  const orchestrated = [];
+  const orchestrator = new WriteGuardOrchestrator({
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: async () => { throw new Error("boom"); },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => { orchestrated.push(coordinator.reconcile().kind); },
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  for (const id of ["stage:wt-a", "restore:wt-a", "save-as:/tmp/x"]) {
+    await assert.rejects(() => orchestrator.begin(id));
+  }
+  assert.deepEqual(coordinator.writingWorktrees(), [], "三处都回滚干净");
+  assert.deepEqual(orchestrated, ["none", "none", "none"], "三处都走了真实 reconcile");
+});
+
+test("询问不提前消失：最后写结束但用户未选择时仍可 Wait（ST-B04-08-2）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  assert.equal(c.request("close").action, "ask");
+  c.endWrite("wt-a");                       // 最后写结束
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask", "询问必须仍在");
+  assert.equal(decision.intent, "close");
+  // 用户此刻才点 Wait。
+  c.resolveAsk("wait");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("询问不提前消失：Stay 后不自动关且不留暗请求", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.endWrite("wt-a");
+  c.resolveAsk("stay");
+  assert.equal(c.reconcile().kind, "none");
+  assert.equal(c.pendingIntent(), null, "Stay 后不得留暗请求");
+});
+
+test("无请求时不产生询问也不关窗", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a");
+  assert.equal(c.reconcile().kind, "none");
+});
+
+test("Wait 时已有 pending：展示核对而不是静默退出（ST-B04-08-2）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.endWrite("wt-a", true);
+  c.resolveAsk("wait");
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask");
+  assert.deepEqual(decision.pending, ["wt-a"]);
+  assert.equal(decision.intent, "close", "原动作保留");
 });

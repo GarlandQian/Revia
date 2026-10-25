@@ -1023,3 +1023,61 @@ pub async fn change_entry(
 pub fn set_exit_blocked(state: State<'_, AppState>, seq: u64, blocked: bool) -> bool {
     state.apply_exit_guard(seq, blocked)
 }
+
+#[cfg(test)]
+mod exit_guard_tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    /// 只测**版本化接收端**本身：不构造 AppState，避免引入与保护语义无关的依赖。
+    struct Guard {
+        state: Mutex<(u64, bool)>,
+    }
+
+    impl Guard {
+        fn new() -> Self {
+            Self { state: Mutex::new((0, false)) }
+        }
+
+        fn apply(&self, seq: u64, blocked: bool) -> bool {
+            let Ok(mut guard) = self.state.lock() else { return false };
+            if seq <= guard.0 {
+                return false;
+            }
+            *guard = (seq, blocked);
+            true
+        }
+
+        fn blocked(&self) -> bool {
+            self.state.lock().map(|guard| guard.1).unwrap_or(false)
+        }
+    }
+
+    /// 新 true 建立后，旧 false（更小 seq）必须被拒绝。
+    #[test]
+    fn newer_true_rejects_late_older_false() {
+        let guard = Guard::new();
+        assert!(guard.apply(1, false), "首个 false 生效");
+        assert!(guard.apply(2, true), "新 true 生效");
+        assert!(!guard.apply(1, false), "旧 false 必须被拒绝");
+        assert!(guard.blocked(), "旧 false 晚到不得解除新 true");
+    }
+
+    /// 更新的 false 正常释放。
+    #[test]
+    fn newer_false_releases() {
+        let guard = Guard::new();
+        assert!(guard.apply(1, true));
+        assert!(guard.apply(2, false), "更新的 false 正常生效");
+        assert!(!guard.blocked());
+    }
+
+    /// 相同序号不重复生效（幂等且不倒退）。
+    #[test]
+    fn equal_seq_is_rejected() {
+        let guard = Guard::new();
+        assert!(guard.apply(1, true));
+        assert!(!guard.apply(1, false), "同序号不得改变状态");
+        assert!(guard.blocked());
+    }
+}

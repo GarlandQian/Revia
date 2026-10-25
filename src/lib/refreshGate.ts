@@ -1188,11 +1188,19 @@ export class CloseCoordinator {
         pending: this.pendingWorktrees(),
       };
     }
-    if (this.authorized === null) return { kind: "none" };
-    const intent = this.authorized;
-    this.authorized = null;
-    this.requested = null;
-    return { kind: "proceed", intent };
+    if (this.authorized !== null) {
+      const intent = this.authorized;
+      this.authorized = null;
+      this.requested = null;
+      return { kind: "proceed", intent };
+    }
+    // 还有**未授权**的原请求（用户尚未选择）：必须继续展示询问，
+    // 否则对话框被隐藏、requested 暗留，用户再也没有 Wait/Stay 可点
+    // （ST-B04-08-2 / SP-B04-08-3）。
+    if (this.requested !== null) {
+      return { kind: "ask", intent: this.requested, writing: [], pending: [] };
+    }
+    return { kind: "none" };
   }
 
   /**
@@ -1303,5 +1311,76 @@ export class CloseGuardGate {
   get blockedReason(): string | null {
     if (this.ready) return null;
     return this.reason;
+  }
+}
+
+/**
+ * 写操作的**共享异步生产编排入口**（任务 08，ST-B04-08-1/3、SP-B04-08-1/2）。
+ *
+ * App 的 stage/unstage/discard、restore、save-as 全部经同一个实例：
+ * `begin()` 负责「检查监听就绪 → 登记在途 → await 保护 → 失败回滚 + 真实 reconcile」，
+ * `end()` 负责收尾。Node 回归直接驱动**同一个类**，不手动补 reconcile。
+ *
+ * 关键点：
+ * - `begin()` 在 `await guard()` **之后**再复核一次监听就绪：保护建立期间
+ *   发生卸载/重装/失败时，不能带着「以为已保护」的状态开始执行 Git（ST-B04-08-1）。
+ * - 保护失败时执行 `rollback` + `reconcile`，让已授权的等待请求当场得到处理，
+ *   不留悬挂授权、不等下一笔无关写（ST-B04-08-3 / SP-B04-08-2）。
+ */
+export interface WriteGuardDeps {
+  /** 监听是否就绪（窗口关闭 + 原生退出都装好）。 */
+  guardsReady: () => boolean;
+  /** 监听未就绪时的可见原因。 */
+  guardBlockedReason: () => string | null;
+  /** 登记在途。 */
+  register: (worktreeId: string) => void;
+  /** 建立保护（例如 await 版本化 setExitBlocked(true)）。 */
+  guard: () => Promise<void>;
+  /** 保护失败/被撤销时的回滚。 */
+  rollback: (worktreeId: string) => void;
+  /** 统一收尾（写结束、保护失败都走它）。 */
+  reconcile: () => void;
+  /** 记录结束（needsVerification 表示结果待核对）。 */
+  endWrite: (worktreeId: string, needsVerification: boolean) => void;
+}
+
+export class WriteGuardOrchestrator {
+  private readonly deps: WriteGuardDeps;
+
+  constructor(deps: WriteGuardDeps) {
+    this.deps = deps;
+  }
+
+  /**
+   * 开始一次受保护的写操作；返回是否**可以执行 Git**。
+   *
+   * 返回 `false` 时已完成回滚与真实收尾，调用方不得执行写命令。
+   */
+  async begin(worktreeId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+    if (!this.deps.guardsReady()) {
+      return { ok: false, reason: this.deps.guardBlockedReason() ?? "" };
+    }
+    this.deps.register(worktreeId);
+    try {
+      await this.deps.guard();
+    } catch (error) {
+      this.deps.rollback(worktreeId);
+      // 真实收尾：已授权的等待请求当场处理，不悬挂。
+      this.deps.reconcile();
+      throw error;
+    }
+    // await 期间监听可能被卸载/重装/失败：必须复核，否则会带着未受保护状态写 Git。
+    if (!this.deps.guardsReady()) {
+      this.deps.rollback(worktreeId);
+      this.deps.reconcile();
+      return { ok: false, reason: this.deps.guardBlockedReason() ?? "" };
+    }
+    return { ok: true };
+  }
+
+  /** 结束一次写操作并统一收尾。 */
+  end(worktreeId: string, needsVerification: boolean): void {
+    this.deps.endWrite(worktreeId, needsVerification);
+    this.deps.reconcile();
   }
 }
