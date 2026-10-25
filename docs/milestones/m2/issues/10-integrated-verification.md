@@ -351,3 +351,7 @@ vmmap exit 255 系统根因与 Rust 振幅仍待定位。Status 保持 `ready-fo
 独占目录 `/private/tmp/revia-rust-memory-verify.aC01we` 按执行时记录精确 argv/cwd、显式非敏感环境、起止、真实退出码和完整双流。完整 Rust harness 为274 passed、0 failed、1既有 ignored；其中旧 `session_flow` 三项因默认 fixture 不存在而提前返回，首轮不能算其业务实测通过。随后用本轮新建隔离 fixture，显式 `REVIA_M1_FIXTURE` 补跑全部三项，真实读取/排版/高亮断言及耗时输出均完成、exit0；不把首轮漏验隐去。
 
 前端 `pnpm lint` 与 `pnpm build`（含 `tsc -b`）均exit0；Rust自动导出绑定后仅运行既有行尾空白规范化，143份源码检查前后SHA一致，diff-check exit0。未更改绑定语义、未放宽断言或新增跳过。当前只完成实现验证，下一步固定新增提交做独立 Standards / Spec 正式复核；尚未构建本轮 Release、GUI/D06/CI或正式长测。原Q98失败仍有效，任务10/11/M2未完成。
+
+### 2026-10-25 / Codex：Rust 减分配第一轮双轴仅文档发现，已修待复核
+
+固定 `201df2a...9e5c7d1`：Standards 确定1项P3、possible smell0；Spec1项P3，产品行为确定发现0、范围扩张0。两轴分别保留 `ST-RM-1` / `SP-RM-1`，不合并计数：当前矩阵末尾仍写布局回归“未执行”，D01余项“源码已写未测”也有歧义。已统一为本地回归执行且通过，只有新版实测/CI尚未完成；原始发现与首轮缺fixture事实保留。此次只改文档，按受影响范围运行diff-check，不重跑产品测试；待两轴核对闭合后才构建新版及正式实测。
