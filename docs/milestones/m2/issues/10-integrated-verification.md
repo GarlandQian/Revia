@@ -102,11 +102,20 @@ Windows 失败的实质是「Git 不能自动推断身份」。用 `user.useConf
 - 移除上面三行 `config` 后运行同一测试 → **失败**，
   `panic` 内容为 `git ["commit", "-m", "two"] 失败：作者身份未知`
   （Git 的中文本地化输出，等价 Windows 的 `Author identity unknown`），
-  位置 `review_marks.rs:860`。
-- 恢复三行后同一条件 → **通过**。
+  位置 `review_marks.rs:860`。对应原件：`sensitivity/pre-fix-useconfigonly.out/.err/.exit`
+  （修前代码 + fixture 内部全局配置 `user.useConfigOnly = true`，退出 101）。
+- 恢复三行后**同一条件**（`user.useConfigOnly = true`）通过 → **实施方此前报告过，
+  但当前留存原件不足以独立确认**。`sensitivity/` 里没有修复版 + 相同
+  `useConfigOnly` 条件的运行输出；最终 31 项通过那次使用的是 fixture 自建的
+  **空**全局配置，不能充当该正对照。此处不据缺件否认该次运行曾发生，只如实标注
+  证据不足。
 
-原件：`/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/`（`pre-fix-useconfigonly.out/.err/.exit`、
-`review_marks.rs.fixed` 修复版快照）。运行后已把测试文件恢复为修复版，
+`sensitivity/pre-fix.out/.err/.exit`（退出 0、测试通过）是**无效对照**：
+该次试图从外层传入隔离配置，但 fixture 在 `Command::env_clear()` 后自建空
+`.gitconfig`，外层 `GIT_CONFIG_GLOBAL` 被覆盖，所以修前代码也能通过；
+它不能证明任何身份推断条件。原件保留，仅作历史。
+
+修复版快照：`sensitivity/review_marks.rs.fixed`。运行后已把测试文件恢复为修复版，
 SHA 与最终检查一致（`a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9`）。
 
 #### 检查（最终一次集中验证）
@@ -131,8 +140,11 @@ SHA 与最终检查一致（`a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b
   **这些原始流已不可恢复**，不从记忆重造；该次运行的完整原件缺失。
 - 之后改用 `record2.py` 在隔离 HOME 下重跑并保留全部原件（即上表）。
 - 另有一次在未隔离 HOME 下的 `record2.py` 尝试因 `--offline` 找不到 `notify`
-  而失败（退出 101），其 `00-*.err` 保留在同一目录，属于环境隔离方式问题，
-  不是产品缺陷；已通过显式 `CARGO_HOME` 修正隔离方式后重跑。
+  而失败（退出 101）——此事**仅为此前实施方描述，对应原件现已缺失、无法独立核对**。
+  现存根目录与 `run-final-ZUIsp1/` 的两组 `00-*.out/.err/.exit` 均为成功（exit 0），
+  两个 `invocations.json` 记录的环境也都显式设置了隔离 HOME 与 `CARGO_HOME`，
+  不支持该失败描述。这里不补造输出或命令，也不把成功日志当作失败原件；
+  该次失败曾发生与否以实施方报告为准，不作独立证据。
 
 #### 未测边界
 
@@ -140,3 +152,38 @@ SHA 与最终检查一致（`a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b
   后的实际 CI 中验证。
 - 未构建 Release、未启动 GUI、未跑 D06/CI/长测、未推送/合并。
 - 旧 CI 失败原件由规划方保留，本任务不改写。
+
+### 2026-10-25 / Pi：两轴审查后的交付记录更正（仅文档）
+
+独立 Standards / Spec 两轴对 `d952a857b3faef2a4101ab5a6582217bd5a7c8e0` 的复核结论是
+**代码无确定缺陷**（fixture 只配置自建临时子模块的本地身份与禁签名，仍走真实 Git，
+gitlink/deinit/reinit 断言全部保留），但指出本任务交付记录有两处超出留存的证据。
+本次只更正 `docs/milestones/m2/issues/10-integrated-verification.md`，
+**未改生产代码、未改测试源码、未重跑任何测试**。
+
+审查来源：
+
+- Standards：`/private/tmp/revia-ci-fixture-standards-1PUoKq/standards.md`
+  （ST-CI-1 / P2 正对照结论超出证据；ST-CI-2 / P3 失败日志"已保留"描述不实）
+- Spec：`/private/tmp/revia-ci-fixture-spec-btOIT5/spec-review.md`
+  （SP-CI-1 / P3 敏感性通过陈述超出原件；SP-CI-2 / P3 失败原件归档描述不准确；
+  要求缺失/部分 0、范围扩张 0、错误实现 2，最高 P3）
+
+更正内容：
+
+1. 「恢复三行后同一条件 → 通过」改为**实施方此前报告过、但当前原件不足以独立确认**；
+   并明确 `sensitivity/pre-fix.out/.err/.exit`（exit 0、通过）是**无效对照**——
+   该次外层配置被 fixture 的 `Command::env_clear()` + 自建空 `.gitconfig` 覆盖，
+   修前代码也能通过；`pre-fix-useconfigonly.out/.err/.exit` 才是修前 + fixture 内部
+   `user.useConfigOnly = true` 的真实身份失败原件（exit 101）。
+2. 未隔离 HOME 下 `notify` 离线失败（101）改为**仅实施方描述、原件现已缺失、
+   无法独立核对**；现存两组 `00-*.out/.err/.exit` 均为成功（exit 0），
+   两个 `invocations.json` 都显式设置了隔离 HOME 与 `CARGO_HOME`，不支持该描述。
+
+保持不变（已核）：最终 `cargo test --offline --locked --test review_marks`
+**31 passed / 0 failed**、`git diff --check` 退出 0、测试源码前后及提交后 SHA 一致
+（`a2ff3004...7d4f9f9`）、无生成绑定改动；**Windows 仍需规划方再次推送 m2 后的实际 CI**。
+
+历史失败与无效证据**全部保留未删**：根目录与 `run-final-ZUIsp1/` 的成功原件、
+`sensitivity/pre-fix.*`（无效对照）、`sensitivity/pre-fix-useconfigonly.*`（真实失败）。
+本轮未删除任何已有文件。
