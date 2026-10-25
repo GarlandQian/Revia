@@ -271,3 +271,40 @@ HEAD 与工作树状态在检查前后未变（`head.txt`/`head-after.txt`、`st
 规划方已核后补5条原始检查exit0（Python32、tsc、lint、build、固定diff-check），代码hash匹配0a2d842；真实main的隔离mock复现仍证明误判通过与丢证缺口。原件[manifest](../evidence/q98-evidence-review01/manifest.json)区分初次缺件、后补实测、重建复现脚本与单独复跑，不覆盖历史。
 
 保持`ready-for-agent`。继续原Pi/当前DeepSeek按上述范围修完再集中最小验证，新增提交后复核；审查失败不算渠道错误，不触发换模。不运行新Release/GUI/CI/长测、不改Q98阈值/暖机/负载、不猜测性改Rust缓存。M2未通过、未合main、未启动M3。
+
+### 2026-10-25 / Pi：Q98 留证第一轮审查返修（ST-Q98-1、SP-Q98-1～5）
+
+**仍不是 M2/Q98 通过。** 本轮只修测量工具的成功资格与失败留证，未改阈值、暖机、
+负载、采样窗口/间隔，未定位 Rust +82 MiB 振幅，未做 GUI/Release/D06/CI/长测。
+
+| 发现 | 修复 |
+| --- | --- |
+| SP-Q98-1 / P1 增量损坏不能阻止成功 | `progress_problems` 与新增 `progress_consistency_errors` 现在**进入 `errors`**，坏 JSON、重复锚点/checkpoint、跨运行、锚点前记录、未闭合、未知类型、缺锚点一律使 `runCompleted=false`。锚点绑定本轮输出路径（`config.outputPath` = `REVIA_MEASURE_LOG`）与目标秒数，不匹配即失败。未终止尾行原文保留在 `progressEvidence.unterminatedTail`，不解析为进度。 |
+| SP-Q98-2 / P1 不完整报告借增量取得权威 | `finalize_phase_samples` 只在**最终报告含非空 `phaseCheckpoints`** 时才产出权威样本；否则样本标 `authoritative=false` 并在最终报告缺 checkpoint 时直接记错误。`analyze_q98` **只统计 `authoritative` 的压力后样本**，`q98MemoryVerdictAuthoritative` 要求 `ok=true` 且最终报告含 checkpoint。最终报告与进度并存时，`progress_consistency_errors` 校验 cycle 集合、压力标记与遮挡状态一致。 |
+| SP-Q98-3 / P2 清理异常丢失清理证据 | 抽出生产函数 `terminate_and_record`：逐步记录尝试（`terminateAttempted`/`killAttempted`）、返回（`terminateReturned`/`killReturned`）、异常（`terminateError`/`waitAfterTerminateError`/`killError`）、`wait` 结果与最终 poll；`signalDelivery` 只写 `unknown`/`not_attempted`，**不从退出码推断**。`finally` 外层再兜底记录，写证据失败也不吞掉终态。 |
+| SP-Q98-4 / P2 解析失败丢部分候选 | 抽出生产函数 `preserve_partial_candidate`，捕获**所有异常类型**（含 `RuntimeError` 解析失败、`TimeoutExpired`），保留已取得的 RSS/footprint 与可观测的 poll/PID/services。 |
+| SP-Q98-5 / P2 命令留证覆盖不完整 | `ps`、`notifyutil` 统一走 `CommandEvidence.run`，含 `TimeoutExpired` 的 `partialStdout/partialStderr` 与 `OSError` 记录；`launchctl` 仍只保留 WebKit services 行并注明裁剪，不落环境秘密。`run_timeout` 已并入 `run`，无第二条命令路径。 |
+| ST-Q98-1 / P2 回归未执行生产路径 | 新增 `_run_production_main` 驱动**真实 `bench.main()`**（只 mock 外部命令、进程、时钟与 `platform`），覆盖：坏进度/缺锚点仍失败、解析失败保全部分候选并写出清理终态、完整报告+干净进度为正对照成功。清理与候选保全分别由生产函数 `terminate_and_record`、`preserve_partial_candidate` 直接覆盖。**已删除**原先复制清理分支与候选语义的假测试。 |
+
+**检查**（对工作区源码的一次集中运行，独占目录
+`/private/tmp/revia-q98-r2.rAebmt`，`record.py` 执行时记录 argv/cwd/显式非敏感 env/
+起止/exit/完整 stdout+stderr，汇总 `invocations.json`）：
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `python3 tools/test_bench_long_running.py` | 0 | **43 passed** |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | 仅既存 warning |
+| `pnpm build` | 0 | — |
+| `git diff --check` | 0 | 无输出 |
+
+受测源码 SHA-256 检查前后一致（`tested-source-sha256-before/after.txt`）。
+
+**历史文案精确化（ST-Q98-2 后补闭合项）**：`0a2d842` 最初把指定目录称为"一次集中检查"
+原件，当时只有源码哈希与 patch；更早那次检查**会话中只有过滤摘要**，完整原始流未留存。
+`5e9b862` 后的检查是**独立重跑**，不回填为原检查，也不把原审查改写为零发现。
+本轮 `src/App.tsx` 测量代码已变更，旧 Release 仍来自 `2a51b160`，两者分清：
+App 测量源（当前工作区）≠ 受测 Release 二进制（`fd5ffc86…`）。
+
+**未测边界**：未启动 GUI、未发送真实系统通知、未向真实进程发信号、未跑长测；
+vmmap exit 255 系统根因与 Rust 振幅仍待定位。Status 保持 `ready-for-agent`。

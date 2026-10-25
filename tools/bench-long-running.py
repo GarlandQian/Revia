@@ -33,9 +33,13 @@ FULL_LOAD_COUNTERS = ("totalFileSwitches", "totalViewSwitches", "totalScrolls", 
 
 
 class CommandEvidence:
-    """Per-run append-only record of external sampling commands: argv, pid, timing,
-    exit/exception and raw stdout/stderr (including output captured before a timeout).
-    Failures stay failures; nothing is retried or replaced by this recorder."""
+    """Per-run append-only record of external sampling commands.
+
+    Every invocation records argv, purpose, timing, exit code or exception, and the raw
+    stdout/stderr actually captured — including whatever was already read when a timeout
+    fired. Nothing is retried or replaced here: a failure stays a failure, and callers
+    decide what to do with it.
+    """
 
     def __init__(self, path):
         self.path = path
@@ -45,35 +49,45 @@ class CommandEvidence:
             journal.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def run(self, argv, purpose, timeout):
-        started = datetime.datetime.now().astimezone().isoformat()
-        begin = time.monotonic()
-        completed = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
-        entry = {"kind": "command", "purpose": purpose, "argv": list(argv),
-                 "startedAt": started, "endedAt": datetime.datetime.now().astimezone().isoformat(),
-                 "durationSeconds": round(time.monotonic() - begin, 3),
-                 "returncode": completed.returncode,
-                 "stdout": completed.stdout, "stderr": completed.stderr}
-        self.record(entry)
-        completed.check_returncode()
-        return completed.stdout
+        """Run one external command under the audited boundary and record the outcome.
 
-    def run_timeout(self, argv, purpose, timeout):
-        """Like run(), but converts TimeoutExpired into evidence + re-raise, keeping partial output."""
+        Raises subprocess.CalledProcessError on a non-zero exit and TimeoutExpired on a
+        timeout, after the record is written; partial output is preserved for both.
+        """
         started = datetime.datetime.now().astimezone().isoformat()
         begin = time.monotonic()
         try:
-            return self.run(argv, purpose, timeout)
+            completed = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
         except subprocess.TimeoutExpired as error:
             self.record({"kind": "command", "purpose": purpose, "argv": list(argv),
-                         "startedAt": started, "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                         "startedAt": started,
+                         "endedAt": datetime.datetime.now().astimezone().isoformat(),
                          "durationSeconds": round(time.monotonic() - begin, 3),
-                         "exception": "TimeoutExpired",
-                         "timeoutSeconds": timeout,
-                         "partialStdout": error.output if isinstance(error.output, str) else
-                         (error.output or b"").decode("utf-8", "replace"),
-                         "partialStderr": error.stderr if isinstance(error.stderr, str) else
-                         (error.stderr or b"").decode("utf-8", "replace")})
+                         "exception": "TimeoutExpired", "timeoutSeconds": timeout,
+                         "partialStdout": _as_text(error.output),
+                         "partialStderr": _as_text(error.stderr)})
             raise
+        except OSError as error:
+            self.record({"kind": "command", "purpose": purpose, "argv": list(argv),
+                         "startedAt": started,
+                         "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                         "durationSeconds": round(time.monotonic() - begin, 3),
+                         "exception": type(error).__name__, "message": str(error)})
+            raise
+        self.record({"kind": "command", "purpose": purpose, "argv": list(argv),
+                     "startedAt": started,
+                     "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                     "durationSeconds": round(time.monotonic() - begin, 3),
+                     "returncode": completed.returncode,
+                     "stdout": completed.stdout, "stderr": completed.stderr})
+        completed.check_returncode()
+        return completed.stdout
+
+
+def _as_text(value):
+    if isinstance(value, str):
+        return value
+    return (value or b"").decode("utf-8", "replace")
 
 
 def webkit_services(domain):
@@ -154,7 +168,7 @@ def physical_footprint(pid, evidence=None):
     if evidence is None:
         output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
     else:
-        output = evidence.run_timeout(["vmmap", "-summary", str(pid)], "rust-footprint", 10)
+        output = evidence.run(["vmmap", "-summary", str(pid)], "rust-footprint", 10)
     return parse_footprint(output)
 
 
@@ -209,41 +223,42 @@ def webcontent_memory(pid, evidence=None):
     if evidence is None:
         output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
     else:
-        output = evidence.run_timeout(["vmmap", "-summary", str(pid)], "webcontent-memory", 10)
+        output = evidence.run(["vmmap", "-summary", str(pid)], "webcontent-memory", 10)
     return {"pid": pid, "footprintMb": parse_footprint(output),
             "webkitMallocAllocatedMb": parse_webkit_allocated(output)}
 
 
 class ProgressLog:
-    """Read the frontend's incremental `[SOAK_PROGRESS] {json}` records from the same log file.
+    """Read the frontend's incremental `[SOAK_PROGRESS] {json}` records from the run log.
 
-    These records exist only to explain an interrupted run. They are never a substitute
-    for the final frontend report: a run still requires a real `.frontend.json` with
-    ok/duration/load, so an incomplete run cannot be upgraded by progress alone.
+    Purpose: explain an interrupted run and cross-check phase windows. These records are
+    DIAGNOSTIC. They never substitute for the final frontend report, and they never make a
+    phase sample authoritative for acceptance.
 
-    Strictness: a trailing partial line is retained and never parsed as progress; records
-    must carry a matching run anchor, unique checkpoint ids, and only closed checkpoints
-    (endedAt present) are exposed.
+    Strictness: a trailing partial line is kept verbatim in `tail` and never parsed as
+    progress. The run anchor must match this driver invocation (output path and target
+    duration); records must share one anchor, carry unique integer cycles, and be closed.
     """
 
     def __init__(self, path):
         self.path = path
 
-    def read(self):
-        """Return (anchor, closedCheckpoints, problems).
+    def read(self, expected_output=None, expected_target=None):
+        """Return (anchor, closed_checkpoints, problems, tail).
 
-        anchor is the first `kind == "run"` record or None. problems lists every
-        integrity violation found; any problem must fail the run closed.
+        `problems` is a list of integrity violations; any problem must fail the run.
+        `tail` is the raw unterminated remainder, preserved for evidence.
         """
         try:
             data = self.path.read_bytes()
         except FileNotFoundError:
-            return None, [], ["缺少前端进度记录：日志文件不存在"]
-        # A trailing partial line (no terminating newline) is never treated as progress.
-        complete, _, _tail = data.rpartition(b"\n")
+            return None, [], ["缺少前端进度记录：日志文件不存在"], ""
+        head, separator, tail = data.rpartition(b"\n")
+        if not separator:
+            head, tail = b"", data
         anchor, closed, problems = None, [], []
         seen = set()
-        for raw in complete.split(b"\n"):
+        for raw in head.split(b"\n") if head else []:
             text = raw.decode("utf-8", "replace")
             marker = text.find("[SOAK_PROGRESS] ")
             if marker < 0:
@@ -261,6 +276,12 @@ class ProgressLog:
             if kind == "run":
                 if anchor is None:
                     anchor = record
+                    if expected_output is not None and record.get("outputPath") != expected_output:
+                        problems.append(
+                            f"运行锚点输出路径不匹配：记录 {record.get('outputPath')!r}，本轮 {expected_output!r}")
+                    if expected_target is not None and record.get("targetSeconds") != expected_target:
+                        problems.append(
+                            f"运行锚点目标时长不匹配：记录 {record.get('targetSeconds')!r}，本轮 {expected_target!r}")
                 elif record.get("runId") != anchor.get("runId"):
                     problems.append("进度记录出现第二个不同运行锚点")
                 continue
@@ -285,7 +306,9 @@ class ProgressLog:
                 continue
             seen.add(cycle)
             closed.append(record)
-        return anchor, closed, problems
+        if anchor is None:
+            problems.append("进度记录缺少运行锚点，不能确认属于本轮运行")
+        return anchor, closed, problems, tail.decode("utf-8", "replace")
 
 
 class CheckpointLog:
@@ -363,7 +386,10 @@ def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, starte
         if proc.poll() is not None:
             errors.append("采样前应用已退出")
         if pressure and not errors:
-            subprocess.run(["notifyutil", "-p", "org.WebKit.lowMemory"], check=True, timeout=5)
+            if evidence is None:
+                subprocess.run(["notifyutil", "-p", "org.WebKit.lowMemory"], check=True, timeout=5)
+            else:
+                evidence.run(["notifyutil", "-p", "org.WebKit.lowMemory"], "low-memory-notification", 5)
             posted = time.monotonic()
             sample["lowMemoryPostedElapsedSec"] = round(posted - started, 3)
             time.sleep(max(0.0, posted + PRESSURE_SETTLE_SECONDS - time.monotonic()))
@@ -408,13 +434,11 @@ def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, starte
 
 
 def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=None):
-    """Validate phase samples against checkpoint metadata.
+    """Validate phase samples. Acceptance metadata comes ONLY from the final report.
 
-    The authoritative source is the final frontend report. Only when that report is
-    absent (an interrupted run, which can never complete) do the frontend's incremental
-    progress records serve as the checkpoint source for DIAGNOSIS; each sample then
-    records `checkpointSource="progress-log"` so the provenance is never confused with
-    final evidence. Progress records with integrity problems contribute no metadata.
+    A final report that omits `phaseCheckpoints` (or reports an empty list) is a failure:
+    the frontend's incremental progress records may only fill DIAGNOSTIC metadata, and
+    such samples are never authoritative, so they cannot contribute acceptance samples.
     """
     def instant(value):
         result = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -423,19 +447,27 @@ def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=
         return result
 
     reported = frontend.get("phaseCheckpoints")
-    if isinstance(reported, list) and reported:
+    has_final = isinstance(reported, list) and bool(reported)
+    if has_final:
         source = "final-report"
     elif progress_checkpoints:
-        reported, source = progress_checkpoints, "progress-log"
+        source = "progress-log"
     else:
-        reported, source = None, "missing"
+        source = "missing"
 
     for sample in samples:
         errors = sample["errors"]
         sample["checkpointSource"] = source
+        sample["authoritative"] = source == "final-report"
         sample["checkpointEndConfirmed"] = checkpoints.has_ended(sample["checkpointId"])
         if not sample["checkpointEndConfirmed"]:
             errors.append("缺少匹配的 checkpoint END，不能确认静置窗口闭合")
+        if source == "missing":
+            errors.append("缺少最终前端报告的阶段 checkpoint，不能作为验收证据")
+            sample["errors"] = list(dict.fromkeys(errors))
+            sample["valid"] = False
+            sample["validation"] = "final"
+            continue
         matches = [item for item in reported if isinstance(item, dict) and item.get("cycle") == sample["checkpointId"]] \
             if isinstance(reported, list) else []
         if len(matches) != 1 or matches[0].get("file") != "src/staged.ts" or matches[0].get("view") != "split":
@@ -453,9 +485,35 @@ def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=
                 errors.append(f"前端 checkpoint 起止时间不可核验：{error}")
         sample["errors"] = list(dict.fromkeys(errors))
         sample["valid"] = not sample["errors"]
-        # Only a final frontend report makes a phase sample authoritative for acceptance.
-        sample["authoritative"] = source == "final-report"
         sample["validation"] = "final"
+
+
+def progress_consistency_errors(frontend, progress_checkpoints):
+    """When both a final report and progress records exist, they must describe the same run.
+
+    Progress is diagnostic, but a passing run whose incremental records contradict the
+    final report is not trustworthy evidence, so the mismatch fails the run.
+    """
+    reported = frontend.get("phaseCheckpoints")
+    if not isinstance(reported, list) or not reported or not progress_checkpoints:
+        return []
+    final_cycles = {item.get("cycle") for item in reported if isinstance(item, dict)}
+    progress_cycles = {item.get("cycle") for item in progress_checkpoints}
+    problems = []
+    if progress_cycles - final_cycles:
+        problems.append(f"进度记录包含最终报告没有的 checkpoint：{sorted(progress_cycles - final_cycles)}")
+    if final_cycles - progress_cycles:
+        problems.append(f"最终报告包含进度记录没有的 checkpoint：{sorted(final_cycles - progress_cycles)}")
+    final_by_cycle = {item.get("cycle"): item for item in reported if isinstance(item, dict)}
+    for record in progress_checkpoints:
+        final = final_by_cycle.get(record.get("cycle"))
+        if not final:
+            continue
+        if bool(final.get("pressure")) != bool(record.get("pressure")):
+            problems.append(f"checkpoint {record.get('cycle')} 的压力标记在最终报告与进度记录间不一致")
+        if final.get("hiddenDuringHold") != record.get("hiddenDuringHold"):
+            problems.append(f"checkpoint {record.get('cycle')} 的遮挡状态在最终报告与进度记录间不一致")
+    return problems
 
 
 def record_phase_samples(checkpoints, proc, services, started, samples, journal, evidence=None):
@@ -510,7 +568,10 @@ def q98_series(points):
 
 def analyze_q98(samples, phase_samples, start):
     cutoff = start + Q98_WARMUP_SECONDS
-    pressure = [s for s in phase_samples if s.get("pressure") and s["valid"] and s["samplingStartedElapsedSec"] >= cutoff]
+    # Only samples whose metadata came from the real final report may count for acceptance.
+    pressure = [s for s in phase_samples
+                if s.get("pressure") and s["valid"] and s.get("authoritative", False)
+                and s["samplingStartedElapsedSec"] >= cutoff]
     regular = [s for s in samples if s["elapsedSec"] >= cutoff and "rustFootprintMb" in s]
     series = {
         "webContentFootprintMb": q98_series([(s["samplingStartedElapsedSec"], s["webContentFootprintMb"]) for s in pressure]),
@@ -558,6 +619,91 @@ def completion_errors(frontend, samples, seconds, returncode, diagnostic=None, m
     if any(frontend.get(key, 0) <= 0 for key in (FOCUS_COUNTERS[focus] if focus else FULL_LOAD_COUNTERS)):
         errors.append("缺少必需的操作负载")
     return errors
+
+
+def terminate_and_record(proc, evidence, cleanup, services=None):
+    """Terminate the measured app and record every step, even when a call raises.
+
+    The record distinguishes three things that must not be conflated:
+      * the intent/attempt to call terminate()/kill() (`terminateAttempted`, `killAttempted`)
+      * whether that call returned without raising (`terminateReturned`, `killReturned`)
+      * whether the signal was actually delivered — which cannot be observed here and is
+        therefore reported as unknown, never asserted, and never inferred from exit code.
+    `proc.wait()` results and any exception are recorded, and the final poll is always
+    captured, so a raising wait() cannot destroy the cleanup evidence.
+    """
+    cleanup["startedAt"] = datetime.datetime.now().astimezone().isoformat()
+    cleanup["reviaPid"] = proc.pid
+    cleanup["servicesBeforeCleanup"] = services
+    poll_before = proc.poll()
+    cleanup["pollBeforeCleanup"] = poll_before
+    if poll_before is not None:
+        cleanup.update({"terminateAttempted": False, "terminateReturned": False,
+                        "killAttempted": False, "killReturned": False,
+                        "signalDelivery": "not_attempted",
+                        "note": "清理前主进程已退出；未发送信号"})
+    else:
+        cleanup["terminateAttempted"] = True
+        cleanup["terminateAttemptedAt"] = datetime.datetime.now().astimezone().isoformat()
+        try:
+            proc.terminate()
+            cleanup["terminateReturned"] = True
+            cleanup["signalDelivery"] = "unknown"
+        except Exception as error:  # noqa: BLE001 - record, never mask
+            cleanup["terminateReturned"] = False
+            cleanup["terminateError"] = f"{type(error).__name__}: {error}"
+            cleanup["signalDelivery"] = "unknown"
+        try:
+            cleanup["waitAfterTerminate"] = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            cleanup["waitAfterTerminate"] = "timeout"
+            cleanup["killAttempted"] = True
+            cleanup["killAttemptedAt"] = datetime.datetime.now().astimezone().isoformat()
+            try:
+                proc.kill()
+                cleanup["killReturned"] = True
+            except Exception as error:  # noqa: BLE001 - record, never mask
+                cleanup["killReturned"] = False
+                cleanup["killError"] = f"{type(error).__name__}: {error}"
+            try:
+                cleanup["waitAfterKill"] = proc.wait()
+            except Exception as error:  # noqa: BLE001 - record, never mask
+                cleanup["waitAfterKill"] = "error"
+                cleanup["waitAfterKillError"] = f"{type(error).__name__}: {error}"
+        except Exception as error:  # noqa: BLE001 - record, never mask
+            cleanup["waitAfterTerminate"] = "error"
+            cleanup["waitAfterTerminateError"] = f"{type(error).__name__}: {error}"
+    try:
+        cleanup["pollAfterCleanup"] = proc.poll()
+    except Exception as error:  # noqa: BLE001 - record, never mask
+        cleanup["pollAfterCleanup"] = "error"
+        cleanup["pollAfterCleanupError"] = f"{type(error).__name__}: {error}"
+    cleanup["endedAt"] = datetime.datetime.now().astimezone().isoformat()
+    evidence.record({"kind": "cleanup", **cleanup})
+    return cleanup
+
+
+def preserve_partial_candidate(candidate, sample, error, proc, services, evidence, partials):
+    """Keep everything a failing sampling candidate already obtained.
+
+    Any exception type (subprocess errors, parse RuntimeErrors, timeouts) must preserve
+    the values read so far plus whatever process state can still be observed.
+    """
+    if sample:
+        for key, value in sample.items():
+            candidate.setdefault(key, value)
+    candidate["failure"] = f"{type(error).__name__}: {error}"
+    candidate["reviaPid"] = getattr(proc, "pid", None)
+    try:
+        candidate["pollAtFailure"] = proc.poll()
+    except Exception as poll_error:  # noqa: BLE001 - record, never mask
+        candidate["pollAtFailure"] = "error"
+        candidate["pollAtFailureError"] = f"{type(poll_error).__name__}: {poll_error}"
+    candidate["servicesAtFailure"] = services
+    candidate["capturedAt"] = datetime.datetime.now().astimezone().isoformat()
+    partials.append(candidate)
+    evidence.record({"kind": "sample-failure", **candidate})
+    return candidate
 
 
 def binary_fingerprint(binary):
@@ -659,13 +805,9 @@ def main():
                     try:
                         sample = sample_memory(proc.pid, evidence)
                         candidate.update(sample)
-                    except (subprocess.SubprocessError, RuntimeError) as error:
-                        # Preserve whatever this candidate already obtained; never drop it silently.
-                        candidate.update({"failure": f"{type(error).__name__}: {error}",
-                                          "reviaPid": proc.pid, "pollAtFailure": proc.poll(),
-                                          "capturedAt": datetime.datetime.now().astimezone().isoformat()})
-                        partial_candidates.append(candidate)
-                        evidence.record({"kind": "sample-failure", **candidate})
+                    except Exception as error:  # noqa: BLE001 - every failure keeps its partial data
+                        preserve_partial_candidate(candidate, sample, error, proc, None,
+                                                   evidence, partial_candidates)
                         if proc.poll() is not None:
                             break
                         if now - started < 15:
@@ -686,15 +828,11 @@ def main():
                                 sample["networkingFootprintMb"] = sum(physical_footprint(child, evidence) for child in services["Networking"])
                             else:
                                 sample["webContentFootprintMb"] = sum(physical_footprint(child, evidence) for child in services["WebContent"])
-                        except subprocess.SubprocessError as error:
-                            # Keep the partial candidate (RSS already read, maybe rust footprint too).
-                            candidate.update({key: sample[key] for key in sample if key not in candidate})
-                            candidate.update({"failure": f"{type(error).__name__}: {error}",
-                                              "reviaPid": proc.pid, "pollAtFailure": proc.poll(),
-                                              "servicesAtFailure": services,
-                                              "capturedAt": datetime.datetime.now().astimezone().isoformat()})
-                            partial_candidates.append(candidate)
-                            evidence.record({"kind": "sample-failure", **candidate})
+                        except Exception as error:  # noqa: BLE001 - every failure keeps its partial data
+                            # Covers subprocess errors AND parse/format RuntimeErrors, so a
+                            # vmmap that exits 0 with unusable output cannot discard what was read.
+                            preserve_partial_candidate(candidate, sample, error, proc, services,
+                                                       evidence, partial_candidates)
                             if proc.poll() is not None:
                                 break
                             raise
@@ -709,31 +847,15 @@ def main():
         except (Exception, KeyboardInterrupt) as error:
             errors.append(f"{type(error).__name__}: {error}")
         finally:
-            # Record the cleanup attempt step by step. Whatever cannot be observed is
-            # reported as unknown, never inferred from the exit code or assumed.
-            cleanup_evidence["startedAt"] = datetime.datetime.now().astimezone().isoformat()
-            poll_before = proc.poll()
-            cleanup_evidence["pollBeforeCleanup"] = poll_before
-            cleanup_evidence["reviaPid"] = proc.pid
-            cleanup_evidence["servicesBeforeCleanup"] = initial_services
-            if poll_before is None:
-                cleanup_evidence["terminateSent"] = True
-                cleanup_evidence["terminateSentAt"] = datetime.datetime.now().astimezone().isoformat()
-                proc.terminate()
+            # Every cleanup step is recorded, including exceptions from terminate/kill/wait.
+            try:
+                terminate_and_record(proc, evidence, cleanup_evidence, initial_services)
+            except Exception as error:  # noqa: BLE001 - cleanup evidence must never vanish
+                cleanup_evidence["cleanupError"] = f"{type(error).__name__}: {error}"
                 try:
-                    cleanup_evidence["waitAfterTerminate"] = proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    cleanup_evidence["waitAfterTerminate"] = "timeout"
-                    cleanup_evidence["killSent"] = True
-                    cleanup_evidence["killSentAt"] = datetime.datetime.now().astimezone().isoformat()
-                    proc.kill()
-                    cleanup_evidence["waitAfterKill"] = proc.wait()
-            else:
-                cleanup_evidence["terminateSent"] = False
-                cleanup_evidence["note"] = "清理前主进程已退出；未发送信号"
-            cleanup_evidence["pollAfterCleanup"] = proc.poll()
-            cleanup_evidence["endedAt"] = datetime.datetime.now().astimezone().isoformat()
-            evidence.record({"kind": "cleanup", **cleanup_evidence})
+                    evidence.record({"kind": "cleanup", **cleanup_evidence})
+                except Exception as record_error:  # noqa: BLE001 - last resort
+                    errors.append(f"清理证据写入失败：{type(record_error).__name__}: {record_error}")
             try:
                 checkpoints.poll()
                 record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal, evidence)
@@ -746,11 +868,17 @@ def main():
             errors.append(f"前端报告无效：{error}")
     # Incremental frontend progress explains an interrupted run. It is diagnostics only:
     # it never satisfies completion, which still requires the real final report below.
-    progress_anchor, progress_checkpoints, progress_problems = progress_log.read()
+    progress_anchor, progress_checkpoints, progress_problems, progress_tail = progress_log.read(
+        expected_output=str(frontend_path), expected_target=seconds)
     finalize_phase_samples(phase_samples, checkpoints, frontend, progress_checkpoints)
     # The live journal is explicitly provisional; publish the same final validity as the report.
     phase_samples_path.write_text("".join(json.dumps(sample) + "\n" for sample in phase_samples))
     errors.extend(completion_errors(frontend, samples, seconds, proc.returncode, diagnostic, minimal_logging))
+    # Incremental progress integrity is part of the success gate: corrupt, duplicated,
+    # cross-run, unanchored or unclosed progress cannot accompany a passing run.
+    errors.extend(f"前端进度记录问题：{problem}" for problem in progress_problems)
+    errors.extend(f"前端进度与最终报告不一致：{problem}"
+                  for problem in progress_consistency_errors(frontend, progress_checkpoints))
     if not binary_unchanged(binary, binary_sha256):
         errors.append("受测二进制在运行期间被替换或移除，构建证据无效")
     report = {
@@ -768,14 +896,15 @@ def main():
         "commandEvidence": str(evidence_path),
         "cleanup": cleanup_evidence,
         "progressEvidence": {"anchor": progress_anchor, "closedCheckpoints": progress_checkpoints,
-                             "problems": progress_problems,
+                             "problems": progress_problems, "unterminatedTail": progress_tail,
                              "note": "中断诊断用；不构成最终前端报告或验收依据"},
         "memoryAnalysis": (None if diagnostic else analyze_memory(samples, frontend.get("setupSeconds", 0))),
         "phaseMemoryTimeSeries": phase_samples,
         # Diagnostic runs report the same Q98 numbers for comparison; only baselines count for acceptance.
         "q98MemoryVerdict": analyze_q98(samples, phase_samples, frontend.get("setupSeconds", 0)),
         # A verdict computed from progress-derived phase samples is diagnostic only.
-        "q98MemoryVerdictAuthoritative": bool(frontend.get("ok") is True),
+        "q98MemoryVerdictAuthoritative": bool(frontend.get("ok") is True)
+        and isinstance(frontend.get("phaseCheckpoints"), list) and bool(frontend.get("phaseCheckpoints")),
         "phaseMemorySummary": {
             "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),
             "invalidSampleCount": sum(not s["valid"] for s in phase_samples),
