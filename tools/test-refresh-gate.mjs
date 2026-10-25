@@ -1823,7 +1823,8 @@ test("恢复转发未赋值时不静默成功（返回 null 而不是伪造结�
 test("没有在途写操作时关闭请求立即执行（不打断任何 Git）", () => {
   const c = new CloseCoordinator();
   assert.deepEqual(c.request("close"), { action: "proceed" });
-  assert.equal(c.pendingIntent(), null);
+  // 请求本身即授权，但账留到原生裁决（ST-B06-08-1）。
+  assert.equal(c.pendingIntent(), "close");
 });
 
 test("有在途写操作时保留窗口并询问，不执行关闭", () => {
@@ -2627,7 +2628,7 @@ function makeExecutionEnv() {
   const deps = {
     coordinator,
     releaseExitGuard: async () => {},
-    performNative: async (intent) => { native.push(intent); },
+    performNative: async (intent) => { native.push(intent); return "completed"; },
     reconcile: () => { reconcileCalls += 1; },
     onError: (error) => errors.push(error),
   };
@@ -2754,4 +2755,182 @@ test("执行失败后仍有效的原动作交回编排，不悬挂", async () =>
   assert.equal(executed, false);
   assert.ok(env.reconcileCalls() >= 1, "必须交回编排");
   assert.equal(c.pendingIntent(), "close", "原动作仍保留");
+});
+
+// ---------------- 整批 B06：退出事件、失败状态与原生裁决 ----------------
+
+test("写结束早于退出事件：request 得到 proceed 后仍能执行原 exit（ST-B06-08-1 / SP-B06-08-1）", async () => {
+  const env = makeExecutionEnv();
+  const c = env.coordinator;
+  // A 写期间 Rust 拦住了 Quit，但 JS 事件还没跑；A 先结束。
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a");
+  // 事件现在才到：无在途写 → proceed。
+  assert.deepEqual(c.request("exit"), { action: "proceed" });
+  // 不能只 reconcile 得 none 就吞掉 Quit：必须认领并执行原 exit。
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "proceed");
+  assert.equal(decision.intent, "exit", "原动作必须是 exit，不能被吞掉");
+  const claimed = c.claimExecution();
+  assert.ok(claimed);
+  const executed = await runCloseExecution(env.deps, claimed);
+  assert.equal(executed, true);
+  assert.deepEqual(env.native, ["exit"]);
+});
+
+test("release/native 持续失败：只自动尝试一次，之后必须由用户重新决定（ST-B06-08-2 / SP-B06-08-2）", async () => {
+  const env = makeExecutionEnv();
+  const c = env.coordinator;
+  let releaseCalls = 0;
+  env.deps.releaseExitGuard = async () => { releaseCalls += 1; throw new Error("release 失败"); };
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+
+  // 第一次执行（自动）。
+  const claimed = c.claimExecution();
+  await runCloseExecution(env.deps, claimed);
+  assert.equal(releaseCalls, 1, "只自动尝试一次");
+  assert.equal(env.errors.length, 1, "失败必须可见");
+
+  // 失败后授权被取消：reconcile 必须回到询问，而不是再次自动执行。
+  const after = c.reconcile();
+  assert.equal(after.kind, "ask", "失败后必须让用户重新选择");
+  assert.equal(after.intent, "exit", "原意图保留");
+  assert.equal(c.claimExecution(), null, "没有授权就不能再自动认领");
+  assert.equal(releaseCalls, 1, "不得无界自动重试");
+
+  // 用户明确再次选择等待 → 才重试。
+  c.resolveAsk("wait");
+  const retry = c.claimExecution();
+  assert.ok(retry, "用户重新选择后可以重试");
+  await runCloseExecution(env.deps, retry);
+  assert.equal(releaseCalls, 2);
+});
+
+test("失败后用户可以选 Stay（真实可留在应用）", async () => {
+  const env = makeExecutionEnv();
+  const c = env.coordinator;
+  env.deps.performNative = async () => { throw new Error("native 失败"); };
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  await runCloseExecution(env.deps, c.claimExecution());
+  assert.equal(c.reconcile().kind, "ask");
+  c.resolveAsk("stay");
+  assert.equal(c.reconcile().kind, "none", "Stay 后不再询问也不关闭");
+  assert.equal(c.pendingIntent(), null);
+});
+
+test("投递不是完成：close 投递后 B 开始写，请求必须保留（事件在回包后）（ST-B06-08-3 / SP-B06-08-3）", async () => {
+  const env = makeExecutionEnv();
+  const c = env.coordinator;
+  const delivered = deferred();
+  env.deps.performNative = async () => {
+    // 投递：立刻返回 delivered，但窗口还没真正关。
+    delivered.resolve();
+    return "delivered";
+  };
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const claimed = c.claimExecution();
+  const running = runCloseExecution(env.deps, claimed);
+  await delivered.promise;
+  // 投递期间 B 开始写（关闭事件会被 B 拦住）。
+  c.beginWrite("wt-b");
+  await running;
+  assert.equal(c.pendingIntent(), "exit", "原 exit 必须保留，不能被改成 close");
+  // B 结束后仍要执行原动作。
+  c.endWrite("wt-b");
+  const again = c.claimExecution();
+  assert.equal(again.intent, "exit", "动作仍是 exit");
+});
+
+test("投递不是完成：关闭事件先于回包到达时同样保留请求", async () => {
+  const env = makeExecutionEnv();
+  const c = env.coordinator;
+  let deliverResolve;
+  const gate = new Promise((resolve) => { deliverResolve = resolve; });
+  env.deps.performNative = async () => { await gate; return "delivered"; };
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const claimed = c.claimExecution();
+  const running = runCloseExecution(env.deps, claimed);
+  // 关闭事件先到：B 开始写 → 事件被拦。
+  c.beginWrite("wt-b");
+  const decision = c.request("close");
+  assert.equal(decision.action, "ask", "B 在途 → 必须拦住");
+  deliverResolve();
+  await running;
+  assert.equal(c.pendingIntent(), "close", "请求保留");
+  assert.equal(c.reconcile().kind, "ask", "仍在询问，不能静默关闭");
+});
+
+test("原生裁决放行才清账", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const claimed = c.claimExecution();
+  c.releaseClaimAwaitingVerdict(claimed.claimId);
+  assert.equal(c.pendingIntent(), "exit", "投递后仍保留");
+  c.completeVerdict();
+  assert.equal(c.pendingIntent(), null, "裁决放行后才清账");
+});
+
+test("重复 reconcile 在旧 claim 未结束时不重复投递", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const first = c.claimExecution();
+  assert.ok(first);
+  assert.equal(c.claimExecution(), null, "已有 claim 时不得再认领");
+  c.releaseClaimAwaitingVerdict(first.claimId);
+  assert.ok(c.claimExecution(), "释放后可以再次认领");
+});
+
+test("旧 claim 晚回/失败不清新 claim（排他，不能只按 requestGeneration）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const old = c.claimExecution();
+  c.releaseClaimAwaitingVerdict(old.claimId);
+  const fresh = c.claimExecution();
+  assert.ok(fresh);
+  assert.notEqual(fresh.claimId, old.claimId);
+  // 旧 claim 的完成/失败都不能影响新 claim。
+  assert.equal(c.completeExecution(old.claimId), false);
+  assert.equal(c.failExecution(old.claimId), false);
+  assert.equal(c.pendingIntent(), "close", "新 claim 的请求仍在");
+  assert.equal(c.completeExecution(fresh.claimId), true);
+});
+
+test("A/B→Stay 反例仍然通过：旧回包不关窗", async () => {
+  const env = makeExecutionEnv();
+  const c = env.coordinator;
+  const release = deferred();
+  env.deps.releaseExitGuard = () => release.promise;
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const claimed = c.claimExecution();
+  const running = runCloseExecution(env.deps, claimed);
+  c.beginWrite("wt-b");
+  c.request("close");
+  c.resolveAsk("stay");
+  release.resolve();
+  await running;
+  assert.deepEqual(env.native, [], "Stay 后不得关窗");
 });

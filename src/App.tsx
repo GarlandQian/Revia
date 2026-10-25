@@ -771,8 +771,13 @@ export function App() {
       let exitGuard = false;
       try {
         const stop = await getCurrentWindow().onCloseRequested(async (event) => {
-          const decision = closeCoordinatorRef.current.request("close");
-          if (decision.action === "proceed") return;
+          const coordinator = closeCoordinatorRef.current;
+          const decision = coordinator.request("close");
+          if (decision.action === "proceed") {
+            // 原生裁决：窗口即将真正关闭，此时才清账。
+            coordinator.completeVerdict();
+            return;
+          }
           event.preventDefault();
           if (!disposed) reconcileCloseRef.current?.();
         });
@@ -1101,12 +1106,17 @@ export function App() {
    * 代际与所有权判断全部在共享入口 `runCloseExecution` 里，App 与 Node 回归同源。
    */
   const performCloseIntent = useCallback(async (
-    claimed: { intent: CloseIntent; generation: number },
+    claimed: { intent: CloseIntent; generation: number; claimId: number },
   ) => {
     await runCloseExecution({
       coordinator: closeCoordinatorRef.current,
       releaseExitGuard: () => syncExitBlocked(false),
-      performNative: () => getCurrentWindow().close(),
+      // Tauri `close()` 只投递 CloseRequested，不确认窗口销毁：
+      // 因此返回 "delivered"，真正的清账由原生裁决（关闭事件被放行）决定。
+      performNative: async () => {
+        await getCurrentWindow().close();
+        return "delivered" as const;
+      },
       reconcile: () => reconcileCloseRef.current?.(),
       onError: (caught) => setAppError(toAppError(caught), null),
     }, claimed);

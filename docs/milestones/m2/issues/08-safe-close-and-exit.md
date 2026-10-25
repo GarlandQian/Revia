@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -582,3 +582,78 @@ Possible Duplicated Code判断建议1项：上述重复版本算法易漂移，�
 统计：Standards3、最严重P2、判断建议0；Spec3、最严重P2、范围扩张0。两个轴不合并计数。Rust生产`ExitGuard`与测试共用、旧release await后Stay校验已有静态改善，不再重复计旧项。
 
 **检查与证据边界**：六条实际调用均退出0（Node156、Rust exit_guard3、tsc/lint/build/diff-check）；79份受测源码检查前/后/固定提交/当前磁盘SHA全部一致，未重复运行测试。`invocations.json`保留真实argv/cwd、显式非敏感环境覆盖与时间；不声称完整继承环境。Pi报告的敏感性2失败/1通过未附原始修改源码/失败日志，仅作实施方报告，不算独立核验。新增Node用例中reconcile仅计数、native仅记录，尚不能证明真实App重入/原生回调闭环。见[检查记录](../batch05-repair-validation.md)与[清单](../evidence/batch05-repair/manifest.json)。08改回ready-for-agent；整批交原Pi，未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
+
+### 2026-10-25 / Pi 实现：整批 B06 返修（退出事件、失败状态与原生裁决）
+
+起点 `95d37df`（生产 `013e1fa`），实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`。
+逐项修 ST-B06-08-1..3 / SP-B06-08-1..3。
+
+#### ST-B06-08-1 / SP-B06-08-1（正常 Quit 被吞掉）
+
+根因：`request()` 在无在途写时清掉 `requested`/`authorized` 并返回 `proceed`，
+App 只 `reconcile()` 就得到 `none`，Quit 被吞。
+
+现在 `request()` 在无阻塞时把**这次请求本身**记为授权（`authorized = requested`），
+**不清账**；`reconcile()` 随即返回 `proceed` 与正确的原动作。
+「A 结束 → 退出事件才到」的交错因此能完整执行原 `exit`。
+
+#### ST-B06-08-2 / SP-B06-08-2（失败后无界自动重试）
+
+根因：`runCloseExecution` 的 catch 保留授权并 `reconcile()`，App 再次 claim 执行，
+形成无界循环。
+
+新增 `failExecution(claimId)`：释放认领并**取消自动授权**，但保留原请求。
+之后 `reconcile()` 返回 `ask`，用户必须重新明确选择（等待/重试 或 留在应用）才会重试。
+失败仍通过 `onError` 如实上报，不隐藏。
+
+#### ST-B06-08-3 / SP-B06-08-3（投递被误当完成）
+
+根因：Tauri `close()` 只投递 `CloseRequested`，不确认销毁；回包就 `completeExecution`
+会清掉原请求，导致 B 拦截关闭后原 `exit` 丢失或被改成 `close`。
+
+现在区分两个阶段：
+
+- `performNative` 返回 `"delivered"`（已投递、裁决未定）或 `"completed"`（已确认完成）；
+- `"delivered"` → `releaseClaimAwaitingVerdict(claimId)`：释放认领但**保留授权与原请求**；
+- 原生裁决放行（`onCloseRequested` 里 `decision.action === "proceed"`）才调用
+  `completeVerdict()` 清账；
+- 认领改为**排他**：`claimExecution()` 在已有认领时返回 `null`（不重复投递），
+  每个 claim 带 `claimId`；旧 claim 的 `completeExecution` / `failExecution` /
+  `abandonExecution` 对不上 `claimId` 时返回 `false`，**旧回包不会清新 claim**。
+
+#### 回归（Node，生产同源）
+
+`tools/test-refresh-gate.mjs` **165 项通过**。B06 新增 9 项，全部驱动
+`CloseCoordinator` + `runCloseExecution`（App 的 `performCloseIntent` 是薄包装）：
+
+- 写结束早于退出事件 → 仍执行原 `exit`；
+- release 持续失败 → **只自动尝试一次**，之后必须用户重新选择，且可 Stay；
+- 失败后 Stay 真实可留在应用；
+- close 投递后 B 开始写（回包后 / 事件前两种顺序）→ 原 `exit`/`close` 都保留；
+- 原生裁决放行才清账；
+- 重复 `reconcile` 在旧 claim 未结束时不重复投递；
+- 旧 claim 晚回/失败不清新 claim（排他，不只按 `requestGeneration`）；
+- A/B→Stay 反例仍通过。
+
+#### 检查（唯一日志目录）
+
+`/private/tmp/revia-b06-jQhG5C`（`record.py` 执行时逐条记录真实 argv/cwd/显式非敏感环境/start/end/exit/stdout/stderr，
+汇总在 `invocations.json`；`tested-source-sha256-before/-after.txt` 覆盖 79 个受测源文件，
+排除 `src/types/bindings`、`src-tauri/gen`、`dist`、`target`、验收原件与文档）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 165 / pass 165 / fail 0 |
+| `cargo test --lib exit_guard` | 0 | 3 passed（生产 `ExitGuard`） |
+| `git diff --check` | 0 | — |
+
+79 份受测源码 SHA 前后逐份一致。本轮未改 Rust 生产代码，只跑匹配的接收端测试。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 的实际拦截与裁决、
+  close 投递后 B 拦截的真实时序、失败后 Stay 的实际观感，均需规划方在固定 Release 上验收。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。

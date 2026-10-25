@@ -1067,8 +1067,9 @@ export class CloseCoordinator {
   private authorized: CloseIntent | null = null;
   /** 请求代际：每次新的请求或 Stay 取消都递增。 */
   private requestGeneration = 0;
-  /** 已被认领、正在执行原生动作的代际（0 表示没有执行中的动作）。 */
-  private executingGeneration = 0;
+  /** 认领序号：只有最新一次认领可以完成/撤销（排他，ST-B06-08-3）。 */
+  private claimSeq = 0;
+  private activeClaimId = 0;
 
   /** 当前请求代际（核对流程必须捕获它）。 */
   generation(): number {
@@ -1147,11 +1148,12 @@ export class CloseCoordinator {
       }
       return { action: "ask", writing: [...this.writing] };
     }
-    // 无在途写、无待核对：直接执行原请求。
-    const action = this.requested;
-    this.requested = null;
-    this.authorized = null;
-    return action === null ? { action: "proceed" } : { action: "proceed" };
+    // 无在途写、无待核对：用户这次请求本身就是授权，立即可执行。
+    //
+    // **不清账**：原请求与授权保留到原生动作完成（ST-B05-08-1），
+    // 这样「写结束早于退出事件」时仍能执行原退出（ST-B06-08-1 / SP-B06-08-1）。
+    this.authorized = this.requested;
+    return { action: "proceed" };
   }
 
   /**
@@ -1219,11 +1221,14 @@ export class CloseCoordinator {
    *
    * 认领后授权**仍然保留**，直到 `complete()` 或代际变化。
    */
-  claimExecution(): { intent: CloseIntent; generation: number } | null {
+  claimExecution(): { intent: CloseIntent; generation: number; claimId: number } | null {
     if (this.authorized === null) return null;
     if (this.writing.size > 0 || this.pending.size > 0) return null;
-    this.executingGeneration = this.requestGeneration;
-    return { intent: this.authorized, generation: this.requestGeneration };
+    // 排他：已有认领在执行时不重复投递。
+    if (this.activeClaimId !== 0) return null;
+    this.claimSeq += 1;
+    this.activeClaimId = this.claimSeq;
+    return { intent: this.authorized, generation: this.requestGeneration, claimId: this.activeClaimId };
   }
 
   /** 这次认领是否仍然有效（代际未变、仍无在途写与待核对）。 */
@@ -1233,22 +1238,66 @@ export class CloseCoordinator {
       && this.pending.size === 0;
   }
 
-  /** 原生动作已完成：清掉授权与原请求。 */
-  completeExecution(generation: number): void {
-    if (this.requestGeneration !== generation) return;
+  /**
+   * 原生动作**已完成**（确认窗口销毁/进程退出）：清掉授权与原请求。
+   *
+   * 只接受**当前**认领；旧认领晚回不得清新认领（ST-B06-08-3）。
+   */
+  completeExecution(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
     this.authorized = null;
     this.requested = null;
-    this.executingGeneration = 0;
+    this.activeClaimId = 0;
+    return true;
+  }
+
+  /**
+   * 原生动作**已投递但裁决未定**（Tauri `close()` 只投递 CloseRequested）。
+   *
+   * 释放认领但**保留授权与原请求**：若关闭事件被新写入拦住，
+   * 之后仍要执行原动作（ST-B06-08-3 / SP-B06-08-3）。
+   */
+  releaseClaimAwaitingVerdict(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
+    this.activeClaimId = 0;
+    return true;
+  }
+
+  /**
+   * 执行失败：释放认领并**取消自动授权**，但保留原请求。
+   *
+   * 之后 `reconcile()` 返回 `ask`，用户必须重新明确选择（等待/重试 或 留在应用），
+   * 不会自动重试（ST-B06-08-2 / SP-B06-08-2）。
+   */
+  failExecution(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
+    this.activeClaimId = 0;
+    this.authorized = null;
+    return true;
   }
 
   /** 原生动作被放弃（代际变化/条件不再满足）：授权交给编排继续等待。 */
-  abandonExecution(): void {
-    this.executingGeneration = 0;
+  abandonExecution(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
+    this.activeClaimId = 0;
+    return true;
+  }
+
+  /**
+   * 原生裁决已放行（窗口确实要关闭）：此时才清掉授权与原请求。
+   *
+   * 与 `completeExecution(claimId)` 的区别：投递 close 时认领可能已释放
+   * （`releaseClaimAwaitingVerdict`），裁决到达时用这个入口清账。
+   */
+  completeVerdict(): void {
+    this.authorized = null;
+    this.requested = null;
+    this.activeClaimId = 0;
   }
 
   /** 是否已有执行中的原生动作。 */
   isExecuting(): boolean {
-    return this.executingGeneration !== 0;
+    return this.activeClaimId !== 0;
   }
 
   /**
@@ -1437,8 +1486,13 @@ export interface CloseExecutionDeps {
   coordinator: CloseCoordinator;
   /** 退出前解除原生阻止标志（版本化，await）。 */
   releaseExitGuard: () => Promise<void>;
-  /** 真正执行原生关闭/退出。 */
-  performNative: (intent: CloseIntent) => Promise<void>;
+  /**
+   * 投递原生关闭/退出请求。
+   *
+   * 返回 `"delivered"` 表示**已投递、裁决未定**（Tauri close 的常态）；
+   * 返回 `"completed"` 表示原生动作已确认完成（例如窗口已销毁）。
+   */
+  performNative: (intent: CloseIntent) => Promise<"delivered" | "completed">;
   /** 重新回到编排（展示询问 / 继续等待 / 再执行）。 */
   reconcile: () => void;
   /** 执行失败时的上报。 */
@@ -1450,31 +1504,39 @@ export interface CloseExecutionDeps {
  */
 export async function runCloseExecution(
   deps: CloseExecutionDeps,
-  claimed: { intent: CloseIntent; generation: number },
+  claimed: { intent: CloseIntent; generation: number; claimId: number },
 ): Promise<boolean> {
   const { coordinator } = deps;
   try {
     if (claimed.intent === "exit") {
       await deps.releaseExitGuard();
       if (!coordinator.isExecutionValid(claimed.generation)) {
-        coordinator.abandonExecution();
+        coordinator.abandonExecution(claimed.claimId);
         deps.reconcile();
         return false;
       }
     }
     // 关窗之前最后校验：这是真正会销毁窗口的调用。
     if (!coordinator.isExecutionValid(claimed.generation)) {
-      coordinator.abandonExecution();
+      coordinator.abandonExecution(claimed.claimId);
       deps.reconcile();
       return false;
     }
-    await deps.performNative(claimed.intent);
-    coordinator.completeExecution(claimed.generation);
-    return true;
+    // Tauri `close()` 只**投递** CloseRequested，不确认窗口销毁。
+    // 因此这里只释放认领、保留授权与原请求；真正的清账由原生裁决回调决定。
+    const delivered = await deps.performNative(claimed.intent);
+    if (delivered === "completed") {
+      coordinator.completeExecution(claimed.claimId);
+      return true;
+    }
+    // 投递完成但裁决未定：若期间已出现新写入，请求必须保留下来。
+    coordinator.releaseClaimAwaitingVerdict(claimed.claimId);
+    deps.reconcile();
+    return false;
   } catch (error) {
-    coordinator.abandonExecution();
+    // 失败：释放认领、取消自动授权（保留原请求），等用户重新决定。
+    coordinator.failExecution(claimed.claimId);
     deps.onError(error);
-    // 失败后把仍有效的原动作交回编排，不让请求悬挂。
     deps.reconcile();
     return false;
   }
