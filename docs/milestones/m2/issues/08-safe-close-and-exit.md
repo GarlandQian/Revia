@@ -873,3 +873,9 @@ B 结束 → 重新投递原 `exit`（`exit` 出现 ≥2 次、`close` 0 次）�
 统计：Standards2、最高P2、建议0；Spec2（缺失1/错误1）、最高P2、范围扩张0。两个轴独立保留。原生allow/prevent已收进共享入口，但“新请求可执行”测试只验证再次投递而未完成新裁决，门禁测试只断言helper，不代表生产接线。
 
 **检查边界**：最终5条真实记录均退出0，Node177、tsc/lint/build/diff-check；79份受测源码before/after/固定提交/磁盘SHA相同，未重跑。早期诊断失败没有完整原始流在提供目录中，不补造、不声称全部尝试成功。Rust未改未重跑。见[第八轮记录](../batch08-repair-validation.md)及[清单](../evidence/batch08-repair/manifest.json)。08回ready-for-agent；原Pi已idle，本轮复核后暂未派发下一轮，Q105未改变，规划方尚未接手生产实现。未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
+
+### 2026-10-25 / 用户授权：Codex 接手本次剩余修复（Q108）
+
+用户明确要求“你来修”。Codex 从干净 `64aa4ecfee729cfb185bd3c7a85288b60a54bda5` 接手 ST-B09-08-1/2 与 SP-B09-08-1/2；原 Pi 保持停止。本次是 Q105 的限定例外，授权记录见 `docs/README.md` Q108，不再派发 Pi，也不把审查返修次数解释为渠道连续三次报错。
+
+只修任务 08 的关闭投递/回包/裁决所有权及实际共享写入口门禁，并补同源并发回归；集中检查后分别进行 Standards / Spec 复核。全部静态闭合后才固定 Release 与真实桌面验收，不提前合并，08 暂保持 `ready-for-agent`。合并顺序仍为独立验收 `m2-ui` → 合回 `m2` → 最终集成验收 → squash main。
