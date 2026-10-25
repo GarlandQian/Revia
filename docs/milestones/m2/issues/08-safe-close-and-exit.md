@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -467,3 +467,22 @@ end():   endWrite + reconcile
 - **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 实际拦截、切换 worktree 期间的真实观感、
   待核对闭环流程，均需规划方在固定 Release 上验收。
 - 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。
+
+### 2026-10-25 / 规划方：e1ab47d 第四轮限定复核，前轮三项闭合但仍不通过
+
+固定 `git diff f92c968689b7ac312c30b6446e74b54c717dcfe6...e1ab47d10f1753722c4f2e61b1f71786ccf63470`，6文件。两个轴独立计数，行号对应e1ab47d。
+
+#### Standards：确定违反2项（P2二：运行时1、验证规范1），Fowler判断建议1项
+
+1. **ST-B05-08-1 / P2 / 旧异步proceed越过Stay**：`refreshGate.ts:1193`在原生关闭完成前消费并清空授权/原请求，`App.tsx:1127`隐藏询问，但`:1081`退出保护IPC仍可挂起。确定交错：A写期间Quit→Wait；A完成后旧退出回包挂起；用户启动B，请求关闭并选Stay；B完成后旧回包恢复，`:1082`不核请求代际直接close，监听见无写就放行，Stay后仍关窗。若B尚在途，`:774`会将原exit登记为close。违反 `technical-direction.md:56` Q96留在应用/执行原请求。授权所有权须延续到原生动作完成，await后检查请求代际及真实在途/pending；旧回包不能执行已取消请求，也不能更换原动作。
+2. **ST-B05-08-2 / P2 / Rust测试复制接收端**：`commands.rs:1042`测试Guard::apply复制生产AppState::apply_exit_guard（`:72`）；三测试只调副本，生产比较退化仍绿。任务08`:443`称其真实生产接收端不实。违反 `local-validation.md:16`生产入口证据要求。调用实际生产对象或提取生产/测试共用的小接收器，别再复制算法。
+
+Possible Duplicated Code判断建议1项：上述重复版本算法易漂移，关联ST-B05-08-2，不额外计为确定违反。
+
+#### Spec：缺失/部分1项（P2），范围扩张0项，实现错误0项
+
+1. **SP-B05-08-1 / P2 / 真实Rust回归未接入**：`spec.md:149`要求“从应用操作入口验证可观察行为”，任务08前轮`:385`要求真实版本接收端。`commands.rs:1033/1042/1059`自建Guard并复制算法，不经过生产方法，未满足这项验证要求；本轮报告`:443`扩大证据。应共享生产接收实现并更正。这不是判定当前版本锁算法有错。
+
+统计：Standards2、最严重P2（建议1）；Spec1、最严重P2。前轮监听切换、晚Wait按钮、rollback真实收尾的直接路径已闭合，不反复计旧项；新异步授权生命周期与真实接收端回归成批交原Pi。
+
+**原始检查边界**：Node150、Rust新测试3与lib103、前端退出0；首次diff-check2及清理后0均保留。6份前后SHA匹配固定提交；72路径清单无72份before/after哈希。runner写第二Rust为session_flow，但原始stdout是lib103，不把runner当精确执行日志。见[检查记录](../batch04-repair-validation.md)与[清单](../evidence/batch04-repair/manifest.json)。不补造缺失记录，下一轮逐命令真实落盘。08保持ready-for-agent，未新Release/桌面/D06/CI/长测/推送/合并，10/11/M2未完成。
