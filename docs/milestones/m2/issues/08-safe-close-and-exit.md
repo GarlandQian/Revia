@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -761,3 +761,21 @@ A/B→Stay 反例等）。
 - **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 实际拦截与裁决、close 投递后 B 拦截的真实时序、
   Stay 后旧原生事件的实际到达顺序、失败后 Stay 的观感，均需规划方在固定 Release 上验收。
 - 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。
+
+### 2026-10-25 / 规划方：520f134 第七轮限定复核，剩余原生裁决两项未闭合
+
+固定`git diff 332097b6c0e95b77327f55d1894787545a4cacf2...520f134ff995010d87d885594d99d3518213e725`，4文件，行号对应520f134。旧同步递归、delivered立即重投已静态闭合，不重复计旧项。
+
+#### Standards：确定违反2项P2，Fowler建议0项
+
+1. **ST-B08-08-1 / P2 / 已投递close仍越过Stay**：`App.tsx:778/787`只凭hasInFlight就放行原生事件，`refreshGate.ts:1656/1689`Stay后不核该投递代际、不向适配返回阻止决定。A写Quit→Wait→A结束→close已发送但事件暂缓，此时询问仍可见，用户Stay后旧事件到达依然销毁窗口。违反`technical-direction.md:56` Q96留在应用。驱动内部忽略事件不等于Tauri preventDefault，必须把允许/阻止原生动作作为同源决定。
+2. **ST-B08-08-2 / P2 / 早到阻止裁决被晚回包覆盖**：`refreshGate.ts:1705`只处理pendingVerdict，executing期事件被B拦时inFlight未标记已收到裁决；`:1782`晚delivered覆盖成awaitingVerdict。B结束`:1677`不再推进，原exit悬挂。违反Q96正常完成执行原请求。需要让投递结果与原生裁决分别有归属，先收到哪个都不丢终结状态。
+
+#### Spec：缺失/部分0项、范围扩张0项、实现错误2项P2
+
+1. **SP-B08-08-1 / P2**：`App.tsx:778/787`与`refreshGate.ts:1656/1689`，Stay后的旧原生关闭仍被放行，违反`spec.md:126`“留在应用”。
+2. **SP-B08-08-2 / P2**：`App.tsx:782`与`refreshGate.ts:1705/1782/1677`，关闭事件先于IPC回包且被B拦后，晚回包使原退出永久等待，违反`spec.md:127`完成后执行原请求。
+
+统计：Standards2、最高P2、建议0；Spec2、最高P2、范围扩张0。两轴独立保留。共享CloseDriver已有推进，但App仍含原生放行决策；Node native只记投递，测试手动调用裁决，不能证明真实适配事件路径。所谓“Stay旧原生事件”测试实际只挂起release而未发送close；早到事件测试未完成B结束后的断言。下一轮对实际完整交错验证，不能继续换成更早的await。
+
+最终5条检查退出0：Node172、tsc/lint/build/diff-check；79份前/后/固定提交/当前磁盘SHA一致。此前Paseo诊断活动有Node失败与过滤输出，提供目录没有完整失败流，不补造；绿色只对应最终记录的5条。Pi称runCloseExecution已删除，但源文件仍保留未使用导出，只是App不再调用，纠正报告边界。原件见[第七轮记录](../batch07-repair-validation.md)及[清单](../evidence/batch07-repair/manifest.json)。08回ready-for-agent，未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
