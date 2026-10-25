@@ -1860,14 +1860,55 @@ test("等待完成后执行**原请求**（关闭不会被改成退出，反之�
   const c = new CloseCoordinator();
   c.beginWrite("wt-a");
   c.request("exit");
+  c.resolveAsk("wait");                 // 用户明确选择等待（授权）
   c.endWrite("wt-a");
   assert.equal(c.takeReadyIntent(), "exit", "执行的就是用户原来的退出请求");
 
   const c2 = new CloseCoordinator();
   c2.beginWrite("wt-b");
   c2.request("close");
+  c2.resolveAsk("wait");
   c2.endWrite("wt-b");
   assert.equal(c2.takeReadyIntent(), "close");
+});
+
+test("询问未选择就完成写入：不执行关闭（仅显示询问不算授权）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  assert.equal(c.request("close").action, "ask");
+  // 用户还没选，写入就结束了。
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), null, "未授权不得关窗");
+  assert.equal(c.pendingIntent(), "close", "原请求仍保留，等待用户选择");
+});
+
+test("写入结束后用户才点「等待」：请求不丢，收尾时执行原动作", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.endWrite("wt-a");                   // 写入先结束
+  assert.equal(c.takeReadyIntent(), null, "此时还没授权");
+  c.resolveAsk("wait");                 // 用户晚点击
+  assert.equal(c.takeReadyIntent(), "exit", "晚点击等待后仍执行原动作");
+});
+
+test("重复请求不替换原动作（关闭询问中再次退出）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.request("exit");                    // 询问中再次请求
+  assert.equal(c.pendingIntent(), "close", "原动作以第一次为准");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), "close", "执行的是最初的动作");
+
+  const c2 = new CloseCoordinator();
+  c2.beginWrite("wt-b");
+  c2.request("exit");
+  c2.request("close");
+  c2.resolveAsk("wait");
+  c2.endWrite("wt-b");
+  assert.equal(c2.takeReadyIntent(), "exit");
 });
 
 test("多个 worktree 的在途写操作全部完成后才执行原请求", () => {
@@ -1875,6 +1916,7 @@ test("多个 worktree 的在途写操作全部完成后才执行原请求", () =
   c.beginWrite("wt-a");
   c.beginWrite("wt-b");
   c.request("close");
+  c.resolveAsk("wait");
   c.endWrite("wt-a");
   assert.equal(c.takeReadyIntent(), null, "还有 wt-b 在写");
   c.endWrite("wt-b");
@@ -1889,7 +1931,9 @@ test("待核对结果先展示，不静默退出", () => {
   assert.equal(decision.action, "showPending");
   assert.deepEqual(decision.pending, ["wt-a"]);
   assert.equal(c.takeReadyIntent(), null, "待核对未确认前不执行退出");
-  c.acknowledgePending("wt-a");
+  const gen = c.pendingGeneration("wt-a");
+  c.acknowledgePending("wt-a", gen);
+  c.confirmPendingContinue();
   assert.equal(c.takeReadyIntent(), "close", "确认后才执行原请求");
 });
 
@@ -1905,7 +1949,7 @@ test("待核对不会被下一次写入自动清除（只有真实核对才清�
   assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "成功写入也不能代替核对");
   assert.equal(c.takeReadyIntent(), null, "未核对前不执行关闭");
   // 真实核对后才清除。
-  c.acknowledgePending("wt-a");
+  c.acknowledgePending("wt-a", c.pendingGeneration("wt-a"));
   assert.deepEqual(c.pendingWorktrees(), []);
 });
 
@@ -2040,7 +2084,7 @@ test("待核对必须先真实核对才清除，且核对后仍需用户明确�
   c.resolveAsk("wait");
   assert.equal(c.takeReadyIntent(), null, "待核对未核对前不执行");
   // 真实核对后清除 pending，并由用户明确「继续」。
-  c.acknowledgePending("wt-a");
+  c.acknowledgePending("wt-a", c.pendingGeneration("wt-a"));
   c.confirmPendingContinue();
   assert.equal(c.takeReadyIntent(), "close", "核对并确认后才执行");
 });
@@ -2065,4 +2109,124 @@ test("另存的 needsVerification 如实保留为待核对", () => {
   c.endWrite("wt-a", true);                   // 另存也可能返回 needsVerification
   assert.deepEqual(c.pendingWorktrees(), ["wt-a"]);
   assert.equal(c.request("exit").action, "showPending");
+});
+
+// ---------------- 整批 B02：关闭/退出生产闭环 ----------------
+
+test("待核对期间原生保护仍然成立（不因无在途写而放行）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  assert.equal(c.hasWriting(), false);
+  assert.equal(c.hasPending(), true);
+  // 生产端用 hasWriting() || hasPending() 计算保护；这里直接断言两段语义。
+  assert.equal(c.hasWriting() || c.hasPending(), true, "待核对期间必须继续阻止退出");
+});
+
+test("最后一笔 NeedsVerification 后进入待核对并主动展示（不静默）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a", true);            // 最后一笔变成待核对
+  assert.equal(c.takeReadyIntent(), null, "待核对未核对前不关闭");
+  assert.equal(c.authorizedIntent(), "close", "授权仍保留");
+  assert.equal(c.hasPending(), true, "待核对必须可见");
+});
+
+test("核对失败不清账（pending 保留，仍阻止关闭）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  c.resolveAsk("wait");
+  const gen = c.pendingGeneration("wt-a");
+  // 核对失败：调用方不会调用 acknowledgePending；即使代际匹配也不该由失败路径清。
+  assert.equal(c.hasPending(), true);
+  assert.equal(c.takeReadyIntent(), null);
+  // 真正成功核对后才清。
+  assert.equal(c.acknowledgePending("wt-a", gen), true);
+  c.confirmPendingContinue();
+  assert.equal(c.takeReadyIntent(), "close");
+});
+
+test("核对期间同一目标新增 pending：旧代际核对不能清掉新的一代", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  const gen1 = c.pendingGeneration("wt-a");
+  // 核对期间该目标又出现一次待核对。
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  const gen2 = c.pendingGeneration("wt-a");
+  assert.ok(gen2 > gen1, "代际必须递增");
+  assert.equal(c.acknowledgePending("wt-a", gen1), false, "旧代际不能清新的一代");
+  assert.equal(c.hasPending(), true, "新的待核对仍可见");
+  assert.equal(c.acknowledgePending("wt-a", gen2), true, "当前代际才能清");
+});
+
+test("核对期间不同 worktree 新增 pending：不被顺手清掉", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.beginWrite("wt-b");
+  c.endWrite("wt-b", true);
+  const genA = c.pendingGeneration("wt-a");
+  // 只核对 A 成功。
+  assert.equal(c.acknowledgePending("wt-a", genA), true);
+  assert.deepEqual(c.pendingWorktrees(), ["wt-b"], "B 的待核对必须保留");
+  // confirmPendingContinue 不批量清除。
+  c.confirmPendingContinue();
+  assert.deepEqual(c.pendingWorktrees(), ["wt-b"], "confirm 不清别的目标");
+});
+
+test("核对中选择 Stay：不关窗、pending 保留", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  c.resolveAsk("stay");
+  assert.equal(c.takeReadyIntent(), null, "Stay 后不关闭");
+  assert.equal(c.pendingIntent(), null, "请求已清");
+  assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "待核对仍可见");
+});
+
+test("等待后出现 pending：保留原动作，主动展示", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.beginWrite("wt-b");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");                  // 还有 wt-b
+  assert.equal(c.takeReadyIntent(), null);
+  c.endWrite("wt-b", true);            // 最后一笔变待核对
+  assert.equal(c.takeReadyIntent(), null, "不能静默关闭");
+  assert.equal(c.authorizedIntent(), "exit", "原动作仍是退出");
+  assert.equal(c.hasPending(), true);
+});
+
+test("重复 close/exit：询问中不替换，授权后动作不变", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.request("exit");
+  c.request("close");
+  assert.equal(c.pendingIntent(), "close", "第一次为准");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), "close");
+});
+
+test("Stay 之后再次请求：可以重新询问（不是永久禁用）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("stay");
+  assert.equal(c.takeReadyIntent(), null);
+  const again = c.request("exit");
+  assert.equal(again.action, "ask", "可以再次请求");
+  assert.equal(c.pendingIntent(), "exit", "新的原动作");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.equal(c.takeReadyIntent(), "exit");
 });

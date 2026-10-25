@@ -1043,11 +1043,24 @@ export type CloseChoice = "wait" | "stay";
 export class CloseCoordinator {
   /** 在途写操作的 worktree 集合（含无归属另存使用的占位键）。 */
   private readonly writing = new Set<string>();
-  /** 结果待核对的 worktree 集合。 */
-  private readonly pending = new Set<string>();
-  /** 用户已明确选择「等待完成」的原请求；`null` 表示没有授权。 */
-  private intent: CloseIntent | null = null;
-  /** 当前是否正在向用户询问（避免重复弹窗）。 */
+  /**
+   * 待核对的目标 → 代际。
+   *
+   * 每次新增待核对都把该目标的代际 +1；核对只能确认**它看到的那一代**，
+   * 核对期间新出现的待核对不会被顺手清掉（ST-B02-08-4 / SP-B02-08-4）。
+   */
+  private readonly pending = new Map<string, number>();
+  private pendingSeq = 0;
+  /**
+   * 用户提出的**原请求动作**（第一次请求为准）。
+   *
+   * 询问期间再次请求（关闭 ↔ 退出）**不替换**它（ST-B02-08-5）；
+   * 它本身**不构成授权**——只有 `resolveAsk("wait")` 才产生授权（ST-B02-08-2）。
+   */
+  private requested: CloseIntent | null = null;
+  /** 用户明确选择「等待」后保留的授权动作；`null` 表示没有授权。 */
+  private authorized: CloseIntent | null = null;
+  /** 当前是否正在向用户询问。 */
   private asking = false;
 
   /** 开始一个写操作（`worktreeId` 可为无归属另存的占位键）。 */
@@ -1058,18 +1071,25 @@ export class CloseCoordinator {
   /**
    * 结束一个写操作。
    *
-   * `needsVerification` 表示结果无法确定：保留待核对标记，供关闭时先展示。
-   * 注意：结束写操作**不会**自动清除该 worktree 的待核对标记——
-   * 只有真实核对（`acknowledgePending`）才会清除（Q91）。
+   * `needsVerification` 表示结果无法确定：新增一条待核对（代际 +1），
+   * 供关闭时先展示。结束写操作**不会**清除已有待核对（Q91）。
    */
   endWrite(worktreeId: string, needsVerification = false): void {
     this.writing.delete(worktreeId);
-    if (needsVerification) this.pending.add(worktreeId);
+    if (needsVerification) {
+      this.pendingSeq += 1;
+      this.pending.set(worktreeId, this.pendingSeq);
+    }
   }
 
-  /** 待核对的 worktree（诊断与测试用）。 */
+  /** 待核对的目标（诊断与测试用）。 */
   pendingWorktrees(): string[] {
-    return [...this.pending];
+    return [...this.pending.keys()];
+  }
+
+  /** 某个目标当前待核对的代际（无待核对时为 0）。 */
+  pendingGeneration(worktreeId: string): number {
+    return this.pending.get(worktreeId) ?? 0;
   }
 
   /** 在途写操作的 worktree（诊断与测试用）。 */
@@ -1082,9 +1102,19 @@ export class CloseCoordinator {
     return this.writing.size > 0;
   }
 
-  /** 当前保留的原请求（诊断与测试用）。 */
+  /** 是否有待核对结果。 */
+  hasPending(): boolean {
+    return this.pending.size > 0;
+  }
+
+  /** 用户提出的原请求动作（诊断与测试用）。 */
   pendingIntent(): CloseIntent | null {
-    return this.intent;
+    return this.requested;
+  }
+
+  /** 已获授权、尚未执行的动作（诊断与测试用）。 */
+  authorizedIntent(): CloseIntent | null {
+    return this.authorized;
   }
 
   /** 是否正在询问用户。 */
@@ -1095,19 +1125,23 @@ export class CloseCoordinator {
   /**
    * 请求关闭/退出；返回此刻应该做什么。
    *
-   * 有在途写操作或待核对时**保留**窗口与进程并把原请求记下来，
-   * 但只有用户之后明确选择「等待」才会真正执行（`resolveAsk("wait")`）。
+   * - 有在途写或待核对：**保留**窗口与进程并询问；原请求动作以**第一次**为准，
+   *   询问期间再次请求不替换（ST-B02-08-5）；
+   * - 记录原请求**不等于授权**：只有用户之后明确选择「等待」才会真正执行
+   *   （ST-B02-08-2 / SP-B02-08-1）；
+   * - 无在途写、无待核对：立刻执行原请求。
    */
   request(intent: CloseIntent): CloseDecision {
     const writing = [...this.writing];
-    const pending = [...this.pending];
+    const pending = this.pendingWorktrees();
     if (writing.length > 0 || pending.length > 0) {
-      this.intent = intent;
+      if (this.requested === null) this.requested = intent;
       this.asking = true;
       if (pending.length > 0) return { action: "showPending", writing, pending };
       return { action: "ask", writing };
     }
-    this.intent = null;
+    this.requested = null;
+    this.authorized = null;
     this.asking = false;
     return { action: "proceed" };
   }
@@ -1115,18 +1149,20 @@ export class CloseCoordinator {
   /**
    * 用户的选择。
    *
-   * - `wait`：确认等待——之后写操作全部完成且无待核对时才执行**原请求**；
-   * - `stay`：清掉请求，**不取消**写操作、不改变动作类型，也不会稍后自动关窗。
+   * - `wait`：授权执行**原请求动作**，之后在无在途写、无待核对时执行；
+   * - `stay`：清掉请求与授权，**不取消**写操作、不改变动作类型，也不会稍后自动关窗。
    */
   resolveAsk(choice: CloseChoice): void {
     this.asking = false;
-    if (choice === "stay") this.intent = null;
-    // `wait` 保留 intent，等 takeReadyIntent 在条件满足时取走。
+    if (choice === "stay") {
+      this.requested = null;
+      this.authorized = null;
+      return;
+    }
+    this.authorized = this.requested;
   }
 
-  /**
-   * 用户选择「留在应用」的便捷入口（等价于 `resolveAsk("stay")`）。
-   */
+  /** 用户选择「留在应用」的便捷入口（等价于 `resolveAsk("stay")`）。 */
   keepOpen(): void {
     this.resolveAsk("stay");
   }
@@ -1134,33 +1170,38 @@ export class CloseCoordinator {
   /**
    * 全部写操作完成且无待核对时，返回**用户已授权等待**的原请求。
    *
-   * 没有原请求（从未请求过、或已选「留在应用」）时返回 `null`：
-   * 调用方**不得**据此凭空关窗。
+   * 三个条件缺一不可：已授权、无在途写、无待核对。
+   * 没有授权时返回 `null`：调用方**不得**据此凭空关窗（ST-B02-08-2）。
    */
   takeReadyIntent(): CloseIntent | null {
+    if (this.authorized === null) return null;
     if (this.writing.size > 0 || this.pending.size > 0) return null;
-    const intent = this.intent;
-    this.intent = null;
+    const intent = this.authorized;
+    this.authorized = null;
+    this.requested = null;
     this.asking = false;
     return intent;
   }
 
   /**
-   * 待核对结果已经**真实核对**（重新读取了真值、或用户看过结果）：
-   * 清除该 worktree 的待核对标记。
+   * 核对**指定代际**的待核对结果：只有代际仍然一致才清除。
    *
-   * 这是清除 pending 的唯一生产入口——不允许用「下一次写操作」代替核对。
+   * 核对失败、或核对期间该目标又出现新的待核对（代际已变）时**不清**，
+   * 新的待核对继续可见（ST-B02-08-4 / SP-B02-08-4）。
    */
-  acknowledgePending(worktreeId: string): void {
+  acknowledgePending(worktreeId: string, generation: number): boolean {
+    if ((this.pending.get(worktreeId) ?? 0) !== generation) return false;
     this.pending.delete(worktreeId);
+    return true;
   }
 
   /**
-   * 用户已核对待核对结果并明确「继续」：清除 pending 并保留原请求，
-   * 之后由 `takeReadyIntent()` 在无在途写时执行。
+   * 用户已核对并明确「继续」：保留授权，之后由 `takeReadyIntent()` 执行。
+   *
+   * **不**批量清除 pending——那会误清核对期间新出现的待核对。
    */
   confirmPendingContinue(): void {
-    this.pending.clear();
     this.asking = false;
+    if (this.requested !== null) this.authorized = this.requested;
   }
 }

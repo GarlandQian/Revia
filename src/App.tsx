@@ -765,7 +765,7 @@ export function App() {
         });
         if (disposed) stop(); else stops.push(stop);
       } catch (caught) {
-        fail("窗口关闭")(caught);
+        fail(messages.close.guardWindowClose)(caught);
       }
       try {
         // 原生退出：Rust 已阻止退出并通知前端，这里按同一套编排询问用户。
@@ -781,7 +781,7 @@ export function App() {
         });
         if (disposed) stop(); else stops.push(stop);
       } catch (caught) {
-        fail("原生退出")(caught);
+        fail(messages.close.guardNativeExit)(caught);
       }
     })();
     return () => {
@@ -1057,31 +1057,59 @@ export function App() {
   performCloseIntentRef.current = performCloseIntent;
 
   /**
+   * 把「是否需要阻止原生退出」同步给 Rust（任务 08）。
+   *
+   * 在途写**或**待核对都必须阻止退出（ST-B02-08-1 / SP-B02-08-2）。
+   * 这个调用必须**先成功**才允许继续写入：保护建立不起来时不能假装安全，
+   * 失败会抛出，由调用方中止本次写操作（ST-B02-08-1）。
+   */
+  const syncExitBlocked = useCallback(async (blocked: boolean): Promise<void> => {
+    await ipc.setExitBlocked(blocked);
+  }, []);
+
+  /**
+   * 写操作开始前的保护前置条件（任务 08、Q96）。
+   *
+   * 先登记在途、再把「阻止退出」同步到 Rust；同步失败时回滚登记并抛出，
+   * **不继续执行写命令**——否则用户以为受保护、实际退出会打断 Git。
+   */
+  const beginProtectedWrite = useCallback(async (worktreeId: string): Promise<void> => {
+    const coordinator = closeCoordinatorRef.current;
+    coordinator.beginWrite(worktreeId);
+    try {
+      await syncExitBlocked(true);
+    } catch (caught) {
+      coordinator.endWrite(worktreeId, false);
+      throw caught;
+    }
+  }, [syncExitBlocked]);
+
+  /**
    * 一个写操作结束（成功或失败）后的收尾（任务 08）。
    *
    * - 把结束事件交给关闭编排，并标记结果是否待核对；
-   * - **只有用户已明确选择「等待」**（`intent` 存在）且条件满足时，才执行**原请求**；
-   * - 没有原请求、或用户已选「留在应用」时，绝不凭空关窗（ST-B01-08-2）。
+   * - 保护标志按「在途写 **或** 待核对」计算，待核对期间仍然阻止退出；
+   * - **只有用户已明确选择「等待」**且条件满足时，才执行**原请求**；
+   * - 已授权等待、但结束时变成待核对：主动弹出待核对，不静默留在后台
+   *   （SP-B02-08-5）。
    */
-  /**
-   * 把「是否有在途写操作」同步给 Rust（原生退出用，任务 08）。
-   *
-   * 只同步状态，不触发任何 Git 动作；失败写进全局错误，不静默。
-   */
-  const syncExitBlocked = useCallback((blocked: boolean) => {
-    void ipc.setExitBlocked(blocked).catch((caught) => {
-      setAppError(toAppError(caught), null);
-    });
-  }, [setAppError]);
-
   const finishWrite = useCallback((worktreeId: string, needsVerification: boolean) => {
     const coordinator = closeCoordinatorRef.current;
     coordinator.endWrite(worktreeId, needsVerification);
-    syncExitBlocked(coordinator.hasWriting());
+    void syncExitBlocked(coordinator.hasWriting() || coordinator.hasPending()).catch((caught) => {
+      setAppError(toAppError(caught), null);
+    });
     const ready = coordinator.takeReadyIntent();
-    if (!ready) return;
-    setCloseRequest(null);
-    void performCloseIntent(ready);
+    if (ready) {
+      setCloseRequest(null);
+      void performCloseIntent(ready);
+      return;
+    }
+    // 用户已授权等待，但本次结束带来了待核对：主动展示，保留原动作与进程。
+    if (coordinator.authorizedIntent() !== null && coordinator.hasPending()) {
+      const pending = coordinator.pendingWorktrees();
+      setCloseRequest({ action: "showPending", writing: coordinator.writingWorktrees(), pending });
+    }
   }, [performCloseIntent, syncExitBlocked]);
 
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
@@ -1092,8 +1120,14 @@ export function App() {
     let needsVerification = false;
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
-    closeCoordinatorRef.current.beginWrite(opWorktreeId);
-    syncExitBlocked(true);
+    try {
+      await beginProtectedWrite(opWorktreeId);
+    } catch (caught) {
+      writingWorktreesRef.current.delete(opWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+      setAppError(toAppError(caught), opWorktreeId);
+      return;
+    }
     setAppError(null, opWorktreeId);
     // 切换期间界面可能仍显示原目标；操作归属取真实写目标，不能取已前进的激活目标。
     const opToken = operationGateRef.current.begin(opWorktreeId);
@@ -1144,7 +1178,7 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       finishWrite(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, finishWrite, refresh, scheduleReviewRecovery, setAppError]);
+  }, [acceptSnapshot, beginProtectedWrite, finishWrite, refresh, scheduleReviewRecovery, setAppError]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -1163,8 +1197,15 @@ export function App() {
     }
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
-    closeCoordinatorRef.current.beginWrite(opWorktreeId);
-    syncExitBlocked(true);
+    try {
+      await beginProtectedWrite(opWorktreeId);
+    } catch (caught) {
+      writingWorktreesRef.current.delete(opWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+      setAppError(toAppError(caught), opWorktreeId);
+      // 保护建立不起来：不执行恢复，错误如实抛出给调用方（ST-B02-08-1）。
+      throw caught;
+    }
     setAppError(null, opWorktreeId);
     // 本次恢复的结果是否无法确定（Q91）：关闭时需先展示待核对。
     let needsVerification = false;
@@ -1189,7 +1230,7 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       finishWrite(opWorktreeId, needsVerification);
     }
-  }, [finishWrite, refreshTarget, setAppError]);
+  }, [beginProtectedWrite, finishWrite, refreshTarget, setAppError]);
 
   /**
    * 另存回收内容（任务 05）。
@@ -1222,8 +1263,13 @@ export function App() {
     // 进入即登记：解析归属期间也算在途，避免解析窗口内被关闭绕过。
     // 无归属（外部新路径）用占位键，不为此路径强加 worktree 写锁。
     const provisionalKey = `save-as:${request.destination}`;
-    closeCoordinatorRef.current.beginWrite(provisionalKey);
-    syncExitBlocked(true);
+    try {
+      await beginProtectedWrite(provisionalKey);
+    } catch (caught) {
+      // 保护建立不起来：不执行任何写入（ST-B02-08-1）。
+      setAppError(toAppError(caught), null);
+      throw caught;
+    }
     let opToken: OperationContext | null = null;
     try {
       // 后端解析真实归属；解析失败同样落到 App 级结果通道，不猜路径、不借用当前 worktree。
@@ -1278,12 +1324,12 @@ export function App() {
         writingWorktreesRef.current.delete(heldGateId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
       }
-      // 关闭生命周期收尾：有归属用 worktree 键，无归属用占位键；
-      // 错误种类如实传递，`needsVerification` 保留为待核对（Q91）。
-      closeCoordinatorRef.current.endWrite(heldGateId ?? provisionalKey, needsVerification);
-      syncExitBlocked(closeCoordinatorRef.current.hasWriting());
+      // 关闭生命周期收尾：与其它写入口**完全一致**地走 finishWrite，
+      // 这样「最后一笔另存」也会消费已授权的等待请求（ST-B02-08-3 / SP-B02-08-3）。
+      // 有归属用 worktree 键，无归属用占位键；needsVerification 如实传递（Q91）。
+      finishWrite(heldGateId ?? provisionalKey, needsVerification);
     }
-  }, [finishWrite, recordExternalResult, refreshTarget, setAppError]);
+  }, [beginProtectedWrite, finishWrite, recordExternalResult, refreshTarget, setAppError]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
@@ -2618,16 +2664,40 @@ export function App() {
             setCloseRequest(null);
           }}
           onPendingReviewed={() => {
-            // 待核对闭环：真实核对（重新读取真值）后清除 pending，再由用户明确继续。
-            // 不重跑任何写命令；占位键（无归属另存）没有 worktree 可读，直接确认。
+            // 待核对闭环：逐个**按代际**真实核对，只清自己成功核对过的那一代。
+            //
+            // - 核对失败（refreshTarget 返回 false 或抛错）→ **不清账**，待核对继续可见；
+            // - 核对期间该目标又出现新的待核对（代际变化）→ 不清，新的继续可见；
+            // - 只有全部目标都核对成功且代际未变时，才由用户明确继续并执行原请求。
+            // 不重跑任何写命令；占位键（无归属另存）没有 worktree 可读，直接按代际确认。
             const coordinator = closeCoordinatorRef.current;
-            const targets = coordinator.pendingWorktrees();
+            const targets = coordinator.pendingWorktrees()
+              .map((worktreeId) => ({ worktreeId, generation: coordinator.pendingGeneration(worktreeId) }));
             void (async () => {
-              for (const worktreeId of targets) {
+              let allConfirmed = true;
+              for (const { worktreeId, generation } of targets) {
                 if (!worktreeId.startsWith("save-as:")) {
-                  await refreshTarget(worktreeId).catch(() => undefined);
+                  let verified = false;
+                  try {
+                    verified = await refreshTarget(worktreeId);
+                  } catch {
+                    verified = false;
+                  }
+                  if (!verified) {
+                    // 核对失败：保留待核对，不关闭。
+                    allConfirmed = false;
+                    continue;
+                  }
                 }
-                coordinator.acknowledgePending(worktreeId);
+                if (!coordinator.acknowledgePending(worktreeId, generation)) {
+                  // 核对期间出现新的待核对（代际已变）：不清账。
+                  allConfirmed = false;
+                }
+              }
+              if (!allConfirmed) {
+                const still = coordinator.pendingWorktrees();
+                setCloseRequest({ action: "showPending", writing: coordinator.writingWorktrees(), pending: still });
+                return;
               }
               coordinator.confirmPendingContinue();
               setCloseRequest(null);

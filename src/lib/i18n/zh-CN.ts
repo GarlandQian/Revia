@@ -188,6 +188,11 @@ export const zhCN = {
     stay: "留在应用",
     /** 前端监听安装失败必须可见，不能静默失去保护。 */
     listenerFailed: (what: string, detail: string) => `${what}保护安装失败：${detail}`,
+    /** 监听目标名称（集中在这里，不在 App 里写死文案）。 */
+    guardWindowClose: "窗口关闭",
+    guardNativeExit: "原生退出",
+    /** 保护建立失败：本次写入已中止。 */
+    guardUnavailable: (detail: string) => `无法建立退出保护，本次操作已中止：${detail}`,
     /** 待核对结果已展示后，用户的明确选择。 */
     pendingTitle: "有结果待核对",
     pendingExplain: "这些操作的结果无法确定，请先查看工作区真实状态，再决定是否关闭。",

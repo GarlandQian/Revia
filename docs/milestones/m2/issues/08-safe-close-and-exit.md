@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -156,3 +156,87 @@ App 与 Node 回归**用同一个类**，不各写一份判断：
 - 通过生产调用链覆盖暂存、取消暂存、丢弃、恢复、有归属与外部另存；Node 可提取 App 实际使用的共享异步编排验证，但不复制一份测试专用实现。Rust 原生状态/命令路径按需要验证。核心并发与关闭行为应有能稳定复现上述缺口的现有测试体系回归。
 - 完成全部修改后集中检查，保存固定源码 SHA、精确命令、退出码和原始 stdout/stderr；只用本次唯一创建的 Git fixture/独立数据目录，不操作真实用户仓库或凭据。不得放宽断言、覆盖旧失败、清理 index.lock 或自动重跑写命令。
 - Pi 不启动 GUI、不构建 Release、不跑 D06/CI/长测、不合并/推送；规划方两轴通过后完成真实桌面关闭/Quit/等待/留在应用/待核对与最终 M2 验收。08 及 M2 尚未完成。
+
+### 2026-10-24 / Pi 实现：整批 B02 返修（关闭/退出生产闭环）
+
+新实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`，起点 `be02cb7`。
+逐项修 ST-B02-08-1..6 / SP-B02-08-1..5，全部改动落在真实 App 与 `CloseCoordinator` 生产路径上。
+
+#### ST-B02-08-1 / SP-B02-08-2（原生保护可缺席）
+
+- `syncExitBlocked` 改为 **await** 的 `async`，不再 fire-and-forget；
+- 新增 `beginProtectedWrite(worktreeId)`：先登记在途，再 `await setExitBlocked(true)`，
+  失败则回滚登记并**抛出**，调用方（stage/unstage/discard、restore、save-as）**中止写入**
+  ——不再"显示错误后继续未受保护地写"；
+- 保护标志按 `hasWriting() || hasPending()` 计算：**待核对期间仍阻止退出**；
+- `lib.rs` 的 `RunEvent::ExitRequested` 已读 `exit_blocked`，为真则 `prevent_exit` 并 emit。
+
+#### ST-B02-08-2 / SP-B02-08-1（未选择即自动关闭）
+
+`CloseCoordinator` 拆成两层：
+
+- `requested`：用户提出的**原动作**（第一次为准，询问中再次请求不替换）；
+- `authorized`：只有 `resolveAsk("wait")` 才设置。
+
+`takeReadyIntent()` 现在要求 `authorized !== null`，因此**仅显示询问不构成授权**：
+写入在用户选择前结束不会关窗。写入结束后用户才点「等待」也能收尾（`resolveAsk("wait")`
+之后 `takeReadyIntent()` 返回原动作）。
+
+#### ST-B02-08-3 / SP-B02-08-3（另存等待不收尾）
+
+`performSaveAs` 的 `finally` 改为调用**同一个** `finishWrite(heldGateId ?? provisionalKey, needsVerification)`，
+与其它写入口完全一致：最后一笔另存也会消费已授权的等待请求。
+外部路径仍只用占位键，不强加 worktree 写锁。
+
+#### ST-B02-08-4 / SP-B02-08-4（核对失败清账、并发误清）
+
+- `pending` 改为 `Map<worktreeId, generation>`，每次新增待核对 `generation` 递增；
+- `acknowledgePending(worktreeId, generation)` **只有代际一致才清除**，返回布尔；
+- `confirmPendingContinue()` 不再 `pending.clear()`；
+- App 的核对流程：`refreshTarget` 返回 `false` 或抛错 → **不清账**，继续展示待核对；
+  核对期间该目标或其它目标出现新 pending → 旧代际清不掉，全部重新展示。
+
+#### ST-B02-08-5（重复请求替换动作）
+
+`request()` 只在 `requested === null` 时记录动作；询问中再次 Quit/关闭不改变原动作。
+对话框显示的动作来自同一个 `requested`，不再与编排不一致。
+
+#### ST-B02-08-6（文案未集中）
+
+`"窗口关闭"` / `"原生退出"` 迁入 i18n（`close.guardWindowClose` / `close.guardNativeExit`），
+并新增 `close.guardUnavailable`。App 里不再写死用户可见文案。
+
+#### SP-B02-08-5（等待后出现 pending 没有展示）
+
+`finishWrite` 在「已授权等待 + 本次结束变成待核对」时**主动**构造
+`showPending` 并 `setCloseRequest(...)`，保留原动作与进程，不要求用户再次尝试退出。
+
+#### 回归（Node，同一生产编排）
+
+`tools/test-refresh-gate.mjs` **127 项通过**。B02 新增 9 项 + 修正既有 5 项为新契约：
+询问未选择就完成（不关窗）、结束后才点等待（收尾）、重复请求不替换动作、
+待核对期间保护仍成立、最后一笔 NeedsVerification 主动展示、核对失败不清账、
+核对期间同目标/不同目标新增 pending 不被误清、核对中 Stay、等待后出现 pending 保留原动作、
+Stay 后可重新请求。
+
+#### 检查（本批唯一日志目录）
+
+`/private/tmp/revia-b02-PvngWy`
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 127 / pass 127 / fail 0 |
+| `cargo test`（完整） | 0 | 100 + 71(1 ignored) + 20 + 24 + 15 + 31 + 3 |
+| `pnpm bindings` | 0 | — |
+| `git diff --check` | 0 | — |
+
+源码前后 SHA 逐行一致。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出交互未验证**：macOS Quit/⌘Q 拦截、对话框观感、待核对闭环流程、
+  保护 IPC 失败时中止写入的实际表现，均需规划方在固定 Release 上验收。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并。
