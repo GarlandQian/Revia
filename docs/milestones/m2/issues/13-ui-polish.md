@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04, 05, 06, 07, 08, 12
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 9、D06、D08；[UI 方向](../../../ui-direction.md)；Q16、Q31、Q37、Q99、Q100、Q104、Q107（Q107 取代 Q15 的外观方向和 Q103 的视觉参照）。
 
@@ -75,3 +75,12 @@
 保留确认的 rev3 外观，完成上述 3/2 项对应修复：select 焦点隔离、diff 语义类和并排五节点探针对齐、图标颜色变量、状态色枚举映射。两份 Node 内置生产入口回归仅验证语义，不冒称浏览器或桌面。
 
 Rust 265 通过/1 ignored、Node 178、Python 20，以及 bindings/tsc/lint/build 均退出0；完整Rust最后再导出绑定空白使初次 diff-check 退出2，已用现有规范化工具处理，源码逐文件SHA恢复检查前原字节，受影响类型/两项新回归/diff-check复验退出0。原失败不删除。详见[检查说明](../task13-validation01.md)及[原始清单](../evidence/task13-review01/manifest.json)。尚待固定提交限定复核，未Release/真实桌面/D06/Windows/合并，暂不勾验收项。
+
+
+### 2026-10-25 / 规划方：限定复核通过，浅色桌面与四组D06已留证，尚不合并
+
+固定 `35da167...6b3ddf5` 的独立 Standards/Spec 均0项，首轮反馈静态闭合；源码与此前原件归属核对一致。固定 `6b3ddf5` 构建未签名Release app，二进制SHA256为 `b0b2a64e324cda9156a301fd73b9e823094942eb0c16b31691ca758a956efb61`，构建前后1835份跟踪文件原字节SHA相同。
+
+普通浅色所列主界面、只读/冲突/二进制、居中确认框、select与dialog快捷键不穿透已真实电脑操控检查，未执行Git写入。普通首屏116/97ms，真冷文字DOM4/6ms，八次首rAF完整文字35/35；四组均60真rAF、0兜底、0未覆盖。原统一appear20ms超帧及返回补色26–33ms完整保留，不用另一目标探针倒填、不宣称首帧全着色。详细边界见[本轮记录](../task13-desktop01.md)及[原字节清单](../evidence/task13-desktop01/manifest.json)。
+
+进程深色参数未生效，`ui-dark-main.png`仍是浅色，只算失败尝试；临时切换系统外观待用户授权，未改系统设置。真实深色与完整异常提示态、Windows编译仍未通过，验收项不提前勾选，Status转ready-for-human但不done。任务08另有整批Standards6/Spec5缺陷已交原Pi返修；本UI仍在m2-ui，未合m2或main，最终集成桌面/D06/CI/Q98长测均待后续。
