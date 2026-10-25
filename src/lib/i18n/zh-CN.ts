@@ -195,6 +195,7 @@ export const zhCN = {
     guardUnavailable: (detail: string) => `无法建立退出保护，本次操作已中止：${detail}`,
     /** 监听尚未安装完成时的原因说明。 */
     guardNotInstalled: "关闭/退出保护监听尚未就绪",
+    closing: "应用正在关闭或退出，不能开始新的写操作",
     /** 待核对结果已展示后，用户的明确选择。 */
     pendingTitle: "有结果待核对",
     pendingExplain: "这些操作的结果无法确定，请先查看工作区真实状态，再决定是否关闭。",

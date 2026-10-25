@@ -1050,9 +1050,9 @@ export type CloseReconcile =
  * 规则：
  * - 原请求动作以**第一次**为准，询问期间再次请求不替换（ST-B03-08-7）；
  * - 记录原请求**不等于授权**，只有 `resolveAsk("wait")` 才授权（ST-B03-08-3）；
- * - `reconcile()` 会消费授权：满足条件就返回 `proceed`，否则返回 `none`/`ask`；
+ * - `reconcile()` 不消费授权：满足条件返回 `proceed`，最终原生动作接受后才清账；
  * - 待核对按**代际**核对，失败或新增待核对都不清账（ST-B03-08-6）；
- * - 每次 `request()` 与 `resolveAsk("stay")` 都推进 `requestGeneration`，
+ * - 每次新请求与 `resolveAsk("stay")` 都推进 `requestGeneration`，
  *   核对流程必须捕获它，旧核对不得授权新请求（ST-B03-08-5）。
  */
 export class CloseCoordinator {
@@ -1070,8 +1070,6 @@ export class CloseCoordinator {
   /** 认领序号：只有最新一次认领可以完成/撤销（排他，ST-B06-08-3）。 */
   private claimSeq = 0;
   private activeClaimId = 0;
-  /** 认领时的请求代际（用于判定该认领是否已被 Stay/新请求作废）。 */
-  private activeClaimGeneration = 0;
 
   /** 当前请求代际（核对流程必须捕获它）。 */
   generation(): number {
@@ -1230,7 +1228,6 @@ export class CloseCoordinator {
     if (this.activeClaimId !== 0) return null;
     this.claimSeq += 1;
     this.activeClaimId = this.claimSeq;
-    this.activeClaimGeneration = this.requestGeneration;
     return { intent: this.authorized, generation: this.requestGeneration, claimId: this.activeClaimId };
   }
 
@@ -1242,7 +1239,7 @@ export class CloseCoordinator {
   }
 
   /**
-   * 原生动作**已完成**（确认窗口销毁/进程退出）：清掉授权与原请求。
+   * 最终原生动作已接受：清掉授权与原请求；驱动仍保持关闭终态，不开放写入。
    *
    * 只接受**当前**认领；旧认领晚回不得清新认领（ST-B06-08-3）。
    */
@@ -1250,18 +1247,6 @@ export class CloseCoordinator {
     if (claimId !== this.activeClaimId) return false;
     this.authorized = null;
     this.requested = null;
-    this.activeClaimId = 0;
-    return true;
-  }
-
-  /**
-   * 原生动作**已投递但裁决未定**（Tauri `close()` 只投递 CloseRequested）。
-   *
-   * 释放认领但**保留授权与原请求**：若关闭事件被新写入拦住，
-   * 之后仍要执行原动作（ST-B06-08-3 / SP-B06-08-3）。
-   */
-  releaseClaimAwaitingVerdict(claimId: number): boolean {
-    if (claimId !== this.activeClaimId) return false;
     this.activeClaimId = 0;
     return true;
   }
@@ -1284,23 +1269,6 @@ export class CloseCoordinator {
     if (claimId !== this.activeClaimId) return false;
     this.activeClaimId = 0;
     return true;
-  }
-
-  /**
-   * 原生裁决已放行（窗口确实要关闭）：此时才清掉授权与原请求。
-   *
-   * 与 `completeExecution(claimId)` 的区别：投递 close 时认领可能已释放
-   * （`releaseClaimAwaitingVerdict`），裁决到达时用这个入口清账。
-   */
-  completeVerdict(): void {
-    this.authorized = null;
-    this.requested = null;
-    this.activeClaimId = 0;
-  }
-
-  /** 某个 claim 对应的请求代际（未知 claim 返回 -1）。 */
-  claimGeneration(claimId: number): number {
-    return claimId !== 0 && claimId === this.activeClaimId ? this.activeClaimGeneration : -1;
   }
 
   /** 是否已有执行中的原生动作。 */
@@ -1413,7 +1381,7 @@ export class CloseGuardGate {
  * 写操作的**共享异步生产编排入口**（任务 08，ST-B04-08-1/3、SP-B04-08-1/2）。
  *
  * App 的 stage/unstage/discard、restore、save-as 全部经同一个实例：
- * `begin()` 负责「检查监听就绪 → 登记在途 → await 保护 → 失败回滚 + 真实 reconcile」，
+ * `begin()` 负责「检查关闭门禁/监听就绪 → 登记在途 → await 保护 → 失败回滚 + 真实 reconcile」，
  * `end()` 负责收尾。Node 回归直接驱动**同一个类**，不手动补 reconcile。
  *
  * 关键点：
@@ -1423,6 +1391,9 @@ export class CloseGuardGate {
  *   不留悬挂授权、不等下一笔无关写（ST-B04-08-3 / SP-B04-08-2）。
  */
 export interface WriteGuardDeps {
+  /** 必填的生产关闭门禁；不能由调用者忘记在 guardsReady 中拼接。 */
+  closeDriver: Pick<CloseDriver, "canStartWrite">;
+  closeBlockedReason: string;
   /** 监听是否就绪（窗口关闭 + 原生退出都装好）。 */
   guardsReady: () => boolean;
   /** 监听未就绪时的可见原因。 */
@@ -1452,6 +1423,9 @@ export class WriteGuardOrchestrator {
    * 返回 `false` 时已完成回滚与真实收尾，调用方不得执行写命令。
    */
   async begin(worktreeId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+    if (!this.deps.closeDriver.canStartWrite()) {
+      return { ok: false, reason: this.deps.closeBlockedReason };
+    }
     if (!this.deps.guardsReady()) {
       return { ok: false, reason: this.deps.guardBlockedReason() ?? "" };
     }
@@ -1464,11 +1438,15 @@ export class WriteGuardOrchestrator {
       this.deps.reconcile();
       throw error;
     }
-    // await 期间监听可能被卸载/重装/失败：必须复核，否则会带着未受保护状态写 Git。
-    if (!this.deps.guardsReady()) {
+    // await 之后同时复核关闭门禁与监听，拒绝时撤回本次登记。
+    if (!this.deps.closeDriver.canStartWrite() || !this.deps.guardsReady()) {
       this.deps.rollback(worktreeId);
       this.deps.reconcile();
-      return { ok: false, reason: this.deps.guardBlockedReason() ?? "" };
+      return {
+        ok: false,
+        reason: !this.deps.closeDriver.canStartWrite()
+          ? this.deps.closeBlockedReason : this.deps.guardBlockedReason() ?? "",
+      };
     }
     return { ok: true };
   }
@@ -1481,88 +1459,43 @@ export class WriteGuardOrchestrator {
 }
 
 
-// ---------------- 关闭/退出的**共享生产驱动**（任务 08）----------------
+// ---------------- 关闭/退出的共享生产驱动（任务 08）----------------
 
-/** 驱动当前所处的阶段（诊断与测试用）。 */
-export type CloseDriverPhase =
-  | "idle"
-  /** 等待用户选择（等待完成 / 留在应用）。 */
-  | "asking"
-  /** 用户已选等待，仍有在途写或待核对。 */
-  | "waiting"
-  /** 正在执行原生动作（IPC 解除保护）。 */
-  | "executing"
-  /** 已通过最终提交复核，正在投递原生关闭。 */
-  | "committing"
-  /** 原生动作已投递，等待原生裁决（CloseRequested）。 */
-  | "awaitingVerdict"
-  /** 已投递但被新写入拦住：等写入结束后按原动作继续。 */
-  | "blockedByWrites"
-  /** 执行失败：等用户重新明确选择。 */
-  | "failed";
+export type CloseDriverPhase = "idle" | "asking" | "waiting" | "executing" | "closing";
 
-/** 一次请求/裁决在 UI 上的表现。 */
 export type CloseDriverEffect =
-  /** 什么都不做。 */
   | { kind: "none" }
-  /** 展示询问（含当前真实在途/待核对集合与原动作）。 */
   | { kind: "ask"; intent: CloseIntent; writing: string[]; pending: string[] }
-  /** 已执行完原生动作（不需要再展示询问）。 */
   | { kind: "settled" };
 
-/**
- * 关闭/退出的**唯一生产驱动**（任务 08，ST-B07-08-1..3）。
- *
- * App 只做 Tauri/React 适配：把原生事件、用户选择、写入结束交给它，
- * 并把返回的 `CloseDriverEffect` 映射成 UI。所有状态机逻辑都在这里，
- * Node 回归也驱动同一个类，只注入可控的 deferred IPC/native 适配层。
- *
- * 关键不变量：
- * - **同步不重入**：`reconcile()` 在 executing/awaitingVerdict 阶段直接返回，
- *   不会自调用；也没有定时自旋。
- * - **一次投递一个在途裁决**：`delivered` 后进入 awaitingVerdict，
- *   重复请求/reconcile 都不会再次投递。
- * - **裁决与所有权关联**：每个原生投递带 `claimId`；Stay 或新请求会推进代际，
- *   旧的原生事件因此被判为失效，不会当成新用户意图。
- * - **失败停手**：`failed` 阶段不自动重试，必须用户重新选择。
- */
 export interface CloseDriverDeps {
   coordinator: CloseCoordinator;
-  /** 解除原生退出阻止（版本化 IPC，可挂起）。 */
+  /** 最后可取消的异步准备；这里只解除退出保护，不关闭窗口。 */
   releaseExitGuard: () => Promise<void>;
-  /**
-   * 投递原生关闭/退出。
-   *
-   * 返回 `"delivered"` 表示已投递、等原生裁决；`"completed"` 表示已确认完成。
-   */
-  performNative: (intent: CloseIntent, claimId: number) => Promise<"delivered" | "completed">;
-  /** 失败上报（可见）。 */
+  /** 不再投递匿名 CloseRequested；仅在最终同步检查通过后销毁窗口。 */
+  closeWindow: () => Promise<void>;
+  /** 原退出请求走真正的应用退出，而不是用销毁窗口冒充。 */
+  exitApp: () => Promise<void>;
   onError: (error: unknown) => void;
-  /** 展示询问。 */
   onAsk: (intent: CloseIntent, writing: string[], pending: string[]) => void;
-  /** 清掉询问（已结算）。 */
   onSettled: () => void;
 }
 
+interface CloseAttempt {
+  intent: CloseIntent;
+  generation: number;
+  claimId: number;
+}
+
+/**
+ * App 与回归共用的关闭驱动。原生关闭事件只表示用户意图，不充当程序化投递的回执。
+ * 每次异步执行持有独立 attempt，所有回包先核对象身份；Stay 可撤销准备阶段，
+ * 最终提交则同步锁住所有写入口并隐藏询问，直到销毁/退出完成也不重新开放写入。
+ */
 export class CloseDriver {
   private readonly deps: CloseDriverDeps;
   private phase: CloseDriverPhase = "idle";
-  /** 正在执行（release/投递中）的 claim（0 表示无）。 */
-  private inFlightClaim = 0;
-  /** 已投递、等待原生裁决的 claim（0 表示无）。 */
-  private pendingVerdictClaim = 0;
-  /**
-   * 是否已有**已发出**的程序化关闭（`window.close()` 已调用）。
-   *
-   * Tauri 的 `CloseRequested` 不带 claimId，无法区分「我们发的」与「用户点的」，
-   * 因此用这个标志保守判定：只要有未结算的程序化关闭，到达的关闭事件
-   * 一律先按「我们那次投递的裁决」处理，避免旧投递被当成新的用户意图。
-   */
-  private outstandingProgrammaticClose = false;
-  /** 已收到裁决、等待回包确认的 claim 与结论（早到裁决，ST-B08-08-2）。 */
-  private earlyVerdict: { claimId: number; allow: boolean } | null = null;
-  /** 已通过最终提交复核、正在投递的 claim（committing 阶段持有）。 */
-  private committedClaim = 0;
+  private attempt: CloseAttempt | null = null;
 
   constructor(deps: CloseDriverDeps) {
     this.deps = deps;
@@ -1572,272 +1505,101 @@ export class CloseDriver {
     return this.phase;
   }
 
-  hasInFlight(): boolean {
-    return this.inFlightClaim !== 0 || this.pendingVerdictClaim !== 0;
-  }
-
-  /**
-   * 关闭已提交（正在销毁窗口）时不允许开始新的写入。
-   *
-   * 写入口在 `beginProtectedWrite` 前检查它，避免「已决定关闭后又有新写」。
-   */
   canStartWrite(): boolean {
-    return this.phase !== "committing" && this.phase !== "awaitingVerdict";
+    return this.phase !== "closing";
   }
 
-  /**
-   * 收到一次关闭/退出请求（来自窗口关闭事件或原生退出通知）。
-   */
   handleRequest(intent: CloseIntent): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
     const coordinator = this.deps.coordinator;
-    if (this.hasInFlight()) {
-      coordinator.request(intent);
-      return { kind: "none" };
-    }
-    const decision = coordinator.request(intent);
-    if (decision.action === "proceed") {
-      return this.drive();
-    }
-    this.phase = "asking";
-    return {
-      kind: "ask",
-      intent: coordinator.pendingIntent() ?? intent,
-      writing: decision.writing,
-      pending: "pending" in decision ? decision.pending : [],
-    };
+    coordinator.request(intent);
+    return this.drive();
   }
 
-  /** 用户的选择。 */
   handleChoice(choice: CloseChoice): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
     const coordinator = this.deps.coordinator;
+    coordinator.resolveAsk(choice);
     if (choice === "stay") {
-      // 授权撤销 + 保留已发出投递的所有权标记（见下）。
-      coordinator.resolveAsk("stay");
-      this.inFlightClaim = 0;
+      if (this.attempt) coordinator.abandonExecution(this.attempt.claimId);
+      this.attempt = null;
       this.phase = "idle";
+      this.deps.onSettled();
       return { kind: "settled" };
     }
-    coordinator.resolveAsk(choice);
     return this.drive();
   }
 
   handlePendingContinue(): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
     this.deps.coordinator.confirmPendingContinue();
     return this.drive();
   }
 
-  /**
-   * 生命周期状态变化（写结束、rollback、待核对清除等）后调用。
-   */
   notifyStateChanged(): CloseDriverEffect {
-    if (this.phase === "executing" || this.phase === "committing" || this.phase === "awaitingVerdict") {
-      return { kind: "none" };
-    }
     return this.drive();
   }
 
-  /**
-   * **原生关闭事件的唯一处理入口**（ST-B08-08-1）。
-   *
-   * 返回 `allow`：App 据此决定是否 `event.preventDefault()`。
-   * 判定与所有权全部在这里，App 不再自己看 `hasInFlight`/`needsExitGuard`。
-   */
-  handleNativeCloseRequest(): { allow: boolean; effect: CloseDriverEffect } {
-    const coordinator = this.deps.coordinator;
-
-    // 有未结算的程序化关闭：这个事件是**它**的裁决。
-    if (this.outstandingProgrammaticClose) {
-      // committing 阶段 inFlightClaim 仍持有；awaitingVerdict 阶段用 pendingVerdictClaim。
-      const claimId = this.pendingVerdictClaim || this.inFlightClaim || this.committedClaim;
-      const valid = claimId !== 0
-        && coordinator.isExecutionValid(this.claimGeneration(claimId));
-      this.outstandingProgrammaticClose = false;
-      this.pendingVerdictClaim = 0;
-      this.inFlightClaim = 0;
-      this.committedClaim = 0;
-
-      if (valid && claimId !== 0) {
-        // 授权仍有效、无在途写/待核对：允许原生关闭，并清账。
-        this.earlyVerdict = { claimId, allow: true };
-        coordinator.completeExecution(claimId) || coordinator.completeVerdict();
-        this.phase = "idle";
-        this.deps.onSettled();
-        return { allow: true, effect: { kind: "settled" } };
-      }
-
-      // 授权已失效（例如用户选了 Stay）或已有新写入：**实际阻止**窗口销毁。
-      // 这次投递到此结算（被拒），之后的事件才可能是新的用户请求。
-      if (claimId !== 0) {
-        this.earlyVerdict = { claimId, allow: false };
-        coordinator.abandonExecution(claimId);
-      }
-      this.committedClaim = 0;
-      // 请求已被 Stay 撤销：直接结算，不要重新投递。
-      if (coordinator.pendingIntent() === null) {
-        this.phase = "idle";
-        this.deps.onSettled();
-        return { allow: false, effect: { kind: "settled" } };
-      }
-      this.phase = "blockedByWrites";
-      return { allow: false, effect: this.drive() };
-    }
-
-    // 不是我们发起的投递：按新的用户请求处理。
-    const effect = this.handleRequest("close");
-    // 新的用户请求若已开始执行（我们会自己投递并走裁决），
-    // 就拦住这次原生默认关闭，避免绕过我们的编排。
-    const allow = effect.kind === "settled" && !this.hasInFlight() && this.phase === "idle";
-    return { allow, effect };
+  /** App 对每个 CloseRequested 都 preventDefault，再把用户意图交给此入口。 */
+  handleNativeCloseRequest(): CloseDriverEffect {
+    return this.handleRequest("close");
   }
 
-  /** 每次 claim 的代际（供裁决校验用）。 */
-  private claimGeneration(claimId: number): number {
-    return this.deps.coordinator.claimGeneration(claimId);
-  }
-
-  /**
-   * 原生退出通知（Rust 已阻止 Quit 并 emit）。
-   */
-  handleNativeExitRequest(): CloseDriverEffect {
-    return this.handleRequest("exit");
-  }
-
-  /** 真正的状态机。 */
   private drive(): CloseDriverEffect {
-    if (this.phase === "executing" || this.phase === "committing" || this.phase === "awaitingVerdict") {
-      return { kind: "none" };
-    }
+    if (this.phase === "closing") return { kind: "none" };
     const coordinator = this.deps.coordinator;
     const decision = coordinator.reconcile();
     if (decision.kind === "ask") {
-      this.phase = "asking";
+      // 准备仍在途时也可展示新出现的写入/待核对，但不能丢掉执行所有权。
+      if (this.attempt === null) this.phase = "asking";
       this.deps.onAsk(decision.intent, decision.writing, decision.pending);
-      return {
-        kind: "ask",
-        intent: decision.intent,
-        writing: decision.writing,
-        pending: decision.pending,
-      };
+      return { kind: "ask", intent: decision.intent, writing: decision.writing, pending: decision.pending };
     }
+    if (this.attempt !== null) return { kind: "none" };
     if (decision.kind === "none") {
       this.phase = "idle";
       this.deps.onSettled();
       return { kind: "settled" };
     }
-    const claimed = coordinator.claimExecution();
-    if (!claimed) {
+    const attempt = coordinator.claimExecution();
+    if (attempt === null) {
       this.phase = "waiting";
       return { kind: "none" };
     }
-    this.inFlightClaim = claimed.claimId;
+    this.attempt = attempt;
     this.phase = "executing";
-    void this.execute(claimed);
+    void this.execute(attempt);
     return { kind: "none" };
   }
 
-  private async execute(claimed: {
-    intent: CloseIntent;
-    generation: number;
-    claimId: number;
-  }): Promise<void> {
+  private async execute(attempt: CloseAttempt): Promise<void> {
     const coordinator = this.deps.coordinator;
     try {
-      if (claimed.intent === "exit") {
-        await this.deps.releaseExitGuard();
-        if (!coordinator.isExecutionValid(claimed.generation)) {
-          coordinator.abandonExecution(claimed.claimId);
-          this.inFlightClaim = 0;
-          this.afterExecution();
-          return;
-        }
-      }
-      // **最终提交阶段**：同步复核授权与在途/待核对，然后才真正投递。
-      // 之后到达的 CloseRequested 由 `handleNativeCloseRequest` 判定 allow/prevent。
-      if (!coordinator.isExecutionValid(claimed.generation)) {
-        coordinator.abandonExecution(claimed.claimId);
-        this.inFlightClaim = 0;
-        this.afterExecution();
-        return;
-      }
-      this.phase = "committing";
-      this.committedClaim = claimed.claimId;
-      this.outstandingProgrammaticClose = true;
-      const delivered = await this.deps.performNative(claimed.intent, claimed.claimId);
-      if (delivered === "completed") {
-        this.inFlightClaim = 0;
-        this.committedClaim = 0;
-        this.outstandingProgrammaticClose = false;
-        coordinator.completeExecution(claimed.claimId);
+      if (attempt.intent === "exit") await this.deps.releaseExitGuard();
+      if (this.attempt !== attempt) return;
+      if (!coordinator.isExecutionValid(attempt.generation)) {
+        coordinator.abandonExecution(attempt.claimId);
+        this.attempt = null;
         this.phase = "idle";
-        this.deps.onSettled();
-        return;
-      }
-      // 回包只确认「传输完成」，不能覆盖已经到达的裁决（ST-B08-08-2）。
-      // 裁决可能来自任一 claim（Stay 后 claim 已被放弃，earlyVerdict 仍记录它）。
-      if (this.earlyVerdict && this.earlyVerdict.claimId === claimed.claimId) {
-        const early = this.earlyVerdict;
-        this.earlyVerdict = null;
-        this.inFlightClaim = 0;
-        if (early.allow) {
-          coordinator.completeExecution(claimed.claimId);
-          this.phase = "idle";
-          this.deps.onSettled();
-          return;
-        }
-        // 早到裁决是「被阻止」：若授权仍在则保留，等写入结束后按原动作继续；
-        // 若已因 Stay 撤销，则直接结算（不再等待）。
-        coordinator.releaseClaimAwaitingVerdict(claimed.claimId);
-        if (coordinator.pendingIntent() === null) {
-          this.phase = "idle";
-          this.deps.onSettled();
-          return;
-        }
-        this.phase = "blockedByWrites";
         this.drive();
         return;
       }
-      this.inFlightClaim = 0;
-      this.committedClaim = 0;
-      if (this.earlyVerdict !== null) {
-        // 已收到过这次投递的裁决：回包只是传输确认，不进入等待。
-        this.earlyVerdict = null;
-        this.phase = "idle";
-        this.deps.onSettled();
-        return;
-      }
-      this.pendingVerdictClaim = claimed.claimId;
-      this.phase = "awaitingVerdict";
+      // 从最终复核到锁写、隐藏询问、发出不可撤销的原生动作之间没有 await。
+      this.phase = "closing";
+      this.deps.onSettled();
+      if (attempt.intent === "exit") await this.deps.exitApp();
+      else await this.deps.closeWindow();
+      if (this.attempt !== attempt) return;
+      coordinator.completeExecution(attempt.claimId);
+      this.attempt = null;
+      // IPC 回包不等于窗口已经销毁；保持 closing，迟到的事件/选择不能重新开放写入。
     } catch (error) {
-      this.inFlightClaim = 0;
-      this.committedClaim = 0;
-      this.outstandingProgrammaticClose = false;
-      coordinator.failExecution(claimed.claimId);
-      this.phase = "failed";
+      if (this.attempt !== attempt) return;
+      coordinator.failExecution(attempt.claimId);
+      this.attempt = null;
+      this.phase = "idle";
       this.deps.onError(error);
-      const intent = coordinator.pendingIntent();
-      if (intent !== null) {
-        this.phase = "asking";
-        this.deps.onAsk(intent, coordinator.writingWorktrees(), coordinator.pendingWorktrees());
-      } else {
-        this.deps.onSettled();
-      }
+      this.drive();
     }
-  }
-
-  private afterExecution(): void {
-    const coordinator = this.deps.coordinator;
-    const decision = coordinator.reconcile();
-    if (decision.kind === "ask") {
-      this.phase = "asking";
-      this.deps.onAsk(decision.intent, decision.writing, decision.pending);
-      return;
-    }
-    if (decision.kind === "proceed") {
-      this.phase = "waiting";
-      void this.drive();
-      return;
-    }
-    this.phase = "idle";
-    this.deps.onSettled();
   }
 }

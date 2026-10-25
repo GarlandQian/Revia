@@ -51,6 +51,17 @@ impl ExitGuard {
         self.state.lock().map(|guard| guard.1).unwrap_or(false)
     }
 
+    /// 前端已锁住新写入后，最终复核退出保护再投递真正的应用退出。
+    fn request_exit(&self, exit: impl FnOnce()) -> Result<()> {
+        let blocked = self.state.lock()
+            .map_err(|_| AppError::internal("退出保护锁失败"))?.1;
+        if blocked {
+            return Err(AppError::rejected("仍有写操作或结果待核对，不能退出"));
+        }
+        exit();
+        Ok(())
+    }
+
     /// 已接受的最高序号（诊断与测试用）。
     pub fn accepted_seq(&self) -> u64 {
         self.state.lock().map(|guard| guard.0).unwrap_or(0)
@@ -1049,9 +1060,28 @@ pub fn set_exit_blocked(state: State<'_, AppState>, seq: u64, blocked: bool) -> 
     state.apply_exit_guard(seq, blocked)
 }
 
+/// 仅执行已通过前端最终门禁的退出；不以关闭窗口替代原退出请求。
+#[tauri::command]
+pub fn request_exit(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<()> {
+    state.exit_guard.request_exit(|| app.exit(0))
+}
+
 #[cfg(test)]
 mod exit_guard_tests {
     use super::ExitGuard;
+
+    #[test]
+    fn explicit_exit_dispatches_only_after_guard_release() {
+        let guard = ExitGuard::default();
+        let calls = std::cell::Cell::new(0);
+        assert!(guard.apply(1, true));
+        let result = guard.request_exit(|| calls.set(calls.get() + 1));
+        assert_eq!(result.unwrap_err().kind, crate::error::ErrorKind::Rejected);
+        assert_eq!(calls.get(), 0, "保护未释放时不投递退出");
+        assert!(guard.apply(2, false));
+        guard.request_exit(|| calls.set(calls.get() + 1)).unwrap();
+        assert_eq!(calls.get(), 1, "只投递实际应用退出，不销毁窗口冒充");
+    }
 
     /// 新 true 建立后，旧 false（更小 seq）必须被拒绝。
     #[test]

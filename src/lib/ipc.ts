@@ -165,6 +165,7 @@ export const ipc = {
    */
   setExitBlocked: (request: { blocked: boolean; seq: number }) =>
     invoke<boolean>("set_exit_blocked", request),
+  requestExit: () => invoke<void>("request_exit"),
   changeEntry: (request: {
     worktreeId: string;
     path: string;

@@ -771,18 +771,12 @@ export function App() {
       let windowGuard = false;
       let exitGuard = false;
       try {
-        const stop = await getCurrentWindow().onCloseRequested(async (event) => {
+        const stop = await getCurrentWindow().onCloseRequested((event) => {
+          // 只接收用户意图；绝不把匿名事件当作程序化关闭的回执。
+          event.preventDefault();
           const driver = closeDriverRef.current;
-          if (!driver) {
-            // 驱动还没就绪：保守拦住，避免未受保护的销毁。
-            event.preventDefault();
-            return;
-          }
-          // 允许/阻止与所有权判定**全部**在共享驱动里；App 只应用结论
-          // （ST-B08-08-1：Stay 后的旧程序化关闭必须真的被阻止）。
-          const decision = driver.handleNativeCloseRequest();
-          if (!decision.allow) event.preventDefault();
-          if (!disposed) applyEffectRef.current?.(decision.effect);
+          if (!driver || disposed) return;
+          applyEffectRef.current?.(driver.handleNativeCloseRequest());
         });
         if (disposed) stop(); else stops.push(stop);
         windowGuard = true;
@@ -1113,11 +1107,8 @@ export function App() {
     closeDriverRef.current = new CloseDriver({
       coordinator: closeCoordinatorRef.current,
       releaseExitGuard: () => syncExitBlocked(false),
-      // Tauri `close()` 只投递 CloseRequested，不确认销毁 → "delivered"。
-      performNative: async () => {
-        await getCurrentWindow().close();
-        return "delivered";
-      },
+      closeWindow: () => getCurrentWindow().destroy(),
+      exitApp: () => ipc.requestExit(),
       onError: (caught) => setAppError(toAppError(caught), null),
       onAsk: (intent, writing, pending) => {
         closeIntentRef.current = intent;
@@ -1148,7 +1139,7 @@ export function App() {
   /**
    * 生命周期状态变化后通知驱动（写结束、rollback、待核对清除等）。
    *
-   * 驱动在 executing/awaitingVerdict 阶段直接返回，不会同步重入。
+   * 驱动不会重复认领已有执行；最终 closing 阶段不会再开启写入或请求。
    */
   const reconcileClose = useCallback(() => {
     const coordinator = closeCoordinatorRef.current;
@@ -1170,6 +1161,8 @@ export function App() {
   const writeOrchestratorRef = useRef<WriteGuardOrchestrator | null>(null);
   if (writeOrchestratorRef.current === null) {
     writeOrchestratorRef.current = new WriteGuardOrchestrator({
+      closeDriver,
+      closeBlockedReason: messages.close.closing,
       guardsReady: () => closeGuardsRef.current.ready,
       guardBlockedReason: () => closeGuardsRef.current.blockedReason,
       register: (worktreeId) => {

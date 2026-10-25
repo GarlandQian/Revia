@@ -879,3 +879,29 @@ B 结束 → 重新投递原 `exit`（`exit` 出现 ≥2 次、`close` 0 次）�
 用户明确要求“你来修”。Codex 从干净 `64aa4ecfee729cfb185bd3c7a85288b60a54bda5` 接手 ST-B09-08-1/2 与 SP-B09-08-1/2；原 Pi 保持停止。本次是 Q105 的限定例外，授权记录见 `docs/README.md` Q108，不再派发 Pi，也不把审查返修次数解释为渠道连续三次报错。
 
 只修任务 08 的关闭投递/回包/裁决所有权及实际共享写入口门禁，并补同源并发回归；集中检查后分别进行 Standards / Spec 复核。全部静态闭合后才固定 Release 与真实桌面验收，不提前合并，08 暂保持 `ready-for-agent`。合并顺序仍为独立验收 `m2-ui` → 合回 `m2` → 最终集成验收 → squash main。
+
+### 2026-10-25 / Codex 实现：B09 关闭所有权与最终写门禁
+
+授权提交 `53daeeb`，修复 ST-B09-08-1/2、SP-B09-08-1/2。不是只删除不匹配的 `earlyVerdict` 分支，而是移除不能可靠关联的匿名回执阶段：
+
+- 本地锁定依赖 `@tauri-apps/api` 2.12.4 的 `onCloseRequested` 是 `await handler` 后未阻止则 `destroy`；Rust `tauri` 2.12.4 发空 payload，`tauri-runtime-wry` 2.12.2 的用户关闭与程序化 `close()` 走相同入口，没有请求身份。single-flight 也不能排除用户事件抢先到达，不能将它声称为可靠关联。
+- App 对每个原生 `CloseRequested` 先 `preventDefault()`，仅转交用户意图；生产不再调用 `window.close()` 循环投递匿名事件。关闭最终用 `destroy()`，退出最终用新增固定命令 `request_exit` → `AppHandle.exit(0)`，不把两种原请求互相替代。Rust 退出入口复核保护仍阻止时返回可见拒绝。
+- `CloseDriver` 用单一 attempt 对象拥有 claim、请求代际和原动作；每个 await 成功/失败先比较对象身份。准备期间 Stay 撤销并释放自己的 attempt，旧回包不得清新 claim、改阶段或更新新 UI。
+- 最终同步复核到锁写、隐藏询问、发出原生动作之间没有 await；之后是 `closing` 终态，迟到的 Stay/Wait、事件、通知及成功回包不能重新开放写入。不可撤销的原生动作发出后不再提供可取消询问；此前仍保留 Q96 的等待/Stay 选择，且不会取消写操作。明确失败则展示错误并回询问，不自动重试。
+- `WriteGuardOrchestrator` 必须接收实际 `closeDriver`，`begin()` 在登记前及保护 await 后都检查门禁。App 暂存/取消暂存/丢弃、恢复、另存继续共用此入口；不是仅在测试中拼接 `guardsReady`。
+
+#### 集中检查
+
+独占原件目录 `/private/tmp/revia-b09-Ztcljf`，记录真实 argv/cwd、显式非敏感环境、start/end/exit 和原始 stdout/stderr。81 份受测源码/测试/配置/锁文件在检查前后、绑定清理前后逐份 SHA256 一致。
+
+| 检查 | 结果 |
+| --- | --- |
+| `node tools/test-refresh-gate.mjs` | 180 passed / 0 failed |
+| `pnpm exec tsc -b`、`pnpm lint`、`pnpm build` | 各退出 0 |
+| `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` | 268 passed / 0 failed / 1 ignored（既有桌面 fixture 准备入口） |
+| 首次 `git diff --check` | 退出 2，仅 ts-rs 生成绑定的行尾空格；保留失败原件 |
+| `node tools/strip-binding-whitespace.mjs` 后仅重跑 `git diff --check` | 均退出 0，20 份绑定恢复原样，没有生成物改动进入提交 |
+
+B05–B08 中依赖旧投递/裁决模型的测试迁移为实际共享驱动+写编排的完整生命周期；保留无请求、Wait/Stay、原动作、多个 worktree、待核对、失败不自动重试等行为，并新增旧成功/失败抵达新准备/提交/返回三个阶段的交错及终态门禁。测试验证到新请求实际提交且清账，不只计投递次数。旧“已发 close 等匿名事件”的阶段已移除，**不能**声称新测试识别了那个旧事件。
+
+当前仅完成实现和上述检查；下一步固定提交做独立 Standards / Spec 复核。尚未构建新 Release、操作桌面、跑 D06/CI/Q98 长测或合并；任务 08/10/11/M2 均未完成。
