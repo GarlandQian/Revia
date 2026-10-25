@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -855,3 +855,21 @@ B 结束 → 重新投递原 `exit`（`exit` 出现 ≥2 次、`close` 0 次）�
 - `CloseRequested` 不带 claimId 是依赖事实，最终提交阶段是内部安全编排，
   不改变 Q96 的选择语义。
 - 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。
+
+### 2026-10-25 / 规划方：4150433 第八轮限定复核，仍有两项P2
+
+固定`git diff 34b2d5148a3530cb4168fad43317d5ae2fd0362d...41504336171c2adf3238f45be6dd098e95e2e262`，唯一提交、4文件，行号对应4150433。前轮Stay实际阻止和早裁决不被本次回包覆盖的单次场景已静态改善，旧同步递归/立即重投不复报。
+
+#### Standards：确定违反2项P2，Fowler建议0项
+
+1. **ST-B09-08-1 / P2 / 新回包消费旧裁决**：`refreshGate.ts:1801`对任何非空earlyVerdict清字段并结算，不核当前claim。close1已发→Stay→事件1被阻止但IPC1仍挂起；新关闭claim2的IPC2先回，`:1799/1803`清claim2字段并消费裁决1。event2后来拿不到claim而被阻止，coordinator仍持active claim2，后续认领null；旧IPC1还能再写pending1。违反`technical-direction.md:56` Q96及派发“旧claim/回包不得影响新请求”。各自投递/回包/裁决须按所有权结算，不能跨claim清状态。
+2. **ST-B09-08-2 / P2 / 最终提交门禁未接生产**：`refreshGate.ts:1584`的canStartWrite只被测试调用；`App.tsx:1173`仍仅检查监听ready，`:1200/1287/1358`直接开始写编排。关闭处于committing/awaiting时仍可登记新写，未兑现本轮最终提交方案的明确条件。此项是生产接线缺口，不推断必然数据损失。
+
+#### Spec：缺失/部分1项、实现错误1项P2，范围扩张0项
+
+1. **SP-B09-08-1 / P2 / 缺失生产写门禁**：同`App.tsx:1173/1200/1287/1358`与`refreshGate.ts:1584`，违反`spec.md:126`保留在途写及本轮最终提交约定，测试方法返回false不证明实际入口拒绝新写。
+2. **SP-B09-08-2 / P2 / 晚裁决污染下一投递**：close1 IPC已返回→Stay→旧事件1被阻止，在`refreshGate.ts:1671`留下无旧回调可消费的earlyVerdict1；用户再关闭，IPC2先回，`:1801`用其他claim裁决清新字段，但active claim2仍占用，event2无法获准，之后永久等待。违反`spec.md:127`执行原请求。此反例不要求两个IPC同时在途。
+
+统计：Standards2、最高P2、建议0；Spec2（缺失1/错误1）、最高P2、范围扩张0。两个轴独立保留。原生allow/prevent已收进共享入口，但“新请求可执行”测试只验证再次投递而未完成新裁决，门禁测试只断言helper，不代表生产接线。
+
+**检查边界**：最终5条真实记录均退出0，Node177、tsc/lint/build/diff-check；79份受测源码before/after/固定提交/磁盘SHA相同，未重跑。早期诊断失败没有完整原始流在提供目录中，不补造、不声称全部尝试成功。Rust未改未重跑。见[第八轮记录](../batch08-repair-validation.md)及[清单](../evidence/batch08-repair/manifest.json)。08回ready-for-agent；原Pi已idle，本轮复核后暂未派发下一轮，Q105未改变，规划方尚未接手生产实现。未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
