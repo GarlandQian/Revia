@@ -319,3 +319,7 @@ vmmap exit 255 系统根因与 Rust 振幅仍待定位。Status 保持 `ready-fo
 独占检查 `/private/tmp/revia-q98-root-takeover.3EEtAR/checks.SZuTne`：Python46通过，源码契约与diff-check均exit0，完整调用元数据/原始流留存；4文件前后SHA一致，46定义/46唯一/0同名。App.tsx逐字节未改，Q98阈值、暖机、阶段窗口/压力settle常量未改，未重跑无关Rust/Node或已核前端检查。旧Release仍2a51b160，本轮未新构建、GUI、D06、CI或长测。Rust+82MiB/vmmap255根因仍未知；Status保持ready-for-agent。
 
 原件说明：root曾误向Pi证据目录追加一次文档diff-check，已保存被改aggregate快照与第6条新调用，按原manifest字节/hash恢复原5条aggregate，原30件现均匹配。此root操作错误独立归档，不归为Pi交付问题，也不称原目录从未修改。
+
+### 2026-10-25：Codex接管版独立复核通过
+
+固定85a2f5c...ddb9da5，两轴分别为Standards确定0/启发式0、Spec0，上轮留证发现闭合；实际App协议形状正对照及真实main故障入口已独立核对。见[审查记录](../q98-evidence-review03.md)及原件manifest。按Q113不再交回Pi；接下来固定新版Release和完整正式30分钟长测，任务10仍ready-for-agent、11/M2未完成。旧Rust +82MiB和vmmap255不是已解决结论，桌面/D06/最终双平台CI仍有独立门槛。
