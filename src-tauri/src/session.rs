@@ -200,8 +200,8 @@ struct Snapshot {
     /// key: `<changes>/<path>`
     models: HashMap<String, FileModelCache>,
     /// 显示行排版缓存：key 为 `<changes>/<path>/<view>`。
-    /// 排版与文本都在这里，`get_rows` 只做切片，不再每次重建。
-    layouts: HashMap<String, Vec<RenderRow>>,
+    /// 只缓存源行位置，`get_rows` 按请求范围生成文本与 hunk 操作目标。
+    layouts: HashMap<String, rows::RowLayout>,
     generation: u64,
 }
 
@@ -371,8 +371,8 @@ impl WorktreeSession {
             let cached = models.get(&key(entry.changes, &entry.path));
             let model = cached.map(|cached| &cached.model);
             let language = language_for_path(&entry.path);
-            let row_count_unified = model.map(|file| rows::layout(file, ViewMode::Unified).len() as u32).unwrap_or(0);
-            let row_count_split = model.map(|file| rows::layout(file, ViewMode::Split).len() as u32).unwrap_or(0);
+            let row_count_unified = model.map(|file| rows::row_count(file, ViewMode::Unified) as u32).unwrap_or(0);
+            let row_count_split = model.map(|file| rows::row_count(file, ViewMode::Split) as u32).unwrap_or(0);
 
             let mut readonly_reason = entry.readonly_reason;
             let full_path = self.path.join(&entry.path);
@@ -534,17 +534,11 @@ impl WorktreeSession {
             .ok_or_else(|| AppError::rejected(format!("没有该文件的改动内容：{path}")))?;
         let layout_key = format!("{changes:?}/{path}/{view:?}");
         if !snapshot.layouts.contains_key(&layout_key) {
-            let mut layout = rows::layout(&cached.model, view);
-            for row in &mut layout {
-                if row.kind == RowKind::Hunk {
-                    row.hunk_action = cached.hunk_actions.get(row.hunk_index as usize).cloned();
-                }
-            }
             // 简单上限：缓存最多 8 份排版（镜像来回切换的常见用法）。
             if snapshot.layouts.len() >= 8 {
                 snapshot.layouts.clear();
             }
-            snapshot.layouts.insert(layout_key.clone(), layout);
+            snapshot.layouts.insert(layout_key.clone(), rows::RowLayout::new(&cached.model, view));
         }
         let layout = snapshot
             .layouts
@@ -553,7 +547,12 @@ impl WorktreeSession {
         let row_count = layout.len() as u32;
         let from = from.min(row_count);
         let to = to.min(row_count).max(from);
-        let rows: Vec<RenderRow> = layout[from as usize..to as usize].to_vec();
+        let mut rows = layout.render_range(&cached.model, from as usize..to as usize);
+        for row in &mut rows {
+            if row.kind == RowKind::Hunk {
+                row.hunk_action = cached.hunk_actions.get(row.hunk_index as usize).cloned();
+            }
+        }
         let entry = snapshot
             .entries
             .iter()
@@ -1434,8 +1433,8 @@ fn fill_entry(entry: &mut ChangeEntry, model: Option<&git::diff::FileChange>) {
             entry.added = file.added;
             entry.deleted = file.deleted;
             entry.hunk_count = file.hunks.len() as u32;
-            entry.row_count_unified = rows::layout(file, ViewMode::Unified).len() as u32;
-            entry.row_count_split = rows::layout(file, ViewMode::Split).len() as u32;
+            entry.row_count_unified = rows::row_count(file, ViewMode::Unified) as u32;
+            entry.row_count_split = rows::row_count(file, ViewMode::Split) as u32;
             entry.collapsed = is_collapsed(&entry.path, file);
             entry.hunks = rows::hunk_anchors(file);
         }
