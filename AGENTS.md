@@ -30,7 +30,7 @@ M2 访谈已完成（Q78–Q104，其中 Q99–Q104 为界面清理与美化）�
 | 1 | 规划方与用户 | 用 grill-with-docs 追问这个里程碑还没定的细节（包括测试接缝），更新决策、术语表和 ADR |
 | 2 | 规划方 | 用 to-spec 写 `spec.md` |
 | 3 | 规划方 | 用 to-tickets 拆成 `issues/`，标好依赖 |
-| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型优先顺序与换模重试按 [Q109–Q112](docs/README.md)，保留已有改动和失败原件；不因一次渠道错误跳过 Pi，规划方接管仍受 Q105 约束 |
+| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型优先顺序、换模重试与一次返修后的接管按 [Q109–Q113](docs/README.md)，保留已有改动和失败原件 |
 | 5 | 规划方 | 用 code-review 审查 `m<N>` 相对 main 的改动，对照 `spec.md`；意见写进对应任务文件的 `## Comments` |
 | 6 | 实施方 | 按 `## Comments` 修改，回到第 5 步 |
 | 7 | 实施方 | 写 `report.md`：实测数据、验收结论、遗留问题 |
