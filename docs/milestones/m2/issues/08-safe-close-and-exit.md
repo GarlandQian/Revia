@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -779,3 +779,79 @@ A/B→Stay 反例等）。
 统计：Standards2、最高P2、建议0；Spec2、最高P2、范围扩张0。两轴独立保留。共享CloseDriver已有推进，但App仍含原生放行决策；Node native只记投递，测试手动调用裁决，不能证明真实适配事件路径。所谓“Stay旧原生事件”测试实际只挂起release而未发送close；早到事件测试未完成B结束后的断言。下一轮对实际完整交错验证，不能继续换成更早的await。
 
 最终5条检查退出0：Node172、tsc/lint/build/diff-check；79份前/后/固定提交/当前磁盘SHA一致。此前Paseo诊断活动有Node失败与过滤输出，提供目录没有完整失败流，不补造；绿色只对应最终记录的5条。Pi称runCloseExecution已删除，但源文件仍保留未使用导出，只是App不再调用，纠正报告边界。原件见[第七轮记录](../batch07-repair-validation.md)及[清单](../evidence/batch07-repair/manifest.json)。08回ready-for-agent，未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
+
+### 2026-10-25 / Pi 实现：整批 B08 返修（原生裁决真的能阻止、早到裁决不丢）
+
+起点 `34b2d51`（生产 `520f134`），实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`。
+逐项修 ST-B08-08-1 / ST-B08-08-2 / SP-B08-08-1 / SP-B08-08-2。
+
+#### 原生适配：为什么用「最终提交阶段」
+
+已核对锁定依赖：Tauri 2 的 `CloseRequested` **不携带任何 claimId**，
+无法从事件本身判断它属于哪次程序化投递。因此不声称事件携带 id，也不靠
+`hasInFlight` 猜测；改用**受保护的最终提交阶段**：
+
+- `execute()` 在投递前做**同步**复核（`isExecutionValid`：代际未变 + 无在途写 + 无待核对），
+  通过后才置 `phase = "committing"`、`committedClaim`、`outstandingProgrammaticClose = true`
+  并调用 `performNative`；
+- 之后到达的 `CloseRequested` 一律由 `handleNativeCloseRequest()` 判定：
+  - 有未结算的程序化关闭 → 这次事件是**它**的裁决，用 `claimGeneration(claimId)` 校验授权；
+  - 授权仍有效 → `allow: true` 并清账；
+  - 授权已失效（Stay）或有新写入 → **`allow: false`**，App 真的调用 `event.preventDefault()`；
+- `canStartWrite()` 在 `committing`/`awaitingVerdict` 期间返回 `false`，写入口不能在此后开始新写。
+
+**App 不再含任何 allow/prevent 业务判断**：`onCloseRequested` 只做
+`const decision = driver.handleNativeCloseRequest(); if (!decision.allow) event.preventDefault();`。
+
+#### ST-B08-08-1 / SP-B08-08-1（已投递 close 仍越过 Stay）
+
+`handleChoice("stay")` 现在撤销授权（`coordinator.resolveAsk("stay")` 推进代际）
+但**保留** `committedClaim`/`pendingVerdictClaim`，因为那次投递仍在外。
+旧 `CloseRequested` 到达时 `claimGeneration` 已不匹配当前代际 → `allow: false` → 真实阻止。
+
+回归 `B08-1：close 已投递后 Stay，旧原生事件必须被阻止`：performNative 已调用（挂起回包）、
+Stay、旧事件到达 → `allow === false`；回包后 `pendingIntent === null`。
+`B08-1：Stay 之后真正的新用户请求仍可执行`：旧事件被阻止后，新请求由驱动自己投递
+（`allow: false` 但不绕过编排），`native` 计数 +1。
+
+#### ST-B08-08-2 / SP-B08-08-2（早到阻止裁决被晚回包覆盖）
+
+新增 `earlyVerdict: { claimId, allow }`：`handleNativeCloseRequest()` 在 `committing` 阶段
+收到裁决时立即记录并结算该 claim；`execute()` 的回包只确认传输，
+若 `earlyVerdict` 已存在就**不进入** `awaitingVerdict`，而是按已消费的裁决结算
+（`allow: true` → 完成；`allow: false` → 释放 claim、保留授权，继续等待写入结束）。
+
+回归 `B08-2：CloseRequested 先于 IPC 回包且被 B 拦，之后 B 结束仍执行原 exit`：
+投递挂起 → B 开始写 → 事件先到被拦（`allow: false`）→ 回包到达不覆盖 →
+B 结束 → 重新投递原 `exit`（`exit` 出现 ≥2 次、`close` 0 次）。
+`B08-2：回包先于 CloseRequested（正常顺序）`同样断言 B 结束后继续执行原动作。
+
+#### 清理
+
+`runCloseExecution` / `CloseExecutionDeps` **已从源文件删除**（上一轮报告称"已删除"
+但实际仍保留未使用导出，此处更正并落实）。App 不再引用它。
+
+#### 检查（唯一日志目录）
+
+`/private/tmp/revia-b08-1yRxyJ`（`record.py` 执行时逐条记录真实 argv/cwd/显式非敏感环境/start/end/exit/stdout/stderr；
+`tested-source-sha256-before/-after.txt` 覆盖 79 个受测源文件，排除 `src/types/bindings`、
+`src-tauri/gen`、`dist`、`target`、验收原件与文档）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 177 / pass 177 / fail 0 |
+| `git diff --check` | 0 | — |
+
+79 份受测源码 SHA 前后逐份一致。全部 `.err` 文件原样保留（含 vite 的既有 configLoader 提示）。
+本轮未改 Rust 生产代码，未重跑 Rust。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 的实际拦截与裁决、Stay 后旧 `CloseRequested`
+  的真实到达时序、失败后 Stay 的观感，均需规划方在固定 Release 上验收。
+- `CloseRequested` 不带 claimId 是依赖事实，最终提交阶段是内部安全编排，
+  不改变 Q96 的选择语义。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。

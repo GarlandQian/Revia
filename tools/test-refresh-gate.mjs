@@ -2791,7 +2791,7 @@ test("投递不是完成：close 投递后 B 开始写，请求必须保留（�
   assert.equal(env.driver.currentPhase(), "awaitingVerdict");
   // 投递期间 B 开始写。
   c.beginWrite("wt-b");
-  env.driver.handleVerdictBlocked();
+  env.driver.handleNativeCloseRequest();
   assert.equal(c.pendingIntent(), "exit", "原 exit 必须保留");
   c.endWrite("wt-b");
   env.driver.notifyStateChanged();
@@ -2811,8 +2811,8 @@ test("投递不是完成：关闭事件先于回包到达时同样保留请求",
   env.driver.notifyStateChanged();
   // 事件先到：B 开始写。
   c.beginWrite("wt-b");
-  const blocked = env.driver.handleVerdictBlocked();
-  assert.equal(blocked.kind, "ask", "B 在途 → 必须拦住");
+  const blocked = env.driver.handleNativeCloseRequest();
+  assert.equal(blocked.allow, false, "B 在途 → 必须拦住");
   gate.resolve();
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(c.pendingIntent(), "close", "请求保留");
@@ -2828,7 +2828,8 @@ test("原生裁决放行才清账", async () => {
   env.driver.notifyStateChanged();
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(c.pendingIntent(), "exit", "投递后仍保留");
-  env.driver.handleNativeVerdict();
+  const verdict = env.driver.handleNativeCloseRequest();
+  assert.equal(verdict.allow, true);
   assert.equal(c.pendingIntent(), null, "裁决放行后才清账");
 });
 
@@ -2963,7 +2964,8 @@ test("B07-2：裁决放行后才清账，且只清一次", async () => {
   env.driver.notifyStateChanged();
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(c.pendingIntent(), "close", "投递后仍保留");
-  env.driver.handleNativeVerdict();
+  const verdict = env.driver.handleNativeCloseRequest();
+  assert.equal(verdict.allow, true, "无阻塞 → 允许关闭");
   assert.equal(c.pendingIntent(), null, "裁决后才清账");
   assert.equal(env.driver.currentPhase(), "idle");
 });
@@ -2980,8 +2982,8 @@ test("B07-2：投递后被新写入拦住，B 结束后按原 exit 继续（不�
   assert.equal(env.driver.currentPhase(), "awaitingVerdict");
   // B 开始写 → 关闭事件被拦。
   c.beginWrite("wt-b");
-  const blocked = env.driver.handleVerdictBlocked();
-  assert.equal(blocked.kind, "ask", "被拦住 → 展示询问");
+  const blocked = env.driver.handleNativeCloseRequest();
+  assert.equal(blocked.allow, false, "被拦住 → 阻止销毁");
   assert.equal(c.pendingIntent(), "exit", "原动作仍是 exit");
   // B 结束：按原动作继续。
   c.endWrite("wt-b");
@@ -3010,14 +3012,14 @@ test("B07-3：Stay 后旧原生事件不当作新意图（ST-B07-08-3）", async
   release.resolve();
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(env.native.length, 0, "Stay 后旧执行不得投递");
-  // B 结束，旧原生事件（若有）也不能当新请求。
+  // B 结束。
   c.endWrite("wt-b");
-  env.driver.handleNativeVerdict();      // 没有在途投递 → 忽略
-  assert.equal(c.pendingIntent(), null, "不得因旧事件关闭窗口");
-  // 真正的新用户请求仍可执行。
-  env.driver.handleRequest("close");
+  // 此刻没有未结算的程序化关闭（Stay 已撤销授权，release 回来时被放弃），
+  // 所以一个到达的关闭事件属于**新的**用户请求，正常走驱动。
+  const fresh = env.driver.handleNativeCloseRequest();
+  assert.notEqual(fresh, undefined, "新事件按请求处理");
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
-  assert.ok(env.native.includes("close"), "新请求正常走驱动并投递");
+  assert.ok(env.native.includes("close"), "新用户请求正常投递");
 });
 
 test("B07：持续失败只自动一次，之后必须用户重新选择", async () => {
@@ -3059,4 +3061,131 @@ test("B07：失败后可以 Stay，不再自动执行", async () => {
   env.driver.handleChoice("stay");
   assert.equal(env.driver.currentPhase(), "idle");
   assert.equal(c.pendingIntent(), null);
+});
+
+// ---------------- 整批 B08：原生裁决必须真的能阻止，且不丢早到裁决 ----------------
+
+test("B08-1：close 已投递后 Stay，旧原生事件必须被阻止（ST-B08-08-1 / SP-B08-08-1）", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  // close 真正投递（performNative 已调用），但原生事件暂缓。
+  const nativeGate = deferred();
+  env.setNative(async (intent) => {
+    env.native.push(intent);
+    await nativeGate.promise;
+    return "delivered";
+  });
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.length, 1, "close 已投递");
+  assert.equal(env.driver.currentPhase(), "committing");
+  // 询问仍可见，用户点 Stay。
+  env.driver.handleChoice("stay");
+  // 旧 CloseRequested 现在才到。
+  const verdict = env.driver.handleNativeCloseRequest();
+  assert.equal(verdict.allow, false, "Stay 后旧原生事件必须被阻止");
+  // 回包随后到达：不得再放行。
+  nativeGate.resolve();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(c.pendingIntent(), null, "Stay 已撤销请求");
+});
+
+test("B08-1：Stay 之后真正的新用户请求仍可执行", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  const nativeGate = deferred();
+  env.setNative(async (intent) => {
+    env.native.push(intent);
+    await nativeGate.promise;
+    return "delivered";
+  });
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve();
+  env.driver.handleChoice("stay");
+  env.driver.handleNativeCloseRequest();       // 旧事件被阻止
+  nativeGate.resolve();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  // 新请求（无在途写、无旧投递）会由驱动自己投递并走裁决，
+  // 因此这次原生事件被拦住（不绕过编排），但请求确实被接受并执行。
+  env.setNative(async (intent) => { env.native.push(intent); return "delivered"; });
+  const before = env.native.length;
+  const fresh = env.driver.handleNativeCloseRequest();
+  assert.equal(fresh.allow, false, "由我们接管，不绕过编排");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.length, before + 1, "新请求被真实投递");
+});
+
+test("B08-2：CloseRequested 先于 IPC 回包且被 B 拦，之后 B 结束仍执行原 exit（ST-B08-08-2 / SP-B08-08-2）", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  const nativeGate = deferred();
+  env.setNative(async (intent) => {
+    env.native.push(intent);
+    await nativeGate.promise;
+    return "delivered";
+  });
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.length, 1, "投递已发出，回包挂起");
+  // B 开始写；CloseRequested 先到 → 被拦。
+  c.beginWrite("wt-b");
+  const early = env.driver.handleNativeCloseRequest();
+  assert.equal(early.allow, false, "B 在途 → 阻止");
+  // 回包现在才到：不能覆盖已消费的裁决。
+  nativeGate.resolve();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(c.pendingIntent(), "exit", "原动作保留");
+  // B 结束 → 按原 exit 继续。
+  c.endWrite("wt-b");
+  env.setNative(async (intent) => { env.native.push(intent); return "delivered"; });
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.filter((n) => n === "exit").length >= 2, true, "B 结束后重新投递原 exit");
+  assert.equal(env.native.includes("close"), false, "不能被改成 close");
+});
+
+test("B08-2：回包先于 CloseRequested（正常顺序）同样在 B 结束后执行原动作", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.driver.currentPhase(), "awaitingVerdict");
+  // B 开始写 → 事件被拦。
+  c.beginWrite("wt-b");
+  const blocked = env.driver.handleNativeCloseRequest();
+  assert.equal(blocked.allow, false);
+  assert.equal(c.pendingIntent(), "exit", "原动作保留");
+  // B 结束 → 继续按原 exit。
+  c.endWrite("wt-b");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.filter((n) => n === "exit").length >= 2, true);
+});
+
+test("B08：committing/awaitingVerdict 期间不允许开始新写", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.driver.canStartWrite(), false, "等待裁决期间不得开始新写");
 });

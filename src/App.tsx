@@ -773,26 +773,16 @@ export function App() {
       try {
         const stop = await getCurrentWindow().onCloseRequested(async (event) => {
           const driver = closeDriverRef.current;
-          if (!driver) return;
-          // 已有我们发起的投递在等裁决：这是**那次投递**的裁决事件。
-          if (driver.hasInFlight()) {
-            const coordinator = closeCoordinatorRef.current;
-            if (coordinator.needsExitGuard()) {
-              // 有在途写/待核对：拦住关闭，保留原动作。
-              event.preventDefault();
-              if (!disposed) closeBlockedRef.current?.();
-              return;
-            }
-            // 无阻塞：原生裁决放行，只有当前在途投递才清账。
-            driver.handleNativeVerdict();
+          if (!driver) {
+            // 驱动还没就绪：保守拦住，避免未受保护的销毁。
+            event.preventDefault();
             return;
           }
-          // 不是我们发起的投递：按新用户请求处理。
-          const effect = driver.handleRequest("close");
-          if (effect.kind === "ask" || driver.hasInFlight()) {
-            event.preventDefault();
-          }
-          if (!disposed) applyEffectRef.current?.(effect);
+          // 允许/阻止与所有权判定**全部**在共享驱动里；App 只应用结论
+          // （ST-B08-08-1：Stay 后的旧程序化关闭必须真的被阻止）。
+          const decision = driver.handleNativeCloseRequest();
+          if (!decision.allow) event.preventDefault();
+          if (!disposed) applyEffectRef.current?.(decision.effect);
         });
         if (disposed) stop(); else stops.push(stop);
         windowGuard = true;
@@ -832,7 +822,6 @@ export function App() {
   /** 执行关闭/退出的入口（供原生退出事件复用，避免定义顺序问题）。 */
   /** 驱动的转发：监听回调早于驱动定义注册。 */
   const applyEffectRef = useRef<((effect: CloseDriverEffect) => void) | null>(null);
-  const closeBlockedRef = useRef<(() => void) | null>(null);
   /** reconcile 的转发（供监听回调与关闭执行共用，避免定义顺序问题）。 */
 
   // ---------------- 添加仓库 ----------------
@@ -1172,9 +1161,6 @@ export function App() {
   // 监听回调通过 ref 到达同一驱动。
   reconcileCloseRef.current = reconcileClose;
   applyEffectRef.current = applyEffect;
-  closeBlockedRef.current = () => {
-    applyEffect(closeDriver.handleVerdictBlocked());
-  };
 
   /**
    * 三个写入口共用的**共享异步编排**（任务 08）。
