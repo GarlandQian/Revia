@@ -21,6 +21,42 @@ use crate::settings::{Registry, Settings};
 use crate::recovery::{self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
+/// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
+///
+/// 生产 `AppState` 与回归测试**共用这一份实现**，测试不再复制比较算法：
+/// 一旦生产比较被改坏，测试会真实失败。
+#[derive(Debug, Default)]
+pub struct ExitGuard {
+    state: std::sync::Mutex<(u64, bool)>,
+}
+
+impl ExitGuard {
+    /// 应用一次带版本的更新；只有**更大的序号**才生效。
+    ///
+    /// 本地 Tauri 每个 invoke 是独立 fetch，旧请求可能晚到；靠这里的版本比较
+    /// 保证旧 `false` 绝不会覆盖新 `true`（ST-B03-08-1）。
+    pub fn apply(&self, seq: u64, blocked: bool) -> bool {
+        let Ok(mut guard) = self.state.lock() else {
+            return false;
+        };
+        if seq <= guard.0 {
+            return false;
+        }
+        *guard = (seq, blocked);
+        true
+    }
+
+    /// 当前是否需要阻止退出。
+    pub fn blocked(&self) -> bool {
+        self.state.lock().map(|guard| guard.1).unwrap_or(false)
+    }
+
+    /// 已接受的最高序号（诊断与测试用）。
+    pub fn accepted_seq(&self) -> u64 {
+        self.state.lock().map(|guard| guard.0).unwrap_or(0)
+    }
+}
+
 pub struct AppState {
     pub registry: Mutex<Registry>,
     pub sessions: Mutex<HashMap<String, Arc<WorktreeSession>>>,
@@ -38,7 +74,7 @@ pub struct AppState {
     /// 存 `(seq, blocked)`：**只有更大的 seq 才生效**。本地 Tauri 每个 invoke 是
     /// 独立 fetch，前端「旧 false 的调用晚到」若直接 store 会解除新建立的保护，
     /// 因此在 Rust 侧用版本号保证旧请求绝不能覆盖新状态（ST-B03-08-1）。
-    pub exit_guard: Arc<std::sync::Mutex<(u64, bool)>>,
+    pub exit_guard: Arc<ExitGuard>,
 }
 
 impl AppState {
@@ -53,7 +89,7 @@ impl AppState {
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
             acceptance: None,
-            exit_guard: Arc::new(std::sync::Mutex::new((0, false))),
+            exit_guard: Arc::new(ExitGuard::default()),
         }
     }
 
@@ -62,23 +98,12 @@ impl AppState {
     /// 原生退出（macOS Quit / ⌘Q）不经过窗口关闭监听，Rust 侧据此决定是否
     /// 阻止退出并通知前端（任务 08、Q96）。只反映状态，不执行任何 Git 动作。
     pub fn exit_blocked(&self) -> bool {
-        self.exit_guard
-            .lock()
-            .map(|guard| guard.1)
-            .unwrap_or(false)
+        self.exit_guard.blocked()
     }
 
     /// 应用一次带版本的保护更新；返回是否被接受（旧版本会被忽略）。
     pub fn apply_exit_guard(&self, seq: u64, blocked: bool) -> bool {
-        let Ok(mut guard) = self.exit_guard.lock() else {
-            return false;
-        };
-        if seq <= guard.0 {
-            // 旧请求：绝不覆盖更新的状态（ST-B03-08-1）。
-            return false;
-        }
-        *guard = (seq, blocked);
-        true
+        self.exit_guard.apply(seq, blocked)
     }
 
     /// 取出（必要时创建）某个 worktree 的会话。
@@ -1026,47 +1051,23 @@ pub fn set_exit_blocked(state: State<'_, AppState>, seq: u64, blocked: bool) -> 
 
 #[cfg(test)]
 mod exit_guard_tests {
-    use super::*;
-    use std::sync::{Arc, Mutex};
-
-    /// 只测**版本化接收端**本身：不构造 AppState，避免引入与保护语义无关的依赖。
-    struct Guard {
-        state: Mutex<(u64, bool)>,
-    }
-
-    impl Guard {
-        fn new() -> Self {
-            Self { state: Mutex::new((0, false)) }
-        }
-
-        fn apply(&self, seq: u64, blocked: bool) -> bool {
-            let Ok(mut guard) = self.state.lock() else { return false };
-            if seq <= guard.0 {
-                return false;
-            }
-            *guard = (seq, blocked);
-            true
-        }
-
-        fn blocked(&self) -> bool {
-            self.state.lock().map(|guard| guard.1).unwrap_or(false)
-        }
-    }
+    use super::ExitGuard;
 
     /// 新 true 建立后，旧 false（更小 seq）必须被拒绝。
     #[test]
     fn newer_true_rejects_late_older_false() {
-        let guard = Guard::new();
+        let guard = ExitGuard::default();
         assert!(guard.apply(1, false), "首个 false 生效");
         assert!(guard.apply(2, true), "新 true 生效");
         assert!(!guard.apply(1, false), "旧 false 必须被拒绝");
         assert!(guard.blocked(), "旧 false 晚到不得解除新 true");
+        assert_eq!(guard.accepted_seq(), 2, "已接受序号不得倒退");
     }
 
     /// 更新的 false 正常释放。
     #[test]
     fn newer_false_releases() {
-        let guard = Guard::new();
+        let guard = ExitGuard::default();
         assert!(guard.apply(1, true));
         assert!(guard.apply(2, false), "更新的 false 正常生效");
         assert!(!guard.blocked());
@@ -1075,7 +1076,7 @@ mod exit_guard_tests {
     /// 相同序号不重复生效（幂等且不倒退）。
     #[test]
     fn equal_seq_is_rejected() {
-        let guard = Guard::new();
+        let guard = ExitGuard::default();
         assert!(guard.apply(1, true));
         assert!(!guard.apply(1, false), "同序号不得改变状态");
         assert!(guard.blocked());

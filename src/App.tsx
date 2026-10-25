@@ -37,7 +37,7 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
-import { CloseCoordinator, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
+import { CloseCoordinator, CloseGuardGate, ExitGuardSync, runCloseExecution, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
 import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
 import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
@@ -787,7 +787,7 @@ export function App() {
           if (disposed) return;
           const decision = closeCoordinatorRef.current.request("exit");
           if (decision.action === "proceed") {
-            void performCloseIntentRef.current?.("exit");
+            reconcileCloseRef.current?.();
             return;
           }
           reconcileCloseRef.current?.();
@@ -815,7 +815,7 @@ export function App() {
   }, []);
 
   /** 执行关闭/退出的入口（供原生退出事件复用，避免定义顺序问题）。 */
-  const performCloseIntentRef = useRef<((intent: CloseIntent) => Promise<void>) | null>(null);
+  /** reconcile 的转发（供监听回调与关闭执行共用，避免定义顺序问题）。 */
 
   // ---------------- 添加仓库 ----------------
 
@@ -1072,23 +1072,9 @@ export function App() {
    * 只有关闭编排确认「没有在途写、没有待核对」后才会走到这里；
    * 动作类型完全按用户原请求，不升级、不替换。
    */
-  const performCloseIntent = useCallback(async (intent: CloseIntent) => {
-    try {
-      // 关闭窗口与退出进程是两件事：退出必须先解除阻止标志，
-      // 否则原生 ExitRequested 会再次阻止，进程永远退不出去。
-      if (intent === "exit") {
-        // 用更高版本显式解除保护，避免被在途的旧调用挡住。
-        await syncExitBlocked(false);
-        await getCurrentWindow().close();
-        return;
-      }
-      await getCurrentWindow().close();
-    } catch (caught) {
-      setAppError(toAppError(caught), null);
-    }
-  }, [setAppError]);
 
-  performCloseIntentRef.current = performCloseIntent;
+
+
 
   /**
    * 把「是否需要阻止原生退出」同步给 Rust（任务 08）。
@@ -1110,6 +1096,23 @@ export function App() {
   }, []);
 
   /**
+   * 执行原生关闭/退出（任务 08，ST-B05-08-1）。
+   *
+   * 代际与所有权判断全部在共享入口 `runCloseExecution` 里，App 与 Node 回归同源。
+   */
+  const performCloseIntent = useCallback(async (
+    claimed: { intent: CloseIntent; generation: number },
+  ) => {
+    await runCloseExecution({
+      coordinator: closeCoordinatorRef.current,
+      releaseExitGuard: () => syncExitBlocked(false),
+      performNative: () => getCurrentWindow().close(),
+      reconcile: () => reconcileCloseRef.current?.(),
+      onError: (caught) => setAppError(toAppError(caught), null),
+    }, claimed);
+  }, [setAppError, syncExitBlocked]);
+
+  /**
    * 统一收尾：所有生命周期事件都走这里（任务 08）。
    *
    * 写结束、晚点 Wait、保护 begin 失败回滚、另存收尾、待核对成功/失败、
@@ -1124,8 +1127,14 @@ export function App() {
     });
     const decision = coordinator.reconcile();
     if (decision.kind === "proceed") {
+      // 认领所有权；认领失败（条件已变）就回到等待，不执行原生动作。
+      const claimed = coordinator.claimExecution();
+      if (!claimed) {
+        reconcileCloseRef.current?.();
+        return;
+      }
       setCloseRequest(null);
-      void performCloseIntent(decision.intent);
+      void performCloseIntent(claimed);
       return;
     }
     if (decision.kind === "ask") {

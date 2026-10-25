@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -486,3 +486,79 @@ Possible Duplicated Code判断建议1项：上述重复版本算法易漂移，�
 统计：Standards2、最严重P2（建议1）；Spec1、最严重P2。前轮监听切换、晚Wait按钮、rollback真实收尾的直接路径已闭合，不反复计旧项；新异步授权生命周期与真实接收端回归成批交原Pi。
 
 **原始检查边界**：Node150、Rust新测试3与lib103、前端退出0；首次diff-check2及清理后0均保留。6份前后SHA匹配固定提交；72路径清单无72份before/after哈希。runner写第二Rust为session_flow，但原始stdout是lib103，不把runner当精确执行日志。见[检查记录](../batch04-repair-validation.md)与[清单](../evidence/batch04-repair/manifest.json)。不补造缺失记录，下一轮逐命令真实落盘。08保持ready-for-agent，未新Release/桌面/D06/CI/长测/推送/合并，10/11/M2未完成。
+
+### 2026-10-25 / Pi 实现：整批 B05 返修（异步关闭授权生命周期与真实接收端）
+
+起点 `e1ab47d`，实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`。
+逐项修 ST-B05-08-1 / ST-B05-08-2 / SP-B05-08-1。
+
+#### ST-B05-08-1（旧异步 proceed 越过 Stay）
+
+根因：`reconcile()` 返回 `proceed` 时就清掉授权与原请求，App 在 `await` 之后
+没有任何代际校验，旧回包恢复时会直接关窗。
+
+现在授权**延续到原生动作完成**：
+
+- `reconcile()` 在 `proceed` 时**不再清授权**；
+- 新增 `claimExecution()` / `isExecutionValid(generation)` / `completeExecution(generation)` /
+  `abandonExecution()`：认领时记下请求代际，`Stay` 或新请求会推进代际使旧认领失效；
+- 新增共享入口 `runCloseExecution(deps, claimed)`（`refreshGate.ts`），
+  App 与 Node 回归**同源**：每个 `await` 之后校验代际 + 真实在途/pending，
+  失效则 `abandonExecution()` 并把仍有效的原动作交回 `reconcile()`，**绝不关窗**；
+- 原生退出事件也改走 `reconcile()`（不再直接执行），保证所有权与代际一致。
+
+确定反例（A 写 Quit→Wait → A 结束 → B 写 + Close→Stay → B 结束 → 旧回包恢复）
+在回归中直接复现：`runCloseExecution` 返回 `false`，`native` 数组为空。
+
+#### ST-B05-08-2 / SP-B05-08-1（Rust 测试复制接收端）
+
+- 从 `AppState` 提取生产类型 `ExitGuard`（`apply` / `blocked` / `accepted_seq`），
+  `AppState::apply_exit_guard` 与 `exit_blocked` 都委托给它；
+- 三个测试改为**直接使用 `ExitGuard`**（生产实现），删除测试内复制的 `Guard`；
+- 敏感性已验证：临时删掉生产里的 `if seq <= guard.0` 版本比较后，
+  `newer_true_rejects_late_older_false` 与 `equal_seq_is_rejected` **真实失败**；
+  恢复后 3 项通过。
+
+**更正前轮表述**：B04 报告里「Rust 真实版本接收端」的说法不准确——
+当时测试用的是复制算法。本轮起才是真正的生产接收端，B04 段落保留为历史。
+
+#### 回归（Node，App 实际调用的异步入口）
+
+`tools/test-refresh-gate.mjs` **156 项通过**。B05 新增 6 项，全部调用
+`runCloseExecution`（App 的 `performCloseIntent` 就是薄包装）：
+
+- 旧回包越过 Stay（A/B 交错）：不关窗；
+- B 未结束时旧回包不关窗，且原动作仍是 `exit`（没被改成 `close`）；
+- 没有后续请求时正常 Wait 仍执行原动作；
+- Stay 之后新请求重新走完整授权，旧回包不影响新请求；
+- 旧回包失败只上报，不授权旧动作；
+- 执行失败后仍有效的原动作交回编排，不悬挂。
+
+#### 检查（唯一日志目录，逐命令真实落盘）
+
+`/private/tmp/revia-b05-uNREPd`
+
+日志由 `record.py` 在**执行时**逐条记录：真实 `argv` 数组、`cwd`、
+显式非敏感环境覆盖（`CI=1`、`NO_COLOR=1`）、start/end 时间、exit、
+完整 stdout/stderr，汇总在 `invocations.json`。
+`tested-source-sha256-before.txt` / `-after.txt` 覆盖 **79 个受测源文件**
+（生产源码 + 测试源码 + 构建配置 + 锁文件，排除 `src/types/bindings`、
+`src-tauri/gen`、`dist`、`target`、验收原件与文档），前后逐份一致。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 156 / pass 156 / fail 0 |
+| `cargo test --lib exit_guard` | 0 | 3 passed（生产 `ExitGuard`） |
+| `git diff --check` | 0 | — |
+
+本轮改了 Rust 生产数据类型（提取 `ExitGuard`），按最小相关范围只跑 `--lib exit_guard`；
+未跑完整 Rust 套件。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 实际拦截、Stay 后不关窗的真实观感、
+  待核对闭环流程，均需规划方在固定 Release 上验收。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。

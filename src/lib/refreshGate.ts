@@ -1067,6 +1067,8 @@ export class CloseCoordinator {
   private authorized: CloseIntent | null = null;
   /** 请求代际：每次新的请求或 Stay 取消都递增。 */
   private requestGeneration = 0;
+  /** 已被认领、正在执行原生动作的代际（0 表示没有执行中的动作）。 */
+  private executingGeneration = 0;
 
   /** 当前请求代际（核对流程必须捕获它）。 */
   generation(): number {
@@ -1189,10 +1191,9 @@ export class CloseCoordinator {
       };
     }
     if (this.authorized !== null) {
-      const intent = this.authorized;
-      this.authorized = null;
-      this.requested = null;
-      return { kind: "proceed", intent };
+      // **不在这里清授权**：授权要延续到原生动作真正完成（ST-B05-08-1）。
+      // App 拿到 proceed 后若发现代际已变（例如用户选了 Stay），必须放弃执行。
+      return { kind: "proceed", intent: this.authorized };
     }
     // 还有**未授权**的原请求（用户尚未选择）：必须继续展示询问，
     // 否则对话框被隐藏、requested 暗留，用户再也没有 Wait/Stay 可点
@@ -1211,6 +1212,43 @@ export class CloseCoordinator {
     if ((this.pending.get(worktreeId) ?? 0) !== generation) return false;
     this.pending.delete(worktreeId);
     return true;
+  }
+
+  /**
+   * 认领一次原生动作的所有权；返回代际或 `null`（当前没有可执行授权）。
+   *
+   * 认领后授权**仍然保留**，直到 `complete()` 或代际变化。
+   */
+  claimExecution(): { intent: CloseIntent; generation: number } | null {
+    if (this.authorized === null) return null;
+    if (this.writing.size > 0 || this.pending.size > 0) return null;
+    this.executingGeneration = this.requestGeneration;
+    return { intent: this.authorized, generation: this.requestGeneration };
+  }
+
+  /** 这次认领是否仍然有效（代际未变、仍无在途写与待核对）。 */
+  isExecutionValid(generation: number): boolean {
+    return this.requestGeneration === generation
+      && this.writing.size === 0
+      && this.pending.size === 0;
+  }
+
+  /** 原生动作已完成：清掉授权与原请求。 */
+  completeExecution(generation: number): void {
+    if (this.requestGeneration !== generation) return;
+    this.authorized = null;
+    this.requested = null;
+    this.executingGeneration = 0;
+  }
+
+  /** 原生动作被放弃（代际变化/条件不再满足）：授权交给编排继续等待。 */
+  abandonExecution(): void {
+    this.executingGeneration = 0;
+  }
+
+  /** 是否已有执行中的原生动作。 */
+  isExecuting(): boolean {
+    return this.executingGeneration !== 0;
   }
 
   /**
@@ -1382,5 +1420,62 @@ export class WriteGuardOrchestrator {
   end(worktreeId: string, needsVerification: boolean): void {
     this.deps.endWrite(worktreeId, needsVerification);
     this.deps.reconcile();
+  }
+}
+
+/**
+ * 原生关闭/退出的**异步执行入口**（任务 08，ST-B05-08-1）。
+ *
+ * App 与 Node 回归都调用它，不各写一套代际判断。它把「认领 → 每个 await 后校验
+ * → 真正执行 → 完成」收在一个函数里：
+ *
+ * - 授权在原生动作**完成**后才清除；中途代际变化（用户选 Stay、新请求）会放弃执行；
+ * - 放弃时把仍有效的原动作交回 `reconcile()` 继续等待，不会静默丢请求；
+ * - 旧的回包（例如 `setExitBlocked(false)` 的 await 晚返回）不能越过 Stay 关窗。
+ */
+export interface CloseExecutionDeps {
+  coordinator: CloseCoordinator;
+  /** 退出前解除原生阻止标志（版本化，await）。 */
+  releaseExitGuard: () => Promise<void>;
+  /** 真正执行原生关闭/退出。 */
+  performNative: (intent: CloseIntent) => Promise<void>;
+  /** 重新回到编排（展示询问 / 继续等待 / 再执行）。 */
+  reconcile: () => void;
+  /** 执行失败时的上报。 */
+  onError: (error: unknown) => void;
+}
+
+/**
+ * 跑一次已认领的原生动作；返回是否真的执行了 `performNative`。
+ */
+export async function runCloseExecution(
+  deps: CloseExecutionDeps,
+  claimed: { intent: CloseIntent; generation: number },
+): Promise<boolean> {
+  const { coordinator } = deps;
+  try {
+    if (claimed.intent === "exit") {
+      await deps.releaseExitGuard();
+      if (!coordinator.isExecutionValid(claimed.generation)) {
+        coordinator.abandonExecution();
+        deps.reconcile();
+        return false;
+      }
+    }
+    // 关窗之前最后校验：这是真正会销毁窗口的调用。
+    if (!coordinator.isExecutionValid(claimed.generation)) {
+      coordinator.abandonExecution();
+      deps.reconcile();
+      return false;
+    }
+    await deps.performNative(claimed.intent);
+    coordinator.completeExecution(claimed.generation);
+    return true;
+  } catch (error) {
+    coordinator.abandonExecution();
+    deps.onError(error);
+    // 失败后把仍有效的原动作交回编排，不让请求悬挂。
+    deps.reconcile();
+    return false;
   }
 }
