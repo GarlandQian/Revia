@@ -6,6 +6,7 @@ from collections import deque
 import datetime
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -90,6 +91,42 @@ def _as_text(value):
     return (value or b"").decode("utf-8", "replace")
 
 
+def finite_number(value):
+    return type(value) is int or (type(value) is float and math.isfinite(value))
+
+
+def reject_json_constant(value):
+    raise ValueError(f"JSON 含非有限数值：{value}")
+
+
+def checkpoint_instant(value):
+    if not isinstance(value, str):
+        raise ValueError("阶段时间不是字符串")
+    result = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if result.tzinfo is None:
+        raise ValueError("阶段时间缺少时区")
+    return result
+
+
+def checkpoint_errors(record):
+    if not isinstance(record, dict):
+        return ["checkpoint 不是对象"]
+    problems = []
+    if type(record.get("cycle")) is not int or record["cycle"] <= 0:
+        problems.append("checkpoint 缺少正整数 cycle")
+    if record.get("file") != "src/staged.ts" or record.get("view") != "split":
+        problems.append("checkpoint 不是固定的 staged/split 文件阶段")
+    for field in ("pressure", "hiddenDuringHold"):
+        if type(record.get(field)) is not bool:
+            problems.append(f"checkpoint 缺少布尔 {field}")
+    try:
+        if checkpoint_instant(record.get("startedAt")) > checkpoint_instant(record.get("endedAt")):
+            problems.append("checkpoint 起止时间倒置")
+    except ValueError as error:
+        problems.append(f"checkpoint 起止时间不可核验：{error}")
+    return problems
+
+
 def webkit_services(domain):
     """Read only this application's launchd service table, never a global PID diff."""
     section = re.search(r"\n\s*services = \{\n(.*?)\n\s*\}", domain, re.S)
@@ -136,7 +173,7 @@ def launchctl_ownership(evidence, pid, purpose):
     return completed.stdout
 
 
-def sample_memory(pid, evidence=None):
+def sample_memory(pid, evidence=None, partial=None):
     if evidence is None:
         domain = subprocess.check_output(["launchctl", "print", f"pid/{pid}"], text=True, timeout=5)
     else:
@@ -145,6 +182,8 @@ def sample_memory(pid, evidence=None):
         if domain is None:
             raise RuntimeError("launchctl 归属证据不可用，不能接受缺失的内存样本")
     services = webkit_services(domain)
+    if partial is not None:
+        partial["servicesAtSampling"] = services
     pids = [pid] + [child for group in services.values() for child in group]
     if evidence is None:
         output = subprocess.check_output(["ps", "-o", "pid=,rss=", "-p", ",".join(map(str, pids))], text=True, timeout=5)
@@ -243,7 +282,7 @@ class ProgressLog:
     def __init__(self, path):
         self.path = path
 
-    def read(self, expected_output=None, expected_target=None):
+    def read(self, expected_output=None, expected_target=None, expected_repo=None):
         """Return (anchor, closed_checkpoints, problems, tail).
 
         `problems` is a list of integrity violations; any problem must fail the run.
@@ -260,12 +299,12 @@ class ProgressLog:
         seen = set()
         for raw in head.split(b"\n") if head else []:
             text = raw.decode("utf-8", "replace")
-            marker = text.find("[SOAK_PROGRESS] ")
+            marker = text.find("[SOAK_PROGRESS]")
             if marker < 0:
                 continue
-            payload = text[marker + len("[SOAK_PROGRESS] "):]
+            payload = text[marker + len("[SOAK_PROGRESS]"):].strip()
             try:
-                record = json.loads(payload)
+                record = json.loads(payload, parse_constant=reject_json_constant)
             except ValueError:
                 problems.append(f"进度记录不是合法 JSON：{payload[:120]}")
                 continue
@@ -276,14 +315,18 @@ class ProgressLog:
             if kind == "run":
                 if anchor is None:
                     anchor = record
+                    if not isinstance(record.get("runId"), str) or not record["runId"]:
+                        problems.append("运行锚点缺少非空 runId")
                     if expected_output is not None and record.get("outputPath") != expected_output:
                         problems.append(
                             f"运行锚点输出路径不匹配：记录 {record.get('outputPath')!r}，本轮 {expected_output!r}")
                     if expected_target is not None and record.get("targetSeconds") != expected_target:
                         problems.append(
                             f"运行锚点目标时长不匹配：记录 {record.get('targetSeconds')!r}，本轮 {expected_target!r}")
-                elif record.get("runId") != anchor.get("runId"):
-                    problems.append("进度记录出现第二个不同运行锚点")
+                    if expected_repo is not None and record.get("repo") != expected_repo:
+                        problems.append("运行锚点仓库与本轮 fixture 不匹配")
+                else:
+                    problems.append("进度记录出现重复运行锚点")
                 continue
             if kind != "checkpoint":
                 problems.append(f"未知进度记录类型：{kind!r}")
@@ -295,7 +338,7 @@ class ProgressLog:
                 problems.append("checkpoint 与运行锚点不属于同一运行")
                 continue
             cycle = record.get("cycle")
-            if not isinstance(cycle, int):
+            if type(cycle) is not int or cycle <= 0:
                 problems.append(f"checkpoint 缺少整数 cycle：{cycle!r}")
                 continue
             if cycle in seen:
@@ -304,10 +347,16 @@ class ProgressLog:
             if not record.get("endedAt"):
                 problems.append(f"checkpoint 未闭合：{cycle}")
                 continue
+            metadata_problems = checkpoint_errors(record)
+            if metadata_problems:
+                problems.extend(metadata_problems)
+                continue
             seen.add(cycle)
             closed.append(record)
         if anchor is None:
             problems.append("进度记录缺少运行锚点，不能确认属于本轮运行")
+        if tail:
+            problems.append("前端进度日志尾行未闭合，不能作为完成证据")
         return anchor, closed, problems, tail.decode("utf-8", "replace")
 
 
@@ -440,18 +489,12 @@ def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=
     the frontend's incremental progress records may only fill DIAGNOSTIC metadata, and
     such samples are never authoritative, so they cannot contribute acceptance samples.
     """
-    def instant(value):
-        result = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None:
-            raise ValueError("阶段时间缺少时区")
-        return result
-
     reported = frontend.get("phaseCheckpoints")
     has_final = isinstance(reported, list) and bool(reported)
     if has_final:
         source = "final-report"
     elif progress_checkpoints:
-        source = "progress-log"
+        reported, source = progress_checkpoints, "progress-log"
     else:
         source = "missing"
 
@@ -459,6 +502,8 @@ def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=
         errors = sample["errors"]
         sample["checkpointSource"] = source
         sample["authoritative"] = source == "final-report"
+        if not has_final:
+            errors.append("缺少最终前端报告的阶段 checkpoint，诊断记录不替代验收证据")
         sample["checkpointEndConfirmed"] = checkpoints.has_ended(sample["checkpointId"])
         if not sample["checkpointEndConfirmed"]:
             errors.append("缺少匹配的 checkpoint END，不能确认静置窗口闭合")
@@ -478,8 +523,8 @@ def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=
             errors.append("阶段静置期间窗口被遮挡")
         else:
             try:
-                if not (instant(matches[0]["startedAt"]) <= instant(sample["timestamp"])
-                        <= instant(sample["samplingEndedAt"]) <= instant(matches[0]["endedAt"])):
+                if not (checkpoint_instant(matches[0]["startedAt"]) <= checkpoint_instant(sample["timestamp"])
+                        <= checkpoint_instant(sample["samplingEndedAt"]) <= checkpoint_instant(matches[0]["endedAt"])):
                     errors.append("采样墙钟区间不在前端 checkpoint 起止区间内")
             except (KeyError, TypeError, ValueError, AttributeError) as error:
                 errors.append(f"前端 checkpoint 起止时间不可核验：{error}")
@@ -488,31 +533,67 @@ def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=
         sample["validation"] = "final"
 
 
-def progress_consistency_errors(frontend, progress_checkpoints):
+def progress_consistency_errors(frontend, progress_checkpoints, anchor=None):
     """When both a final report and progress records exist, they must describe the same run.
 
     Progress is diagnostic, but a passing run whose incremental records contradict the
     final report is not trustworthy evidence, so the mismatch fails the run.
     """
     reported = frontend.get("phaseCheckpoints")
-    if not isinstance(reported, list) or not reported or not progress_checkpoints:
-        return []
-    final_cycles = {item.get("cycle") for item in reported if isinstance(item, dict)}
-    progress_cycles = {item.get("cycle") for item in progress_checkpoints}
+    if not isinstance(reported, list) or not reported:
+        return ["缺少最终前端报告的阶段 checkpoint"]
     problems = []
+    if anchor is not None:
+        expected_id = f"{frontend.get('operationsStartedAt')}/{anchor.get('outputPath')}"
+        if anchor.get("runId") != expected_id or anchor.get("setupSeconds") != frontend.get("setupSeconds"):
+            problems.append("最终报告的操作开始时间/setup 与运行锚点不一致")
+        try:
+            checkpoint_instant(frontend.get("operationsStartedAt"))
+        except ValueError as error:
+            problems.append(f"最终报告操作开始时间不可核验：{error}")
+    final_by_cycle = {}
+    for item in reported:
+        invalid = checkpoint_errors(item)
+        if invalid:
+            problems.extend(invalid)
+            continue
+        cycle = item["cycle"]
+        if cycle in final_by_cycle:
+            problems.append(f"最终报告 checkpoint 重复：{cycle}")
+        final_by_cycle[cycle] = item
+    final_cycles = set(final_by_cycle)
+    progress_cycles = {item["cycle"] for item in progress_checkpoints}
     if progress_cycles - final_cycles:
         problems.append(f"进度记录包含最终报告没有的 checkpoint：{sorted(progress_cycles - final_cycles)}")
     if final_cycles - progress_cycles:
         problems.append(f"最终报告包含进度记录没有的 checkpoint：{sorted(final_cycles - progress_cycles)}")
-    final_by_cycle = {item.get("cycle"): item for item in reported if isinstance(item, dict)}
+    previous_counts = {}
     for record in progress_checkpoints:
         final = final_by_cycle.get(record.get("cycle"))
         if not final:
             continue
-        if bool(final.get("pressure")) != bool(record.get("pressure")):
-            problems.append(f"checkpoint {record.get('cycle')} 的压力标记在最终报告与进度记录间不一致")
-        if final.get("hiddenDuringHold") != record.get("hiddenDuringHold"):
-            problems.append(f"checkpoint {record.get('cycle')} 的遮挡状态在最终报告与进度记录间不一致")
+        for field in ("file", "view", "pressure", "hiddenDuringHold", "startedAt", "endedAt"):
+            expected, actual = final.get(field), record.get(field)
+            if field in ("startedAt", "endedAt"):
+                try:
+                    expected, actual = checkpoint_instant(expected), checkpoint_instant(actual)
+                except ValueError as error:
+                    problems.append(f"checkpoint {record['cycle']} 时间不可核验：{error}")
+                    continue
+            if expected != actual:
+                problems.append(f"checkpoint {record['cycle']} 的 {field} 在最终报告与进度记录间不一致")
+        for field, total in (("cycles", "totalCycles"), ("fileSwitches", "totalFileSwitches"),
+                             ("viewSwitches", "totalViewSwitches"), ("scrolls", "totalScrolls"),
+                             ("jumps", "totalJumps"), ("checkpointPauseSeconds", "checkpointPauseSeconds"),
+                             ("visibilityPauseSeconds", "visibilityPauseSeconds")):
+            value, limit = record.get(field), frontend.get(total)
+            if (not finite_number(value) or value < 0 or not finite_number(limit) or value > limit
+                    or value < previous_counts.get(field, 0)):
+                problems.append(f"checkpoint {record['cycle']} 的 {field} 缺失或超出最终累计值")
+            elif field == "cycles" and value != record["cycle"]:
+                problems.append(f"checkpoint {record['cycle']} 的循环计数不一致")
+            if finite_number(value):
+                previous_counts[field] = value
     return problems
 
 
@@ -599,7 +680,8 @@ def completion_errors(frontend, samples, seconds, returncode, diagnostic=None, m
     if diagnostic is None and frontend.get("diagnostic") is not None:
         errors.append("诊断结果不能作为长期运行基线")
     if diagnostic is None or diagnostic.get("cycles") is None:
-        if frontend.get("actualDurationSeconds", 0) < seconds:
+        duration = frontend.get("actualDurationSeconds")
+        if not finite_number(duration) or duration < seconds:
             errors.append("前端连续操作时长不足")
     if diagnostic is not None:
         if frontend.get("diagnostic") != diagnostic:
@@ -616,70 +698,83 @@ def completion_errors(frontend, samples, seconds, returncode, diagnostic=None, m
     if not samples or any(not s.get("webContentPids") for s in samples):
         errors.append("缺少已归属的 WebContent 内存数据")
     focus = diagnostic.get("focus") if diagnostic else None
-    if any(frontend.get(key, 0) <= 0 for key in (FOCUS_COUNTERS[focus] if focus else FULL_LOAD_COUNTERS)):
+    if any(not finite_number(frontend.get(key)) or frontend[key] <= 0
+           for key in (FOCUS_COUNTERS[focus] if focus else FULL_LOAD_COUNTERS)):
         errors.append("缺少必需的操作负载")
     return errors
 
 
 def terminate_and_record(proc, evidence, cleanup, services=None):
-    """Terminate the measured app and record every step, even when a call raises.
+    """Journal each attempt before calling a signal/wait boundary; both waits are bounded."""
+    cleanup.update(startedAt=datetime.datetime.now().astimezone().isoformat(), reviaPid=proc.pid,
+                   servicesBeforeCleanup=services, terminateAttempted=False, terminateReturned=False,
+                   killAttempted=False, killReturned=False, signalDelivery="not_attempted", errors=[])
 
-    The record distinguishes three things that must not be conflated:
-      * the intent/attempt to call terminate()/kill() (`terminateAttempted`, `killAttempted`)
-      * whether that call returned without raising (`terminateReturned`, `killReturned`)
-      * whether the signal was actually delivered — which cannot be observed here and is
-        therefore reported as unknown, never asserted, and never inferred from exit code.
-    `proc.wait()` results and any exception are recorded, and the final poll is always
-    captured, so a raising wait() cannot destroy the cleanup evidence.
-    """
-    cleanup["startedAt"] = datetime.datetime.now().astimezone().isoformat()
-    cleanup["reviaPid"] = proc.pid
-    cleanup["servicesBeforeCleanup"] = services
-    poll_before = proc.poll()
-    cleanup["pollBeforeCleanup"] = poll_before
-    if poll_before is not None:
-        cleanup.update({"terminateAttempted": False, "terminateReturned": False,
-                        "killAttempted": False, "killReturned": False,
-                        "signalDelivery": "not_attempted",
-                        "note": "清理前主进程已退出；未发送信号"})
-    else:
-        cleanup["terminateAttempted"] = True
-        cleanup["terminateAttemptedAt"] = datetime.datetime.now().astimezone().isoformat()
+    def persist(step):
         try:
-            proc.terminate()
-            cleanup["terminateReturned"] = True
-            cleanup["signalDelivery"] = "unknown"
-        except Exception as error:  # noqa: BLE001 - record, never mask
-            cleanup["terminateReturned"] = False
-            cleanup["terminateError"] = f"{type(error).__name__}: {error}"
-            cleanup["signalDelivery"] = "unknown"
+            evidence.record({"kind": "cleanup", "step": step, **cleanup})
+        except OSError as error:
+            cleanup["errors"].append(f"清理日志写入失败：{type(error).__name__}: {error}")
+
+    def observe_poll(field):
         try:
-            cleanup["waitAfterTerminate"] = proc.wait(timeout=5)
+            cleanup[field] = proc.poll()
+        except Exception as error:
+            cleanup[field] = "unknown"
+            cleanup[field + "Error"] = f"{type(error).__name__}: {error}"
+            cleanup["errors"].append(f"{field} 不可核验：{cleanup[field + 'Error']}")
+        return cleanup[field]
+
+    def wait_after(action):
+        field = "waitAfter" + action
+        cleanup[field + "AttemptedAt"] = datetime.datetime.now().astimezone().isoformat()
+        persist("wait-after-" + action.lower() + "-attempt")
+        try:
+            cleanup[field] = proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            cleanup["waitAfterTerminate"] = "timeout"
-            cleanup["killAttempted"] = True
-            cleanup["killAttemptedAt"] = datetime.datetime.now().astimezone().isoformat()
-            try:
-                proc.kill()
-                cleanup["killReturned"] = True
-            except Exception as error:  # noqa: BLE001 - record, never mask
-                cleanup["killReturned"] = False
-                cleanup["killError"] = f"{type(error).__name__}: {error}"
-            try:
-                cleanup["waitAfterKill"] = proc.wait()
-            except Exception as error:  # noqa: BLE001 - record, never mask
-                cleanup["waitAfterKill"] = "error"
-                cleanup["waitAfterKillError"] = f"{type(error).__name__}: {error}"
-        except Exception as error:  # noqa: BLE001 - record, never mask
-            cleanup["waitAfterTerminate"] = "error"
-            cleanup["waitAfterTerminateError"] = f"{type(error).__name__}: {error}"
+            cleanup[field] = "timeout"
+        except Exception as error:
+            cleanup[field] = "error"
+            cleanup[field + "Error"] = f"{type(error).__name__}: {error}"
+            cleanup["errors"].append(f"{field} 失败：{cleanup[field + 'Error']}")
+        persist("wait-after-" + action.lower() + "-result")
+        return cleanup[field]
+
     try:
-        cleanup["pollAfterCleanup"] = proc.poll()
-    except Exception as error:  # noqa: BLE001 - record, never mask
-        cleanup["pollAfterCleanup"] = "error"
-        cleanup["pollAfterCleanupError"] = f"{type(error).__name__}: {error}"
-    cleanup["endedAt"] = datetime.datetime.now().astimezone().isoformat()
-    evidence.record({"kind": "cleanup", **cleanup})
+        poll_before = observe_poll("pollBeforeCleanup")
+        persist("poll-before")
+        if poll_before is None:
+            cleanup.update(terminateAttempted=True,
+                           terminateAttemptedAt=datetime.datetime.now().astimezone().isoformat(),
+                           signalDelivery="unknown")
+            persist("terminate-attempt")
+            try:
+                proc.terminate()
+                cleanup["terminateReturned"] = True
+            except Exception as error:
+                cleanup["terminateError"] = f"{type(error).__name__}: {error}"
+                cleanup["errors"].append(f"terminate 失败：{cleanup['terminateError']}")
+            persist("terminate-result")
+            if wait_after("Terminate") == "timeout":
+                cleanup.update(killAttempted=True,
+                               killAttemptedAt=datetime.datetime.now().astimezone().isoformat())
+                persist("kill-attempt")
+                try:
+                    proc.kill()
+                    cleanup["killReturned"] = True
+                except Exception as error:
+                    cleanup["killError"] = f"{type(error).__name__}: {error}"
+                    cleanup["errors"].append(f"kill 失败：{cleanup['killError']}")
+                persist("kill-result")
+                if wait_after("Kill") == "timeout":
+                    cleanup["errors"].append("kill 后等待仍超时，进程终态未知")
+        elif poll_before != "unknown":
+            cleanup["note"] = "清理前主进程已退出；未发送信号"
+    finally:
+        if observe_poll("pollAfterCleanup") is None:
+            cleanup["errors"].append("清理后应用仍在运行，终态未完成")
+        cleanup["endedAt"] = datetime.datetime.now().astimezone().isoformat()
+        persist("final")
     return cleanup
 
 
@@ -699,7 +794,7 @@ def preserve_partial_candidate(candidate, sample, error, proc, services, evidenc
     except Exception as poll_error:  # noqa: BLE001 - record, never mask
         candidate["pollAtFailure"] = "error"
         candidate["pollAtFailureError"] = f"{type(poll_error).__name__}: {poll_error}"
-    candidate["servicesAtFailure"] = services
+    candidate["servicesAtFailure"] = services if services is not None else candidate.get("servicesAtSampling")
     candidate["capturedAt"] = datetime.datetime.now().astimezone().isoformat()
     partials.append(candidate)
     evidence.record({"kind": "sample-failure", **candidate})
@@ -757,7 +852,9 @@ def main():
         parser.error("此驱动仅适用于 macOS；时长与采样间隔必须为正")
     if not binary.is_file() or not repo.is_dir():
         parser.error("应用或 fixture 不存在，请先构建当前源码并准备 fixture")
-    if any(p.exists() for p in (output, frontend_path, frontend_path.with_suffix(".log"), log_path, samples_path, phase_samples_path)):
+    evidence_path = Path(str(output) + ".evidence.jsonl")
+    if any(p.exists() for p in (output, frontend_path, frontend_path.with_suffix(".log"), log_path,
+                                samples_path, phase_samples_path, evidence_path)):
         parser.error("输出已存在，请指定新的 --output，保留旧证据")
     output.parent.mkdir(parents=True, exist_ok=True)
     env = {key: value for key, value in os.environ.items() if not key.startswith("REVIA_")}
@@ -780,7 +877,6 @@ def main():
     samples, phase_samples, errors, frontend = [], [], [], {}
     checkpoints = CheckpointLog(frontend_path.with_suffix(".log"))
     progress_log = ProgressLog(frontend_path.with_suffix(".log"))
-    evidence_path = Path(str(output) + ".evidence.jsonl")
     evidence = CommandEvidence(evidence_path)
     cleanup_evidence = {}
     partial_candidates = []
@@ -802,8 +898,9 @@ def main():
                 if now >= next_sample:
                     sampling_started_at = datetime.datetime.now().astimezone().isoformat()
                     candidate = {"elapsedSec": round(now - started, 2), "samplingStartedAt": sampling_started_at}
+                    sample = {}
                     try:
-                        sample = sample_memory(proc.pid, evidence)
+                        sample = sample_memory(proc.pid, evidence, candidate)
                         candidate.update(sample)
                     except Exception as error:  # noqa: BLE001 - every failure keeps its partial data
                         preserve_partial_candidate(candidate, sample, error, proc, None,
@@ -852,10 +949,14 @@ def main():
                 terminate_and_record(proc, evidence, cleanup_evidence, initial_services)
             except Exception as error:  # noqa: BLE001 - cleanup evidence must never vanish
                 cleanup_evidence["cleanupError"] = f"{type(error).__name__}: {error}"
+                errors.append(f"清理失败：{cleanup_evidence['cleanupError']}")
                 try:
                     evidence.record({"kind": "cleanup", **cleanup_evidence})
                 except Exception as record_error:  # noqa: BLE001 - last resort
                     errors.append(f"清理证据写入失败：{type(record_error).__name__}: {record_error}")
+            errors.extend(cleanup_evidence.get("errors", []))
+            if cleanup_evidence.get("terminateAttempted"):
+                errors.append("应用未自行结束，驱动执行了清理；不能视为完整成功运行")
             try:
                 checkpoints.poll()
                 record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal, evidence)
@@ -863,13 +964,20 @@ def main():
                 errors.append(f"最终阶段日志不可核验：{error}")
     if frontend_path.exists():
         try:
-            frontend = json.loads(frontend_path.read_text())
+            frontend = json.loads(frontend_path.read_text(), parse_constant=reject_json_constant)
+            if not isinstance(frontend, dict):
+                raise ValueError("前端最终报告不是对象")
         except (OSError, ValueError) as error:
             errors.append(f"前端报告无效：{error}")
+            frontend = {}
     # Incremental frontend progress explains an interrupted run. It is diagnostics only:
     # it never satisfies completion, which still requires the real final report below.
-    progress_anchor, progress_checkpoints, progress_problems, progress_tail = progress_log.read(
-        expected_output=str(frontend_path), expected_target=seconds)
+    try:
+        progress_anchor, progress_checkpoints, progress_problems, progress_tail = progress_log.read(
+            expected_output=str(frontend_path), expected_target=seconds, expected_repo=str(repo))
+    except OSError as error:
+        progress_anchor, progress_checkpoints, progress_tail = None, [], ""
+        progress_problems = [f"进度日志读取失败：{type(error).__name__}: {error}"]
     finalize_phase_samples(phase_samples, checkpoints, frontend, progress_checkpoints)
     # The live journal is explicitly provisional; publish the same final validity as the report.
     phase_samples_path.write_text("".join(json.dumps(sample) + "\n" for sample in phase_samples))
@@ -878,7 +986,12 @@ def main():
     # cross-run, unanchored or unclosed progress cannot accompany a passing run.
     errors.extend(f"前端进度记录问题：{problem}" for problem in progress_problems)
     errors.extend(f"前端进度与最终报告不一致：{problem}"
-                  for problem in progress_consistency_errors(frontend, progress_checkpoints))
+                  for problem in progress_consistency_errors(frontend, progress_checkpoints, progress_anchor))
+    errors.extend(f"常规采样候选失败：{candidate['failure']}" for candidate in partial_candidates)
+    setup_seconds = frontend.get("setupSeconds")
+    if not finite_number(setup_seconds) or setup_seconds < 0:
+        errors.append("缺少真实有效的 setupSeconds，不能确定暖机分界")
+        setup_seconds = None
     if not binary_unchanged(binary, binary_sha256):
         errors.append("受测二进制在运行期间被替换或移除，构建证据无效")
     report = {
@@ -898,12 +1011,12 @@ def main():
         "progressEvidence": {"anchor": progress_anchor, "closedCheckpoints": progress_checkpoints,
                              "problems": progress_problems, "unterminatedTail": progress_tail,
                              "note": "中断诊断用；不构成最终前端报告或验收依据"},
-        "memoryAnalysis": (None if diagnostic else analyze_memory(samples, frontend.get("setupSeconds", 0))),
+        "memoryAnalysis": (None if diagnostic or setup_seconds is None else analyze_memory(samples, setup_seconds)),
         "phaseMemoryTimeSeries": phase_samples,
         # Diagnostic runs report the same Q98 numbers for comparison; only baselines count for acceptance.
-        "q98MemoryVerdict": analyze_q98(samples, phase_samples, frontend.get("setupSeconds", 0)),
+        "q98MemoryVerdict": (None if setup_seconds is None else analyze_q98(samples, phase_samples, setup_seconds)),
         # A verdict computed from progress-derived phase samples is diagnostic only.
-        "q98MemoryVerdictAuthoritative": bool(frontend.get("ok") is True)
+        "q98MemoryVerdictAuthoritative": not errors and diagnostic is None and bool(frontend.get("ok") is True)
         and isinstance(frontend.get("phaseCheckpoints"), list) and bool(frontend.get("phaseCheckpoints")),
         "phaseMemorySummary": {
             "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),

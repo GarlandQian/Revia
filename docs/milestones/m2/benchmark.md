@@ -36,6 +36,21 @@ caffeinate -di python3 tools/bench-long-running.py \
 
 输出包括汇总 `.json`、前端原始 `.json.frontend.json`、逐条落盘的 `.json.samples.jsonl`、阶段采样 `.json.phase-samples.jsonl`、标准输出 `.json.log` 和前端/Rust 步骤 `.json.frontend.log`。输出已存在时拒绝覆盖。日志仅含本地测试信息，不上传。
 
+增量留证使用原非退出日志通道：`[SOAK_PROGRESS] {json}`。每轮恰有一个 `kind: "run"`
+锚点，绑定本轮最终前端输出路径、fixture、目标时长、真实 setup 和操作开始时间；已闭合
+阶段写 `kind: "checkpoint"`，含相同 runId、cycle、file/view、pressure、真实起止、
+hiddenDuringHold，以及当时的累计负载和暂停秒数。最终报告必须含完整 checkpoint 集合，
+并与增量的身份、集合、元数据和累计值相符。缺失、重复、跨运行、损坏 JSON 或未闭合尾行
+均阻断成功；尾行文本另存 `progressEvidence.unterminatedTail`，原始字节仍在前端日志中。
+增量只用于诊断，不能替代最终报告或提供权威 Q98 样本；缺真实 setup 时不猜暖机起点。
+
+采样外部命令另存 `.json.evidence.jsonl`，记录 stdout/stderr、超时已得输出、异常及时间。
+launchctl 仅保存必要的 WebKit services 归属行并注明裁剪，不保存可能含凭据的完整环境。
+`partialCandidates` 只属于本次失败尝试，不沿用上一轮 RSS/footprint；已取得的归属和解析值
+仍保留。清理在每次 terminate/kill/wait 调用前后追加记录，两次 wait 各有 5 秒上限；
+尝试、返回、异常与实际信号交付未知分开记录，清理异常仍生成汇总。执行过清理或有失败
+候选时不算完整成功，exit0 不证明未发信号。
+
 内存分析保留完整时序，另列操作开始后 180 秒的热身分界、稳态分段均值和线性趋势；短测不产生稳态结论。不能仅凭进程退出码、一个峰值或斜率自动宣布通过。还需结合真实桌面截图和时序判定是否持续增长，必要时定位、修复后重新长测。
 
 ## 性能回归
@@ -63,7 +78,7 @@ node tools/test-ipc-diagnostics.mjs
 node tools/test-visible-highlight-lines.mjs
 ```
 
-20 项 Python 标准库测试覆盖压力取样与 Q98 判定、单项诊断的负载要求、静置期间遮挡判无效、无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。不引入新的测试框架。另有 11 项 Node 原生 IPC 诊断回归和 13 项可见高亮行回归，后者覆盖两视图、旧/新行号偏移、离散 hunk、纯增删及半开可见窗口。
+Python 标准库测试覆盖压力取样与 Q98 判定、单项诊断的负载要求、静置期间遮挡判无效、无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。失败留证回归通过真实生产 main 或生产清理/采样入口，在外部命令、进程和时钟等边界模拟故障；不向真实进程发信号或系统通知。不引入新的测试框架。另有 11 项 Node 原生 IPC 诊断回归和 13 项可见高亮行回归，后者覆盖两视图、旧/新行号偏移、离散 hunk、纯增删及半开可见窗口。
 
 ## 跳转与颜色诊断的口径
 

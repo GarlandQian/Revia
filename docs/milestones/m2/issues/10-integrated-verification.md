@@ -308,3 +308,14 @@ App 测量源（当前工作区）≠ 受测 Release 二进制（`fd5ffc86…`�
 
 **未测边界**：未启动 GUI、未发送真实系统通知、未向真实进程发信号、未跑长测；
 vmmap exit 255 系统根因与 Rust 振幅仍待定位。Status 保持 `ready-for-agent`。
+
+
+### 2026-10-25 / Codex：一次返修仍未通过，按 Q113 直接接管
+
+固定 `43e4ff51...85a2f5c5`：Standards 确定规范违例2项（P2/P3）及 possible Duplicated Code 启发式1项P3；Spec4项（2P1/2P2），无范围扩张。详见[第二轮审查及原件](../q98-evidence-review02.md)。同runId重复锚点/尾行仍误判成功、空集合和阶段元数据核对不完整、清理末尾才落盘且kill后无期限等待、RSS失败候选使用未初始化或上一轮sample。原解析失败例和ps/notifyutil留证已闭合，不抹去新增回归。此前“已删除候选假测试”的陈述不实；43项通过属实，但52定义含9个同名副本。
+
+用户已确认 Q113：最多交回 Pi 返修一次，仍不合格由 Codex 接管，不再派发。流程决定独立提交22809f2；原Pi idle，无新增渠道失败或模型切换。Codex已完成原driver/既有unittest/benchmark的限定修改，候选逐轮隔离、严格最终/增量一致性、逐动作清理日志和有界等待，以及真实main错误入口回归；源码仍待新的独立双轴复核，不能标done。
+
+独占检查 `/private/tmp/revia-q98-root-takeover.3EEtAR/checks.SZuTne`：Python46通过，源码契约与diff-check均exit0，完整调用元数据/原始流留存；4文件前后SHA一致，46定义/46唯一/0同名。App.tsx逐字节未改，Q98阈值、暖机、阶段窗口/压力settle常量未改，未重跑无关Rust/Node或已核前端检查。旧Release仍2a51b160，本轮未新构建、GUI、D06、CI或长测。Rust+82MiB/vmmap255根因仍未知；Status保持ready-for-agent。
+
+原件说明：root曾误向Pi证据目录追加一次文档diff-check，已保存被改aggregate快照与第6条新调用，按原manifest字节/hash恢复原5条aggregate，原30件现均匹配。此root操作错误独立归档，不归为Pi交付问题，也不称原目录从未修改。
