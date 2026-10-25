@@ -1,0 +1,10 @@
+{
+  "verifiedAt": "2026-10-25T22:30:34.891813+08:00",
+  "archivedOriginalCount": 231,
+  "allGzipBytesAndSha256Match": true,
+  "allOriginalsUnchangedAfterArchiving": true,
+  "productSourceFilesUnchanged": 143,
+  "localDocumentLinksChecked": 129,
+  "onlyExpectedTrackedDocumentationChanged": true,
+  "note": "This verification is derived finalization metadata, not an extra product run or a payload original counted by manifest.files."
+}

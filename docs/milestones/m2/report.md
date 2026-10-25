@@ -4,17 +4,19 @@
 
 ## 当前验收状态
 
-- **Rust 减分配修复恢复验证**：用户“继续吧”放行后，Codex完成完整Rust检查（harness274/0失败/1既有ignored，初轮session_flow三项缺fixture提前返回，已用隔离fixture补跑三项实际通过）、lint/build含类型检查，143份源码SHA前后一致。下一步固定源码做正式双轴复核；尚未新版Release/D06/CI/长测，不宣称72.9MiB超幅已消除，旧Q98失败仍有效。详见[任务10最新 Comments](./issues/10-integrated-verification.md#comments)。
+- **Rust 减分配修复完成复验**：产品9e5c7d1、受测HEAD59b925d，源码中重复全量排版/文本分配已消除；完整Rust harness274/0失败/1既有ignored，旧session_flow首轮缺fixture后已显式补跑三项实际通过，lint/build含类型检查exit0。正式双轴首轮各1P3（仅文档），59b925d限定复核均闭合、新增0，原发现保留。143份源码本地检查/构建/长测前后一致。见[本轮完整记录](./q98-rust-memory-20261025.md)。
 - **内部集成完成**：m2已从ababf47快进到2a51b16，无冲突；后续d952修复测试fixture，f10仅更正证据描述，9434e7a记录用户模型顺序。main仍为800ac01，用户原有图标/配置/AGENTS改动保留，没有推main、开PR或发布。
-- **实际CI通过**：[40174661706](https://github.com/GarlandQian/Revia/actions/runs/40174661706)对应f10fc971；macOS arm64与Windows x64的类型检查/lint/build、完整Rust、Release编译均成功，Rust分别271/243通过、0失败、各1既有ignored。review_marks分别31/29，旧Windows失败用例已实际通过。旧40172283582失败及两轴证据描述发现保留，后续文档更正不冒称重新双轴0项。
+- **新版实际CI通过**：[40199770545](https://github.com/GarlandQian/Revia/actions/runs/40199770545)对应59b925d；macOS arm64与Windows x64的类型检查/lint/build、Rust及Release编译均成功，harness分别274/246通过、0失败、各1既有ignored。新增三项布局测试两平台实际ok；旧fixture-optional session_flow不以CI总数冒称业务执行。本轮只按Q97正常推m2，后续文档/证据提交未重构建或重测；旧40174661706成功及40172283582失败保留各自版本。
 - **桌面局部闭环完成**：B10真实窗口Close/Stay、Cmd-Q/Stay及原生菜单Quit/Wait显式交付后退出有证据；C05恢复准备失败后显示待核对、阻止自动关闭、Stay、真实状态核对、新Close请求和用户授权确认后同PID55553退出0已闭合。C05不是恢复成功；独立的5f样本另有成功恢复。文本只读对比、二进制详情/另存、审阅导航/重启保留及浅深主界面各保留其局部证据，不概括为全部桌面通过。详见[B10记录](./batch10-repair-validation.md)。
-- **D06四组已测**：标准首屏137/124ms、真冷独立文字4/3ms，八次独立首rAF均35/35；滚动各60真rAF、0fallback/0uncovered。标准统一原热跳18ms/false与最大帧31/48ms保留，另一目标的独立探针不能倒填；返回首帧并非全色。详见[最终测量](./final-measure-20261025.md)。
-- **Q98正式长测完整但Rust超幅未通过**：接管版两轴复核后固定6f420a8构建新版，主动1801.042秒、29阶段最终全部有效，应用自行退出且整体留证权威。本轮未复现vmmap错误；WebContent footprint/malloc两条通过，Rust常规footprint首138.5、最高211.4、末132.5MiB，maxRise72.9超过+10，斜率+0.2401不能抵消超幅。原生empty大块dirty区域与波动对应，具体分配来源仍待定位，不宣称泄漏或根因已修。见[完整正式长测](./q98-formal-20261025.md)；旧两轮失败保留、不拼接。
-- **Q98留证接管版复核通过**：Pi一次返修仍未合格后，Codex按Q113直接修复；固定85a2f5c...ddb9da5独立复核Standards确定0/启发式0、Spec0，上轮发现闭合。Python46及源码契约/diff-check原件已核，App/阈值/暖机/负载未改。见[第三轮独立复核](./q98-evidence-review03.md)。已完成新版Release及完整正式30分钟长测，结果见前项；旧vmmap255根因仍未验证，不将工具复核通过称作Q98/M2通过。
-- **仍需收口**：必要的审阅外改失效/同位置更新、跨目标旧响应、真实Rejected、hunk键盘与完整文件快捷键/丢弃恢复、字号增大和有限原生退出补验；任务05剩余查看/清空项区分自动化与桌面。任务08回到ready-for-human但未done；任务10仍ready-for-agent、11及13未done。留证修复已复核且完整长测有效；本轮 Rust 排版减分配修改已写且用户已放行验证，相关检查完成，正式复核及新版本实测仍待完成，验收全部通过才合main，再做M3详细访谈和规格。
+- **新版D06四组有效，原跳转超帧未闭合**：59b925d标准首屏124/129ms；真冷文字3/2ms、八次独立首帧35/35，滚动各60真rAF/0fallback/0uncovered。原appear18/22/28ms的withinOneFrame=false及统一最大帧35ms保留，另一目标探针不能倒填，返回首帧并非全色。统一首次未取得前台可见合成窗口的失败原件也保留，不笼统称D06全部通过。见[新版测量](./q98-rust-memory-20261025.md#新版-d06-与保留的不利结果)；[旧版测量](./final-measure-20261025.md)不覆盖。
+- **新版完整Q98通过**：59b925d新Release主动1801.023秒、同PID93979、29阶段最终全部有效，应用自行exit0、留证权威。Rust footprint首47.8/末47.6/峰49.6MiB，maxRise1.8、斜率-0.0051；压力后WebContent footprint/malloc的maxRise1.3/5.4、斜率+0.0922/+0.2639，均达原阈值。与旧完整长测Rust72.9MiB超幅对照；历史失败保留，不拼接、不放宽规则，不声称全部历史分配来源已调用栈归因。见[本轮完整记录](./q98-rust-memory-20261025.md)及[旧完整失败](./q98-formal-20261025.md)。
+- **Q98留证接管版复核通过**：Pi一次返修仍未合格后，Codex按Q113直接修复；固定85a2f5c...ddb9da5独立复核Standards确定0/启发式0、Spec0，上轮发现闭合。Python46及源码契约/diff-check原件已核，App/阈值/暖机/负载未改。见[第三轮独立复核](./q98-evidence-review03.md)。该留证版随后完整长测Rust超幅；本轮减分配修复又以新Release完成Q98通过，分别留存。旧vmmap255根因仍未验证，不将工具复核通过单独称作Q98/M2通过。
+- **仍需收口**：D06原跳转超帧；必要的审阅外改失效/同位置更新、跨目标旧响应、真实Rejected、hunk键盘与完整文件快捷键/丢弃恢复、字号增大和有限原生退出补验；任务05剩余查看/清空项区分自动化与桌面。任务08仍ready-for-human未done，任务10仍ready-for-agent、11及13未done。新版Q98及最终产品源码双平台CI已完成，不因文档收尾重复长测；全部剩余验收通过才合main，再做M3访谈和规格。
 
 既有桌面/D06实际受测Release构建源为2a51b160，二进制SHA256 `fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d`；f10相对它仅测试/文档变化，不能称f10重新构建。后续模型文档也不回填受测版本。原件分别归入[静态](./evidence/batch10-repair-static/manifest.json)、[桌面](./evidence/task13-desktop04/manifest.json)、[内部集成](./evidence/m2-ui-integration-20261025/manifest.json)、[CI修复](./evidence/task10-ci-fixture-final01/manifest.json)和[最终测量](./evidence/final-measure-20261025/manifest.json)；旧失败、无效尝试及缺件边界均保留。
 
+
+本轮源码9e5c7d1、实际受测59b925d的新Release/D06/Q98/CI及四份独立审查原件另归入[本轮清单](./evidence/q98-rust-memory-20261025/manifest.json)。二进制SHA256 `28da0f0dc4bf542af589c0e73cc6592520860adee0852fa0f0b5da899438e9fd`；旧桌面样本不倒填为该版本。
 
 ## 历史进度（按记录当时状态）
 

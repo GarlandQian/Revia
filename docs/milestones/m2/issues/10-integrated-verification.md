@@ -355,3 +355,13 @@ vmmap exit 255 系统根因与 Rust 振幅仍待定位。Status 保持 `ready-fo
 ### 2026-10-25 / Codex：Rust 减分配第一轮双轴仅文档发现，已修待复核
 
 固定 `201df2a...9e5c7d1`：Standards 确定1项P3、possible smell0；Spec1项P3，产品行为确定发现0、范围扩张0。两轴分别保留 `ST-RM-1` / `SP-RM-1`，不合并计数：当前矩阵末尾仍写布局回归“未执行”，D01余项“源码已写未测”也有歧义。已统一为本地回归执行且通过，只有新版实测/CI尚未完成；原始发现与首轮缺fixture事实保留。此次只改文档，按受影响范围运行diff-check，不重跑产品测试；待两轴核对闭合后才构建新版及正式实测。
+
+### 2026-10-25 / Codex：Rust 减分配复验完成，完整 Q98 通过
+
+产品9e5c7d1、实际受测59b925d；正式双轴首轮Standards1P3/possible0、Spec1P3（产品行为0），均为矩阵文档状态，59b925d限定复核确认闭合、新增0，原始发现及四份报告保留。完整本地Rust harness274/0失败/1既有ignored，首轮旧session_flow缺fixture提前返回未计业务通过，随后显式隔离fixture补跑三项实际通过；前端检查及143份源码SHA核对通过。
+
+新.app binary SHA256 `28da0f0dc4bf542af589c0e73cc6592520860adee0852fa0f0b5da899438e9fd`；完整正式Q98主动1801.023秒、同PID93979、29阶段最终全部有效、自然exit0且CUA确认停止。Rust footprint47.8→47.6、峰49.6MiB，maxRise1.8/斜率-0.0051；压力后WebContent footprint及malloc的maxRise1.3/5.4、斜率+0.0922/+0.2639均通过原阈值。194常规/29阶段/5暖机后压力样本完整，可见性有效、无errors/partialCandidates，fixture语义与原index字节不变。独立重算吻合，旧72.9MiB完整失败及更早中断保留，未做调用栈归因，不宣称全部历史来源已证明。
+
+新版[CI40199770545](https://github.com/GarlandQian/Revia/actions/runs/40199770545)固定59b925d，两平台前端/Rust/Release全部success，harness macOS274/Windows246、0失败、各1既有ignored；旧fixture-optional用例不以CI总数冒称业务执行。本轮按Q97只正常推m2，后续仅文档/证据提交不冒称重新构建或重测。
+
+D06四组有效，但原appear18/22/28ms超帧保留未闭合，不拿独立探针倒填；前台合成窗口失败尝试、CUA预检普通实例误启动立即退出、CI派生脚本SyntaxError和Q98派生native选点时间关联纠正均完整留证。最后一项仅重跑派生分析，未重跑长测。详见[本轮报告及原件](../q98-rust-memory-20261025.md)。D02/D03/D04/D05/D08与任务05剩余边界仍按矩阵收口，10/11/13及M2未done，不合main、不启动M3，不因文档收尾重复完整长测。

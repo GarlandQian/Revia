@@ -1,0 +1,2388 @@
+{
+  "recordedAt": "2026-10-25T22:30:34.782841+08:00",
+  "sourceHead": "59b925d846286441df4c66ce2074cba4d46299a8",
+  "productCommit": "9e5c7d1b7d30d06631ea53b63e1360fb45b4c063",
+  "runRoot": "/private/tmp/revia-rust-memory-verify.aC01we",
+  "runCompleted": true,
+  "q98VerdictAuthoritative": true,
+  "q98Passed": true,
+  "binarySha256": "28da0f0dc4bf542af589c0e73cc6592520860adee0852fa0f0b5da899438e9fd",
+  "ciRunId": 40199770545,
+  "note": "One complete formal Q98 run after targeted repair. All D06 attempts, original review findings, CI analysis failure and first native-sample correlation output retained. No repeated soak or rewritten raw journals.",
+  "verification": "Each gzip decompressed and byte-compared against source during archival; SHA256 records original bytes.",
+  "fileCount": 231,
+  "files": [
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/analysis-v1.json",
+      "archive": "analysis-v1.json.gz",
+      "bytes": 9838,
+      "sha256": "54ba89b9d7c26eed21488b66697d3d1217c98f77785b9150d26509eeae6be048"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/analysis.json",
+      "archive": "analysis.json.gz",
+      "bytes": 10488,
+      "sha256": "624b7acd45c1cc95030998797fc1834e5c93e2fabb381885c37c1eb7bd4a9e14"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/analyze-d06.py",
+      "archive": "analyze-d06.py.gz",
+      "bytes": 2868,
+      "sha256": "3eb56b58999522a21f35d4df595dfb4accf952ec22708c9fe76236f2560e1f0c"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/analyze-final-v1.py",
+      "archive": "analyze-final-v1.py.gz",
+      "bytes": 8257,
+      "sha256": "ca2b7f01a8376bfde01d9917f84f21d9e0020806df0f0587a8c6c78d21437f5a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/analyze-final.py",
+      "archive": "analyze-final.py.gz",
+      "bytes": 8885,
+      "sha256": "5f0f6c922150c69c54118f7ef5fb4ef1210eb5432dc0bc6e7156e9e4a4546bf1"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/archive-closeout.py",
+      "archive": "archive-closeout.py.gz",
+      "bytes": 2304,
+      "sha256": "9fc97e6621f1ade3760868f0c6f71f977f565c3816c7677d3c94ac6a4ee97ca5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/checks-docs.patch",
+      "archive": "checks-docs.patch.gz",
+      "bytes": 8880,
+      "sha256": "7f9b393cca31d9279d74762c8658c098703483801ec2a44a78013cda2014cde6"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/01-push-m2.err",
+      "archive": "ci/01-push-m2.err.gz",
+      "bytes": 66,
+      "sha256": "a79f1343a3ee8204cd53311d2149fb3ba995813f13ee68d814eb6efe59db8aee"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/01-push-m2.exit",
+      "archive": "ci/01-push-m2.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/01-push-m2.json",
+      "archive": "ci/01-push-m2.json.gz",
+      "bytes": 1839,
+      "sha256": "6330074caf56f40e6170d4c8fc9fb48944d0239a1749be111728598844d691cc"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/01-push-m2.out",
+      "archive": "ci/01-push-m2.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/02-discover-run.err",
+      "archive": "ci/02-discover-run.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/02-discover-run.exit",
+      "archive": "ci/02-discover-run.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/02-discover-run.json",
+      "archive": "ci/02-discover-run.json.gz",
+      "bytes": 2061,
+      "sha256": "4f5274ef4f2ebc6167a2d01b37993ab55a3a7dec94fc2f41c89e69382984e20b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/02-discover-run.out",
+      "archive": "ci/02-discover-run.out.gz",
+      "bytes": 918,
+      "sha256": "740e1e226ba5c7c24bab344dfb62757f89f75eb97efcf8b20969ae80821ad4a2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/03-discover-fixed-run.err",
+      "archive": "ci/03-discover-fixed-run.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/03-discover-fixed-run.exit",
+      "archive": "ci/03-discover-fixed-run.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/03-discover-fixed-run.json",
+      "archive": "ci/03-discover-fixed-run.json.gz",
+      "bytes": 2143,
+      "sha256": "7be7a3177e7f455b9fcde5837fc39ae758d4a56f65933e27457a3ad7ef61ca3d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/03-discover-fixed-run.out",
+      "archive": "ci/03-discover-fixed-run.out.gz",
+      "bytes": 226,
+      "sha256": "93d23b39eadd5623cdc6f74d8c5d929f8417983bb8fb2281dd0d30bbc5a68aff"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/04-watch-fixed-run.err",
+      "archive": "ci/04-watch-fixed-run.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/04-watch-fixed-run.exit",
+      "archive": "ci/04-watch-fixed-run.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/04-watch-fixed-run.json",
+      "archive": "ci/04-watch-fixed-run.json.gz",
+      "bytes": 1976,
+      "sha256": "cd98e62f63dacf05bd268a588c6f42595f5649a5e119867270e6af55d35ed441"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/04-watch-fixed-run.out",
+      "archive": "ci/04-watch-fixed-run.out.gz",
+      "bytes": 8699,
+      "sha256": "8ababe1ef62b669a2e29e18ba1431f3100f6c6b775e5ad07e02e9781e3709591"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/05-final-run.err",
+      "archive": "ci/05-final-run.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/05-final-run.exit",
+      "archive": "ci/05-final-run.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/05-final-run.json",
+      "archive": "ci/05-final-run.json.gz",
+      "bytes": 2004,
+      "sha256": "4d654410ba8857e6d28a5766dcb6ca79f48bf639fd5d34159ac5334d87603137"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/05-final-run.out",
+      "archive": "ci/05-final-run.out.gz",
+      "bytes": 6182,
+      "sha256": "c050c634b2627d60d8b85750196766619ef81d674c05ebea18737c15344d7abc"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/06-final-log.err",
+      "archive": "ci/06-final-log.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/06-final-log.exit",
+      "archive": "ci/06-final-log.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/06-final-log.json",
+      "archive": "ci/06-final-log.json.gz",
+      "bytes": 1919,
+      "sha256": "ba152a1012947e6c3926aab3ade16998a33fcc8dd6841f1c7c560ae87a024c29"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/06-final-log.out",
+      "archive": "ci/06-final-log.out.gz",
+      "bytes": 258052,
+      "sha256": "fe677ebe5c5d62a8cca7170434fadacff17db8d420daa9ab11537d2ee22a0c18"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/07-analyze-ci.err",
+      "archive": "ci/07-analyze-ci.err.gz",
+      "bytes": 337,
+      "sha256": "347b9ee89d474e67885bb66bae9e1f0f305b6d1275cc68b57a184483fa173311"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/07-analyze-ci.exit",
+      "archive": "ci/07-analyze-ci.exit.gz",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/07-analyze-ci.json",
+      "archive": "ci/07-analyze-ci.json.gz",
+      "bytes": 1893,
+      "sha256": "b1f9f40ba9332431fc2a20662dc1a45dc3d281f246ecc3b11bae87dc6f45403e"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/07-analyze-ci.out",
+      "archive": "ci/07-analyze-ci.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/08-analyze-ci-fixed.err",
+      "archive": "ci/08-analyze-ci-fixed.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/08-analyze-ci-fixed.exit",
+      "archive": "ci/08-analyze-ci-fixed.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/08-analyze-ci-fixed.json",
+      "archive": "ci/08-analyze-ci-fixed.json.gz",
+      "bytes": 1911,
+      "sha256": "c753f8638b2a7acb7d470a058f9c80d36ed43f68cc04fc640685685746b1fd91"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/08-analyze-ci-fixed.out",
+      "archive": "ci/08-analyze-ci-fixed.out.gz",
+      "bytes": 1272,
+      "sha256": "2e6a084f93d2a12eba3bfed893198f573d98867a1bd215f3f3dc374f647b85d5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/analysis.json",
+      "archive": "ci/analysis.json.gz",
+      "bytes": 2400,
+      "sha256": "0540326d939839d81fa5f1bdb5881114ee08dd37eb53fe2d7fd743f95d3b4267"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/analyze-ci-failed-v1.py",
+      "archive": "ci/analyze-ci-failed-v1.py.gz",
+      "bytes": 2053,
+      "sha256": "7064d2990e4d0781cf1ac4cc75f1841b7f5a17d97afa6e702cd016fd9b192e2a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/analyze-ci.py",
+      "archive": "ci/analyze-ci.py.gz",
+      "bytes": 2080,
+      "sha256": "d574fc0efe01299021e6a90123ee4db68e20b9de837a142debdbec2b895522da"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/invocations.json",
+      "archive": "ci/invocations.json.gz",
+      "bytes": 16181,
+      "sha256": "15f0472e8d0d3b645079b9ab020850d932012b4cc35ff8b8d111aed7f0f6a444"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ci/record.py",
+      "archive": "ci/record.py.gz",
+      "bytes": 2832,
+      "sha256": "8da54c70cb04312eacb69d5a64ad23ecac3071e31f247ef9b56bfc80a67d3817"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/01-rust-full.err",
+      "archive": "commands/01-rust-full.err.gz",
+      "bytes": 4681,
+      "sha256": "2fca2efa87eaf993dc6aa763f549ef93cede9099bab4e438bea8b6179ea0725d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/01-rust-full.exit",
+      "archive": "commands/01-rust-full.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/01-rust-full.json",
+      "archive": "commands/01-rust-full.json.gz",
+      "bytes": 2138,
+      "sha256": "92115ad6e9042282319b298ca1d0b7a678b60ead81ec878946fc887460e0a482"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/01-rust-full.out",
+      "archive": "commands/01-rust-full.out.gz",
+      "bytes": 18839,
+      "sha256": "e4abfe3c86cafe17aab0effab46ff23937a6901e4ea9a900e192bc4252b9892b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/02-bindings-normalize.err",
+      "archive": "commands/02-bindings-normalize.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/02-bindings-normalize.exit",
+      "archive": "commands/02-bindings-normalize.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/02-bindings-normalize.json",
+      "archive": "commands/02-bindings-normalize.json.gz",
+      "bytes": 1949,
+      "sha256": "71fbe0623f7233f40aea336f333084ce527a2f9e8a4f7d5df61bdb3bfd96c180"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/02-bindings-normalize.out",
+      "archive": "commands/02-bindings-normalize.out.gz",
+      "bytes": 44,
+      "sha256": "bbee37ddfd264da8a0ddbbb515d6dca4b35d7f25d64fb456aefd10d55826746d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/03-diff-check.err",
+      "archive": "commands/03-diff-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/03-diff-check.exit",
+      "archive": "commands/03-diff-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/03-diff-check.json",
+      "archive": "commands/03-diff-check.json.gz",
+      "bytes": 1838,
+      "sha256": "50badccb0941ed5c2198717d9e5cff54f84afec43dfacfa6d92d5ae329db6ebe"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/03-diff-check.out",
+      "archive": "commands/03-diff-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/04-fixture.err",
+      "archive": "commands/04-fixture.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/04-fixture.exit",
+      "archive": "commands/04-fixture.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/04-fixture.json",
+      "archive": "commands/04-fixture.json.gz",
+      "bytes": 2202,
+      "sha256": "6ed12db9b1ad9eae0c775cbcfb281603eb557f8c9712cca0adb1815939615527"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/04-fixture.out",
+      "archive": "commands/04-fixture.out.gz",
+      "bytes": 888,
+      "sha256": "591808522fa8f66273d3de8aaa56c4520c2f58efbe974294cbb3f1b90f3a6474"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/05-session-flow-with-fixture.err",
+      "archive": "commands/05-session-flow-with-fixture.err.gz",
+      "bytes": 601,
+      "sha256": "8cb97053fcad4f9acaeef14b071ead1b547e781d99b3bfac37b86f2b49ddefb5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/05-session-flow-with-fixture.exit",
+      "archive": "commands/05-session-flow-with-fixture.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/05-session-flow-with-fixture.json",
+      "archive": "commands/05-session-flow-with-fixture.json.gz",
+      "bytes": 2396,
+      "sha256": "b4d868718692f6f903bb0e76255b62d531189e7894dd0bbda22b416c25430721"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/05-session-flow-with-fixture.out",
+      "archive": "commands/05-session-flow-with-fixture.out.gz",
+      "bytes": 912,
+      "sha256": "76b6246acd9c38d2d143e00fdd4a24b1fb49b1b0f796ee981ff7de97b287c8d1"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/06-frontend-lint.err",
+      "archive": "commands/06-frontend-lint.err.gz",
+      "bytes": 9,
+      "sha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/06-frontend-lint.exit",
+      "archive": "commands/06-frontend-lint.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/06-frontend-lint.json",
+      "archive": "commands/06-frontend-lint.json.gz",
+      "bytes": 1984,
+      "sha256": "872d3d7ab4ecd03e802f3a0c24301aa64ea84135c967c15f07060153302386af"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/06-frontend-lint.out",
+      "archive": "commands/06-frontend-lint.out.gz",
+      "bytes": 1419,
+      "sha256": "53a4d241bd62c056a8036df5cdd49afbfca64f4619f5c1c869bbacdce642ea00"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/07-frontend-build.err",
+      "archive": "commands/07-frontend-build.err.gz",
+      "bytes": 327,
+      "sha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/07-frontend-build.exit",
+      "archive": "commands/07-frontend-build.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/07-frontend-build.json",
+      "archive": "commands/07-frontend-build.json.gz",
+      "bytes": 1988,
+      "sha256": "1d86b9c0511e3ae18ba3a0c26e20283388ba71ad5bc4e8a0b0809c27e3af2e86"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/07-frontend-build.out",
+      "archive": "commands/07-frontend-build.out.gz",
+      "bytes": 997,
+      "sha256": "682cc2d955ef4fc6842112168dd8c2a05043d51094e069765e5482fd81b72715"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/08-pre-review-diff-check.err",
+      "archive": "commands/08-pre-review-diff-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/08-pre-review-diff-check.exit",
+      "archive": "commands/08-pre-review-diff-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/08-pre-review-diff-check.json",
+      "archive": "commands/08-pre-review-diff-check.json.gz",
+      "bytes": 1871,
+      "sha256": "2baa553a96d8219569c3046592da58abefc5e5fe5355b9326d01ab40c48db175"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/08-pre-review-diff-check.out",
+      "archive": "commands/08-pre-review-diff-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/09-cold-fixture.err",
+      "archive": "commands/09-cold-fixture.err.gz",
+      "bytes": 344,
+      "sha256": "29fed2446d9452abc6097fe6eb7e37463a64545eb0a9a1889487e54b1ea922df"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/09-cold-fixture.exit",
+      "archive": "commands/09-cold-fixture.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/09-cold-fixture.json",
+      "archive": "commands/09-cold-fixture.json.gz",
+      "bytes": 2230,
+      "sha256": "977eabebc4df5fd9813679c545ab0e9528f9c463f6b38885ba7693c403706d9c"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/09-cold-fixture.out",
+      "archive": "commands/09-cold-fixture.out.gz",
+      "bytes": 50,
+      "sha256": "a7036d9dd9005900ad9d9f28af140566541f181a07fd895d3c6a31ec51fc0b51"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/10-source-freeze.err",
+      "archive": "commands/10-source-freeze.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/10-source-freeze.exit",
+      "archive": "commands/10-source-freeze.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/10-source-freeze.json",
+      "archive": "commands/10-source-freeze.json.gz",
+      "bytes": 1918,
+      "sha256": "3334089d31ce07ccfcd30d4bb5ca6641b3e0136fe2fc04fc25e8894c20e53a19"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/10-source-freeze.out",
+      "archive": "commands/10-source-freeze.out.gz",
+      "bytes": 97,
+      "sha256": "445b4ac6cbee9838463f81bcc4125d46f2cc5257d0232691789cf04c328b012b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/11-fixture-before.err",
+      "archive": "commands/11-fixture-before.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/11-fixture-before.exit",
+      "archive": "commands/11-fixture-before.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/11-fixture-before.json",
+      "archive": "commands/11-fixture-before.json.gz",
+      "bytes": 1923,
+      "sha256": "78f76c22fa2fab1aaf76639528599c757dd0893b7cff7e6f8bfe44cfa9eabc21"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/11-fixture-before.out",
+      "archive": "commands/11-fixture-before.out.gz",
+      "bytes": 85,
+      "sha256": "63abf9387414607e6b34effec58b2885b9129919285b3e21d91ea24ea080276f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/12-review-doc-fix-check.err",
+      "archive": "commands/12-review-doc-fix-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/12-review-doc-fix-check.exit",
+      "archive": "commands/12-review-doc-fix-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/12-review-doc-fix-check.json",
+      "archive": "commands/12-review-doc-fix-check.json.gz",
+      "bytes": 1869,
+      "sha256": "622f735ba07c104c43ddbf1d306468b777b9d4e227bd539afbb7677641b23a2b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/12-review-doc-fix-check.out",
+      "archive": "commands/12-review-doc-fix-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/13-pre-release-source.err",
+      "archive": "commands/13-pre-release-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/13-pre-release-source.exit",
+      "archive": "commands/13-pre-release-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/13-pre-release-source.json",
+      "archive": "commands/13-pre-release-source.json.gz",
+      "bytes": 1931,
+      "sha256": "d7727a1d376d4b21f17a6bb9a1d62676efe48720b6008929600bda58aca31db5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/13-pre-release-source.out",
+      "archive": "commands/13-pre-release-source.out.gz",
+      "bytes": 96,
+      "sha256": "d18cfa576020e58bede009d0f6acc11494e5b28c5243c7fa80e184165cd4581b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/14-release-app.err",
+      "archive": "commands/14-release-app.err.gz",
+      "bytes": 1026,
+      "sha256": "aa20458719e84b62403c19dc9b0a42f6e10bc34d0c98c6f7a3e2db042e044203"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/14-release-app.exit",
+      "archive": "commands/14-release-app.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/14-release-app.json",
+      "archive": "commands/14-release-app.json.gz",
+      "bytes": 2176,
+      "sha256": "1c5391fe85aeafbf345793594d01ca9a1a3fef024f1d678af21fa6ef16e3d55d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/14-release-app.out",
+      "archive": "commands/14-release-app.out.gz",
+      "bytes": 997,
+      "sha256": "eb732c9d19f981f904af8d9ba23197f4412cd5c03237556f00198adcf3ed8e05"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/15-post-build-source.err",
+      "archive": "commands/15-post-build-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/15-post-build-source.exit",
+      "archive": "commands/15-post-build-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/15-post-build-source.json",
+      "archive": "commands/15-post-build-source.json.gz",
+      "bytes": 1929,
+      "sha256": "ca6aceab32ac93311112906cb7fa77b7908384fb8f7e4b3c93a2afb56ed5a614"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/15-post-build-source.out",
+      "archive": "commands/15-post-build-source.out.gz",
+      "bytes": 96,
+      "sha256": "c8513e2a65afa3820079780df891ad8a1b01f5635a3e0c5b5dfbaf79e532b60d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/16-d06-standard-split.err",
+      "archive": "commands/16-d06-standard-split.err.gz",
+      "bytes": 106,
+      "sha256": "b8d1f45096d04c8ce8716ff1a49fa11c2fafd79fae7e14fa9b5288a6c3191280"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/16-d06-standard-split.exit",
+      "archive": "commands/16-d06-standard-split.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/16-d06-standard-split.json",
+      "archive": "commands/16-d06-standard-split.json.gz",
+      "bytes": 2610,
+      "sha256": "49b5f7e2ec5a3d285e3c7e5c50f1c2c4f2c301329a2b4fa43cd861b6cbc234d1"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/16-d06-standard-split.out",
+      "archive": "commands/16-d06-standard-split.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/17-d06-standard-unified.err",
+      "archive": "commands/17-d06-standard-unified.err.gz",
+      "bytes": 94,
+      "sha256": "32dc12e88e1dea9f22996c138d88004974af738e9b977708aad4ad2b3f05e224"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/17-d06-standard-unified.exit",
+      "archive": "commands/17-d06-standard-unified.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/17-d06-standard-unified.json",
+      "archive": "commands/17-d06-standard-unified.json.gz",
+      "bytes": 2623,
+      "sha256": "54c7f65aec0b5c00aec2eb4429c257a2321a84408139ec852401226a561bf042"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/17-d06-standard-unified.out",
+      "archive": "commands/17-d06-standard-unified.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/18-d06-standard-unified-r2.err",
+      "archive": "commands/18-d06-standard-unified-r2.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/18-d06-standard-unified-r2.exit",
+      "archive": "commands/18-d06-standard-unified-r2.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/18-d06-standard-unified-r2.json",
+      "archive": "commands/18-d06-standard-unified-r2.json.gz",
+      "bytes": 2637,
+      "sha256": "2d4a62b7fc1629b0fa29162629a6feff29a99e7451eb454b0324883103c8550a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/18-d06-standard-unified-r2.out",
+      "archive": "commands/18-d06-standard-unified-r2.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/19-d06-cold-split.err",
+      "archive": "commands/19-d06-cold-split.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/19-d06-cold-split.exit",
+      "archive": "commands/19-d06-cold-split.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/19-d06-cold-split.json",
+      "archive": "commands/19-d06-cold-split.json.gz",
+      "bytes": 2571,
+      "sha256": "0aa283da98256acc01c49989b174feb64ffbba07ebe9f0e91b6f928ec8db6d72"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/19-d06-cold-split.out",
+      "archive": "commands/19-d06-cold-split.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/20-d06-cold-unified.err",
+      "archive": "commands/20-d06-cold-unified.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/20-d06-cold-unified.exit",
+      "archive": "commands/20-d06-cold-unified.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/20-d06-cold-unified.json",
+      "archive": "commands/20-d06-cold-unified.json.gz",
+      "bytes": 2583,
+      "sha256": "0610bc9324ba4de2ce6761732c9f8cc9b5d5bc0b917687f87f4683ec0b56c4b2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/20-d06-cold-unified.out",
+      "archive": "commands/20-d06-cold-unified.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/21-d06-analysis.err",
+      "archive": "commands/21-d06-analysis.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/21-d06-analysis.exit",
+      "archive": "commands/21-d06-analysis.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/21-d06-analysis.json",
+      "archive": "commands/21-d06-analysis.json.gz",
+      "bytes": 1898,
+      "sha256": "f824f838d5ae0e0dcc444b23d2df86f17de5ba22defe447f7d0667747ea3ee0a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/21-d06-analysis.out",
+      "archive": "commands/21-d06-analysis.out.gz",
+      "bytes": 579,
+      "sha256": "0a00b4672d0af4cf89b59684b861eb1a050f7a9fb60daf250a241efdcec884cd"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/22-pre-soak-source.err",
+      "archive": "commands/22-pre-soak-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/22-pre-soak-source.exit",
+      "archive": "commands/22-pre-soak-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/22-pre-soak-source.json",
+      "archive": "commands/22-pre-soak-source.json.gz",
+      "bytes": 1923,
+      "sha256": "b70b63d6303f29aa7a9dd4a4b0e83be23b806fcff87a7d2c30c5f9e1c6587c23"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/22-pre-soak-source.out",
+      "archive": "commands/22-pre-soak-source.out.gz",
+      "bytes": 96,
+      "sha256": "e4b165d4c3b104ba86449b3ec575372ff4e73a4440eb5ad6c86402f37836b2ef"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/23-q98-formal.err",
+      "archive": "commands/23-q98-formal.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/23-q98-formal.exit",
+      "archive": "commands/23-q98-formal.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/23-q98-formal.json",
+      "archive": "commands/23-q98-formal.json.gz",
+      "bytes": 2592,
+      "sha256": "e740b38fe76d546678249beb418317ab0eefb571521820c20e6a01a1ee5a3d48"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/23-q98-formal.out",
+      "archive": "commands/23-q98-formal.out.gz",
+      "bytes": 12552,
+      "sha256": "46dba6ab096eb8d3a9e1d51c246a545527017c6db7f22b7a5b23d4e0446f6099"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/24-post-soak-source.err",
+      "archive": "commands/24-post-soak-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/24-post-soak-source.exit",
+      "archive": "commands/24-post-soak-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/24-post-soak-source.json",
+      "archive": "commands/24-post-soak-source.json.gz",
+      "bytes": 1925,
+      "sha256": "32c674824dfba11a1efae322e53f42c8d55fb758a8c6efed7b3966eda616bd3e"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/24-post-soak-source.out",
+      "archive": "commands/24-post-soak-source.out.gz",
+      "bytes": 95,
+      "sha256": "c8130eefc02631f1fbcacc8bd7dd0a732cfb478f30bd5ef2fae971b3f8c20068"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/25-fixture-after.err",
+      "archive": "commands/25-fixture-after.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/25-fixture-after.exit",
+      "archive": "commands/25-fixture-after.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/25-fixture-after.json",
+      "archive": "commands/25-fixture-after.json.gz",
+      "bytes": 1919,
+      "sha256": "4292662c1094432df5c69ebcfb5e86934031e79034824b4e63b24636a01894d2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/25-fixture-after.out",
+      "archive": "commands/25-fixture-after.out.gz",
+      "bytes": 80,
+      "sha256": "5c3e842d474df8c5d83905dc7fcc2d49c1f12b0ac9cc5531101cc1a39e26208f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/26-independent-q98-analysis.err",
+      "archive": "commands/26-independent-q98-analysis.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/26-independent-q98-analysis.exit",
+      "archive": "commands/26-independent-q98-analysis.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/26-independent-q98-analysis.json",
+      "archive": "commands/26-independent-q98-analysis.json.gz",
+      "bytes": 1936,
+      "sha256": "6831d7ad355eff218e475dbd4b0b70f1dc2b39cab09b4a37d77e1787b15b109b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/26-independent-q98-analysis.out",
+      "archive": "commands/26-independent-q98-analysis.out.gz",
+      "bytes": 1497,
+      "sha256": "fa22596a2b12a4bdb49db5f3b3596f8f18bfd5919595463c3159c07b7cac5ea1"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/27-independent-q98-analysis-time-correlation.err",
+      "archive": "commands/27-independent-q98-analysis-time-correlation.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/27-independent-q98-analysis-time-correlation.exit",
+      "archive": "commands/27-independent-q98-analysis-time-correlation.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/27-independent-q98-analysis-time-correlation.json",
+      "archive": "commands/27-independent-q98-analysis-time-correlation.json.gz",
+      "bytes": 1978,
+      "sha256": "2bc60bd6bf7b5f1c9c5d4083470f1a4ee1b986f24c4d31c4fdae5c5f34379571"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/27-independent-q98-analysis-time-correlation.out",
+      "archive": "commands/27-independent-q98-analysis-time-correlation.out.gz",
+      "bytes": 2051,
+      "sha256": "06243b7ee3910ffe7fe898200656f1a2487a126043d351dd8295aa13fa0452b5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/28-closeout-docs-diff-check.err",
+      "archive": "commands/28-closeout-docs-diff-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/28-closeout-docs-diff-check.exit",
+      "archive": "commands/28-closeout-docs-diff-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/28-closeout-docs-diff-check.json",
+      "archive": "commands/28-closeout-docs-diff-check.json.gz",
+      "bytes": 1881,
+      "sha256": "c49d7570b106d2a29b803a977d551e7f56268f852b327d64b2f3b6d082d8d988"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/28-closeout-docs-diff-check.out",
+      "archive": "commands/28-closeout-docs-diff-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/29-closeout-source-snapshot.err",
+      "archive": "commands/29-closeout-source-snapshot.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/29-closeout-source-snapshot.exit",
+      "archive": "commands/29-closeout-source-snapshot.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/29-closeout-source-snapshot.json",
+      "archive": "commands/29-closeout-source-snapshot.json.gz",
+      "bytes": 1949,
+      "sha256": "6257b8a8c450368c822515740c4d3e0f05e503ff97cea956e0bd7f372fb6b1b4"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/29-closeout-source-snapshot.out",
+      "archive": "commands/29-closeout-source-snapshot.out.gz",
+      "bytes": 358,
+      "sha256": "3ba133c4696d3965ce171844e1fd6e8531cebe1dd1e0b34b1dd823925c4c0fe5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/invocations.json",
+      "archive": "commands/invocations.json.gz",
+      "bytes": 62917,
+      "sha256": "1f00f7413342040addc20db59c2ffdd6876d713bb3fd1e31d1e00278a42aa843"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/commands/record.py",
+      "archive": "commands/record.py.gz",
+      "bytes": 2832,
+      "sha256": "8da54c70cb04312eacb69d5a64ad23ecac3071e31f247ef9b56bfc80a67d3817"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-analysis.json",
+      "archive": "d06-analysis.json.gz",
+      "bytes": 5490,
+      "sha256": "fca859ba31208658201fb9b061f7d4e11d098beab4754f6f357d08fd4de893d2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-split-ax.txt",
+      "archive": "d06-cold-split-ax.txt.gz",
+      "bytes": 180,
+      "sha256": "ff5e7a6394178b10041012b3518317b84f895440c8607bba80a54f547f486290"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-split.json",
+      "archive": "d06-cold-split.json.gz",
+      "bytes": 8048,
+      "sha256": "a0417bc60c307b090cfedbb16682ba13247f835d37848011178cf7b0bdb77d5b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-split.log",
+      "archive": "d06-cold-split.log.gz",
+      "bytes": 4329,
+      "sha256": "f17c1d86715d8086222a10b0a90ae8a1f81261a2fbdae2ae14271af96e0d0ebb"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-split.png",
+      "archive": "d06-cold-split.png.gz",
+      "bytes": 502004,
+      "sha256": "36c365afae791257d56acce826c240452025b20da76547f27f902ed2e03dff88"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-unified-ax.txt",
+      "archive": "d06-cold-unified-ax.txt.gz",
+      "bytes": 180,
+      "sha256": "4127f933dc244459e28bef9a50530f123938a0903b343931d62a6714ec62991d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-unified.json",
+      "archive": "d06-cold-unified.json.gz",
+      "bytes": 7672,
+      "sha256": "617620920513e7b6815d96f8f7158ea9deda2c0e06832eb05b309c1121b7d3fb"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-unified.log",
+      "archive": "d06-cold-unified.log.gz",
+      "bytes": 3447,
+      "sha256": "05958caf34fa92463aef60e6591ac0caffd9ba91063ad0d7dfd8c951c649b6f4"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-cold-unified.png",
+      "archive": "d06-cold-unified.png.gz",
+      "bytes": 353112,
+      "sha256": "9b71dee77eaf26288a4d44580b96e8a4a9b517026879a7ad1604bfc647d5e4cc"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-split-ax.txt",
+      "archive": "d06-standard-split-ax.txt.gz",
+      "bytes": 96,
+      "sha256": "214aa86b3351962794b788c304361dd0ac3e064918e0ecab9600ecd12a2965c0"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-split.json",
+      "archive": "d06-standard-split.json.gz",
+      "bytes": 8085,
+      "sha256": "cf7aed28ef00e59388bd03dce381908f0f6e74e1dea53584223bd8b13a76d774"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-split.log",
+      "archive": "d06-standard-split.log.gz",
+      "bytes": 23355,
+      "sha256": "dffe46163fd801a9801066159cb851f5c522f2a2bf2c26873fa29d3429065a03"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-split.png",
+      "archive": "d06-standard-split.png.gz",
+      "bytes": 201820,
+      "sha256": "c9e44cefd84f407439e7577b1fc415f601476ec673d543084ca22709d637298d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-ax.txt",
+      "archive": "d06-standard-unified-ax.txt.gz",
+      "bytes": 96,
+      "sha256": "d2a68210e9292bf87a88343d5e26e668b2cd69a7a14ed08417543c9d2584b282"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-r2-ax.txt",
+      "archive": "d06-standard-unified-r2-ax.txt.gz",
+      "bytes": 180,
+      "sha256": "dc25a72f78075b610743988a37b122f491586006cac240336742a64b61b43609"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-r2.json",
+      "archive": "d06-standard-unified-r2.json.gz",
+      "bytes": 7691,
+      "sha256": "c86e5c984481f9d7facfa1b78c5e0ae64ee6ce40896c69c2221f6820b3d4b45f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-r2.log",
+      "archive": "d06-standard-unified-r2.log.gz",
+      "bytes": 5471,
+      "sha256": "1618dce675bce71f5f369f6f51298de5c69b56cc076f5455b82b6e06a7ce2236"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-r2.png",
+      "archive": "d06-standard-unified-r2.png.gz",
+      "bytes": 407050,
+      "sha256": "754fba2dd3261efe59ac9f2e1cd7963efe76884cb98e731545a54ca9b446fbe3"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-readiness-failure-ax.txt",
+      "archive": "d06-standard-unified-readiness-failure-ax.txt.gz",
+      "bytes": 180,
+      "sha256": "55b56964bbe7306527fdd67216a74910309f3991e5bfca361f99df283014c5e2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified-readiness-failure.png",
+      "archive": "d06-standard-unified-readiness-failure.png.gz",
+      "bytes": 96467,
+      "sha256": "0601bc3de896a7cdbcf3c49562485b1e6b2ce4eb8933d0c7a05e3675f7598073"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified.json",
+      "archive": "d06-standard-unified.json.gz",
+      "bytes": 115,
+      "sha256": "7c11312b6316d2360479b9599000618f13e144bdd7add1b72ddf6de69c6beabc"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified.log",
+      "archive": "d06-standard-unified.log.gz",
+      "bytes": 450,
+      "sha256": "1744cfcbb615de13a608ea262aaae168b9872dd50597db5408350e98b4cd9e7e"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/d06-standard-unified.png",
+      "archive": "d06-standard-unified.png.gz",
+      "bytes": 94482,
+      "sha256": "cc2d8c451d2955c09f1409e334c17a3898e91232330caa2532744615d4bdda1f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/docs-before-closeout/issues/10-integrated-verification.md",
+      "archive": "docs-before-closeout/issues/10-integrated-verification.md.gz",
+      "bytes": 34854,
+      "sha256": "47e4443edec5d404c6bf0975d36e77276b5139ef6fdfb68e62bcb8799fc9c59f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/docs-before-closeout/issues/10-integration-matrix.md",
+      "archive": "docs-before-closeout/issues/10-integration-matrix.md.gz",
+      "bytes": 16720,
+      "sha256": "a2c15318b6f2f3d627994f7e57810667e447ec97d6d077b5db26507aac0cb87d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/docs-before-closeout/issues/11-desktop-acceptance.md",
+      "archive": "docs-before-closeout/issues/11-desktop-acceptance.md.gz",
+      "bytes": 3108,
+      "sha256": "e4870f089e90932f7c847998434bbcd80e599d418a8f515d8613402b997cd59b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/docs-before-closeout/report.md",
+      "archive": "docs-before-closeout/report.md.gz",
+      "bytes": 53904,
+      "sha256": "8944acb69a58280648dda7f81a45e67c48bd53d0279486aa86bd78e470cc2304"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixture-after.json",
+      "archive": "fixture-after.json.gz",
+      "bytes": 2368,
+      "sha256": "06f3c7514d6513febc5819477bd0f77d1e5a5f1cfe869d3df86c93d142027e05"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixture-before.json",
+      "archive": "fixture-before.json.gz",
+      "bytes": 2334,
+      "sha256": "e689500b3df4e5a38ab2fc8b6f85de945c015fd25b2b901d0a6eaf732d441cd8"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixture-snapshot.py",
+      "archive": "fixture-snapshot.py.gz",
+      "bytes": 1612,
+      "sha256": "f6b419b1233c1bafc706ff59678e1975e3a492191622aacd6845380f85077d82"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/head-before.txt",
+      "archive": "head-before.txt.gz",
+      "bytes": 41,
+      "sha256": "05cde35434fd156edbd2cead9d6392e6a8d3ffb276ebcbd0a6413cb8cedb7abb"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-after-exit.json",
+      "archive": "q98-after-exit.json.gz",
+      "bytes": 392,
+      "sha256": "3ce856f73cce6c23b98f2d7b812f5a93c70c567aff2241deb4028f08aacac266"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-mid01-ax.txt",
+      "archive": "q98-mid01-ax.txt.gz",
+      "bytes": 618,
+      "sha256": "3ae0ae2d3897aafc3984ea34fe3bc53223fac2e1bbdf46a10bc08706b6f437b4"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-mid01.png",
+      "archive": "q98-mid01.png.gz",
+      "bytes": 535459,
+      "sha256": "428080077d6bb5541cc93c65761b47ef840152deb21e0d3dd441ce9889e5eb86"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-mid02-ax.txt",
+      "archive": "q98-mid02-ax.txt.gz",
+      "bytes": 3162,
+      "sha256": "3707e51a615209b44ed026a3e53120981b96e39d53f4cd75b55c17fb743c4f85"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-mid02.png",
+      "archive": "q98-mid02.png.gz",
+      "bytes": 566781,
+      "sha256": "6cc311403d943bb6ad5110ad3f331a7c2670d480a24973c63ee3df45100ee7f2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-near-end-ax.txt",
+      "archive": "q98-near-end-ax.txt.gz",
+      "bytes": 3078,
+      "sha256": "d0f417d3f8e0e09b60397e3bb190145859893f1b4e7a1f9b53dfd35428431a4a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-near-end.png",
+      "archive": "q98-near-end.png.gz",
+      "bytes": 566765,
+      "sha256": "e39c96a2fc17cdd37c22939d17894653d4dcabcc2baa378b9a54f89e345eeb89"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-rust-memory-20261025.md",
+      "archive": "q98-rust-memory-20261025.md.gz",
+      "bytes": 11193,
+      "sha256": "91abd972878f098498a33da1c867d3b47a8685bc5e59a86277d9d00a3d85eb53"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-start-ax.txt",
+      "archive": "q98-start-ax.txt.gz",
+      "bytes": 1160,
+      "sha256": "4f7bb88359569e3a0104f1cd0a99df904ff82ef6dd1d81191543af278a6fdd5f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98-start.png",
+      "archive": "q98-start.png.gz",
+      "bytes": 287773,
+      "sha256": "d79c250b6e675472691980e52feb8f8ccfdfd28128b7eaf5969080de5771227a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json",
+      "archive": "q98.json.gz",
+      "bytes": 274366,
+      "sha256": "2fdd166b9bbde5b2e553b2bf37bd7691a8582c005246781c14ac9d82a139dd1b"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json.evidence.jsonl",
+      "archive": "q98.json.evidence.jsonl.gz",
+      "bytes": 1814300,
+      "sha256": "d9e8ca744a0746041df9d39c10d4de216136aa4fb5e32629e4b02d0c9d07c14e"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json.frontend.json",
+      "archive": "q98.json.frontend.json.gz",
+      "bytes": 95056,
+      "sha256": "65025ce2430ee16ac60a7f61a17c8fd0497f6499e82c5445230b573d8d3336c6"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json.frontend.log",
+      "archive": "q98.json.frontend.log.gz",
+      "bytes": 16196186,
+      "sha256": "496193078bd64caae51aba258e09878daf940d9c1dfd48f0e0459c0358f71f71"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json.log",
+      "archive": "q98.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json.phase-samples.jsonl",
+      "archive": "q98.json.phase-samples.jsonl.gz",
+      "bytes": 29017,
+      "sha256": "cf4f2dd9b1685cf07afbdaa4dab39ed4409b0dbdf21efd6379663fb2e788285a"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/q98.json.samples.jsonl",
+      "archive": "q98.json.samples.jsonl.gz",
+      "bytes": 71159,
+      "sha256": "a704165b301cf9c4e53474f4f316909321c2dd51c787f6c093718f0ed2456fa7"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/review-doc-fix.patch",
+      "archive": "review-doc-fix.patch.gz",
+      "bytes": 6527,
+      "sha256": "2d9973456dbe407228ecba1b197cf108ebcb2b2ec2753426a8a477429e641c27"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/scope.md",
+      "archive": "scope.md.gz",
+      "bytes": 348,
+      "sha256": "a9dcc521c682397f2eac949bfec6af65b02fab059dd0768a6862d9046758fb58"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot-after-build.json",
+      "archive": "snapshot-after-build.json.gz",
+      "bytes": 16895,
+      "sha256": "350ab39e4b76663386fd0a2ee347e56cdd69d74c6cbd22a6ac2c80739374368d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot-after-closeout-docs.json",
+      "archive": "snapshot-after-closeout-docs.json.gz",
+      "bytes": 17157,
+      "sha256": "a01f3b22cc598ca28b75453167d589d0ddbf2b76db16f7c00c46f5ff1371d332"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot-after-soak.json",
+      "archive": "snapshot-after-soak.json.gz",
+      "bytes": 16894,
+      "sha256": "0ff7fc52de820a883549d8558e2c99f1807399d2e2a7bc0c18b9e513ec0ef387"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot-before-build.json",
+      "archive": "snapshot-before-build.json.gz",
+      "bytes": 16860,
+      "sha256": "f2e32c4f1b496563bb9da1caa37f266948f9ae92f96134b048b7bb2df383d578"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot-before-soak.json",
+      "archive": "snapshot-before-soak.json.gz",
+      "bytes": 16895,
+      "sha256": "9ca3849c06593522b716bac1c93a75690d1b21bd0a1d65e7cb4534a5170ec95e"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot-pre-release.json",
+      "archive": "snapshot-pre-release.json.gz",
+      "bytes": 16895,
+      "sha256": "d8ad708c9db4ed9790413e6efd3c440401db5d4e9dae02959155b82256f8e5c0"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/snapshot.py",
+      "archive": "snapshot.py.gz",
+      "bytes": 1883,
+      "sha256": "2391a0871849da28b0295a8e44e328f648c5c097749b36f7b6ad0d69ced62ba5"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/source-after-checks.json",
+      "archive": "source-after-checks.json.gz",
+      "bytes": 14743,
+      "sha256": "b456848f1b272996c9d21bf48ed41f5648f51d2ff95ed69eace78d261e2605a2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/source-before-checks.json",
+      "archive": "source-before-checks.json.gz",
+      "bytes": 14743,
+      "sha256": "b456848f1b272996c9d21bf48ed41f5648f51d2ff95ed69eace78d261e2605a2"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/spec-followup.md",
+      "archive": "spec-followup.md.gz",
+      "bytes": 960,
+      "sha256": "a691352fbffc2d28f2983267c9c1f01799e4ed4e37a46fccd007d094df4b4eac"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/spec-review.md",
+      "archive": "spec-review.md.gz",
+      "bytes": 1693,
+      "sha256": "e910a23aeb255070aafbb8fbe3475e4c6f90f6f1a9bf5f11ae88c0b33e6eb147"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/standards-followup.md",
+      "archive": "standards-followup.md.gz",
+      "bytes": 775,
+      "sha256": "df549b5b4a405fb70fc1ee389deee9e828d3def916f2b0b051bc825ff94afd4f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/standards-review.md",
+      "archive": "standards-review.md.gz",
+      "bytes": 1648,
+      "sha256": "bcc92dd9be925536bd0d528da2c714aa7d7156b4007c0823696672bc9026076d"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/static-results.json",
+      "archive": "static-results.json.gz",
+      "bytes": 487,
+      "sha256": "37551d2f92ae042c422d4610f497fb63f77e10e93a67c65adc5de50778b5ec57"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/status-before.txt",
+      "archive": "status-before.txt.gz",
+      "bytes": 202,
+      "sha256": "d8cb1cbb2b528692f9a1a581133bd2fb90ff0c2beec0df6f1bfb284f6291a41f"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/ui-preflight-note.md",
+      "archive": "ui-preflight-note.md.gz",
+      "bytes": 847,
+      "sha256": "6396a926abca47cc6a1470e51929e5a29f40920bf16fd2be811f8f99d9680a22"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/update-closeout-docs.py",
+      "archive": "update-closeout-docs.py.gz",
+      "bytes": 14572,
+      "sha256": "0c370189137c3e54bdf197f48e7f6c3c684dd1841ba143174f104b8da32265df"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/verify-closeout.py",
+      "archive": "verify-closeout.py.gz",
+      "bytes": 2579,
+      "sha256": "51fb67cfb6a4afe8a2793ce5dd1d6577ea5cccad2ef3ba3e726e15d2c738a3a1"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/worktree-before.patch",
+      "archive": "worktree-before.patch.gz",
+      "bytes": 39852,
+      "sha256": "ff6089b4ac2586a1bd9d13e5e0e809a5395db5ac64f12d84c8a78389e5d76376"
+    }
+  ],
+  "excluded": [
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/config",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/description",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/index",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/objects/21/ea2e1c50e0c86a5a6d4ce20966b2583018e7e9",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/objects/23/027f276853e3124c8af9a6da60df603f369d81",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/objects/b4/d9dc53202668464153ccdcf19277507db7fc85",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/cold/cold.ts",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-cold-split/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-cold-split/settings.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-cold-unified/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-cold-unified/settings.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-standard-split/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-standard-split/settings.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-standard-unified/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-standard-unified-r2/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/data-standard-unified-r2/settings.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/config",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/description",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/index",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/0e/6e973058304fa19ea20801d09b53d5fd180832",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/4a/b2f154ab402fe6664e3b923040c4f9a901aa5a",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/58/5e7fc4a18a6ab7075e76c7b5c304d468a7f24a",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/5a/40bea7c5a7aa064257720aff98eeefe779ee59",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/65/7b0964ab3d989b387271933f44650906895e82",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/9f/0bf742f002f703511c6c039288f281b4c68c37",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/a6/16cada826bd0389cca7c92250f786db738d5ae",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/b0/319ed36680b8fa5924b3568bab9b80550ca7d6",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/ba/171bcd921aaa2ffcb438f2e6d4fca6874a7bd1",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/c8/d80d7d67b5d4a95a048225c1a9fe16a47eda03",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/d8/9d59905bf0d553cb86a73674866440d193dd2c",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/d9/1200561862a942a86b58c0ead6cc7408bcc18c",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/dd/eeea2ee847c03f97c9a464f4c1888aa8ab7fdc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/ea/cd4817d95c4c6615bb634e567997a350c95d74",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/objects/f5/7f79f2721160ef96125e32278ecb1b29c5e82c",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/.node-version",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/README.md",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/assets/icon.png",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/logs/app.log",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/pnpm-lock.yaml",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/src/App.vue",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/src/Model.swift",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/src/generated.ts",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/src/large.ts",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/diffs/src/staged.ts",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/config",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/description",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/index",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/objects/47/98ad6145bdd3c12130f7cd6a5ef0f2c175b419",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/objects/d9/cf3e2645a82a2f6c9abe80fa13ca56caf4c6ae",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/objects/e5/8e67c09a54b9a7356598775b476fde5609f646",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/mergetool/README.txt",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/config",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/description",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/index",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/objects/24/6e7255dcdccf54394f1a3adee95bd46e81ae4e",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/objects/5b/29ac203eeee886431e1f96a6d3157fda8b531c",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/objects/87/24eabb75cb47104e917284b4ca082ccfaa61ba",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/objects/93/963b6bced38a23bf5e677ca8f196ae001e4e44",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/objects/9d/e44db35f8b70d204e9eb9d7f814dc36b1318f4",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/objects/fa/69513b4182cf2679d3ceeee390f24ed426e234",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/.husky/pre-commit",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/README.md",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-default/package.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/config",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/description",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/index",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/23/4f116d2396e74792e2ae94cbdbe3a436f912f7",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/33/9eb10b06a91ff426be95d2caedc25409d25899",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/4f/6cb1d68690899eb316c61f09c963d1216d77c1",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/5b/29ac203eeee886431e1f96a6d3157fda8b531c",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/87/24eabb75cb47104e917284b4ca082ccfaa61ba",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/8e/f0a5258f8f4133e6f4a93596c798f521b31290",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/objects/93/963b6bced38a23bf5e677ca8f196ae001e4e44",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.husky/pre-commit",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/.node-version",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/README.md",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/fixtures/node-versioned/package.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/__future__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_bootlocale.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_collections_abc.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_compression.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_sitebuiltins.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_weakrefset.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/abc.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/argparse.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/bisect.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/bz2.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/codecs.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/collections/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/collections/abc.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/copyreg.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/datetime.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/aliases.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/cp437.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/latin_1.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/utf_8.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/enum.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/fnmatch.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/functools.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/genericpath.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/gettext.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/hashlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/heapq.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/io.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/decoder.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/scanner.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/keyword.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/locale.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/lzma.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ntpath.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/operator.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/os.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/platform.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/plistlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/posixpath.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/random.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/re.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/reprlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/selectors.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/shutil.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/signal.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/site.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_compile.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_constants.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_parse.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/stat.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/struct.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/tempfile.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/types.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/parse.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/warnings.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/weakref.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/xml/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/xml/parsers/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/xml/parsers/expat.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/tmp/revia-soak-data-q9acz9fn/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/tmp/revia-soak-data-q9acz9fn/settings.json",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-rust-memory-verify.aC01we/tmp/xcrun_db",
+      "reason": "Owned fixture/runtime data or symlink; retained in run, not command evidence"
+    }
+  ]
+}
