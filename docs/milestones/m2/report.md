@@ -8,11 +8,11 @@
 - **实际CI通过**：[40174661706](https://github.com/GarlandQian/Revia/actions/runs/40174661706)对应f10fc971；macOS arm64与Windows x64的类型检查/lint/build、完整Rust、Release编译均成功，Rust分别271/243通过、0失败、各1既有ignored。review_marks分别31/29，旧Windows失败用例已实际通过。旧40172283582失败及两轴证据描述发现保留，后续文档更正不冒称重新双轴0项。
 - **桌面局部闭环完成**：B10真实窗口Close/Stay、Cmd-Q/Stay及原生菜单Quit/Wait显式交付后退出有证据；C05恢复准备失败后显示待核对、阻止自动关闭、Stay、真实状态核对、新Close请求和用户授权确认后同PID55553退出0已闭合。C05不是恢复成功；独立的5f样本另有成功恢复。文本只读对比、二进制详情/另存、审阅导航/重启保留及浅深主界面各保留其局部证据，不概括为全部桌面通过。详见[B10记录](./batch10-repair-validation.md)。
 - **D06四组已测**：标准首屏137/124ms、真冷独立文字4/3ms，八次独立首rAF均35/35；滚动各60真rAF、0fallback/0uncovered。标准统一原热跳18ms/false与最大帧31/48ms保留，另一目标的独立探针不能倒填；返回首帧并非全色。详见[最终测量](./final-measure-20261025.md)。
-- **Q98未通过**：首轮墙钟78.54秒因2179ms帧间隔中断；第二轮墙钟1223.25秒因常规WebContent vmmap错误中断，缺前端最终JSON。18段采样时检查/END均成功，但完整checkpoint证据缺失导致最终全部invalid；不是18次采样都失败。Rust现有34样本maxRise82MiB超过+10，负斜率不取消失败，也不直接等于泄漏。两轮均无主动1800秒完成证明，不拼接、不放宽规则。
-- **Q98留证接管版复核通过**：Pi一次返修仍未合格后，Codex按Q113直接修复；固定85a2f5c...ddb9da5独立复核Standards确定0/启发式0、Spec0，上轮发现闭合。Python46及源码契约/diff-check原件已核，App/阈值/暖机/负载未改。见[第三轮独立复核](./q98-evidence-review03.md)。下一步构建新版Release及完整正式30分钟长测；旧Rust振幅与vmmap255根因仍未验证，不将工具复核通过称作Q98/M2通过。
-- **仍需收口**：必要的审阅外改失效/同位置更新、跨目标旧响应、真实Rejected、hunk键盘与完整文件快捷键/丢弃恢复、字号增大和有限原生退出补验；任务05剩余查看/清空项区分自动化与桌面。任务08回到ready-for-human但未done；任务10仍ready-for-agent、11及13未done。先定位长测采样留证和Rust内存问题，验收全部通过才合main，再做M3详细访谈和规格。
+- **Q98正式长测完整但Rust超幅未通过**：接管版两轴复核后固定6f420a8构建新版，主动1801.042秒、29阶段最终全部有效，应用自行退出且整体留证权威。本轮未复现vmmap错误；WebContent footprint/malloc两条通过，Rust常规footprint首138.5、最高211.4、末132.5MiB，maxRise72.9超过+10，斜率+0.2401不能抵消超幅。原生empty大块dirty区域与波动对应，具体分配来源仍待定位，不宣称泄漏或根因已修。见[完整正式长测](./q98-formal-20261025.md)；旧两轮失败保留、不拼接。
+- **Q98留证接管版复核通过**：Pi一次返修仍未合格后，Codex按Q113直接修复；固定85a2f5c...ddb9da5独立复核Standards确定0/启发式0、Spec0，上轮发现闭合。Python46及源码契约/diff-check原件已核，App/阈值/暖机/负载未改。见[第三轮独立复核](./q98-evidence-review03.md)。已完成新版Release及完整正式30分钟长测，结果见前项；旧vmmap255根因仍未验证，不将工具复核通过称作Q98/M2通过。
+- **仍需收口**：必要的审阅外改失效/同位置更新、跨目标旧响应、真实Rejected、hunk键盘与完整文件快捷键/丢弃恢复、字号增大和有限原生退出补验；任务05剩余查看/清空项区分自动化与桌面。任务08回到ready-for-human但未done；任务10仍ready-for-agent、11及13未done。留证修复已复核且完整长测有效，接下来定位Rust原生大块分配波动，验收全部通过才合main，再做M3详细访谈和规格。
 
-实际受测Release构建源为2a51b160，二进制SHA256 `fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d`；f10相对它仅测试/文档变化，不能称f10重新构建。后续模型文档也不回填受测版本。原件分别归入[静态](./evidence/batch10-repair-static/manifest.json)、[桌面](./evidence/task13-desktop04/manifest.json)、[内部集成](./evidence/m2-ui-integration-20261025/manifest.json)、[CI修复](./evidence/task10-ci-fixture-final01/manifest.json)和[最终测量](./evidence/final-measure-20261025/manifest.json)；旧失败、无效尝试及缺件边界均保留。
+既有桌面/D06实际受测Release构建源为2a51b160，二进制SHA256 `fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d`；f10相对它仅测试/文档变化，不能称f10重新构建。后续模型文档也不回填受测版本。原件分别归入[静态](./evidence/batch10-repair-static/manifest.json)、[桌面](./evidence/task13-desktop04/manifest.json)、[内部集成](./evidence/m2-ui-integration-20261025/manifest.json)、[CI修复](./evidence/task10-ci-fixture-final01/manifest.json)和[最终测量](./evidence/final-measure-20261025/manifest.json)；旧失败、无效尝试及缺件边界均保留。
 
 
 ## 历史进度（按记录当时状态）

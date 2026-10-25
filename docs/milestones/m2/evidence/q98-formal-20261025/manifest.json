@@ -1,0 +1,1412 @@
+{
+  "recordedAt": "2026-10-25T20:35:39.387934+08:00",
+  "sourceHead": "6f420a84dc68a98a0709e0fb537c1845ca4c0418",
+  "runRoot": "/private/tmp/revia-q98-final.Zcp8cD",
+  "runCompleted": true,
+  "q98VerdictAuthoritative": true,
+  "q98Passed": false,
+  "note": "One full formal run, not a silent retry. Original failed build and duplicate concurrent invocation index retained.",
+  "fileCount": 91,
+  "files": [
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/analysis.json",
+      "archive": "analysis.json.gz",
+      "bytes": 9887,
+      "sha256": "7aba1063f0610ab8a97ae61f81f8fa915680aaa061c92a5fa5334deb9b01491a"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/analyze-final.py",
+      "archive": "analyze-final.py.gz",
+      "bytes": 7933,
+      "sha256": "0bbc54b5b3cf2e4d8961b3a8116f550f647a559f0ea7a49705b1b903dec84053"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/archive-final.py",
+      "archive": "archive-final.py.gz",
+      "bytes": 5590,
+      "sha256": "f15e9b6f2d27a2d60b33ca8143a10612d24ecaa949bf8805988e1304fba69d90"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/archive-review.py",
+      "archive": "archive-review.py.gz",
+      "bytes": 3449,
+      "sha256": "3e9c51c8ab17857adbf4bd20c33ce24c7f9bb95864a34160221b6f64109f1fc0"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/01-review-documentation-check.err",
+      "archive": "commands/01-review-documentation-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/01-review-documentation-check.exit",
+      "archive": "commands/01-review-documentation-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/01-review-documentation-check.json",
+      "archive": "commands/01-review-documentation-check.json.gz",
+      "bytes": 1886,
+      "sha256": "2eccf7f6d4430d5fa2a7eb1db673a7605076bcfc95a37a12f5bc05f41b2488f4"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/01-review-documentation-check.out",
+      "archive": "commands/01-review-documentation-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/02-freeze.err",
+      "archive": "commands/02-freeze.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/02-freeze.exit",
+      "archive": "commands/02-freeze.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/02-freeze.json",
+      "archive": "commands/02-freeze.json.gz",
+      "bytes": 1887,
+      "sha256": "0c8cf25f4ce8ddab49c709d7ed03f111cbfbf2d9e790e5d7b8967510ca9eaa83"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/02-freeze.out",
+      "archive": "commands/02-freeze.out.gz",
+      "bytes": 97,
+      "sha256": "19ff770d9ba26658c6b6a6c667b11be13afa03814110ba1076268592a3a4cf8e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/03-embed-rebuild.err",
+      "archive": "commands/03-embed-rebuild.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/03-embed-rebuild.exit",
+      "archive": "commands/03-embed-rebuild.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/03-embed-rebuild.json",
+      "archive": "commands/03-embed-rebuild.json.gz",
+      "bytes": 1859,
+      "sha256": "7db08d12e7f5cf696dc1e36bd3dcd8e137ecfed854ade75eb663526e529374bc"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/03-embed-rebuild.out",
+      "archive": "commands/03-embed-rebuild.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/04-release-app.err",
+      "archive": "commands/04-release-app.err.gz",
+      "bytes": 37,
+      "sha256": "6b5cf4a8e1bb474f8fc75a0bcff5095c87f42c94b75e7707f9691c0a6f973d3b"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/04-release-app.exit",
+      "archive": "commands/04-release-app.exit.gz",
+      "bytes": 4,
+      "sha256": "743c7850cccfba5e53a9002663ec1ddd1079315a98bdbfdde10e6044f56abefe"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/04-release-app.json",
+      "archive": "commands/04-release-app.json.gz",
+      "bytes": 2105,
+      "sha256": "0f07aa794b73442a9f7396f49fdd2f38c37e77bbfd16e619fa6a5a964e0bfcec"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/04-release-app.out",
+      "archive": "commands/04-release-app.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-fixture.err",
+      "archive": "commands/05-fixture.err.gz",
+      "bytes": 344,
+      "sha256": "7b0522fb122a25299ee38bb543831392bc6c067c9ead2af53042b19510f80643"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-fixture.exit",
+      "archive": "commands/05-fixture.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-fixture.json",
+      "archive": "commands/05-fixture.json.gz",
+      "bytes": 2174,
+      "sha256": "94cc3bf9755ade6b736b40c15b567deb75fd8ec5c4153c2f20e36ac9648b0616"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-fixture.out",
+      "archive": "commands/05-fixture.out.gz",
+      "bytes": 807,
+      "sha256": "3d6149ce52bb6062984b0cf1dce4ad2f8a03c9debfbf91b87b173593a6a519f2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-release-app-node-path.err",
+      "archive": "commands/05-release-app-node-path.err.gz",
+      "bytes": 8794,
+      "sha256": "589ac3b209b133848532386df2ef26a62549379c5a3a13363b0476a01d1e6758"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-release-app-node-path.exit",
+      "archive": "commands/05-release-app-node-path.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-release-app-node-path.json",
+      "archive": "commands/05-release-app-node-path.json.gz",
+      "bytes": 2206,
+      "sha256": "fa708878f91b9f72b95985b513a14cde68506701fc7bd3474aa1ef369733c4cb"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/05-release-app-node-path.out",
+      "archive": "commands/05-release-app-node-path.out.gz",
+      "bytes": 997,
+      "sha256": "7e6550d2ab826e3aae488921170e1075a7d6d93e8557b01c11a63d96ad596011"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/07-post-build-source.err",
+      "archive": "commands/07-post-build-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/07-post-build-source.exit",
+      "archive": "commands/07-post-build-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/07-post-build-source.json",
+      "archive": "commands/07-post-build-source.json.gz",
+      "bytes": 1919,
+      "sha256": "ca5f1bda332f5582b2137948b99ae85cea62a7a4a64a3d9d74e048a872f85300"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/07-post-build-source.out",
+      "archive": "commands/07-post-build-source.out.gz",
+      "bytes": 96,
+      "sha256": "7d11b76dfa01493ae4a1ffdcc362edb3bfc2741069f412f10ca80e57aa72ffd1"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/08-fixture-before.err",
+      "archive": "commands/08-fixture-before.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/08-fixture-before.exit",
+      "archive": "commands/08-fixture-before.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/08-fixture-before.json",
+      "archive": "commands/08-fixture-before.json.gz",
+      "bytes": 1913,
+      "sha256": "55d18620dfc4147f1168be94fcb0a8a9a807252ec000f3aa9f6fe5edbe78b825"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/08-fixture-before.out",
+      "archive": "commands/08-fixture-before.out.gz",
+      "bytes": 85,
+      "sha256": "5e72bafaae42a0ea8cbda260e9f7796f71f753ddebfdd38a0257acbe092a8aa4"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/09-q98-formal.err",
+      "archive": "commands/09-q98-formal.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/09-q98-formal.exit",
+      "archive": "commands/09-q98-formal.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/09-q98-formal.json",
+      "archive": "commands/09-q98-formal.json.gz",
+      "bytes": 2555,
+      "sha256": "3e27507f71d4d9e39b04670b8b9fb64919e5885bfab52cd6b5732615cffa1e2d"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/09-q98-formal.out",
+      "archive": "commands/09-q98-formal.out.gz",
+      "bytes": 12484,
+      "sha256": "0f71cfa5a891f790f0d71d14d36c1b5fdb2b10c5ca062ba83c1b28b322c2a112"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/10-post-soak-source.err",
+      "archive": "commands/10-post-soak-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/10-post-soak-source.exit",
+      "archive": "commands/10-post-soak-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/10-post-soak-source.json",
+      "archive": "commands/10-post-soak-source.json.gz",
+      "bytes": 1916,
+      "sha256": "3cd5f3cb292d9196aed372418aff6e8506d6a31c3e1a88b183555e0e7face8f7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/10-post-soak-source.out",
+      "archive": "commands/10-post-soak-source.out.gz",
+      "bytes": 95,
+      "sha256": "9901d809f6a45bd5cbc7388e74285a09ba467c38bac1c4df13c1d631c2114eeb"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/11-fixture-after.err",
+      "archive": "commands/11-fixture-after.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/11-fixture-after.exit",
+      "archive": "commands/11-fixture-after.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/11-fixture-after.json",
+      "archive": "commands/11-fixture-after.json.gz",
+      "bytes": 1910,
+      "sha256": "14496ce01f5cc6dc622082b0949c597b2e8407d801f800e7015c9f9bfe85d938"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/11-fixture-after.out",
+      "archive": "commands/11-fixture-after.out.gz",
+      "bytes": 80,
+      "sha256": "19cf497771d6eb7c8b7f891c246fe2ca2787f6e25760b16d6592d88084a270f5"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/12-independent-analysis.err",
+      "archive": "commands/12-independent-analysis.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/12-independent-analysis.exit",
+      "archive": "commands/12-independent-analysis.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/12-independent-analysis.json",
+      "archive": "commands/12-independent-analysis.json.gz",
+      "bytes": 1915,
+      "sha256": "c931b5fd14ea94ad573241a9ae0c29999fe42214c72fb91e1939c971cd399375"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/12-independent-analysis.out",
+      "archive": "commands/12-independent-analysis.out.gz",
+      "bytes": 1531,
+      "sha256": "16333d662d1cebba1ee4d2829d50234ea9730cddb07736f2436f46bf37a87617"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/invocations.json",
+      "archive": "commands/invocations.json.gz",
+      "bytes": 24870,
+      "sha256": "e46c95f9fc543defff1a5d853e7449eafc75d4be45f64665e84eadd9f4867a33"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/record.py",
+      "archive": "commands/record.py.gz",
+      "bytes": 2832,
+      "sha256": "8da54c70cb04312eacb69d5a64ad23ecac3071e31f247ef9b56bfc80a67d3817"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixture-after.json",
+      "archive": "fixture-after.json.gz",
+      "bytes": 2341,
+      "sha256": "612ba0ef13632e37fa142f982d8342da62daf90f6a79aded14fdf97bdb669c7e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixture-before.json",
+      "archive": "fixture-before.json.gz",
+      "bytes": 2307,
+      "sha256": "5d92c6747c6fab1bb680394d885a064f370ba0437c2bfef1c8d818250e61f9a7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixture-snapshot.py",
+      "archive": "fixture-snapshot.py.gz",
+      "bytes": 1603,
+      "sha256": "9475c57f2ded69f99bd35c32ba40e0861fe596b34d240dfa34d9b74ddec9d522"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/preparation.txt",
+      "archive": "preparation.txt.gz",
+      "bytes": 110,
+      "sha256": "8048723c972022c793b50830406395f96ca9f7e954ff9143d043d8733b6a5867"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98-formal.md",
+      "archive": "q98-formal.md.gz",
+      "bytes": 6128,
+      "sha256": "c997cb4225a3a75200f0ab9840a9fab109df892389e01d2bf21511532b0945ec"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json",
+      "archive": "q98.json.gz",
+      "bytes": 274230,
+      "sha256": "a61271e6f4b74f4b1684bb30efdae47e1db30fd4d2817b886da42f4a6007acb9"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json.evidence.jsonl",
+      "archive": "q98.json.evidence.jsonl.gz",
+      "bytes": 1823091,
+      "sha256": "bf3d5696ffeee26074016cf19faf6cf98efa805d1964db92068563fc27351966"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json.frontend.json",
+      "archive": "q98.json.frontend.json.gz",
+      "bytes": 96615,
+      "sha256": "fb469a94b2a57ae045357719aa116ef3d8d9c2d2282094af5edc194f320946ae"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json.frontend.log",
+      "archive": "q98.json.frontend.log.gz",
+      "bytes": 16360935,
+      "sha256": "ea72e8c8c98cdac9c76ad643d81b2b1744649a669c107ea610fd822b01886113"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json.log",
+      "archive": "q98.json.log.gz",
+      "bytes": 94,
+      "sha256": "cf46ebf59495a5e4665c25dc740319c6678958abfb3431b3da47e549c54c55b3"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json.phase-samples.jsonl",
+      "archive": "q98.json.phase-samples.jsonl.gz",
+      "bytes": 29053,
+      "sha256": "f9c2ea37fd3055033bf455c393de9b5ee9f3a07abc5a635db07b42e353f52932"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/q98.json.samples.jsonl",
+      "archive": "q98.json.samples.jsonl.gz",
+      "bytes": 70431,
+      "sha256": "3ef0811e1993dd4baf9001f294f5ba8080065ab9fbc7a08d4c42c09c371cde1e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/review03.md",
+      "archive": "review03.md.gz",
+      "bytes": 2352,
+      "sha256": "db87b888bb14830972c1233bf4f10b8dacac08d1f012446309e862e41a097758"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/snapshot-after-build.json",
+      "archive": "snapshot-after-build.json.gz",
+      "bytes": 16895,
+      "sha256": "ffec9ac0b2af82a2403224bdc3295d64b26a51cd3d26c985592daeb184bd4c14"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/snapshot-after-soak.json",
+      "archive": "snapshot-after-soak.json.gz",
+      "bytes": 16894,
+      "sha256": "ff26deeec861e8f65d86c834c56acedb4d4a0c99e3284f78f435dd5bf376bd0c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/snapshot-before-build.json",
+      "archive": "snapshot-before-build.json.gz",
+      "bytes": 16610,
+      "sha256": "89ec6cfa4c80a78c7041003089c0a023baf9bac6dd4632c5a3d75c0d41d09961"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/snapshot.py",
+      "archive": "snapshot.py.gz",
+      "bytes": 1874,
+      "sha256": "f38535511cadd1a983256e41ce1e2683711df8c0b76bc92da7308bbbfdadd301"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-activation.txt",
+      "archive": "ui-activation.txt.gz",
+      "bytes": 2365,
+      "sha256": "b640da5ed3a3f336dfdd602ae92e7e83a9b7ad1e5c83e542f6b3c0fd4bc156fa"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-after-exit.json",
+      "archive": "ui-after-exit.json.gz",
+      "bytes": 393,
+      "sha256": "2ffa89f34d6530eb494d88855324085051d3a5a3ba87466cce2951f06f442670"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-mid01.png",
+      "archive": "ui-mid01.png.gz",
+      "bytes": 187086,
+      "sha256": "62c20aa326615d0bdf24526aa1b2c4c8a268e35fbd11c3f83fecd1d37a82ac90"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-mid01.txt",
+      "archive": "ui-mid01.txt.gz",
+      "bytes": 1003,
+      "sha256": "eb814b7ef14280a51c38c9cd1e0beca676cb6bfc1a7a9fe6d5e7d1b31506a57b"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-mid02.png",
+      "archive": "ui-mid02.png.gz",
+      "bytes": 298530,
+      "sha256": "aa1ccc4d2aba28faca24b1e0b04666b7b66f82e911fc54e6e22e77e94e4335f5"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-mid02.txt",
+      "archive": "ui-mid02.txt.gz",
+      "bytes": 1734,
+      "sha256": "bb4f9237909ed8d73b13c9406c56fda6f7b067affe58f1c3ff387afe5d6c8a96"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-near-end.png",
+      "archive": "ui-near-end.png.gz",
+      "bytes": 128664,
+      "sha256": "a67ca2f3571107067159f783d8df47659d36a708487a046ce8393974960a6015"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-near-end.txt",
+      "archive": "ui-near-end.txt.gz",
+      "bytes": 478,
+      "sha256": "bdbdbf9ea25668b0ea00ce087f16483cbfe8ff397525914958d0af332d64f54b"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-start.png",
+      "archive": "ui-start.png.gz",
+      "bytes": 895023,
+      "sha256": "bb2139a6dc28fd09f5dcd5d8e9406a7779a6b96f78ed79eabed4dfef1d56f27b"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/ui-start.txt",
+      "archive": "ui-start.txt.gz",
+      "bytes": 424,
+      "sha256": "2466d90352bc90294d114bb0cac39a92fc2d79764af2a37a7d4322a7a63f57b4"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/13-final-documentation-check.err",
+      "archive": "finalization/commands/13-final-documentation-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/13-final-documentation-check.exit",
+      "archive": "finalization/commands/13-final-documentation-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/13-final-documentation-check.json",
+      "archive": "finalization/commands/13-final-documentation-check.json.gz",
+      "bytes": 1884,
+      "sha256": "e2a7dad1b289ec142d63d39b47a6d68a852f5d11b05838cc719235adb267f1c7",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/13-final-documentation-check.out",
+      "archive": "finalization/commands/13-final-documentation-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/14-final-current-status-check.err",
+      "archive": "finalization/commands/14-final-current-status-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/14-final-current-status-check.exit",
+      "archive": "finalization/commands/14-final-current-status-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/14-final-current-status-check.json",
+      "archive": "finalization/commands/14-final-current-status-check.json.gz",
+      "bytes": 1887,
+      "sha256": "34cb67930d779ddec629ce97d6ef38b37ef4948565071d58188ea213ce490443",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/14-final-current-status-check.out",
+      "archive": "finalization/commands/14-final-current-status-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/commands/invocations.json",
+      "archive": "finalization/commands/invocations.json.gz",
+      "bytes": 28731,
+      "sha256": "69077fe0f8e88166eddd6186d8ed3664d7fd7a2bdaaf13732f5f4c546b763723",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/finalize-evidence.py",
+      "archive": "finalization/finalize-evidence.py.gz",
+      "bytes": 1725,
+      "sha256": "202a0bca43a7cc7b72c141d44ea2da3547ccab2548922f1f6b9f79c7ef6b4239",
+      "capturedAt": "2026-10-25T20:36:58.683486+08:00"
+    }
+  ],
+  "excluded": [
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/config",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/description",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/index",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/0d/cf1cbe9a84eda0a8485f0dfc1c5256c6d6d103",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/0e/6e973058304fa19ea20801d09b53d5fd180832",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/4a/b2f154ab402fe6664e3b923040c4f9a901aa5a",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/58/5e7fc4a18a6ab7075e76c7b5c304d468a7f24a",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/5a/40bea7c5a7aa064257720aff98eeefe779ee59",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/65/7b0964ab3d989b387271933f44650906895e82",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/9f/0bf742f002f703511c6c039288f281b4c68c37",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/a6/16cada826bd0389cca7c92250f786db738d5ae",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/b0/319ed36680b8fa5924b3568bab9b80550ca7d6",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/ba/171bcd921aaa2ffcb438f2e6d4fca6874a7bd1",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/c8/d80d7d67b5d4a95a048225c1a9fe16a47eda03",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/d8/9d59905bf0d553cb86a73674866440d193dd2c",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/d9/1200561862a942a86b58c0ead6cc7408bcc18c",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/ea/cd4817d95c4c6615bb634e567997a350c95d74",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/objects/f5/7f79f2721160ef96125e32278ecb1b29c5e82c",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/.node-version",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/README.md",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/assets/icon.png",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/logs/app.log",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/pnpm-lock.yaml",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/src/App.vue",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/src/Model.swift",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/src/generated.ts",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/src/large.ts",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/diffs/src/staged.ts",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/config",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/description",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/index",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/objects/47/98ad6145bdd3c12130f7cd6a5ef0f2c175b419",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/objects/d7/c6e5ac285abecfa8675175e4b303ee840a6e80",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/objects/e5/8e67c09a54b9a7356598775b476fde5609f646",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/mergetool/README.txt",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/config",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/description",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/index",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/objects/0b/c6868d0bd01706e74c478a728c65eebe1d0e97",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/objects/5b/29ac203eeee886431e1f96a6d3157fda8b531c",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/objects/87/24eabb75cb47104e917284b4ca082ccfaa61ba",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/objects/93/963b6bced38a23bf5e677ca8f196ae001e4e44",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/objects/9d/e44db35f8b70d204e9eb9d7f814dc36b1318f4",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/objects/fa/69513b4182cf2679d3ceeee390f24ed426e234",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/.husky/pre-commit",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/README.md",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-default/package.json",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/COMMIT_EDITMSG",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/config",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/description",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/applypatch-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/post-update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/pre-applypatch.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/pre-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/pre-merge-commit.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/pre-push.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/pre-rebase.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/pre-receive.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/push-to-checkout.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/sendemail-validate.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/hooks/update.sample",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/index",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/info/exclude",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/logs/HEAD",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/logs/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/23/4f116d2396e74792e2ae94cbdbe3a436f912f7",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/4f/6cb1d68690899eb316c61f09c963d1216d77c1",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/5b/29ac203eeee886431e1f96a6d3157fda8b531c",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/80/40d45c3d85e3062bbd56d2323b7c6acc89edc7",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/87/24eabb75cb47104e917284b4ca082ccfaa61ba",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/8e/f0a5258f8f4133e6f4a93596c798f521b31290",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/objects/93/963b6bced38a23bf5e677ca8f196ae001e4e44",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.git/refs/heads/main",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.husky/pre-commit",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/.node-version",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/README.md",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/fixtures/node-versioned/package.json",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/__future__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_bootlocale.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_collections_abc.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_compression.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_sitebuiltins.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_weakrefset.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/abc.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/argparse.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/bisect.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/bz2.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/codecs.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/collections/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/collections/abc.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/copyreg.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/datetime.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/aliases.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/cp437.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/latin_1.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/utf_8.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/enum.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/fnmatch.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/functools.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/genericpath.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/gettext.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/hashlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/heapq.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/io.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/decoder.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/scanner.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/keyword.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/locale.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/lzma.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ntpath.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/operator.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/os.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/platform.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/plistlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/posixpath.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/random.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/re.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/reprlib.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/selectors.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/shutil.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/signal.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/site.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_compile.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_constants.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_parse.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/stat.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/struct.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/tempfile.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/types.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/parse.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/warnings.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/weakref.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/xml/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/xml/parsers/__init__.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/xml/parsers/expat.cpython-39.pyc",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/tmp/revia-soak-data-j27nh6j8/recovery/maintenance.json",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/tmp/revia-soak-data-j27nh6j8/settings.json",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-final.Zcp8cD/tmp/xcrun_db",
+      "reason": "Owned fixture/runtime data or symlink, retained in original run; not command evidence"
+    }
+  ],
+  "finalizedAt": "2026-10-25T20:36:58.683486+08:00",
+  "finalizationNote": "Initial invocations.json snapshot predates checks13/14; finalization preserves the appended aggregate separately, without overwriting the earlier snapshot."
+}

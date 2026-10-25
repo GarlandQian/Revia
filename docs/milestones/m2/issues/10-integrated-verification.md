@@ -323,3 +323,7 @@ vmmap exit 255 系统根因与 Rust 振幅仍待定位。Status 保持 `ready-fo
 ### 2026-10-25：Codex接管版独立复核通过
 
 固定85a2f5c...ddb9da5，两轴分别为Standards确定0/启发式0、Spec0，上轮留证发现闭合；实际App协议形状正对照及真实main故障入口已独立核对。见[审查记录](../q98-evidence-review03.md)及原件manifest。按Q113不再交回Pi；接下来固定新版Release和完整正式30分钟长测，任务10仍ready-for-agent、11/M2未完成。旧Rust +82MiB和vmmap255不是已解决结论，桌面/D06/最终双平台CI仍有独立门槛。
+
+### 2026-10-25：接管版完整正式长测，Rust超幅未通过
+
+固定6f420a8构建真实新版.app，binary SHA256 `08ec2eeec7f6d8f8e997cdac027ee20220334a44803061522fadef444b95e44f`；143份源码构建/运行前后不变。主动1801.042秒、29阶段最终全部有效、同PID60845自然exit0，runCompleted及整体权威均true，vmmap本轮未失败。WebContent两条通过；Rust footprint 138.5→132.5、最高211.4MiB，maxRise72.9失败，斜率+0.2401不抵消。原生empty大块dirty解释主要波动，但调用点仍未知，不宣称泄漏或故障修好。见[正式长测及原件](../q98-formal-20261025.md)。按Q113由Codex继续定位，不再派Pi；10/11/M2仍未完成，不合main/M3。
