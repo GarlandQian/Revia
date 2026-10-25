@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -657,3 +657,21 @@ App 只 `reconcile()` 就得到 `none`，Quit 被吞。
 - **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 的实际拦截与裁决、
   close 投递后 B 拦截的真实时序、失败后 Stay 的实际观感，均需规划方在固定 Release 上验收。
 - 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。
+
+### 2026-10-25 / 规划方：ff6ba78 第六轮限定复核，App执行链仍不通过
+
+固定 `git diff 95d37df24f95e159c7175069b0ace6fabc287a56...ff6ba782a3e5a2e30960856e60bc49bb2bdca876`，唯一提交、4文件。两个独立轴分开计数，行号对应ff6ba78。
+
+#### Standards：确定违反3项（P1一项、P2两项），Fowler建议0项
+
+1. **ST-B07-08-1 / P1 / 排他claim与App重入冲突**：`refreshGate.ts:1228`在active claim时返回null，`App.tsx:1143`却同步reconcile；授权/claim均未改变，持续proceed→null→reconcile至栈溢出，每层`:1135`还发保护IPC。A Quit→Wait→A结束，旧release挂起，B开始并先结束，或重复原生退出事件，均可触发。违反`technical-direction.md:56` Q96可控等待/Stay。已有执行必须等待状态变化，派发已明确要求去掉该递归。
+2. **ST-B07-08-2 / P2 / delivered后自动重投**：`refreshGate.ts:1533-1534`释放claim保留授权后立即真实reconcile；无新写入时又claim并投递close，而非等待原生裁决。违反任务08 ST-B06-08-3不重复投递及Q96。与第1项不同，是claim释放后缺少等待裁决状态。
+3. **ST-B07-08-3 / P2 / 旧原生投递越过Stay**：旧close已发送但事件暂缓，B写入期间再次请求关闭并Stay，B结束后旧CloseRequested到达；`App.tsx:775/778`把旧事件当全新request，在无写/pending时自动授权并无归属地completeVerdict，关闭窗口。claimId只保护回包，不保护事件。违反Q96留在应用，需关联/拒绝失效原生投递；不能仅修IPC回包。
+
+#### Spec：缺失/部分0项、范围扩张0项、实现错误1项（P1）
+
+1. **SP-B07-08-1 / P1 / 真实App无限同步重入**：`refreshGate.ts:1195/1228`仍proceed但已有claim返回null，`App.tsx:1143`状态不变就自调用；A退出release挂起期间B先结束或重复退出事件可触发。违反`spec.md:126`等待/Stay与`:127`执行原请求。投递回包`:1533-1534`立即reconcile再次投递是同一所有权驱动不收敛的相关子点，本轴不另计。
+
+统计：Standards3、最高P1、建议0；Spec1、最高P1、范围扩张0。保持轴独立，不将相关项合并或放大计数。前轮立即Quit丢请求、失败后保留自动授权的直接路径已有静态闭合；Rust真实生产接收端保持闭合。
+
+**证据边界**：六条检查退出0，Node165/Rust exit_guard3/tsc/lint/build/diff-check；79份受测源码检查前/后/固定提交/当前磁盘SHA一致，未重跑。新增回归仍用计数型reconcile和fake native，没有驱动App请求→执行→重入→裁决完整链，不能替代真实接线。下一轮必须让App与测试共用完整生产驱动，只注入环境适配，不在测试补生产调用。检查/双轴原件见[第六轮记录](../batch06-repair-validation.md)和[清单](../evidence/batch06-repair/manifest.json)。08回ready-for-agent，未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
