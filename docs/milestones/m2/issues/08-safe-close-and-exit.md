@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -919,3 +919,24 @@ B05–B08 中依赖旧投递/裁决模型的测试迁移为实际共享驱动+�
 缺失/部分 0 项、范围扩张 0 项、实现错误 0 项，无最高严重度。Q96 原动作及 Stay、Q91 待核对按代际清账/不自动重跑未见本增量回退。两轴各自独立计数，不相互抵消。
 
 原件与边界见[第九轮记录](../batch09-repair-validation.md)及[归档清单](../evidence/batch09-repair/manifest.json)。81 份源码的检查前后、固定提交与当前磁盘 SHA256 已核对；首轮 diff 空白失败及定点清理重跑均保留。08 改为 `ready-for-human`，不是 `done`；WebView 中询问隐藏、真实 Wait/Stay/待核对与关闭/退出、失败反馈仍需固定 Release 验收。本轮未新 Release/GUI/D06/CI/Q98/推送/合并，10/11/M2 未完成。
+
+### 2026-10-25 / 规划方：集成桌面发现 macOS Quit 绕过，B10 修复待复核
+
+`m2` 已同步到 `m2-ui`，固定集成提交 `5f632d661ce5dc37b237c27f60205c8d41fcf86c`；这不是 `m2-ui` 合回 `m2`，最终合并顺序没有改变。该版前端、现有 Node/Python 与 Rust 检查通过后构建 Release，二进制 SHA256 `0623cacdf0c395a00d2eba975df7699c0e72d788a0d80d84f7b94a25c1e3a09d`。此前双轴静态复核未发现此问题，不能改写为已覆盖原生 Quit。
+
+- 独占桌面目录 `/private/tmp/revia-m2-desktop-_2le4ddh`，生产 fixture 的真实 `stage_file` 响应被显式门控后，窗口关闭询问、Stay、继续浏览、禁止同 worktree 再写、释放后仍留在应用均成功（C01）。
+- 同一 PID 23756 随后进入真实 `unstage_file`（C02）；结果已捕获，但尚未交付前端，也未创建 release。真实 `super+q` 令进程退出 0，没有退出询问。捕获至退出约 31.35 秒，未达到 300 秒门控超时；源码与二进制未变。Git 操作已执行完成，**不据此声称 Git 被杀或数据丢失**；确定缺陷是在结果未交付和登记完成前提前退出。
+- 失败原件和旧 bundle 保存在 `/private/tmp/revia-b10-vzc_he0k`，不覆盖；C02 不能算取消暂存后 Stay 通过。
+
+本机锁定依赖链表明，Tauri 默认 Quit 通过 muda 的 `terminate:` 进入 Cocoa；Tao 0.37.1 的 `applicationWillTerminate` 只发 LoopDestroyed，runtime 映射为 Exit，绕过 Revia 原有的 ExitRequested。不是 ExitGuard 类型错配或旧 false 回包覆盖。Apple 的公开 [applicationShouldTerminate](https://developer.apple.com/documentation/appkit/nsapplicationdelegate/applicationshouldterminate(_:)) 是该正常退出入口的可阻止委托。
+
+按 Q108 接手任务 08 剩余修复，新增仅 macOS 的 `platform/macos_exit.rs`：
+
+- 在 Tauri build 后、run 前向原 Tao delegate 添加公开的 `applicationShouldTerminate:`；检查实际类名和包括继承链的已有实现，拒绝覆盖；主线程重新注册同一个保活的 delegate，不替换菜单或对象。
+- 使用 Cocoa 的 NSApplicationTerminateReply/NSUInteger ABI；回调取消当前原生终止并转交既有 `revia://exit-requested`，保留统一 CloseDriver 的原动作、Wait/Stay 和待核对语义。最终仍由 request_exit/app.exit 走 runtime stop，保留 Rust 最后保护。
+- 转发错误或 Rust panic 不放行退出；没有窗口时仍走 runtime 退出。未使用 NSTerminateLater，不增加另一套待回复生命周期。前端监听不可用时可能拒绝退出且不能交付请求，这是 fail-closed 边界，不承诺系统注销/关机自动继续，也不保护系统强退。
+- 复用已锁定 objc2 0.6.5 与 objc2-app-kit 0.3.2，仅增加 macOS 直接依赖；锁文件只新增根包依赖项，没有升级其他包。
+
+相关修改完成后集中检查：`cargo test --manifest-path src-tauri/Cargo.toml --offline --locked` 为 **271 passed / 0 failed / 1 ignored**；既有绑定清理和 diff-check 均退出 0。新增两项现有 Rust 单测验证转发成功/错误/panic 均 Cancel，以及真实注册 selector 的 ABI、重复/继承方法拒绝；它们**不替代** AppKit、Cmd-Q、Dock Quit 的真实桌面验证。前端未改，本次不机械重跑刚通过的前端检查。
+
+原件 `/private/tmp/revia-b10-vzc_he0k/checks-cpi33j4q` 保留 argv/cwd/显式环境/start/end/exit/stdout/stderr。依赖解析仅改变 Cargo.lock；此后 154 份受测源码、测试、配置、锁文件在 Rust 检查前后 SHA256 一致，warning 原样保留。本节实现尚待固定提交的独立 Standards / Spec 复核及新 Release，08 暂回 `ready-for-agent`；真实 Cmd-Q/Dock Quit、Wait/Stay、待核对尚未重验，10/11/M2 均未完成。

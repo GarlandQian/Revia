@@ -18,7 +18,7 @@ use commands::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             use tauri::Manager;
@@ -134,26 +134,23 @@ pub fn run() {
             commands::request_exit,
         ])
         .build(tauri::generate_context!())
-        .expect("Revia 启动失败")
-        .run(|app, event| {
-            use tauri::{Emitter, Manager};
-            // 原生退出（macOS 默认菜单的 Quit / ⌘Q）不经过窗口关闭监听，
-            // 必须在这里统一保护（Q96、任务 08）。
-            //
-            // 前端负责判断「是否有在途写操作」并决定是否放行；Rust 只做一件事：
-            // 先把退出请求**交给前端**，由前端决定「等待完成后退出」或「留在应用」。
-            // 前端不可用时（例如窗口已销毁）不阻塞退出，避免进程无法结束。
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                let Some(window) = app.get_webview_window("main") else { return };
-                // 只有前端明确报告「有在途写」时才阻止；默认放行，避免死锁。
-                let blocked = app
-                    .try_state::<AppState>()
-                    .map(|state| state.exit_blocked())
-                    .unwrap_or(false);
-                if blocked {
-                    api.prevent_exit();
-                    let _ = window.emit("revia://exit-requested", ());
-                }
+        .expect("Revia 启动失败");
+    platform::install_exit_interceptor(app.handle()).expect("原生退出保护安装失败");
+    app.run(|app, event| {
+        use tauri::{Emitter, Manager};
+        // Runtime 退出的最后一道保护；macOS terminate: 在平台层先转交同一前端驱动。
+        // 前端窗口已销毁时放行，避免进程无法结束。
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            let Some(window) = app.get_webview_window("main") else { return };
+            // 只有前端明确报告「有在途写或待核对结果」时才阻止。
+            let blocked = app
+                .try_state::<AppState>()
+                .map(|state| state.exit_blocked())
+                .unwrap_or(false);
+            if blocked {
+                api.prevent_exit();
+                let _ = window.emit("revia://exit-requested", ());
             }
-        });
+        }
+    });
 }

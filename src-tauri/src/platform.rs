@@ -1,4 +1,7 @@
-//! Filesystem identity and permissions stay in the platform shell (Q55).
+//! Filesystem identity, permissions and native termination stay in the platform shell (Q55).
+
+#[cfg(target_os = "macos")]
+mod macos_exit;
 
 use std::fs;
 #[cfg(any(unix, windows))]
@@ -6,6 +9,15 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use crate::error::Result;
+
+/// Install after Tauri builds its native application, before its event loop starts.
+pub fn install_exit_interceptor(app: &tauri::AppHandle) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    macos_exit::install(app)?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+    Ok(())
+}
 
 pub fn directory_identity(path: &Path) -> Result<Option<String>> {
     let metadata = fs::metadata(path)?;
