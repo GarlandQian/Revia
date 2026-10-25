@@ -32,7 +32,7 @@ function unwrapEntry(outcome) {
   return outcome.entry;
 }
 
-const { CloseCoordinator, CloseGuardGate, ExitGuardSync, SnapshotGate, WriteGuardOrchestrator, runCloseExecution, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
+const { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, SnapshotGate, WriteGuardOrchestrator, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -2610,7 +2610,7 @@ test("Wait 时已有 pending：展示核对而不是静默退出（ST-B04-08-2�
   assert.equal(decision.intent, "close", "原动作保留");
 });
 
-// ---------------- 整批 B05：异步关闭授权生命周期 ----------------
+// ---------------- 整批 B05：异步关闭授权生命周期（改为驱动 CloseDriver） ----------------
 
 /** 可控 deferred。 */
 function deferred() {
@@ -2619,286 +2619,232 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-/** 构造与 App 相同的执行环境：closeCoordinator + releaseExitGuard + native。 */
-function makeExecutionEnv() {
-  const coordinator = new CloseCoordinator();
-  const native = [];
-  const errors = [];
-  let reconcileCalls = 0;
-  const deps = {
-    coordinator,
-    releaseExitGuard: async () => {},
-    performNative: async (intent) => { native.push(intent); return "completed"; },
-    reconcile: () => { reconcileCalls += 1; },
-    onError: (error) => errors.push(error),
-  };
-  return {
-    coordinator, deps, native, errors,
-    reconcileCalls: () => reconcileCalls,
-  };
-}
-
 test("旧回包越过 Stay：A 写期间 Quit→Wait，A 结束，用户启动 B 后 Stay，旧回包不得关窗（ST-B05-08-1）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
-  // A 写期间请求退出并选择等待。
+  const release = deferred();
+  env.setRelease(() => release.promise);
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  // 认领执行；releaseExitGuard 挂起（旧回包还没回来）。
-  const release = deferred();
-  env.deps.releaseExitGuard = () => release.promise;
-  const claimed = c.claimExecution();
-  assert.ok(claimed, "应能认领");
-  const running = runCloseExecution(env.deps, claimed);
-  // 用户此时启动 B 写，并请求关闭、选择 Stay。
+  env.driver.notifyStateChanged();
+  // 用户启动 B，请求关闭并 Stay。
   c.beginWrite("wt-b");
-  c.request("close");
-  c.resolveAsk("stay");
-  // 旧回包现在才恢复。
+  env.driver.handleRequest("close");
+  env.driver.handleChoice("stay");
   release.resolve();
-  const executed = await running;
-  assert.equal(executed, false, "Stay 之后旧回包不得执行原生动作");
-  assert.deepEqual(env.native, [], "绝不能关窗");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(env.native, [], "Stay 之后旧回包不得投递原生动作");
 });
 
 test("B 尚未结束时旧回包也不关窗，且保留最初的原动作 exit", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
+  const release = deferred();
+  env.setRelease(() => release.promise);
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const release = deferred();
-  env.deps.releaseExitGuard = () => release.promise;
-  const claimed = c.claimExecution();
-  const running = runCloseExecution(env.deps, claimed);
-  // B 开始写（用户没做新请求）。
+  env.driver.notifyStateChanged();
   c.beginWrite("wt-b");
   release.resolve();
-  const executed = await running;
-  assert.equal(executed, false, "B 仍在途 → 不能执行");
-  assert.deepEqual(env.native, []);
-  assert.equal(c.pendingIntent(), "exit", "原动作仍是 exit，没有被改成 close");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(env.native, [], "B 仍在途 → 不投递");
+  assert.equal(c.pendingIntent(), "exit", "原动作仍是 exit");
 });
 
 test("没有后续请求时，正常 Wait 仍执行原动作", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
   c.beginWrite("wt-a");
   c.request("close");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const claimed = c.claimExecution();
-  const executed = await runCloseExecution(env.deps, claimed);
-  assert.equal(executed, true);
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(env.native, ["close"]);
 });
 
 test("Stay 之后新请求重新走完整授权流程（旧回包不影响新请求）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
+  const release = deferred();
+  env.setRelease(() => release.promise);
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const release = deferred();
-  env.deps.releaseExitGuard = () => release.promise;
-  const claimed = c.claimExecution();
-  const running = runCloseExecution(env.deps, claimed);
-  // Stay，然后发起新请求并等待。
-  c.resolveAsk("stay");
+  env.driver.notifyStateChanged();
+  env.driver.handleChoice("stay");
   c.beginWrite("wt-b");
   c.request("close");
   c.resolveAsk("wait");
   release.resolve();
-  await running;
-  assert.deepEqual(env.native, [], "旧回包没有关窗");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(env.native, [], "旧回包没有投递");
   // 新请求在 B 结束后正常执行。
   c.endWrite("wt-b");
-  const claimed2 = c.claimExecution();
-  const executed2 = await runCloseExecution(env.deps, claimed2);
-  assert.equal(executed2, true);
+  env.setRelease(async () => {});
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(env.native, ["close"], "新请求执行的是新动作");
 });
 
 test("旧回包失败不影响新请求（失败只上报，不授权旧动作）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
+  const release = deferred();
+  env.setRelease(() => release.promise);
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const release = deferred();
-  env.deps.releaseExitGuard = () => release.promise;
-  const claimed = c.claimExecution();
-  const running = runCloseExecution(env.deps, claimed);
-  c.resolveAsk("stay");
+  env.driver.notifyStateChanged();
+  env.driver.handleChoice("stay");
   release.reject(new Error("旧回包失败"));
-  const executed = await running;
-  assert.equal(executed, false);
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(env.native, []);
   assert.equal(env.errors.length, 1, "失败被如实上报");
 });
 
-test("执行失败后仍有效的原动作交回编排，不悬挂", async () => {
-  const env = makeExecutionEnv();
+test("执行失败后仍有效的原动作保留，并回到询问", async () => {
+  const env = makeDriverEnv();
   const c = env.coordinator;
+  env.setNative(async () => { throw new Error("native 失败"); });
   c.beginWrite("wt-a");
   c.request("close");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  env.deps.performNative = async () => { throw new Error("native 失败"); };
-  const claimed = c.claimExecution();
-  const executed = await runCloseExecution(env.deps, claimed);
-  assert.equal(executed, false);
-  assert.ok(env.reconcileCalls() >= 1, "必须交回编排");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.ok(env.errors.length >= 1, "失败必须上报");
   assert.equal(c.pendingIntent(), "close", "原动作仍保留");
+  assert.equal(env.driver.currentPhase(), "asking", "回到询问等用户决定");
 });
 
-// ---------------- 整批 B06：退出事件、失败状态与原生裁决 ----------------
+// ---------------- 整批 B06：退出事件、失败状态与原生裁决（驱动 CloseDriver） ----------------
 
 test("写结束早于退出事件：request 得到 proceed 后仍能执行原 exit（ST-B06-08-1 / SP-B06-08-1）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
-  // A 写期间 Rust 拦住了 Quit，但 JS 事件还没跑；A 先结束。
   c.beginWrite("wt-a");
   c.endWrite("wt-a");
-  // 事件现在才到：无在途写 → proceed。
-  assert.deepEqual(c.request("exit"), { action: "proceed" });
-  // 不能只 reconcile 得 none 就吞掉 Quit：必须认领并执行原 exit。
-  const decision = c.reconcile();
-  assert.equal(decision.kind, "proceed");
-  assert.equal(decision.intent, "exit", "原动作必须是 exit，不能被吞掉");
-  const claimed = c.claimExecution();
-  assert.ok(claimed);
-  const executed = await runCloseExecution(env.deps, claimed);
-  assert.equal(executed, true);
-  assert.deepEqual(env.native, ["exit"]);
+  // 事件现在才到：无在途写 → 直接执行原 exit。
+  const effect = env.driver.handleRequest("exit");
+  assert.notEqual(effect.kind, "ask", "不应停在询问");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(env.native, ["exit"], "原 exit 必须被执行");
 });
 
 test("release/native 持续失败：只自动尝试一次，之后必须由用户重新决定（ST-B06-08-2 / SP-B06-08-2）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
   let releaseCalls = 0;
-  env.deps.releaseExitGuard = async () => { releaseCalls += 1; throw new Error("release 失败"); };
+  env.setRelease(async () => { releaseCalls += 1; throw new Error("release 失败"); });
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-
-  // 第一次执行（自动）。
-  const claimed = c.claimExecution();
-  await runCloseExecution(env.deps, claimed);
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(releaseCalls, 1, "只自动尝试一次");
   assert.equal(env.errors.length, 1, "失败必须可见");
-
-  // 失败后授权被取消：reconcile 必须回到询问，而不是再次自动执行。
-  const after = c.reconcile();
-  assert.equal(after.kind, "ask", "失败后必须让用户重新选择");
-  assert.equal(after.intent, "exit", "原意图保留");
-  assert.equal(c.claimExecution(), null, "没有授权就不能再自动认领");
+  assert.equal(env.driver.currentPhase(), "asking", "回到询问");
+  // 反复通知不会重试。
+  for (let i = 0; i < 5; i += 1) env.driver.notifyStateChanged();
+  await Promise.resolve();
   assert.equal(releaseCalls, 1, "不得无界自动重试");
-
-  // 用户明确再次选择等待 → 才重试。
-  c.resolveAsk("wait");
-  const retry = c.claimExecution();
-  assert.ok(retry, "用户重新选择后可以重试");
-  await runCloseExecution(env.deps, retry);
+  // 用户再次选择等待 → 才重试。
+  env.setRelease(async () => { releaseCalls += 1; });
+  env.driver.handleChoice("wait");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(releaseCalls, 2);
 });
 
 test("失败后用户可以选 Stay（真实可留在应用）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
-  env.deps.performNative = async () => { throw new Error("native 失败"); };
+  env.setNative(async () => { throw new Error("native 失败"); });
   c.beginWrite("wt-a");
   c.request("close");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  await runCloseExecution(env.deps, c.claimExecution());
-  assert.equal(c.reconcile().kind, "ask");
-  c.resolveAsk("stay");
-  assert.equal(c.reconcile().kind, "none", "Stay 后不再询问也不关闭");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.driver.currentPhase(), "asking");
+  env.driver.handleChoice("stay");
+  assert.equal(env.driver.currentPhase(), "idle");
   assert.equal(c.pendingIntent(), null);
 });
 
 test("投递不是完成：close 投递后 B 开始写，请求必须保留（事件在回包后）（ST-B06-08-3 / SP-B06-08-3）", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
-  const delivered = deferred();
-  env.deps.performNative = async () => {
-    // 投递：立刻返回 delivered，但窗口还没真正关。
-    delivered.resolve();
-    return "delivered";
-  };
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const claimed = c.claimExecution();
-  const running = runCloseExecution(env.deps, claimed);
-  await delivered.promise;
-  // 投递期间 B 开始写（关闭事件会被 B 拦住）。
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.driver.currentPhase(), "awaitingVerdict");
+  // 投递期间 B 开始写。
   c.beginWrite("wt-b");
-  await running;
-  assert.equal(c.pendingIntent(), "exit", "原 exit 必须保留，不能被改成 close");
-  // B 结束后仍要执行原动作。
+  env.driver.handleVerdictBlocked();
+  assert.equal(c.pendingIntent(), "exit", "原 exit 必须保留");
   c.endWrite("wt-b");
-  const again = c.claimExecution();
-  assert.equal(again.intent, "exit", "动作仍是 exit");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.includes("close"), false, "不能被改成 close");
 });
 
 test("投递不是完成：关闭事件先于回包到达时同样保留请求", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
-  let deliverResolve;
-  const gate = new Promise((resolve) => { deliverResolve = resolve; });
-  env.deps.performNative = async () => { await gate; return "delivered"; };
+  const gate = deferred();
+  env.setNative(async () => { await gate.promise; return "delivered"; });
   c.beginWrite("wt-a");
   c.request("close");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const claimed = c.claimExecution();
-  const running = runCloseExecution(env.deps, claimed);
-  // 关闭事件先到：B 开始写 → 事件被拦。
+  env.driver.notifyStateChanged();
+  // 事件先到：B 开始写。
   c.beginWrite("wt-b");
-  const decision = c.request("close");
-  assert.equal(decision.action, "ask", "B 在途 → 必须拦住");
-  deliverResolve();
-  await running;
+  const blocked = env.driver.handleVerdictBlocked();
+  assert.equal(blocked.kind, "ask", "B 在途 → 必须拦住");
+  gate.resolve();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(c.pendingIntent(), "close", "请求保留");
-  assert.equal(c.reconcile().kind, "ask", "仍在询问，不能静默关闭");
 });
 
-test("原生裁决放行才清账", () => {
-  const c = new CloseCoordinator();
+test("原生裁决放行才清账", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const claimed = c.claimExecution();
-  c.releaseClaimAwaitingVerdict(claimed.claimId);
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(c.pendingIntent(), "exit", "投递后仍保留");
-  c.completeVerdict();
+  env.driver.handleNativeVerdict();
   assert.equal(c.pendingIntent(), null, "裁决放行后才清账");
 });
 
-test("重复 reconcile 在旧 claim 未结束时不重复投递", () => {
-  const c = new CloseCoordinator();
+test("重复 reconcile 在旧 claim 未结束时不重复投递", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
   c.beginWrite("wt-a");
   c.request("close");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const first = c.claimExecution();
-  assert.ok(first);
-  assert.equal(c.claimExecution(), null, "已有 claim 时不得再认领");
-  c.releaseClaimAwaitingVerdict(first.claimId);
-  assert.ok(c.claimExecution(), "释放后可以再次认领");
+  for (let i = 0; i < 10; i += 1) env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.length, 1, "只投递一次");
 });
 
-test("旧 claim 晚回/失败不清新 claim（排他，不能只按 requestGeneration）", () => {
+test("旧 claim 晚回/失败不清新 claim（排他）", () => {
   const c = new CloseCoordinator();
   c.beginWrite("wt-a");
   c.request("close");
@@ -2907,30 +2853,210 @@ test("旧 claim 晚回/失败不清新 claim（排他，不能只按 requestGene
   const old = c.claimExecution();
   c.releaseClaimAwaitingVerdict(old.claimId);
   const fresh = c.claimExecution();
-  assert.ok(fresh);
   assert.notEqual(fresh.claimId, old.claimId);
-  // 旧 claim 的完成/失败都不能影响新 claim。
   assert.equal(c.completeExecution(old.claimId), false);
   assert.equal(c.failExecution(old.claimId), false);
-  assert.equal(c.pendingIntent(), "close", "新 claim 的请求仍在");
+  assert.equal(c.pendingIntent(), "close");
   assert.equal(c.completeExecution(fresh.claimId), true);
 });
 
 test("A/B→Stay 反例仍然通过：旧回包不关窗", async () => {
-  const env = makeExecutionEnv();
+  const env = makeDriverEnv();
   const c = env.coordinator;
   const release = deferred();
-  env.deps.releaseExitGuard = () => release.promise;
+  env.setRelease(() => release.promise);
   c.beginWrite("wt-a");
   c.request("exit");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  const claimed = c.claimExecution();
-  const running = runCloseExecution(env.deps, claimed);
+  env.driver.notifyStateChanged();
   c.beginWrite("wt-b");
-  c.request("close");
-  c.resolveAsk("stay");
+  env.driver.handleRequest("close");
+  env.driver.handleChoice("stay");
   release.resolve();
-  await running;
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(env.native, [], "Stay 后不得关窗");
+});
+
+// ---------------- 整批 B07：共享生产驱动（App 实际调用它） ----------------
+
+/** 与 App 同构的驱动环境：可注入 deferred 的 IPC / native 适配层。 */
+function makeDriverEnv() {
+  const coordinator = new CloseCoordinator();
+  const native = [];          // 真实投递记录
+  const errors = [];
+  const asked = [];
+  const settled = [];
+  let releaseImpl = async () => {};
+  let nativeImpl = async (intent) => { native.push(intent); return "delivered"; };
+  const driver = new CloseDriver({
+    coordinator,
+    releaseExitGuard: () => releaseImpl(),
+    performNative: (intent, claimId) => nativeImpl(intent, claimId),
+    onError: (error) => errors.push(error),
+    onAsk: (intent, writing, pending) => asked.push({ intent, writing, pending }),
+    onSettled: () => settled.push(true),
+  });
+  return {
+    coordinator, driver, native, errors, asked, settled,
+    setRelease(fn) { releaseImpl = fn; },
+    setNative(fn) { nativeImpl = fn; },
+  };
+}
+
+test("B07-1：执行中重复请求不递归、不多发（ST-B07-08-1 / SP-B07-08-1）", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  const release = deferred();
+  env.setRelease(() => release.promise);
+  c.beginWrite("wt-a");
+  // 第一次请求：A 在途 → 询问。
+  const first = env.driver.handleRequest("exit");
+  assert.equal(first.kind, "ask");
+  // 用户选等待，但 A 仍在途 → 继续等待。
+  env.driver.handleChoice("wait");
+  assert.equal(env.driver.currentPhase(), "asking");
+  // A 结束 → 进入 executing（release 挂起）。
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  assert.equal(env.driver.currentPhase(), "executing");
+  // B 开始并先结束；重复 reconcile / 重复原生退出事件。
+  c.beginWrite("wt-b");
+  c.endWrite("wt-b");
+  for (let i = 0; i < 20; i += 1) env.driver.notifyStateChanged();
+  for (let i = 0; i < 20; i += 1) env.driver.handleRequest("exit");
+  assert.equal(env.native.length, 0, "release 还没回，不能投递");
+  // 释放后只投递一次。
+  release.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(env.native.length, 1, "只投递一次，无递归重入");
+});
+
+test("B07-2：delivered 后等待裁决，不自动重投（ST-B07-08-2）", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  const effect = env.driver.notifyStateChanged();
+  assert.equal(effect.kind, "none");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.length, 1, "投递一次");
+  assert.equal(env.driver.currentPhase(), "awaitingVerdict", "进入等待裁决");
+  // 反复 reconcile/请求都不再投递。
+  for (let i = 0; i < 10; i += 1) env.driver.notifyStateChanged();
+  for (let i = 0; i < 10; i += 1) env.driver.handleRequest("close");
+  await Promise.resolve();
+  assert.equal(env.native.length, 1, "等待裁决期间不得重复投递");
+});
+
+test("B07-2：裁决放行后才清账，且只清一次", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(c.pendingIntent(), "close", "投递后仍保留");
+  env.driver.handleNativeVerdict();
+  assert.equal(c.pendingIntent(), null, "裁决后才清账");
+  assert.equal(env.driver.currentPhase(), "idle");
+});
+
+test("B07-2：投递后被新写入拦住，B 结束后按原 exit 继续（不改成 close）", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.driver.currentPhase(), "awaitingVerdict");
+  // B 开始写 → 关闭事件被拦。
+  c.beginWrite("wt-b");
+  const blocked = env.driver.handleVerdictBlocked();
+  assert.equal(blocked.kind, "ask", "被拦住 → 展示询问");
+  assert.equal(c.pendingIntent(), "exit", "原动作仍是 exit");
+  // B 结束：按原动作继续。
+  c.endWrite("wt-b");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.filter((n) => n === "exit").length >= 1, true);
+  assert.equal(env.native.filter((n) => n === "close").length, 0, "不能被改成 close");
+});
+
+test("B07-3：Stay 后旧原生事件不当作新意图（ST-B07-08-3）", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  const release = deferred();
+  env.setRelease(() => release.promise);
+  // A 写期间 Quit→Wait，投递前 release 挂起。
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  // 用户启动 B，再次请求关闭并 Stay。
+  c.beginWrite("wt-b");
+  env.driver.handleRequest("close");
+  env.driver.handleChoice("stay");
+  // 旧 release 现在才回。
+  release.resolve();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.native.length, 0, "Stay 后旧执行不得投递");
+  // B 结束，旧原生事件（若有）也不能当新请求。
+  c.endWrite("wt-b");
+  env.driver.handleNativeVerdict();      // 没有在途投递 → 忽略
+  assert.equal(c.pendingIntent(), null, "不得因旧事件关闭窗口");
+  // 真正的新用户请求仍可执行。
+  env.driver.handleRequest("close");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.ok(env.native.includes("close"), "新请求正常走驱动并投递");
+});
+
+test("B07：持续失败只自动一次，之后必须用户重新选择", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  let releaseCalls = 0;
+  env.setRelease(async () => { releaseCalls += 1; throw new Error("release 失败"); });
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(releaseCalls, 1, "只自动尝试一次");
+  assert.equal(env.errors.length, 1, "失败可见");
+  assert.equal(env.driver.currentPhase(), "asking", "回到询问等用户决定");
+  // 再次 reconcile 不重试。
+  env.driver.notifyStateChanged();
+  await Promise.resolve();
+  assert.equal(releaseCalls, 1, "不得无界自动重试");
+  // 用户再次选择等待 → 才重试。
+  env.setRelease(async () => { releaseCalls += 1; });
+  env.driver.handleChoice("wait");
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(releaseCalls, 2);
+});
+
+test("B07：失败后可以 Stay，不再自动执行", async () => {
+  const env = makeDriverEnv();
+  const c = env.coordinator;
+  env.setNative(async () => { throw new Error("native 失败"); });
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  env.driver.notifyStateChanged();
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(env.driver.currentPhase(), "asking");
+  env.driver.handleChoice("stay");
+  assert.equal(env.driver.currentPhase(), "idle");
+  assert.equal(c.pendingIntent(), null);
 });

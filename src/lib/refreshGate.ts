@@ -1541,3 +1541,278 @@ export async function runCloseExecution(
     return false;
   }
 }
+
+// ---------------- 关闭/退出的**共享生产驱动**（任务 08）----------------
+
+/** 驱动当前所处的阶段（诊断与测试用）。 */
+export type CloseDriverPhase =
+  | "idle"
+  /** 等待用户选择（等待完成 / 留在应用）。 */
+  | "asking"
+  /** 用户已选等待，仍有在途写或待核对。 */
+  | "waiting"
+  /** 正在执行原生动作（IPC 解除保护 / 投递 close）。 */
+  | "executing"
+  /** 原生动作已投递，等待原生裁决（CloseRequested）。 */
+  | "awaitingVerdict"
+  /** 已投递但被新写入拦住：等写入结束后按原动作继续。 */
+  | "blockedByWrites"
+  /** 执行失败：等用户重新明确选择。 */
+  | "failed";
+
+/** 一次请求/裁决在 UI 上的表现。 */
+export type CloseDriverEffect =
+  /** 什么都不做。 */
+  | { kind: "none" }
+  /** 展示询问（含当前真实在途/待核对集合与原动作）。 */
+  | { kind: "ask"; intent: CloseIntent; writing: string[]; pending: string[] }
+  /** 已执行完原生动作（不需要再展示询问）。 */
+  | { kind: "settled" };
+
+/**
+ * 关闭/退出的**唯一生产驱动**（任务 08，ST-B07-08-1..3）。
+ *
+ * App 只做 Tauri/React 适配：把原生事件、用户选择、写入结束交给它，
+ * 并把返回的 `CloseDriverEffect` 映射成 UI。所有状态机逻辑都在这里，
+ * Node 回归也驱动同一个类，只注入可控的 deferred IPC/native 适配层。
+ *
+ * 关键不变量：
+ * - **同步不重入**：`reconcile()` 在 executing/awaitingVerdict 阶段直接返回，
+ *   不会自调用；也没有定时自旋。
+ * - **一次投递一个在途裁决**：`delivered` 后进入 awaitingVerdict，
+ *   重复请求/reconcile 都不会再次投递。
+ * - **裁决与所有权关联**：每个原生投递带 `claimId`；Stay 或新请求会推进代际，
+ *   旧的原生事件因此被判为失效，不会当成新用户意图。
+ * - **失败停手**：`failed` 阶段不自动重试，必须用户重新选择。
+ */
+export interface CloseDriverDeps {
+  coordinator: CloseCoordinator;
+  /** 解除原生退出阻止（版本化 IPC，可挂起）。 */
+  releaseExitGuard: () => Promise<void>;
+  /**
+   * 投递原生关闭/退出。
+   *
+   * 返回 `"delivered"` 表示已投递、等原生裁决；`"completed"` 表示已确认完成。
+   */
+  performNative: (intent: CloseIntent, claimId: number) => Promise<"delivered" | "completed">;
+  /** 失败上报（可见）。 */
+  onError: (error: unknown) => void;
+  /** 展示询问。 */
+  onAsk: (intent: CloseIntent, writing: string[], pending: string[]) => void;
+  /** 清掉询问（已结算）。 */
+  onSettled: () => void;
+}
+
+export class CloseDriver {
+  private readonly deps: CloseDriverDeps;
+  private phase: CloseDriverPhase = "idle";
+  /** 正在执行的 claim（0 表示无）。 */
+  private inFlightClaim = 0;
+  /** 已投递、等待裁决的 claim（0 表示无）。 */
+  private pendingVerdictClaim = 0;
+
+  constructor(deps: CloseDriverDeps) {
+    this.deps = deps;
+  }
+
+  /** 当前阶段（诊断与测试用）。 */
+  currentPhase(): CloseDriverPhase {
+    return this.phase;
+  }
+
+  /** 是否有正在执行或等待裁决的原生动作。 */
+  hasInFlight(): boolean {
+    return this.inFlightClaim !== 0 || this.pendingVerdictClaim !== 0;
+  }
+
+  /**
+   * 收到一次关闭/退出请求（来自窗口关闭事件或原生退出通知）。
+   *
+   * 返回 UI 效果；调用方只需展示它，不再自行 reconcile。
+   */
+  handleRequest(intent: CloseIntent): CloseDriverEffect {
+    const coordinator = this.deps.coordinator;
+    // 已有在途原生动作（执行中或等待裁决）：这次事件不当作新的用户意图。
+    if (this.hasInFlight()) {
+      // 仍要让编排知道有新请求进来（可能推进代际使旧投递失效），但不重复投递。
+      coordinator.request(intent);
+      return { kind: "none" };
+    }
+    const decision = coordinator.request(intent);
+    if (decision.action === "proceed") {
+      // 无阻塞：这次请求即授权，立刻驱动执行。
+      return this.drive();
+    }
+    this.phase = "asking";
+    return {
+      kind: "ask",
+      intent: coordinator.pendingIntent() ?? intent,
+      writing: decision.writing,
+      pending: "pending" in decision ? decision.pending : [],
+    };
+  }
+
+  /** 用户的选择。 */
+  handleChoice(choice: CloseChoice): CloseDriverEffect {
+    const coordinator = this.deps.coordinator;
+    coordinator.resolveAsk(choice);
+    if (choice === "stay") {
+      this.phase = "idle";
+      return { kind: "settled" };
+    }
+    return this.drive();
+  }
+
+  /** 待核对已核对完成并选择继续。 */
+  handlePendingContinue(): CloseDriverEffect {
+    this.deps.coordinator.confirmPendingContinue();
+    return this.drive();
+  }
+
+  /**
+   * 生命周期状态变化（写结束、rollback、待核对清除等）后调用。
+   *
+   * 在 executing/awaitingVerdict 阶段直接返回，避免同步重入与重复投递。
+   */
+  notifyStateChanged(): CloseDriverEffect {
+    if (this.phase === "executing" || this.phase === "awaitingVerdict") {
+      return { kind: "none" };
+    }
+    return this.drive();
+  }
+
+  /**
+   * 原生裁决：窗口即将真正关闭（`CloseRequested` 未被阻止）。
+   *
+   * 只有**当前在途投递**的裁决才清账；Stay 之后到达的旧事件直接忽略。
+   */
+  handleNativeVerdict(): void {
+    const coordinator = this.deps.coordinator;
+    if (this.pendingVerdictClaim === 0) {
+      // 没有我们发起的投递：这是与关闭保护无关的原生事件，不当作新意图。
+      return;
+    }
+    const claimId = this.pendingVerdictClaim;
+    this.pendingVerdictClaim = 0;
+    coordinator.completeExecution(claimId) || coordinator.completeVerdict();
+    this.phase = "idle";
+    this.deps.onSettled();
+  }
+
+  /**
+   * 关闭事件被阻止（有在途写/待核对）：保留原动作，等写入结束后继续。
+   */
+  handleVerdictBlocked(): CloseDriverEffect {
+    if (this.pendingVerdictClaim !== 0) {
+      const claimId = this.pendingVerdictClaim;
+      this.pendingVerdictClaim = 0;
+      this.deps.coordinator.releaseClaimAwaitingVerdict(claimId);
+    }
+    this.phase = "blockedByWrites";
+    return this.drive();
+  }
+
+  /** 真正的状态机。 */
+  private drive(): CloseDriverEffect {
+    // 同步不重入：执行中/等待裁决时什么都不做。
+    if (this.phase === "executing" || this.phase === "awaitingVerdict") {
+      return { kind: "none" };
+    }
+    const coordinator = this.deps.coordinator;
+    const decision = coordinator.reconcile();
+    if (decision.kind === "ask") {
+      this.phase = "asking";
+      this.deps.onAsk(decision.intent, decision.writing, decision.pending);
+      return {
+        kind: "ask",
+        intent: decision.intent,
+        writing: decision.writing,
+        pending: decision.pending,
+      };
+    }
+    if (decision.kind === "none") {
+      this.phase = "idle";
+      this.deps.onSettled();
+      return { kind: "settled" };
+    }
+    const claimed = coordinator.claimExecution();
+    if (!claimed) {
+      // 已有 claim 在执行（不应发生，因为前面已排除 executing）：
+      // 稳定地保持"等待中"，绝不递归重试。
+      this.phase = "waiting";
+      return { kind: "none" };
+    }
+    this.inFlightClaim = claimed.claimId;
+    this.phase = "executing";
+    void this.execute(claimed);
+    return { kind: "none" };
+  }
+
+  private async execute(claimed: {
+    intent: CloseIntent;
+    generation: number;
+    claimId: number;
+  }): Promise<void> {
+    const coordinator = this.deps.coordinator;
+    try {
+      if (claimed.intent === "exit") {
+        await this.deps.releaseExitGuard();
+        if (!coordinator.isExecutionValid(claimed.generation)) {
+          coordinator.abandonExecution(claimed.claimId);
+          this.inFlightClaim = 0;
+          this.afterExecution();
+          return;
+        }
+      }
+      if (!coordinator.isExecutionValid(claimed.generation)) {
+        coordinator.abandonExecution(claimed.claimId);
+        this.inFlightClaim = 0;
+        this.afterExecution();
+        return;
+      }
+      const delivered = await this.deps.performNative(claimed.intent, claimed.claimId);
+      this.inFlightClaim = 0;
+      if (delivered === "completed") {
+        coordinator.completeExecution(claimed.claimId);
+        this.phase = "idle";
+        this.deps.onSettled();
+        return;
+      }
+      // 已投递：进入等待裁决，**不再**立即 reconcile（否则会重复投递）。
+      this.pendingVerdictClaim = claimed.claimId;
+      this.phase = "awaitingVerdict";
+    } catch (error) {
+      this.inFlightClaim = 0;
+      coordinator.failExecution(claimed.claimId);
+      this.phase = "failed";
+      this.deps.onError(error);
+      // 失败后展示询问（等待/重试 或 留在应用），由用户决定。
+      const intent = coordinator.pendingIntent();
+      if (intent !== null) {
+        this.phase = "asking";
+        this.deps.onAsk(intent, coordinator.writingWorktrees(), coordinator.pendingWorktrees());
+      } else {
+        this.deps.onSettled();
+      }
+    }
+  }
+
+  /** 执行被放弃（代际失效）后：按真实状态继续等待或结算。 */
+  private afterExecution(): void {
+    const coordinator = this.deps.coordinator;
+    const decision = coordinator.reconcile();
+    if (decision.kind === "ask") {
+      this.phase = "asking";
+      this.deps.onAsk(decision.intent, decision.writing, decision.pending);
+      return;
+    }
+    if (decision.kind === "proceed") {
+      // 授权仍有效（例如 B 已结束）：继续执行原动作。
+      this.phase = "waiting";
+      void this.drive();
+      return;
+    }
+    this.phase = "idle";
+    this.deps.onSettled();
+  }
+}

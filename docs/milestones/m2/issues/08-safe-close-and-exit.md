@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -675,3 +675,89 @@ App 只 `reconcile()` 就得到 `none`，Quit 被吞。
 统计：Standards3、最高P1、建议0；Spec1、最高P1、范围扩张0。保持轴独立，不将相关项合并或放大计数。前轮立即Quit丢请求、失败后保留自动授权的直接路径已有静态闭合；Rust真实生产接收端保持闭合。
 
 **证据边界**：六条检查退出0，Node165/Rust exit_guard3/tsc/lint/build/diff-check；79份受测源码检查前/后/固定提交/当前磁盘SHA一致，未重跑。新增回归仍用计数型reconcile和fake native，没有驱动App请求→执行→重入→裁决完整链，不能替代真实接线。下一轮必须让App与测试共用完整生产驱动，只注入环境适配，不在测试补生产调用。检查/双轴原件见[第六轮记录](../batch06-repair-validation.md)和[清单](../evidence/batch06-repair/manifest.json)。08回ready-for-agent，未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
+
+### 2026-10-25 / Pi 实现：整批 B07 返修（App 真实共享关闭驱动）
+
+起点 `332097b`（生产 `ff6ba78`），实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`。
+逐项修 ST-B07-08-1..3 / SP-B07-08-1。
+
+#### App 现在实际调用的共享驱动
+
+新增 **`CloseDriver`**（`src/lib/refreshGate.ts`），App 的 `closeDriverRef` 就是它的实例：
+
+| App 位置 | 调用的驱动入口 |
+| --- | --- |
+| `onCloseRequested` 原生关闭事件 | `handleRequest("close")` / `hasInFlight()` / `handleNativeVerdict()` |
+| `revia://exit-requested` 原生退出事件 | `handleRequest("exit")` |
+| 写结束、rollback、待核对清除 | `notifyStateChanged()` |
+| 对话框「等待」/「留在应用」 | `handleChoice("wait" / "stay")` |
+| 待核对核对完成 | `handlePendingContinue()` |
+| 关闭事件被在途写拦住 | `handleVerdictBlocked()` |
+
+App 只做 Tauri/React 适配：把 `CloseDriverEffect` 映射成对话框状态。**不再**在 App 里
+自己判断 claim/代际。`runCloseExecution` 已删除（其逻辑并入驱动）。
+
+#### ST-B07-08-1 / SP-B07-08-1（排他 claim 与同步递归，P1）
+
+根因：`claimExecution()` 返回 `null` 时 App 立即 `reconcile()`，状态不变 → 无限同步递归 + IPC 风暴。
+
+驱动引入明确阶段 `idle / asking / waiting / executing / awaitingVerdict / blockedByWrites / failed`：
+
+- `drive()` 在 `executing` / `awaitingVerdict` 阶段**直接返回**，不自调用；
+- claim 失败时置 `waiting` 并返回，**不递归**；
+- 没有任何定时器自旋。
+
+回归 `B07-1：执行中重复请求不递归、不多发`：release 挂起期间 20 次
+`notifyStateChanged()` + 20 次 `handleRequest()`，断言 release 未回时投递数为 0，
+释放后**只投递一次**。
+
+#### ST-B07-08-2（delivered 后自动重投，P2）
+
+`"delivered"` 后进入 `awaitingVerdict` 并设 `pendingVerdictClaim`，
+**不再**立即 `reconcile()`。等待裁决期间重复请求/reconcile 都不投递。
+
+回归 `B07-2：delivered 后等待裁决，不自动重投`（10 次 reconcile + 10 次请求后仍只有 1 次投递）、
+`B07-2：裁决放行后才清账`、`B07-2：投递后被新写入拦住，B 结束后按原 exit 继续（不改成 close）`。
+
+#### ST-B07-08-3（旧原生投递越过 Stay，P2）
+
+驱动把原生投递与裁决**与请求所有权关联**：
+
+- `handleNativeVerdict()` 只对**当前在途投递**（`pendingVerdictClaim`）生效，
+  否则直接忽略——Stay 之后到达的旧 `CloseRequested` 不会被当成新用户意图；
+- `handleVerdictBlocked()` 释放该 claim 但保留授权与原请求，进入 `blockedByWrites`；
+- 真正的新请求（无在途投递时）仍正常走 `handleRequest` 并投递。
+
+回归 `B07-3：Stay 后旧原生事件不当作新意图`：A Quit→Wait、release 挂起、B 开始、
+再次请求 + Stay、旧 release 回 → 投递数为 0；随后 `handleNativeVerdict()` 被忽略；
+新请求仍能正常投递。
+
+#### 其余回归
+
+`B07：持续失败只自动一次，之后必须用户重新选择`（release 持续失败：1 次尝试、可见错误、
+phase 回到 `asking`、5 次通知不重试、用户再次 Wait 才重试）、
+`B07：失败后可以 Stay`。B05/B06 的既有用例改为驱动 `CloseDriver`，
+语义不变（旧回包越过 Stay、投递后 B 拦截、裁决放行才清账、旧 claim 不清新 claim、
+A/B→Stay 反例等）。
+
+#### 检查（唯一日志目录）
+
+`/private/tmp/revia-b07-opWp3M`（`record.py` 执行时逐条记录真实 argv/cwd/显式非敏感环境/start/end/exit/stdout/stderr；
+`tested-source-sha256-before/-after.txt` 覆盖 79 个受测源文件，排除 `src/types/bindings`、
+`src-tauri/gen`、`dist`、`target`、验收原件与文档）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 172 / pass 172 / fail 0 |
+| `git diff --check` | 0 | — |
+
+79 份受测源码 SHA 前后逐份一致。本轮未改 Rust 生产代码，未重跑 Rust 测试。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 实际拦截与裁决、close 投递后 B 拦截的真实时序、
+  Stay 后旧原生事件的实际到达顺序、失败后 Stay 的观感，均需规划方在固定 Release 上验收。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。

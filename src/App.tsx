@@ -37,7 +37,8 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
-import { CloseCoordinator, CloseGuardGate, ExitGuardSync, runCloseExecution, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
+import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
+import type { CloseDriverEffect } from "@/lib/refreshGate";
 import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
 import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
@@ -771,15 +772,27 @@ export function App() {
       let exitGuard = false;
       try {
         const stop = await getCurrentWindow().onCloseRequested(async (event) => {
-          const coordinator = closeCoordinatorRef.current;
-          const decision = coordinator.request("close");
-          if (decision.action === "proceed") {
-            // 原生裁决：窗口即将真正关闭，此时才清账。
-            coordinator.completeVerdict();
+          const driver = closeDriverRef.current;
+          if (!driver) return;
+          // 已有我们发起的投递在等裁决：这是**那次投递**的裁决事件。
+          if (driver.hasInFlight()) {
+            const coordinator = closeCoordinatorRef.current;
+            if (coordinator.needsExitGuard()) {
+              // 有在途写/待核对：拦住关闭，保留原动作。
+              event.preventDefault();
+              if (!disposed) closeBlockedRef.current?.();
+              return;
+            }
+            // 无阻塞：原生裁决放行，只有当前在途投递才清账。
+            driver.handleNativeVerdict();
             return;
           }
-          event.preventDefault();
-          if (!disposed) reconcileCloseRef.current?.();
+          // 不是我们发起的投递：按新用户请求处理。
+          const effect = driver.handleRequest("close");
+          if (effect.kind === "ask" || driver.hasInFlight()) {
+            event.preventDefault();
+          }
+          if (!disposed) applyEffectRef.current?.(effect);
         });
         if (disposed) stop(); else stops.push(stop);
         windowGuard = true;
@@ -790,12 +803,9 @@ export function App() {
         // 原生退出：Rust 已阻止退出并通知前端，这里按同一套编排询问用户。
         const stop = await listen("revia://exit-requested", () => {
           if (disposed) return;
-          const decision = closeCoordinatorRef.current.request("exit");
-          if (decision.action === "proceed") {
-            reconcileCloseRef.current?.();
-            return;
-          }
-          reconcileCloseRef.current?.();
+          const driver = closeDriverRef.current;
+          if (!driver) return;
+          applyEffectRef.current?.(driver.handleRequest("exit"));
         });
         if (disposed) stop(); else stops.push(stop);
         exitGuard = true;
@@ -820,6 +830,9 @@ export function App() {
   }, []);
 
   /** 执行关闭/退出的入口（供原生退出事件复用，避免定义顺序问题）。 */
+  /** 驱动的转发：监听回调早于驱动定义注册。 */
+  const applyEffectRef = useRef<((effect: CloseDriverEffect) => void) | null>(null);
+  const closeBlockedRef = useRef<(() => void) | null>(null);
   /** reconcile 的转发（供监听回调与关闭执行共用，避免定义顺序问题）。 */
 
   // ---------------- 添加仓库 ----------------
@@ -1101,67 +1114,67 @@ export function App() {
   }, []);
 
   /**
-   * 执行原生关闭/退出（任务 08，ST-B05-08-1）。
+   * 关闭/退出的**共享生产驱动**适配（任务 08，ST-B07-08-1..3）。
    *
-   * 代际与所有权判断全部在共享入口 `runCloseExecution` 里，App 与 Node 回归同源。
+   * 状态机全部在 `CloseDriver` 里；App 只把它的 `CloseDriverEffect`
+   * 映射成对话框与原生动作。Node 回归驱动同一个类。
    */
-  const performCloseIntent = useCallback(async (
-    claimed: { intent: CloseIntent; generation: number; claimId: number },
-  ) => {
-    await runCloseExecution({
+  const closeDriverRef = useRef<CloseDriver | null>(null);
+  if (closeDriverRef.current === null) {
+    closeDriverRef.current = new CloseDriver({
       coordinator: closeCoordinatorRef.current,
       releaseExitGuard: () => syncExitBlocked(false),
-      // Tauri `close()` 只投递 CloseRequested，不确认窗口销毁：
-      // 因此返回 "delivered"，真正的清账由原生裁决（关闭事件被放行）决定。
+      // Tauri `close()` 只投递 CloseRequested，不确认销毁 → "delivered"。
       performNative: async () => {
         await getCurrentWindow().close();
-        return "delivered" as const;
+        return "delivered";
       },
-      reconcile: () => reconcileCloseRef.current?.(),
       onError: (caught) => setAppError(toAppError(caught), null),
-    }, claimed);
-  }, [setAppError, syncExitBlocked]);
-
-  /**
-   * 统一收尾：所有生命周期事件都走这里（任务 08）。
-   *
-   * 写结束、晚点 Wait、保护 begin 失败回滚、另存收尾、待核对成功/失败、
-   * Stay、重复请求——全部调用同一个 `reconcile()`，由它决定：
-   * 执行**被保留的原请求** / 展示询问（含当前真实集合）/ 什么都不做。
-   */
-  const reconcileClose = useCallback(() => {
-    const coordinator = closeCoordinatorRef.current;
-    // 保护标志按真实状态同步（在途写或待核对都需要阻止退出）。
-    void syncExitBlocked(coordinator.needsExitGuard()).catch((caught) => {
-      setAppError(toAppError(caught), null);
+      onAsk: (intent, writing, pending) => {
+        closeIntentRef.current = intent;
+        setCloseRequest(
+          pending.length > 0 ? { action: "showPending", writing, pending } : { action: "ask", writing },
+        );
+      },
+      onSettled: () => setCloseRequest(null),
     });
-    const decision = coordinator.reconcile();
-    if (decision.kind === "proceed") {
-      // 认领所有权；认领失败（条件已变）就回到等待，不执行原生动作。
-      const claimed = coordinator.claimExecution();
-      if (!claimed) {
-        reconcileCloseRef.current?.();
-        return;
-      }
-      setCloseRequest(null);
-      void performCloseIntent(claimed);
-      return;
-    }
-    if (decision.kind === "ask") {
-      // 动作取自**被保留的原请求**，不是 last-event ref（ST-B03-08-7）。
-      closeIntentRef.current = decision.intent;
+  }
+  const closeDriver = closeDriverRef.current;
+
+  /** 把驱动返回的效果落到 React 状态（驱动内部已调用 onAsk/onSettled）。 */
+  const applyEffect = useCallback((effect: CloseDriverEffect) => {
+    if (effect.kind === "none") return;
+    if (effect.kind === "ask") {
+      closeIntentRef.current = effect.intent;
       setCloseRequest(
-        decision.pending.length > 0
-          ? { action: "showPending", writing: decision.writing, pending: decision.pending }
-          : { action: "ask", writing: decision.writing },
+        effect.pending.length > 0
+          ? { action: "showPending", writing: effect.writing, pending: effect.pending }
+          : { action: "ask", writing: effect.writing },
       );
       return;
     }
     setCloseRequest(null);
-  }, [performCloseIntent, syncExitBlocked]);
+  }, []);
 
-  // 监听回调通过 ref 到达同一编排入口。
+  /**
+   * 生命周期状态变化后通知驱动（写结束、rollback、待核对清除等）。
+   *
+   * 驱动在 executing/awaitingVerdict 阶段直接返回，不会同步重入。
+   */
+  const reconcileClose = useCallback(() => {
+    const coordinator = closeCoordinatorRef.current;
+    void syncExitBlocked(coordinator.needsExitGuard()).catch((caught) => {
+      setAppError(toAppError(caught), null);
+    });
+    applyEffect(closeDriver.notifyStateChanged());
+  }, [applyEffect, closeDriver, syncExitBlocked]);
+
+  // 监听回调通过 ref 到达同一驱动。
   reconcileCloseRef.current = reconcileClose;
+  applyEffectRef.current = applyEffect;
+  closeBlockedRef.current = () => {
+    applyEffect(closeDriver.handleVerdictBlocked());
+  };
 
   /**
    * 三个写入口共用的**共享异步编排**（任务 08）。
@@ -2748,15 +2761,12 @@ export function App() {
           writing={closeRequest.writing}
           pending={"pending" in closeRequest ? closeRequest.pending : []}
           onWait={() => {
-            // 用户明确选择「等待」：授权原动作，然后**立刻** reconcile。
-            // 写入可能早已结束，此时 reconcile 会直接执行原请求（ST-B03-08-3）。
-            closeCoordinatorRef.current.resolveAsk("wait");
-            reconcileClose();
+            // 用户明确选择「等待」：交给共享驱动（可能立刻执行，也可能继续等待）。
+            applyEffect(closeDriver.handleChoice("wait"));
           }}
           onStay={() => {
-            // 留在应用：清掉请求与授权并推进请求代际，使在途核对回调失效。
-            closeCoordinatorRef.current.resolveAsk("stay");
-            setCloseRequest(null);
+            // 留在应用：驱动清掉请求与授权并推进代际，在途旧投递/核对失效。
+            applyEffect(closeDriver.handleChoice("stay"));
           }}
           onPendingReviewed={() => {
             // 待核对闭环：捕获**请求代际**与每个目标的**待核对代际**，
@@ -2794,8 +2804,7 @@ export function App() {
                 reconcileClose();
                 return;
               }
-              coordinator.confirmPendingContinue();
-              reconcileClose();
+              applyEffect(closeDriver.handlePendingContinue());
             })();
           }}
         />
