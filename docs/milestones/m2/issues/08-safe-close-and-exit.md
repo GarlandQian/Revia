@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -562,3 +562,23 @@ Possible Duplicated Code判断建议1项：上述重复版本算法易漂移，�
 - **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 实际拦截、Stay 后不关窗的真实观感、
   待核对闭环流程，均需规划方在固定 Release 上验收。
 - 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。
+
+### 2026-10-25 / 规划方：013e1fa 第五轮限定复核，仍不通过
+
+固定 `git diff 1dd509ab476a9f279a23074368ec46177b566fb7...013e1fa631c82e99948efa4d3339e1a79103bad7`，唯一提交、5文件。两个独立轴分开计数；行号对应013e1fa。
+
+#### Standards：确定违反3项（P2三项），Fowler判断建议0项
+
+1. **ST-B06-08-1 / P2 / 正常Quit被吞掉**：`refreshGate.ts:1152`无writing/pending时清requested/auth并返回proceed；但`App.tsx:790`只reconcile，得到none。Rust拦住Quit后，A先结束、JS事件后执行，就丢此次原退出。违反`technical-direction.md:56` Q96“完成并记录结果后执行用户原请求”。原生退出事件与request/proceed契约需一致。
+2. **ST-B06-08-2 / P2 / 失败后无界自动重试**：`refreshGate.ts:1478`catch保留授权并调用App真实reconcile，`App.tsx:1128`再次claim执行。release/native IPC持续失败时反复执行、隐藏询问，无法回到可控Stay。违反Q96等待/留在应用闭环。失败必须可见，等待用户决定，不自动重复。
+3. **ST-B06-08-3 / P2 / 投递关闭回包误当完成**：`App.tsx:1109`的Tauri close只投递CloseRequested；`refreshGate.ts:1472`回包就complete清授权。期间B开始写并拦截关闭：事件先到则保留请求后被complete清，回包先到则原exit可变close。违反Q96保留在途写/执行原动作。区分原生请求投递与最终关闭裁决；相关所有权需排他且旧claim不能清新claim，不能仅按requestGeneration校验。App的claim失败分支目前递归reconcile，修排他时一起避免同步重入。
+
+#### Spec：缺失/部分1项、实现错误2项（P2三项），范围扩张0项
+
+1. **SP-B06-08-1 / P2 / 原生退出立即放行丢请求**：`App.tsx:790`与`refreshGate.ts:1152`，写结束先于退出事件回调时，request清账后reconcile无动作。违反`spec.md:127`“执行原关闭／退出请求”。
+2. **SP-B06-08-2 / P2 / 关闭失败不能留在应用**：`refreshGate.ts:1478`与`App.tsx:1131`，失败立即回授权循环，用户没有Wait/Stay询问。违反`spec.md:126`的两个选择。
+3. **SP-B06-08-3 / P2 / 原生投递未确认最终放行**：`App.tsx:1109/776`与`refreshGate.ts:1472`，关闭事件因B被拦而成功回包仍消费原exit；B结束不再退出或变close。违反`spec.md:127`执行原请求、不擅自变动作。
+
+统计：Standards3、最严重P2、判断建议0；Spec3、最严重P2、范围扩张0。两个轴不合并计数。Rust生产`ExitGuard`与测试共用、旧release await后Stay校验已有静态改善，不再重复计旧项。
+
+**检查与证据边界**：六条实际调用均退出0（Node156、Rust exit_guard3、tsc/lint/build/diff-check）；79份受测源码检查前/后/固定提交/当前磁盘SHA全部一致，未重复运行测试。`invocations.json`保留真实argv/cwd、显式非敏感环境覆盖与时间；不声称完整继承环境。Pi报告的敏感性2失败/1通过未附原始修改源码/失败日志，仅作实施方报告，不算独立核验。新增Node用例中reconcile仅计数、native仅记录，尚不能证明真实App重入/原生回调闭环。见[检查记录](../batch05-repair-validation.md)与[清单](../evidence/batch05-repair/manifest.json)。08改回ready-for-agent；整批交原Pi，未新Release/GUI/D06/CI/长测/推送/合并，10/11/M2未完成。
