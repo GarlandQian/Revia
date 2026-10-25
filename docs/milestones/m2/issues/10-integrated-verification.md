@@ -260,3 +260,14 @@ HEAD 与工作树状态在检查前后未变（`head.txt`/`head-after.txt`、`st
 未重跑全量 Rust/无关 Node，未做 GUI/Release/D06/CI/长测。
 
 **Status 保持 ready-for-agent**，等待双轴复核。
+
+
+### 2026-10-25 / Codex：Q98 留证第一轮双轴未通过，统一返修
+
+固定`1849ff8...0a2d842`：**Standards 2项P2，Spec 5项（2项P1、3项P2）**，两轴独立计数；完整发现与返修范围见[审查记录](../q98-evidence-review01.md)。后补`5e9b862`仅改检查原件说明，ST-Q98-2已实质闭合；“原始流只在会话内”仍应精确为“会话仅有过滤摘要，完整原始流未留存”。其余源码问题未修，不回写原审查为零发现。
+
+必须一批修复：ST-Q98-1回归真实生产入口；SP-Q98-1增量缺失/损坏/重复/跨运行/未闭合必须进入最终失败资格；SP-Q98-2最终报告缺checkpoint不得借增量获得权威Q98通过；SP-Q98-3清理尝试/返回/异常逐步留证并保留汇总；SP-Q98-4解析错误保留已取得部分候选；SP-Q98-5补齐ps/notifyutil调用与timeout原始输出。不得只改报告或复制生产分支到测试里假覆盖。
+
+规划方已核后补5条原始检查exit0（Python32、tsc、lint、build、固定diff-check），代码hash匹配0a2d842；真实main的隔离mock复现仍证明误判通过与丢证缺口。原件[manifest](../evidence/q98-evidence-review01/manifest.json)区分初次缺件、后补实测、重建复现脚本与单独复跑，不覆盖历史。
+
+保持`ready-for-agent`。继续原Pi/当前DeepSeek按上述范围修完再集中最小验证，新增提交后复核；审查失败不算渠道错误，不触发换模。不运行新Release/GUI/CI/长测、不改Q98阈值/暖机/负载、不猜测性改Rust缓存。M2未通过、未合main、未启动M3。
