@@ -237,9 +237,26 @@ m2-ui→m2快进已完成。实际Release仍来自2a51b160；d952测试修复、
 存活分配与 allocator 高水位，本轮**未**改缓存/分配策略、未挑首点、未延长暖机、
 未减少负载、未用同阶段样本替代常规样本。
 
-**检查**（一次集中运行，原件 `/private/tmp/revia-q98-evidence-repair.Qvsbwg`）：
-`python3 tools/test_bench_long_running.py` 32 passed、`pnpm exec tsc -b` 0、
-`pnpm lint` 0（仅既存 warning）、`pnpm build` 0、`git diff --check` 0。
+**检查**（对已提交源码 `0a2d842` 的一次集中运行；每条命令的真实 argv/cwd/起止/
+退出码/完整 stdout+stderr 由 `record.py` 在**执行时**落盘，汇总在
+`final-checks-20261025-184247/invocations.json`）：
+
+| 命令 | 退出码 | 结果 | 原件 |
+| --- | --- | --- | --- |
+| `python3 tools/test_bench_long_running.py` | 0 | 32 passed | `01-python-unittest.*` |
+| `pnpm exec tsc -b` | 0 | — | `02-tsc.*` |
+| `pnpm lint` | 0 | 仅既存 warning | `03-lint.*` |
+| `pnpm build` | 0 | — | `04-build.*` |
+| `git diff --check HEAD~1 HEAD` | 0 | 无输出 | `05-diff-check.*` |
+
+受测源码 SHA-256 在检查前后与提交后三次一致（`tested-source-sha256-before/after.txt`），
+HEAD 与工作树状态在检查前后未变（`head.txt`/`head-after.txt`、`status-before/after.txt`），
+29 件原件逐份 SHA 见 `manifest.json`。
+
+**证据边界**：本轮更早一次同类检查的原始流只在会话内、未落盘，因此**不称其已留存**；
+上表为重跑后的真实原件，路径
+`/private/tmp/revia-q98-evidence-repair.Qvsbwg/final-checks-20261025-184247`。
+
 未重跑全量 Rust/无关 Node，未做 GUI/Release/D06/CI/长测。
 
 **Status 保持 ready-for-agent**，等待双轴复核。
