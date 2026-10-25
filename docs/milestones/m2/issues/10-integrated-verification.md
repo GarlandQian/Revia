@@ -187,3 +187,12 @@ gitlink/deinit/reinit 断言全部保留），但指出本任务交付记录有�
 历史失败与无效证据**全部保留未删**：根目录与 `run-final-ZUIsp1/` 的成功原件、
 `sensitivity/pre-fix.*`（无效对照）、`sensitivity/pre-fix-useconfigonly.*`（真实失败）。
 本轮未删除任何已有文件。
+
+
+### 2026-10-25 规划方：最新集成原件与 Q98 失败
+
+m2-ui→m2快进已完成。实际Release仍来自2a51b160；d952测试修复、f10证据更正和9434e7a模型决定不冒称新构建。最新[CI40174661706](https://github.com/GarlandQian/Revia/actions/runs/40174661706)对应f10，两端前端检查/完整Rust/Release编译成功：macOS271、Windows243通过，各0失败/1既有ignored。旧Windows失败、两轴发现和历史缺件边界保留。[矩阵](./10-integration-matrix.md)由Pi草稿按终态校正，104个不同代表性测试名已核源码存在，平台套件数不作各T编号数量。
+
+**Status保持ready-for-agent。** 最终Q98首轮78.54墙秒因2179ms帧间隔中断；第二轮1223.25墙秒因常规WebContent vmmap255中断，无最终frontend.json。18阶段即时检查/END均通过，但完整checkpoint缺失使最终无效；不能补造或改松。Rust现有34样本maxRise82MiB超过+10，负斜率不取消，缺setupSeconds的影响单列，不认定泄漏。
+
+已交原Pi按Q109首选GLM-5.3-Flash只读诊断，再评审最小修复；Rust振幅另行定位。不静默重试挑样本、不改暖机/阈值/负载、不拼接时长、不sudo采样。D06四组及两轮Q98见[最终测量](../final-measure-20261025.md)，其余归档见[B10记录](../batch10-repair-validation.md)。任务11/M2未通过，未合main，未启动M3。

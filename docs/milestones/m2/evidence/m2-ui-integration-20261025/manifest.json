@@ -1,0 +1,253 @@
+{
+  "createdAt": 1792913577.1707761,
+  "sourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+  "tree": "572064fb2c8859959ec4ffebc271c5b83c40550f",
+  "scope": "Fast-forward m2-ui into m2, preservation of main state, Q97 push, actual CI failure and repair handoff. Not M2 completion or desktop evidence.",
+  "commandsDescribedAfterExecution": [
+    {
+      "argv": [
+        "git",
+        "merge",
+        "--ff-only",
+        "--no-stat",
+        "m2-ui"
+      ],
+      "cwd": "/Users/garland/.codex/worktrees/m2-close-finish/Revia",
+      "exitFile": "merge.exit"
+    },
+    {
+      "argv": [
+        "git",
+        "push",
+        "origin",
+        "m2"
+      ],
+      "cwd": "/Users/garland/.codex/worktrees/m2-close-finish/Revia",
+      "exitFile": "push.exit"
+    }
+  ],
+  "limitations": [
+    "Command descriptions were added after execution; no original start/end/environment recorder existed for merge/push. Original stdout/stderr/exit files are retained unchanged.",
+    "The initial CI snapshot was in progress and remains preserved. The final snapshot records completed/failure, macOS success and Windows failure.",
+    "Windows failed in a fixture commit before the deinit behavior assertions; this is not a finding that the product submodule behavior failed.",
+    "No desktop/run02 files are included; they remain separate and unsealed."
+  ],
+  "files": [
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/before.json",
+      "stored": "original/before.json.gz",
+      "gzip": true,
+      "sourceBytes": 2880,
+      "storedBytes": 1303,
+      "sourceSha256": "8c1f69ee2a10dbb128f05cfcabc88fdc60acb2b700c0a9a00afeabedb1da2841",
+      "storedSha256": "435e98e055a429b9fd16137eaddff018b786733d8037c2716cef4e37bc774a38"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/after.json",
+      "stored": "original/after.json.gz",
+      "gzip": true,
+      "sourceBytes": 828,
+      "storedBytes": 387,
+      "sourceSha256": "b2f5ccf9e17a8472811ed49983c58c15b455dfea7d64de7d1588cc2a3600a84f",
+      "storedSha256": "f3fd69ff71f5a532ac30f5ecad85a7a43495e53f23e89ef3f0ad14b29a4d3da7"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/m2-status-before.bin",
+      "stored": "original/m2-status-before.bin.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/m2-status-after.bin",
+      "stored": "original/m2-status-after.bin.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/m2-ui-status-before.bin",
+      "stored": "original/m2-ui-status-before.bin.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/m2-ui-status-after.bin",
+      "stored": "original/m2-ui-status-after.bin.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/main-status-before.bin",
+      "stored": "original/main-status-before.bin.gz",
+      "gzip": true,
+      "sourceBytes": 704,
+      "storedBytes": 211,
+      "sourceSha256": "28dda7c789a5a95e3c1e18e18232e30a1f4a39b26c4e4219aaccd1c2c345c873",
+      "storedSha256": "5c66aeab7eeb527a69820f7d88a905c56b690cd79d9bdf796d524643b6c49402"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/main-status-after.bin",
+      "stored": "original/main-status-after.bin.gz",
+      "gzip": true,
+      "sourceBytes": 704,
+      "storedBytes": 211,
+      "sourceSha256": "28dda7c789a5a95e3c1e18e18232e30a1f4a39b26c4e4219aaccd1c2c345c873",
+      "storedSha256": "5c66aeab7eeb527a69820f7d88a905c56b690cd79d9bdf796d524643b6c49402"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/merge.stdout",
+      "stored": "original/merge.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 39,
+      "storedBytes": 59,
+      "sourceSha256": "88a8aa2032cf98ce7aaf4484fa41c962d3796bff5654e8cb70480579f5ecbf2d",
+      "storedSha256": "7b77a0624ba447971c9f5f0296309432d24c8fdf716c4ad31b5cfd81e6c55fc1"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/merge.stderr",
+      "stored": "original/merge.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/merge.exit",
+      "stored": "original/merge.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/push.stdout",
+      "stored": "original/push.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/push.stderr",
+      "stored": "original/push.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 66,
+      "storedBytes": 83,
+      "sourceSha256": "87fd36b2cbda324946cc9ba5db4102c4432b79f4af6c3c08226f64e8d575d40f",
+      "storedSha256": "6f9255d03cc497b1247f222efe160ae9cbc8a34b870b8f40728a46f10f39ff1b"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/push.exit",
+      "stored": "original/push.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/ci-run-40172283582-in-progress.json",
+      "stored": "original/ci-run-40172283582-in-progress.json.gz",
+      "gzip": true,
+      "sourceBytes": 6129,
+      "storedBytes": 807,
+      "sourceSha256": "dbcc39ccaeafe17ff98a28f2dde5bd260e17c81ba58a3a825f3fd2067f995834",
+      "storedSha256": "0c66ce5dcdff9425ee60811ad91c36e3c4e4feeb5d83e08f1209bbde807301b6"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/ci-read.stderr",
+      "stored": "original/ci-read.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/ci-read.exit",
+      "stored": "original/ci-read.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/ci-run-40172283582-final.json",
+      "stored": "original/ci-run-40172283582-final.json.gz",
+      "gzip": true,
+      "sourceBytes": 6139,
+      "storedBytes": 789,
+      "sourceSha256": "70bc6ebd41fc2ff484734a7898fb4a5f9784815c9e0f644202477e9c2a5891d9",
+      "storedSha256": "26aba78683e87df07a3a448e9d01dc014b5084cc2ec7c6ebc6fe343e41e58e72"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/ci-final-read.stderr",
+      "stored": "original/ci-final-read.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/ci-final-read.exit",
+      "stored": "original/ci-final-read.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/windows-job-121105479132.log",
+      "stored": "original/windows-job-121105479132.log.gz",
+      "gzip": true,
+      "sourceBytes": 121660,
+      "storedBytes": 21369,
+      "sourceSha256": "4e45728e6994ec67829050ce106df8a62b34e7e6c0c6195444cf256d6c4a6085",
+      "storedSha256": "c58768f3e3ed9e4d9a93d934773822511d6654ba678f5e07ad74a33743643d08"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/windows-log.stderr",
+      "stored": "original/windows-log.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/windows-log.exit",
+      "stored": "original/windows-log.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-m2-ui-merge-yk2t6656/pi-windows-fixture-repair.md",
+      "stored": "original/pi-windows-fixture-repair.md.gz",
+      "gzip": true,
+      "sourceBytes": 4092,
+      "storedBytes": 2616,
+      "sourceSha256": "fea9a323c681a360eedd092fa2d9e1416ab77be98239af2f0270d726f29ed931",
+      "storedSha256": "9db874a742de2a03b9767f4798039148461b1c807165ecef86e10543fc88762b"
+    }
+  ]
+}

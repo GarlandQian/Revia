@@ -1,0 +1,496 @@
+{
+  "mode": "sources-and-offline",
+  "manifestSha256": "eb034e7bc2673870b648968bb8da18387f3bb9f25d6002f695f9b0166fdcd844",
+  "fileCount": 97,
+  "passed": 97,
+  "failed": 0,
+  "errors": [],
+  "ok": true,
+  "results": [
+    {
+      "archivePath": "artifacts/run/cold-attempt01-note.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-attempt02-invocation.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-attempt02.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-attempt02.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-head-before.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-head-before.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-index-before.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-index-before.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-status-before.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold-status-before.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/cold.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/context.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split-exit.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split-launch.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-split.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified-exit.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified-launch.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-cold-unified.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split-exit.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split-launch.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split-scroll.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split-scroll.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-split.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified-exit.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified-launch.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified-scroll.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified-scroll.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/d06-standard-unified.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/fixture-invocations.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/fixture-snapshot-before-invocations.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/fixture.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/fixture.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/integration-source-before.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-activation.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-driver-exit.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-driver-launch.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-driver.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-driver.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-mid-observation.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-mid-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-mid-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-start-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02-start-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02.json.frontend.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02.json.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02.json.phase-samples.jsonl.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-attempt02.json.samples.jsonl.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-driver-exit.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-driver-launch.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-driver.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-driver.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-start-observation.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-start-ui.jpg.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98-start-ui.txt.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98.json.frontend.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98.json.frontend.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98.json.log.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98.json.phase-samples.jsonl.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/q98.json.samples.jsonl.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/standard-head-before.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/standard-head-before.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/standard-index-before.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/standard-index-before.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/standard-status-before.stderr.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/run/standard-status-before.stdout.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/d06/d06-review.md.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/d06/metrics.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt01/derive-facts.py.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt01/facts.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt01/report.md.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt02-code-path/facts.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt02-code-path/report.md.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt02-final/facts.json.gz",
+      "ok": true,
+      "errors": []
+    },
+    {
+      "archivePath": "artifacts/analysis/q98-attempt02-final/report.md.gz",
+      "ok": true,
+      "errors": []
+    }
+  ]
+}

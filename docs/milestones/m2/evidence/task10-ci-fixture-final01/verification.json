@@ -1,0 +1,22 @@
+{
+  "verifiedAtUtc": "2026-10-25T08:24:26.028851+00:00",
+  "archive": "/private/tmp/revia-ci-fixture-sealed.117aEx",
+  "manifestSha256": "0e8db78c6430b3609287b0d51a8fc6caa4b266f7a5de61c05e781dd98ddf2f81",
+  "verifiedOriginalFiles": 69,
+  "sourceComparisons": 69,
+  "gzipAndOriginalSha256Matches": 69,
+  "mismatches": [],
+  "rawBytes": 347640,
+  "gzipBytes": 72917,
+  "emptyOriginalFiles": 10,
+  "countsByGroup": {
+    "correction-dispatch": 1,
+    "documentation-correction": 10,
+    "final-local-run": 15,
+    "independent-review": 2,
+    "repair-records": 11,
+    "sensitivity": 8,
+    "terminal-ci": 22
+  },
+  "scope": "Static archive verification only; no product, CI, benchmark or GUI test was run."
+}

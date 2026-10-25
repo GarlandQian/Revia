@@ -96,3 +96,10 @@ Rust 265 通过/1 ignored、Node 178、Python 20，以及 bindings/tsc/lint/buil
 ### 2026-10-25 / 规划方：补验监视失败常驻提示（显式Rust接缝）
 
 沿用同一固定二进制，隔离普通进程PID48991，通过现有Rust `Acceptance.watch_failure`显式注入故障；真实浅色窗口的顶部/编辑器/状态栏提示与手动刷新入口可见，点击刷新后提示仍在。没有模拟IPC或产品Git写入，退出0、二进制/1960份跟踪文件SHA及fixture状态/index条目不变。详见[限定记录](../task13-desktop03.md)与[原件清单](../evidence/task13-desktop03/manifest.json)。未验证外部内容变化、写前校验或深色故障提示，不将本轮扩大为完整Q95/最终M2通过；其余门槛和不合并状态不变。
+
+
+### 2026-10-25 规划方：用户授权内部集成及最新状态
+
+按用户“m2-ui合并下，后续如果没问题，开始m3”，m2-ui已在2a51b160快进合入m2，未squash main。rev3/Q107外观不回退。浅深主界面、焦点隔离和异常局部截图保留；C05已补真实pending及核对关闭闭环，**没有因此补齐真实Rejected提示**。
+
+最新D06四组、标准首屏137/124ms与真冷文字4/3ms已取得；原统一18ms/false和首帧未全色仍保留。实际CI对应f10已两端通过，bundle仍来自2a51。Q98两轮均失败，内部合并不等同最终验收。字号增大/键盘与有限功能补验见[矩阵](./10-integration-matrix.md)，保持ready-for-human，不done。原件见[B10记录](../batch10-repair-validation.md)和[最终测量](../final-measure-20261025.md)。

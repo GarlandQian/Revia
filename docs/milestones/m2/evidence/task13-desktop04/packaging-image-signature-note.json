@@ -1,0 +1,197 @@
+{
+  "recordedAtUtc": "2026-10-25T07:55:21.709686+00:00",
+  "category": "new-packaging-incident-note-not-raw-tool-output",
+  "earlierAttemptDirectory": "/private/tmp/revia-b10-desktop-archive.RrBwDI",
+  "earlierManifestSha256": "53624913e21313c8be7e0e1d2dbab71f2904163d43d2a5577abd73d0a5cafb24",
+  "issue": "The first independent archive verifier assumed .png files had PNG magic and stopped at its first screenshot. A subsequent read-only signature inventory found all 31 .png-named screenshot originals have JPEG signatures.",
+  "scope": "The first packaging script had already copied and byte-roundtrip-compared all 1551 originals; its independent verifier had not completed. This is an archive validation assumption, not a product failure.",
+  "resolution": "Preserve source filenames and bytes unchanged. Record the detected image/jpeg media type and extension mismatch explicitly, then run corrected independent verification in a fresh temporary archive. Earlier attempt is retained without changes or deletion.",
+  "images": [
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/01-start-review-persisted.png",
+      "sourceSha256": "03f35416aa71307a2e2e743c64c29a1a83f665206191e808c3bec2f86f91aa55",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/02-stage-window-close-ask.png",
+      "sourceSha256": "e639ce8d1e85583c9cf590486c326b1680421d21700d8e134883cf9ed8878853",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/03-stage-released-still-open.png",
+      "sourceSha256": "1dc7ae0ef6e621360fcbbe70228a932ca29c55bacd27613f802a9db1cf80ace0",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/04-unstage-cmdq-ask.png",
+      "sourceSha256": "e4f40a92d7fea39abed44774a11e068705b248307c4ad688642b9c9766ffa00e",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/05-cmdq-stay-before-release.png",
+      "sourceSha256": "e2f918e10746f7bf1429af28cbd47536fc82f4cbd83b5754c532739879f84a3f",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/06-cmdq-stay-released-still-open.png",
+      "sourceSha256": "8839e164974016d417ffeca277b94ed5c07ba2e5a9b0a205a646302decc7f54c",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/08-menu-quit-ask.png",
+      "sourceSha256": "a44311be19583ff9a6a752f3d410aa43859f1d7b903442a89f75e35bf871754b",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/09-menu-wait-before-release.png",
+      "sourceSha256": "661540d9990e735ba756382449e53fca53f5f256288e5fb2ddf1be46155a4f0e",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/10-restart-persistence-shell-fallback.png",
+      "sourceSha256": "c69a2b39effab4aa32d58ec52ce5ae516a5ddebd80c7fdaadcb0d81205ad7517",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/11-hunk-recovery-ready.png",
+      "sourceSha256": "c194a7de8cfc4d20318cb822f0f60c8c7aac39abbb9e977a2f443b3755800686",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/12-restore-confirmation-awaiting-approval.png",
+      "sourceSha256": "981e72c0f989fc0cd776e6c498067d1941957b9149ef9b012e7d7143cd69396b",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/13-recovery-readonly-comparison.png",
+      "sourceSha256": "8bc57b04b9cb5544963d33c8da39bb00b983c75a087a376946f3ceca7da8a6a3",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/14-recovery-binary-information.png",
+      "sourceSha256": "6aae5bae96a0e359d703aa4bfa6cb8207888eb5243d32ed8f0deb2b7b305d7bc",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/15-binary-later-changes.png",
+      "sourceSha256": "c0a623e6694feda3dce4b3c5fe9bf50b5c4252fe697eab6146142f735c4a8e55",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/16-binary-later-changes-reread.png",
+      "sourceSha256": "15fc824c90b0b648dc0880e81046e0327d09dd36feb56b8edd8ee9db93d8f580",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/17-external-save-as-cmdq-ask.png",
+      "sourceSha256": "6f57aaef64d806ce3a546da8c4afdf1aa4057940eeb07ebc9f3c513761f3835f",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/18-external-save-as-stay-after-timeout.png",
+      "sourceSha256": "fbc195c67871cdef0d746aede56f62ac82a85bddfa0fc2fc754ea6f5238de29e",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/19-approved-restore-response-held.png",
+      "sourceSha256": "f15bfe79132df7109a8ab85eee8d09d37fb59cc4c3b112c99e065b6cbe7cb4c5",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/20-restore-wait-before-error-delivery.png",
+      "sourceSha256": "be825700f51d29f47d471ea6dd3d020b4ab207fa242934aaf2ae04784d30ec42",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/21-restore-needs-verification-blocks-close.png",
+      "sourceSha256": "fed7e965b73d069160c5ee6bcc12b4a3b5b7aacb48357f4eee638f5aab21fe4c",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/22-pending-stay-keeps-recovery-visible.png",
+      "sourceSha256": "87648feab23d316e351e9435dea45ccdc3f47c85ebb6cce36979b328060d3fc4",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-b10-vzc_he0k/desktop/ui/23-pending-close-awaiting-acknowledgement.png",
+      "sourceSha256": "d545bef780d7887bd16287bdd358cc0751f9360c3cb64dd44e61d9aa1306c9a0",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/01-initial.png",
+      "sourceSha256": "018c1ae7fbae15e1053090c4f60035a67800f2321e5ba6696abc14b3ba433e1b",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/02-partial-restored.png",
+      "sourceSha256": "a34749159dc3c8988fc5642213fc9329e90fafe0a11e6745535add186c1e7e47",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/03-review-newer-than-held-read.png",
+      "sourceSha256": "60398978a683489b523a4394b471f2cf670e3dad0df4c917549b7550e02c479c",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/04-review-after-old-read.png",
+      "sourceSha256": "759a1451da6535f5c32a093e6d43105a303fc1dd98f3ff4a24e1a225024e2b12",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/05-review-navigate-untracked.png",
+      "sourceSha256": "524441c96279cb3ebb70edf2a7dd895fff14b3614c38ae51a279f59b654e5f32",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/06-review-wrap-to-hunk.png",
+      "sourceSha256": "47b7700fd385ce8cc91c850bf1210054992e18e2693c737ca23ccddefc58917e",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/07-review-all-stays.png",
+      "sourceSha256": "233897f750c897bb97caa8a2f6d6204eba8ab7951a5c4bc1baa93764a1408ae5",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/12-close-stage-ask.png",
+      "sourceSha256": "11c4b602c0d2011be9c61c88cee5dd534a063dd23a79342c810f3767581e2419",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    },
+    {
+      "source": "/private/tmp/revia-m2-desktop-_2le4ddh/ui/15-stage-released-stays.png",
+      "sourceSha256": "a1748954b950b0b886f5fcf07f4141f44d95c13812f09dec34d9fa47d3af94be",
+      "originalSuffix": ".png",
+      "signatureMediaType": "image/jpeg"
+    }
+  ]
+}

@@ -1,0 +1,4650 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-25T16:49:29.857638+08:00",
+  "purpose": "Byte-preserving static archive; not a new measurement, rerun or acceptance verdict.",
+  "recommendedRepositoryPath": "docs/milestones/m2/evidence/final-measure-20261025/",
+  "versions": {
+    "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+    "measuredIntegrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+    "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+    "laterDocumentationOnlyCommit": "9434e7aa0421c88d7e1bddf576df8909095b8239",
+    "laterCommitIsMeasuredBuild": false
+  },
+  "runs": {
+    "d06-standard-split": {
+      "launchSource": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-launch.json",
+      "processes": [
+        {
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+      "exitRecord": {
+        "exitCode": 0,
+        "endedAt": 1792915194.561192,
+        "binaryUnchanged": true,
+        "integrationSourcesUnchanged": true
+      },
+      "recordedResultOk": true
+    },
+    "d06-standard-unified": {
+      "launchSource": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-launch.json",
+      "processes": [
+        {
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+      "exitRecord": {
+        "exitCode": 0,
+        "endedAt": 1792915278.135916,
+        "binaryUnchanged": true,
+        "integrationSourcesUnchanged": true
+      },
+      "recordedResultOk": true
+    },
+    "d06-cold-split": {
+      "launchSource": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split-launch.json",
+      "processes": [
+        {
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+      "exitRecord": {
+        "exitCode": 0,
+        "endedAt": 1792915330.139762,
+        "binaryUnchanged": true,
+        "integrationSourcesUnchanged": true
+      },
+      "recordedResultOk": true
+    },
+    "d06-cold-unified": {
+      "launchSource": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified-launch.json",
+      "processes": [
+        {
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+      "exitRecord": {
+        "exitCode": 0,
+        "endedAt": 1792915405.1389298,
+        "binaryUnchanged": true,
+        "integrationSourcesUnchanged": true
+      },
+      "recordedResultOk": true
+    },
+    "q98-attempt01": {
+      "launchSource": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-driver-launch.json",
+      "processes": [
+        {
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+      "exitRecord": {
+        "exitCode": 1,
+        "endedAt": 1792915561.485404,
+        "binaryUnchanged": true,
+        "integrationSourcesUnchanged": true
+      },
+      "recordedResultOk": false,
+      "driverWallSeconds": 78.54,
+      "targetActiveSeconds": 1800,
+      "q98Passed": false
+    },
+    "q98-attempt02": {
+      "launchSource": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-driver-launch.json",
+      "processes": [
+        {
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d",
+      "exitRecord": {
+        "exitCode": 1,
+        "endedAt": 1792917071.305799,
+        "binaryUnchanged": true,
+        "integrationSourcesUnchanged": true
+      },
+      "recordedResultOk": false,
+      "driverWallSeconds": 1223.25,
+      "targetActiveSeconds": 1800,
+      "q98Passed": false
+    }
+  },
+  "sourceGroups": [
+    {
+      "id": "run-root",
+      "root": "/private/tmp/revia-m2-final-measure-ex9swy__",
+      "archiveSubdirectory": "artifacts/run",
+      "nature": "recorded-runtime-or-provenance",
+      "includedFileNames": [
+        "cold-attempt01-note.json",
+        "cold-attempt02-invocation.json",
+        "cold-attempt02.stderr",
+        "cold-attempt02.stdout",
+        "cold-head-before.stderr",
+        "cold-head-before.stdout",
+        "cold-index-before.stderr",
+        "cold-index-before.stdout",
+        "cold-status-before.stderr",
+        "cold-status-before.stdout",
+        "cold.stderr",
+        "cold.stdout",
+        "context.json",
+        "d06-cold-split-exit.json",
+        "d06-cold-split-launch.json",
+        "d06-cold-split-ui.jpg",
+        "d06-cold-split-ui.txt",
+        "d06-cold-split.json",
+        "d06-cold-split.log",
+        "d06-cold-split.stderr",
+        "d06-cold-split.stdout",
+        "d06-cold-unified-exit.json",
+        "d06-cold-unified-launch.json",
+        "d06-cold-unified-ui.jpg",
+        "d06-cold-unified-ui.txt",
+        "d06-cold-unified.json",
+        "d06-cold-unified.log",
+        "d06-cold-unified.stderr",
+        "d06-cold-unified.stdout",
+        "d06-standard-split-exit.json",
+        "d06-standard-split-launch.json",
+        "d06-standard-split-scroll.jpg",
+        "d06-standard-split-scroll.txt",
+        "d06-standard-split-ui.jpg",
+        "d06-standard-split-ui.txt",
+        "d06-standard-split.json",
+        "d06-standard-split.log",
+        "d06-standard-split.stderr",
+        "d06-standard-split.stdout",
+        "d06-standard-unified-exit.json",
+        "d06-standard-unified-launch.json",
+        "d06-standard-unified-scroll.jpg",
+        "d06-standard-unified-scroll.txt",
+        "d06-standard-unified-ui.jpg",
+        "d06-standard-unified-ui.txt",
+        "d06-standard-unified.json",
+        "d06-standard-unified.log",
+        "d06-standard-unified.stderr",
+        "d06-standard-unified.stdout",
+        "fixture-invocations.json",
+        "fixture-snapshot-before-invocations.json",
+        "fixture.stderr",
+        "fixture.stdout",
+        "integration-source-before.json",
+        "q98-attempt02-activation.json",
+        "q98-attempt02-driver-exit.json",
+        "q98-attempt02-driver-launch.json",
+        "q98-attempt02-driver.stderr",
+        "q98-attempt02-driver.stdout",
+        "q98-attempt02-mid-observation.json",
+        "q98-attempt02-mid-ui.jpg",
+        "q98-attempt02-mid-ui.txt",
+        "q98-attempt02-start-ui.jpg",
+        "q98-attempt02-start-ui.txt",
+        "q98-attempt02.json",
+        "q98-attempt02.json.frontend.log",
+        "q98-attempt02.json.log",
+        "q98-attempt02.json.phase-samples.jsonl",
+        "q98-attempt02.json.samples.jsonl",
+        "q98-driver-exit.json",
+        "q98-driver-launch.json",
+        "q98-driver.stderr",
+        "q98-driver.stdout",
+        "q98-start-observation.json",
+        "q98-start-ui.jpg",
+        "q98-start-ui.txt",
+        "q98.json",
+        "q98.json.frontend.json",
+        "q98.json.frontend.log",
+        "q98.json.log",
+        "q98.json.phase-samples.jsonl",
+        "q98.json.samples.jsonl",
+        "standard-head-before.stderr",
+        "standard-head-before.stdout",
+        "standard-index-before.stderr",
+        "standard-index-before.stdout",
+        "standard-status-before.stderr",
+        "standard-status-before.stdout"
+      ],
+      "recursive": false
+    },
+    {
+      "id": "analysis-d06",
+      "root": "/private/tmp/revia-final-d06-audit-XIGT3O",
+      "archiveSubdirectory": "artifacts/analysis/d06",
+      "nature": "derived-analysis",
+      "includedFileNames": [
+        "d06-review.md",
+        "metrics.json"
+      ],
+      "recursive": false
+    },
+    {
+      "id": "analysis-q98-first",
+      "root": "/private/tmp/revia-q98-first-run-analysis.SR4nHb",
+      "archiveSubdirectory": "artifacts/analysis/q98-attempt01",
+      "nature": "derived-analysis",
+      "includedFileNames": [
+        "derive-facts.py",
+        "facts.json",
+        "report.md"
+      ],
+      "recursive": false
+    },
+    {
+      "id": "analysis-q98-code-path",
+      "root": "/private/tmp/revia-q98-attempt02-code-path-x5ub2kxy",
+      "archiveSubdirectory": "artifacts/analysis/q98-attempt02-code-path",
+      "nature": "derived-analysis",
+      "includedFileNames": [
+        "facts.json",
+        "report.md"
+      ],
+      "recursive": false
+    },
+    {
+      "id": "analysis-q98-final",
+      "root": "/private/tmp/revia-q98-attempt02-analysis.DRZ63o",
+      "archiveSubdirectory": "artifacts/analysis/q98-attempt02-final",
+      "nature": "derived-analysis",
+      "includedFileNames": [
+        "facts.json",
+        "report.md"
+      ],
+      "recursive": false
+    }
+  ],
+  "excluded": [
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/cold",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    },
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/data-cold-split-6ko7ct9b",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    },
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/data-cold-unified-223lonpk",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    },
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/data-standard-split-z4ma_942",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    },
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/data-standard-unified-ti3520eu",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    },
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/fixtures",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    },
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/home",
+      "type": "directory",
+      "reason": "All subdirectories, symlinks and special files excluded without traversal."
+    }
+  ],
+  "excludedCategories": [
+    "fixture repositories",
+    "application data",
+    "home",
+    "Git metadata",
+    "target",
+    "node_modules",
+    "app bundle",
+    "binary"
+  ],
+  "knownMissing": [
+    {
+      "path": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02.json.frontend.json",
+      "meaning": "Expected final frontend report absent; not synthesized or filled from logs."
+    }
+  ],
+  "boundaries": {
+    "standardUnifiedOriginalAppearMs": 18,
+    "standardUnifiedOriginalWithinOneFrame": false,
+    "independentProbeCanReplaceOriginalJump": false,
+    "q98Attempt01Passed": false,
+    "q98Attempt02Passed": false,
+    "anyRunCompleted1800ActiveSeconds": false,
+    "q98Attempt02PhaseCount": 18,
+    "q98Attempt02PhaseSamplingChecksPassedCount": 18,
+    "q98Attempt02PhaseEndConfirmedCount": 18,
+    "q98Attempt02PhaseFinalValidCount": 0,
+    "q98Attempt02PhaseFinalError": "Missing unique frontend staged/split checkpoint; not 18 failed sampling operations.",
+    "derivedAnalysisIsRuntimeOriginal": false,
+    "sourceScriptsExecuted": false
+  },
+  "totals": {
+    "fileCount": 97,
+    "sourceBytes": 16690356,
+    "gzipBytes": 5290792,
+    "emptyFileCount": 18,
+    "groupCounts": {
+      "run-root": 88,
+      "analysis-d06": 2,
+      "analysis-q98-first": 3,
+      "analysis-q98-code-path": 2,
+      "analysis-q98-final": 2
+    }
+  },
+  "supportFiles": [
+    {
+      "path": "README.md",
+      "bytes": 5890,
+      "sha256": "eb7c62d945a5d322a06252a5cd384d96da4e20dcb5a98008302a737d09ac2870"
+    },
+    {
+      "path": "verify.py",
+      "bytes": 4410,
+      "sha256": "a64e2a85ec941c05ade25b0ac66d3cd29e117cb6ca6c30773a733db2215f3b1f"
+    }
+  ],
+  "entries": [
+    {
+      "sourceGroup": "run-root",
+      "nature": "retrospective-note-not-original-error-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-attempt01-note.json",
+      "sourceName": "cold-attempt01-note.json",
+      "sourceBytes": 385,
+      "sourceSha256": "7d0db77f619dc443fb757116aaae3bb4427ad79ef54a7a54ee27ddd5fd72a540",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826070571725,
+      "archivePath": "artifacts/run/cold-attempt01-note.json.gz",
+      "gzipBytes": 281,
+      "gzipSha256": "b4b5970a22d054b98ba324aaafe20772a62fe3382f544ae897246bc84dad0389",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-attempt02-invocation.json",
+      "sourceName": "cold-attempt02-invocation.json",
+      "sourceBytes": 567,
+      "sourceSha256": "516d99b5fbee3e9da9e6da974eee7bb036edb81aafc2686b96752c6f69023ce6",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826253316766,
+      "archivePath": "artifacts/run/cold-attempt02-invocation.json.gz",
+      "gzipBytes": 351,
+      "gzipSha256": "0a0a2c83a0826a84abc52c948f84da98b27908c19e16095d645fd25630b1233e",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-attempt02.stderr",
+      "sourceName": "cold-attempt02.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826070722809,
+      "archivePath": "artifacts/run/cold-attempt02.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-attempt02.stdout",
+      "sourceName": "cold-attempt02.stdout",
+      "sourceBytes": 50,
+      "sourceSha256": "735c2f420c5e2c15881d5b4a19de83d3dd883060b263a0a07bcc4ac47c45cf93",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826248370710,
+      "archivePath": "artifacts/run/cold-attempt02.stdout.gz",
+      "gzipBytes": 70,
+      "gzipSha256": "b787be0a5d769595c48376ae88d8c2b27e2a11a1bd5f0ec9ccfb02fe564f3b06",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-head-before.stderr",
+      "sourceName": "cold-head-before.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826304626572,
+      "archivePath": "artifacts/run/cold-head-before.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-head-before.stdout",
+      "sourceName": "cold-head-before.stdout",
+      "sourceBytes": 41,
+      "sourceSha256": "2c49402b560c4e4cbb2c3abc9b47dbde47b8be0d0892e0706d742cb72e417794",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826304541239,
+      "archivePath": "artifacts/run/cold-head-before.stdout.gz",
+      "gzipBytes": 59,
+      "gzipSha256": "0f54c60c58cac35f80ebe9e82f49a8f490b0e672ec555ee60aa714519bfa5037",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-index-before.stderr",
+      "sourceName": "cold-index-before.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826327538843,
+      "archivePath": "artifacts/run/cold-index-before.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-index-before.stdout",
+      "sourceName": "cold-index-before.stdout",
+      "sourceBytes": 58,
+      "sourceSha256": "48f796b8a8e73662c0de13977302124ec593a3141f148eed4ec0c818d12c2127",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826327487135,
+      "archivePath": "artifacts/run/cold-index-before.stdout.gz",
+      "gzipBytes": 77,
+      "gzipSha256": "df8927586926ebe7a432d03d45f82715cbd8bbb5d23981aa7b3f12f62d3a6cf3",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-status-before.stderr",
+      "sourceName": "cold-status-before.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826317134482,
+      "archivePath": "artifacts/run/cold-status-before.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold-status-before.stdout",
+      "sourceName": "cold-status-before.stdout",
+      "sourceBytes": 121,
+      "sourceSha256": "0d3672b631893063b059b315e8b0abcf5c8840c5722c33ce88ada1093163dff2",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826317036315,
+      "archivePath": "artifacts/run/cold-status-before.stdout.gz",
+      "gzipBytes": 88,
+      "gzipSha256": "5be0db5b42e9981657594e960451df7ebe21b3ef7302748d75891dda479e1387",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold.stderr",
+      "sourceName": "cold.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914783417672690,
+      "archivePath": "artifacts/run/cold.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/cold.stdout",
+      "sourceName": "cold.stdout",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914783417516856,
+      "archivePath": "artifacts/run/cold.stdout.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-build-and-source-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/context.json",
+      "sourceName": "context.json",
+      "sourceBytes": 722,
+      "sourceSha256": "e3beb8905f1658a52c65d706f5cd500f08a85655c4146d5ad630ffb685e06217",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914779681191443,
+      "archivePath": "artifacts/run/context.json.gz",
+      "gzipBytes": 437,
+      "gzipSha256": "b3ba5b7b43a3fdfdfbe2ad50396a717736b932cac0a9e6b93ab4168e05f52dee",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "shared-source-and-build-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "d06-cold-split",
+        "d06-cold-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split-exit.json",
+      "sourceName": "d06-cold-split-exit.json",
+      "sourceBytes": 118,
+      "sourceSha256": "7e273e37855bd57a56a5cb3bee5c17e0f4c1604916d94d8455d09230163aba96",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330413624312,
+      "archivePath": "artifacts/run/d06-cold-split-exit.json.gz",
+      "gzipBytes": 112,
+      "gzipSha256": "c54fd72a563648072ce0c0ddf98bf6828b49995f85ddf03b6e933197db87f2e3",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split-launch.json",
+      "sourceName": "d06-cold-split-launch.json",
+      "sourceBytes": 1156,
+      "sourceSha256": "1b9589813ccf4fe975916088070bee3c666c823d8f13511f29b64ec26ef0dc13",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915278522572670,
+      "archivePath": "artifacts/run/d06-cold-split-launch.json.gz",
+      "gzipBytes": 612,
+      "gzipSha256": "01a4181b4d34e75e7232548a0d9d4c700f04d7d4c58ab6794919369e573e15ec",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split-ui.jpg",
+      "sourceName": "d06-cold-split-ui.jpg",
+      "sourceBytes": 567676,
+      "sourceSha256": "0a585e61d927ab829544ea0f33e2b1814f2f9f7e6ec6b5339cf7585c7a3c8961",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330049108366,
+      "archivePath": "artifacts/run/d06-cold-split-ui.jpg.gz",
+      "gzipBytes": 470911,
+      "gzipSha256": "37707274dd3d615ccb25a518da0efea48e3d31baeecfb3e2bc07b8a2dfbb25ab",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split-ui.txt",
+      "sourceName": "d06-cold-split-ui.txt",
+      "sourceBytes": 96,
+      "sourceSha256": "2d03139a6fb2227fb2328b3b87694fe3ecfea32ac3d726edcab668c04e101804",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330047143070,
+      "archivePath": "artifacts/run/d06-cold-split-ui.txt.gz",
+      "gzipBytes": 117,
+      "gzipSha256": "171dfcede9f8949a30ef267d4faa06b70ec6bf191629b0ba6eadcb943c10cc92",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split.json",
+      "sourceName": "d06-cold-split.json",
+      "sourceBytes": 8095,
+      "sourceSha256": "a6c5b0a66bf820cf725c41a60036e47eb8167d2268458def48daedaabd98dec1",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915288888074578,
+      "archivePath": "artifacts/run/d06-cold-split.json.gz",
+      "gzipBytes": 1462,
+      "gzipSha256": "78f26eee3f687ad1f36e7a68ec21c2fbdff3677b586ad6ab9a16953bf7252daa",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split.log",
+      "sourceName": "d06-cold-split.log",
+      "sourceBytes": 4443,
+      "sourceSha256": "2ab0b0ac93d0829b4a2b421b14a6c6c0a834ac6b85fe7c815d29a50b91f13010",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330060575641,
+      "archivePath": "artifacts/run/d06-cold-split.log.gz",
+      "gzipBytes": 1289,
+      "gzipSha256": "e027e2e6577a690013855267aa2dcc7960a4e830b346a504a73434e60dd29ff1",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split.stderr",
+      "sourceName": "d06-cold-split.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915278520078581,
+      "archivePath": "artifacts/run/d06-cold-split.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-split.stdout",
+      "sourceName": "d06-cold-split.stdout",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915278519986956,
+      "archivePath": "artifacts/run/d06-cold-split.stdout.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified-exit.json",
+      "sourceName": "d06-cold-unified-exit.json",
+      "sourceBytes": 119,
+      "sourceSha256": "53e78c0e496b5fce06117ffcc7c5a67df20a825053d1f2f252e51788f9cc57c3",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915405333381864,
+      "archivePath": "artifacts/run/d06-cold-unified-exit.json.gz",
+      "gzipBytes": 112,
+      "gzipSha256": "da09db1119721d8d7867f98cea0f5196161bffcc39f1e5f7d367eb4b7a7b2408",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified-launch.json",
+      "sourceName": "d06-cold-unified-launch.json",
+      "sourceBytes": 1162,
+      "sourceSha256": "8ce0345826909e002722d1e85e43c9d89267a9790d019d6f5a62223d449f714d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330505315936,
+      "archivePath": "artifacts/run/d06-cold-unified-launch.json.gz",
+      "gzipBytes": 614,
+      "gzipSha256": "d72dcec373818ac27a8461a6f80d74926cbb176c0af87f8ba5c9cd609dc040f7",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified-ui.jpg",
+      "sourceName": "d06-cold-unified-ui.jpg",
+      "sourceBytes": 387179,
+      "sourceSha256": "ce99fbf61d9ddd141189cc4007818a4dd7623152f6cfba0146bd16575dae709e",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915405063127079,
+      "archivePath": "artifacts/run/d06-cold-unified-ui.jpg.gz",
+      "gzipBytes": 285602,
+      "gzipSha256": "383db0eeae99dd44a3409abad40afdcfccc4f8274d400dc7f5513374c37df657",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified-ui.txt",
+      "sourceName": "d06-cold-unified-ui.txt",
+      "sourceBytes": 96,
+      "sourceSha256": "473c5c5bfcf5d4d571f9da712d9c2cda3da4e4d5d7eade00313cf2233fc38e21",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915405062742869,
+      "archivePath": "artifacts/run/d06-cold-unified-ui.txt.gz",
+      "gzipBytes": 117,
+      "gzipSha256": "4b66e0ccedc65d80807a9ae012f9216307a0259bf93f57a53954925863be0fb9",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified.json",
+      "sourceName": "d06-cold-unified.json",
+      "sourceBytes": 7678,
+      "sourceSha256": "291c890f31ad62cd67b253e39e22192997daf974762dc1163b3462256d809c01",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915335465785410,
+      "archivePath": "artifacts/run/d06-cold-unified.json.gz",
+      "gzipBytes": 1448,
+      "gzipSha256": "8acd031ce78342bb9441a1f9b717416a7821719247ab19a84aa1009be524bbec",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified.log",
+      "sourceName": "d06-cold-unified.log",
+      "sourceBytes": 3559,
+      "sourceSha256": "d68b828ff72fc165a9b96fd91f3b60bc228661461b16cfd17e0c076ebcd0da40",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915405078361363,
+      "archivePath": "artifacts/run/d06-cold-unified.log.gz",
+      "gzipBytes": 1214,
+      "gzipSha256": "7cf885a9a5435f66c460bb74603d4f3067358b0920ae723e20615492ea351854",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified.stderr",
+      "sourceName": "d06-cold-unified.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330503129472,
+      "archivePath": "artifacts/run/d06-cold-unified.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-cold-unified.stdout",
+      "sourceName": "d06-cold-unified.stdout",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915330502991972,
+      "archivePath": "artifacts/run/d06-cold-unified.stdout.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-exit.json",
+      "sourceName": "d06-standard-split-exit.json",
+      "sourceBytes": 118,
+      "sourceSha256": "a55043216d95ad40ad1285482821112c00e0fa7ddd3e39938be6f41640123803",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915194827715912,
+      "archivePath": "artifacts/run/d06-standard-split-exit.json.gz",
+      "gzipBytes": 112,
+      "gzipSha256": "0e188f7dfcb008821c7fe9f4aa41ca4bc35ee3ff580debf9fe49abb7d8d8b47e",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-launch.json",
+      "sourceName": "d06-standard-split-launch.json",
+      "sourceBytes": 1182,
+      "sourceSha256": "3c4e6185f59ecff094e3965a3f54f7538e7e078c3deb2fd1d03f35fb046b20d2",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914995777358320,
+      "archivePath": "artifacts/run/d06-standard-split-launch.json.gz",
+      "gzipBytes": 627,
+      "gzipSha256": "75c707994a94c066d64a772bfb1bd8021fba040a79b3566c77fe2eb750738911",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-scroll.jpg",
+      "sourceName": "d06-standard-split-scroll.jpg",
+      "sourceBytes": 620214,
+      "sourceSha256": "55e8fb0f8a99459b0ca139ef4043dadcc64f69296a951bd27b954ba7341d664d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915180189845191,
+      "archivePath": "artifacts/run/d06-standard-split-scroll.jpg.gz",
+      "gzipBytes": 508564,
+      "gzipSha256": "e07db14a787c03a8326ed2f934c92c4a2126bb0267413563ad5eae2b809dd680",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-scroll.txt",
+      "sourceName": "d06-standard-split-scroll.txt",
+      "sourceBytes": 249,
+      "sourceSha256": "59d9018a7320b166aaa55912254a9ffcb1c6271ad883b3ad829dfe98095d6810",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915180189389565,
+      "archivePath": "artifacts/run/d06-standard-split-scroll.txt.gz",
+      "gzipBytes": 215,
+      "gzipSha256": "657ce2c425ead8b09423d46a112a346198fb5f42e1e4ba10445abc4624d20bd5",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-ui.jpg",
+      "sourceName": "d06-standard-split-ui.jpg",
+      "sourceBytes": 549467,
+      "sourceSha256": "35ba7a6dae811aa5432e62cd548a7b78d8bfc073c262d981a3e32d3afe46c4cb",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915133151322217,
+      "archivePath": "artifacts/run/d06-standard-split-ui.jpg.gz",
+      "gzipBytes": 446708,
+      "gzipSha256": "87344ba192ab8a73b522d62e28ed28ee502497cb7b830cb5521b228a484afc8a",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split-ui.txt",
+      "sourceName": "d06-standard-split-ui.txt",
+      "sourceBytes": 6955,
+      "sourceSha256": "34252b73a96413c267c9a83684ed3f6a3c22ae9c33b006f1386cc22a043c7fcf",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915133149239338,
+      "archivePath": "artifacts/run/d06-standard-split-ui.txt.gz",
+      "gzipBytes": 2127,
+      "gzipSha256": "111d6ca592750ee54e0135655bb8c0f951eb0afef9daf11e75e2f24241ae4a82",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split.json",
+      "sourceName": "d06-standard-split.json",
+      "sourceBytes": 8114,
+      "sourceSha256": "e8f06c27a7457b35da39c4a9a762d2a93b4aa3630b15c97bf8488ef197721503",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915112303815655,
+      "archivePath": "artifacts/run/d06-standard-split.json.gz",
+      "gzipBytes": 1450,
+      "gzipSha256": "b4608e357cda9dca1cf61d82070fb07d356c39469a7218739e21ac6e78b80595",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split.log",
+      "sourceName": "d06-standard-split.log",
+      "sourceBytes": 12945,
+      "sourceSha256": "03a0d0e919099145a100b552176f448b1455689048fd50963b438c192e15bbf7",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915194551822792,
+      "archivePath": "artifacts/run/d06-standard-split.log.gz",
+      "gzipBytes": 2000,
+      "gzipSha256": "c16bddd6fbbb029210a2938d3675baecd3abc6234d5ca8061a23502ea51427e8",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split.stderr",
+      "sourceName": "d06-standard-split.stderr",
+      "sourceBytes": 93,
+      "sourceSha256": "611c9c194a73ca905d58fcf68933707134b38ad6f020f02072357fae54c76902",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915108130589236,
+      "archivePath": "artifacts/run/d06-standard-split.stderr.gz",
+      "gzipBytes": 107,
+      "gzipSha256": "970f1dd8c4acd29ad9c4404fd6ce4ba25166192a951b77b56a5a8785db4351b2",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-split.stdout",
+      "sourceName": "d06-standard-split.stdout",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914995774871188,
+      "archivePath": "artifacts/run/d06-standard-split.stdout.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-split"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-exit.json",
+      "sourceName": "d06-standard-unified-exit.json",
+      "sourceBytes": 118,
+      "sourceSha256": "98c9c08a658d1e2127779ce3bf15b78bc714742284881544779a5eac77efc9c8",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915278434762013,
+      "archivePath": "artifacts/run/d06-standard-unified-exit.json.gz",
+      "gzipBytes": 112,
+      "gzipSha256": "3b5d6f9e73fd6a5c25a3323e79c1a051d8d687f44b358237db204d6ebfdbf596",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-launch.json",
+      "sourceName": "d06-standard-unified-launch.json",
+      "sourceBytes": 1189,
+      "sourceSha256": "a3cf8b6f49673cba0ff94ca52ae5a40e813d9c966312338b697fa30a45c8ba31",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915239073179452,
+      "archivePath": "artifacts/run/d06-standard-unified-launch.json.gz",
+      "gzipBytes": 628,
+      "gzipSha256": "58e304759cad396ef4fb805ee41103af42cef31ffbb8d321777e5fade526c082",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-scroll.jpg",
+      "sourceName": "d06-standard-unified-scroll.jpg",
+      "sourceBytes": 488588,
+      "sourceSha256": "2300b21d89d78f8d3eb30ea3ac8494340fe9e0f7879e8e7b2c850e8c130ea4dc",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915265007652912,
+      "archivePath": "artifacts/run/d06-standard-unified-scroll.jpg.gz",
+      "gzipBytes": 387683,
+      "gzipSha256": "1ca3aa117ec055fc6619bfae416443e9e6513a2979a324dfb7ae7f61e647904f",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-scroll.txt",
+      "sourceName": "d06-standard-unified-scroll.txt",
+      "sourceBytes": 6193,
+      "sourceSha256": "08ad3c9a549985a640c3d0e06578ca6b68d97e29aad3eeb2d81937221bc90fc6",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915265007412162,
+      "archivePath": "artifacts/run/d06-standard-unified-scroll.txt.gz",
+      "gzipBytes": 1260,
+      "gzipSha256": "0b0380f31733e7cc03e00ab8ea50f821744ccf06b0815c9cd7b8a6f52f73ef60",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-ui.jpg",
+      "sourceName": "d06-standard-unified-ui.jpg",
+      "sourceBytes": 439214,
+      "sourceSha256": "1bab9517c42786df12c68c79530c0a6c65e0dab6b604abee8014dc2689dde62e",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915263774682883,
+      "archivePath": "artifacts/run/d06-standard-unified-ui.jpg.gz",
+      "gzipBytes": 343414,
+      "gzipSha256": "61c6c66b3ec62545b7df5ee4243157e332ecdc15f550ef986d8ed5c4e4e69b94",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified-ui.txt",
+      "sourceName": "d06-standard-unified-ui.txt",
+      "sourceBytes": 96,
+      "sourceSha256": "824e7697898fba2a4bdde58ba110aaac032b8c2ec431f96b44e3abfd798bf9af",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915263774336799,
+      "archivePath": "artifacts/run/d06-standard-unified-ui.txt.gz",
+      "gzipBytes": 117,
+      "gzipSha256": "ed1bdd8999609facf3e6c7de696e20e9ad1482c02a2c0c1c114ee2944ca33779",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified.json",
+      "sourceName": "d06-standard-unified.json",
+      "sourceBytes": 7717,
+      "sourceSha256": "9de566577a0adb4c7955e2f1efb049d89c7e0e0bd212be64a374b8b7c9eb72a3",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915243977387798,
+      "archivePath": "artifacts/run/d06-standard-unified.json.gz",
+      "gzipBytes": 1408,
+      "gzipSha256": "5ef6728311fb46883a83aa3417f49312221f252023ae95ef14cf1251a0200c9d",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified.log",
+      "sourceName": "d06-standard-unified.log",
+      "sourceBytes": 5750,
+      "sourceSha256": "90f52bc158df79ecbb459ef6ca7e112f4441fbc60b677be33f3ca8095175eb63",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915278053776113,
+      "archivePath": "artifacts/run/d06-standard-unified.log.gz",
+      "gzipBytes": 1449,
+      "gzipSha256": "3c8ae107377b6af54b46fb2d894e758b235a2b959a9a67d0f07e50665074a9f6",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified.stderr",
+      "sourceName": "d06-standard-unified.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915239070482029,
+      "archivePath": "artifacts/run/d06-standard-unified.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/d06-standard-unified.stdout",
+      "sourceName": "d06-standard-unified.stdout",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915239070370404,
+      "archivePath": "artifacts/run/d06-standard-unified.stdout.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "d06-standard-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/fixture-invocations.json",
+      "sourceName": "fixture-invocations.json",
+      "sourceBytes": 619,
+      "sourceSha256": "c543a0ea5706cabb69f44a58a6e7dd6ad12d273263f426ddbd9d1c5f99c683da",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914783417440314,
+      "archivePath": "artifacts/run/fixture-invocations.json.gz",
+      "gzipBytes": 357,
+      "gzipSha256": "4133a29e1da7605f515f85a956ade14540cf109e41cf51c350e4d25c9e7cd925",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/fixture-snapshot-before-invocations.json",
+      "sourceName": "fixture-snapshot-before-invocations.json",
+      "sourceBytes": 3394,
+      "sourceSha256": "125aa2fd79d4724b9d966790bb5244f4bb5e31456cef21a1043fd17592c21d1b",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826327856219,
+      "archivePath": "artifacts/run/fixture-snapshot-before-invocations.json.gz",
+      "gzipBytes": 460,
+      "gzipSha256": "7043394e2f30aa2086d2961932f543d9617ad5123371176e48bac751b3f63049",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/fixture.stderr",
+      "sourceName": "fixture.stderr",
+      "sourceBytes": 342,
+      "sourceSha256": "3ebf77e8998c829d8109eda5642158de74b5248598e44b6eb3e066bc138a6c1f",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914780819209245,
+      "archivePath": "artifacts/run/fixture.stderr.gz",
+      "gzipBytes": 264,
+      "gzipSha256": "bceb180596a8d271c37fdff2ccd60dd692d7af6149eb23e0e02d388f70aa9df4",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/fixture.stdout",
+      "sourceName": "fixture.stdout",
+      "sourceBytes": 888,
+      "sourceSha256": "fd091d1c40734bf83056a1a0c64308baaeff808000ff0b0e04caa87be1059cbc",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914783416511937,
+      "archivePath": "artifacts/run/fixture.stdout.gz",
+      "gzipBytes": 325,
+      "gzipSha256": "7d9e50783456866a750a135d3e3fa7a7fcf4998851714a81b2bccf18fa1f1830",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-build-and-source-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/integration-source-before.json",
+      "sourceName": "integration-source-before.json",
+      "sourceBytes": 325083,
+      "sourceSha256": "8c291e9ab23bfc8284650be18fea096db754add81fd989989631a5287b58efba",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914995761112109,
+      "archivePath": "artifacts/run/integration-source-before.json.gz",
+      "gzipBytes": 82321,
+      "gzipSha256": "ac7d4cd7cb7c92f21fe79a7c8e414e4c944ef67b2821702881447b25a78b3e2e",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "shared-source-and-build-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "d06-cold-split",
+        "d06-cold-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "operator-observation-record",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-activation.json",
+      "sourceName": "q98-attempt02-activation.json",
+      "sourceBytes": 246,
+      "sourceSha256": "1b36dd6edffd10ad7425bf636ac6fcb13a0fb5a38e8389553d7718d9e9d72fe4",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915889911409961,
+      "archivePath": "artifacts/run/q98-attempt02-activation.json.gz",
+      "gzipBytes": 201,
+      "gzipSha256": "e0cbb13d9d7e349f915940db5bcf4f18cab1625c0cbfdc031d20985f3a60b185",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-driver-exit.json",
+      "sourceName": "q98-attempt02-driver-exit.json",
+      "sourceBytes": 118,
+      "sourceSha256": "60020e78c48ff035c902b6be976fd70c235b8c5d2fd7031b8bee9d6e884776b3",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917071437445322,
+      "archivePath": "artifacts/run/q98-attempt02-driver-exit.json.gz",
+      "gzipBytes": 111,
+      "gzipSha256": "4d08c5b4ae080d734d8439e34428e00675c7af2c446d1e20b895ec9ed3ecdb76",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-driver-launch.json",
+      "sourceName": "q98-attempt02-driver-launch.json",
+      "sourceBytes": 1346,
+      "sourceSha256": "9f6515d6be218a63bde5c57e7690225d0b7729ee0889147ae1d5aae7c6f4cea1",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915847944295484,
+      "archivePath": "artifacts/run/q98-attempt02-driver-launch.json.gz",
+      "gzipBytes": 763,
+      "gzipSha256": "a3a4a1525ad8db3e6319ac1a8303828423481a1ae6e4895f2826ffe8f4fb2ee8",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-driver.stderr",
+      "sourceName": "q98-attempt02-driver.stderr",
+      "sourceBytes": 201,
+      "sourceSha256": "04886533c82c9ed1b23e8a70ca3d793f130ce9559b719262f866dc5c4a7c7ed8",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917071251135563,
+      "archivePath": "artifacts/run/q98-attempt02-driver.stderr.gz",
+      "gzipBytes": 174,
+      "gzipSha256": "d67dea75025855297b3ca6490227aedff00d269bf2df78e0a41d63b2d036b8a9",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-driver.stdout",
+      "sourceName": "q98-attempt02-driver.stdout",
+      "sourceBytes": 8350,
+      "sourceSha256": "80b0689be99618be3d838f8f9a217ea9ea30edc9bd7746a6d41da3a318de8c9d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917071292012966,
+      "archivePath": "artifacts/run/q98-attempt02-driver.stdout.gz",
+      "gzipBytes": 2128,
+      "gzipSha256": "3374000978b4ad79f8ff681bc518c7455ff9ba7147b047becc8c20a620990137",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "operator-observation-record",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-mid-observation.json",
+      "sourceName": "q98-attempt02-mid-observation.json",
+      "sourceBytes": 130,
+      "sourceSha256": "b4718fdbedcc13837829675c7e178ffba17c576e395d075545c0f97a9ad21e7b",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792916814585073973,
+      "archivePath": "artifacts/run/q98-attempt02-mid-observation.json.gz",
+      "gzipBytes": 135,
+      "gzipSha256": "f8daaa21b55dc6f6472fa8dcd0f833cd54d0082f2bdfe5e9cfce4f0a09ae9bdf",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-mid-ui.jpg",
+      "sourceName": "q98-attempt02-mid-ui.jpg",
+      "sourceBytes": 918269,
+      "sourceSha256": "ebe285193866ea55777d6c9bfc1a21a9843c237c9a2164b8e2efbc67cbae124d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792916814584611639,
+      "archivePath": "artifacts/run/q98-attempt02-mid-ui.jpg.gz",
+      "gzipBytes": 857976,
+      "gzipSha256": "e5a4cc501f59b07afa13bd21a3288e03538700c42d13026a2dbe3250a5adff4c",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-mid-ui.txt",
+      "sourceName": "q98-attempt02-mid-ui.txt",
+      "sourceBytes": 320,
+      "sourceSha256": "ced25cf0df74b144b08fc462c1044639267966f5aab00f5ec43d114e7afc5128",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792916814583928179,
+      "archivePath": "artifacts/run/q98-attempt02-mid-ui.txt.gz",
+      "gzipBytes": 258,
+      "gzipSha256": "7d2312588715741eb20f1415dc2ebe553164d27f1cf17a47b860d9af0810afb7",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-start-ui.jpg",
+      "sourceName": "q98-attempt02-start-ui.jpg",
+      "sourceBytes": 645891,
+      "sourceSha256": "916b0f23a73c5a14de99f75a66c2419349cfa33a438d5b9533751bddb1451958",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915889911184419,
+      "archivePath": "artifacts/run/q98-attempt02-start-ui.jpg.gz",
+      "gzipBytes": 534980,
+      "gzipSha256": "b8e61ca447764c3fa8632d6ee859aa78ac2101a894b09069fb9cc5aa290b02a3",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02-start-ui.txt",
+      "sourceName": "q98-attempt02-start-ui.txt",
+      "sourceBytes": 787,
+      "sourceSha256": "77d39b58dbfc6d44e76dcc5565567f0bd3451cfae36375d92b9af3027c8d4277",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915889910920835,
+      "archivePath": "artifacts/run/q98-attempt02-start-ui.txt.gz",
+      "gzipBytes": 479,
+      "gzipSha256": "7696adefab52c6400a4958b555053badda77b9a8be7c4ae68f5728669dfec2d4",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02.json",
+      "sourceName": "q98-attempt02.json",
+      "sourceBytes": 97106,
+      "sourceSha256": "54f001fcf0385f840e270a3d9875778c8ea6807c34602ac142a09b18ff94bbd8",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917071291913424,
+      "archivePath": "artifacts/run/q98-attempt02.json.gz",
+      "gzipBytes": 9747,
+      "gzipSha256": "22c3087a49c1f6c75627d8545d38a59ae9cdfb9c831fc5b55b379d26dac44280",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02.json.frontend.log",
+      "sourceName": "q98-attempt02.json.frontend.log",
+      "sourceBytes": 10154489,
+      "sourceSha256": "b90a5c239c8c67393a13d8d20b0ded99f0b5a9964666c2513b36cf7a0f05e27d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917071243581167,
+      "archivePath": "artifacts/run/q98-attempt02.json.frontend.log.gz",
+      "gzipBytes": 813935,
+      "gzipSha256": "e85c683681772306e82d22dccc3f222a6ade0a30dccabedafbc42925ea202701",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02.json.log",
+      "sourceName": "q98-attempt02.json.log",
+      "sourceBytes": 198,
+      "sourceSha256": "a3e7edbdb7b15767190e97ecbf73bbee36a25abd9e2900a777865ab79c1fb820",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915918548110305,
+      "archivePath": "artifacts/run/q98-attempt02.json.log.gz",
+      "gzipBytes": 167,
+      "gzipSha256": "38439606fbdb887b1c0f419d477370150274716726bf8c850bb096e85c8ecb09",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02.json.phase-samples.jsonl",
+      "sourceName": "q98-attempt02.json.phase-samples.jsonl",
+      "sourceBytes": 18399,
+      "sourceSha256": "b3a377176d747072e3ec59effce54229057c95443959d5540995cdc58e1137c7",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917071261617758,
+      "archivePath": "artifacts/run/q98-attempt02.json.phase-samples.jsonl.gz",
+      "gzipBytes": 2113,
+      "gzipSha256": "76c3bf1e015993136521c106db4986f345e04ec41f8ee92e758a56f94cae7357",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-attempt02.json.samples.jsonl",
+      "sourceName": "q98-attempt02.json.samples.jsonl",
+      "sourceBytes": 44025,
+      "sourceSha256": "03c611ae87d1e9e6edd3d3384f2e79904bdd7e089af565df8a4e7eddb28a36a4",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917059899807571,
+      "archivePath": "artifacts/run/q98-attempt02.json.samples.jsonl.gz",
+      "gzipBytes": 5109,
+      "gzipSha256": "773ce83d5a7ce9211581727ec31262a1d740c9ee04671f0b9caced695a49035c",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-driver-exit.json",
+      "sourceName": "q98-driver-exit.json",
+      "sourceBytes": 118,
+      "sourceSha256": "2962687f8a28695f69dea49d0493f2e343be46bbf555e5ea9ba945e697d1d1d3",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915562092224024,
+      "archivePath": "artifacts/run/q98-driver-exit.json.gz",
+      "gzipBytes": 111,
+      "gzipSha256": "7f44612046cf3c7c273de0f16095bd4719c4e62e3ecbf65c00851448e3538a95",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-execution-provenance",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-driver-launch.json",
+      "sourceName": "q98-driver-launch.json",
+      "sourceBytes": 1109,
+      "sourceSha256": "b5c273243b39ee0eec733229005667e38099e80620d8cee20bd2daac2b462105",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915482798592358,
+      "archivePath": "artifacts/run/q98-driver-launch.json.gz",
+      "gzipBytes": 609,
+      "gzipSha256": "effbe5ee2f388fbe7ffc3d3fbaed06468b58dc51d4d9c25169d69c7f27daae66",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-driver.stderr",
+      "sourceName": "q98-driver.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915482795822894,
+      "archivePath": "artifacts/run/q98-driver.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-driver.stdout",
+      "sourceName": "q98-driver.stdout",
+      "sourceBytes": 1324,
+      "sourceSha256": "612cae015e546ca881d12769a5a36258b1a209b72c571c2a22cb25b60e10d0e0",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915561473963214,
+      "archivePath": "artifacts/run/q98-driver.stdout.gz",
+      "gzipBytes": 764,
+      "gzipSha256": "17725d25f010760d08eec6ec2fa082dce69d794434525de80b1bd03874506cfd",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "operator-observation-record",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-start-observation.json",
+      "sourceName": "q98-start-observation.json",
+      "sourceBytes": 136,
+      "sourceSha256": "921be20b1d89368b177a00f1e472155f4e7a8087faab4fd08a2479fccefebf5c",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915543856306916,
+      "archivePath": "artifacts/run/q98-start-observation.json.gz",
+      "gzipBytes": 137,
+      "gzipSha256": "4db41bb5f1e0ddd4bb6adf6a19b0a72e78358fe5889af749d56d702d168bc2d7",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-screenshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-start-ui.jpg",
+      "sourceName": "q98-start-ui.jpg",
+      "sourceBytes": 521543,
+      "sourceSha256": "c2bf4fe751f98524443569afa14eb82f238ba3a8539d8099e91f6b20a2e99395",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915543856042082,
+      "archivePath": "artifacts/run/q98-start-ui.jpg.gz",
+      "gzipBytes": 413782,
+      "gzipSha256": "caaa24cc8e33697cdc0cff71c047a6e080ee95af4a0772694a46247e1500fedb",
+      "contentSignature": "JPEG",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-accessibility-snapshot",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98-start-ui.txt",
+      "sourceName": "q98-start-ui.txt",
+      "sourceBytes": 2773,
+      "sourceSha256": "bc4a56af8cd830475ac8533aa2ad3619ab902cd58b3671c0bb8bf176dcd87540",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915543855815457,
+      "archivePath": "artifacts/run/q98-start-ui.txt.gz",
+      "gzipBytes": 794,
+      "gzipSha256": "c7040259c3f2ce7453597077210000d0b76cea80eebf2b5ba0273371410da635",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98.json",
+      "sourceName": "q98.json",
+      "sourceBytes": 14749,
+      "sourceSha256": "7c14e637fdaa24f92359f0e5f7f738c340b27128e158a1673aa1576dfb0a52ac",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915561473851963,
+      "archivePath": "artifacts/run/q98.json.gz",
+      "gzipBytes": 3234,
+      "gzipSha256": "69a4e3f03e85a38a070728b54faf48ba06ff5d3d55f29da478d2335357077644",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-result",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98.json.frontend.json",
+      "sourceName": "q98.json.frontend.json",
+      "sourceBytes": 6082,
+      "sourceSha256": "4247b874abae32c64029659cdf2c3ca8b2ba2e8c8291c4729bf9f963d8d3b76d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915560824227207,
+      "archivePath": "artifacts/run/q98.json.frontend.json.gz",
+      "gzipBytes": 1432,
+      "gzipSha256": "2d847fe5026d971fc0257015c97813e9040928049d2982352774cbba7d3cfe9c",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98.json.frontend.log",
+      "sourceName": "q98.json.frontend.log",
+      "sourceBytes": 652396,
+      "sourceSha256": "530c9463af6a9d49e3c2883f391bc31e197dd797ba5030bbb98085ed48a91892",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915560823884165,
+      "archivePath": "artifacts/run/q98.json.frontend.log.gz",
+      "gzipBytes": 54873,
+      "gzipSha256": "936f73eb133caf896c3c86134b5d9e8e4ceee01b58325f71269e46039ea403b4",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98.json.log",
+      "sourceName": "q98.json.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915482885571263,
+      "archivePath": "artifacts/run/q98.json.log.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98.json.phase-samples.jsonl",
+      "sourceName": "q98.json.phase-samples.jsonl",
+      "sourceBytes": 1207,
+      "sourceSha256": "b7c19e07fc530d58e7ddcacd2a03665c1c34fe37c4f2040fce98083d08c1e5e9",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915561418289046,
+      "archivePath": "artifacts/run/q98.json.phase-samples.jsonl.gz",
+      "gzipBytes": 595,
+      "gzipSha256": "65a2ee444a1ea598733715c1ebc3aa1953ec4e5bbf52e28b8027a6d095fc4e23",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/q98.json.samples.jsonl",
+      "sourceName": "q98.json.samples.jsonl",
+      "sourceBytes": 2944,
+      "sourceSha256": "52883acb5b61a2797e9efd321d84999211a34f02ac90153eaaaa31b2b0e7cdaf",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915555508694975,
+      "archivePath": "artifacts/run/q98.json.samples.jsonl.gz",
+      "gzipBytes": 590,
+      "gzipSha256": "69e0adedd2429b5572a3415a56d614f8069e56cbb61fac2393a08deae7d84b0d",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "run-specific",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/standard-head-before.stderr",
+      "sourceName": "standard-head-before.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826267490929,
+      "archivePath": "artifacts/run/standard-head-before.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/standard-head-before.stdout",
+      "sourceName": "standard-head-before.stdout",
+      "sourceBytes": 41,
+      "sourceSha256": "c59909998d912e462b70d1c13842ac8df9b88d71416d78f7bf74ed1facf63992",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826267402346,
+      "archivePath": "artifacts/run/standard-head-before.stdout.gz",
+      "gzipBytes": 59,
+      "gzipSha256": "b99bd8260813afaa2be7b2349e927c40ef38ec9b97669c9db38d7f03f10293ea",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/standard-index-before.stderr",
+      "sourceName": "standard-index-before.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826293879210,
+      "archivePath": "artifacts/run/standard-index-before.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/standard-index-before.stdout",
+      "sourceName": "standard-index-before.stdout",
+      "sourceBytes": 640,
+      "sourceSha256": "ecf425f9920590531f43afd26dc0d7872496ad6963db253667faea56dbf12a77",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826293809293,
+      "archivePath": "artifacts/run/standard-index-before.stdout.gz",
+      "gzipBytes": 405,
+      "gzipSha256": "78eb879057754532b6815ca854e336a7b1429e3be04828ebba58da80d2fcce1c",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/standard-status-before.stderr",
+      "sourceName": "standard-status-before.stderr",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826283693432,
+      "archivePath": "artifacts/run/standard-status-before.stderr.gz",
+      "gzipBytes": 20,
+      "gzipSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "contentSignature": "empty",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "run-root",
+      "nature": "recorded-run-output",
+      "sourcePath": "/private/tmp/revia-m2-final-measure-ex9swy__/standard-status-before.stdout",
+      "sourceName": "standard-status-before.stdout",
+      "sourceBytes": 894,
+      "sourceSha256": "ad587f04624aa6ccafbb3a929309736c637874cc0f94068b8869eccbe61f9253",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792914826283567682,
+      "archivePath": "artifacts/run/standard-status-before.stdout.gz",
+      "gzipBytes": 335,
+      "gzipSha256": "baf522e584ff554fead83f4a819e9df62d0e7dd53d49844438f92c2cb172699c",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "fixture-preparation-context",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "q98-attempt01",
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-d06",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-final-d06-audit-XIGT3O/d06-review.md",
+      "sourceName": "d06-review.md",
+      "sourceBytes": 5060,
+      "sourceSha256": "5e4ba7f75ed398d85c86537092c723333a9925afbf156e57eb7eb1b846db8544",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915967246336372,
+      "archivePath": "artifacts/analysis/d06/d06-review.md.gz",
+      "gzipBytes": 3083,
+      "gzipSha256": "104775f507def206b33dd934d0de60fb87ccec588480c5a622108ac25705f4a2",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-d06",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-final-d06-audit-XIGT3O/metrics.json",
+      "sourceName": "metrics.json",
+      "sourceBytes": 30420,
+      "sourceSha256": "002e0c4ed9f9fc940f95e92d481776526d1dc75543f30eb4070ab52fd52dcf4f",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792915967240920818,
+      "archivePath": "artifacts/analysis/d06/metrics.json.gz",
+      "gzipBytes": 2467,
+      "gzipSha256": "56b5213bd492cc9d5ac4a36d942f6ecfda0078ef0ef889bd12cd32119abbeba7",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "d06-standard-split",
+        "d06-standard-unified",
+        "d06-cold-split",
+        "d06-cold-unified"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "d06-standard-split",
+          "role": "Revia",
+          "pid": 85755
+        },
+        {
+          "runId": "d06-standard-unified",
+          "role": "Revia",
+          "pid": 87247
+        },
+        {
+          "runId": "d06-cold-split",
+          "role": "Revia",
+          "pid": 87618
+        },
+        {
+          "runId": "d06-cold-unified",
+          "role": "Revia",
+          "pid": 87831
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-first",
+      "nature": "derived-analysis-script-preserved-not-executed",
+      "sourcePath": "/private/tmp/revia-q98-first-run-analysis.SR4nHb/derive-facts.py",
+      "sourceName": "derive-facts.py",
+      "sourceBytes": 5729,
+      "sourceSha256": "7afe0f2e0bea81559b42d65ef44a324981c6c37d6aace39f77aecc64e606dc49",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792916370253813157,
+      "archivePath": "artifacts/analysis/q98-attempt01/derive-facts.py.gz",
+      "gzipBytes": 2212,
+      "gzipSha256": "9d93a080ac42647753fb0addca13a9c5e15cb50d9530fd88f5ceaffcc729116c",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-first",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-q98-first-run-analysis.SR4nHb/facts.json",
+      "sourceName": "facts.json",
+      "sourceBytes": 14242,
+      "sourceSha256": "57b1c113c77fb8ebf593744104763f4d8ea1de2ae8948d0872d37fef3c3e7d8d",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792916375566826610,
+      "archivePath": "artifacts/analysis/q98-attempt01/facts.json.gz",
+      "gzipBytes": 4033,
+      "gzipSha256": "037d48289760d9597c3471adb4113c085acd224b2426331033984576debd1c8f",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-first",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-q98-first-run-analysis.SR4nHb/report.md",
+      "sourceName": "report.md",
+      "sourceBytes": 7534,
+      "sourceSha256": "b5364a0304caa5f150f816e94a24bff962c27ee9c3b2fbe6cf71cee6eb3298de",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792916157731197477,
+      "archivePath": "artifacts/analysis/q98-attempt01/report.md.gz",
+      "gzipBytes": 4250,
+      "gzipSha256": "38052337d8179d364937cc69477fe9c19f5ca65299ac35e34c65f724d5e293df",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt01"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt01",
+          "role": "Revia",
+          "pid": 88354
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "driver",
+          "pid": 88350
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "WebContent",
+          "pid": 88359
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "Networking",
+          "pid": 88360
+        },
+        {
+          "runId": "q98-attempt01",
+          "role": "GPU",
+          "pid": 88358
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-code-path",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-q98-attempt02-code-path-x5ub2kxy/facts.json",
+      "sourceName": "facts.json",
+      "sourceBytes": 8165,
+      "sourceSha256": "4ba61f1b43edf39688ee1c9af64d77dd8e07180cd64731d557b357ffa27c8d41",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917596310893059,
+      "archivePath": "artifacts/analysis/q98-attempt02-code-path/facts.json.gz",
+      "gzipBytes": 2746,
+      "gzipSha256": "cb3db06f427e792490d8b3ceb04a0c70357292e99111175d32f3c1c9dc258eb9",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-code-path",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-q98-attempt02-code-path-x5ub2kxy/report.md",
+      "sourceName": "report.md",
+      "sourceBytes": 6350,
+      "sourceSha256": "db8abd9388cfa38d9404f45c820f6c2e7ad027cb520135c1de9464512aa3bc14",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792917596311016767,
+      "archivePath": "artifacts/analysis/q98-attempt02-code-path/report.md.gz",
+      "gzipBytes": 3734,
+      "gzipSha256": "a09bb9c02c5f014a25a4b186d249a4d9e341a4841096d893abc5b956ed5523e8",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-final",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-q98-attempt02-analysis.DRZ63o/facts.json",
+      "sourceName": "facts.json",
+      "sourceBytes": 42544,
+      "sourceSha256": "2caa54a8ba5d34d24c7bb0b433dfe7c44e6fa44256c9683f555e5ae78dc552bb",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792918085819501611,
+      "archivePath": "artifacts/analysis/q98-attempt02-final/facts.json.gz",
+      "gzipBytes": 8495,
+      "gzipSha256": "7c0ab1311c7bebacd822b67e336ae18ea3617fd4b8c6863abd3884cb5ea096f5",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    },
+    {
+      "sourceGroup": "analysis-q98-final",
+      "nature": "derived-analysis",
+      "sourcePath": "/private/tmp/revia-q98-attempt02-analysis.DRZ63o/report.md",
+      "sourceName": "report.md",
+      "sourceBytes": 12632,
+      "sourceSha256": "ac8d22e072a95295fc17a23584a48a04ed5b45d05fb8035300211a40e357e92e",
+      "sourceMode": "0o644",
+      "sourceMtimeNs": 1792918077637532947,
+      "archivePath": "artifacts/analysis/q98-attempt02-final/report.md.gz",
+      "gzipBytes": 6735,
+      "gzipSha256": "40c25bae6847e9e70a99343d18a8c8ec8b5cc219f6aed0c6247bc3904840cfb6",
+      "contentSignature": "preserved-unclassified",
+      "associationKind": "derived-analysis-of-runs",
+      "relatedRunIds": [
+        "q98-attempt02"
+      ],
+      "relatedProcesses": [
+        {
+          "runId": "q98-attempt02",
+          "role": "Revia",
+          "pid": 90685
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "driver",
+          "pid": 90683
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "WebContent",
+          "pid": 90688
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "Networking",
+          "pid": 90689
+        },
+        {
+          "runId": "q98-attempt02",
+          "role": "GPU",
+          "pid": 90687
+        }
+      ],
+      "buildSourceCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+      "integrationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+      "binarySha256": "fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "verifiedAtUtc": "2026-10-25T07:56:00.370990+00:00",
+  "archive": "/private/tmp/revia-b10-desktop-sealed.cUu4D3",
+  "manifestSha256": "d12cdfacb7b711ad97beb64ff83605b3c5a0522f2365cb46495be8d4c17e9710",
+  "verifiedOriginalFiles": 1551,
+  "sourceComparisons": 1551,
+  "storedAndOriginalSha256Matches": 1551,
+  "mismatches": [],
+  "rawBytes": 14132463,
+  "storedBytes": 11689429,
+  "imageFiles": 31,
+  "pngNamedFiles": 31,
+  "imageMediaTypeCounts": {
+    "image/jpeg": 31
+  },
+  "gzipFiles": 1520,
+  "emptyOriginalFiles": 220,
+  "countsByGroup": {
+    "desktop-2a51": 1230,
+    "desktop-5f": 321
+  },
+  "scope": "Original desktop evidence byte verification only; no product/GUI test or live-fixture read."
+}

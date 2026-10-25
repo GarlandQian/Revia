@@ -1,8 +1,20 @@
 # M2 阶段报告
 
-更新日期：2026-10-24。任务 01、02、03、04、06、09 已完成；任务 06 两轴复核、真实桌面、D06 与最终双平台 CI 已通过，旧前台尝试的取证限制已更正；M2 未完成。工作保留在 `m2`，未合并回 `main`；已按 Q97 正常推送 `m2` 用于编译验收，未创建 PR 或发布。
+更新日期：2026-10-25。**M2 未完成：m2-ui 已合入 m2，尚未 squash main，未启动 M3 实施。** 任务01/02/03/04/06/09的既有验收保留；本轮局部成功不替代任务10/11最终验收。后文旧进度按其记录时点阅读，以本节与[当前矩阵](./issues/10-integration-matrix.md)为准。
 
-## 当前进度（2026-10-23）
+## 当前验收状态
+
+- **内部集成完成**：m2已从ababf47快进到2a51b16，无冲突；后续d952修复测试fixture，f10仅更正证据描述，9434e7a记录用户模型顺序。main仍为800ac01，用户原有图标/配置/AGENTS改动保留，没有推main、开PR或发布。
+- **实际CI通过**：[40174661706](https://github.com/GarlandQian/Revia/actions/runs/40174661706)对应f10fc971；macOS arm64与Windows x64的类型检查/lint/build、完整Rust、Release编译均成功，Rust分别271/243通过、0失败、各1既有ignored。review_marks分别31/29，旧Windows失败用例已实际通过。旧40172283582失败及两轴证据描述发现保留，后续文档更正不冒称重新双轴0项。
+- **桌面局部闭环完成**：B10真实窗口Close/Stay、Cmd-Q/Stay及原生菜单Quit/Wait显式交付后退出有证据；C05恢复准备失败后显示待核对、阻止自动关闭、Stay、真实状态核对、新Close请求和用户授权确认后同PID55553退出0已闭合。C05不是恢复成功；独立的5f样本另有成功恢复。文本只读对比、二进制详情/另存、审阅导航/重启保留及浅深主界面各保留其局部证据，不概括为全部桌面通过。详见[B10记录](./batch10-repair-validation.md)。
+- **D06四组已测**：标准首屏137/124ms、真冷独立文字4/3ms，八次独立首rAF均35/35；滚动各60真rAF、0fallback/0uncovered。标准统一原热跳18ms/false与最大帧31/48ms保留，另一目标的独立探针不能倒填；返回首帧并非全色。详见[最终测量](./final-measure-20261025.md)。
+- **Q98未通过**：首轮墙钟78.54秒因2179ms帧间隔中断；第二轮墙钟1223.25秒因常规WebContent vmmap错误中断，缺前端最终JSON。18段采样时检查/END均成功，但完整checkpoint证据缺失导致最终全部invalid；不是18次采样都失败。Rust现有34样本maxRise82MiB超过+10，负斜率不取消失败，也不直接等于泄漏。两轮均无主动1800秒完成证明，不拼接、不放宽规则。
+- **仍需收口**：必要的审阅外改失效/同位置更新、跨目标旧响应、真实Rejected、hunk键盘与完整文件快捷键/丢弃恢复、字号增大和有限原生退出补验；任务05剩余查看/清空项区分自动化与桌面。任务08回到ready-for-human但未done；任务10仍ready-for-agent、11及13未done。先定位长测采样留证和Rust内存问题，验收全部通过才合main，再做M3详细访谈和规格。
+
+实际受测Release构建源为2a51b160，二进制SHA256 `fd5ffc86131aebbe77850487192005166a63c1a98f9e97aa72b3ddaa1d96988d`；f10相对它仅测试/文档变化，不能称f10重新构建。后续模型文档也不回填受测版本。原件分别归入[静态](./evidence/batch10-repair-static/manifest.json)、[桌面](./evidence/task13-desktop04/manifest.json)、[内部集成](./evidence/m2-ui-integration-20261025/manifest.json)、[CI修复](./evidence/task10-ci-fixture-final01/manifest.json)和[最终测量](./evidence/final-measure-20261025/manifest.json)；旧失败、无效尝试及缺件边界均保留。
+
+
+## 历史进度（按记录当时状态）
 
 - 任务13改版按用户确认的 rev3 / Q107 收尾，用户同意先在 `m2-ui` 复核和真实桌面/D06，再合 `m2`，后续UI以当前方向为准。首轮限定复核Standards3/Spec2（各最严重P2）对应修复完成；[本地检查](./task13-validation01.md)核Rust265/1ignored、Node178、Python20及前端检查退出0，保留首次绑定空白失败与规范化后复验，最终全部源码SHA回到检查前。尚待新固定提交复核，没有Release/桌面/D06/Windows/合并，不提前done；08既有缺陷仍独立待返修。
 

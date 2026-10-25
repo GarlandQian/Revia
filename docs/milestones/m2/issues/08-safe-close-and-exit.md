@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -940,3 +940,12 @@ B05–B08 中依赖旧投递/裁决模型的测试迁移为实际共享驱动+�
 相关修改完成后集中检查：`cargo test --manifest-path src-tauri/Cargo.toml --offline --locked` 为 **271 passed / 0 failed / 1 ignored**；既有绑定清理和 diff-check 均退出 0。新增两项现有 Rust 单测验证转发成功/错误/panic 均 Cancel，以及真实注册 selector 的 ABI、重复/继承方法拒绝；它们**不替代** AppKit、Cmd-Q、Dock Quit 的真实桌面验证。前端未改，本次不机械重跑刚通过的前端检查。
 
 原件 `/private/tmp/revia-b10-vzc_he0k/checks-cpi33j4q` 保留 argv/cwd/显式环境/start/end/exit/stdout/stderr。依赖解析仅改变 Cargo.lock；此后 154 份受测源码、测试、配置、锁文件在 Rust 检查前后 SHA256 一致，warning 原样保留。本节实现尚待固定提交的独立 Standards / Spec 复核及新 Release，08 暂回 `ready-for-agent`；真实 Cmd-Q/Dock Quit、Wait/Stay、待核对尚未重验，10/11/M2 均未完成。
+
+
+### 2026-10-25 规划方：B10 静态闭合与真实关闭结果
+
+固定5f632d6...2a51b16的独立Standards/Spec均0项，B10完整Rust271通过/0失败/1既有ignored，见[修复记录](../batch10-repair-validation.md)。Status回到ready-for-human，不done。
+
+窗口Close/Stay、Cmd-Q/Stay及原生菜单Quit/Wait显式交付后退出已有局部闭环。C05已真实执行：恢复准备失败→Wait→显式释放→待核对可见并阻止自动关→Stay→真实状态核对→新Close请求→用户授权“我已核对，继续关闭”→同PID55553退出0。HEAD/index/两侧diff/工作区字节与模式不变；不是恢复成功或写后数据丢失，不再待用户许可。
+
+Dock样本仍仅工具超时、没有实际Quit；另存C06自动释放不是显式释放通过。有限关闭入口尾项及全M2验收未完成，不按动作×入口穷举。[桌面原件](../evidence/task13-desktop04/manifest.json)保留历史失败和当前结论。
