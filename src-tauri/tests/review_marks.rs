@@ -884,9 +884,19 @@ fn deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed() {
     run(&f.repo, &["-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive"]);
     // 让父仓库里的 gitlink 相对基线产生改动：子模块里新提交并暂存到父仓库，
     // 这样 `sub` 会稳定出现在改动列表里（不靠「文件离开列表」兜底）。
-    fs::write(f.repo.join("sub").join("f.txt"), b"two\n").unwrap();
-    run(&f.repo.join("sub"), &["add", "--all"]);
-    run(&f.repo.join("sub"), &["commit", "-m", "two"]);
+    //
+    // 子模块是**克隆**出来的，仓库本地 config 不随 clone 继承：
+    // 父仓库与 source 的 user.name/user.email/commit.gpgsign 在这里都不生效。
+    // 不显式设置就会依赖宿主是否能自动推断身份——macOS 上 Git 会按
+    // 用户名/主机名自动生成，Windows CI 上则直接报 `Author identity unknown`。
+    // 因此在这个临时子模块克隆里显式确定身份并禁用签名，让断言不依赖宿主环境。
+    let sub = f.repo.join("sub");
+    run(&sub, &["config", "user.name", "Sub"]);
+    run(&sub, &["config", "user.email", "sub@example.invalid"]);
+    run(&sub, &["config", "commit.gpgsign", "false"]);
+    fs::write(sub.join("f.txt"), b"two\n").unwrap();
+    run(&sub, &["add", "--all"]);
+    run(&sub, &["commit", "-m", "two"]);
     run(&f.repo, &["add", "--", "sub"]);
 
     let session = f.session();

@@ -56,3 +56,87 @@ Pi 在 `6071b59` 将并发写入从截断写改为临时文件后 rename，并�
 现有 `10-integration-matrix.md` 属于历史准备交付，不是最终通过。它指向的 `/private/tmp/revia-batch02-8LEw43` 当前不存在，且写“见文末受测提交”却无该段及最终 SHA，因此本轮无法独立核对这批原始检查；不据此指称造假，不把无法核对的数字升级为已验证。后续矩阵应关联新的固定源码、实际归档原件/哈希清单，区分实施检查与规划方验收。
 
 当前视觉基准为 Q107/rev3，`m2-ui` 已实现但尚未合入 `m2`；rev1、半透明侧栏和“美化未实现”等历史描述不能作为最终验收依据。Pi 本轮完成08返修及现有功能矩阵/报告准备，不编辑尚在独立验收的 `m2-ui`；最终集成源码仍须在合入UI后重新固定验证，旧结果不替代新版 Windows 编译、完整真实桌面、D06 和主动30分钟Q98长测。任务10、11及M2均不提前done。
+
+### 2026-10-25 / Pi 实现：review_marks 子模块 fixture 提交身份（定点修复）
+
+固定起点 `2a51b160d1c3871b9c67fee81ae6f082910bc1f8`（分支 `m2`，工作树干净）。
+只改 `src-tauri/tests/review_marks.rs`；未改生产代码、未改用户 Git 配置、未动其他任务状态。
+
+#### 真实失败与原因
+
+固定 `2a51` 的 Compile Check（run 40172283582，Windows job 121105479132）中
+`review_marks` 29 项有 1 项失败：`deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed`，
+在 `git commit -m two` 处报 `Author identity unknown`（断言位置 `review_marks.rs:860`），
+Windows Release 编译随后被跳过。原始完整日志由规划方保存于
+`/private/tmp/revia-m2-ui-merge-yk2t6656/windows-job-121105479132.log`。
+
+原因：`f.repo/sub` 是 `git submodule add` **克隆**出来的仓库，
+仓库本地 `user.name` / `user.email` / `commit.gpgsign` 不随 clone 继承。
+父仓库与 `sub-source` 里设置的本地身份在克隆体里都不生效。
+不显式设置时，Git 会尝试按系统用户名/主机名自动推断：
+macOS 上能推断（伴随警告），Windows CI 上直接拒绝并报 `Author identity unknown`。
+
+#### 修复（最小、仅测试）
+
+在子模块克隆里显式确定身份并禁用签名，再创建第二个提交：
+
+```rust
+let sub = f.repo.join("sub");
+run(&sub, &["config", "user.name", "Sub"]);
+run(&sub, &["config", "user.email", ...]);   // 与 source 相同的字面量
+run(&sub, &["config", "commit.gpgsign", "false"]);
+fs::write(sub.join("f.txt"), b"two\n").unwrap();
+run(&sub, &["add", "--all"]);
+run(&sub, &["commit", "-m", "two"]);
+```
+
+未使用 `cfg(windows)` 跳过、`#[ignore]`、放宽断言或伪造 Git 结果。
+安全断言全部保留：gitlink 改动仍出现在改动列表；deinit 后版本无法确认、
+旧标记失效且不能新增认领；重新 init 不恢复旧标记。
+
+#### 敏感性验证（复现 Windows 的失败条件）
+
+Windows 失败的实质是「Git 不能自动推断身份」。用 `user.useConfigOnly = true`
+在 fixture 的隔离全局配置里复现该条件（不改任何真实用户配置）：
+
+- 移除上面三行 `config` 后运行同一测试 → **失败**，
+  `panic` 内容为 `git ["commit", "-m", "two"] 失败：作者身份未知`
+  （Git 的中文本地化输出，等价 Windows 的 `Author identity unknown`），
+  位置 `review_marks.rs:860`。
+- 恢复三行后同一条件 → **通过**。
+
+原件：`/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/`（`pre-fix-useconfigonly.out/.err/.exit`、
+`review_marks.rs.fixed` 修复版快照）。运行后已把测试文件恢复为修复版，
+SHA 与最终检查一致（`a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9`）。
+
+#### 检查（最终一次集中验证）
+
+日志子目录：`/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1`（本轮唯一独占目录；`record2.py` 执行时逐条记录
+真实 argv/cwd、显式非敏感环境（隔离 `HOME` + `GIT_CONFIG_GLOBAL` + `GIT_CONFIG_NOSYSTEM=1` +
+显式 `CARGO_HOME` 以复用离线缓存）、start/end、exit、完整 stdout/stderr，汇总在 `invocations.json`）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `cargo test --offline --locked --test review_marks` | 0 | 31 passed / 0 failed |
+| `git diff --check` | 0 | — |
+
+- 测试源码检查前/后 SHA 逐份一致：`a2ff3004...7d4f9f9`。
+- 无生成绑定改动（`src/types/bindings` 未变），未运行绑定规范化。
+- 只跑受影响的 `review_marks` 套件；未重跑前端或全量 Rust。
+
+#### 证据边界（如实记录，不补造）
+
+- 本轮最初用 `record.py` 运行过一次 `review_marks`（31 passed）并生成了
+  `00-*.out/.err/.exit` 与 `invocations.json`，随后被我用 `rm -f` 删除，
+  **这些原始流已不可恢复**，不从记忆重造；该次运行的完整原件缺失。
+- 之后改用 `record2.py` 在隔离 HOME 下重跑并保留全部原件（即上表）。
+- 另有一次在未隔离 HOME 下的 `record2.py` 尝试因 `--offline` 找不到 `notify`
+  而失败（退出 101），其 `00-*.err` 保留在同一目录，属于环境隔离方式问题，
+  不是产品缺陷；已通过显式 `CARGO_HOME` 修正隔离方式后重跑。
+
+#### 未测边界
+
+- **本机（macOS）通过不等于 Windows 通过**：Windows 必须在规划方再次推送 `m2`
+  后的实际 CI 中验证。
+- 未构建 Release、未启动 GUI、未跑 D06/CI/长测、未推送/合并。
+- 旧 CI 失败原件由规划方保留，本任务不改写。
