@@ -22,7 +22,7 @@
 
 所有命令显式cd `/Users/garland/.codex/worktrees/revia-m2/Revia`，只提交m2，main/用户图标/`.codex/`/旧fixture保持原样。使用正常编辑、精确暂存和独立提交，保留全部失败日志，不checkout/restore/reset文件或amend。测试沿用现有体系，Git验证仅自建临时仓库及独立数据目录。
 
-Pi负责实现、检查和静态效果图源文件，不启动GUI、不跑Release/D06/CI/长测、不推送/合并。规划方推送仅现有SSH origin正常推m2，不HTTPS、不改凭据/Git配置。原Pi/原模型保持；连续三次渠道错误才由规划方接管，测试失败/等待超时不计。
+Pi负责实现、检查和静态效果图源文件，不启动GUI、不跑Release/D06/CI/长测、不推送/合并。规划方推送仅现有SSH origin正常推m2，不HTTPS、不改凭据/Git配置。原Pi会话保持，模型优先顺序按[Q109](../../README.md)；连续三次渠道错误才由规划方接管，测试失败/等待超时不计。
 
 ## 本批执行记录（2026-10-24）
 
