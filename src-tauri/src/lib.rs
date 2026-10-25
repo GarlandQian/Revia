@@ -131,6 +131,7 @@ pub fn run() {
             commands::write_measurement,
             commands::debug_log,
             commands::set_exit_blocked,
+            commands::request_exit,
         ])
         .build(tauri::generate_context!())
         .expect("Revia 启动失败")

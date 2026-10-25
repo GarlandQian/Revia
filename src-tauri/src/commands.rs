@@ -21,6 +21,53 @@ use crate::settings::{Registry, Settings};
 use crate::recovery::{self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
+/// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
+///
+/// 生产 `AppState` 与回归测试**共用这一份实现**，测试不再复制比较算法：
+/// 一旦生产比较被改坏，测试会真实失败。
+#[derive(Debug, Default)]
+pub struct ExitGuard {
+    state: std::sync::Mutex<(u64, bool)>,
+}
+
+impl ExitGuard {
+    /// 应用一次带版本的更新；只有**更大的序号**才生效。
+    ///
+    /// 本地 Tauri 每个 invoke 是独立 fetch，旧请求可能晚到；靠这里的版本比较
+    /// 保证旧 `false` 绝不会覆盖新 `true`（ST-B03-08-1）。
+    pub fn apply(&self, seq: u64, blocked: bool) -> bool {
+        let Ok(mut guard) = self.state.lock() else {
+            return false;
+        };
+        if seq <= guard.0 {
+            return false;
+        }
+        *guard = (seq, blocked);
+        true
+    }
+
+    /// 当前是否需要阻止退出。
+    pub fn blocked(&self) -> bool {
+        self.state.lock().map(|guard| guard.1).unwrap_or(false)
+    }
+
+    /// 前端已锁住新写入后，最终复核退出保护再投递真正的应用退出。
+    fn request_exit(&self, exit: impl FnOnce()) -> Result<()> {
+        let blocked = self.state.lock()
+            .map_err(|_| AppError::internal("退出保护锁失败"))?.1;
+        if blocked {
+            return Err(AppError::rejected("仍有写操作或结果待核对，不能退出"));
+        }
+        exit();
+        Ok(())
+    }
+
+    /// 已接受的最高序号（诊断与测试用）。
+    pub fn accepted_seq(&self) -> u64 {
+        self.state.lock().map(|guard| guard.0).unwrap_or(0)
+    }
+}
+
 pub struct AppState {
     pub registry: Mutex<Registry>,
     pub sessions: Mutex<HashMap<String, Arc<WorktreeSession>>>,
@@ -33,11 +80,12 @@ pub struct AppState {
     pub recovery: RecoveryStore,
     /// 审阅标记存储（任务 07，持久化在 Revia 数据目录）。
     pub review: Arc<crate::review::ReviewStore>,
-    /// 前端是否报告「有在途写操作，退出需要等待」（任务 08、Q96）。
+    /// 前端报告的「退出保护」状态与版本（任务 08、Q96）。
     ///
-    /// Rust 侧只在原生退出（macOS Quit / ⌘Q）时读它：为真则阻止退出并通知前端，
-    /// 由前端按用户选择决定何时真正退出。默认 `false`（放行），避免进程无法结束。
-    pub exit_blocked: Arc<std::sync::atomic::AtomicBool>,
+    /// 存 `(seq, blocked)`：**只有更大的 seq 才生效**。本地 Tauri 每个 invoke 是
+    /// 独立 fetch，前端「旧 false 的调用晚到」若直接 store 会解除新建立的保护，
+    /// 因此在 Rust 侧用版本号保证旧请求绝不能覆盖新状态（ST-B03-08-1）。
+    pub exit_guard: Arc<ExitGuard>,
 }
 
 impl AppState {
@@ -52,16 +100,21 @@ impl AppState {
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
             acceptance: None,
-            exit_blocked: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            exit_guard: Arc::new(ExitGuard::default()),
         }
     }
 
-    /// 前端报告「是否仍有在途写操作」。
+    /// 当前是否需要阻止原生退出。
     ///
     /// 原生退出（macOS Quit / ⌘Q）不经过窗口关闭监听，Rust 侧据此决定是否
     /// 阻止退出并通知前端（任务 08、Q96）。只反映状态，不执行任何 Git 动作。
     pub fn exit_blocked(&self) -> bool {
-        self.exit_blocked.load(std::sync::atomic::Ordering::SeqCst)
+        self.exit_guard.blocked()
+    }
+
+    /// 应用一次带版本的保护更新；返回是否被接受（旧版本会被忽略）。
+    pub fn apply_exit_guard(&self, seq: u64, blocked: bool) -> bool {
+        self.exit_guard.apply(seq, blocked)
     }
 
     /// 取出（必要时创建）某个 worktree 的会话。
@@ -997,12 +1050,65 @@ pub async fn change_entry(
     Ok(slice.entry)
 }
 
-/// 设置「有在途写操作，退出需等待」的标志（任务 08、Q96）。
+/// 设置「退出保护」状态（任务 08、Q96）。
 ///
-/// 只记录状态：不取消写操作、不重跑任何命令。
+/// 请求带单调递增的 `seq`：只有更大的序号才生效，因此「旧 false 晚到」
+/// 不会解除已经建立的新保护（ST-B03-08-1）。只记录状态：
+/// 不取消写操作、不重跑任何命令。
 #[tauri::command]
-pub fn set_exit_blocked(state: State<'_, AppState>, blocked: bool) {
-    state
-        .exit_blocked
-        .store(blocked, std::sync::atomic::Ordering::SeqCst);
+pub fn set_exit_blocked(state: State<'_, AppState>, seq: u64, blocked: bool) -> bool {
+    state.apply_exit_guard(seq, blocked)
+}
+
+/// 仅执行已通过前端最终门禁的退出；不以关闭窗口替代原退出请求。
+#[tauri::command]
+pub fn request_exit(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<()> {
+    state.exit_guard.request_exit(|| app.exit(0))
+}
+
+#[cfg(test)]
+mod exit_guard_tests {
+    use super::ExitGuard;
+
+    #[test]
+    fn explicit_exit_dispatches_only_after_guard_release() {
+        let guard = ExitGuard::default();
+        let calls = std::cell::Cell::new(0);
+        assert!(guard.apply(1, true));
+        let result = guard.request_exit(|| calls.set(calls.get() + 1));
+        assert_eq!(result.unwrap_err().kind, crate::error::ErrorKind::Rejected);
+        assert_eq!(calls.get(), 0, "保护未释放时不投递退出");
+        assert!(guard.apply(2, false));
+        guard.request_exit(|| calls.set(calls.get() + 1)).unwrap();
+        assert_eq!(calls.get(), 1, "只投递实际应用退出，不销毁窗口冒充");
+    }
+
+    /// 新 true 建立后，旧 false（更小 seq）必须被拒绝。
+    #[test]
+    fn newer_true_rejects_late_older_false() {
+        let guard = ExitGuard::default();
+        assert!(guard.apply(1, false), "首个 false 生效");
+        assert!(guard.apply(2, true), "新 true 生效");
+        assert!(!guard.apply(1, false), "旧 false 必须被拒绝");
+        assert!(guard.blocked(), "旧 false 晚到不得解除新 true");
+        assert_eq!(guard.accepted_seq(), 2, "已接受序号不得倒退");
+    }
+
+    /// 更新的 false 正常释放。
+    #[test]
+    fn newer_false_releases() {
+        let guard = ExitGuard::default();
+        assert!(guard.apply(1, true));
+        assert!(guard.apply(2, false), "更新的 false 正常生效");
+        assert!(!guard.blocked());
+    }
+
+    /// 相同序号不重复生效（幂等且不倒退）。
+    #[test]
+    fn equal_seq_is_rejected() {
+        let guard = ExitGuard::default();
+        assert!(guard.apply(1, true));
+        assert!(!guard.apply(1, false), "同序号不得改变状态");
+        assert!(guard.blocked());
+    }
 }

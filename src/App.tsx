@@ -56,7 +56,8 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog, MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
-import { CloseCoordinator, runReviewRecoveryBatch } from "@/lib/refreshGate";
+import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
+import type { CloseDriverEffect } from "@/lib/refreshGate";
 import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
 import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
@@ -185,15 +186,24 @@ export function App() {
    */
   const worktreeErrorEpochRef = useRef<Record<string, number>>({});
 
+  /**
+   * 当前 worktree id 的 ref：让 `setAppError` 的**身份保持稳定**。
+   *
+   * 关闭/退出保护监听的 effect 依赖 `setAppError`；如果它随 worktree 变化，
+   * 切换 worktree 就会卸载并重装监听，在途写保护出现空档（ST-B04-08-1）。
+   */
+  const worktreeIdRefForError = useRef<string | null>(null);
+  worktreeIdRefForError.current = worktreeId;
+
   const setAppError = useCallback((err: AppErrorPayload | null, targetWorktreeId?: string | null) => {
-    const wtId = targetWorktreeId ?? worktreeId;
+    const wtId = targetWorktreeId ?? worktreeIdRefForError.current;
     if (wtId) {
       worktreeErrorEpochRef.current[wtId] = (worktreeErrorEpochRef.current[wtId] ?? 0) + 1;
       setWorktreeErrors((prev) => ({ ...prev, [wtId]: err }));
     } else {
       setGlobalError(err);
     }
-  }, [worktreeId]);
+  }, []);
 
   /** 记录一次无归属操作的结果；`seq` 用来拒绝旧完成覆盖较新的错误。 */
   const recordExternalResult = useCallback((seq: number, err: AppErrorPayload | null) => {
@@ -768,49 +778,64 @@ export function App() {
     const stops: Array<() => void> = [];
     const fail = (what: string) => (caught: unknown) => {
       if (disposed) return;
-      setAppError(
-        { kind: "internal", message: messages.close.listenerFailed(what, getErrorMessage(caught)) },
-        null,
+      // 保护安装失败：标记为不可用，写入口会据此拒绝开始写入（ST-B03-08-2）。
+      closeGuardsRef.current.markFailed(
+        messages.close.guardUnavailable(messages.close.listenerFailed(what, getErrorMessage(caught))),
       );
+      setAppError({ kind: "internal", message: closeGuardsRef.current.blockedReason ?? "" }, null);
     };
+    // 每次（重）装都从未就绪开始：安装中不允许写入。
+    closeGuardsRef.current = new CloseGuardGate();
     void (async () => {
+      let windowGuard = false;
+      let exitGuard = false;
       try {
-        const stop = await getCurrentWindow().onCloseRequested(async (event) => {
-          closeIntentRef.current = "close";
-          const decision = closeCoordinatorRef.current.request("close");
-          if (decision.action === "proceed") return;
+        const stop = await getCurrentWindow().onCloseRequested((event) => {
+          // 只接收用户意图；绝不把匿名事件当作程序化关闭的回执。
           event.preventDefault();
-          if (!disposed) setCloseRequest(decision);
+          const driver = closeDriverRef.current;
+          if (!driver || disposed) return;
+          applyEffectRef.current?.(driver.handleNativeCloseRequest());
         });
         if (disposed) stop(); else stops.push(stop);
+        windowGuard = true;
       } catch (caught) {
-        fail("窗口关闭")(caught);
+        fail(messages.close.guardWindowClose)(caught);
       }
       try {
         // 原生退出：Rust 已阻止退出并通知前端，这里按同一套编排询问用户。
         const stop = await listen("revia://exit-requested", () => {
           if (disposed) return;
-          closeIntentRef.current = "exit";
-          const decision = closeCoordinatorRef.current.request("exit");
-          if (decision.action === "proceed") {
-            void performCloseIntentRef.current?.("exit");
-            return;
-          }
-          setCloseRequest(decision);
+          const driver = closeDriverRef.current;
+          if (!driver) return;
+          applyEffectRef.current?.(driver.handleRequest("exit"));
         });
         if (disposed) stop(); else stops.push(stop);
+        exitGuard = true;
       } catch (caught) {
-        fail("原生退出")(caught);
+        fail(messages.close.guardNativeExit)(caught);
+      }
+      // 两个监听都装好才算就绪：缺一个都可能让关闭/退出绕过保护。
+      if (!disposed && windowGuard && exitGuard) {
+        closeGuardsRef.current.markInstalled("window");
+        closeGuardsRef.current.markInstalled("exit");
       }
     })();
     return () => {
       disposed = true;
+      closeGuardsRef.current.dispose();
       for (const stop of stops) stop();
     };
-  }, [setAppError]);
+    // 依赖数组为空：这是**应用级**生命周期，不随 worktree 变化卸载重装。
+    // 所有可变输入都经 ref 读取，因此切换 worktree 不会在在途写期间出现保护空档
+    // （ST-B04-08-1 / SP-B04-08-1）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** 执行关闭/退出的入口（供原生退出事件复用，避免定义顺序问题）。 */
-  const performCloseIntentRef = useRef<((intent: CloseIntent) => Promise<void>) | null>(null);
+  /** 驱动的转发：监听回调早于驱动定义注册。 */
+  const applyEffectRef = useRef<((effect: CloseDriverEffect) => void) | null>(null);
+  /** reconcile 的转发（供监听回调与关闭执行共用，避免定义顺序问题）。 */
 
   // ---------------- 添加仓库 ----------------
 
@@ -1041,8 +1066,17 @@ export function App() {
   const closeCoordinatorRef = useRef(new CloseCoordinator());
   /** 当前需要用户选择的关闭/退出请求（`null` 表示没有）。 */
   const [closeRequest, setCloseRequest] = useState<CloseDecision | null>(null);
-  /** 当前询问对应的原动作（close / exit），只用于文案，不改动作类型。 */
+  /** 当前询问对应的原动作（close / exit）：由 reconcile 从被保留的原请求写入。 */
   const closeIntentRef = useRef<CloseIntent>("close");
+  /**
+   * 关闭/退出保护监听的安装状态（任务 08、Q96）。
+   *
+   * 只有窗口关闭监听**和**原生退出监听都装好，才允许开始写入；
+   * 安装中/失败/卸载时写入口会拒绝执行（ST-B03-08-2）。
+   */
+  const closeGuardsRef = useRef(new CloseGuardGate());
+  /** reconcile 的转发（监听回调早于其定义注册）。 */
+  const reconcileCloseRef = useRef<(() => void) | null>(null);
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
   const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
@@ -1058,50 +1092,112 @@ export function App() {
    * 只有关闭编排确认「没有在途写、没有待核对」后才会走到这里；
    * 动作类型完全按用户原请求，不升级、不替换。
    */
-  const performCloseIntent = useCallback(async (intent: CloseIntent) => {
-    try {
-      // 关闭窗口与退出进程是两件事：退出必须先解除阻止标志，
-      // 否则原生 ExitRequested 会再次阻止，进程永远退不出去。
-      if (intent === "exit") {
-        await ipc.setExitBlocked(false);
-        await getCurrentWindow().close();
-        return;
-      }
-      await getCurrentWindow().close();
-    } catch (caught) {
-      setAppError(toAppError(caught), null);
+
+
+
+
+  /**
+   * 把「是否需要阻止原生退出」同步给 Rust（任务 08）。
+   *
+   * 用**版本号**串行化：每次请求带上单调递增的版本，Rust 侧只接受更大的版本。
+   * 这样「旧 false 的 invoke 晚到」不可能覆盖「新 true」——本地 Tauri 每个 invoke
+   * 是独立 fetch，仅靠 JS 丢旧回包不足以保证 Rust 实际状态（ST-B03-08-1）。
+   */
+  /**
+   * 退出保护同步器：版本化，旧 `false` 晚到也不会覆盖新 `true`（ST-B03-08-1）。
+   */
+  const exitGuardRef = useRef(new ExitGuardSync((request) => ipc.setExitBlocked(request)));
+  const syncExitBlocked = useCallback(async (blocked: boolean): Promise<void> => {
+    const accepted = await exitGuardRef.current.set(blocked);
+    if (!accepted) {
+      // 被更高版本取代：说明更新的状态已经生效，不算失败。
+      debugLog(`退出保护更新被更新版本取代：blocked=${blocked}`);
     }
-  }, [setAppError]);
-
-  performCloseIntentRef.current = performCloseIntent;
+  }, []);
 
   /**
-   * 一个写操作结束（成功或失败）后的收尾（任务 08）。
+   * 关闭/退出的**共享生产驱动**适配（任务 08，ST-B07-08-1..3）。
    *
-   * - 把结束事件交给关闭编排，并标记结果是否待核对；
-   * - **只有用户已明确选择「等待」**（`intent` 存在）且条件满足时，才执行**原请求**；
-   * - 没有原请求、或用户已选「留在应用」时，绝不凭空关窗（ST-B01-08-2）。
+   * 状态机全部在 `CloseDriver` 里；App 只把它的 `CloseDriverEffect`
+   * 映射成对话框与原生动作。Node 回归驱动同一个类。
    */
+  const closeDriverRef = useRef<CloseDriver | null>(null);
+  if (closeDriverRef.current === null) {
+    closeDriverRef.current = new CloseDriver({
+      coordinator: closeCoordinatorRef.current,
+      releaseExitGuard: () => syncExitBlocked(false),
+      closeWindow: () => getCurrentWindow().destroy(),
+      exitApp: () => ipc.requestExit(),
+      onError: (caught) => setAppError(toAppError(caught), null),
+      onAsk: (intent, writing, pending) => {
+        closeIntentRef.current = intent;
+        setCloseRequest(
+          pending.length > 0 ? { action: "showPending", writing, pending } : { action: "ask", writing },
+        );
+      },
+      onSettled: () => setCloseRequest(null),
+    });
+  }
+  const closeDriver = closeDriverRef.current;
+
+  /** 把驱动返回的效果落到 React 状态（驱动内部已调用 onAsk/onSettled）。 */
+  const applyEffect = useCallback((effect: CloseDriverEffect) => {
+    if (effect.kind === "none") return;
+    if (effect.kind === "ask") {
+      closeIntentRef.current = effect.intent;
+      setCloseRequest(
+        effect.pending.length > 0
+          ? { action: "showPending", writing: effect.writing, pending: effect.pending }
+          : { action: "ask", writing: effect.writing },
+      );
+      return;
+    }
+    setCloseRequest(null);
+  }, []);
+
   /**
-   * 把「是否有在途写操作」同步给 Rust（原生退出用，任务 08）。
+   * 生命周期状态变化后通知驱动（写结束、rollback、待核对清除等）。
    *
-   * 只同步状态，不触发任何 Git 动作；失败写进全局错误，不静默。
+   * 驱动不会重复认领已有执行；最终 closing 阶段不会再开启写入或请求。
    */
-  const syncExitBlocked = useCallback((blocked: boolean) => {
-    void ipc.setExitBlocked(blocked).catch((caught) => {
+  const reconcileClose = useCallback(() => {
+    const coordinator = closeCoordinatorRef.current;
+    void syncExitBlocked(coordinator.needsExitGuard()).catch((caught) => {
       setAppError(toAppError(caught), null);
     });
-  }, [setAppError]);
+    applyEffect(closeDriver.notifyStateChanged());
+  }, [applyEffect, closeDriver, syncExitBlocked]);
 
-  const finishWrite = useCallback((worktreeId: string, needsVerification: boolean) => {
-    const coordinator = closeCoordinatorRef.current;
-    coordinator.endWrite(worktreeId, needsVerification);
-    syncExitBlocked(coordinator.hasWriting());
-    const ready = coordinator.takeReadyIntent();
-    if (!ready) return;
-    setCloseRequest(null);
-    void performCloseIntent(ready);
-  }, [performCloseIntent, syncExitBlocked]);
+  // 监听回调通过 ref 到达同一驱动。
+  reconcileCloseRef.current = reconcileClose;
+  applyEffectRef.current = applyEffect;
+
+  /**
+   * 三个写入口共用的**共享异步编排**（任务 08）。
+   *
+   * 依赖全部经 ref/回调读取，所以实例稳定；App 与 Node 回归用同一个类。
+   */
+  const writeOrchestratorRef = useRef<WriteGuardOrchestrator | null>(null);
+  if (writeOrchestratorRef.current === null) {
+    writeOrchestratorRef.current = new WriteGuardOrchestrator({
+      closeDriver,
+      closeBlockedReason: messages.close.closing,
+      guardsReady: () => closeGuardsRef.current.ready,
+      guardBlockedReason: () => closeGuardsRef.current.blockedReason,
+      register: (worktreeId) => {
+        closeCoordinatorRef.current.beginWrite(worktreeId);
+      },
+      guard: () => syncExitBlocked(true),
+      rollback: (worktreeId) => {
+        closeCoordinatorRef.current.rollbackWrite(worktreeId);
+      },
+      reconcile: () => reconcileCloseRef.current?.(),
+      endWrite: (worktreeId, needsVerification) => {
+        closeCoordinatorRef.current.endWrite(worktreeId, needsVerification);
+      },
+    });
+  }
+  const writeOrchestrator = writeOrchestratorRef.current;
 
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
@@ -1111,8 +1207,24 @@ export function App() {
     let needsVerification = false;
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
-    closeCoordinatorRef.current.beginWrite(opWorktreeId);
-    syncExitBlocked(true);
+    try {
+      // 共享异步编排：登记 → await 保护 → 复核就绪；失败已回滚并真实收尾。
+      const started = await writeOrchestrator.begin(opWorktreeId);
+      if (!started.ok) {
+        writingWorktreesRef.current.delete(opWorktreeId);
+        setWritingWorktrees(new Set(writingWorktreesRef.current));
+        setAppError(
+          { kind: "internal", message: messages.close.guardUnavailable(started.reason) },
+          opWorktreeId,
+        );
+        return;
+      }
+    } catch (caught) {
+      writingWorktreesRef.current.delete(opWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+      setAppError(toAppError(caught), opWorktreeId);
+      return;
+    }
     setAppError(null, opWorktreeId);
     // 切换期间界面可能仍显示原目标；操作归属取真实写目标，不能取已前进的激活目标。
     const opToken = operationGateRef.current.begin(opWorktreeId);
@@ -1161,9 +1273,9 @@ export function App() {
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
-      finishWrite(opWorktreeId, needsVerification);
+      writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, finishWrite, refresh, scheduleReviewRecovery, setAppError]);
+  }, [acceptSnapshot, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -1182,8 +1294,20 @@ export function App() {
     }
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
-    closeCoordinatorRef.current.beginWrite(opWorktreeId);
-    syncExitBlocked(true);
+    try {
+      // 共享异步编排：失败时已回滚并真实收尾，这里只需如实抛出。
+      const started = await writeOrchestrator.begin(opWorktreeId);
+      if (!started.ok) {
+        writingWorktreesRef.current.delete(opWorktreeId);
+        setWritingWorktrees(new Set(writingWorktreesRef.current));
+        throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+      }
+    } catch (caught) {
+      writingWorktreesRef.current.delete(opWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+      setAppError(toAppError(caught), opWorktreeId);
+      throw caught;
+    }
     setAppError(null, opWorktreeId);
     // 本次恢复的结果是否无法确定（Q91）：关闭时需先展示待核对。
     let needsVerification = false;
@@ -1206,9 +1330,9 @@ export function App() {
     } finally {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
-      finishWrite(opWorktreeId, needsVerification);
+      writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [finishWrite, refreshTarget, setAppError]);
+  }, [refreshTarget, setAppError, writeOrchestrator]);
 
   /**
    * 另存回收内容（任务 05）。
@@ -1241,8 +1365,16 @@ export function App() {
     // 进入即登记：解析归属期间也算在途，避免解析窗口内被关闭绕过。
     // 无归属（外部新路径）用占位键，不为此路径强加 worktree 写锁。
     const provisionalKey = `save-as:${request.destination}`;
-    closeCoordinatorRef.current.beginWrite(provisionalKey);
-    syncExitBlocked(true);
+    try {
+      // 共享异步编排：失败时已回滚并真实收尾。
+      const started = await writeOrchestrator.begin(provisionalKey);
+      if (!started.ok) {
+        throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+      }
+    } catch (caught) {
+      setAppError(toAppError(caught), null);
+      throw caught;
+    }
     let opToken: OperationContext | null = null;
     try {
       // 后端解析真实归属；解析失败同样落到 App 级结果通道，不猜路径、不借用当前 worktree。
@@ -1297,12 +1429,12 @@ export function App() {
         writingWorktreesRef.current.delete(heldGateId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
       }
-      // 关闭生命周期收尾：有归属用 worktree 键，无归属用占位键；
-      // 错误种类如实传递，`needsVerification` 保留为待核对（Q91）。
-      closeCoordinatorRef.current.endWrite(heldGateId ?? provisionalKey, needsVerification);
-      syncExitBlocked(closeCoordinatorRef.current.hasWriting());
+      // 关闭生命周期收尾：与其它写入口**完全一致**地走 finishWrite，
+      // 这样「最后一笔另存」也会消费已授权的等待请求（ST-B02-08-3 / SP-B02-08-3）。
+      // 有归属用 worktree 键，无归属用占位键；needsVerification 如实传递（Q91）。
+      writeOrchestrator.end(heldGateId ?? provisionalKey, needsVerification);
     }
-  }, [finishWrite, recordExternalResult, refreshTarget, setAppError]);
+  }, [recordExternalResult, refreshTarget, setAppError, writeOrchestrator]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
@@ -2652,31 +2784,50 @@ export function App() {
           writing={closeRequest.writing}
           pending={"pending" in closeRequest ? closeRequest.pending : []}
           onWait={() => {
-            // 用户明确选择「等待」：保留原请求，等全部写完成并记录结果后执行（不杀 Git）。
-            closeCoordinatorRef.current.resolveAsk("wait");
-            setCloseRequest(null);
+            // 用户明确选择「等待」：交给共享驱动（可能立刻执行，也可能继续等待）。
+            applyEffect(closeDriver.handleChoice("wait"));
           }}
           onStay={() => {
-            // 留在应用：不取消写操作、不改变动作类型，也不会稍后自动关窗。
-            closeCoordinatorRef.current.resolveAsk("stay");
-            setCloseRequest(null);
+            // 留在应用：驱动清掉请求与授权并推进代际，在途旧投递/核对失效。
+            applyEffect(closeDriver.handleChoice("stay"));
           }}
           onPendingReviewed={() => {
-            // 待核对闭环：真实核对（重新读取真值）后清除 pending，再由用户明确继续。
-            // 不重跑任何写命令；占位键（无归属另存）没有 worktree 可读，直接确认。
+            // 待核对闭环：捕获**请求代际**与每个目标的**待核对代际**，
+            // 只清自己成功核对过的那一代（ST-B03-08-4/5/6）。
             const coordinator = closeCoordinatorRef.current;
-            const targets = coordinator.pendingWorktrees();
+            const requestGen = coordinator.generation();
+            const targets = coordinator.pendingWorktrees()
+              .map((worktreeId) => ({ worktreeId, generation: coordinator.pendingGeneration(worktreeId) }));
             void (async () => {
-              for (const worktreeId of targets) {
+              let allConfirmed = true;
+              for (const { worktreeId, generation } of targets) {
+                // 用户在核对过程中取消/发起新请求：旧核对不得授权新请求。
+                if (coordinator.generation() !== requestGen) return;
                 if (!worktreeId.startsWith("save-as:")) {
-                  await refreshTarget(worktreeId).catch(() => undefined);
+                  let verified = false;
+                  try {
+                    verified = await refreshTarget(worktreeId);
+                  } catch {
+                    verified = false;
+                  }
+                  if (!verified) {
+                    // 核对失败：保留待核对，不关闭、不重跑。
+                    allConfirmed = false;
+                    continue;
+                  }
                 }
-                coordinator.acknowledgePending(worktreeId);
+                if (!coordinator.acknowledgePending(worktreeId, generation)) {
+                  // 该目标出现了新的待核对（代际已变）：不清账。
+                  allConfirmed = false;
+                }
               }
-              coordinator.confirmPendingContinue();
-              setCloseRequest(null);
-              const ready = coordinator.takeReadyIntent();
-              if (ready) void performCloseIntentRef.current?.(ready);
+              if (coordinator.generation() !== requestGen) return;
+              if (!allConfirmed) {
+                // 失败或出现新 pending：按**当前真实集合**主动重新展示。
+                reconcileClose();
+                return;
+              }
+              applyEffect(closeDriver.handlePendingContinue());
             })();
           }}
         />

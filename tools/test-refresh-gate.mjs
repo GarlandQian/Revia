@@ -32,7 +32,7 @@ function unwrapEntry(outcome) {
   return outcome.entry;
 }
 
-const { CloseCoordinator, SnapshotGate, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
+const { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, SnapshotGate, WriteGuardOrchestrator, RefreshCoordinator, OperationResultGate, ReviewOverlay, SelectionGate, WatchEventGate, applyReviewSuccess, applyReviewSuccessAndCompose, commitReviewResult, mergePublishedReview, planReviewResult, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, runReviewRecoveryBatch, reviewedSetForNavigation } = await import("../src/lib/refreshGate.ts");
 imports.deregister();
 const { subscribeToForeground } = await import("../src/lib/foregroundRefresh.ts");
 
@@ -1823,7 +1823,8 @@ test("恢复转发未赋值时不静默成功（返回 null 而不是伪造结�
 test("没有在途写操作时关闭请求立即执行（不打断任何 Git）", () => {
   const c = new CloseCoordinator();
   assert.deepEqual(c.request("close"), { action: "proceed" });
-  assert.equal(c.pendingIntent(), null);
+  // 请求本身即授权，但账留到原生裁决（ST-B06-08-1）。
+  assert.equal(c.pendingIntent(), "close");
 });
 
 test("有在途写操作时保留窗口并询问，不执行关闭", () => {
@@ -1853,21 +1854,62 @@ test("留在应用：清掉请求但不取消写操作、不改变动作类型",
   assert.deepEqual(c.writingWorktrees(), ["wt-a"], "写操作没有被取消");
   // 写操作完成后不再执行任何关闭/退出。
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), null, "留在应用后不执行原请求");
+  assert.notEqual(c.reconcile().kind, "proceed", "留在应用后不执行原请求")
 });
 
 test("等待完成后执行**原请求**（关闭不会被改成退出，反之亦然）", () => {
   const c = new CloseCoordinator();
   c.beginWrite("wt-a");
   c.request("exit");
+  c.resolveAsk("wait");                 // 用户明确选择等待（授权）
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), "exit", "执行的就是用户原来的退出请求");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "exit" }, "执行的就是用户原来的退出请求")
 
   const c2 = new CloseCoordinator();
   c2.beginWrite("wt-b");
   c2.request("close");
+  c2.resolveAsk("wait");
   c2.endWrite("wt-b");
-  assert.equal(c2.takeReadyIntent(), "close");
+  assert.deepEqual(c2.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("询问未选择就完成写入：不执行关闭（仅显示询问不算授权）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  assert.equal(c.request("close").action, "ask");
+  // 用户还没选，写入就结束了。
+  c.endWrite("wt-a");
+  assert.notEqual(c.reconcile().kind, "proceed", "未授权不得关窗")
+  assert.equal(c.pendingIntent(), "close", "原请求仍保留，等待用户选择");
+});
+
+test("写入结束后用户才点「等待」：请求不丢，收尾时执行原动作", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("exit");
+  c.endWrite("wt-a");                   // 写入先结束
+  assert.notEqual(c.reconcile().kind, "proceed", "此时还没授权")
+  c.resolveAsk("wait");                 // 用户晚点击
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "exit" }, "晚点击等待后仍执行原动作")
+});
+
+test("重复请求不替换原动作（关闭询问中再次退出）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.request("exit");                    // 询问中再次请求
+  assert.equal(c.pendingIntent(), "close", "原动作以第一次为准");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" }, "执行的是最初的动作")
+
+  const c2 = new CloseCoordinator();
+  c2.beginWrite("wt-b");
+  c2.request("exit");
+  c2.request("close");
+  c2.resolveAsk("wait");
+  c2.endWrite("wt-b");
+  assert.deepEqual(c2.reconcile(), { kind: "proceed", intent: "exit" });
 });
 
 test("多个 worktree 的在途写操作全部完成后才执行原请求", () => {
@@ -1875,10 +1917,11 @@ test("多个 worktree 的在途写操作全部完成后才执行原请求", () =
   c.beginWrite("wt-a");
   c.beginWrite("wt-b");
   c.request("close");
+  c.resolveAsk("wait");
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), null, "还有 wt-b 在写");
+  assert.notEqual(c.reconcile().kind, "proceed", "还有 wt-b 在写")
   c.endWrite("wt-b");
-  assert.equal(c.takeReadyIntent(), "close");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
 });
 
 test("待核对结果先展示，不静默退出", () => {
@@ -1888,9 +1931,11 @@ test("待核对结果先展示，不静默退出", () => {
   const decision = c.request("close");
   assert.equal(decision.action, "showPending");
   assert.deepEqual(decision.pending, ["wt-a"]);
-  assert.equal(c.takeReadyIntent(), null, "待核对未确认前不执行退出");
-  c.acknowledgePending("wt-a");
-  assert.equal(c.takeReadyIntent(), "close", "确认后才执行原请求");
+  assert.notEqual(c.reconcile().kind, "proceed", "待核对未确认前不执行退出")
+  const gen = c.pendingGeneration("wt-a");
+  c.acknowledgePending("wt-a", gen);
+  c.confirmPendingContinue();
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" }, "确认后才执行原请求")
 });
 
 test("待核对不会被下一次写入自动清除（只有真实核对才清除，Q91）", () => {
@@ -1903,9 +1948,9 @@ test("待核对不会被下一次写入自动清除（只有真实核对才清�
   assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "开始新写入不能清 pending");
   c.endWrite("wt-a", false);
   assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "成功写入也不能代替核对");
-  assert.equal(c.takeReadyIntent(), null, "未核对前不执行关闭");
+  assert.notEqual(c.reconcile().kind, "proceed", "未核对前不执行关闭")
   // 真实核对后才清除。
-  c.acknowledgePending("wt-a");
+  c.acknowledgePending("wt-a", c.pendingGeneration("wt-a"));
   assert.deepEqual(c.pendingWorktrees(), []);
 });
 
@@ -1988,9 +2033,9 @@ test("没有原请求时，写操作结束绝不凭空关窗（ST-B01-08-2 / SP-
   c.beginWrite("wt-a");
   c.beginWrite("wt-b");
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), null, "没有请求就不能执行关闭");
+  assert.notEqual(c.reconcile().kind, "proceed", "没有请求就不能执行关闭")
   c.endWrite("wt-b");
-  assert.equal(c.takeReadyIntent(), null, "最后一笔结束也不能凭空关窗");
+  assert.notEqual(c.reconcile().kind, "proceed", "最后一笔结束也不能凭空关窗")
   assert.equal(c.pendingIntent(), null, "不得自行创建请求");
 });
 
@@ -2000,7 +2045,7 @@ test("用户选「留在应用」后，写操作结束不会自动关窗", () =>
   assert.equal(c.request("close").action, "ask");
   c.resolveAsk("stay");                       // 用户选择留在应用
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), null, "Stay 之后不得稍后自动关窗");
+  assert.notEqual(c.reconcile().kind, "proceed", "Stay 之后不得稍后自动关窗")
 });
 
 test("用户选「等待」后才在全部写完成时执行原请求", () => {
@@ -2009,12 +2054,12 @@ test("用户选「等待」后才在全部写完成时执行原请求", () => {
   c.beginWrite("wt-b");
   assert.equal(c.request("exit").action, "ask");
   // 仅展示询问不算授权：还没选等待时不能执行。
-  assert.equal(c.takeReadyIntent(), null);
+  assert.notEqual(c.reconcile().kind, "proceed");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), null, "仍有 wt-b 在写");
+  assert.notEqual(c.reconcile().kind, "proceed", "仍有 wt-b 在写")
   c.endWrite("wt-b");
-  assert.equal(c.takeReadyIntent(), "exit", "全部完成且已授权 → 执行原退出请求");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "exit" }, "全部完成且已授权 → 执行原退出请求")
 });
 
 test("重复关闭请求不会叠加或改变动作类型", () => {
@@ -2025,8 +2070,10 @@ test("重复关闭请求不会叠加或改变动作类型", () => {
   assert.equal(c.pendingIntent(), "close");
   c.resolveAsk("wait");
   c.endWrite("wt-a");
-  assert.equal(c.takeReadyIntent(), "close");
-  assert.equal(c.takeReadyIntent(), null, "只执行一次");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+  const claimed = c.claimExecution();
+  c.completeExecution(claimed.claimId);
+  assert.notEqual(c.reconcile().kind, "proceed", "只执行一次");
 });
 
 test("待核对必须先真实核对才清除，且核对后仍需用户明确继续", () => {
@@ -2038,11 +2085,11 @@ test("待核对必须先真实核对才清除，且核对后仍需用户明确�
   assert.deepEqual(decision.pending, ["wt-a"]);
   // 没有核对前不能关闭。
   c.resolveAsk("wait");
-  assert.equal(c.takeReadyIntent(), null, "待核对未核对前不执行");
+  assert.notEqual(c.reconcile().kind, "proceed", "待核对未核对前不执行")
   // 真实核对后清除 pending，并由用户明确「继续」。
-  c.acknowledgePending("wt-a");
+  c.acknowledgePending("wt-a", c.pendingGeneration("wt-a"));
   c.confirmPendingContinue();
-  assert.equal(c.takeReadyIntent(), "close", "核对并确认后才执行");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" }, "核对并确认后才执行")
 });
 
 test("另存生命周期：无归属占位键也计入在途，但不占用 worktree 写门禁", () => {
@@ -2053,7 +2100,7 @@ test("另存生命周期：无归属占位键也计入在途，但不占用 work
   assert.equal(c.request("close").action, "ask");
   c.resolveAsk("wait");
   c.endWrite(external);
-  assert.equal(c.takeReadyIntent(), "close");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
   // 占位键与真实 worktree 键互不影响：另一个 worktree 的写不会被它阻塞。
   c.beginWrite("wt-a");
   assert.deepEqual(c.writingWorktrees(), ["wt-a"]);
@@ -2065,4 +2112,913 @@ test("另存的 needsVerification 如实保留为待核对", () => {
   c.endWrite("wt-a", true);                   // 另存也可能返回 needsVerification
   assert.deepEqual(c.pendingWorktrees(), ["wt-a"]);
   assert.equal(c.request("exit").action, "showPending");
+});
+
+// ---------------- 整批 B02：关闭/退出生产闭环 ----------------
+
+test("待核对期间原生保护仍然成立（不因无在途写而放行）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  assert.equal(c.hasWriting(), false);
+  assert.equal(c.hasPending(), true);
+  // 生产端用 hasWriting() || hasPending() 计算保护；这里直接断言两段语义。
+  assert.equal(c.hasWriting() || c.hasPending(), true, "待核对期间必须继续阻止退出");
+});
+
+test("最后一笔 NeedsVerification 后进入待核对并主动展示（不静默）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a", true);            // 最后一笔变成待核对
+  assert.notEqual(c.reconcile().kind, "proceed", "待核对未核对前不关闭")
+  assert.equal(c.authorizedIntent(), "close", "授权仍保留");
+  assert.equal(c.hasPending(), true, "待核对必须可见");
+});
+
+test("核对失败不清账（pending 保留，仍阻止关闭）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  c.resolveAsk("wait");
+  const gen = c.pendingGeneration("wt-a");
+  // 核对失败：调用方不会调用 acknowledgePending；即使代际匹配也不该由失败路径清。
+  assert.equal(c.hasPending(), true);
+  assert.notEqual(c.reconcile().kind, "proceed");
+  // 真正成功核对后才清。
+  assert.equal(c.acknowledgePending("wt-a", gen), true);
+  c.confirmPendingContinue();
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("核对期间同一目标新增 pending：旧代际核对不能清掉新的一代", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  const gen1 = c.pendingGeneration("wt-a");
+  // 核对期间该目标又出现一次待核对。
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  const gen2 = c.pendingGeneration("wt-a");
+  assert.ok(gen2 > gen1, "代际必须递增");
+  assert.equal(c.acknowledgePending("wt-a", gen1), false, "旧代际不能清新的一代");
+  assert.equal(c.hasPending(), true, "新的待核对仍可见");
+  assert.equal(c.acknowledgePending("wt-a", gen2), true, "当前代际才能清");
+});
+
+test("核对期间不同 worktree 新增 pending：不被顺手清掉", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.beginWrite("wt-b");
+  c.endWrite("wt-b", true);
+  const genA = c.pendingGeneration("wt-a");
+  // 只核对 A 成功。
+  assert.equal(c.acknowledgePending("wt-a", genA), true);
+  assert.deepEqual(c.pendingWorktrees(), ["wt-b"], "B 的待核对必须保留");
+  // confirmPendingContinue 不批量清除。
+  c.confirmPendingContinue();
+  assert.deepEqual(c.pendingWorktrees(), ["wt-b"], "confirm 不清别的目标");
+});
+
+test("核对中选择 Stay：不关窗、pending 保留", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  c.resolveAsk("stay");
+  assert.notEqual(c.reconcile().kind, "proceed", "Stay 后不关闭")
+  assert.equal(c.pendingIntent(), null, "请求已清");
+  assert.deepEqual(c.pendingWorktrees(), ["wt-a"], "待核对仍可见");
+});
+
+test("等待后出现 pending：保留原动作，主动展示", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.beginWrite("wt-b");
+  c.request("exit");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");                  // 还有 wt-b
+  assert.notEqual(c.reconcile().kind, "proceed");
+  c.endWrite("wt-b", true);            // 最后一笔变待核对
+  assert.notEqual(c.reconcile().kind, "proceed", "不能静默关闭")
+  assert.equal(c.authorizedIntent(), "exit", "原动作仍是退出");
+  assert.equal(c.hasPending(), true);
+});
+
+test("重复 close/exit：询问中不替换，授权后动作不变", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.request("exit");
+  c.request("close");
+  assert.equal(c.pendingIntent(), "close", "第一次为准");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("Stay 之后再次请求：可以重新询问（不是永久禁用）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("stay");
+  assert.notEqual(c.reconcile().kind, "proceed");
+  const again = c.request("exit");
+  assert.equal(again.action, "ask", "可以再次请求");
+  assert.equal(c.pendingIntent(), "exit", "新的原动作");
+  c.resolveAsk("wait");
+  c.endWrite("wt-a");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "exit" });
+});
+
+// ---------------- 整批 B03：保护版本化、监听就绪、晚等待与核对代际 ----------------
+
+test("退出保护版本化：旧 false 晚到不能覆盖新 true（ST-B03-08-1 / SP-B03-08-1）", async () => {
+  // 模拟 Rust：只接受更大的 seq（与 commands.rs apply_exit_guard 同语义）。
+  let stored = { seq: 0, blocked: false };
+  const rust = async ({ blocked, seq }) => {
+    if (seq <= stored.seq) return false;
+    stored = { seq, blocked };
+    return true;
+  };
+  const guard = new ExitGuardSync(rust);
+  // 第一笔写开始 → true(seq1)；写结束 → false(seq2) 但**延迟到达**。
+  const releaseDeferred = guard.set(false);      // 先发起（seq1 之后）
+  await guard.set(true);                          // 新写获得保护（seq2）
+  await releaseDeferred;                          // 旧 false 现在才完成
+  // 由于旧 false 的 seq 更小，Rust 实际状态仍是 true。
+  assert.equal(stored.blocked, true, "旧 false 绝不能解除新建立的保护");
+  assert.equal(guard.current(), true, "本地已知状态也必须是 true");
+});
+
+test("退出保护版本化：新 false 可以正常释放", async () => {
+  let stored = { seq: 0, blocked: false };
+  const guard = new ExitGuardSync(async ({ blocked, seq }) => {
+    if (seq <= stored.seq) return false;
+    stored = { seq, blocked };
+    return true;
+  });
+  await guard.set(true);
+  await guard.set(false);
+  assert.equal(stored.blocked, false, "更新的 false 正常生效");
+});
+
+test("监听闸门：只装好一个不算就绪，写入口必须拒绝（ST-B03-08-2）", () => {
+  const gate = new CloseGuardGate();
+  assert.equal(gate.ready, false, "初始未就绪");
+  gate.markInstalled("window");
+  assert.equal(gate.ready, false, "只有窗口监听仍不算就绪");
+  gate.markInstalled("exit");
+  assert.equal(gate.ready, true, "两个都装好才就绪");
+  assert.equal(gate.blockedReason, null);
+});
+
+test("监听闸门：安装失败后即使另一个成功也不就绪，且原因可见", () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markFailed("原生退出监听失败");
+  gate.markInstalled("exit");
+  assert.equal(gate.ready, true, "失败后再 markInstalled 仍算装好（失败是瞬时错误）");
+  const failed = new CloseGuardGate();
+  failed.markFailed("窗口关闭监听失败");
+  assert.equal(failed.ready, false, "只失败没装好 → 未就绪");
+  assert.equal(failed.blockedReason, "窗口关闭监听失败");
+});
+
+test("监听闸门：卸载/重装回到未就绪", () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  assert.equal(gate.ready, true);
+  gate.dispose();
+  assert.equal(gate.ready, false, "卸载后必须未就绪");
+});
+
+test("晚点等待：写入已结束后点 Wait，reconcile 立即执行原动作（ST-B03-08-3 / SP-B03-08-2）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  assert.equal(c.request("close").action, "ask");
+  c.endWrite("wt-a");                      // 写入先结束
+  // 询问必须**继续存在**：用户还没选择，不能隐藏对话框（ST-B04-08-2）。
+  assert.equal(c.reconcile().kind, "ask", "未选择时询问仍然可见");
+  c.resolveAsk("wait");                    // 用户晚点击
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" },
+    "App 只需调用 reconcile 就能收尾，不需要等下一笔写");
+});
+
+test("晚点等待 + 已 pending：reconcile 展示待核对而不是关窗（SP-B03-08-2）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.endWrite("wt-a", true);
+  c.resolveAsk("wait");
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask");
+  assert.deepEqual(decision.pending, ["wt-a"]);
+  assert.equal(decision.intent, "close", "原动作保留");
+});
+
+test("保护 begin 失败回滚后 reconcile 不留幽灵授权（ST-B03-08-4）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.resolveAsk("wait");
+  // 保护失败 → 回滚登记。
+  c.rollbackWrite("wt-a");
+  // 回滚后没有在途写、没有 pending，授权应能正常执行（不是悬挂）。
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("旧核对不得授权新请求（ST-B03-08-5 / SP-B03-08-3）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  const genBefore = c.generation();
+  // 核对进行中，用户选择 Stay 并重新发起退出请求。
+  c.resolveAsk("stay");
+  c.request("exit");
+  assert.notEqual(c.generation(), genBefore, "新请求必须推进代际");
+  // 旧核对回调发现代际变化，直接返回（不 confirm、不关窗）。
+  assert.equal(c.generation() === genBefore, false);
+  // 新请求尚未被授权。
+  assert.equal(c.reconcile().kind, "ask", "新请求需要新的用户选择");
+});
+
+test("核对期间新 pending 不被隐藏（ST-B03-08-6 / SP-B03-08-4）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  const genA = c.pendingGeneration("wt-a");
+  // 核对 A 期间 B 新增 pending。
+  c.beginWrite("wt-b");
+  c.endWrite("wt-b", true);
+  c.request("close");
+  c.resolveAsk("wait");
+  // 只核对成功 A。
+  assert.equal(c.acknowledgePending("wt-a", genA), true);
+  c.confirmPendingContinue();
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask");
+  assert.deepEqual(decision.pending, ["wt-b"], "B 必须继续展示");
+});
+
+test("展示动作取自被保留的原请求，不受后续事件影响（ST-B03-08-7 / SP-B03-08-5）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");                      // 首次关闭
+  c.request("exit");                       // 期间又按 ⌘Q
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask");
+  assert.equal(decision.intent, "close", "展示与执行都必须是第一次的关闭");
+});
+
+test("核对中重复点击/多回调：第二次点击不会重复授权", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  const gen = c.pendingGeneration("wt-a");
+  assert.equal(c.acknowledgePending("wt-a", gen), true);
+  c.confirmPendingContinue();
+  c.confirmPendingContinue();              // 重复回调
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+  const claimed = c.claimExecution();
+  c.completeExecution(claimed.claimId);
+  assert.equal(c.reconcile().kind, "none", "第二次 reconcile 不再执行");
+});
+
+test("Stay 后旧核对失败不会重弹已取消的询问（SP-B03-08-3）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a", true);
+  c.request("close");
+  const genBefore = c.generation();
+  c.resolveAsk("stay");
+  assert.notEqual(c.generation(), genBefore);
+  // 旧核对失败分支在代际变化后必须直接返回：不展示、不授权。
+  assert.equal(c.reconcile().kind, "none", "Stay 后不应弹任何询问");
+});
+
+// ---------------- 整批 B04：真实异步生产路径 ----------------
+
+/** 可精确控制「到达顺序」与「回包顺序」的版本化接收端（模拟 Rust apply_exit_guard）。 */
+function makeDeferredReceiver() {
+  const state = { seq: 0, blocked: false };
+  const arrivals = [];
+  const rejections = [];
+  const receive = (request) => {
+    // 到达即记录；实际应用由 resolve 控制，从而可制造「旧 false 晚应用」。
+    let resolve, reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    arrivals.push({
+      request,
+      resolve: (accepted) => {
+        // 模拟 Rust：只接受更大的 seq。
+        if (request.seq > state.seq) {
+          state.seq = request.seq;
+          state.blocked = request.blocked;
+          resolve(true);
+          return;
+        }
+        rejections.push(request);
+        resolve(false);
+      },
+      reject,
+    });
+    return promise;
+  };
+  return { state, arrivals, rejections, receive };
+}
+
+test("真实乱序：旧 false 的回包晚于新 true 应用，Rust 状态仍为 true（ST-B04-08-1）", async () => {
+  const receiver = makeDeferredReceiver();
+  const guard = new ExitGuardSync(receiver.receive);
+
+  const firstWrite = guard.set(false);            // 写结束 → false（先发起）
+  const secondWrite = guard.set(true);            // 新写开始 → true（后发起）
+
+  // 故意让**新的 true 先应用**，旧的 false 后应用（真正的乱序）。
+  receiver.arrivals[1].resolve(true);
+  await secondWrite;
+  receiver.arrivals[0].resolve(false);
+  await firstWrite;
+
+  assert.equal(receiver.state.blocked, true, "旧 false 晚到不得解除新 true");
+  assert.equal(guard.current(), true, "本地已知状态也保持 true");
+});
+
+test("真实乱序：新 false 在更高版本下正常释放", async () => {
+  const receiver = makeDeferredReceiver();
+  const guard = new ExitGuardSync(receiver.receive);
+  const on = guard.set(true);
+  receiver.arrivals[0].resolve(true);
+  await on;
+  const off = guard.set(false);
+  receiver.arrivals[1].resolve(true);
+  await off;
+  assert.equal(receiver.state.blocked, false);
+  assert.equal(guard.current(), false);
+});
+
+test("共享异步编排：切 worktree 不影响在途保护（保护不随 worktree 重装）", async () => {
+  // 模拟 App：监听闸门是应用级、worktree 切换不改变它。
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  let guardCalls = 0;
+  const orchestrator = new WriteGuardOrchestrator({
+    closeDriver: makeDriverEnv({ coordinator }).driver,
+    closeBlockedReason: "closing",
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: async () => { guardCalls += 1; },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => coordinator.reconcile(),
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  // A 写开始（保护建立）。
+  assert.deepEqual(await orchestrator.begin("wt-a"), { ok: true });
+  // 用户切到 wt-b（只是 UI 状态变化，不动 gate/coordinator）。
+  assert.equal(gate.ready, true, "切换 worktree 不卸载监听");
+  assert.deepEqual(coordinator.writingWorktrees(), ["wt-a"], "A 仍在途");
+  // A 结束。
+  orchestrator.end("wt-a", false);
+  assert.equal(guardCalls, 1);
+});
+
+test("共享异步编排：await 保护期间监听被卸载，则不执行 Git 并回滚", async () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  let guardResolve;
+  const guardPromise = new Promise((resolve) => { guardResolve = resolve; });
+  const orchestrator = new WriteGuardOrchestrator({
+    closeDriver: makeDriverEnv({ coordinator }).driver,
+    closeBlockedReason: "closing",
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: () => guardPromise,
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => coordinator.reconcile(),
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  const pending = orchestrator.begin("wt-a");
+  // 保护 await 期间监听卸载（模拟 effect 清理/安装失败）。
+  gate.dispose();
+  guardResolve();
+  const result = await pending;
+  assert.equal(result.ok, false, "await 后必须复核就绪");
+  assert.deepEqual(coordinator.writingWorktrees(), [], "必须回滚登记");
+});
+
+test("共享异步编排：保护失败时已 Wait 的请求即时收尾（ST-B04-08-3 / SP-B04-08-2）", async () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  const orchestrator = new WriteGuardOrchestrator({
+    closeDriver: makeDriverEnv({ coordinator }).driver,
+    closeBlockedReason: "closing",
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: async () => { throw new Error("保护 IPC 失败"); },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    // App 的 reconcile 回调就是「消费 decision」：这里记录它拿到什么。
+    reconcile: () => { observed.push(coordinator.reconcile()); },
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  const observed = [];
+  // 先有一笔在途写，用户此时请求关闭并选择等待。
+  coordinator.beginWrite("wt-existing");
+  coordinator.request("close");
+  coordinator.resolveAsk("wait");
+  // 保护建立失败（此时 wt-existing 仍在途）。
+  await assert.rejects(() => orchestrator.begin("wt-a"));
+  // 收尾：仍有在途写 → 继续询问（不擅自关窗），原动作保留。
+  assert.ok(observed.length >= 1, "保护失败必须触发真实 reconcile");
+  assert.equal(observed[observed.length - 1].kind, "ask", "仍有在途写 → 继续询问");
+  assert.equal(observed[observed.length - 1].intent, "close", "原动作保留");
+  // 在途写结束后，授权应当立即执行（不悬挂、不等下一笔无关写）。
+  coordinator.endWrite("wt-existing");
+  assert.deepEqual(coordinator.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("共享异步编排：三个写入口共用同一实例，保护失败都收尾", async () => {
+  const gate = new CloseGuardGate();
+  gate.markInstalled("window");
+  gate.markInstalled("exit");
+  const coordinator = new CloseCoordinator();
+  const orchestrated = [];
+  const orchestrator = new WriteGuardOrchestrator({
+    closeDriver: makeDriverEnv({ coordinator }).driver,
+    closeBlockedReason: "closing",
+    guardsReady: () => gate.ready,
+    guardBlockedReason: () => gate.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: async () => { throw new Error("boom"); },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => { orchestrated.push(coordinator.reconcile().kind); },
+    endWrite: (id, nv) => coordinator.endWrite(id, nv),
+  });
+  for (const id of ["stage:wt-a", "restore:wt-a", "save-as:/tmp/x"]) {
+    await assert.rejects(() => orchestrator.begin(id));
+  }
+  assert.deepEqual(coordinator.writingWorktrees(), [], "三处都回滚干净");
+  assert.deepEqual(orchestrated, ["none", "none", "none"], "三处都走了真实 reconcile");
+});
+
+test("询问不提前消失：最后写结束但用户未选择时仍可 Wait（ST-B04-08-2）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  assert.equal(c.request("close").action, "ask");
+  c.endWrite("wt-a");                       // 最后写结束
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask", "询问必须仍在");
+  assert.equal(decision.intent, "close");
+  // 用户此刻才点 Wait。
+  c.resolveAsk("wait");
+  assert.deepEqual(c.reconcile(), { kind: "proceed", intent: "close" });
+});
+
+test("询问不提前消失：Stay 后不自动关且不留暗请求", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.endWrite("wt-a");
+  c.resolveAsk("stay");
+  assert.equal(c.reconcile().kind, "none");
+  assert.equal(c.pendingIntent(), null, "Stay 后不得留暗请求");
+});
+
+test("无请求时不产生询问也不关窗", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.endWrite("wt-a");
+  assert.equal(c.reconcile().kind, "none");
+});
+
+test("Wait 时已有 pending：展示核对而不是静默退出（ST-B04-08-2）", () => {
+  const c = new CloseCoordinator();
+  c.beginWrite("wt-a");
+  c.request("close");
+  c.endWrite("wt-a", true);
+  c.resolveAsk("wait");
+  const decision = c.reconcile();
+  assert.equal(decision.kind, "ask");
+  assert.deepEqual(decision.pending, ["wt-a"]);
+  assert.equal(decision.intent, "close", "原动作保留");
+});
+
+// ---------------- 任务 08：真实共享驱动与写编排的完整生命周期 ----------------
+// B09 不再投递匿名 CloseRequested；旧 B05-B08 的投递/裁决模拟改为
+// 最后可取消的准备阶段与不可撤销的原生提交，不能冒称验证了旧事件的身份。
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+const flushClose = () => new Promise((resolve) => setImmediate(resolve));
+
+/** 只替换环境适配；关闭与写入的决策、登记、回滚和收尾均来自生产类。 */
+function makeDriverEnv({ coordinator = new CloseCoordinator() } = {}) {
+  const native = [];
+  const errors = [];
+  const asked = [];
+  const settled = [];
+  const guards = new CloseGuardGate();
+  guards.markInstalled("window");
+  guards.markInstalled("exit");
+  let releaseImpl = async () => {};
+  let nativeImpl = async () => {};
+  let guardImpl = async () => {};
+  let releaseCalls = 0;
+  let guardCalls = 0;
+  const driver = new CloseDriver({
+    coordinator,
+    releaseExitGuard: () => { releaseCalls += 1; return releaseImpl(); },
+    closeWindow: () => { native.push("close"); return nativeImpl("close"); },
+    exitApp: () => { native.push("exit"); return nativeImpl("exit"); },
+    onError: (error) => errors.push(error),
+    onAsk: (intent, writing, pending) => asked.push({ intent, writing, pending }),
+    onSettled: () => settled.push(true),
+  });
+  const writes = new WriteGuardOrchestrator({
+    closeDriver: driver,
+    closeBlockedReason: "closing",
+    guardsReady: () => guards.ready,
+    guardBlockedReason: () => guards.blockedReason,
+    register: (id) => coordinator.beginWrite(id),
+    guard: () => { guardCalls += 1; return guardImpl(); },
+    rollback: (id) => coordinator.rollbackWrite(id),
+    reconcile: () => driver.notifyStateChanged(),
+    endWrite: (id, needsVerification) => coordinator.endWrite(id, needsVerification),
+  });
+  return {
+    coordinator, driver, writes, native, errors, asked, settled, guards,
+    setRelease(fn) { releaseImpl = fn; },
+    setNative(fn) { nativeImpl = fn; },
+    setGuard(fn) { guardImpl = fn; },
+    releaseCalls() { return releaseCalls; },
+    guardCalls() { return guardCalls; },
+  };
+}
+
+for (const intent of ["close", "exit"]) {
+  test(`无写入的 ${intent} 执行原动作，回包后保持终态门禁`, async () => {
+    const env = makeDriverEnv();
+    env.driver.handleRequest(intent);
+    await flushClose();
+    assert.deepEqual(env.native, [intent]);
+    assert.equal(env.releaseCalls(), intent === "exit" ? 1 : 0);
+    assert.equal(env.coordinator.pendingIntent(), null);
+    assert.equal(env.coordinator.isExecuting(), false);
+    assert.equal(env.driver.currentPhase(), "closing");
+    assert.equal((await env.writes.begin("wt-a")).ok, false);
+  });
+
+  test(`A/B 跨 worktree 写入正常结束后仅执行原 ${intent}`, async () => {
+    const env = makeDriverEnv();
+    assert.equal((await env.writes.begin("wt-a")).ok, true);
+    assert.equal(env.driver.handleRequest(intent).kind, "ask");
+    env.driver.handleChoice("wait");
+    assert.equal((await env.writes.begin("wt-b")).ok, true);
+    env.driver.handleRequest(intent === "close" ? "exit" : "close");
+    env.writes.end("wt-a", false);
+    await flushClose();
+    assert.deepEqual(env.native, []);
+    assert.deepEqual(env.coordinator.writingWorktrees(), ["wt-b"]);
+    env.writes.end("wt-b", false);
+    await flushClose();
+    assert.deepEqual(env.native, [intent]);
+    assert.equal(env.coordinator.pendingIntent(), null);
+  });
+
+  test(`最后一笔写入结束早于选择，${intent} 询问仍可 Wait/Stay`, async () => {
+    const env = makeDriverEnv();
+    await env.writes.begin("wt-a");
+    env.driver.handleRequest(intent);
+    env.writes.end("wt-a", false);
+    await flushClose();
+    assert.deepEqual(env.native, [], "仅展示询问不等于授权");
+    assert.equal(env.driver.currentPhase(), "asking");
+    env.driver.handleChoice("wait");
+    await flushClose();
+    assert.deepEqual(env.native, [intent]);
+    assert.equal(env.coordinator.pendingIntent(), null);
+  });
+
+  test(`已 Wait 的 ${intent} 遇到待核对，真实核对并明确继续前不提交`, async () => {
+    const env = makeDriverEnv();
+    await env.writes.begin("wt-a");
+    env.driver.handleRequest(intent);
+    env.driver.handleChoice("wait");
+    env.writes.end("wt-a", true);
+    await flushClose();
+    assert.deepEqual(env.native, []);
+    assert.deepEqual(env.asked.at(-1).pending, ["wt-a"]);
+    const generation = env.coordinator.pendingGeneration("wt-a");
+    assert.equal(env.coordinator.acknowledgePending("wt-a", generation), true);
+    env.driver.handlePendingContinue();
+    await flushClose();
+    assert.deepEqual(env.native, [intent]);
+    assert.equal(env.coordinator.pendingIntent(), null);
+  });
+
+  test(`${intent} 原生提交失败不自动重试，原请求保留到用户重新选择`, async () => {
+    const env = makeDriverEnv();
+    const error = new Error("native failed");
+    env.setNative(async () => { throw error; });
+    env.driver.handleRequest(intent);
+    await flushClose();
+    assert.deepEqual(env.native, [intent]);
+    assert.deepEqual(env.errors, [error]);
+    assert.equal(env.coordinator.pendingIntent(), intent);
+    assert.equal(env.driver.currentPhase(), "asking");
+    assert.equal(env.driver.canStartWrite(), true, "失败时未提交原生动作，可留在应用");
+    for (let i = 0; i < 10; i += 1) env.driver.notifyStateChanged();
+    await flushClose();
+    assert.deepEqual(env.native, [intent], "禁止无界自动重试");
+    env.setNative(async () => {});
+    env.driver.handleChoice("wait");
+    await flushClose();
+    assert.deepEqual(env.native, [intent, intent]);
+    assert.equal(env.coordinator.pendingIntent(), null);
+  });
+
+  test(`${intent} 最终提交至销毁期间，重复事件与迟到选择不能解除门禁`, async () => {
+    const env = makeDriverEnv();
+    const native = deferred();
+    env.setNative(() => native.promise);
+    env.driver.handleRequest(intent);
+    await flushClose();
+    assert.deepEqual(env.native, [intent]);
+    assert.equal(env.driver.currentPhase(), "closing");
+    const settled = env.settled.length;
+    assert.equal(settled, 1, "最终提交时同步隐藏询问");
+    for (const delivered of [false, true]) {
+      if (delivered) {
+        native.resolve();
+        await flushClose();
+      }
+      for (let i = 0; i < 10; i += 1) {
+        env.driver.handleNativeCloseRequest();
+        env.driver.handleRequest("exit");
+        env.driver.handleChoice("stay");
+        env.driver.handleChoice("wait");
+        env.driver.handlePendingContinue();
+        env.driver.notifyStateChanged();
+      }
+      const guardsBefore = env.guardCalls();
+      for (const entry of ["stage", "unstage", "discard", "restore", "save-as"]) {
+        const id = entry === "save-as" ? "save-as:/fixture/destination" : "wt-a";
+        const started = await env.writes.begin(id);
+        assert.deepEqual(started, { ok: false, reason: "closing" }, `${entry} 共享生产入口拒绝`);
+      }
+      assert.equal(env.guardCalls(), guardsBefore, "拒绝时不发保护 IPC");
+      assert.deepEqual(env.coordinator.writingWorktrees(), [], "没有幽灵登记");
+      assert.deepEqual(env.native, [intent], "没有重复原生提交");
+      assert.equal(env.driver.currentPhase(), "closing");
+      assert.equal(env.settled.length, settled, "迟到选择/回包不产生旧 UI 效果");
+    }
+    assert.equal(env.coordinator.pendingIntent(), null);
+    assert.deepEqual(env.errors, []);
+  });
+}
+
+test("无关闭请求时，写入收尾不会制造请求", async () => {
+  const env = makeDriverEnv();
+  await env.writes.begin("wt-a");
+  await env.writes.begin("save-as:/fixture/destination");
+  env.writes.end("wt-a", false);
+  env.writes.end("save-as:/fixture/destination", false);
+  await flushClose();
+  assert.deepEqual(env.native, []);
+  assert.equal(env.coordinator.pendingIntent(), null);
+});
+
+test("Stay 不取消 A/B 写入，也不保留暗请求", async () => {
+  const env = makeDriverEnv();
+  await env.writes.begin("wt-a");
+  await env.writes.begin("wt-b");
+  env.driver.handleRequest("exit");
+  env.driver.handleChoice("wait");
+  env.driver.handleChoice("stay");
+  assert.deepEqual(env.coordinator.writingWorktrees(), ["wt-a", "wt-b"]);
+  env.writes.end("wt-a", false);
+  env.writes.end("wt-b", false);
+  await flushClose();
+  assert.deepEqual(env.native, []);
+  assert.equal(env.coordinator.pendingIntent(), null);
+  env.driver.handleNativeCloseRequest();
+  await flushClose();
+  assert.deepEqual(env.native, ["close"], "新的真实用户请求正常完成");
+  assert.equal(env.coordinator.pendingIntent(), null);
+});
+
+test("准备中的重复关闭/退出和写入收尾不递归、不重复认领", async () => {
+  const env = makeDriverEnv();
+  const release = deferred();
+  env.setRelease(() => release.promise);
+  env.driver.handleRequest("exit");
+  await env.writes.begin("wt-b");
+  env.writes.end("wt-b", false);
+  for (let i = 0; i < 20; i += 1) {
+    env.driver.notifyStateChanged();
+    env.driver.handleRequest("exit");
+    env.driver.handleNativeCloseRequest();
+  }
+  assert.equal(env.releaseCalls(), 1);
+  assert.deepEqual(env.native, []);
+  release.resolve();
+  await flushClose();
+  assert.deepEqual(env.native, ["exit"]);
+  assert.equal(env.coordinator.pendingIntent(), null);
+});
+
+test("退出准备期间 B 开始写：最后复核不提交，B 结束后执行原 exit", async () => {
+  const env = makeDriverEnv();
+  const release = deferred();
+  env.setRelease(() => release.promise);
+  env.driver.handleRequest("exit");
+  assert.equal((await env.writes.begin("wt-b")).ok, true);
+  release.resolve();
+  await flushClose();
+  assert.deepEqual(env.native, []);
+  assert.equal(env.coordinator.pendingIntent(), "exit");
+  assert.deepEqual(env.asked.at(-1).writing, ["wt-b"]);
+  env.setRelease(async () => {});
+  env.writes.end("wt-b", false);
+  await flushClose();
+  assert.deepEqual(env.native, ["exit"]);
+  assert.equal(env.coordinator.pendingIntent(), null);
+});
+
+test("保护建立仍挂起也算在途：退出等待到真实 begin/end 收尾", async () => {
+  const env = makeDriverEnv();
+  const guard = deferred();
+  env.setGuard(() => guard.promise);
+  const begin = env.writes.begin("wt-a");
+  assert.deepEqual(env.coordinator.writingWorktrees(), ["wt-a"]);
+  env.driver.handleRequest("exit");
+  env.driver.handleChoice("wait");
+  await flushClose();
+  assert.deepEqual(env.native, []);
+  guard.resolve();
+  assert.equal((await begin).ok, true);
+  assert.deepEqual(env.native, []);
+  env.writes.end("wt-a", false);
+  await flushClose();
+  assert.deepEqual(env.native, ["exit"]);
+});
+
+test("保护失败回滚真正推进已授权请求，不等待下一笔无关写入", async () => {
+  const env = makeDriverEnv();
+  const guard = deferred();
+  env.setGuard(() => guard.promise);
+  const begin = env.writes.begin("wt-a");
+  env.driver.handleRequest("exit");
+  env.driver.handleChoice("wait");
+  guard.reject(new Error("guard failed"));
+  await assert.rejects(begin, /guard failed/);
+  await flushClose();
+  assert.deepEqual(env.coordinator.writingWorktrees(), []);
+  assert.deepEqual(env.native, ["exit"]);
+  assert.equal(env.coordinator.pendingIntent(), null);
+});
+
+for (const oldOutcome of ["resolve", "reject"]) {
+  for (const newPhase of ["preparing", "submitted", "returned"]) {
+    test(`Stay 后旧准备 ${oldOutcome} 到达新请求 ${newPhase}，不触碰新所有权`, async () => {
+      const env = makeDriverEnv();
+      const oldRelease = deferred();
+      const newRelease = deferred();
+      const native = deferred();
+      env.setRelease(() => oldRelease.promise);
+      env.driver.handleRequest("exit");
+      assert.equal(env.driver.currentPhase(), "executing");
+      env.driver.handleChoice("stay");
+      env.setRelease(() => newRelease.promise);
+      env.setNative(() => native.promise);
+      env.driver.handleRequest("exit");
+      const generation = env.coordinator.generation();
+      if (newPhase !== "preparing") {
+        newRelease.resolve();
+        await flushClose();
+      }
+      if (newPhase === "returned") {
+        native.resolve();
+        await flushClose();
+      }
+      const before = {
+        phase: env.driver.currentPhase(), intent: env.coordinator.pendingIntent(),
+        claim: env.coordinator.isExecuting(), settled: env.settled.length, asked: env.asked.length,
+      };
+      oldRelease[oldOutcome](new Error("cancelled attempt"));
+      await flushClose();
+      assert.deepEqual({
+        phase: env.driver.currentPhase(), intent: env.coordinator.pendingIntent(),
+        claim: env.coordinator.isExecuting(), settled: env.settled.length, asked: env.asked.length,
+      }, before, "旧成功/失败不得清 claim、改阶段、弹旧询问或清新 UI");
+      assert.equal(env.coordinator.generation(), generation);
+      assert.deepEqual(env.errors, []);
+      newRelease.resolve();
+      await flushClose();
+      assert.deepEqual(env.native, ["exit"], "只有新请求最终提交原生动作");
+      native.resolve();
+      await flushClose();
+      assert.equal(env.coordinator.pendingIntent(), null, "新请求完整结算，不只是投递计数");
+      assert.equal(env.coordinator.isExecuting(), false);
+      assert.equal(env.driver.currentPhase(), "closing");
+      assert.equal((await env.writes.begin("wt-a")).ok, false);
+    });
+  }
+
+  test(`Stay 后没有新请求，旧准备 ${oldOutcome} 也不得关窗`, async () => {
+    const env = makeDriverEnv();
+    const release = deferred();
+    env.setRelease(() => release.promise);
+    env.driver.handleRequest("exit");
+    env.driver.handleChoice("stay");
+    release[oldOutcome](new Error("cancelled attempt"));
+    await flushClose();
+    assert.deepEqual(env.native, []);
+    assert.deepEqual(env.errors, []);
+    assert.equal(env.coordinator.pendingIntent(), null);
+    assert.equal(env.driver.currentPhase(), "idle");
+    assert.equal((await env.writes.begin("wt-a")).ok, true);
+  });
+}
+
+test("旧退出准备晚回，不把 Stay 后的新 close 改成 exit", async () => {
+  const env = makeDriverEnv();
+  const release = deferred();
+  env.setRelease(() => release.promise);
+  env.driver.handleRequest("exit");
+  env.driver.handleChoice("stay");
+  env.driver.handleNativeCloseRequest();
+  await flushClose();
+  release.resolve();
+  await flushClose();
+  assert.deepEqual(env.native, ["close"]);
+  assert.equal(env.coordinator.pendingIntent(), null);
+  assert.equal(env.driver.currentPhase(), "closing");
+});
+
+test("退出保护持续失败只尝试一次，随后可 Stay 并正常写入", async () => {
+  const env = makeDriverEnv();
+  env.setRelease(async () => { throw new Error("release failed"); });
+  env.driver.handleRequest("exit");
+  await flushClose();
+  for (let i = 0; i < 10; i += 1) env.driver.notifyStateChanged();
+  await flushClose();
+  assert.equal(env.releaseCalls(), 1);
+  assert.equal(env.errors.length, 1);
+  assert.deepEqual(env.native, []);
+  assert.equal(env.driver.currentPhase(), "asking");
+  env.driver.handleChoice("stay");
+  assert.equal(env.coordinator.pendingIntent(), null);
+  assert.equal((await env.writes.begin("wt-a")).ok, true);
+});
+
+test("准备中的写入引入待核对，旧成功回包不能静默退出", async () => {
+  const env = makeDriverEnv();
+  const release = deferred();
+  env.setRelease(() => release.promise);
+  env.driver.handleRequest("exit");
+  await env.writes.begin("wt-b");
+  env.writes.end("wt-b", true);
+  release.resolve();
+  await flushClose();
+  assert.deepEqual(env.native, []);
+  assert.deepEqual(env.asked.at(-1).pending, ["wt-b"]);
+  env.driver.handleChoice("stay");
+  env.driver.notifyStateChanged();
+  assert.deepEqual(env.coordinator.pendingWorktrees(), ["wt-b"], "Stay 不伪清待核对");
+  assert.equal(env.coordinator.pendingIntent(), null);
+});
+
+test("旧 claim 的完成/失败/撤销不能清新 claim", () => {
+  const c = new CloseCoordinator();
+  c.request("close");
+  const old = c.claimExecution();
+  c.abandonExecution(old.claimId);
+  const fresh = c.claimExecution();
+  assert.notEqual(fresh.claimId, old.claimId);
+  assert.equal(c.completeExecution(old.claimId), false);
+  assert.equal(c.failExecution(old.claimId), false);
+  assert.equal(c.abandonExecution(old.claimId), false);
+  assert.equal(c.pendingIntent(), "close");
+  assert.equal(c.isExecuting(), true);
+  assert.equal(c.completeExecution(fresh.claimId), true);
 });

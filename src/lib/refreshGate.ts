@@ -1029,138 +1029,577 @@ export type CloseDecision =
 export type CloseChoice = "wait" | "stay";
 
 /**
+ * 一次 reconcile 的结论（所有生命周期事件都走它）。
+ *
+ * - `none`：什么都不做（没有请求，或条件未满足）；
+ * - `proceed`：执行 `intent`（**只能是用户已授权等待的原动作**）；
+ * - `ask`：展示询问（含当前真实在途/待核对集合与**被保留的原动作**）。
+ */
+export type CloseReconcile =
+  | { kind: "none" }
+  | { kind: "proceed"; intent: CloseIntent }
+  | { kind: "ask"; intent: CloseIntent; writing: string[]; pending: string[] };
+
+/**
  * 写入期间的关闭/退出编排（任务 08，Q90/Q91/Q96）。
  *
- * 只做决策，不执行任何 Git 或窗口动作：
- * - 不因关闭杀掉 Git（本类从不取消写操作、不重跑写命令）；
- * - 「留在应用」不改变写操作，也不把关闭改成退出；
- * - **只有用户明确选择「等待」**才会在全部写完成并记录结果后执行原请求；
- * - 没有原请求、或用户已选「留在应用」时，**绝不凭空创建**关闭请求；
- * - 待核对结果必须先展示并核对真值，之后由用户明确选择继续或留在应用。
+ * 这是**唯一**的生产编排：App 在写结束、晚点 Wait、保护失败回滚、另存收尾、
+ * 待核对成功/失败、Stay、重复请求等所有生命周期事件后都调用 `reconcile()`，
+ * 由它给出「执行原请求 / 展示询问 / 什么都不做」。
  *
- * 写操作按 worktree 记录：切到别的 worktree 后仍在执行的操作也算在途（Q90）。
+ * 规则：
+ * - 原请求动作以**第一次**为准，询问期间再次请求不替换（ST-B03-08-7）；
+ * - 记录原请求**不等于授权**，只有 `resolveAsk("wait")` 才授权（ST-B03-08-3）；
+ * - `reconcile()` 不消费授权：满足条件返回 `proceed`，最终原生动作接受后才清账；
+ * - 待核对按**代际**核对，失败或新增待核对都不清账（ST-B03-08-6）；
+ * - 每次新请求与 `resolveAsk("stay")` 都推进 `requestGeneration`，
+ *   核对流程必须捕获它，旧核对不得授权新请求（ST-B03-08-5）。
  */
 export class CloseCoordinator {
   /** 在途写操作的 worktree 集合（含无归属另存使用的占位键）。 */
   private readonly writing = new Set<string>();
-  /** 结果待核对的 worktree 集合。 */
-  private readonly pending = new Set<string>();
-  /** 用户已明确选择「等待完成」的原请求；`null` 表示没有授权。 */
-  private intent: CloseIntent | null = null;
-  /** 当前是否正在向用户询问（避免重复弹窗）。 */
-  private asking = false;
+  /** 待核对的目标 → 代际。 */
+  private readonly pending = new Map<string, number>();
+  private pendingSeq = 0;
+  /** 原请求动作（第一次为准）；不构成授权。 */
+  private requested: CloseIntent | null = null;
+  /** 用户明确选择「等待」后保留的授权动作。 */
+  private authorized: CloseIntent | null = null;
+  /** 请求代际：每次新的请求或 Stay 取消都递增。 */
+  private requestGeneration = 0;
+  /** 认领序号：只有最新一次认领可以完成/撤销（排他，ST-B06-08-3）。 */
+  private claimSeq = 0;
+  private activeClaimId = 0;
 
-  /** 开始一个写操作（`worktreeId` 可为无归属另存的占位键）。 */
+  /** 当前请求代际（核对流程必须捕获它）。 */
+  generation(): number {
+    return this.requestGeneration;
+  }
+
   beginWrite(worktreeId: string): void {
     this.writing.add(worktreeId);
   }
 
   /**
-   * 结束一个写操作。
-   *
-   * `needsVerification` 表示结果无法确定：保留待核对标记，供关闭时先展示。
-   * 注意：结束写操作**不会**自动清除该 worktree 的待核对标记——
-   * 只有真实核对（`acknowledgePending`）才会清除（Q91）。
+   * 结束一个写操作。`needsVerification` 表示结果无法确定 → 新增一条待核对（代际 +1）。
+   * 结束写操作**不会**清除已有待核对（Q91）。
    */
   endWrite(worktreeId: string, needsVerification = false): void {
     this.writing.delete(worktreeId);
-    if (needsVerification) this.pending.add(worktreeId);
+    if (needsVerification) {
+      this.pendingSeq += 1;
+      this.pending.set(worktreeId, this.pendingSeq);
+    }
   }
 
-  /** 待核对的 worktree（诊断与测试用）。 */
+  /** 保护前置失败时的回滚：撤销登记，不留幽灵在途/授权。 */
+  rollbackWrite(worktreeId: string): void {
+    this.writing.delete(worktreeId);
+  }
+
   pendingWorktrees(): string[] {
-    return [...this.pending];
+    return [...this.pending.keys()];
   }
 
-  /** 在途写操作的 worktree（诊断与测试用）。 */
+  pendingGeneration(worktreeId: string): number {
+    return this.pending.get(worktreeId) ?? 0;
+  }
+
   writingWorktrees(): string[] {
     return [...this.writing];
   }
 
-  /** 是否还有在途写操作（任意 worktree）。 */
   hasWriting(): boolean {
     return this.writing.size > 0;
   }
 
-  /** 当前保留的原请求（诊断与测试用）。 */
-  pendingIntent(): CloseIntent | null {
-    return this.intent;
+  hasPending(): boolean {
+    return this.pending.size > 0;
   }
 
-  /** 是否正在询问用户。 */
-  isAsking(): boolean {
-    return this.asking;
+  /** 是否需要阻止原生退出（在途写 **或** 待核对）。 */
+  needsExitGuard(): boolean {
+    return this.writing.size > 0 || this.pending.size > 0;
+  }
+
+  /** 被保留的原请求动作（展示用；不等于授权）。 */
+  pendingIntent(): CloseIntent | null {
+    return this.requested;
+  }
+
+  authorizedIntent(): CloseIntent | null {
+    return this.authorized;
   }
 
   /**
    * 请求关闭/退出；返回此刻应该做什么。
    *
-   * 有在途写操作或待核对时**保留**窗口与进程并把原请求记下来，
-   * 但只有用户之后明确选择「等待」才会真正执行（`resolveAsk("wait")`）。
+   * 原动作以**第一次**为准；询问期间再次请求不替换（ST-B03-08-7）。
+   * 记录请求不等于授权：只有用户之后选择「等待」才会执行。
    */
   request(intent: CloseIntent): CloseDecision {
-    const writing = [...this.writing];
-    const pending = [...this.pending];
-    if (writing.length > 0 || pending.length > 0) {
-      this.intent = intent;
-      this.asking = true;
-      if (pending.length > 0) return { action: "showPending", writing, pending };
-      return { action: "ask", writing };
+    if (this.requested === null) {
+      this.requested = intent;
+      this.requestGeneration += 1;
     }
-    this.intent = null;
-    this.asking = false;
+    if (this.writing.size > 0 || this.pending.size > 0) {
+      if (this.pending.size > 0) {
+        return { action: "showPending", writing: [...this.writing], pending: this.pendingWorktrees() };
+      }
+      return { action: "ask", writing: [...this.writing] };
+    }
+    // 无在途写、无待核对：用户这次请求本身就是授权，立即可执行。
+    //
+    // **不清账**：原请求与授权保留到原生动作完成（ST-B05-08-1），
+    // 这样「写结束早于退出事件」时仍能执行原退出（ST-B06-08-1 / SP-B06-08-1）。
+    this.authorized = this.requested;
     return { action: "proceed" };
   }
 
   /**
    * 用户的选择。
    *
-   * - `wait`：确认等待——之后写操作全部完成且无待核对时才执行**原请求**；
-   * - `stay`：清掉请求，**不取消**写操作、不改变动作类型，也不会稍后自动关窗。
+   * - `wait`：授权执行**原请求动作**；
+   * - `stay`：清掉请求与授权，并**推进请求代际**，使在途核对回调失效。
    */
   resolveAsk(choice: CloseChoice): void {
-    this.asking = false;
-    if (choice === "stay") this.intent = null;
-    // `wait` 保留 intent，等 takeReadyIntent 在条件满足时取走。
+    if (choice === "stay") {
+      this.requested = null;
+      this.authorized = null;
+      this.requestGeneration += 1;
+      return;
+    }
+    this.authorized = this.requested;
   }
 
-  /**
-   * 用户选择「留在应用」的便捷入口（等价于 `resolveAsk("stay")`）。
-   */
   keepOpen(): void {
     this.resolveAsk("stay");
   }
 
   /**
-   * 全部写操作完成且无待核对时，返回**用户已授权等待**的原请求。
+   * 统一收尾：所有生命周期事件后调用。
    *
-   * 没有原请求（从未请求过、或已选「留在应用」）时返回 `null`：
-   * 调用方**不得**据此凭空关窗。
+   * 返回 `proceed` 时调用方执行 `intent`；返回 `ask` 时调用方展示对话框
+   * （动作取自 `intent`，即**被保留的原请求**）。
    */
-  takeReadyIntent(): CloseIntent | null {
-    if (this.writing.size > 0 || this.pending.size > 0) return null;
-    const intent = this.intent;
-    this.intent = null;
-    this.asking = false;
-    return intent;
+  reconcile(): CloseReconcile {
+    if (this.writing.size > 0 || this.pending.size > 0) {
+      if (this.requested === null) return { kind: "none" };
+      return {
+        kind: "ask",
+        intent: this.requested,
+        writing: [...this.writing],
+        pending: this.pendingWorktrees(),
+      };
+    }
+    if (this.authorized !== null) {
+      // **不在这里清授权**：授权要延续到原生动作真正完成（ST-B05-08-1）。
+      // App 拿到 proceed 后若发现代际已变（例如用户选了 Stay），必须放弃执行。
+      return { kind: "proceed", intent: this.authorized };
+    }
+    // 还有**未授权**的原请求（用户尚未选择）：必须继续展示询问，
+    // 否则对话框被隐藏、requested 暗留，用户再也没有 Wait/Stay 可点
+    // （ST-B04-08-2 / SP-B04-08-3）。
+    if (this.requested !== null) {
+      return { kind: "ask", intent: this.requested, writing: [], pending: [] };
+    }
+    return { kind: "none" };
   }
 
   /**
-   * 待核对结果已经**真实核对**（重新读取了真值、或用户看过结果）：
-   * 清除该 worktree 的待核对标记。
-   *
-   * 这是清除 pending 的唯一生产入口——不允许用「下一次写操作」代替核对。
+   * 核对**指定代际**的待核对：只有代际仍一致才清除。
+   * 核对失败或该目标又出现新待核对时代际已变，返回 false 且不清账。
    */
-  acknowledgePending(worktreeId: string): void {
+  acknowledgePending(worktreeId: string, generation: number): boolean {
+    if ((this.pending.get(worktreeId) ?? 0) !== generation) return false;
     this.pending.delete(worktreeId);
+    return true;
   }
 
   /**
-   * 用户已核对待核对结果并明确「继续」：清除 pending 并保留原请求，
-   * 之后由 `takeReadyIntent()` 在无在途写时执行。
+   * 认领一次原生动作的所有权；返回代际或 `null`（当前没有可执行授权）。
+   *
+   * 认领后授权**仍然保留**，直到 `complete()` 或代际变化。
+   */
+  claimExecution(): { intent: CloseIntent; generation: number; claimId: number } | null {
+    if (this.authorized === null) return null;
+    if (this.writing.size > 0 || this.pending.size > 0) return null;
+    // 排他：已有认领在执行时不重复投递。
+    if (this.activeClaimId !== 0) return null;
+    this.claimSeq += 1;
+    this.activeClaimId = this.claimSeq;
+    return { intent: this.authorized, generation: this.requestGeneration, claimId: this.activeClaimId };
+  }
+
+  /** 这次认领是否仍然有效（代际未变、仍无在途写与待核对）。 */
+  isExecutionValid(generation: number): boolean {
+    return this.requestGeneration === generation
+      && this.writing.size === 0
+      && this.pending.size === 0;
+  }
+
+  /**
+   * 最终原生动作已接受：清掉授权与原请求；驱动仍保持关闭终态，不开放写入。
+   *
+   * 只接受**当前**认领；旧认领晚回不得清新认领（ST-B06-08-3）。
+   */
+  completeExecution(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
+    this.authorized = null;
+    this.requested = null;
+    this.activeClaimId = 0;
+    return true;
+  }
+
+  /**
+   * 执行失败：释放认领并**取消自动授权**，但保留原请求。
+   *
+   * 之后 `reconcile()` 返回 `ask`，用户必须重新明确选择（等待/重试 或 留在应用），
+   * 不会自动重试（ST-B06-08-2 / SP-B06-08-2）。
+   */
+  failExecution(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
+    this.activeClaimId = 0;
+    this.authorized = null;
+    return true;
+  }
+
+  /** 原生动作被放弃（代际变化/条件不再满足）：授权交给编排继续等待。 */
+  abandonExecution(claimId: number): boolean {
+    if (claimId !== this.activeClaimId) return false;
+    this.activeClaimId = 0;
+    return true;
+  }
+
+  /** 是否已有执行中的原生动作。 */
+  isExecuting(): boolean {
+    return this.activeClaimId !== 0;
+  }
+
+  /**
+   * 用户已核对并明确「继续」：授权原请求，之后由 `reconcile()` 执行。
+   * **不**批量清除 pending（会误清核对期间新出现的待核对）。
    */
   confirmPendingContinue(): void {
-    this.pending.clear();
-    this.asking = false;
+    if (this.requested !== null) this.authorized = this.requested;
+  }
+}
+
+/**
+ * 退出保护的**版本化同步器**（任务 08、ST-B03-08-1）。
+ *
+ * 本地 Tauri 每个 invoke 是独立 fetch，仅靠 JS 丢弃旧回包不足以保证 Rust 的实际
+ * 状态：旧 `false` 的请求晚到仍会解除新建立的保护。这里给每次更新分配单调递增
+ * 的 `seq`，由 Rust 侧只接受更大的序号，所以**旧释放绝不能覆盖新占用**。
+ *
+ * App 与 Node 回归用同一个类；测试直接驱动它，不复制算法。
+ */
+export class ExitGuardSync {
+  private seq = 0;
+  /** 已被 Rust 接受的最新状态（诊断与测试用）。 */
+  private applied: boolean | null = null;
+  /** 已接受的最高序号。 */
+  private appliedSeq = 0;
+  private readonly send: (request: { blocked: boolean; seq: number }) => Promise<boolean>;
+
+  constructor(send: (request: { blocked: boolean; seq: number }) => Promise<boolean>) {
+    this.send = send;
+  }
+
+  /** 当前生效的保护状态（尚未同步过时为 `null`）。 */
+  current(): boolean | null {
+    return this.applied;
+  }
+
+  /** 已接受的最高序号。 */
+  lastSeq(): number {
+    return this.appliedSeq;
+  }
+
+  /**
+   * 请求设置保护；返回是否被接受。
+   *
+   * 每次调用都分配更大的 `seq`；接收端忽略更小的序号，因此调用顺序与网络到达
+   * 顺序无关。被拒绝（旧序号）时不改变本地已知状态。
+   */
+  async set(blocked: boolean): Promise<boolean> {
+    this.seq += 1;
+    const seq = this.seq;
+    const accepted = await this.send({ blocked, seq });
+    if (accepted) {
+      this.applied = blocked;
+      this.appliedSeq = Math.max(this.appliedSeq, seq);
+    }
+    return accepted;
+  }
+}
+
+/**
+ * 关闭/退出保护监听的**就绪闸门**（任务 08、ST-B03-08-2 / SP-B03-08-1）。
+ *
+ * 窗口关闭监听与原生退出监听**都**装好才允许开始写入；安装中、失败、卸载后
+ * 一律视为未就绪。写入口据此拒绝执行，而不是"报告错误后继续未受保护地写"。
+ */
+export class CloseGuardGate {
+  private windowReady = false;
+  private exitReady = false;
+  private disposed = false;
+  private reason: string | null = null;
+
+  /** 记录某个监听安装成功。 */
+  markInstalled(which: "window" | "exit"): void {
+    if (which === "window") this.windowReady = true;
+    else this.exitReady = true;
+    this.reason = null;
+  }
+
+  /** 记录安装失败（附带可见原因）。 */
+  markFailed(reason: string): void {
+    this.reason = reason;
+  }
+
+  /** 组件卸载/重装：立即回到未就绪。 */
+  dispose(): void {
+    this.disposed = true;
+    this.windowReady = false;
+    this.exitReady = false;
+  }
+
+  /** 两个监听都就绪且未卸载。 */
+  get ready(): boolean {
+    return !this.disposed && this.windowReady && this.exitReady;
+  }
+
+  /** 未就绪时的原因（就绪时为 `null`）。 */
+  get blockedReason(): string | null {
+    if (this.ready) return null;
+    return this.reason;
+  }
+}
+
+/**
+ * 写操作的**共享异步生产编排入口**（任务 08，ST-B04-08-1/3、SP-B04-08-1/2）。
+ *
+ * App 的 stage/unstage/discard、restore、save-as 全部经同一个实例：
+ * `begin()` 负责「检查关闭门禁/监听就绪 → 登记在途 → await 保护 → 失败回滚 + 真实 reconcile」，
+ * `end()` 负责收尾。Node 回归直接驱动**同一个类**，不手动补 reconcile。
+ *
+ * 关键点：
+ * - `begin()` 在 `await guard()` **之后**再复核一次监听就绪：保护建立期间
+ *   发生卸载/重装/失败时，不能带着「以为已保护」的状态开始执行 Git（ST-B04-08-1）。
+ * - 保护失败时执行 `rollback` + `reconcile`，让已授权的等待请求当场得到处理，
+ *   不留悬挂授权、不等下一笔无关写（ST-B04-08-3 / SP-B04-08-2）。
+ */
+export interface WriteGuardDeps {
+  /** 必填的生产关闭门禁；不能由调用者忘记在 guardsReady 中拼接。 */
+  closeDriver: Pick<CloseDriver, "canStartWrite">;
+  closeBlockedReason: string;
+  /** 监听是否就绪（窗口关闭 + 原生退出都装好）。 */
+  guardsReady: () => boolean;
+  /** 监听未就绪时的可见原因。 */
+  guardBlockedReason: () => string | null;
+  /** 登记在途。 */
+  register: (worktreeId: string) => void;
+  /** 建立保护（例如 await 版本化 setExitBlocked(true)）。 */
+  guard: () => Promise<void>;
+  /** 保护失败/被撤销时的回滚。 */
+  rollback: (worktreeId: string) => void;
+  /** 统一收尾（写结束、保护失败都走它）。 */
+  reconcile: () => void;
+  /** 记录结束（needsVerification 表示结果待核对）。 */
+  endWrite: (worktreeId: string, needsVerification: boolean) => void;
+}
+
+export class WriteGuardOrchestrator {
+  private readonly deps: WriteGuardDeps;
+
+  constructor(deps: WriteGuardDeps) {
+    this.deps = deps;
+  }
+
+  /**
+   * 开始一次受保护的写操作；返回是否**可以执行 Git**。
+   *
+   * 返回 `false` 时已完成回滚与真实收尾，调用方不得执行写命令。
+   */
+  async begin(worktreeId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+    if (!this.deps.closeDriver.canStartWrite()) {
+      return { ok: false, reason: this.deps.closeBlockedReason };
+    }
+    if (!this.deps.guardsReady()) {
+      return { ok: false, reason: this.deps.guardBlockedReason() ?? "" };
+    }
+    this.deps.register(worktreeId);
+    try {
+      await this.deps.guard();
+    } catch (error) {
+      this.deps.rollback(worktreeId);
+      // 真实收尾：已授权的等待请求当场处理，不悬挂。
+      this.deps.reconcile();
+      throw error;
+    }
+    // await 之后同时复核关闭门禁与监听，拒绝时撤回本次登记。
+    if (!this.deps.closeDriver.canStartWrite() || !this.deps.guardsReady()) {
+      this.deps.rollback(worktreeId);
+      this.deps.reconcile();
+      return {
+        ok: false,
+        reason: !this.deps.closeDriver.canStartWrite()
+          ? this.deps.closeBlockedReason : this.deps.guardBlockedReason() ?? "",
+      };
+    }
+    return { ok: true };
+  }
+
+  /** 结束一次写操作并统一收尾。 */
+  end(worktreeId: string, needsVerification: boolean): void {
+    this.deps.endWrite(worktreeId, needsVerification);
+    this.deps.reconcile();
+  }
+}
+
+
+// ---------------- 关闭/退出的共享生产驱动（任务 08）----------------
+
+export type CloseDriverPhase = "idle" | "asking" | "waiting" | "executing" | "closing";
+
+export type CloseDriverEffect =
+  | { kind: "none" }
+  | { kind: "ask"; intent: CloseIntent; writing: string[]; pending: string[] }
+  | { kind: "settled" };
+
+export interface CloseDriverDeps {
+  coordinator: CloseCoordinator;
+  /** 最后可取消的异步准备；这里只解除退出保护，不关闭窗口。 */
+  releaseExitGuard: () => Promise<void>;
+  /** 不再投递匿名 CloseRequested；仅在最终同步检查通过后销毁窗口。 */
+  closeWindow: () => Promise<void>;
+  /** 原退出请求走真正的应用退出，而不是用销毁窗口冒充。 */
+  exitApp: () => Promise<void>;
+  onError: (error: unknown) => void;
+  onAsk: (intent: CloseIntent, writing: string[], pending: string[]) => void;
+  onSettled: () => void;
+}
+
+interface CloseAttempt {
+  intent: CloseIntent;
+  generation: number;
+  claimId: number;
+}
+
+/**
+ * App 与回归共用的关闭驱动。原生关闭事件只表示用户意图，不充当程序化投递的回执。
+ * 每次异步执行持有独立 attempt，所有回包先核对象身份；Stay 可撤销准备阶段，
+ * 最终提交则同步锁住所有写入口并隐藏询问，直到销毁/退出完成也不重新开放写入。
+ */
+export class CloseDriver {
+  private readonly deps: CloseDriverDeps;
+  private phase: CloseDriverPhase = "idle";
+  private attempt: CloseAttempt | null = null;
+
+  constructor(deps: CloseDriverDeps) {
+    this.deps = deps;
+  }
+
+  currentPhase(): CloseDriverPhase {
+    return this.phase;
+  }
+
+  canStartWrite(): boolean {
+    return this.phase !== "closing";
+  }
+
+  handleRequest(intent: CloseIntent): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
+    const coordinator = this.deps.coordinator;
+    coordinator.request(intent);
+    return this.drive();
+  }
+
+  handleChoice(choice: CloseChoice): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
+    const coordinator = this.deps.coordinator;
+    coordinator.resolveAsk(choice);
+    if (choice === "stay") {
+      if (this.attempt) coordinator.abandonExecution(this.attempt.claimId);
+      this.attempt = null;
+      this.phase = "idle";
+      this.deps.onSettled();
+      return { kind: "settled" };
+    }
+    return this.drive();
+  }
+
+  handlePendingContinue(): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
+    this.deps.coordinator.confirmPendingContinue();
+    return this.drive();
+  }
+
+  notifyStateChanged(): CloseDriverEffect {
+    return this.drive();
+  }
+
+  /** App 对每个 CloseRequested 都 preventDefault，再把用户意图交给此入口。 */
+  handleNativeCloseRequest(): CloseDriverEffect {
+    return this.handleRequest("close");
+  }
+
+  private drive(): CloseDriverEffect {
+    if (this.phase === "closing") return { kind: "none" };
+    const coordinator = this.deps.coordinator;
+    const decision = coordinator.reconcile();
+    if (decision.kind === "ask") {
+      // 准备仍在途时也可展示新出现的写入/待核对，但不能丢掉执行所有权。
+      if (this.attempt === null) this.phase = "asking";
+      this.deps.onAsk(decision.intent, decision.writing, decision.pending);
+      return { kind: "ask", intent: decision.intent, writing: decision.writing, pending: decision.pending };
+    }
+    if (this.attempt !== null) return { kind: "none" };
+    if (decision.kind === "none") {
+      this.phase = "idle";
+      this.deps.onSettled();
+      return { kind: "settled" };
+    }
+    const attempt = coordinator.claimExecution();
+    if (attempt === null) {
+      this.phase = "waiting";
+      return { kind: "none" };
+    }
+    this.attempt = attempt;
+    this.phase = "executing";
+    void this.execute(attempt);
+    return { kind: "none" };
+  }
+
+  private async execute(attempt: CloseAttempt): Promise<void> {
+    const coordinator = this.deps.coordinator;
+    try {
+      if (attempt.intent === "exit") await this.deps.releaseExitGuard();
+      if (this.attempt !== attempt) return;
+      if (!coordinator.isExecutionValid(attempt.generation)) {
+        coordinator.abandonExecution(attempt.claimId);
+        this.attempt = null;
+        this.phase = "idle";
+        this.drive();
+        return;
+      }
+      // 从最终复核到锁写、隐藏询问、发出不可撤销的原生动作之间没有 await。
+      this.phase = "closing";
+      this.deps.onSettled();
+      if (attempt.intent === "exit") await this.deps.exitApp();
+      else await this.deps.closeWindow();
+      if (this.attempt !== attempt) return;
+      coordinator.completeExecution(attempt.claimId);
+      this.attempt = null;
+      // IPC 回包不等于窗口已经销毁；保持 closing，迟到的事件/选择不能重新开放写入。
+    } catch (error) {
+      if (this.attempt !== attempt) return;
+      coordinator.failExecution(attempt.claimId);
+      this.attempt = null;
+      this.phase = "idle";
+      this.deps.onError(error);
+      this.drive();
+    }
   }
 }
