@@ -1,0 +1,179 @@
+{
+  "sourceCommit": "6b3ddf5d3046e5745e65c81076806bbda441b359",
+  "launchCommit": "1a73cbbce10f6f9e1d7c031c946e30345c248ca4",
+  "binarySha256": "b0b2a64e324cda9156a301fd73b9e823094942eb0c16b31691ca758a956efb61",
+  "boundary": "Existing Rust watch_failure injection, light visible UI only, no external fixture change or product Git write, not full Q95 or final M2 acceptance.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/archive.py",
+      "stored": "original/archive.py.gz",
+      "gzip": true,
+      "sourceBytes": 2272,
+      "storedBytes": 1110,
+      "sourceSha256": "ef2da77c9dc66dcd3cf0acef2e673b076fdf391aa89bbf9960dab9dffd6b4a5b",
+      "storedSha256": "ee20941fed78f32c0de09bcbe5c1ca4a38448ac4485ca7732d7bdadb0a0df81d"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/exit.json",
+      "stored": "original/exit.json.gz",
+      "gzip": true,
+      "sourceBytes": 154,
+      "storedBytes": 127,
+      "sourceSha256": "e7f7c33463d68c95d34792c196babccda89e96e99f4463be9b403b5cc8d8686f",
+      "storedSha256": "3cc87f1b333fa548ea95c2a6565566cebb883e8ad068a26be98f649b44d3a699"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/fixture-after.bin",
+      "stored": "original/fixture-after.bin.gz",
+      "gzip": true,
+      "sourceBytes": 1485,
+      "storedBytes": 594,
+      "sourceSha256": "23b50b3983c6a6f82f98c6c7cfcd3cfc9c796e1b9f0e34553d1bcb68545482bb",
+      "storedSha256": "646661384377c893ca4c80a3a58698a5098b0305b2ba919dea15181b2d51ccb1"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/fixture-before.bin",
+      "stored": "original/fixture-before.bin.gz",
+      "gzip": true,
+      "sourceBytes": 1485,
+      "storedBytes": 594,
+      "sourceSha256": "23b50b3983c6a6f82f98c6c7cfcd3cfc9c796e1b9f0e34553d1bcb68545482bb",
+      "storedSha256": "646661384377c893ca4c80a3a58698a5098b0305b2ba919dea15181b2d51ccb1"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/launch.json",
+      "stored": "original/launch.json.gz",
+      "gzip": true,
+      "sourceBytes": 680,
+      "storedBytes": 436,
+      "sourceSha256": "aa7ba9835d60ce4ca5bf025b8592b19824a9294559f1a419663c8a95c6920fdb",
+      "storedSha256": "fb82f912a355978ab3693428cfeadcef54da516e9aaaedf71e07b88c26993e82"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/launch.py",
+      "stored": "original/launch.py.gz",
+      "gzip": true,
+      "sourceBytes": 2117,
+      "storedBytes": 1002,
+      "sourceSha256": "d09a37b4d60e99b41741740ae0050612c75fbbe60ed757fb0be283f9eeb3977b",
+      "storedSha256": "47625a2064e29b0f857211a00bfe182b54b00736978b1ca458cb2d1e4fff034a"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/observations.json",
+      "stored": "original/observations.json.gz",
+      "gzip": true,
+      "sourceBytes": 407,
+      "storedBytes": 294,
+      "sourceSha256": "fb8c7e3f43c65c4c1db654acd8fe0d9dcceb332d0accda2ec9497984c1bf37fb",
+      "storedSha256": "57f58fde4c38ab9f0d6ae3d373dff3a82cbaca0b1ec636602a817ef63aacd6bc"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/source-before.json",
+      "stored": "original/source-before.json.gz",
+      "gzip": true,
+      "sourceBytes": 274182,
+      "storedBytes": 72869,
+      "sourceSha256": "5b5c64e6d2fa8f86641bd03214469bcb05afdace975bacda592445589d119807",
+      "storedSha256": "9a3387ea2330834f9896e52b65095fc2585826594aa8517ae3e8c4fcc74b3078"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/source.txt",
+      "stored": "original/source.txt.gz",
+      "gzip": true,
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "27b9df563fa62576d1568aabde5e6f884a95adcc02e476c8591ec4c7af26b725",
+      "storedSha256": "a420bbd8ce9723a6888f72db4d7cb56beb4f9f8eef55dc9320bfb6e1592d261c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/stderr",
+      "stored": "original/stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/stdout",
+      "stored": "original/stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/task13-comment.md",
+      "stored": "original/task13-comment.md.gz",
+      "gzip": true,
+      "sourceBytes": 697,
+      "storedBytes": 585,
+      "sourceSha256": "b3cf0db986c43f85ec1e9ece119e1b7d0bc1fef53e0520f3ee12edcfd55710e1",
+      "storedSha256": "2ce9418b1e61aa28299218ff22bd12450a12ef81765d1ae460c4788b60544b84"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/task13-desktop03.md",
+      "stored": "original/task13-desktop03.md.gz",
+      "gzip": true,
+      "sourceBytes": 2012,
+      "storedBytes": 1395,
+      "sourceSha256": "ad2921e0a2f8af8d865a32ad0db4beb5c2f94d3da1b7f87df148e6ffdc129ab4",
+      "storedSha256": "b8033ea4cfc3a7004ca34cb7ab0ae1ff75055ea90d713fa4a745604a7eb1a66e"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/watch-after-refresh.ax.txt",
+      "stored": "original/watch-after-refresh.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 6142,
+      "storedBytes": 1770,
+      "sourceSha256": "bfdc6324122a8d317eb85abd516bb5300c7fd3dfade33a5a5fed8251f4bc3089",
+      "storedSha256": "5985e6752e2543f8d7404c6bc9c8cf6bb660f9ccc0c3c03a44495c79d41ad192"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/watch-after-refresh.png",
+      "stored": "original/watch-after-refresh.png",
+      "gzip": false,
+      "sourceBytes": 543151,
+      "storedBytes": 543151,
+      "sourceSha256": "661c3512d0cfe5c25f3acb62e5d2a9c49b58a3f3ad8c9dc7122849f537d9ad0a",
+      "storedSha256": "661c3512d0cfe5c25f3acb62e5d2a9c49b58a3f3ad8c9dc7122849f537d9ad0a"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/watch-failure.ax.txt",
+      "stored": "original/watch-failure.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 6058,
+      "storedBytes": 1745,
+      "sourceSha256": "98dae05c99fc34443af586f808f0477ea9793264ddbba663d8b24ebf1967afcf",
+      "storedSha256": "e2d945c8a70711608f91c311406635d239326b83d84e640cce1e646b4f8ce134"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/watch-failure.png",
+      "stored": "original/watch-failure.png",
+      "gzip": false,
+      "sourceBytes": 543309,
+      "storedBytes": 543309,
+      "sourceSha256": "393995b4321ae60aada6ae662541acf0a63e653acc26235af5bc36be4373912f",
+      "storedSha256": "393995b4321ae60aada6ae662541acf0a63e653acc26235af5bc36be4373912f"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/data/settings.json",
+      "stored": "original/data/settings.json.gz",
+      "gzip": true,
+      "sourceBytes": 122,
+      "storedBytes": 133,
+      "sourceSha256": "d53a27cfab4e01be79dc858698cd0c8b07fe694f3983c5cee548fb4899c58639",
+      "storedSha256": "99f9c94815ad4601d6ee7bf58b354083afe39951194f86f9b54d0f9192835813"
+    },
+    {
+      "source": "/private/tmp/revia-task13-watch-mw6eybl6/data/watch-failure.txt",
+      "stored": "original/data/watch-failure.txt.gz",
+      "gzip": true,
+      "sourceBytes": 103,
+      "storedBytes": 123,
+      "sourceSha256": "67ec4620749784c475a9ccaeebede9a5ca8743073ec33268f7e15f5bd2afd2c9",
+      "storedSha256": "8a0cb8442808d0031e0dda89b0ad2a117ad8920eb2f70e12a6bae064a9e8fc03"
+    }
+  ]
+}
