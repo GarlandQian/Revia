@@ -1,4 +1,4 @@
-import type { JumpDomDiagnostics } from "./jumpDiagnostics";
+import type { DomJumpSample, JumpDomDiagnostics } from "./jumpDiagnostics";
 
 /**
  * 测量工具：首屏、跳转、滚动期间的覆盖情况与帧间隔。
@@ -56,6 +56,8 @@ export interface JumpSample {
   warmWithinOneFrame: boolean | null;
   /** 原 M1 字段：compact 退出耗时；不单独证明高亮 token 已进入 DOM。 */
   colorRestoreMs: number | null;
+  /** 原 60% 目标及原返回位置的同次 DOM/首帧观测；旧总计时仍独立保留。 */
+  sameTargetDom: { outward: DomJumpSample; return: DomJumpSample };
 }
 
 export interface ScrollSample {

@@ -7,13 +7,53 @@ import { probeJumpFrame, type JumpFrameResult } from "./jumpFrameProbe";
 import { nextTask } from "./measure";
 import { waitForSoak } from "./soak";
 
-interface DomJumpSample extends JumpFrameResult {
+export interface DomJumpSample extends JumpFrameResult {
   fromRow: number;
   toRow: number;
   targetWasCached: boolean;
   missingRowsBefore: number;
   colorsCachedBefore: boolean;
   placeholderStyle: JumpCanvasStyle;
+}
+
+interface JumpDomOptions {
+  view: ViewMode;
+  rowHeight: number;
+  rows: RowWindowStore;
+  highlights: HighlightStore;
+  getScroller: () => DiffViewHandle | null;
+}
+
+/** 观察调用方指定的同一次跳转；准备过程不取数、不预热目标、不改滚动调度。 */
+export function observeJumpDom(options: JumpDomOptions & {
+  toRow: number;
+  checkColors: boolean;
+  jump: () => void;
+}): Promise<DomJumpSample> {
+  const { view, rowHeight, rows, highlights, toRow } = options;
+  const handle = options.getScroller();
+  const root = document.querySelector<HTMLElement>(".diff-scroll");
+  if (!handle || handle.getViewportHeight() <= 0 || !root) throw new Error("跳转诊断缺少有效视口");
+  const fromRow = Math.floor(handle.getScrollTop() / rowHeight);
+  const end = Math.min(rows.rowCountValue, toRow + Math.ceil(handle.getViewportHeight() / rowHeight));
+  const missingRowsBefore = rows.uncovered(toRow, end);
+  const colorsCachedBefore = inspectJumpDom({
+    root, view, from: toRow, to: end, rowHeight, getRow: (index) => rows.getRow(index), highlights,
+  }).colorsCached;
+  const preparation = prepareJumpDom(root, view, rowHeight);
+  return probeJumpFrame({
+    root,
+    jump: options.jump,
+    inspect: () => inspectJumpDom({
+      root, view, from: toRow, to: end, rowHeight, getRow: (index) => rows.getRow(index), highlights, preparation,
+    }),
+    colorsRestored: () => options.getScroller()?.isCompact() === false,
+    targetWasCached: missingRowsBefore === 0,
+    checkColors: options.checkColors && colorsCachedBefore,
+  }).then((result) => ({
+    fromRow, toRow, targetWasCached: missingRowsBefore === 0, missingRowsBefore,
+    colorsCachedBefore, placeholderStyle: preparation.style, ...result,
+  }));
 }
 
 export interface JumpDomDiagnostics {
@@ -25,13 +65,7 @@ export interface JumpDomDiagnostics {
 }
 
 /** 独立诊断保留原 M1 计时；同次跳转核对 DOM 与首个渲染机会，不声称硬件上屏时间。 */
-export async function diagnoseJumpDom(options: {
-  view: ViewMode;
-  rowHeight: number;
-  rows: RowWindowStore;
-  highlights: HighlightStore;
-  getScroller: () => DiffViewHandle | null;
-}): Promise<JumpDomDiagnostics> {
+export async function diagnoseJumpDom(options: JumpDomOptions): Promise<JumpDomDiagnostics> {
   const { view, rowHeight, rows, highlights, getScroller } = options;
   const scroller = () => {
     const current = getScroller();
@@ -82,35 +116,9 @@ export async function diagnoseJumpDom(options: {
     return sample.textMatched && sample.colorsMatched && !scroller().isCompact();
   }, 2000);
 
-  const jump = async (to: number, checkColors: boolean): Promise<DomJumpSample> => {
-    const handle = scroller();
-    const fromRow = Math.floor(handle.getScrollTop() / rowHeight);
-    const end = Math.min(rows.rowCountValue, to + Math.ceil(handle.getViewportHeight() / rowHeight));
-    const missingRowsBefore = rows.uncovered(to, end);
-    const colorsCachedBefore = inspect(to).colorsCached;
-    const root = document.querySelector<HTMLElement>(".diff-scroll");
-    if (!root) throw new Error("跳转诊断缺少 diff 视口");
-    const preparation = prepareJumpDom(root, view, rowHeight);
-    const result = await probeJumpFrame({
-      root,
-      jump: () => handle.scrollToRow(to),
-      inspect: () => inspectJumpDom({
-        root, view, from: to, to: end, rowHeight, getRow: (index) => rows.getRow(index), highlights, preparation,
-      }),
-      colorsRestored: () => !scroller().isCompact(),
-      targetWasCached: missingRowsBefore === 0,
-      checkColors: checkColors && colorsCachedBefore,
-    });
-    return {
-      fromRow,
-      toRow: to,
-      targetWasCached: missingRowsBefore === 0,
-      missingRowsBefore,
-      colorsCachedBefore,
-      placeholderStyle: preparation.style,
-      ...result,
-    };
-  };
+  const jump = (toRow: number, checkColors: boolean) => observeJumpDom({
+    ...options, toRow, checkColors, jump: () => scroller().scrollToRow(toRow),
+  });
 
   const outward = await jump(target, false);
   const back = await jump(0, sourceReady);

@@ -51,7 +51,7 @@ import { matchesHunkAction } from "@/features/diff/hunkAction";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { ipc, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
-import { diagnoseJumpDom } from "@/lib/jumpDiagnostics";
+import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
 import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog, MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
@@ -1777,15 +1777,30 @@ export function App() {
         const from = Math.floor((diffRef.current?.getScrollTop() ?? 0) / ROW_HEIGHT);
         const to = Math.floor(total * 0.6);
         const targetWasCached = rowStore.isCovered(to, to + viewportRows);
-        const started = performance.now();
-        rowStore.prioritize(to, to + viewportRows);
-        const prioritizedAt = performance.now();
-        diffRef.current?.scrollToRow(to);
-        const scrollReturnedAt = performance.now();
-        const coveredTarget = await waitUntil(() => rowStore.isCovered(to, to + viewportRows), 4000);
-        const dataAt = performance.now();
-        await nextTask();
-        const taskAt = performance.now();
+        let started = 0;
+        let prioritizedAt = 0;
+        let scrollReturnedAt = 0;
+        const observedOutward = observeJumpDom({
+          view: targetView, rowHeight: ROW_HEIGHT, rows: rowStore, highlights: highlightStore,
+          getScroller: () => diffRef.current, toRow: to, checkColors: false,
+          jump: () => {
+            started = performance.now();
+            rowStore.prioritize(to, to + viewportRows);
+            prioritizedAt = performance.now();
+            diffRef.current?.scrollToRow(to);
+            scrollReturnedAt = performance.now();
+          },
+        });
+        const [legacyOutward, outwardDom] = await Promise.all([
+          (async () => {
+            const coveredTarget = await waitUntil(() => rowStore.isCovered(to, to + viewportRows), 4000);
+            const dataAt = performance.now();
+            await nextTask();
+            return { coveredTarget, dataAt, taskAt: performance.now() };
+          })(),
+          observedOutward,
+        ]);
+        const { coveredTarget, dataAt, taskAt } = legacyOutward;
         const appearMs = taskAt - started;
         debugLog(
           `跳转目标齐备：${coveredTarget}（取数 ${Math.round(dataAt - started)} ms，提交 ${Math.round(appearMs)} ms）`,
@@ -1794,13 +1809,28 @@ export function App() {
         let warmAppearMs: number | null = null;
         let colorRestoreMs: number | null = null;
         const warmTargetWasCached = rowStore.isCovered(from, from + viewportRows);
-        const warmStart = performance.now();
-        diffRef.current?.scrollToRow(from);
-        const warmScrollReturnedAt = performance.now();
-        const warmCovered = await waitUntil(() => rowStore.isCovered(from, from + viewportRows), 4000);
-        const warmDataAt = performance.now();
-        await nextTask();
-        const warmTaskAt = performance.now();
+        let warmStart = 0;
+        let warmScrollReturnedAt = 0;
+        // 同次首帧已核验后才返回，避免在同一渲染机会前用回跳覆盖外跳画面。
+        const observedReturn = observeJumpDom({
+          view: targetView, rowHeight: ROW_HEIGHT, rows: rowStore, highlights: highlightStore,
+          getScroller: () => diffRef.current, toRow: from, checkColors: false,
+          jump: () => {
+            warmStart = performance.now();
+            diffRef.current?.scrollToRow(from);
+            warmScrollReturnedAt = performance.now();
+          },
+        });
+        const [legacyReturn, returnDom] = await Promise.all([
+          (async () => {
+            const warmCovered = await waitUntil(() => rowStore.isCovered(from, from + viewportRows), 4000);
+            const warmDataAt = performance.now();
+            await nextTask();
+            return { warmCovered, warmDataAt, warmTaskAt: performance.now() };
+          })(),
+          observedReturn,
+        ]);
+        const { warmCovered, warmDataAt, warmTaskAt } = legacyReturn;
         if (warmCovered) warmAppearMs = warmTaskAt - warmStart;
         // 等待颜色与余量恢复（compact 复位到 false，约 2 帧内恢复）
         const colorRestored = await waitUntil(() => diffRef.current != null && !diffRef.current.isCompact(), 2000);
@@ -1833,6 +1863,7 @@ export function App() {
           warmAppearMs,
           warmWithinOneFrame: warmAppearMs != null ? warmAppearMs <= 16.7 : null,
           colorRestoreMs,
+          sameTargetDom: { outward: outwardDom, return: returnDom },
         };
       }
 
