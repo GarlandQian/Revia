@@ -32,6 +32,50 @@ FOCUS_COUNTERS = {"idle": (), "ipc": ("totalIpcRequests",), "highlight": ("total
 FULL_LOAD_COUNTERS = ("totalFileSwitches", "totalViewSwitches", "totalScrolls", "totalJumps")
 
 
+class CommandEvidence:
+    """Per-run append-only record of external sampling commands: argv, pid, timing,
+    exit/exception and raw stdout/stderr (including output captured before a timeout).
+    Failures stay failures; nothing is retried or replaced by this recorder."""
+
+    def __init__(self, path):
+        self.path = path
+
+    def record(self, entry):
+        with self.path.open("a") as journal:
+            journal.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def run(self, argv, purpose, timeout):
+        started = datetime.datetime.now().astimezone().isoformat()
+        begin = time.monotonic()
+        completed = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        entry = {"kind": "command", "purpose": purpose, "argv": list(argv),
+                 "startedAt": started, "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                 "durationSeconds": round(time.monotonic() - begin, 3),
+                 "returncode": completed.returncode,
+                 "stdout": completed.stdout, "stderr": completed.stderr}
+        self.record(entry)
+        completed.check_returncode()
+        return completed.stdout
+
+    def run_timeout(self, argv, purpose, timeout):
+        """Like run(), but converts TimeoutExpired into evidence + re-raise, keeping partial output."""
+        started = datetime.datetime.now().astimezone().isoformat()
+        begin = time.monotonic()
+        try:
+            return self.run(argv, purpose, timeout)
+        except subprocess.TimeoutExpired as error:
+            self.record({"kind": "command", "purpose": purpose, "argv": list(argv),
+                         "startedAt": started, "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                         "durationSeconds": round(time.monotonic() - begin, 3),
+                         "exception": "TimeoutExpired",
+                         "timeoutSeconds": timeout,
+                         "partialStdout": error.output if isinstance(error.output, str) else
+                         (error.output or b"").decode("utf-8", "replace"),
+                         "partialStderr": error.stderr if isinstance(error.stderr, str) else
+                         (error.stderr or b"").decode("utf-8", "replace")})
+            raise
+
+
 def webkit_services(domain):
     """Read only this application's launchd service table, never a global PID diff."""
     section = re.search(r"\n\s*services = \{\n(.*?)\n\s*\}", domain, re.S)
@@ -44,11 +88,54 @@ def webkit_services(domain):
     return result
 
 
-def sample_memory(pid):
-    domain = subprocess.check_output(["launchctl", "print", f"pid/{pid}"], text=True, timeout=5)
+def launchctl_ownership(evidence, pid, purpose):
+    """Run `launchctl print pid/<pid>` and record ONLY the WebKit service rows.
+
+    launchctl's full stdout includes the process environment, which can contain
+    credentials, so the raw stdout is never persisted. The returned text is used
+    in-process for parsing only. Returns None when launchctl itself failed or timed
+    out; callers must treat that as missing ownership evidence, never as success.
+    """
+    started = datetime.datetime.now().astimezone().isoformat()
+    try:
+        completed = subprocess.run(["launchctl", "print", f"pid/{pid}"], capture_output=True,
+                                   text=True, timeout=5)
+    except subprocess.TimeoutExpired:
+        evidence.record({"kind": "ownership", "purpose": purpose, "pid": pid, "startedAt": started,
+                         "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                         "exception": "TimeoutExpired", "timeoutSeconds": 5,
+                         "redaction": "launchctl stdout may contain process environment (possible credentials); "
+                                      "nothing from stdout retained"})
+        return None
+    section = re.search(r"\n\s*services = \{\n(.*?)\n\s*\}", completed.stdout, re.S)
+    retained = [" ".join(line.split()) for line in (section[1].splitlines() if section else [])
+                if "com.apple.WebKit." in line]
+    evidence.record({"kind": "ownership", "purpose": purpose, "pid": pid, "startedAt": started,
+                     "endedAt": datetime.datetime.now().astimezone().isoformat(),
+                     "returncode": completed.returncode,
+                     "webkitServiceRows": retained,
+                     "services": webkit_services(completed.stdout),
+                     "redaction": "launchctl stdout may contain process environment (possible credentials); "
+                                  "only WebKit service rows retained, not the raw stdout"})
+    if completed.returncode != 0:
+        return None
+    return completed.stdout
+
+
+def sample_memory(pid, evidence=None):
+    if evidence is None:
+        domain = subprocess.check_output(["launchctl", "print", f"pid/{pid}"], text=True, timeout=5)
+    else:
+        # Ownership evidence keeps only WebKit service rows; the raw stdout may contain secrets.
+        domain = launchctl_ownership(evidence, pid, "rss-sample")
+        if domain is None:
+            raise RuntimeError("launchctl 归属证据不可用，不能接受缺失的内存样本")
     services = webkit_services(domain)
     pids = [pid] + [child for group in services.values() for child in group]
-    output = subprocess.check_output(["ps", "-o", "pid=,rss=", "-p", ",".join(map(str, pids))], text=True, timeout=5)
+    if evidence is None:
+        output = subprocess.check_output(["ps", "-o", "pid=,rss=", "-p", ",".join(map(str, pids))], text=True, timeout=5)
+    else:
+        output = evidence.run(["ps", "-o", "pid=,rss=", "-p", ",".join(map(str, pids))], "rss-sample", 5)
     rss = {int(row[0]): int(row[1]) / 1024 for line in output.splitlines() if len(row := line.split()) == 2}
     if any(child not in rss for child in pids) or any(not services[role] for role in ROLES):
         raise RuntimeError("Revia/WebKit 进程不完整，不能接受缺失的内存样本")
@@ -63,8 +150,11 @@ def sample_memory(pid):
     return values
 
 
-def physical_footprint(pid):
-    output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
+def physical_footprint(pid, evidence=None):
+    if evidence is None:
+        output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
+    else:
+        output = evidence.run_timeout(["vmmap", "-summary", str(pid)], "rust-footprint", 10)
     return parse_footprint(output)
 
 
@@ -115,10 +205,87 @@ def parse_webkit_allocated(output):
     return sum(zones.values())
 
 
-def webcontent_memory(pid):
-    output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
+def webcontent_memory(pid, evidence=None):
+    if evidence is None:
+        output = subprocess.check_output(["vmmap", "-summary", str(pid)], text=True, timeout=10)
+    else:
+        output = evidence.run_timeout(["vmmap", "-summary", str(pid)], "webcontent-memory", 10)
     return {"pid": pid, "footprintMb": parse_footprint(output),
             "webkitMallocAllocatedMb": parse_webkit_allocated(output)}
+
+
+class ProgressLog:
+    """Read the frontend's incremental `[SOAK_PROGRESS] {json}` records from the same log file.
+
+    These records exist only to explain an interrupted run. They are never a substitute
+    for the final frontend report: a run still requires a real `.frontend.json` with
+    ok/duration/load, so an incomplete run cannot be upgraded by progress alone.
+
+    Strictness: a trailing partial line is retained and never parsed as progress; records
+    must carry a matching run anchor, unique checkpoint ids, and only closed checkpoints
+    (endedAt present) are exposed.
+    """
+
+    def __init__(self, path):
+        self.path = path
+
+    def read(self):
+        """Return (anchor, closedCheckpoints, problems).
+
+        anchor is the first `kind == "run"` record or None. problems lists every
+        integrity violation found; any problem must fail the run closed.
+        """
+        try:
+            data = self.path.read_bytes()
+        except FileNotFoundError:
+            return None, [], ["缺少前端进度记录：日志文件不存在"]
+        # A trailing partial line (no terminating newline) is never treated as progress.
+        complete, _, _tail = data.rpartition(b"\n")
+        anchor, closed, problems = None, [], []
+        seen = set()
+        for raw in complete.split(b"\n"):
+            text = raw.decode("utf-8", "replace")
+            marker = text.find("[SOAK_PROGRESS] ")
+            if marker < 0:
+                continue
+            payload = text[marker + len("[SOAK_PROGRESS] "):]
+            try:
+                record = json.loads(payload)
+            except ValueError:
+                problems.append(f"进度记录不是合法 JSON：{payload[:120]}")
+                continue
+            if not isinstance(record, dict):
+                problems.append("进度记录不是对象")
+                continue
+            kind = record.get("kind")
+            if kind == "run":
+                if anchor is None:
+                    anchor = record
+                elif record.get("runId") != anchor.get("runId"):
+                    problems.append("进度记录出现第二个不同运行锚点")
+                continue
+            if kind != "checkpoint":
+                problems.append(f"未知进度记录类型：{kind!r}")
+                continue
+            if anchor is None:
+                problems.append("checkpoint 记录早于运行锚点")
+                continue
+            if record.get("runId") != anchor.get("runId"):
+                problems.append("checkpoint 与运行锚点不属于同一运行")
+                continue
+            cycle = record.get("cycle")
+            if not isinstance(cycle, int):
+                problems.append(f"checkpoint 缺少整数 cycle：{cycle!r}")
+                continue
+            if cycle in seen:
+                problems.append(f"checkpoint 重复：{cycle}")
+                continue
+            if not record.get("endedAt"):
+                problems.append(f"checkpoint 未闭合：{cycle}")
+                continue
+            seen.add(cycle)
+            closed.append(record)
+        return anchor, closed, problems
 
 
 class CheckpointLog:
@@ -183,7 +350,7 @@ class CheckpointLog:
         return checkpoint_id in self._ended
 
 
-def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, started):
+def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, started, evidence=None):
     beginning = time.monotonic()
     pressure = checkpoint["pressure"]
     hold = PRESSURE_HOLD_SECONDS if pressure else PHASE_HOLD_SECONDS
@@ -206,15 +373,15 @@ def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, starte
             if proc.poll() is not None:
                 errors.append("低内存通知后应用已退出")
         if not errors:
-            sample.update(sample_memory(proc.pid))
+            sample.update(sample_memory(proc.pid, evidence))
             services = {role: sample[ROLES[role] + "Pids"] for role in ROLES}
             if expected_services is not None and services != expected_services:
                 raise RuntimeError("WebKit 进程与常规采样归属不一致")
-            sample["rustFootprintMb"] = physical_footprint(proc.pid)
-            sample["webContentVmmap"] = [webcontent_memory(pid) for pid in services["WebContent"]]
+            sample["rustFootprintMb"] = physical_footprint(proc.pid, evidence)
+            sample["webContentVmmap"] = [webcontent_memory(pid, evidence) for pid in services["WebContent"]]
             sample["webContentFootprintMb"] = sum(item["footprintMb"] for item in sample["webContentVmmap"])
             sample["webContentMallocAllocatedMb"] = sum(item["webkitMallocAllocatedMb"] for item in sample["webContentVmmap"])
-            after = sample_memory(proc.pid)
+            after = sample_memory(proc.pid, evidence)
             sample["servicesAfterSampling"] = {role: after[ROLES[role] + "Pids"] for role in ROLES}
             if sample["servicesAfterSampling"] != services:
                 raise RuntimeError("阶段采样期间 WebKit 进程归属改变")
@@ -240,19 +407,35 @@ def sample_phase_memory(proc, checkpoints, checkpoint, expected_services, starte
     return sample
 
 
-def finalize_phase_samples(samples, checkpoints, frontend):
+def finalize_phase_samples(samples, checkpoints, frontend, progress_checkpoints=None):
+    """Validate phase samples against checkpoint metadata.
+
+    The authoritative source is the final frontend report. Only when that report is
+    absent (an interrupted run, which can never complete) do the frontend's incremental
+    progress records serve as the checkpoint source for DIAGNOSIS; each sample then
+    records `checkpointSource="progress-log"` so the provenance is never confused with
+    final evidence. Progress records with integrity problems contribute no metadata.
+    """
     def instant(value):
         result = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
         if result.tzinfo is None:
             raise ValueError("阶段时间缺少时区")
         return result
 
+    reported = frontend.get("phaseCheckpoints")
+    if isinstance(reported, list) and reported:
+        source = "final-report"
+    elif progress_checkpoints:
+        reported, source = progress_checkpoints, "progress-log"
+    else:
+        reported, source = None, "missing"
+
     for sample in samples:
         errors = sample["errors"]
+        sample["checkpointSource"] = source
         sample["checkpointEndConfirmed"] = checkpoints.has_ended(sample["checkpointId"])
         if not sample["checkpointEndConfirmed"]:
             errors.append("缺少匹配的 checkpoint END，不能确认静置窗口闭合")
-        reported = frontend.get("phaseCheckpoints")
         matches = [item for item in reported if isinstance(item, dict) and item.get("cycle") == sample["checkpointId"]] \
             if isinstance(reported, list) else []
         if len(matches) != 1 or matches[0].get("file") != "src/staged.ts" or matches[0].get("view") != "split":
@@ -270,12 +453,14 @@ def finalize_phase_samples(samples, checkpoints, frontend):
                 errors.append(f"前端 checkpoint 起止时间不可核验：{error}")
         sample["errors"] = list(dict.fromkeys(errors))
         sample["valid"] = not sample["errors"]
+        # Only a final frontend report makes a phase sample authoritative for acceptance.
+        sample["authoritative"] = source == "final-report"
         sample["validation"] = "final"
 
 
-def record_phase_samples(checkpoints, proc, services, started, samples, journal):
+def record_phase_samples(checkpoints, proc, services, started, samples, journal, evidence=None):
     while checkpoints.pending:
-        sample = sample_phase_memory(proc, checkpoints, checkpoints.pending.popleft(), services, started)
+        sample = sample_phase_memory(proc, checkpoints, checkpoints.pending.popleft(), services, started, evidence)
         samples.append(sample)
         journal.write(json.dumps(sample) + "\n")
         journal.flush()
@@ -448,6 +633,11 @@ def main():
     started_at = datetime.datetime.now().astimezone().isoformat()
     samples, phase_samples, errors, frontend = [], [], [], {}
     checkpoints = CheckpointLog(frontend_path.with_suffix(".log"))
+    progress_log = ProgressLog(frontend_path.with_suffix(".log"))
+    evidence_path = Path(str(output) + ".evidence.jsonl")
+    evidence = CommandEvidence(evidence_path)
+    cleanup_evidence = {}
+    partial_candidates = []
     initial_services = None
     with log_path.open("x") as log, samples_path.open("x") as journal, phase_samples_path.open("x") as phase_journal:
         proc = subprocess.Popen([str(binary)], env=env, stdout=log, stderr=subprocess.STDOUT)
@@ -457,7 +647,7 @@ def main():
         try:
             while proc.poll() is None:
                 checkpoints.poll()
-                record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
+                record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal, evidence)
                 now = time.monotonic()
                 # Allow 120s visibility setup, about 200s phase/pressure holds and an exit margin;
                 # single-operation diagnostics may also pause up to 10 minutes per hidden-window interruption.
@@ -465,9 +655,17 @@ def main():
                     raise TimeoutError("等待可见窗口或操作硬超时")
                 if now >= next_sample:
                     sampling_started_at = datetime.datetime.now().astimezone().isoformat()
+                    candidate = {"elapsedSec": round(now - started, 2), "samplingStartedAt": sampling_started_at}
                     try:
-                        sample = sample_memory(proc.pid)
+                        sample = sample_memory(proc.pid, evidence)
+                        candidate.update(sample)
                     except (subprocess.SubprocessError, RuntimeError) as error:
+                        # Preserve whatever this candidate already obtained; never drop it silently.
+                        candidate.update({"failure": f"{type(error).__name__}: {error}",
+                                          "reviaPid": proc.pid, "pollAtFailure": proc.poll(),
+                                          "capturedAt": datetime.datetime.now().astimezone().isoformat()})
+                        partial_candidates.append(candidate)
+                        evidence.record({"kind": "sample-failure", **candidate})
                         if proc.poll() is not None:
                             break
                         if now - started < 15:
@@ -480,15 +678,23 @@ def main():
                     initial_services = services
                     if diagnostic or len(samples) % 3 == 0:
                         try:
-                            sample["rustFootprintMb"] = physical_footprint(proc.pid)
+                            sample["rustFootprintMb"] = physical_footprint(proc.pid, evidence)
                             if diagnostic:
-                                sample["webContentVmmap"] = [webcontent_memory(child) for child in services["WebContent"]]
+                                sample["webContentVmmap"] = [webcontent_memory(child, evidence) for child in services["WebContent"]]
                                 sample["webContentFootprintMb"] = sum(item["footprintMb"] for item in sample["webContentVmmap"])
                                 sample["webContentMallocAllocatedMb"] = sum(item["webkitMallocAllocatedMb"] for item in sample["webContentVmmap"])
-                                sample["networkingFootprintMb"] = sum(physical_footprint(child) for child in services["Networking"])
+                                sample["networkingFootprintMb"] = sum(physical_footprint(child, evidence) for child in services["Networking"])
                             else:
-                                sample["webContentFootprintMb"] = sum(physical_footprint(child) for child in services["WebContent"])
-                        except subprocess.SubprocessError:
+                                sample["webContentFootprintMb"] = sum(physical_footprint(child, evidence) for child in services["WebContent"])
+                        except subprocess.SubprocessError as error:
+                            # Keep the partial candidate (RSS already read, maybe rust footprint too).
+                            candidate.update({key: sample[key] for key in sample if key not in candidate})
+                            candidate.update({"failure": f"{type(error).__name__}: {error}",
+                                              "reviaPid": proc.pid, "pollAtFailure": proc.poll(),
+                                              "servicesAtFailure": services,
+                                              "capturedAt": datetime.datetime.now().astimezone().isoformat()})
+                            partial_candidates.append(candidate)
+                            evidence.record({"kind": "sample-failure", **candidate})
                             if proc.poll() is not None:
                                 break
                             raise
@@ -503,16 +709,34 @@ def main():
         except (Exception, KeyboardInterrupt) as error:
             errors.append(f"{type(error).__name__}: {error}")
         finally:
-            if proc.poll() is None:
+            # Record the cleanup attempt step by step. Whatever cannot be observed is
+            # reported as unknown, never inferred from the exit code or assumed.
+            cleanup_evidence["startedAt"] = datetime.datetime.now().astimezone().isoformat()
+            poll_before = proc.poll()
+            cleanup_evidence["pollBeforeCleanup"] = poll_before
+            cleanup_evidence["reviaPid"] = proc.pid
+            cleanup_evidence["servicesBeforeCleanup"] = initial_services
+            if poll_before is None:
+                cleanup_evidence["terminateSent"] = True
+                cleanup_evidence["terminateSentAt"] = datetime.datetime.now().astimezone().isoformat()
                 proc.terminate()
                 try:
-                    proc.wait(timeout=5)
+                    cleanup_evidence["waitAfterTerminate"] = proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
+                    cleanup_evidence["waitAfterTerminate"] = "timeout"
+                    cleanup_evidence["killSent"] = True
+                    cleanup_evidence["killSentAt"] = datetime.datetime.now().astimezone().isoformat()
                     proc.kill()
-                    proc.wait()
+                    cleanup_evidence["waitAfterKill"] = proc.wait()
+            else:
+                cleanup_evidence["terminateSent"] = False
+                cleanup_evidence["note"] = "清理前主进程已退出；未发送信号"
+            cleanup_evidence["pollAfterCleanup"] = proc.poll()
+            cleanup_evidence["endedAt"] = datetime.datetime.now().astimezone().isoformat()
+            evidence.record({"kind": "cleanup", **cleanup_evidence})
             try:
                 checkpoints.poll()
-                record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal)
+                record_phase_samples(checkpoints, proc, initial_services, started, phase_samples, phase_journal, evidence)
             except (OSError, RuntimeError) as error:
                 errors.append(f"最终阶段日志不可核验：{error}")
     if frontend_path.exists():
@@ -520,7 +744,10 @@ def main():
             frontend = json.loads(frontend_path.read_text())
         except (OSError, ValueError) as error:
             errors.append(f"前端报告无效：{error}")
-    finalize_phase_samples(phase_samples, checkpoints, frontend)
+    # Incremental frontend progress explains an interrupted run. It is diagnostics only:
+    # it never satisfies completion, which still requires the real final report below.
+    progress_anchor, progress_checkpoints, progress_problems = progress_log.read()
+    finalize_phase_samples(phase_samples, checkpoints, frontend, progress_checkpoints)
     # The live journal is explicitly provisional; publish the same final validity as the report.
     phase_samples_path.write_text("".join(json.dumps(sample) + "\n" for sample in phase_samples))
     errors.extend(completion_errors(frontend, samples, seconds, proc.returncode, diagnostic, minimal_logging))
@@ -537,10 +764,18 @@ def main():
         "binarySha256": binary_sha256,
         "platform": platform.platform(), "isolatedDataDir": data_dir, "repo": str(repo),
         "errors": errors, "frontend": frontend, "memoryTimeSeries": samples,
+        "partialCandidates": partial_candidates,
+        "commandEvidence": str(evidence_path),
+        "cleanup": cleanup_evidence,
+        "progressEvidence": {"anchor": progress_anchor, "closedCheckpoints": progress_checkpoints,
+                             "problems": progress_problems,
+                             "note": "中断诊断用；不构成最终前端报告或验收依据"},
         "memoryAnalysis": (None if diagnostic else analyze_memory(samples, frontend.get("setupSeconds", 0))),
         "phaseMemoryTimeSeries": phase_samples,
         # Diagnostic runs report the same Q98 numbers for comparison; only baselines count for acceptance.
         "q98MemoryVerdict": analyze_q98(samples, phase_samples, frontend.get("setupSeconds", 0)),
+        # A verdict computed from progress-derived phase samples is diagnostic only.
+        "q98MemoryVerdictAuthoritative": bool(frontend.get("ok") is True),
         "phaseMemorySummary": {
             "sampleCount": len(phase_samples), "validSampleCount": sum(s["valid"] for s in phase_samples),
             "invalidSampleCount": sum(not s["valid"] for s in phase_samples),
@@ -553,7 +788,10 @@ def main():
     print(f"运行{'完成，待验收' if not errors else '失败'}：{errors}；报告 {output}", flush=True)
     if report["q98MemoryVerdict"] is not None:
         verdict = report["q98MemoryVerdict"]
-        print(f"Q98 内存判定：{'通过' if verdict['passed'] else '不通过'}；{verdict['errors']}", flush=True)
+        if report["q98MemoryVerdictAuthoritative"]:
+            print(f"Q98 内存判定：{'通过' if verdict['passed'] else '不通过'}；{verdict['errors']}", flush=True)
+        else:
+            print(f"Q98 内存判定（非权威：缺最终前端报告，仅诊断）：{verdict['errors']}", flush=True)
     return 1 if errors else 0
 
 

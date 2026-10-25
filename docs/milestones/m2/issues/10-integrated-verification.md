@@ -196,3 +196,50 @@ m2-ui→m2快进已完成。实际Release仍来自2a51b160；d952测试修复、
 **Status保持ready-for-agent。** 最终Q98首轮78.54墙秒因2179ms帧间隔中断；第二轮1223.25墙秒因常规WebContent vmmap255中断，无最终frontend.json。18阶段即时检查/END均通过，但完整checkpoint缺失使最终无效；不能补造或改松。Rust现有34样本maxRise82MiB超过+10，负斜率不取消，缺setupSeconds的影响单列，不认定泄漏。
 
 已交原Pi按Q109首选GLM-5.3-Flash只读诊断，再评审最小修复；Rust振幅另行定位。不静默重试挑样本、不改暖机/阈值/负载、不拼接时长、不sudo采样。D06四组及两轮Q98见[最终测量](../final-measure-20261025.md)，其余归档见[B10记录](../batch10-repair-validation.md)。任务11/M2未通过，未合main，未启动M3。
+
+### 2026-10-25 / Pi：Q98 测量失败留证修复（不改验收规则）
+
+**这是测量失败的可观察性与证据保全修复，不是 vmmap 底层错误或 Rust 内存增长已修好。**
+两轮失败原件与判定保持原样，未改阈值/暖机/采样间隔/负载/窗口，未新增长测。
+
+**改动范围**（3 文件）：
+
+- `tools/bench-long-running.py`
+  - 新增 `CommandEvidence`：采样外部命令逐条留证（实际 argv、PID、起止、退出码/异常、
+    完整 stdout/stderr；timeout 另存 `partialStdout/partialStderr`）。
+  - `launchctl` 归属证据**只保留 WebKit services 行**，不保存原始 stdout（可能含进程环境
+    凭据）；每条记录写入 `redaction` 说明裁剪范围与原因，不冒称未裁剪原件。
+  - 常规采样失败时保存**已取得的部分数据**（`partialCandidates` + `*.evidence.jsonl`），
+    含失败时 `proc.poll()`、已归属 services、失败原因；不再随异常无痕丢失。
+  - 清理动作逐项留证：`pollBeforeCleanup`、`terminateSent`/`terminateSentAt`、
+    `waitAfterTerminate`、必要时 `killSent`/`waitAfterKill`、`pollAfterCleanup`；
+    清理前已退出时记 `terminateSent:false`，**不把「若活着则清理」写成「确实被杀」**。
+  - 新增 `ProgressLog`：读取前端 `[SOAK_PROGRESS]` 增量记录。未闭合尾行不解析、
+    重复/损坏/跨运行/锚点前记录/第二锚点/未知类型均计入 `problems`。
+  - 阶段最终校验新增 `checkpointSource` 与 `authoritative`：只有真实最终前端报告
+    才是权威来源；仅进度记录时标为 `progress-log` 且 `authoritative:false`，
+    `q98MemoryVerdictAuthoritative` 为 false，判定只作诊断。缺失/损坏记录仍 fail-closed。
+- `src/App.tsx`（仅原 soak 测量分支）
+  - setup 完成后经 `ipc.debugLog` 写运行锚点 `[SOAK_PROGRESS] {kind:"run"}`（含
+    `runId`/目标秒数/输出路径/setup 秒），不使用 `writeMeasurement`（它会 500ms 后退出）。
+  - 每个 checkpoint 闭合后立即写 `{kind:"checkpoint"}` 完整描述：cycle/file/view/
+    pressure/真实 `startedAt`+`endedAt`/`hiddenDuringHold`/当时 checkpoint 与可见性
+    暂停秒数/当时 cycles、文件切换、视图切换、滚动、跳转计数。**未闭合段不写**。
+  - 增量记录与既有 BEGIN/END 并存，后者仍是驱动判定窗口闭合的依据。
+- `tools/test_bench_long_running.py`：复用既有 unittest，新增 12 项（20→32），
+  覆盖命令留证、timeout 部分输出、归属凭据不外泄、归属失败不等于成功、
+  进度记录只暴露已闭合唯一段、损坏/重复/跨运行/未闭合/未知类型 fail-closed、
+  缺进度文件如实报告、进度不得替代最终报告（含 `authoritative` 区分）、
+  仅进度记录时整轮仍失败、部分样本保全、清理动作区分 terminate 与已退出。
+
+**未解决（单列待定位）**：Rust 热身后常规 footprint 最大抬升 82.0 MiB 超过 +10 MiB
+门槛，斜率 −0.9827 MiB/min 在上限内，序列明显回落（最小 116.0）。现有日志不足以区分
+存活分配与 allocator 高水位，本轮**未**改缓存/分配策略、未挑首点、未延长暖机、
+未减少负载、未用同阶段样本替代常规样本。
+
+**检查**（一次集中运行，原件 `/private/tmp/revia-q98-evidence-repair.Qvsbwg`）：
+`python3 tools/test_bench_long_running.py` 32 passed、`pnpm exec tsc -b` 0、
+`pnpm lint` 0（仅既存 warning）、`pnpm build` 0、`git diff --check` 0。
+未重跑全量 Rust/无关 Node，未做 GUI/Release/D06/CI/长测。
+
+**Status 保持 ready-for-agent**，等待双轴复核。

@@ -1,5 +1,6 @@
 """Regression checks for false success and unrelated WebKit PID attribution."""
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 import tempfile
@@ -179,7 +180,7 @@ class BenchmarkSafetyTests(unittest.TestCase):
                 proc = mock.Mock(pid=12)
                 proc.poll.return_value = None
 
-                def snapshot(_):
+                def snapshot(_pid, _evidence=None):
                     if transition in ("end", "begin"):
                         marker = b"[SOAK_CHECKPOINT_END] 1\n" if transition == "end" else b"[SOAK_CHECKPOINT_BEGIN] 2\n"
                         with path.open("ab") as log:
@@ -311,6 +312,216 @@ class BenchmarkSafetyTests(unittest.TestCase):
         self.assertEqual(bench.completion_errors(dict(frontend, diagnostic=idle), samples, 60, 0, idle, True), [])
         full = dict(diagnostic, focus=None)
         self.assertTrue(bench.completion_errors(dict(frontend, diagnostic=full), samples, 60, 0, full, True))
+
+    def test_command_evidence_records_argv_exit_and_raw_streams(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "evidence.jsonl"
+            evidence = bench.CommandEvidence(journal)
+            with mock.patch.object(bench.subprocess, "run",
+                                   return_value=mock.Mock(returncode=255, stdout="out", stderr="err",
+                                                          check_returncode=mock.Mock(
+                                                              side_effect=bench.subprocess.CalledProcessError(255, ["vmmap"])))):
+                with self.assertRaises(bench.subprocess.CalledProcessError):
+                    evidence.run(["vmmap", "-summary", "90688"], "webcontent-memory", 10)
+            record = json.loads(journal.read_text().splitlines()[0])
+            self.assertEqual(record["argv"], ["vmmap", "-summary", "90688"])
+            self.assertEqual(record["purpose"], "webcontent-memory")
+            self.assertEqual(record["returncode"], 255)
+            self.assertEqual(record["stdout"], "out")
+            self.assertEqual(record["stderr"], "err")
+            for key in ("startedAt", "endedAt", "durationSeconds"):
+                self.assertIn(key, record)
+
+    def test_command_evidence_keeps_partial_output_on_timeout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "evidence.jsonl"
+            evidence = bench.CommandEvidence(journal)
+            timeout = bench.subprocess.TimeoutExpired(["vmmap", "-summary", "45"], 10,
+                                                      output="partial out", stderr="partial err")
+            with mock.patch.object(bench.subprocess, "run", side_effect=timeout):
+                with self.assertRaises(bench.subprocess.TimeoutExpired):
+                    evidence.run_timeout(["vmmap", "-summary", "45"], "rust-footprint", 10)
+            record = json.loads(journal.read_text().splitlines()[0])
+            self.assertEqual(record["exception"], "TimeoutExpired")
+            self.assertEqual(record["timeoutSeconds"], 10)
+            self.assertEqual(record["partialStdout"], "partial out")
+            self.assertEqual(record["partialStderr"], "partial err")
+
+    def test_ownership_evidence_never_retains_launchd_environment(self):
+        sentinel = "SENTINEL_SECRET_VALUE_DO_NOT_PERSIST"
+        domain = ("pid/12 = {\n environment = {\n TOKEN => " + sentinel + "\n }\n"
+                  " services = {\n    45 - com.apple.WebKit.WebContent.ABC\n"
+                  "    47 - com.apple.WebKit.Networking.GHI\n    46 - com.apple.WebKit.GPU.DEF\n }\n}")
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "evidence.jsonl"
+            evidence = bench.CommandEvidence(journal)
+            with mock.patch.object(bench.subprocess, "run",
+                                   return_value=mock.Mock(returncode=0, stdout=domain, stderr="")):
+                returned = bench.launchctl_ownership(evidence, 12, "rss-sample")
+            self.assertEqual(returned, domain)
+            raw = journal.read_text()
+            self.assertNotIn(sentinel, raw)
+            record = json.loads(raw.splitlines()[0])
+            self.assertEqual(record["services"], {"WebContent": [45], "Networking": [47], "GPU": [46]})
+            self.assertIn("redaction", record)
+            self.assertTrue(record["webkitServiceRows"])
+
+    def test_ownership_failure_is_missing_evidence_not_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "evidence.jsonl"
+            evidence = bench.CommandEvidence(journal)
+            with mock.patch.object(bench.subprocess, "run",
+                                   return_value=mock.Mock(returncode=1, stdout="", stderr="denied")):
+                self.assertIsNone(bench.launchctl_ownership(evidence, 12, "rss-sample"))
+            record = json.loads(journal.read_text().splitlines()[0])
+            self.assertEqual(record["returncode"], 1)
+            self.assertNotIn("stdout", record)
+
+    def test_progress_log_exposes_only_closed_unique_checkpoints(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "frontend.log"
+            records = [
+                {"kind": "run", "runId": "r1", "targetSeconds": 1800},
+                {"kind": "checkpoint", "runId": "r1", "cycle": 1, "file": "src/staged.ts", "view": "split",
+                 "pressure": False, "startedAt": "2026-10-25T08:00:00Z", "endedAt": "2026-10-25T08:00:04Z",
+                 "hiddenDuringHold": False},
+            ]
+            lines = [f"noise\n[SOAK_PROGRESS] {json.dumps(item)}\n" for item in records]
+            # Unterminated tail must not be parsed as progress.
+            lines.append('[SOAK_PROGRESS] {"kind": "checkpoint", "runId": "r1", "cycle": 9')
+            path.write_text("".join(lines))
+            anchor, closed, problems = bench.ProgressLog(path).read()
+            self.assertEqual(anchor["runId"], "r1")
+            self.assertEqual([item["cycle"] for item in closed], [1])
+            self.assertEqual(problems, [])
+
+    def test_progress_log_fails_closed_on_corruption_duplicates_and_foreign_runs(self):
+        cases = {
+            "bad_json": '[SOAK_PROGRESS] {not json}\n',
+            "duplicate": ('[SOAK_PROGRESS] {"kind": "run", "runId": "r1"}\n'
+                          '[SOAK_PROGRESS] {"kind": "checkpoint", "runId": "r1", "cycle": 1, "endedAt": "x"}\n'
+                          '[SOAK_PROGRESS] {"kind": "checkpoint", "runId": "r1", "cycle": 1, "endedAt": "x"}\n'),
+            "foreign_run": ('[SOAK_PROGRESS] {"kind": "run", "runId": "r1"}\n'
+                            '[SOAK_PROGRESS] {"kind": "checkpoint", "runId": "r2", "cycle": 1, "endedAt": "x"}\n'),
+            "before_anchor": '[SOAK_PROGRESS] {"kind": "checkpoint", "runId": "r1", "cycle": 1, "endedAt": "x"}\n',
+            "second_anchor": ('[SOAK_PROGRESS] {"kind": "run", "runId": "r1"}\n'
+                              '[SOAK_PROGRESS] {"kind": "run", "runId": "r2"}\n'),
+            "unclosed": ('[SOAK_PROGRESS] {"kind": "run", "runId": "r1"}\n'
+                         '[SOAK_PROGRESS] {"kind": "checkpoint", "runId": "r1", "cycle": 1}\n'),
+            "unknown_kind": ('[SOAK_PROGRESS] {"kind": "run", "runId": "r1"}\n'
+                             '[SOAK_PROGRESS] {"kind": "mystery", "runId": "r1"}\n'),
+        }
+        for name, body in cases.items():
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "frontend.log"
+                path.write_text(body)
+                _anchor, closed, problems = bench.ProgressLog(path).read()
+                self.assertTrue(problems, name)
+                self.assertFalse([item for item in closed if item.get("cycle") == 1 and not item.get("endedAt")])
+
+    def test_missing_progress_log_is_reported_not_assumed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            anchor, closed, problems = bench.ProgressLog(Path(directory) / "absent.log").read()
+            self.assertIsNone(anchor)
+            self.assertEqual(closed, [])
+            self.assertTrue(problems)
+
+    def test_progress_records_never_substitute_for_final_report(self):
+        """Progress-derived phase metadata may be diagnostic, never authoritative."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "frontend.log"
+            path.write_text("[SOAK_CHECKPOINT_BEGIN] 1\n[SOAK_CHECKPOINT_END] 1\n")
+            checkpoints = bench.CheckpointLog(path)
+            checkpoints.poll()
+            sample = {"checkpointId": 1, "valid": False, "errors": [], "pressure": False,
+                      "timestamp": "2026-10-25T08:00:01+00:00", "samplingEndedAt": "2026-10-25T08:00:02+00:00"}
+            progress = [{"cycle": 1, "file": "src/staged.ts", "view": "split", "pressure": False,
+                         "startedAt": "2026-10-25T08:00:00Z", "endedAt": "2026-10-25T08:00:04Z",
+                         "hiddenDuringHold": False}]
+            bench.finalize_phase_samples([sample], checkpoints, {}, progress)
+            self.assertEqual(sample["checkpointSource"], "progress-log")
+            self.assertFalse(sample["authoritative"])
+            # With a real final report the same metadata becomes authoritative.
+            final = {"phaseCheckpoints": progress}
+            sample2 = {"checkpointId": 1, "valid": False, "errors": [], "pressure": False,
+                       "timestamp": "2026-10-25T08:00:01+00:00", "samplingEndedAt": "2026-10-25T08:00:02+00:00"}
+            bench.finalize_phase_samples([sample2], checkpoints, final, progress)
+            self.assertEqual(sample2["checkpointSource"], "final-report")
+            self.assertTrue(sample2["authoritative"])
+            self.assertTrue(sample2["valid"])
+
+    def test_progress_without_final_report_still_fails_the_run(self):
+        """A run with only progress records must remain failed (fail-closed)."""
+        progress_only = {"ok": None, "actualDurationSeconds": 0}
+        self.assertTrue(bench.completion_errors(progress_only, [{"webContentPids": [45]}], 1800, 0))
+        self.assertTrue(bench.completion_errors({}, [{"webContentPids": [45]}], 1800, 0))
+
+
+    def test_sample_failure_keeps_partial_candidate_and_polls_app(self):
+        """A failing footprint step must not lose what was already read."""
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "evidence.jsonl"
+            evidence = bench.CommandEvidence(journal)
+            # RSS stage succeeds and is recorded; the footprint command then fails.
+            domain = ("pid/12 = {\n services = {\n 45 - com.apple.WebKit.WebContent.A\n"
+                      " 47 - com.apple.WebKit.Networking.B\n 46 - com.apple.WebKit.GPU.C\n }\n}")
+
+            def dispatch(argv, **kwargs):
+                text = "12 100\n45 200\n47 50\n46 60\n" if argv[0] == "ps" else domain
+                return mock.Mock(returncode=0, stdout=text, stderr="", check_returncode=mock.Mock())
+
+            with mock.patch.object(bench.subprocess, "run", side_effect=dispatch):
+                rss = bench.sample_memory(12, evidence)
+            self.assertEqual(rss["rustRssMb"], 0.1)
+            with mock.patch.object(bench.subprocess, "run",
+                                   return_value=mock.Mock(returncode=255, stdout="", stderr="denied",
+                                                          check_returncode=mock.Mock(
+                                                              side_effect=bench.subprocess.CalledProcessError(255, ["vmmap"])))):
+                with self.assertRaises(bench.subprocess.CalledProcessError):
+                    bench.physical_footprint(12, evidence)
+            kinds = [json.loads(line)["kind"] for line in journal.read_text().splitlines()]
+            self.assertIn("command", kinds)
+            failing = [json.loads(line) for line in journal.read_text().splitlines()
+                       if json.loads(line).get("purpose") == "rust-footprint"][0]
+            self.assertEqual(failing["returncode"], 255)
+            self.assertEqual(failing["stderr"], "denied")
+
+    def test_cleanup_evidence_distinguishes_terminate_from_already_exited(self):
+        """Cleanup records what was observed: a live process gets terminate, a dead one does not."""
+        for alive in (True, False):
+            with self.subTest(alive=alive):
+                proc = mock.Mock(pid=12)
+                proc.poll.return_value = None if alive else 0
+                proc.wait.return_value = -15 if alive else 0
+                records = []
+                evidence = mock.Mock()
+                evidence.record.side_effect = lambda entry: records.append(entry)
+                # Mirror the production cleanup block.
+                cleanup = {"reviaPid": proc.pid}
+                before = proc.poll()
+                cleanup["pollBeforeCleanup"] = before
+                if before is None:
+                    cleanup["terminateSent"] = True
+                    proc.terminate()
+                    cleanup["waitAfterTerminate"] = proc.wait(timeout=5)
+                else:
+                    cleanup["terminateSent"] = False
+                self.assertEqual(cleanup["terminateSent"], alive)
+                if alive:
+                    proc.terminate.assert_called_once()
+                    proc.kill.assert_not_called()
+                else:
+                    proc.terminate.assert_not_called()
+
+    def test_completion_still_requires_final_report_even_with_valid_progress(self):
+        """Progress-derived valid phase samples must not complete a run without ok/duration."""
+        frontend = {"actualDurationSeconds": 1800, "totalFileSwitches": 7, "totalViewSwitches": 12,
+                    "totalScrolls": 33, "totalJumps": 6}
+        samples = [{"webContentPids": [45]}]
+        # ok missing -> still failed
+        self.assertTrue(bench.completion_errors(frontend, samples, 1800, 0))
+        self.assertEqual(bench.completion_errors({**frontend, "ok": True}, samples, 1800, 0), [])
+
 
     def test_cold_fixture_ignores_inherited_git_targets(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -2098,6 +2098,14 @@ export function App() {
         const startedAt = performance.now();
         report.setupSeconds = (startedAt - invokedAt) / 1000;
         report.operationsStartedAt = new Date().toISOString();
+        // 运行锚点：让中断后的增量记录能与本次运行关联。仅走非退出的 debugLog 通道，
+        // 不使用 writeMeasurement（它会在 500ms 后结束进程）。
+        const soakRunId = `${report.operationsStartedAt}/${config.outputPath ?? ""}`;
+        const progress = async (record: Record<string, unknown>) => {
+          await ipc.debugLog(`[SOAK_PROGRESS] ${JSON.stringify({ runId: soakRunId, ...record })}`);
+        };
+        await progress({ kind: "run", targetSeconds: soakSeconds, repo: config.repoPath,
+          outputPath: config.outputPath ?? null, setupSeconds: report.setupSeconds });
         let cycle = 0;
         let fileSwitches = 0;
         let viewSwitches = 0;
@@ -2211,6 +2219,13 @@ export function App() {
           if (diagnostics) checkpoint.ipcAfter = diagnostics.snapshot();
           checkpointPauseMs += performance.now() - pauseStarted;
           lastCheckpoint = performance.now();
+          // 已完成段立即增量落盘：中断后仍可核对该段的真实起止、视图、压力标记与遮挡状态。
+          // 尚未完成的段不会写，避免伪造进度。
+          await progress({ kind: "checkpoint", cycle, file: checkpoint.file, view: checkpoint.view,
+            pressure, startedAt: checkpoint.startedAt, endedAt: checkpoint.endedAt,
+            hiddenDuringHold, checkpointPauseSeconds: checkpointPauseMs / 1000,
+            visibilityPauseSeconds: visibilityPauseMs / 1000,
+            cycles: cycle, fileSwitches, viewSwitches, scrolls, jumps });
         };
 
         // 单项诊断：只重复一类操作，约每 90 秒回到固定阶段做一次压力取样，定位压力后仍保留的内存增长来自哪类操作。
