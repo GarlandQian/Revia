@@ -269,3 +269,95 @@ Stay 后可重新请求。
 统计：Standards7、最严重P1；Spec5、最严重P1。只静态复核，无新测试/GUI/CI。旧未授权自动关闭、另存finally与pending代际本身已有改善，但不据此宣称全闭合；问题成批交原Pi，08保持ready-for-agent。
 
 本版检查原件26份已归档到[清单](../evidence/batch02-repair/manifest.json)。四份改动代码/测试的检查前后SHA与02ff5a3原字节匹配，另两份文档提交SHA匹配。原始Rust264通过/1ignored、Node127及前端检查exit0可核；原件没有完整检查树SHA或逐命令runner/精确参数记录，因此不把四源码证据扩大为全树检查前字节证明。完整边界见[记录](../batch02-repair-validation.md)。下一轮必要回归必须覆盖App实际调用的异步编排，不能再只用测试手动多调用一次helper来模拟缺失接线。
+
+### 2026-10-25 / Pi 实现：整批 B03 返修（异步关闭编排收为单一生产入口）
+
+起点 `1cd80b6`，实施目录 `/Users/garland/.codex/worktrees/m2-close-finish/Revia`。
+逐项修 ST-B03-08-1..7 / SP-B03-08-1..5。
+
+#### 统一生产编排（本轮结构性改动）
+
+`CloseCoordinator` 重构为**唯一**编排，新增 `reconcile()`：
+
+- `requested`（原动作，第一次为准）与 `authorized`（仅 `resolveAsk("wait")` 设置）分离；
+- 所有生命周期事件（写结束、晚点 Wait、保护 begin 失败回滚、另存收尾、
+  待核对成功/失败、Stay、重复请求）后，App 都调用同一个 `reconcileClose()`，
+  由 `reconcile()` 返回 `proceed` / `ask` / `none`；
+- 删除 `takeReadyIntent()`：不再有"需要调用方额外手动消费"的第二入口，
+  Node 回归也不再手动多调一次 helper 来模拟 App 缺失的接线。
+
+#### ST-B03-08-1 / SP-B03-08-1（保护 IPC 倒序）
+
+新增 `ExitGuardSync`（`refreshGate.ts`）：每次更新分配单调递增 `seq`，
+Rust 侧 `AppState::apply_exit_guard(seq, blocked)` **只接受更大的序号**，
+`set_exit_blocked` 命令改为 `(seq, blocked) -> bool`。
+因此「旧 `false` 的 invoke 晚到」不可能解除新建立的保护——
+不是只在 JS 丢旧回包，而是 Rust 实际状态有序。
+`ipc.ts` 契约同步更新；回归用与 Rust 同语义的假接收端验证旧 false 晚到仍保持 true。
+
+#### ST-B03-08-2 / SP-B03-08-1（监听失败仍写）
+
+新增 `CloseGuardGate`：窗口关闭监听与原生退出监听**都**装好才算 `ready`；
+安装中、失败、卸载/重装一律未就绪。`beginProtectedWrite` 在开始任何写入前
+检查 `closeGuardsRef.current.ready`，不就绪直接抛出（`guardUnavailable`），
+调用方中止写入——不再"报错后继续未受保护地写"。
+
+#### ST-B03-08-3 / SP-B03-08-2（晚等待不收尾）
+
+`onWait` 现在 `resolveAsk("wait")` 后**立即** `reconcileClose()`：
+写入可能早已结束，此时直接执行原请求；若已变待核对则立即展示。
+不需要等下一笔无关写。
+
+#### ST-B03-08-4（保护失败遗留请求）
+
+`beginProtectedWrite` 失败走 `rollbackWrite()` 撤销登记，并统一 `reconcile()`，
+不留幽灵在途/授权。回归覆盖"回滚后授权仍能正常执行，不悬挂"。
+
+#### ST-B03-08-5 / SP-B03-08-3（旧核对授权新请求）
+
+`CloseCoordinator` 新增 `generation()`（请求代际）：`request()` 与
+`resolveAsk("stay")` 都推进它。核对流程在开始时捕获 `requestGen`，
+每次 await 后与结束时都比对；不一致直接返回，不 confirm、不关窗、不重弹。
+
+#### ST-B03-08-6 / SP-B03-08-4（新 pending 被隐藏）
+
+核对只按 `acknowledgePending(worktreeId, generation)` 清自己成功核对的那一代；
+失败或出现新 pending 时 `allConfirmed = false`，随后统一 `reconcile()`，
+按**当前真实集合**重新展示（含其它目标新增的待核对）。
+
+#### ST-B03-08-7 / SP-B03-08-5（展示动作不一致）
+
+对话框的 `intent` 来自 `closeIntentRef`，而 `closeIntentRef` 只由
+`reconcile()` 用 `decision.intent`（即 `requested`）写入——不再由每次事件覆盖。
+
+#### 回归（Node，同一生产编排）
+
+`tools/test-refresh-gate.mjs` **140 项通过**。B03 新增 13 项，直接驱动
+`CloseCoordinator` / `ExitGuardSync` / `CloseGuardGate` 这三个 App 实际使用的类：
+旧 false 晚到不覆盖新 true、新 false 正常释放、监听只装一个不算就绪、
+安装失败未就绪且原因可见、卸载回未就绪、晚点 Wait 立即收尾、
+晚点 Wait + pending 展示、回滚后不悬挂、旧核对不授权新请求、
+核对期间新 pending 不被隐藏、展示动作取保留原动作、重复点击不重复授权、
+Stay 后不重弹已取消询问。
+
+#### 检查（唯一日志目录）
+
+`/private/tmp/revia-b03-HSdpQU`（含 `runner.sh` 精确命令与 cwd、各命令 `.out/.err/.exit`、前后源码 SHA）
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `pnpm exec tsc -b` | 0 | — |
+| `pnpm lint` | 0 | — |
+| `pnpm build` | 0 | — |
+| `node tools/test-refresh-gate.mjs` | 0 | tests 140 / pass 140 / fail 0 |
+| `cargo test`（完整，因改了 Rust 保护契约） | 0 | 100 + 71(1 ignored) + 20 + 24 + 15 + 31 + 3 |
+| `pnpm bindings` | 0 | — |
+| `git diff --check` | 0 | — |
+
+源码前后 SHA 逐行一致。
+
+#### 未验证（必须保留）
+
+- **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 的实际拦截、监听安装失败时的拒绝写入、
+  待核对闭环流程与对话框观感，均需规划方在固定 Release 上验收。
+- 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。

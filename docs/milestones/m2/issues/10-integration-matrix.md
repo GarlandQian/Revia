@@ -92,3 +92,31 @@ Rust 合计：lib 100 + discard_recovery 71（1 ignored 桌面夹具）+ file_st
 - macOS Quit/⌘Q 的真实拦截：需要真实桌面（Rust 侧 `RunEvent::ExitRequested` +
   `exit_blocked` 已实现，但未在 GUI 中触发验证）。
 - 保护 IPC（`set_exit_blocked`）失败时写操作会中止，这条路径**未在真实桌面复现**。
+
+## 状态更新（整批 B03 返修后）
+
+- **任务 08**：关闭/退出编排已收为单一生产入口 `CloseCoordinator.reconcile()`；
+  退出保护改为**版本化**（Rust `apply_exit_guard(seq, blocked)` 只接受更大序号）；
+  窗口关闭与原生退出监听都装好才允许写入（`CloseGuardGate`）；
+  核对按请求代际 + pending 代际确认，旧回调不能授权新请求。
+  **真实桌面关闭/Quit/等待/留在应用/待核对交互仍未验证。**
+- **任务 13 当前基准为 Q107/rev3**（`m2-ui` 独立目录，HEAD 见其仓库），
+  **尚未验收合入 m2**。本矩阵不把 `13-mockups/`（原稿）或 `13-mockups-rev1/`
+  当作当前状态；这两份仅作历史存档。最终集成必须在 UI 合入后**重新固定版本**再测。
+- **任务 10** 仍是准备，不是最终验收；合入 UI 后需重新固定集成版本并重跑检查。
+
+### 历史内容（与当前状态无关，仅存档）
+
+以下为早期轮次的描述，**不代表当前实现**：
+
+- ~~「美化未实现」「侧栏半透明待测」~~ —— 这些是 rev1 阶段的记录；
+  rev3 已在 m2-ui 实现，当前不把半透明当作待测项，等 UI 合入后按 D06 实测决定。
+- 旧日志目录（`/private/tmp/revia-batch01-sEGPJM`、`/private/tmp/revia-batch02-8LEw43`）
+  在本 worktree 已不可访问；各轮检查改用新的唯一目录，不重建旧日志。
+
+### 未测边界（当前）
+
+- macOS Quit/⌘Q 的真实拦截、监听安装失败时拒绝写入、待核对闭环的实际流程：
+  需真实桌面（Rust 侧已实现，未在 GUI 触发验证）。
+- D06 性能、30 分钟长测、双平台 CI：均未执行。
+- Windows x64 编译需新 CI。

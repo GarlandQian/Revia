@@ -157,8 +157,14 @@ export const ipc = {
     }>("measure_config"),
   writeMeasurement: (payload: unknown) => invoke<string | null>("write_measurement", { payload }),
   debugLog: (message: string) => invoke<void>("debug_log", { message }),
-  /** 报告是否有在途写操作：原生退出（⌘Q）据此决定是否先等待（任务 08）。 */
-  setExitBlocked: (blocked: boolean) => invoke<void>("set_exit_blocked", { blocked }),
+  /**
+   * 报告退出保护状态（任务 08）。
+   *
+   * 带单调递增的 `seq`：Rust 只接受更大的序号，因此「旧 false 晚到」
+   * 不会解除已经建立的新保护。返回 Rust 是否接受了这次更新。
+   */
+  setExitBlocked: (request: { blocked: boolean; seq: number }) =>
+    invoke<boolean>("set_exit_blocked", request),
   changeEntry: (request: {
     worktreeId: string;
     path: string;

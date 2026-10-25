@@ -1029,50 +1029,57 @@ export type CloseDecision =
 export type CloseChoice = "wait" | "stay";
 
 /**
+ * 一次 reconcile 的结论（所有生命周期事件都走它）。
+ *
+ * - `none`：什么都不做（没有请求，或条件未满足）；
+ * - `proceed`：执行 `intent`（**只能是用户已授权等待的原动作**）；
+ * - `ask`：展示询问（含当前真实在途/待核对集合与**被保留的原动作**）。
+ */
+export type CloseReconcile =
+  | { kind: "none" }
+  | { kind: "proceed"; intent: CloseIntent }
+  | { kind: "ask"; intent: CloseIntent; writing: string[]; pending: string[] };
+
+/**
  * 写入期间的关闭/退出编排（任务 08，Q90/Q91/Q96）。
  *
- * 只做决策，不执行任何 Git 或窗口动作：
- * - 不因关闭杀掉 Git（本类从不取消写操作、不重跑写命令）；
- * - 「留在应用」不改变写操作，也不把关闭改成退出；
- * - **只有用户明确选择「等待」**才会在全部写完成并记录结果后执行原请求；
- * - 没有原请求、或用户已选「留在应用」时，**绝不凭空创建**关闭请求；
- * - 待核对结果必须先展示并核对真值，之后由用户明确选择继续或留在应用。
+ * 这是**唯一**的生产编排：App 在写结束、晚点 Wait、保护失败回滚、另存收尾、
+ * 待核对成功/失败、Stay、重复请求等所有生命周期事件后都调用 `reconcile()`，
+ * 由它给出「执行原请求 / 展示询问 / 什么都不做」。
  *
- * 写操作按 worktree 记录：切到别的 worktree 后仍在执行的操作也算在途（Q90）。
+ * 规则：
+ * - 原请求动作以**第一次**为准，询问期间再次请求不替换（ST-B03-08-7）；
+ * - 记录原请求**不等于授权**，只有 `resolveAsk("wait")` 才授权（ST-B03-08-3）；
+ * - `reconcile()` 会消费授权：满足条件就返回 `proceed`，否则返回 `none`/`ask`；
+ * - 待核对按**代际**核对，失败或新增待核对都不清账（ST-B03-08-6）；
+ * - 每次 `request()` 与 `resolveAsk("stay")` 都推进 `requestGeneration`，
+ *   核对流程必须捕获它，旧核对不得授权新请求（ST-B03-08-5）。
  */
 export class CloseCoordinator {
   /** 在途写操作的 worktree 集合（含无归属另存使用的占位键）。 */
   private readonly writing = new Set<string>();
-  /**
-   * 待核对的目标 → 代际。
-   *
-   * 每次新增待核对都把该目标的代际 +1；核对只能确认**它看到的那一代**，
-   * 核对期间新出现的待核对不会被顺手清掉（ST-B02-08-4 / SP-B02-08-4）。
-   */
+  /** 待核对的目标 → 代际。 */
   private readonly pending = new Map<string, number>();
   private pendingSeq = 0;
-  /**
-   * 用户提出的**原请求动作**（第一次请求为准）。
-   *
-   * 询问期间再次请求（关闭 ↔ 退出）**不替换**它（ST-B02-08-5）；
-   * 它本身**不构成授权**——只有 `resolveAsk("wait")` 才产生授权（ST-B02-08-2）。
-   */
+  /** 原请求动作（第一次为准）；不构成授权。 */
   private requested: CloseIntent | null = null;
-  /** 用户明确选择「等待」后保留的授权动作；`null` 表示没有授权。 */
+  /** 用户明确选择「等待」后保留的授权动作。 */
   private authorized: CloseIntent | null = null;
-  /** 当前是否正在向用户询问。 */
-  private asking = false;
+  /** 请求代际：每次新的请求或 Stay 取消都递增。 */
+  private requestGeneration = 0;
 
-  /** 开始一个写操作（`worktreeId` 可为无归属另存的占位键）。 */
+  /** 当前请求代际（核对流程必须捕获它）。 */
+  generation(): number {
+    return this.requestGeneration;
+  }
+
   beginWrite(worktreeId: string): void {
     this.writing.add(worktreeId);
   }
 
   /**
-   * 结束一个写操作。
-   *
-   * `needsVerification` 表示结果无法确定：新增一条待核对（代际 +1），
-   * 供关闭时先展示。结束写操作**不会**清除已有待核对（Q91）。
+   * 结束一个写操作。`needsVerification` 表示结果无法确定 → 新增一条待核对（代际 +1）。
+   * 结束写操作**不会**清除已有待核对（Q91）。
    */
   endWrite(worktreeId: string, needsVerification = false): void {
     this.writing.delete(worktreeId);
@@ -1082,112 +1089,115 @@ export class CloseCoordinator {
     }
   }
 
-  /** 待核对的目标（诊断与测试用）。 */
+  /** 保护前置失败时的回滚：撤销登记，不留幽灵在途/授权。 */
+  rollbackWrite(worktreeId: string): void {
+    this.writing.delete(worktreeId);
+  }
+
   pendingWorktrees(): string[] {
     return [...this.pending.keys()];
   }
 
-  /** 某个目标当前待核对的代际（无待核对时为 0）。 */
   pendingGeneration(worktreeId: string): number {
     return this.pending.get(worktreeId) ?? 0;
   }
 
-  /** 在途写操作的 worktree（诊断与测试用）。 */
   writingWorktrees(): string[] {
     return [...this.writing];
   }
 
-  /** 是否还有在途写操作（任意 worktree）。 */
   hasWriting(): boolean {
     return this.writing.size > 0;
   }
 
-  /** 是否有待核对结果。 */
   hasPending(): boolean {
     return this.pending.size > 0;
   }
 
-  /** 用户提出的原请求动作（诊断与测试用）。 */
+  /** 是否需要阻止原生退出（在途写 **或** 待核对）。 */
+  needsExitGuard(): boolean {
+    return this.writing.size > 0 || this.pending.size > 0;
+  }
+
+  /** 被保留的原请求动作（展示用；不等于授权）。 */
   pendingIntent(): CloseIntent | null {
     return this.requested;
   }
 
-  /** 已获授权、尚未执行的动作（诊断与测试用）。 */
   authorizedIntent(): CloseIntent | null {
     return this.authorized;
-  }
-
-  /** 是否正在询问用户。 */
-  isAsking(): boolean {
-    return this.asking;
   }
 
   /**
    * 请求关闭/退出；返回此刻应该做什么。
    *
-   * - 有在途写或待核对：**保留**窗口与进程并询问；原请求动作以**第一次**为准，
-   *   询问期间再次请求不替换（ST-B02-08-5）；
-   * - 记录原请求**不等于授权**：只有用户之后明确选择「等待」才会真正执行
-   *   （ST-B02-08-2 / SP-B02-08-1）；
-   * - 无在途写、无待核对：立刻执行原请求。
+   * 原动作以**第一次**为准；询问期间再次请求不替换（ST-B03-08-7）。
+   * 记录请求不等于授权：只有用户之后选择「等待」才会执行。
    */
   request(intent: CloseIntent): CloseDecision {
-    const writing = [...this.writing];
-    const pending = this.pendingWorktrees();
-    if (writing.length > 0 || pending.length > 0) {
-      if (this.requested === null) this.requested = intent;
-      this.asking = true;
-      if (pending.length > 0) return { action: "showPending", writing, pending };
-      return { action: "ask", writing };
+    if (this.requested === null) {
+      this.requested = intent;
+      this.requestGeneration += 1;
     }
+    if (this.writing.size > 0 || this.pending.size > 0) {
+      if (this.pending.size > 0) {
+        return { action: "showPending", writing: [...this.writing], pending: this.pendingWorktrees() };
+      }
+      return { action: "ask", writing: [...this.writing] };
+    }
+    // 无在途写、无待核对：直接执行原请求。
+    const action = this.requested;
     this.requested = null;
     this.authorized = null;
-    this.asking = false;
-    return { action: "proceed" };
+    return action === null ? { action: "proceed" } : { action: "proceed" };
   }
 
   /**
    * 用户的选择。
    *
-   * - `wait`：授权执行**原请求动作**，之后在无在途写、无待核对时执行；
-   * - `stay`：清掉请求与授权，**不取消**写操作、不改变动作类型，也不会稍后自动关窗。
+   * - `wait`：授权执行**原请求动作**；
+   * - `stay`：清掉请求与授权，并**推进请求代际**，使在途核对回调失效。
    */
   resolveAsk(choice: CloseChoice): void {
-    this.asking = false;
     if (choice === "stay") {
       this.requested = null;
       this.authorized = null;
+      this.requestGeneration += 1;
       return;
     }
     this.authorized = this.requested;
   }
 
-  /** 用户选择「留在应用」的便捷入口（等价于 `resolveAsk("stay")`）。 */
   keepOpen(): void {
     this.resolveAsk("stay");
   }
 
   /**
-   * 全部写操作完成且无待核对时，返回**用户已授权等待**的原请求。
+   * 统一收尾：所有生命周期事件后调用。
    *
-   * 三个条件缺一不可：已授权、无在途写、无待核对。
-   * 没有授权时返回 `null`：调用方**不得**据此凭空关窗（ST-B02-08-2）。
+   * 返回 `proceed` 时调用方执行 `intent`；返回 `ask` 时调用方展示对话框
+   * （动作取自 `intent`，即**被保留的原请求**）。
    */
-  takeReadyIntent(): CloseIntent | null {
-    if (this.authorized === null) return null;
-    if (this.writing.size > 0 || this.pending.size > 0) return null;
+  reconcile(): CloseReconcile {
+    if (this.writing.size > 0 || this.pending.size > 0) {
+      if (this.requested === null) return { kind: "none" };
+      return {
+        kind: "ask",
+        intent: this.requested,
+        writing: [...this.writing],
+        pending: this.pendingWorktrees(),
+      };
+    }
+    if (this.authorized === null) return { kind: "none" };
     const intent = this.authorized;
     this.authorized = null;
     this.requested = null;
-    this.asking = false;
-    return intent;
+    return { kind: "proceed", intent };
   }
 
   /**
-   * 核对**指定代际**的待核对结果：只有代际仍然一致才清除。
-   *
-   * 核对失败、或核对期间该目标又出现新的待核对（代际已变）时**不清**，
-   * 新的待核对继续可见（ST-B02-08-4 / SP-B02-08-4）。
+   * 核对**指定代际**的待核对：只有代际仍一致才清除。
+   * 核对失败或该目标又出现新待核对时代际已变，返回 false 且不清账。
    */
   acknowledgePending(worktreeId: string, generation: number): boolean {
     if ((this.pending.get(worktreeId) ?? 0) !== generation) return false;
@@ -1196,12 +1206,102 @@ export class CloseCoordinator {
   }
 
   /**
-   * 用户已核对并明确「继续」：保留授权，之后由 `takeReadyIntent()` 执行。
-   *
-   * **不**批量清除 pending——那会误清核对期间新出现的待核对。
+   * 用户已核对并明确「继续」：授权原请求，之后由 `reconcile()` 执行。
+   * **不**批量清除 pending（会误清核对期间新出现的待核对）。
    */
   confirmPendingContinue(): void {
-    this.asking = false;
     if (this.requested !== null) this.authorized = this.requested;
+  }
+}
+
+/**
+ * 退出保护的**版本化同步器**（任务 08、ST-B03-08-1）。
+ *
+ * 本地 Tauri 每个 invoke 是独立 fetch，仅靠 JS 丢弃旧回包不足以保证 Rust 的实际
+ * 状态：旧 `false` 的请求晚到仍会解除新建立的保护。这里给每次更新分配单调递增
+ * 的 `seq`，由 Rust 侧只接受更大的序号，所以**旧释放绝不能覆盖新占用**。
+ *
+ * App 与 Node 回归用同一个类；测试直接驱动它，不复制算法。
+ */
+export class ExitGuardSync {
+  private seq = 0;
+  /** 已被 Rust 接受的最新状态（诊断与测试用）。 */
+  private applied: boolean | null = null;
+  /** 已接受的最高序号。 */
+  private appliedSeq = 0;
+  private readonly send: (request: { blocked: boolean; seq: number }) => Promise<boolean>;
+
+  constructor(send: (request: { blocked: boolean; seq: number }) => Promise<boolean>) {
+    this.send = send;
+  }
+
+  /** 当前生效的保护状态（尚未同步过时为 `null`）。 */
+  current(): boolean | null {
+    return this.applied;
+  }
+
+  /** 已接受的最高序号。 */
+  lastSeq(): number {
+    return this.appliedSeq;
+  }
+
+  /**
+   * 请求设置保护；返回是否被接受。
+   *
+   * 每次调用都分配更大的 `seq`；接收端忽略更小的序号，因此调用顺序与网络到达
+   * 顺序无关。被拒绝（旧序号）时不改变本地已知状态。
+   */
+  async set(blocked: boolean): Promise<boolean> {
+    this.seq += 1;
+    const seq = this.seq;
+    const accepted = await this.send({ blocked, seq });
+    if (accepted) {
+      this.applied = blocked;
+      this.appliedSeq = Math.max(this.appliedSeq, seq);
+    }
+    return accepted;
+  }
+}
+
+/**
+ * 关闭/退出保护监听的**就绪闸门**（任务 08、ST-B03-08-2 / SP-B03-08-1）。
+ *
+ * 窗口关闭监听与原生退出监听**都**装好才允许开始写入；安装中、失败、卸载后
+ * 一律视为未就绪。写入口据此拒绝执行，而不是"报告错误后继续未受保护地写"。
+ */
+export class CloseGuardGate {
+  private windowReady = false;
+  private exitReady = false;
+  private disposed = false;
+  private reason: string | null = null;
+
+  /** 记录某个监听安装成功。 */
+  markInstalled(which: "window" | "exit"): void {
+    if (which === "window") this.windowReady = true;
+    else this.exitReady = true;
+    this.reason = null;
+  }
+
+  /** 记录安装失败（附带可见原因）。 */
+  markFailed(reason: string): void {
+    this.reason = reason;
+  }
+
+  /** 组件卸载/重装：立即回到未就绪。 */
+  dispose(): void {
+    this.disposed = true;
+    this.windowReady = false;
+    this.exitReady = false;
+  }
+
+  /** 两个监听都就绪且未卸载。 */
+  get ready(): boolean {
+    return !this.disposed && this.windowReady && this.exitReady;
+  }
+
+  /** 未就绪时的原因（就绪时为 `null`）。 */
+  get blockedReason(): string | null {
+    if (this.ready) return null;
+    return this.reason;
   }
 }
