@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 依据：[M2 规格](../spec.md)实现决策 3、7，T06、T11、D05；Q90、Q91、Q96。
 
@@ -361,3 +361,27 @@ Stay 后不重弹已取消询问。
 - **真实桌面关闭/退出未验证**：macOS Quit/⌘Q 的实际拦截、监听安装失败时的拒绝写入、
   待核对闭环流程与对话框观感，均需规划方在固定 Release 上验收。
 - 未启动 GUI、未构建 Release、未跑 D06/CI/长测、未推送/合并；08 保持 `ready-for-human`。
+
+### 2026-10-25 / 规划方：4dec0b5 第三轮限定复核仍不通过
+
+固定 `git diff 1cd80b696ef121422d31497460c7f226b6a50b98...4dec0b531a88b5d52469ad94bf33ed18de15a490`，8文件。两个独立轴，不合并计数；行号对应4dec0b5。
+
+#### Standards：确定违反3项（P1一、P2二），Fowler判断建议0项
+
+规范为 `docs/technical-direction.md:52` Q90、`:55` Q91、`:56` Q96及前轮ST-B03要求。
+
+1. **ST-B04-08-1 / P1 / 切worktree卸载在途保护**：`App.tsx:177`使setAppError随worktreeId变化，关闭监听effect仍依赖它（`:802`），允许切换时`:799-800`卸载全部监听再异步安装（`:764/777`）。ready闸门只拦新写，不保护已在执行的A写；窗口关闭在空档无监听可默认销毁，`lib.rs:146`窗口销毁又放行退出。`beginProtectedWrite:1116`等待期间卸载后也未复核ready。违反Q90/Q96，不能用禁止浏览切换替代修复。
+2. **ST-B04-08-2 / P2 / 晚Wait按钮被提前隐藏**：用户未选择时最后写结束，`refreshGate.ts:1191`返回none，`App.tsx:1152`隐藏询问，但requested仍暗留。Node新增用例手动在此后resolveAsk，真实用户已无按钮。违反Q96与前轮ST-B03-08-3，需保留可实际完成的询问及原动作。
+3. **ST-B04-08-3 / P2 / rollback仍未接生产reconcile**：`App.tsx:1118`只rollback后抛错；stage/restore/save-as外层catch（`:1176/:1253/:1319`）位于finishWrite finally之外，保护挂起期间已选择Wait后失败仍遗留授权/旧询问。Node`:2328`额外手调reconcile掩盖。违反Q96与前轮ST-B03-08-4。
+
+#### Spec：缺失/部分2项、错误实现1项（P1一、P2二），范围扩张0项
+
+1. **SP-B04-08-1 / P1 / 保护生命周期不完整**：`App.tsx:177/799/802/1116`，允许切worktree导致已有写期间监听卸载，或保护await返回后在未就绪状态开始Git。违反 `spec.md:94`“切换文件和 worktree”与`:126`“先保留窗口和进程”。
+2. **SP-B04-08-2 / P2 / 保护失败未收尾**：`App.tsx:1118/1176/1253/1319`，rollback后未处理已授权请求，可能等下一笔无关写才关闭。违反 `spec.md:127`“正常完成并记录结果后执行原关闭／退出请求”。
+3. **SP-B04-08-3 / P2 / 未选择询问消失**：`refreshGate.ts:1191`与`App.tsx:1152`，写先结束就藏询问，晚Wait实际不可达且暗留requested。违反 `spec.md:126`提供“等待完成后关闭／退出”和“留在应用”，以及`:127`执行原请求。
+
+统计：Standards3、最严重P1；Spec3、最严重P1。Rust版本锁、A核对期间B新pending展示、请求代际及原动作展示已有静态改善，不否定这些进展，但不能据此放行。
+
+**测试证据边界**：`test-refresh-gate.mjs:2239-2248`假Rust async函数内部没有await/defer，旧false在调用时已同步store，然后true才store；未实际制造“旧false晚到”，更未执行真实Rust `apply_exit_guard`。下一轮使用真实可控延迟的共享异步生产入口，不用测试手工补一步reconcile，Rust契约回归覆盖真实版本接收端；不新增框架。
+
+七份源码检查前后/固定提交/当前字节SHA一致；Node140、Rust264/1ignored、前端检查退出0原件已归档，详见[检查记录](../batch03-repair-validation.md)及[清单](../evidence/batch03-repair/manifest.json)。runner有cwd/命令但无逐调用环境，不扩大证据。所有缺陷成批交原Pi；08保持ready-for-agent，10/11/M2未完成，未新Release/桌面/D06/CI/长测/推送/合并。
