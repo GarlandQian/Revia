@@ -2,7 +2,7 @@
 
 状态：M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)）；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见 [M3 报告](./milestones/m3/report.md)）。功能和界面改为照 Rebased（Q117–Q127），下一步是 M4 界面重做。更新日期：2026-10-26。
 
-Revia 照 Rebased（JetBrains 的独立 Git 客户端）的功能和界面，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
+Revia 照 Rebased（JetBrains 的独立 Git 客户端）的布局和功能，配上 VS Code 的外观，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q131）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
 ## 文档导航
 
@@ -158,6 +158,10 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的功能和界面，做
 | Q128 | 文件状态表示照 Rebased：文件名按 Git 状态上色，行右侧不再显示状态字母，颜色在 M4 按 Rebased 实测和 IntelliJ 主题写定；取代 Q31 | 用户于 2026-10-26 对 Q31 与一比一照抄的冲突回复“照rebased” |
 | Q129 | 早于 Q119 的界面决定与 Rebased 冲突时，一律照 Rebased，不再逐项追问用户；安全边界（产品方向“安全边界”一节与 Q123）和 Revia 独有功能（审阅标记、回收区、写前校验、结果待核对、提交前快照）除外 | 用户于 2026-10-26 回复“旧界面决定和 Rebased 冲突时一律照 Rebased，不用再逐项问；安全边界和 Revia 独有功能除外” |
 | Q130 | 图标不用 IntelliJ 原装图标：界面图标用 Codicons（VS Code 源代码管理与 GitLens 所用，CC BY 4.0），文件类型图标用 Material Icon Theme（VS Code 安装量最高的文件图标主题，MIT）；在“关于 Revia”中注明两者的版权与许可。取代 Q117 中“图标取自 IntelliJ 社区版”的部分，配色与尺寸仍取自 Rebased | 用户于 2026-10-26 问“图标是不是可以不用他的”“要看 git 客户端最流行的”，对比主流 Git 客户端所用图标后选择“图标用 Codicons，文件类型图标用 Material Icon Theme” |
+| Q131 | 外观改照 VS Code，布局、功能和交互仍照 Rebased：配色、界面字体（系统字体）、图标、控件样式与尺寸照 VS Code；区域划分与位置、功能、交互照 Rebased。取代 Q119 中外观一比一照 Rebased 的部分、Q117 中“配色和尺寸取自 IntelliJ”、Q107 的 Inter 界面字体；Q129 改为：旧决定在布局与交互上与 Rebased 冲突时照 Rebased，在外观上照 VS Code，安全边界和 Revia 独有功能除外。效果图见 [M4 效果图](./milestones/m4/mockups/) | 用户于 2026-10-26 认为“界面抄 rebased 的 ui 好看吗 好像不行吧”，随后确认“外观照 VS Code 默认主题，布局和功能照 Rebased”，看过四套主题的效果图后回复“Q1–Q5 都按你的推荐定” |
+| Q132 | 支持颜色主题：浅色、深色各选一套，随系统深浅色切换。M4 内置四套：VS Code Light 2026、Atom One Light、VS Code Dark 2026、One Dark Pro；首次打开时浅色默认 Atom One Light，深色默认 One Dark Pro。颜色主题按 VS Code 颜色主题的格式实现；导入任意 VS Code 主题文件放到 M7 | 用户要求“可以做成换肤的吗，因为我更喜欢 vscode 的 one dark pro”“要做成浅色和深色各自可以设置皮肤的”，并问“One Dark Pro 浅色的时候用哪个皮肤”；默认值与导入时机同上一轮“按推荐” |
+| Q133 | 代码字体和字号可以在设置中修改（同 VS Code），默认仍用随应用打包的 JetBrains Mono；填写的字体本机没有安装时退回默认字体。取代 Q39 中“不提供字体选择”的部分 | 同上一轮“按推荐” |
+| Q134 | 界面和文档把这一功能统一叫“颜色主题”，与 VS Code 中文版一致，不叫“皮肤”“换肤” | 同上一轮“按推荐” |
 
 各项的完整说明见对应的方向文档。
 
@@ -166,7 +170,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的功能和界面，做
 ```text
 Revia
 |-- 产品定位与取舍顺序 [Q5 已确认；定位按 Q118 改为照 Rebased]
-|-- 照 Rebased 重做 [Q117-Q130 已确认]
+|-- 照 Rebased 重做 [Q117-Q134 已确认]
 |   |-- 继续自研，不 fork；Rebased 1.1.22 为验收基准 [Q117，ADR-0011]
 |   |-- 界面一比一与独有功能的位置 [Q119]
 |   |-- 提交工具窗口两种模式 [Q120，ADR-0003]
@@ -178,7 +182,10 @@ Revia
 |   |-- 里程碑 M3-M8 与 M2、M3 合入 main [Q126/Q127]
 |   |-- 文件名按状态上色，不再显示状态字母 [Q128，取代 Q31]
 |   |-- 旧界面决定与 Rebased 冲突时照 Rebased，安全边界与独有功能除外 [Q129]
-|   `-- 图标：Codicons，文件类型图标 Material Icon Theme [Q130]
+|   |-- 图标：Codicons，文件类型图标 Material Icon Theme [Q130]
+|   |-- 外观改照 VS Code，布局与功能仍照 Rebased [Q131]
+|   |-- 颜色主题：浅色、深色各选一套，内置四套 [Q132/Q134]
+|   `-- 代码字体与字号可设置 [Q133]
 |-- 技术栈：Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS [T1/Q1/Q6/Q7 已确认]
 |   |-- Git 执行：Rust 层受控调用 Git CLI [Q7 已确认]
 |   |   |-- Git 程序：登录 shell PATH 中的 git，不自带 [Q27 已确认]

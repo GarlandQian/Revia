@@ -1,14 +1,14 @@
-# M4：界面照 Rebased 重做
+# M4：界面重做（Rebased 的布局与交互，VS Code 的外观）
 
 **Status:** needs-info
 
-依据：Q117–Q130；ADR-0003、ADR-0004、ADR-0005、ADR-0009、ADR-0010、ADR-0011；[产品方向](../../product-direction.md#实施顺序)、[UI 方向](../../ui-direction.md)、[安全边界](../../product-direction.md#安全边界)。外观数据见 [Rebased 参照](./rebased-reference.md)。
+依据：Q117–Q134；ADR-0003、ADR-0004、ADR-0005、ADR-0009、ADR-0010、ADR-0011；[产品方向](../../product-direction.md#实施顺序)、[UI 方向](../../ui-direction.md)、[安全边界](../../product-direction.md#安全边界)。布局与交互参照见 [Rebased 参照](./rebased-reference.md)，外观见已确认的 [效果图](./mockups/)。
 
-本规格是草稿。在 Rebased 窗口里逐屏截图实测（见参照末节），把实测的尺寸与交互补进下文后，改为 `ready-for-agent`。
+本规格是草稿。在 Rebased 窗口里逐屏截图实测布局与交互（见参照末节）并补进下文后，改为 `ready-for-agent`。
 
 ## 目标
 
-把 M1–M3 已有的功能（仓库与 worktree、改动列表、暂存与取消暂存、丢弃与回收区、审阅标记、diff、提交区）按本机 Rebased 1.1.22 一比一重做界面，并补上多选、全部暂存和多个文件一起丢弃。M4 完成后开始自用，推送先在终端中做（Q126）。
+把 M1–M3 已有的功能（仓库与 worktree、改动列表、暂存与取消暂存、丢弃与回收区、审阅标记、diff、提交区）按本机 Rebased 1.1.22 的布局与交互、VS Code 的外观重做界面，加上颜色主题与代码字体设置，并补上多选、全部暂存和多个文件一起丢弃。M4 完成后开始自用，推送先在终端中做（Q126）。
 
 ## 不在 M4
 
@@ -21,7 +21,7 @@
 
 ## 规则
 
-- 外观与交互以 Rebased 为准，旧界面决定与 Rebased 冲突时照 Rebased（Q129）。
+- 布局与交互以 Rebased 为准，外观以 VS Code 和所选颜色主题为准；旧界面决定冲突时同样照此处理（Q129、Q131）。
 - 以下保持原决定：
   - 安全边界：写前校验 diff 指纹；丢弃先存回收区；hunk 来自 Git，不提供忽略空白等改变 hunk 划分的选项（Q17、ADR-0004）；不删锁文件；不改用户的 Git 配置。
   - Revia 独有功能的行为：审阅标记、回收区、结果待核对、提交前快照。
@@ -29,10 +29,10 @@
 
 ## F01 视觉基础
 
-1. 设计变量全部取自 Islands Light / Islands Dark（参照数据），跟随系统深浅色。Q107 时期的近似值全部替换：现在的窗口底色、工具窗口底色、选中色和 diff 配色都与 Rebased 不同。
-2. Inter 与 JetBrains Mono 继续随应用打包；字号与行高按实测。
+1. 颜色主题（Q132、Q134）：设计变量按 VS Code 颜色主题的键命名并取值（例如 `sideBar.background`、`list.activeSelectionBackground`、`diffEditor.insertedTextBackground`、`gitDecoration.modifiedResourceForeground`），语法颜色取主题的 `tokenColors`。内置 VS Code Light 2026、Atom One Light、VS Code Dark 2026、One Dark Pro 四套，浅色、深色各选一套，随系统切换；默认浅色 Atom One Light、深色 One Dark Pro。主题文件随应用打包并保留各自许可。Q107 时期的设计变量全部替换。
+2. 字体（Q131、Q133）：界面字体用系统字体，控件样式与尺寸照 VS Code（效果图中的行高 22、页签高 35、状态栏高 22）；代码字体默认 JetBrains Mono，可在设置中改字体和字号，本机没有该字体时退回默认。
 3. 图标（Q130）：界面图标用 Codicons，取代现在的 lucide-react；文件类型图标用 Material Icon Theme，取代现在自绘的文件类型图标。图标的尺寸、位置和用在哪个操作上照 Rebased，只换图形。两套图标的版本与来源记在仓库中，“关于 Revia”注明 Codicons（CC BY 4.0）与 Material Icon Theme（MIT）的版权与许可。
-4. 文件名按状态上色，颜色取 `FILESTATUS_*`，不再显示状态字母（Q128）。
+4. 文件名按状态上色，颜色取颜色主题的 `gitDecoration.*`，不显示状态字母（Q128）。
 
 ## F02 主窗口框架
 
@@ -77,7 +77,7 @@
 
 ## F08 设置
 
-设置改为 Rebased 设置对话框的形式。设置项沿用现有的：Git 程序路径、合并工具、重新加载环境、diff 字号。回收区的查看与清空在“回收区”页签中。
+设置改为 Rebased 设置对话框的布局、VS Code 的外观。设置项：Git 程序路径、合并工具、重新加载环境、颜色主题（浅色、深色各一项，Q132）、代码字体与字号（Q133）。回收区的查看与清空在“回收区”页签中。
 
 ## F09 后端
 
@@ -87,7 +87,7 @@
 
 ## 验收
 
-- 每一屏与 Rebased 1.1.22 并排截图（浅色、深色），经用户认可（Q125）。屏幕清单见参照末节。
+- 每一屏与 Rebased 1.1.22（布局、交互）及已确认的效果图（外观）并排截图，四套颜色主题都要截，经用户认可（Q125、Q131）。屏幕清单见参照末节。
 - 在新界面上重做 D06 测量，以及 M2、M3 与界面相关的验收：截图、提示条、确认框、关闭询问（Q127）。
 - Rust 测试、前端脚本测试、测量与长测脚手架随新 DOM 更新后全部通过。
 - Windows 编译检查通过（Q55）。

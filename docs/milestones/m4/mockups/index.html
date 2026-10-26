@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light-2026">
+<head>
+<meta charset="utf-8">
+<title>Revia VS Code 外观效果图</title>
+<link rel="stylesheet" href="codicon.css">
+<link rel="stylesheet" href="themes.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 800px; overflow: hidden; }
+  body {
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    color: var(--foreground); background: var(--editor-background);
+    -webkit-font-smoothing: antialiased;
+  }
+  .codicon { font-size: 16px; line-height: 16px; color: var(--icon-foreground); }
+  .win { display: grid; grid-template-columns: 44px 330px 1fr; grid-template-rows: 38px 1fr 22px; height: 800px; }
+
+  /* 主工具栏 */
+  .titlebar { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 86px;
+    background: var(--titlebar-activebackground); color: var(--titlebar-activeforeground);
+    border-bottom: 1px solid var(--titlebar-border); position: relative; }
+  .lights { position: absolute; left: 14px; top: 13px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .widget { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: 5px; font-weight: 500; }
+  .widget:hover, .widget.hover { background: var(--toolbar-hoverbackground); }
+  .widget .codicon { color: inherit; font-size: 14px; }
+  .widget .chev { font-size: 12px; opacity: .7; }
+  .repo-badge { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: #e06c4c; }
+  .spacer { flex: 1; }
+  .tb-icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 5px; }
+  .tb-icon .codicon { color: var(--titlebar-activeforeground); opacity: .8; }
+
+  /* 工具窗口图标条 */
+  .activity { background: var(--activitybar-background); border-right: 1px solid var(--activitybar-border); display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+  .act { width: 44px; height: 44px; display: grid; place-items: center; position: relative; }
+  .act .codicon { font-size: 22px; color: var(--activitybar-inactiveforeground); }
+  .act.on .codicon { color: var(--activitybar-foreground); }
+  .act.on::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--activitybar-activeborder); }
+  .act .count { position: absolute; right: 7px; bottom: 7px; min-width: 15px; height: 15px; border-radius: 8px; padding: 0 4px; font-size: 9px; line-height: 15px; text-align: center; background: var(--badge-background); color: var(--badge-foreground); }
+
+  /* 提交工具窗口 */
+  .side { background: var(--sidebar-background); color: var(--sidebar-foreground); border-right: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; }
+  .side-head { height: 35px; display: flex; align-items: center; padding: 0 8px 0 12px; gap: 14px; }
+  .tab2 { height: 35px; display: flex; align-items: center; font-size: 11.5px; letter-spacing: .02em; color: var(--sidebartitle-foreground); opacity: .75; border-bottom: 1px solid transparent; }
+  .tab2.on { opacity: 1; border-bottom-color: var(--focusborder); }
+  .side-tools { margin-left: auto; display: flex; gap: 2px; }
+  .ibtn { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; }
+  .ibtn.hover { background: var(--toolbar-hoverbackground); }
+  .tree { flex: 1; overflow: hidden; padding-bottom: 6px; }
+  .sec { height: 22px; display: flex; align-items: center; padding: 0 8px 0 4px; gap: 2px; font-weight: 600; font-size: 11.5px; color: var(--sidebarsectionheader-foreground); background: var(--sidebarsectionheader-background); }
+  .sec .codicon { font-size: 16px; }
+  .sec .grow { flex: 1; }
+  .badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 500; line-height: 18px; text-align: center; background: var(--badge-background); color: var(--badge-foreground); }
+  .row { height: 22px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 24px; white-space: nowrap; position: relative; }
+  .row.sel { background: var(--list-inactiveselectionbackground); }
+  .row.focus { background: var(--list-activeselectionbackground); outline: 1px solid var(--list-focusoutline); outline-offset: -1px; }
+  .row img { width: 16px; height: 16px; flex: none; }
+  .name { flex: none; }
+  .desc { color: var(--descriptionforeground); font-size: 12px; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .mod { color: var(--gitdecoration-modifiedresourceforeground); }
+  .add { color: var(--gitdecoration-addedresourceforeground); }
+  .del { color: var(--gitdecoration-deletedresourceforeground); text-decoration: line-through; }
+  .ren { color: var(--gitdecoration-renamedresourceforeground); }
+  .con { color: var(--gitdecoration-conflictingresourceforeground); }
+  .unt { color: var(--gitdecoration-untrackedresourceforeground); }
+  .acts { display: flex; gap: 2px; }
+  .acts .codicon { font-size: 15px; }
+  .rv .codicon { font-size: 14px; color: var(--descriptionforeground); }
+
+  .commit { border-top: 1px solid var(--sidebarsectionheader-border); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .chk { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+  .box { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--checkbox-border); background: var(--checkbox-background); }
+  .msg { height: 96px; border-radius: 4px; border: 1px solid var(--input-border); background: var(--input-background); color: var(--input-foreground); padding: 7px 9px; font-size: 13px; line-height: 1.45; }
+  .msg .ph { color: var(--input-placeholderforeground); }
+  .btnrow { display: flex; align-items: center; gap: 8px; }
+  .primary { flex: 1; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--button-background); color: var(--button-foreground); font-weight: 500; }
+  .primary .codicon { color: var(--button-foreground); font-size: 14px; }
+  .progress { font-size: 12px; color: var(--descriptionforeground); display: flex; align-items: center; gap: 5px; }
+  .progress .codicon { font-size: 14px; color: var(--descriptionforeground); }
+
+  /* 编辑区 */
+  .editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--editor-background); }
+  .tabs { height: 35px; display: flex; align-items: stretch; background: var(--editorgroupheader-tabsbackground); border-bottom: 1px solid var(--editorgroupheader-tabsborder); }
+  .tab { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 12px; border-right: 1px solid var(--tab-border); background: var(--tab-inactivebackground); color: var(--tab-inactiveforeground); position: relative; }
+  .tab.on { background: var(--tab-activebackground); color: var(--tab-activeforeground); }
+  .tab.on::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--tab-activebordertop); }
+  .tab.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--tab-activebackground); }
+  .tab img { width: 16px; height: 16px; }
+  .tab .desc { flex: none; font-size: 12px; }
+  .tab .codicon { font-size: 14px; }
+  .ed-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; padding-right: 8px; }
+  .ed-actions .lbl { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 5px; font-size: 12px; color: var(--foreground); }
+  .ed-actions .lbl.hover { background: var(--toolbar-hoverbackground); }
+  .crumbs { height: 22px; display: flex; align-items: center; gap: 4px; padding: 0 14px; font-size: 12px; color: var(--breadcrumb-foreground); }
+  .crumbs img { width: 14px; height: 14px; }
+  .crumbs .codicon { font-size: 12px; color: var(--breadcrumb-foreground); }
+  .banner { margin: 2px 10px 6px; padding: 7px 10px; border-radius: 5px; display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+    background: var(--editorwidget-background); border: 1px solid var(--widget-border); }
+  .banner .codicon { color: var(--editorinfo-foreground); }
+  .banner .link { color: var(--textlink-foreground); margin-left: auto; }
+
+  .diff { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; overflow: hidden;
+    font: 12px/19px "SF Mono", Menlo, Monaco, monospace; border-top: 1px solid var(--panel-border); }
+  .pane { overflow: hidden; }
+  .pane + .pane { border-left: 1px solid var(--panel-border); }
+  .ln { display: grid; grid-template-columns: 46px 1fr; height: 19px; }
+  .ln .no { text-align: right; padding-right: 12px; color: var(--editorlinenumber-foreground); background: var(--editorgutter-background); }
+  .ln .tx { white-space: pre; overflow: hidden; color: var(--syn-default); padding-left: 4px; }
+  .ln.rm .tx, .ln.rm .no { background: var(--diffeditor-removedlinebackground); }
+  .ln.ad .tx, .ln.ad .no { background: var(--diffeditor-insertedlinebackground); }
+  .ln.rm .no, .ln.ad .no { color: var(--editorlinenumber-activeforeground); }
+  .ln.gap .tx, .ln.gap .no { background: repeating-linear-gradient(-45deg, var(--diffeditor-diagonalfill) 0 1px, transparent 1px 7px); }
+  .ln.rm .w { background: var(--diffeditor-removedtextbackground); }
+  .ln.ad .w { background: var(--diffeditor-insertedtextbackground); }
+  .hh { height: 24px; white-space: nowrap; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 50px; font-family: -apple-system, "PingFang SC", sans-serif; font-size: 11.5px; color: var(--descriptionforeground); background: var(--editorgroupheader-tabsbackground); opacity: .95; }
+  .hh .codicon { font-size: 13px; color: var(--descriptionforeground); }
+  .hh .hact { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; color: var(--foreground); }
+  .hh .hact .codicon { color: var(--foreground); }
+  .hh .grow { flex: 1; }
+  .k { color: var(--syn-keyword); } .st { color: var(--syn-storage); } .s { color: var(--syn-string); } .n { color: var(--syn-number); }
+  .c { color: var(--syn-comment); font-style: var(--syn-comment-style, normal); } .f { color: var(--syn-func); } .t { color: var(--syn-type); }
+  .v { color: var(--syn-variable); } .p { color: var(--syn-property); } .o { color: var(--syn-operator); } .tg { color: var(--syn-tag); } .at { color: var(--syn-attr); } .cn { color: var(--syn-constant); }
+
+  /* 状态栏 */
+  .status { grid-column: 1 / -1; display: flex; align-items: center; gap: 2px; padding: 0 6px; font-size: 12px;
+    background: var(--statusbar-background); color: var(--statusbar-foreground); border-top: 1px solid var(--statusbar-border); }
+  .status .it { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; }
+  .status .codicon { font-size: 14px; color: var(--statusbar-foreground); }
+</style>
+</head>
+<body>
+<div class="win">
+  <header class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="widget"><span class="repo-badge">R</span>Revia<span class="codicon codicon-chevron-down chev"></span></div>
+    <div class="widget hover"><span class="codicon codicon-git-branch"></span>feature/diff-stream<span class="codicon codicon-chevron-down chev"></span></div>
+    <div class="spacer"></div>
+    <div class="tb-icon"><span class="codicon codicon-search"></span></div>
+    <div class="tb-icon"><span class="codicon codicon-settings-gear"></span></div>
+  </header>
+
+  <nav class="activity">
+    <div class="act on"><span class="codicon codicon-source-control"></span><span class="count">7</span></div>
+  </nav>
+
+  <aside class="side">
+    <div class="side-head">
+      <div class="tab2 on">提交</div>
+      <div class="tab2">回收区</div>
+      <div class="side-tools">
+        <div class="ibtn"><span class="codicon codicon-refresh"></span></div>
+        <div class="ibtn"><span class="codicon codicon-discard"></span></div>
+        <div class="ibtn"><span class="codicon codicon-list-tree"></span></div>
+        <div class="ibtn"><span class="codicon codicon-collapse-all"></span></div>
+        <div class="ibtn"><span class="codicon codicon-ellipsis"></span></div>
+      </div>
+    </div>
+    <div class="tree">
+      <div class="sec"><span class="codicon codicon-chevron-down"></span>已暂存<span class="grow"></span><span class="codicon codicon-remove" style="margin-right:6px"></span><span class="badge">3</span></div>
+      <div class="row"><img src="icons/typescript.svg"><span class="name add">refreshGate.ts</span><span class="desc">src/lib</span><span class="rv"><span class="codicon codicon-pass"></span></span></div>
+      <div class="row"><img src="icons/typescript.svg"><span class="name ren">measure.ts</span><span class="desc">src/lib · 原 src/lib/bench.ts</span><span class="rv"><span class="codicon codicon-pass"></span></span></div>
+      <div class="row"><img src="icons/typescript.svg"><span class="name del">legacy.ts</span><span class="desc">src/lib</span></div>
+      <div class="sec"><span class="codicon codicon-chevron-down"></span>未暂存<span class="grow"></span><span class="codicon codicon-discard" style="margin-right:4px"></span><span class="codicon codicon-add" style="margin-right:6px"></span><span class="badge">4</span></div>
+      <div class="row focus"><img src="icons/react_ts.svg"><span class="name mod">App.tsx</span><span class="desc">src</span><span class="acts"><span class="codicon codicon-discard"></span><span class="codicon codicon-add"></span></span></div>
+      <div class="row sel"><img src="icons/react_ts.svg"><span class="name mod">DiffView.tsx</span><span class="desc">src/features/diff</span><span class="rv"><span class="codicon codicon-pass"></span></span></div>
+      <div class="row"><img src="icons/typescript.svg"><span class="name con">conflict.ts</span><span class="desc">src/lib · 未解决冲突</span><span class="rv"><span class="codicon codicon-lock"></span></span></div>
+      <div class="row"><img src="icons/pnpm.svg"><span class="name mod">pnpm-lock.yaml</span><span class="desc">默认收起</span></div>
+      <div class="sec"><span class="codicon codicon-chevron-right"></span>未跟踪<span class="grow"></span><span class="badge">3</span></div>
+    </div>
+    <div class="commit">
+      <div class="chk"><span class="box"></span>修改上一次提交<span class="spacer"></span><span class="codicon codicon-history"></span></div>
+      <div class="msg">改用 Rebased 布局重做提交工具窗口<br><br><span class="ph">按 ⌘K 提交</span></div>
+      <div class="btnrow">
+        <div class="primary"><span class="codicon codicon-check"></span>提交</div>
+        <div class="ibtn"><span class="codicon codicon-gear"></span></div>
+      </div>
+      <div class="progress"><span class="codicon codicon-pass"></span>已审阅 3/10</div>
+    </div>
+  </aside>
+
+  <main class="editor">
+    <div class="tabs">
+      <div class="tab on"><img src="icons/react_ts.svg"><span>App.tsx</span><span class="desc">未暂存</span><span class="codicon codicon-close"></span></div>
+      <div class="tab"><img src="icons/typescript.svg"><span>refreshGate.ts</span><span class="desc">已暂存</span></div>
+      <div class="ed-actions">
+        <div class="ibtn"><span class="codicon codicon-arrow-up"></span></div>
+        <div class="ibtn"><span class="codicon codicon-arrow-down"></span></div>
+        <div class="ibtn"><span class="codicon codicon-split-horizontal"></span></div>
+        <div class="lbl hover"><span class="codicon codicon-eye"></span>标记为已审阅</div>
+        <div class="ibtn"><span class="codicon codicon-ellipsis"></span></div>
+      </div>
+    </div>
+    <div class="crumbs"><img src="icons/folder-src.svg">src<span class="codicon codicon-chevron-right"></span><img src="icons/react_ts.svg">App.tsx<span style="margin-left:auto">并排 · 3 处改动</span></div>
+    <div class="diff" id="diff"><div class="pane" id="left"></div><div class="pane" id="right"></div></div>
+  </main>
+
+  <footer class="status">
+    <div class="it"><span class="codicon codicon-git-branch"></span>feature/diff-stream</div>
+    <div class="it"><span class="codicon codicon-arrow-up"></span>2 <span class="codicon codicon-arrow-down"></span>0 截至上次 fetch</div>
+    <div class="spacer"></div>
+    <div class="it"><span class="codicon codicon-pass"></span>已审阅 3/10</div>
+    <div class="it">Revia</div>
+  </footer>
+</div>
+<script>
+const KW = /\b(const|let|return|if|function|new|export|import|from|null|false|true|useState|useRef|useCallback)\b/;
+function hl(code) {
+  // ⟦…⟧ 包住单词级改动
+  return code.split(/(⟦[^⟧]*⟧)/).map(seg => {
+    if (seg.startsWith("⟦")) return `<span class="w">${tok(seg.slice(1, -1))}</span>`;
+    return tok(seg);
+  }).join("");
+}
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function tok(s) {
+  const re = /("[^"]*")|(\b\d+\b)|(\/\/.*$)|(\b(?:const|let|return|if|function|new|export|import|from)\b)|(\b(?:null|false|true)\b)|(<\/?[A-Za-z][\w.]*)|(\b[a-zA-Z]+(?==))|(\.[a-zA-Z_]\w*)|(\b[A-Z]\w*\b)|(\b[a-z_]\w*(?=\())|(\b[a-z_]\w*\b)|(=>|===|\?|:|=)/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(s))) {
+    out += esc(s.slice(last, m.index)); last = re.lastIndex;
+    const t = m[0], cls = m[1] ? "s" : m[2] ? "n" : m[3] ? "c" : m[4] ? "k" : m[5] ? "cn" : m[6] ? "tg" : m[7] ? "at" : m[8] ? "p" : m[9] ? "t" : m[10] ? "f" : m[11] ? "v" : "o";
+    if (cls === "p") out += `.<span class="p">${esc(t.slice(1))}</span>`; else out += `<span class="${cls}">${esc(t)}</span>`;
+  }
+  return out + esc(s.slice(last));
+}
+const H = (title) => ({ h: title });
+const rows = [
+  H("export function App()"),
+  [118, "  const [busy, setBusy] = useState(false);", 118, "  const [busy, setBusy] = useState(false);"],
+  [119, "  const gateRef = useRef(new SnapshotGate());", 119, "  const gateRef = useRef(new SnapshotGate());"],
+  [120, "  const ⟦writing = useRef(false)⟧;", 120, "  const ⟦[writingWorktrees, setWritingWorktrees] = useState(new Set<string>())⟧;", "rm", "ad"],
+  [null, "", 121, "  const closeCoordinatorRef = useRef(new CloseCoordinator());", "gap", "ad"],
+  [null, "", 122, "  const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;", "gap", "ad"],
+  [121, "  const diffRef = useRef<DiffViewHandle | null>(null);", 123, "  const diffRef = useRef<DiffViewHandle | null>(null);"],
+  [122, "", 124, ""],
+  [123, "  const [view, setView] = useState<ViewMode>(\"split\");", 125, "  const [view, setView] = useState<ViewMode>(\"split\");"],
+  H("const acceptSnapshot = useCallback("),
+  [402, "  const acceptSnapshot = useCallback((token: GateToken, next: ChangesSnapshot) => {", 404, "  const acceptSnapshot = useCallback((token: GateToken, next: ChangesSnapshot) => {"],
+  [403, "    if (!gateRef.current.accepts(token)) return;", 405, "    if (!gateRef.current.accepts(token)) return;"],
+  [404, "    setSnapshot(⟦next⟧);", 406, "    setSnapshot(⟦(current) => mergeReview(current, next)⟧);", "rm", "ad"],
+  [null, "", 407, "    setReviewNotice(null);", "gap", "ad"],
+  [405, "    restoreSelection(next);", 408, "    restoreSelection(next);"],
+  [406, "  }, [restoreSelection]);", 409, "  }, [restoreSelection]);"],
+  H("function Toolbar({"),
+  [611, "  return (", 614, "  return ("],
+  [612, "    <⟦div className=\"flex items-center gap-3 border-b px-3 py-1.5\"⟧>", 615, "    <⟦header className=\"main-toolbar\" data-tauri-drag-region⟧>", "rm", "ad"],
+  [null, "", 616, "      <ProjectWidget repo={activeRepo} worktreeId={worktreeId} />", "gap", "ad"],
+  [613, "      <ToggleGroup value={[view]} onValueChange={onViewChange}>", 617, "      <ToggleGroup value={[view]} onValueChange={onViewChange}>"],
+  [614, "        <ToggleGroupItem value=\"split\">{messages.diff.split}</ToggleGroupItem>", 618, "        <ToggleGroupItem value=\"split\">{messages.diff.split}</ToggleGroupItem>"],
+  [615, "      </ToggleGroup>", 619, "      </ToggleGroup>"],
+  [616, "      <Button variant=\"ghost\" onClick={onRefresh} disabled={busy}>", 620, "      <Button variant=\"ghost\" onClick={onRefresh} disabled={busy}>"],
+  [617, "        {messages.changes.refresh}", 621, "        {messages.changes.refresh}"],
+  [618, "      </Button>", 622, "      </Button>"],
+];
+const L = document.getElementById("left"), R = document.getElementById("right");
+for (const r of rows) {
+  if (r.h) {
+    L.insertAdjacentHTML("beforeend", `<div class="hh"><span class="codicon codicon-symbol-method"></span>${esc(r.h)}<span class="grow"></span></div>`);
+    R.insertAdjacentHTML("beforeend", `<div class="hh"><span class="grow"></span><span class="hact"><span class="codicon codicon-add"></span>暂存此 hunk</span><span class="hact"><span class="codicon codicon-discard"></span>丢弃此 hunk</span></div>`);
+    continue;
+  }
+  const [ln, lt, rn, rt, lc = "", rc = ""] = r;
+  L.insertAdjacentHTML("beforeend", `<div class="ln ${lc}"><span class="no">${ln ?? ""}</span><span class="tx">${hl(lt)}</span></div>`);
+  R.insertAdjacentHTML("beforeend", `<div class="ln ${rc}"><span class="no">${rn ?? ""}</span><span class="tx">${hl(rt)}</span></div>`);
+}
+const t = new URLSearchParams(location.search).get("theme");
+if (t) document.documentElement.dataset.theme = t;
+</script>
+</body>
+</html>

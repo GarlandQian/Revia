@@ -1,6 +1,6 @@
 # M4 参照：Rebased 1.1.22 的外观数据
 
-M4 照本机安装的 Rebased 1.1.22 一比一重做界面（Q117、Q119）。本文整理从 Rebased 中提取的主题数据，完整键值在 [reference/](./reference/)（来源与许可见 [NOTICE](./reference/NOTICE.md)）。主题文件只给出颜色和部分尺寸，屏幕上的实际效果仍以 Rebased 窗口截图为准，见末节。
+M4 的布局与交互照本机安装的 Rebased 1.1.22（Q117、Q119），外观改照 VS Code 与所选颜色主题（Q131、Q132），见 [效果图](./mockups/)。因此本文的配色与尺寸只作对照记录，实现不取这些值；仍然有用的是末节要实测的布局与交互。完整键值在 [reference/](./reference/)（来源与许可见 [NOTICE](./reference/NOTICE.md)）。
 
 ## 主题链
 
