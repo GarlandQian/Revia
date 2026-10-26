@@ -3,6 +3,8 @@
 #[cfg(target_os = "macos")]
 mod macos_exit;
 
+pub(crate) mod output_pipe;
+
 use std::fs;
 #[cfg(any(unix, windows))]
 use std::fs::File;

@@ -3,9 +3,13 @@
 //! 边界：所有 Git 调用都在 Rust 层完成（ADR-0002）；前端只调用固定、带类型的命令。
 
 pub mod acceptance;
+pub mod commit;
+pub mod commit_flow;
+pub mod commit_snapshot;
 pub mod commands;
 pub mod error;
 pub mod git;
+pub mod operation;
 pub mod platform;
 pub mod recovery;
 pub mod review;
@@ -132,6 +136,11 @@ pub fn run() {
             commands::debug_log,
             commands::set_exit_blocked,
             commands::request_exit,
+            commands::commit_context,
+            commands::amend_head_message,
+            commands::save_commit_draft,
+            commands::clear_commit_draft,
+            commands::execute_commit,
         ])
         .build(tauri::generate_context!())
         .expect("Revia 启动失败");

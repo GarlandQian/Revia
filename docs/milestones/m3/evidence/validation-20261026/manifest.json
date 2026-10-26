@@ -1,0 +1,311 @@
+{
+  "sourceCommit": "03736a0e66b87e98abcda3d6207993db955be9b5",
+  "originalDirectory": "/private/tmp/revia-m3-completion.WlOGeT",
+  "commands": [
+    {
+      "name": "bench-driver-regressions",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_bench_long_running.py"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 1,
+      "started": "2026-10-26T20:17:27.924344+08:00",
+      "finished": "2026-10-26T20:17:28.300410+08:00"
+    },
+    {
+      "name": "bench-driver-regressions-r2",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_bench_long_running.py"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:18:42.101475+08:00",
+      "finished": "2026-10-26T20:18:42.704178+08:00"
+    },
+    {
+      "name": "commit-state-node",
+      "argv": [
+        "node",
+        "--test",
+        "tools/test-commit-state.mjs"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:14:02.510721+08:00",
+      "finished": "2026-10-26T20:14:02.634322+08:00"
+    },
+    {
+      "name": "diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:20:28.649064+08:00",
+      "finished": "2026-10-26T20:20:28.670625+08:00"
+    },
+    {
+      "name": "fixture-setup",
+      "argv": [
+        "env",
+        "HOME=/private/tmp/revia-m3-completion.WlOGeT/fixture-home",
+        "GIT_CONFIG_GLOBAL=/private/tmp/revia-m3-completion.WlOGeT/fixture-home/.gitconfig",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "bash",
+        "tools/fixtures/setup.sh",
+        "/private/tmp/revia-m3-completion.WlOGeT/fixtures"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:16:51.424356+08:00",
+      "finished": "2026-10-26T20:16:52.154092+08:00"
+    },
+    {
+      "name": "frontend-build",
+      "argv": [
+        "pnpm",
+        "build"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 2,
+      "started": "2026-10-26T20:14:02.218884+08:00",
+      "finished": "2026-10-26T20:14:04.606309+08:00"
+    },
+    {
+      "name": "frontend-build-r2",
+      "argv": [
+        "pnpm",
+        "build"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:14:54.169389+08:00",
+      "finished": "2026-10-26T20:14:58.127804+08:00"
+    },
+    {
+      "name": "frontend-lint",
+      "argv": [
+        "pnpm",
+        "lint"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:15:21.177898+08:00",
+      "finished": "2026-10-26T20:15:21.891338+08:00"
+    },
+    {
+      "name": "frontend-types-generated",
+      "argv": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "-b"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:20:26.452658+08:00",
+      "finished": "2026-10-26T20:20:28.491022+08:00"
+    },
+    {
+      "name": "node-regressions",
+      "argv": [
+        "node",
+        "--test",
+        "tools/test-commit-state.mjs",
+        "tools/test-ipc-diagnostics.mjs",
+        "tools/test-jump-dom-probe.mjs",
+        "tools/test-refresh-gate.mjs",
+        "tools/test-row-window-store.mjs",
+        "tools/test-ui-input.mjs",
+        "tools/test-visible-highlight-lines.mjs"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:15:22.094464+08:00",
+      "finished": "2026-10-26T20:15:23.049825+08:00"
+    },
+    {
+      "name": "release-app",
+      "argv": [
+        "env",
+        "PATH=/opt/homebrew/bin:/Users/garland/.local/state/fnm_multishells/1049_1792893957463/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "CARGO_NET_OFFLINE=true",
+        "pnpm",
+        "tauri",
+        "build",
+        "--bundles",
+        "app",
+        "--no-sign",
+        "--ci"
+      ],
+      "headAtInvocation": "03736a0e66b87e98abcda3d6207993db955be9b5",
+      "exitCode": 0,
+      "started": "2026-10-26T20:21:46.664985+08:00",
+      "finished": "2026-10-26T20:23:37.310342+08:00"
+    },
+    {
+      "name": "rust-commit-flow",
+      "argv": [
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "src-tauri/Cargo.toml",
+        "--test",
+        "commit_flow"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:15:21.058101+08:00",
+      "finished": "2026-10-26T20:15:51.751889+08:00"
+    },
+    {
+      "name": "rust-regressions",
+      "argv": [
+        "env",
+        "REVIA_M1_FIXTURE=/private/tmp/revia-m3-completion.WlOGeT/fixtures/diffs",
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "src-tauri/Cargo.toml"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 101,
+      "started": "2026-10-26T20:16:52.306112+08:00",
+      "finished": "2026-10-26T20:16:58.271553+08:00"
+    },
+    {
+      "name": "rust-regressions-r2",
+      "argv": [
+        "env",
+        "REVIA_M1_FIXTURE=/private/tmp/revia-m3-completion.WlOGeT/fixtures/diffs",
+        "/opt/homebrew/bin/cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "src-tauri/Cargo.toml"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:18:27.219417+08:00",
+      "finished": "2026-10-26T20:19:01.091206+08:00"
+    },
+    {
+      "name": "strip-bindings",
+      "argv": [
+        "node",
+        "tools/strip-binding-whitespace.mjs"
+      ],
+      "headAtInvocation": "253d7fb9a2001f8612a9d52792ff42837280a010",
+      "exitCode": 0,
+      "started": "2026-10-26T20:19:01.261613+08:00",
+      "finished": "2026-10-26T20:19:01.304806+08:00"
+    }
+  ],
+  "filesWithinArchive": {
+    "bench-driver-regressions/command.json": "91d256fa3a1e9b090f28093f93401d73119d472e9677129197bac7af7da49a02",
+    "bench-driver-regressions/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "bench-driver-regressions/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "bench-driver-regressions/stderr.log": "64e0c52e78bf8254d96d41def7229bdd2e9b9781f42e7eac53d9ea038e9869e7",
+    "bench-driver-regressions/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bench-driver-regressions-r2/command.json": "5772454ee73acc1a3c4c6ae49cc7680c5810bfc54136b519fd7e09f76d131857",
+    "bench-driver-regressions-r2/source-files.sha256.json": "868fdffe6bf5c30fb0a4b5f69975a418b0e423c6bcc9b22bc5bc8988dbb3526e",
+    "bench-driver-regressions-r2/source.patch": "46189898275ad932df098f852319e39f888a4a3a79c709bccc7ecce3c302f780",
+    "bench-driver-regressions-r2/stderr.log": "39a1dea9866875abc354a5a09b1685d75d3080f8796525bc28ac43d2bd413e3c",
+    "bench-driver-regressions-r2/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commit-state-node/command.json": "60f3dd8f5b42fcd855f6cb3c9cbf50853922c2a4551a67ba3fa1bbeac8ed2ad5",
+    "commit-state-node/source-files.sha256.json": "09b8d46c6bd62c8c806a2e3e96ba4bdb4ef69543b424ec3c46aa904369488246",
+    "commit-state-node/source.patch": "d9169d25900cca865809d3e679266d496712420dc1a5c652104b7e8497c54f0c",
+    "commit-state-node/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commit-state-node/stdout.log": "88c71eea8693a84ece22c9bad7e912246511b3bf693ad9308e4ab760aa09a542",
+    "desktop/app.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "desktop/app.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "desktop/desktop-blocker.json": "b4865a13f50e017103e8289dc82a067b2cc66b502c38d6998a3a2a4fba6a0f88",
+    "desktop/launch.json": "a891f6b255546ac91662011f3446d27b39cbf4d1397aaf811af25d202d48e911",
+    "desktop/manifest.json": "d57ec4b0f463f0db2528e9800a370072da80cdf8750bd03251a6446e049cad05",
+    "diff-check/command.json": "e343872b6d76ac27fe6ffa0c2be246e0fa0f1ee340c03cd3c437acfa69d216f7",
+    "diff-check/source-files.sha256.json": "51ac9dec6bf777f5f5e90556518f0f3eb264a5962135196c469c93c955235b02",
+    "diff-check/source.patch": "4c7e959a6d3f068be6280f2a77fce93110b4c1279d5e5e04ddadf7b9f1f24336",
+    "diff-check/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fixture-setup/command.json": "eb5277808c9fdbf41a3bfa58a66ad914a11008048e102b882e748d1ef12b42b5",
+    "fixture-setup/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "fixture-setup/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "fixture-setup/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fixture-setup/stdout.log": "8b6d7dbb90eb0afba281741701e057407afeaabc0a2f118b5ebd348a0d964bbb",
+    "frontend-build/command.json": "66425955a4ea2766efd8d960a4288a9686f05edd36c0b73e6e776a22208ace18",
+    "frontend-build/source-files.sha256.json": "09b8d46c6bd62c8c806a2e3e96ba4bdb4ef69543b424ec3c46aa904369488246",
+    "frontend-build/source.patch": "d9169d25900cca865809d3e679266d496712420dc1a5c652104b7e8497c54f0c",
+    "frontend-build/stderr.log": "93e2763b8001999c2f55b67d35af6f4d6e4318042e49d0e4ab172df5bfb45e7d",
+    "frontend-build/stdout.log": "ca40afbbed765c5842bdbd465b1f83bef1dbfd6923c8150862542a2a03d59f02",
+    "frontend-build-r2/command.json": "d7423b362b75175411e89d82231349a5a625da4680ab5ebfb44200660152efc0",
+    "frontend-build-r2/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "frontend-build-r2/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "frontend-build-r2/stderr.log": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+    "frontend-build-r2/stdout.log": "b1949e79309780b274f0460ab18444ad5975e9a0faa0b2d385108503d7e5b80a",
+    "frontend-lint/command.json": "24016e2b0c12bd7b860856b1734f450daa2d0bd0b4728e9357fa7033cd769b2a",
+    "frontend-lint/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "frontend-lint/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "frontend-lint/stderr.log": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+    "frontend-lint/stdout.log": "53a4d241bd62c056a8036df5cdd49afbfca64f4619f5c1c869bbacdce642ea00",
+    "frontend-types-generated/command.json": "05d69465bcfbbd125907c86a8a92a8d8d0f698bd889b3bb7a5deb5dee4d8714f",
+    "frontend-types-generated/source-files.sha256.json": "51ac9dec6bf777f5f5e90556518f0f3eb264a5962135196c469c93c955235b02",
+    "frontend-types-generated/source.patch": "4c7e959a6d3f068be6280f2a77fce93110b4c1279d5e5e04ddadf7b9f1f24336",
+    "frontend-types-generated/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "frontend-types-generated/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "node-regressions/command.json": "effdf6a89e2582bd372c6d56b215f4b1de3b94b11ad4120fce51287ba03fafcf",
+    "node-regressions/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "node-regressions/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "node-regressions/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "node-regressions/stdout.log": "74af51e82f0c3dda191f10968f361a2647d3285b47818aa583d68ecad8d70a04",
+    "release-app/command.json": "06c2aece775634630a1d5d52a044f1b7f44afd17cf02743b895ae572028753c9",
+    "release-app/source-files.sha256.json": "a73adb9d23d3d9d5cd6e4285e520e80bbbe0a223bb159a90228e0c8d65d7e995",
+    "release-app/source.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "release-app/stderr.log": "7d3bfe567ee47eb167dfa7281b1e508e3a75dd6e3d945c361adc7a1689981f7d",
+    "release-app/stdout.log": "db65a44ff4abce1c8450f75e87e302251ed3de6deda69f02f2777da5712c00f2",
+    "rust-commit-flow/command.json": "29bfbbe763b4fe6d724e612774dfd1ec7e08772ed6067d970554bf2beb51d27b",
+    "rust-commit-flow/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "rust-commit-flow/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "rust-commit-flow/stderr.log": "6f8668ffb94abc498aaa2e628c58e7a445a1f88554f3a1321e992d503d7faeeb",
+    "rust-commit-flow/stdout.log": "b35137ed3e0c5247e58f8d75bd1246348d6725ce74d4a448f7404d2139669f7a",
+    "rust-regressions/command.json": "a1939a4993b0d5e539e45f71bc48ac61eb48dc26fe27aa2329d68ed90bcad06f",
+    "rust-regressions/source-files.sha256.json": "4dbea900deef16e78ec829efc9c08d499e3f15a8f245b8494ff5cb49ae16f75a",
+    "rust-regressions/source.patch": "cd010d21290e54e3eeea42fa4add7b0659bdd3bf67f0a529a411ea30e3125ec4",
+    "rust-regressions/stderr.log": "4bbfd53a77b05258324f03f461c30e4f0605e0b8c458bc4ddd95071df4c4f72e",
+    "rust-regressions/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rust-regressions-r2/command.json": "b9abd2b81437935906d2e5d89a86535546cabbab516cda47306e70d0e344c2dc",
+    "rust-regressions-r2/source-files.sha256.json": "39f2bad410988fa0191b52582312931cb9e7dd2f76ecfb5bbe53fb84edab5906",
+    "rust-regressions-r2/source.patch": "2a76ddb622c89ab2adb74c4264373e49b4bba4b94fd2fa6b76371140792625aa",
+    "rust-regressions-r2/stderr.log": "674ff8bb7a7e0b4cf36d2d6b7daf6cc41b1c889862968d611c540ce6b9851c29",
+    "rust-regressions-r2/stdout.log": "7de2f80332c5509690e416b6e2f51c7a46cc40d80713019d3dc2d0847b596bc1",
+    "smoke/result.json": "f75bb7baeadd459af495a7cad955f36988ff4941880ef3b06b2d0fc3b014e3d0",
+    "smoke/result.log": "4b108cfe989341c5dd720c3c22c2a421b12f2ae5cca5a084c8c8e08b6d44ce38",
+    "smoke/run.json": "eb437605fa9df4c26d27bf6b4fd4bf45b9e82ae6644892dda031fa5e31ff1ce2",
+    "smoke/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "smoke/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "strip-bindings/command.json": "99908853d90b69efa02cda008bb89f2b52ccd71422f6aedbb1b961be9003c750",
+    "strip-bindings/source-files.sha256.json": "868fdffe6bf5c30fb0a4b5f69975a418b0e423c6bcc9b22bc5bc8988dbb3526e",
+    "strip-bindings/source.patch": "46189898275ad932df098f852319e39f888a4a3a79c709bccc7ecce3c302f780",
+    "strip-bindings/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "strip-bindings/stdout.log": "eb6c387d9845d03f5dd54939f9651c7baae6cdfc826a680046d7cbc8f29bc435"
+  },
+  "archive": "raw-evidence.tar.gz",
+  "archiveSha256": "d90930ee326ea7cea65656ebf072d0d58bbf5cb1566451617e9ee8e331083e1e"
+}

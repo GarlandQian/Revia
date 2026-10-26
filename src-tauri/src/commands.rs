@@ -19,6 +19,8 @@ use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
 use crate::recovery::{self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
+use crate::commit::{CommitDraft, DraftStore};
+use crate::commit_flow::{self, CommitOptions, CommitOutcome, CommitOutputEvent};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 /// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
@@ -86,6 +88,12 @@ pub struct AppState {
     /// 独立 fetch，前端「旧 false 的调用晚到」若直接 store 会解除新建立的保护，
     /// 因此在 Rust 侧用版本号保证旧请求绝不能覆盖新状态（ST-B03-08-1）。
     pub exit_guard: Arc<ExitGuard>,
+    /// 每 worktree 持久提交草稿（M3 F02.5）。
+    pub drafts: DraftStore,
+    /// Revia 数据目录（跳过 hooks 的临时空目录放在这里，F04.2）。
+    pub data_dir: PathBuf,
+    /// 提交操作 ID 计数器（实时输出事件归属用）。
+    commit_ops: std::sync::atomic::AtomicU64,
 }
 
 impl AppState {
@@ -94,13 +102,16 @@ impl AppState {
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
             review: Arc::new(crate::review::ReviewStore::new(data_dir.clone())),
-            registry: Mutex::new(Registry::load(data_dir, command_log.clone())),
+            registry: Mutex::new(Registry::load(data_dir.clone(), command_log.clone())),
             sessions: Mutex::new(HashMap::new()),
             command_log,
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
             acceptance: None,
             exit_guard: Arc::new(ExitGuard::default()),
+            drafts: DraftStore::new(data_dir.clone()),
+            data_dir,
+            commit_ops: std::sync::atomic::AtomicU64::new(1),
         }
     }
 
@@ -1064,6 +1075,139 @@ pub fn set_exit_blocked(state: State<'_, AppState>, seq: u64, blocked: bool) -> 
 #[tauri::command]
 pub fn request_exit(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<()> {
     state.exit_guard.request_exit(|| app.exit(0))
+}
+
+// ---------- 提交工作流（M3 F01–F06） ----------
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitContextRequest {
+    pub worktree_id: String,
+}
+
+/// 读取提交上下文（只读；草稿按 worktree 身份绑定，F02.5）。
+#[tauri::command]
+pub async fn commit_context(
+    state: State<'_, AppState>,
+    request: CommitContextRequest,
+) -> Result<commit_flow::CommitContext> {
+    let session = state.session(&request.worktree_id)?;
+    let drafts = state.drafts.clone();
+    tauri::async_runtime::spawn_blocking(move || session.commit_context(&drafts))
+        .await
+        .map_err(|error| AppError::internal(format!("读取提交上下文失败：{error}")))?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AmendMessageRequest {
+    pub worktree_id: String,
+    pub expected_head: String,
+}
+
+/// amend 预填用户所见 HEAD 的完整信息（F06.1；HEAD 变化拒绝）。
+#[tauri::command]
+pub async fn amend_head_message(
+    state: State<'_, AppState>,
+    request: AmendMessageRequest,
+) -> Result<Option<String>> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || session.amend_head_message(&request.expected_head))
+        .await
+        .map_err(|error| AppError::internal(format!("读取最近提交信息失败：{error}")))?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveDraftRequest {
+    pub worktree_id: String,
+    pub draft: CommitDraft,
+}
+
+/// 保存提交草稿（F02.5：身份绑定 + 原子落盘；失败如实上报，前端保留本地输入）。
+#[tauri::command]
+pub async fn save_commit_draft(
+    state: State<'_, AppState>,
+    request: SaveDraftRequest,
+) -> Result<()> {
+    let session = state.session(&request.worktree_id)?;
+    let drafts = state.drafts.clone();
+    tauri::async_runtime::spawn_blocking(move || session.save_commit_draft(&drafts, &request.draft))
+        .await
+        .map_err(|error| AppError::internal(format!("保存提交草稿失败：{error}")))?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearDraftRequest {
+    pub worktree_id: String,
+}
+
+/// 清除提交草稿（用户明确丢弃输入时；不存在视为已清除）。
+#[tauri::command]
+pub async fn clear_commit_draft(
+    state: State<'_, AppState>,
+    request: ClearDraftRequest,
+) -> Result<()> {
+    let session = state.session(&request.worktree_id)?;
+    let drafts = state.drafts.clone();
+    tauri::async_runtime::spawn_blocking(move || session.clear_commit_draft(&drafts))
+        .await
+        .map_err(|error| AppError::internal(format!("清除提交草稿失败：{error}")))?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecuteCommitRequest {
+    /// 登记的 worktree ID（前端不传任何路径或 Git 参数，F03.1）。
+    pub worktree_id: String,
+    pub options: CommitOptions,
+}
+
+/// 执行提交（F03/F04/F05 完整时序）。
+///
+/// 实时输出经 `revia://commit-output` 事件交付：事件同时带后端 operationId、
+/// 前端提供的 clientNonce 与 worktree ID，前端只认领属于当前这次请求的事件
+/// （F04.1）。写门、退出保护与待核对由前端 `WriteGuardOrchestrator` +
+/// Rust 同 worktree 写锁共同保证（F03.3）。
+#[tauri::command]
+pub async fn execute_commit(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    request: ExecuteCommitRequest,
+) -> Result<CommitOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let drafts = state.drafts.clone();
+    let recovery = state.recovery.clone();
+    let hooks_off_root = state.data_dir.clone();
+    let operation_id = format!(
+        "commit-{}",
+        state
+            .commit_ops
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    let options = request.options;
+    tauri::async_runtime::spawn_blocking(move || {
+        let emit_app = app.clone();
+        let emit: Arc<dyn Fn(CommitOutputEvent) + Send + Sync> =
+            Arc::new(move |event: CommitOutputEvent| {
+                use tauri::Emitter;
+                // 事件发送失败（窗口已关）不影响提交本身；输出仍留在返回值里。
+                let _ = emit_app.emit("revia://commit-output", &event);
+            });
+        session.execute_commit_flow(
+            &drafts,
+            &recovery,
+            hooks_off_root,
+            options,
+            operation_id,
+            emit,
+        )
+    })
+    .await
+    .map_err(|error| {
+        AppError::needs_verification(format!("提交任务中断，结果待核对：{error}"))
+    })?
 }
 
 #[cfg(test)]

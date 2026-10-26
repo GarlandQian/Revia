@@ -56,6 +56,11 @@ impl AppError {
     pub fn needs_verification(message: impl Into<String>) -> Self {
         Self { kind: ErrorKind::NeedsVerification, message: message.into() }
     }
+
+    /// 跨 IPC 的可序列化载荷（结构化结果里需要带上错误时用）。
+    pub fn payload(&self) -> AppErrorPayload {
+        AppErrorPayload { kind: self.kind, message: self.message.clone() }
+    }
 }
 
 impl fmt::Display for AppError {

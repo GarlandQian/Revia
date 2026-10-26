@@ -760,7 +760,8 @@ class BenchmarkSafetyTests(unittest.TestCase):
     def _run_production_main(self, directory, frontend=None, log_text=None, polls=None,
                              vmmap_text=None, ps_fail_at=None, process_setup=None):
         """Drive actual main() with only OS/process/clock/allocation boundaries mocked."""
-        root = Path(directory)
+        # Match production main() canonical paths, including macOS /var symlinks.
+        root = Path(directory).resolve()
         app = root / "Revia.app"
         (app / "Contents" / "MacOS").mkdir(parents=True)
         (app / "Contents" / "MacOS" / "revia").write_bytes(b"fake build")

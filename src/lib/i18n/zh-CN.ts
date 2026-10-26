@@ -81,6 +81,7 @@ export const zhCN = {
       discardFile: "丢弃当前文件的未暂存改动（⌥⌘Z）",
       review: "标记已审阅（⌥⌘R）",
       reviewNext: "标记并跳到下一个未审阅文件（⌥⌘R）",
+      commit: "提交（⌘K / Ctrl+K）",
     },
   },
   review: {
@@ -106,9 +107,14 @@ export const zhCN = {
     empty: "暂无回收记录",
     sourceFile: "整文件丢弃",
     sourceHunk: "单 hunk 丢弃（保存完整文件）",
+    /** 提交前快照：不是丢弃，文案不得写成「已丢弃」（M3 F05.4）。 */
+    sourceCommit: "提交前快照（提交时的完整工作区状态，未丢弃任何内容）",
     completed: "已保存 · 丢弃完成",
+    completedCommit: "已保存 · 提交已成功（这是提交后的真实状态基准）",
     notApplied: "已保存 · 未执行丢弃",
+    notAppliedCommit: "已保存 · 提交未启动或已失败（工作区未由 Revia 改动）",
     needsVerification: "已保存 · 结果待核对",
+    needsVerificationCommit: "已保存 · 提交结果待核对（没有可信的提交后基准）",
     otherWorktree: "非当前 worktree 或原身份无法确认；记录仍可查看",
     viewOnly: "回收记录保存在 Revia 数据目录，独立于 Git；恢复只写工作区，不改变暂存区。",
     details: "查看与恢复",
@@ -180,6 +186,99 @@ export const zhCN = {
     internal: "内部错误",
     copy: "复制",
     dismiss: "关闭",
+  },
+  /**
+   * 提交区（M3 F01–F06）。文案集中在这里，组件里不写死中文。
+   */
+  commit: {
+    section: "提交",
+    placeholder: "提交信息（首行建议不超过 72 个字符）",
+    messageLabel: "提交信息",
+    firstLineHint: (length: number) => `首行 ${length} 个字符，超过建议的 72 个字符`,
+    amend: "修改上一次提交",
+    amendUnavailable: "当前不能修改上一次提交",
+    amendUnavailableNoHead: "仓库还没有任何提交，不能修改上一次提交",
+    amendUnavailableOperation: "有进行中的操作，不能修改上一次提交",
+    skipHooks: "跳过 hooks（仅本次提交）",
+    skipHooksDetail: "本次命令内全部 hooks 都不运行，不修改你的 Git 配置",
+    skipHooksOnce: "仅本次提交生效，切换或重启后不会保留",
+    templateUsed: "已用仓库的提交模板初始化信息",
+    /** 输入为空：不能提交（F02.2）。 */
+    emptyMessage: "填写提交信息后才能提交",
+    /** 有信息但没有已暂存内容（普通提交；无冲突 merge 收尾除外）。 */
+    noStaged: "暂存区没有已暂存的改动，不能提交（无冲突 merge 收尾除外）",
+    /** 只有 intent-to-add 占位，没有真实暂存内容。 */
+    intentOnly: "只有 intent-to-add 占位条目，没有被写进提交的内容",
+    /** 没有选中 worktree。 */
+    noWorktree: "先选择要提交的 worktree",
+    /** 提交内容与确认时不一致（F03.2）。 */
+    stale: "提交内容已变化，请重新确认后再提交。",
+    /** amend 二次确认在刷新/切换/编辑后失效（F06.2）。 */
+    amendConfirmStale: "HEAD、暂存区、上游读数或选项已变化，这次确认已失效，请重新确认。",
+    /** amend 预填结果提示（F06.1）。 */
+    amendPrefilled: "已用上一次提交的信息预填",
+    amendPrefillFailed: "读取上一次提交信息失败，未覆盖当前输入",
+    /** 模板读取失败：可见但不阻断提交（F02.3）。 */
+    templateFailed: (detail: string) => `读取提交模板失败，仍可继续编辑提交：${detail}`,
+    /** 草稿持久化提示（F02.5：失败必须可见且保留本地输入）。 */
+    draftSaved: "草稿已保存",
+    draftFailed: (detail: string) => `草稿保存失败，输入仍保留在本机：${detail}`,
+    draftLoadFailed: (detail: string) => `草稿读取失败：${detail}`,
+    draftRestored: "已恢复上次的草稿",
+    /** 结果区标题与输出（F04.1）。 */
+    outputTitle: (worktree: string) => `提交输出（${worktree}）`,
+    outputLive: "实时输出",
+    outputWaiting: "等待 Git 输出…",
+    resultSuccess: (head: string) => `已创建提交 ${head.slice(0, 12)}`,
+    resultAmend: (head: string) => `已修改提交，新 HEAD ${head.slice(0, 12)}`,
+    resultNeedsVerification: "结果待核对：无法确认是否已创建提交，请核对真实状态后再继续",
+    /** 已确认的 Git 失败：结构化结果里带 Git 类错误。 */
+    resultGitFailed: (exitCode: number) => `git commit 失败（退出码 ${exitCode}）`,
+    resultOutput: "Git 输出",
+    copyFailed: "复制失败",
+    recent: "最近的提交信息",
+    recentEmpty: "没有可用的历史提交信息",
+    recentPick: "使用这条信息",
+    submit: "提交",
+    submitting: "提交中…",
+    submitHint: "⌘K 或 Ctrl+K 提交",
+    conflictBlocked: (count: number) => `有 ${count} 个文件存在未解决冲突，先在终端解决后才能提交`,
+    operationMerge: "merge 进行中：解决冲突后可以直接提交完成合并",
+    operationRebase: "rebase 进行中：请到终端处理，处理完再提交",
+    operationCherryPick: "cherry-pick 进行中：请到终端处理，处理完再提交",
+    operationRevert: "revert 进行中：请到终端处理，处理完再提交",
+    operationSequencer: "（多提交序列中间阶段）",
+    operationTerminal: "Revia 不提供 continue / abort / skip，请在终端完成",
+    upstreamWarning: (name: string) =>
+      `上一次提交已经包含于上游 ${name}（按本地记录，截至上次 fetch）。修改它会影响已推送的历史。`,
+    upstreamBoundary: "上游状态只按本地记录判断，不会联网核对远端真实状态。",
+    upstreamUnknown: "本地没有上游分支的引用，无法判断是否已发布；不会联网核对。",
+    upstreamNone: "当前分支没有配置上游跟踪分支。",
+    amendConfirmTitle: "确认修改已包含于上游的提交",
+    amendConfirmBody: (name: string) =>
+      `这次修改会改写已经存在于上游 ${name} 的提交（按本地记录）。确认要修改它吗？`,
+    amendUnknownConfirmTitle: "确认修改发布状态未知的提交",
+    amendUnknownConfirmBody: "本地没有上游分支的引用，无法确认上一次提交是否已发布。修改会改写本地提交；如果已经发布，也会影响相应历史。确认继续吗？",
+    amendConfirmAction: "确认修改上一次提交",
+    progress: (reviewed: number, total: number) => `已审阅 ${reviewed}/${total}`,
+    progressDetail: "审阅进度不会阻止提交",
+    resultTitle: "提交结果",
+    resultNoOutput: "Git 没有输出内容",
+    resultHookChanges: (worktree: string[], index: string[]) =>
+      `hooks 修改过这些文件（Revia 不会自动撤销）：工作区 ${worktree.join(", ") || "（无）"}；暂存区 ${index.join(", ") || "（无）"}`,
+    resultSnapshot: (id: string) => `提交前已保存快照记录 ${id}（回收区可查看）`,
+    resultDraftKept: "草稿已保留（本次输入与提交时不同或保存失败）",
+    resultDraftError: (detail: string) => `草稿收尾失败：${detail}`,
+    resultCopy: "复制输出",
+    resultCopied: "已复制",
+    resultExpand: "展开输出",
+    resultCollapse: "收起输出",
+    resultClose: "关闭结果",
+    resultLines: (count: number) => `${count} 行输出`,
+    outputOtherWorktree: "输出属于另一个 worktree，已保留在这里",
+    blockedWriting: "当前 worktree 有正在进行的写操作，请稍候",
+    /** 关闭/退出前草稿落盘失败：不得静默销毁窗口。 */
+    closeFlushFailed: (detail: string) => `提交草稿未能保存，已取消关闭以免丢失输入：${detail}`,
   },
   measure: {
     title: "测量",

@@ -9,6 +9,11 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
+import type { AmendConfirmation } from "@/types/bindings/AmendConfirmation";
+import type { CommitContext } from "@/types/bindings/CommitContext";
+import type { CommitDraft } from "@/types/bindings/CommitDraft";
+import type { CommitOutcome } from "@/types/bindings/CommitOutcome";
+import type { CommitOutputEvent } from "@/types/bindings/CommitOutputEvent";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
@@ -85,6 +90,32 @@ export interface CommandRecordPayload {
   timedOut: boolean;
   stdoutBytes: number;
   stderrExcerpt: string;
+}
+
+/** 与 Rust 侧 `CommitOptions` 对应（固定类型，前端不能扩展成任意 Git 参数）。 */
+export interface CommitExecuteOptions {
+  /** 用户输入的原始提交信息（逐字保留，草稿按它比较）。 */
+  message: string;
+  amend: boolean;
+  /** 跳过 hooks：仅本次命令生效（命令局部全跳过）。 */
+  skipHooks: boolean;
+  /** 用户所见提交预期（`commitContext` 的返回值原样带回）。 */
+  expected: CommitContext["expectation"];
+  /** amend 且 HEAD 已包含于本地上游时的二次确认凭据（绑定预期/信息/选项）。 */
+  amendConfirmation: AmendConfirmation | null;
+  /** 本次请求的 nonce：后端原样带回输出事件，前端据此只认领本次事件。 */
+  clientNonce: string;
+  draftRevision: string;
+}
+
+/** 与 Rust 侧 `CommitOutputEvent` 对应的实时输出事件名。 */
+export const COMMIT_OUTPUT_EVENT = "revia://commit-output";
+export type { CommitOutputEvent };
+
+/** 生成一次提交请求的操作凭据（只允许后端接受的安全字符集）。 */
+export function newCommitNonce(): string {
+  const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  return `c${random.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 48)}`;
 }
 
 export const ipc = {
@@ -213,4 +244,24 @@ export const ipc = {
   recoveryMaintenance: () => invoke<RecoveryMaintenance>("recovery_maintenance"),
   clearRecovery: () => invoke<number>("clear_recovery"),
   purgeRecovery: () => invoke<number>("purge_recovery"),
+
+  // ---------- 提交工作流（M3 F01–F06） ----------
+  /** 提交上下文：预期、模板、最近信息、草稿、上游状态、门禁（只读）。 */
+  commitContext: (worktreeId: string) =>
+    invoke<CommitContext>("commit_context", { request: { worktreeId } }),
+  /** amend 预填用户所见 HEAD 的完整信息；读取时 HEAD 变化即拒绝。 */
+  amendHeadMessage: (worktreeId: string, expectedHead: string) =>
+    invoke<string | null>("amend_head_message", { request: { worktreeId, expectedHead } }),
+  /** 保存该 worktree 的持久草稿（身份绑定；失败必须展示且保留本地输入）。 */
+  saveCommitDraft: (request: { worktreeId: string; draft: CommitDraft }) =>
+    invoke<void>("save_commit_draft", { request }),
+  /** 清除该 worktree 的持久草稿（用户明确丢弃输入时）。 */
+  clearCommitDraft: (worktreeId: string) =>
+    invoke<void>("clear_commit_draft", { request: { worktreeId } }),
+  /**
+   * 执行提交。只传登记 worktree ID、信息、amend/skip 与用户所见预期；
+   * 不传任何 Git 参数。实时输出走 `revia://commit-output` 事件。
+   */
+  executeCommit: (request: { worktreeId: string; options: CommitExecuteOptions }) =>
+    invoke<CommitOutcome>("execute_commit", { request }),
 };

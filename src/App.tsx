@@ -17,6 +17,9 @@ import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
+import type { AmendConfirmation } from "@/types/bindings/AmendConfirmation";
+import type { CommitContext } from "@/types/bindings/CommitContext";
+import type { CommitOutputEvent } from "@/types/bindings/CommitOutputEvent";
 import {
   ArrowDown,
   ArrowUp,
@@ -39,6 +42,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CommitComposer, messageSubmittable, type CommitResultView } from "@/components/app/CommitComposer";
+import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
+import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
+import { CommitOutputStore } from "@/lib/commitOutput";
 import { ChangesList, type Selection } from "@/components/app/ChangesList";
 import { FileTypeIcon } from "@/components/app/FileTypeIcon";
 import { CloseRequestDialog, DiscardDialog, RecoveryDialog } from "@/components/app/RecoveryDialogs";
@@ -49,11 +56,11 @@ import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
 import { matchesHunkAction } from "@/features/diff/hunkAction";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
-import { ipc, type SoakFocus } from "@/lib/ipc";
+import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isButtonTarget, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog, MAIN_TOOLBAR_INSET } from "@/lib/platform";
+import { isButtonTarget, isCommitMessageTarget, isCommitShortcut, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog, MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
@@ -1121,13 +1128,28 @@ export function App() {
    * 状态机全部在 `CloseDriver` 里；App 只把它的 `CloseDriverEffect`
    * 映射成对话框与原生动作。Node 回归驱动同一个类。
    */
+  /** 冲刷并等待草稿落盘的转发 ref（实现定义在提交工作流区；关闭编排先于它）。 */
+  const flushCommitDraftRef = useRef<(targetWorktreeId?: string) => Promise<void>>(
+    async () => undefined,
+  );
+
+  /** 先落草稿再执行不可撤销的原生动作；失败时抛出，绝不静默关闭。 */
+  const closeAfterDraftFlush = useCallback(
+    async (action: () => Promise<void>): Promise<void> => {
+      await flushCommitDraftRef.current();
+      await action();
+    },
+    [],
+  );
+
   const closeDriverRef = useRef<CloseDriver | null>(null);
   if (closeDriverRef.current === null) {
     closeDriverRef.current = new CloseDriver({
       coordinator: closeCoordinatorRef.current,
       releaseExitGuard: () => syncExitBlocked(false),
-      closeWindow: () => getCurrentWindow().destroy(),
-      exitApp: () => ipc.requestExit(),
+      // 关闭/退出前必须先把草稿落盘并等待完成：落盘失败时不得静默销毁窗口（F02.5）。
+      closeWindow: () => closeAfterDraftFlush(() => getCurrentWindow().destroy()),
+      exitApp: () => closeAfterDraftFlush(() => ipc.requestExit()),
       onError: (caught) => setAppError(toAppError(caught), null),
       onAsk: (intent, writing, pending) => {
         closeIntentRef.current = intent;
@@ -1446,6 +1468,556 @@ export function App() {
     return performWrite({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
   }, [performWrite, worktreeId]);
 
+  // ---------------- 提交工作流（M3 F01–F06） ----------------
+
+  /**
+   * 提交区状态（输入、代际、草稿落地判定）放在一个可变对象里：
+   *
+   * 异步草稿读写必须绑定 worktree 与代际，旧回包不能覆盖新输入（F02.5）。
+   * 用 ref 保存，React 状态只做渲染镜像。
+   */
+  const commitStateRef = useRef(new CommitComposerState());
+  const [commitInput, setCommitInput] = useState<ComposerInput>(EMPTY_INPUT);
+  const commitInputRef = useRef(commitInput);
+  commitInputRef.current = commitInput;
+  const [commitContext, setCommitContext] = useState<CommitContext | null>(null);
+  const commitContextRef = useRef<CommitContext | null>(null);
+  commitContextRef.current = commitContext;
+  const [commitContextError, setCommitContextError] = useState<string | null>(null);
+  const [commitSubmittingWorktrees, setCommitSubmittingWorktrees] = useState<Set<string>>(new Set());
+  const commitSubmittingRef = useRef(new Set<string>());
+  const commitSubmitting = worktreeId !== null && commitSubmittingWorktrees.has(worktreeId);
+  // 磁盘保存失败时仍按身份保留本地输入；切换回来先核身份，不能继承同路径旧仓库。
+  const localDraftsRef = useRef(new Map<string, { input: ComposerInput; revision: string; identity: string | null }>());
+  const [commitDraftNotice, setCommitDraftNotice] = useState<string | null>(null);
+  /**
+   * 提交结果按 **worktree** 保存（F03.3：结果和错误归原 worktree）。
+   *
+   * 切走再切回来时仍能看到那次提交的输出；旧 worktree 的结果不会画到当前目标上。
+   */
+  const [commitResults, setCommitResults] = useState<Record<string, CommitResultView>>({});
+  const [commitResultExpanded, setCommitResultExpanded] = useState(true);
+  const [commitCopied, setCommitCopied] = useState(false);
+  /** 当前 worktree 的提交结果（其他 worktree 的结果不出现在这里）。 */
+  const commitResult = worktreeId ? commitResults[worktreeId] ?? null : null;
+
+  const setCommitResultFor = useCallback((view: CommitResultView) => {
+    setCommitResults((current) => ({ ...current, [view.worktreeId]: view }));
+  }, []);
+  /**
+   * amend 二次确认（F06.2）：凭据绑定**当时的**整组预期 + 信息 + 选项。
+   *
+   * 任何刷新/切换/编辑都会清掉它，因此不会拿旧确认去改一份新的提交内容。
+   */
+  const [amendConfirm, setAmendConfirm] = useState<{
+    upstreamName: string;
+    confirmation: AmendConfirmation;
+    worktreeId: string;
+    activation: number;
+    contextEpoch: number;
+    generation: number;
+  } | null>(null);
+  const commitOutputsRef = useRef<CommitOutputStore | null>(null);
+  if (commitOutputsRef.current === null) commitOutputsRef.current = new CommitOutputStore();
+  const commitOutputs = commitOutputsRef.current;
+  /** 提交上下文读取序号：迟到的上下文不能覆盖新 worktree 的上下文（F02.5）。 */
+  const commitContextEpochRef = useRef(0);
+  const draftPersistenceRef = useRef<CommitDraftPersistence | null>(null);
+  if (draftPersistenceRef.current === null) {
+    draftPersistenceRef.current = new CommitDraftPersistence(({ write, error }) => {
+      if (worktreeIdRef.current !== write.worktreeId) return;
+      if (error !== null) {
+        setCommitDraftNotice(messages.commit.draftFailed(error));
+      } else if (commitStateRef.current.recordSaved(write.worktreeId, write.generation, write.input)) {
+        setCommitDraftNotice(messages.commit.draftSaved);
+      }
+    });
+  }
+  const draftPersistence = draftPersistenceRef.current;
+
+  const queueCommitDraft = useCallback((targetWorktreeId: string, input: ComposerInput) => {
+    const revision = newCommitNonce();
+    const context = commitContextRef.current;
+    const identity = context?.worktreeId === targetWorktreeId ? context.draftIdentity : null;
+    localDraftsRef.current.set(targetWorktreeId, { input, revision, identity });
+    draftPersistence.schedule({
+      worktreeId: targetWorktreeId,
+      input,
+      revision,
+      generation: commitStateRef.current.current().generation,
+    });
+  }, [draftPersistence]);
+
+  // 编辑、提交和关闭共用持久化顺序；关闭处不再读取内部队列或失败表。
+  flushCommitDraftRef.current = (target) => draftPersistence.flush(target);
+
+  /**
+   * 读取提交上下文（预期、模板、最近信息、草稿、上游、门禁）。
+   *
+   * 只读；任何读取失败都展示原因，不静默禁用提交（F01.1/F02.3）。
+   * 读取在**发起时**就绑定 worktree / 激活代号 / 输入代际（ticket），
+   * await 回来只按它判断能否落地，旧读取不会覆盖新输入（F02.5）。
+   */
+  const loadCommitContext = useCallback(async (targetWorktreeId: string): Promise<CommitContext | null> => {
+    if (worktreeIdRef.current !== targetWorktreeId) return null;
+    setAmendConfirm(null);
+    const epoch = ++commitContextEpochRef.current;
+    const activation = gateRef.current.token().activation;
+    const ticket = commitStateRef.current.ticket(targetWorktreeId, activation);
+    try {
+      const next = await ipc.commitContext(targetWorktreeId);
+      if (epoch !== commitContextEpochRef.current) return null;
+      if (worktreeIdRef.current !== targetWorktreeId) return null;
+      if (gateRef.current.token().activation !== activation) return null;
+      commitContextRef.current = next;
+      setCommitContext(next);
+      setCommitContextError(null);
+      if (next.templateError) setCommitDraftNotice(messages.commit.templateFailed(next.templateError));
+      if (next.draftError) setCommitDraftNotice(messages.commit.draftLoadFailed(next.draftError));
+      const state = commitStateRef.current;
+      if (closeDriver.currentPhase() === "closing" || !next.draftIdentity) return next;
+      const cached = localDraftsRef.current.get(targetWorktreeId);
+      if (cached?.identity === null && state.current().touched && next.draftIdentity) {
+        cached.identity = next.draftIdentity;
+      }
+      if (cached && next.draftIdentity && cached.identity === next.draftIdentity && !state.current().touched) {
+        const restored = { ...cached.input, skipHooks: false };
+        cached.input = restored;
+        state.edit(restored);
+        commitInputRef.current = restored;
+        setCommitInput(restored);
+        const failure = draftPersistence.failureFor(targetWorktreeId);
+        if (failure) setCommitDraftNotice(messages.commit.draftFailed(failure));
+        return next;
+      }
+      if (cached?.identity && next.draftIdentity && cached.identity !== next.draftIdentity) {
+        localDraftsRef.current.delete(targetWorktreeId);
+      }
+      const loaded = state.applyLoaded(ticket, activation, next.draft);
+      if (loaded.applied) {
+        localDraftsRef.current.set(targetWorktreeId, {
+          input: loaded.input, revision: next.draft?.revision || newCommitNonce(), identity: next.draftIdentity,
+        });
+        commitInputRef.current = loaded.input;
+        setCommitInput(loaded.input);
+        setCommitDraftNotice(messages.commit.draftRestored);
+      } else if (!next.draftError && state.needsTemplateSeed()) {
+        // 没有草稿且用户还没输入：用模板初始化**一次**（模板不覆盖用户输入，F02.3）。
+        // 初始化后立刻排队保存，避免「只是接受模板、没编辑」时正常关闭丢稿。
+        state.markTemplateSeeded();
+        // 模板只在「用户还没有任何本地输入」时初始化一次（F02.3）。
+        const untouched = !state.current().touched;
+        const snapshot = state.current();
+        const empty = !messageSubmittable(snapshot.input.message)
+          && !snapshot.input.amend && !snapshot.input.skipHooks;
+        if (untouched && empty && next.template) {
+          const seeded: ComposerInput = { ...snapshot.input, message: next.template };
+          state.edit(seeded);
+          commitInputRef.current = seeded;
+          setCommitInput(seeded);
+          setCommitDraftNotice(messages.commit.templateUsed);
+          queueCommitDraft(targetWorktreeId, seeded);
+        }
+      }
+      return next;
+    } catch (caught) {
+      if (epoch !== commitContextEpochRef.current) return null;
+      if (worktreeIdRef.current !== targetWorktreeId) return null;
+      setCommitContextError(getErrorMessage(caught));
+      return null;
+    }
+  }, [closeDriver, draftPersistence, queueCommitDraft]);
+
+  /** 输入变化：推进代际、更新界面、按代际异步保存草稿（不阻塞输入）。 */
+  const updateCommitInput = useCallback((next: ComposerInput, options?: { persist?: boolean }) => {
+    const target = worktreeIdRef.current;
+    if (!target || closeDriver.currentPhase() === "closing") return;
+    commitStateRef.current.edit(next);
+    commitInputRef.current = next;
+    setCommitInput(next);
+    // 任何输入变化都让旧确认失效（F06.2）。
+    setAmendConfirm(null);
+    if (options?.persist !== false) queueCommitDraft(target, next);
+  }, [closeDriver, queueCommitDraft]);
+
+  /** 切换 worktree / 重新打开会话时重置提交区（每个 worktree 各自独立，F02.5）。 */
+  const resetCommitComposer = useCallback((targetWorktreeId: string | null) => {
+    // 先把上一个 worktree 尚未落盘的输入排队写出去（不 await：切换不阻塞界面，
+    // 但写入仍在它自己的队列里，稍后加载该 worktree 时会等这个队列）。
+    void draftPersistence.flush().catch(() => undefined);
+    commitStateRef.current.reset(targetWorktreeId);
+    commitStateRef.current.setSubmitting(targetWorktreeId !== null && commitSubmittingRef.current.has(targetWorktreeId));
+    commitInputRef.current = resetInput();
+    commitContextRef.current = null;
+    // 跳过 hooks 只属于原 worktree 的那一次命令：切换后一律复位（F04.2）。
+    setCommitInput(resetInput());
+    setCommitContext(null);
+    setCommitContextError(null);
+    setCommitDraftNotice(null);
+    setAmendConfirm(null);
+  }, [draftPersistence]);
+
+  /**
+   * worktree 切换 / 会话打开后：重置提交区并按该 worktree 读取上下文。
+   */
+  useEffect(() => {
+    if (!worktreeId) {
+      resetCommitComposer(null);
+      return;
+    }
+    resetCommitComposer(worktreeId);
+    // 切回某个 worktree 时必须先等它自己的草稿写入队列结束，
+    // 否则会先读到旧盘内容并覆盖本地更新的输入（F02.5）。
+    void (async () => {
+      try {
+        await draftPersistence.waitFor(worktreeId);
+      } catch {
+        // 队列失败已由写入路径展示；这里继续读取，读取结果本身仍可见。
+      }
+      if (worktreeIdRef.current !== worktreeId) return;
+      await loadCommitContext(worktreeId);
+    })();
+  }, [draftPersistence, loadCommitContext, resetCommitComposer, worktreeId]);
+
+  /**
+   * 刷新 / 回到前台 / 监视事件后更新提交门禁（F01.3：刷新、切换、回到前台都要更新）。
+   *
+   * 只读上下文；不因为刷新而覆盖用户已经输入的正文。刷新出新 index 时
+   * 旧的 amend 二次确认必须失效（F06.2）。
+   */
+  useEffect(() => {
+    if (!worktreeId || snapshot?.worktreeId !== worktreeId) return;
+    setAmendConfirm(null);
+    void draftPersistence.waitFor(worktreeId).then(() => loadCommitContext(worktreeId));
+  }, [draftPersistence, loadCommitContext, snapshot?.revision, snapshot?.worktreeId, worktreeId]);
+
+  /** amend 勾选：勾上时用最近一次提交的完整信息预填（异步旧信息不得覆盖新输入，F06.1）。 */
+  const toggleAmend = useCallback((checked: boolean) => {
+    const target = worktreeIdRef.current;
+    if (!target || closeDriver.currentPhase() === "closing") return;
+    const current = commitInputRef.current;
+    if (!checked) {
+      updateCommitInput({ ...current, amend: false });
+      return;
+    }
+    const context = commitContextRef.current;
+    const expectedHead = context?.expectation.head;
+    if (context?.worktreeId !== target || !context.gates.amendAvailable || !expectedHead) return;
+    const pendingContextEpoch = commitContextEpochRef.current;
+    const pendingActivation = gateRef.current.token().activation;
+    const state = commitStateRef.current;
+    // 先记下 amend 选择（立即生效），信息预填等异步结果回来再补。
+    const withAmend = { ...current, amend: true };
+    state.edit(withAmend);
+    commitInputRef.current = withAmend;
+    setCommitInput(withAmend);
+    queueCommitDraft(target, withAmend);
+    setAmendConfirm(null);
+    // 预填必须绑定「勾上 amend 之后」的那一代输入：期间用户又编辑或切换
+    // worktree 时，旧信息不得覆盖新输入（F06.1）。
+    const pendingGeneration = state.current().generation;
+    const canApplyPrefill = () => worktreeIdRef.current === target
+      && closeDriver.currentPhase() !== "closing"
+      && state.current().generation === pendingGeneration
+      && commitContextEpochRef.current === pendingContextEpoch
+      && gateRef.current.token().activation === pendingActivation
+      && commitContextRef.current?.expectation.head === expectedHead;
+    void ipc.amendHeadMessage(target, expectedHead)
+      .then((message) => {
+        if (!canApplyPrefill()) return;
+        const seeded = { ...commitInputRef.current, message: message ?? "" };
+        updateCommitInput(seeded);
+        setCommitDraftNotice(messages.commit.amendPrefilled);
+      })
+      .catch(() => {
+        if (!canApplyPrefill()) return;
+        setCommitDraftNotice(messages.commit.amendPrefillFailed);
+      });
+  }, [closeDriver, queueCommitDraft, updateCommitInput]);
+
+  /** 选择一条最近的提交信息（只替换信息正文，不改变 amend/skip 选项，F02.4）。 */
+  const pickRecentMessage = useCallback((value: string) => {
+    const current = commitInputRef.current;
+    updateCommitInput({ ...current, message: value });
+  }, [updateCommitInput]);
+
+  /**
+   * 执行提交（F03/F04/F05/F06）。
+   *
+   * 与其它写入口**完全一致**：同一套 `WriteGuardOrchestrator`（关闭/退出保护）、
+   * 同一份 `writingWorktrees` 非排队互斥、同一套按 worktree 保留结果的错误通道。
+   * 结果与错误归**原 worktree**，切走后不覆盖当前界面（F03.3）。
+   */
+  const performCommit = useCallback(async (confirmation: AmendConfirmation | null = null) => {
+    const target = worktreeIdRef.current;
+    if (!target) {
+      setAppError({ kind: "rejected", message: messages.commit.noWorktree }, null);
+      return;
+    }
+    if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
+    const context = commitContextRef.current;
+    if (!context || context.worktreeId !== target) {
+      setAppError({ kind: "rejected", message: messages.commit.stale }, target);
+      return;
+    }
+    const input = commitInputRef.current;
+    if (!messageSubmittable(input.message)) {
+      setAppError({ kind: "rejected", message: messages.commit.emptyMessage }, target);
+      return;
+    }
+    // amend 且 HEAD 已包含于本地上游（或本地无法判断是否已发布）：必须有一次
+    // 绑定预期/信息/选项的二次确认（F06.2）。
+    if (input.amend && (context.gates.upstreamContainsHead || context.gates.upstreamUnknown)
+      && confirmation === null) {
+      setAmendConfirm({
+        upstreamName: context.upstreamName ?? "",
+        confirmation: AmendConfirmationOf(context, input),
+        worktreeId: target,
+        activation: gateRef.current.token().activation,
+        contextEpoch: commitContextEpochRef.current,
+        generation: commitStateRef.current.current().generation,
+      });
+      return;
+    }
+    setAmendConfirm(null);
+    const submitted: ComposerInput = { ...input };
+    const submittedExpectation = context.expectation;
+    const contextEpochAtSubmit = commitContextEpochRef.current;
+    const activationAtSubmit = gateRef.current.token().activation;
+    const submittedRevision = localDraftsRef.current.get(target)?.revision ?? newCommitNonce();
+    localDraftsRef.current.set(target, {
+      input: submitted, revision: submittedRevision, identity: context.draftIdentity,
+    });
+    const targetTitle = snapshotRef.current?.worktreePath ?? target;
+    commitSubmittingRef.current.add(target);
+    commitStateRef.current.setSubmitting(true);
+    setCommitSubmittingWorktrees(new Set(commitSubmittingRef.current));
+    writingWorktreesRef.current.add(target);
+    setWritingWorktrees(new Set(writingWorktreesRef.current));
+    const releaseFlight = () => {
+      commitSubmittingRef.current.delete(target);
+      setCommitSubmittingWorktrees(new Set(commitSubmittingRef.current));
+      if (commitStateRef.current.current().worktreeId === target) commitStateRef.current.setSubmitting(false);
+      writingWorktreesRef.current.delete(target);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+    };
+    let needsVerification = false;
+    let gateHeld = false;
+    try {
+      // 先登记生命周期再等待草稿，关闭不能越过这段异步准备去销毁窗口。
+      const started = await writeOrchestrator.begin(target);
+      if (!started.ok) throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+      gateHeld = true;
+      await draftPersistence.flush(target);
+      // 即使草稿来自加载/模板，也保存并绑定这一次提交的精确版本。
+      if (localDraftsRef.current.get(target)?.revision === submittedRevision) {
+        await draftPersistence.save({
+          worktreeId: target,
+          input: submitted,
+          revision: submittedRevision,
+          generation: commitStateRef.current.current().generation,
+        });
+      }
+      const failure = draftPersistence.failureFor(target);
+      if (failure) throw { kind: "internal", message: messages.commit.draftFailed(failure) };
+      if (confirmation && (commitContextEpochRef.current !== contextEpochAtSubmit
+        || gateRef.current.token().activation !== activationAtSubmit
+        || localDraftsRef.current.get(target)?.revision !== submittedRevision)) {
+        throw { kind: "rejected", message: messages.commit.amendConfirmStale };
+      }
+    } catch (caught) {
+      setAppError(toAppError(caught), target);
+      releaseFlight();
+      if (gateHeld) writeOrchestrator.end(target, false);
+      return;
+    }
+    setAppError(null, target);
+    const opToken = operationGateRef.current.begin(target);
+    const clientNonce = newCommitNonce();
+    const outputRun = commitOutputs.start(target, clientNonce);
+    // 先把结果区打开并清空输出：Git 的 stdout/stderr 会实时追加到这里（F04.1）。
+    setCommitResultFor({
+      worktreeId: target,
+      title: messages.commit.outputTitle(targetTitle),
+      detail: null,
+      outcome: null,
+      output: [],
+      needsVerification: false,
+      hookChanges: null,
+      snapshotRecordId: null,
+    });
+    setCommitResultExpanded(true);
+    setCommitCopied(false);
+    try {
+      const outcome = await ipc.executeCommit({
+        worktreeId: target,
+        options: {
+          message: submitted.message,
+          amend: submitted.amend,
+          skipHooks: submitted.skipHooks,
+          expected: submittedExpectation,
+          amendConfirmation: confirmation,
+          clientNonce,
+          draftRevision: submittedRevision,
+        },
+      });
+      // 已确认失败：结构化结果里带 Git 类错误，输出/hooks 改动/快照都保留（F04.3）。
+      const failed = !outcome.success;
+      const gitError = outcome.error;
+      needsVerification = outcome.needsVerification;
+      setCommitResultFor({
+        worktreeId: target,
+        title: outcome.success
+          ? (submitted.amend
+            ? messages.commit.resultAmend(outcome.newHead ?? "")
+            : messages.commit.resultSuccess(outcome.newHead ?? ""))
+          : gitError
+            ? messages.commit.resultGitFailed(outcome.exitCode ?? -1)
+            : messages.commit.resultTitle,
+        detail: outcome.draftError
+          ? messages.commit.resultDraftError(outcome.draftError)
+          : outcome.verificationNote ?? null,
+        outcome,
+        output: commitOutputs.finish(outputRun, outcome.output),
+        needsVerification: outcome.needsVerification,
+        hookChanges: outcome.hookChanges,
+        snapshotRecordId: outcome.snapshotRecordId,
+      });
+      setCommitResultExpanded(true);
+      setCommitCopied(false);
+      if (failed) {
+        // 已确认失败：错误按 Git 类归原 worktree，草稿保留。
+        if (operationGateRef.current.canRecord(opToken)) {
+          setAppError(gitError ?? { kind: "git", message: messages.commit.resultTitle }, target);
+        }
+      } else if (outcome.needsVerification) {
+        // 提交已成功但收尾（如快照记录）需要核对：如实提示。
+        if (operationGateRef.current.canRecord(opToken)) {
+          setAppError(
+            { kind: "needsVerification", message: messages.commit.resultNeedsVerification },
+            target,
+          );
+        }
+      } else {
+        // 成功且草稿确实被清：清掉本地输入（期间新输入不会被抹掉，F02.5）。
+        if (outcome.draftCleared && localDraftsRef.current.get(target)?.revision === submittedRevision) {
+          localDraftsRef.current.delete(target);
+          if (commitStateRef.current.current().worktreeId === target) {
+            commitStateRef.current.clear();
+            commitInputRef.current = resetInput();
+            setCommitInput(resetInput());
+            setCommitDraftNotice(null);
+          }
+        }
+        if (operationGateRef.current.canRecord(opToken)) setAppError(null, target);
+      }
+      // 不论成功、已确认失败还是待核对，都刷新**原 worktree** 的真实状态：
+      // 提交可能已经改变了 HEAD/index，界面必须与真实状态一致（F04.3/F06.4）。
+      await refreshTarget(target);
+      await loadCommitContext(target);
+    } catch (caught) {
+      const err = toAppError(caught);
+      needsVerification ||= err.kind === "needsVerification";
+      const lines = commitOutputs.snapshot(outputRun);
+      setCommitResultFor({
+        worktreeId: target,
+        title: err.kind === "needsVerification" ? messages.commit.resultNeedsVerification : err.message,
+        detail: err.kind === "needsVerification" ? err.message : null,
+        outcome: null,
+        output: lines,
+        needsVerification: err.kind === "needsVerification",
+        hookChanges: null,
+        snapshotRecordId: null,
+      });
+      setCommitResultExpanded(true);
+      // 失败/待核对保留草稿：本地输入不清，也不改写已保存的草稿（F02.5）。
+      if (operationGateRef.current.canRecord(opToken)) setAppError(err, target);
+      // 任何失败都重新核对原目标：预期/门禁可能已变化（F01.3）。
+      await refreshTarget(target);
+      await loadCommitContext(target);
+    } finally {
+      // 所有退出分支都复原本次 skip；只触碰仍属于原次输入的缓存。
+      const local = localDraftsRef.current.get(target);
+      if (local?.revision === submittedRevision && local.input.skipHooks) {
+        local.input = { ...local.input, skipHooks: false };
+        if (commitStateRef.current.current().worktreeId === target) {
+          commitStateRef.current.edit(local.input);
+          commitInputRef.current = local.input;
+          setCommitInput(local.input);
+        }
+      }
+      releaseFlight();
+      commitOutputs.release(outputRun);
+      writeOrchestrator.end(target, needsVerification);
+    }
+  }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, refreshTarget, setAppError, writeOrchestrator]);
+
+  /** 确认 amend 的二次警告：只对**当前**上下文成立时生效（F06.2）。 */
+  const confirmAmend = useCallback(() => {
+    const pending = amendConfirm;
+    if (!pending) return;
+    const context = commitContextRef.current;
+    const input = commitInputRef.current;
+    if (!context
+      || worktreeIdRef.current !== pending.worktreeId
+      || gateRef.current.token().activation !== pending.activation
+      || commitContextEpochRef.current !== pending.contextEpoch
+      || commitStateRef.current.current().generation !== pending.generation
+      || context.expectation.fingerprint !== pending.confirmation.expectationFingerprint
+      || input.message !== pending.confirmation.message
+      || input.amend !== pending.confirmation.amend
+      || input.skipHooks !== pending.confirmation.skipHooks
+      || context.upstreamVersion !== pending.confirmation.upstreamVersion
+      || !(context.gates.upstreamContainsHead || context.gates.upstreamUnknown)) {
+      setAmendConfirm(null);
+      setAppError({ kind: "rejected", message: messages.commit.amendConfirmStale }, worktreeIdRef.current);
+      return;
+    }
+    setAmendConfirm(null);
+    void performCommit(pending.confirmation);
+  }, [amendConfirm, performCommit, setAppError]);
+
+  /** 复制提交输出（可复制，F04.1）。 */
+  const copyCommitOutput = useCallback(() => {
+    const text = commitResult?.output.join("\n") ?? "";
+    void navigator.clipboard.writeText(text)
+      .then(() => {
+        setCommitCopied(true);
+        window.setTimeout(() => setCommitCopied(false), 1500);
+      })
+      .catch((caught) => {
+        setAppError({ kind: "internal", message: `${messages.commit.copyFailed}：${getErrorMessage(caught)}` },
+          commitResult?.worktreeId ?? null);
+      });
+  }, [commitResult, setAppError]);
+
+  /** 实时输出的传输与展示；归属、缓冲和终态判定由同一个 module 持有。 */
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<CommitOutputEvent>(COMMIT_OUTPUT_EVENT, (event) => {
+      if (disposed) return;
+      const update = commitOutputs.accept(event.payload);
+      if (!update) return;
+      setCommitResults((current) => {
+        const existing = current[update.worktreeId];
+        if (!existing) return current;
+        return { ...current, [update.worktreeId]: { ...existing, output: update.output } };
+      });
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch((caught) => {
+      if (disposed) return;
+      // 监听安装失败必须可见：否则用户以为有实时输出而实际没有（F04.1）。
+      setAppError({ kind: "internal", message: messages.close.listenerFailed(messages.commit.outputLive, getErrorMessage(caught)) }, null);
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [commitOutputs, setAppError]);
+
   /**
    * 切换某个文件的审阅标记（任务 07）。
    *
@@ -1675,6 +2247,16 @@ export function App() {
   // 快捷键（Q19、Q93、审查意见 6）：
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 提交快捷键（⌘K / Ctrl+K，M3 F06.5）：
+      // - 在提交信息框里由信息框自己处理，这里不再重复触发；
+      // - 其它输入控件与任何弹窗内不穿透（Q93）。
+      if (isCommitShortcut(event) && !isCommitMessageTarget(event.target)) {
+        if (isTextInputOrDialog(event.target) || document.querySelector("[role='dialog'], dialog[open]")) return;
+        event.preventDefault();
+        void performCommit();
+        return;
+      }
+
       // 只对文本输入控件和弹窗内的按键放行，不穿透到后台文件操作（Q93、审查意见 6）
       if (isTextInputOrDialog(event.target)) return;
 
@@ -1731,7 +2313,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, discardFile, focusNextFile, isWriting, jumpToHunk, refresh, reviewNextFile, selectedEntry, stageFile, unstageFile]);
+  }, [changeFontSize, chooseRepo, discardFile, focusNextFile, isWriting, jumpToHunk, performCommit, refresh, reviewNextFile, selectedEntry, stageFile, unstageFile]);
 
   // ---------------- 测量 ----------------
 
@@ -2716,6 +3298,44 @@ export function App() {
         ) : (
           <div className="px-3 py-2 text-fg-2">{messages.changes.loading}</div>
         )}
+        {worktreeId ? (
+          <CommitComposer
+            context={commitContext}
+            message={commitInput.message}
+            amend={commitInput.amend}
+            skipHooks={commitInput.skipHooks}
+            busy={busy || isWriting}
+            submitting={commitSubmitting}
+            reviewedCount={snapshot?.review.reviewedCount ?? 0}
+            totalFiles={snapshot?.review.total ?? 0}
+            result={commitResult}
+            resultExpanded={commitResultExpanded}
+            copied={commitCopied}
+            onMessage={(value) => updateCommitInput({ ...commitInputRef.current, message: value })}
+            onAmend={toggleAmend}
+            // 跳过 hooks 只对本次命令生效：改它不写草稿（F04.2）。
+            onSkipHooks={(value) => updateCommitInput(
+              { ...commitInputRef.current, skipHooks: value },
+              { persist: false },
+            )}
+            onSubmit={() => void performCommit()}
+            onPickRecent={pickRecentMessage}
+            onToggleResult={() => setCommitResultExpanded((value) => !value)}
+            onCopyResult={copyCommitOutput}
+            onCloseResult={() => setCommitResults((current) => {
+              if (!worktreeId) return current;
+              const next = { ...current };
+              delete next[worktreeId];
+              return next;
+            })}
+            activeWorktreeId={worktreeId}
+            draftNotice={commitContextError ?? commitDraftNotice}
+            templateError={commitContext?.templateError ?? null}
+            amendConfirm={amendConfirm}
+            onAmendConfirm={confirmAmend}
+            onAmendCancel={() => setAmendConfirm(null)}
+          />
+        ) : null}
       </aside>
 
       <main className="island mr-1.5 mb-1 ml-[3px] flex min-w-0 flex-col bg-island">
@@ -3290,6 +3910,22 @@ function Metric({ label, value }: { label: string; value: string }) {
 // ---------------- 工具 ----------------
 
 /** 界面展示顺序：未暂存 -> 未跟踪 -> 已暂存（审查意见 5）。 */
+/**
+ * 构造 amend 的二次确认凭据（F06.2）。
+ *
+ * 绑定当时看到的整组提交预期指纹、提交信息原文与选项：刷新出新 index、
+ * 修改输入或切换选项都会让这份凭据失效，后端写前逐项比对。
+ */
+function AmendConfirmationOf(context: CommitContext, input: ComposerInput): AmendConfirmation {
+  return {
+    upstreamVersion: context.upstreamVersion,
+    expectationFingerprint: context.expectation.fingerprint,
+    message: input.message,
+    amend: input.amend,
+    skipHooks: input.skipHooks,
+  };
+}
+
 function getDisplayOrderEntries(snapshot: ChangesSnapshot): ChangeEntry[] {
   const unstaged = snapshot.entries.filter((entry) => entry.changes === "unstaged");
   const untracked = snapshot.entries.filter((entry) => entry.changes === "untracked");

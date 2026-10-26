@@ -11,6 +11,37 @@ import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
 import type { RestoreAttempt } from "@/types/bindings/RestoreAttempt";
 import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
+import type { RecoverySource } from "@/types/bindings/RecoverySource";
+
+/**
+ * 记录来源文案（M3 F05.4）。
+ *
+ * 提交前快照不是「丢弃」：它保存的是提交时部分暂存文件的完整工作区状态，
+ * 提交本身没有改动工作区，因此文案里不能出现「已丢弃」。
+ */
+function sourceLabel(source: RecoverySource): string {
+  switch (source) {
+    case "discardHunk":
+      return messages.recovery.sourceHunk;
+    case "commitSnapshot":
+      return messages.recovery.sourceCommit;
+    case "discardFile":
+      return messages.recovery.sourceFile;
+  }
+}
+
+/** 记录状态文案：提交快照用提交语义，不与丢弃共用措辞（M3 F05.4）。 */
+function statusLabel(source: RecoverySource, status: RecoverySummary["status"]): string {
+  const commit = source === "commitSnapshot";
+  switch (status) {
+    case "completed":
+      return commit ? messages.recovery.completedCommit : messages.recovery.completed;
+    case "notApplied":
+      return commit ? messages.recovery.notAppliedCommit : messages.recovery.notApplied;
+    case "needsVerification":
+      return commit ? messages.recovery.needsVerificationCommit : messages.recovery.needsVerification;
+  }
+}
 
 /** `narrow` 用于确认类对话框；回收区面板需要更宽。 */
 function Modal({ title, children, onClose, narrow }: { title: string; children: ReactNode; onClose: () => void; narrow?: boolean }) {
@@ -327,9 +358,9 @@ export function RecoveryDialog({
           <Button variant="ghost" size="sm" onClick={backToList}>← {messages.recovery.back}</Button>
           <h3 className="break-all font-mono font-semibold">{selected.target}</h3>
           <p>{new Date(selected.createdAtMs).toLocaleString()} · {selected.worktreePath}</p>
-          <p>{selected.source === "discardHunk" ? messages.recovery.sourceHunk : messages.recovery.sourceFile}</p>
-          <p className="text-muted-foreground">{messages.recovery.restoreFullFile}</p>
+          <p>{sourceLabel(selected.source)}</p>
           <p role="status">{stateLabel(selected.state)}</p>
+          <p className="text-muted-foreground">{messages.recovery.restoreFullFile}</p>
           {selected.restore ? (
             <p role="status" className={selected.restore.state === "needsVerification" ? "text-destructive" : "text-muted-foreground"}>
               {`${messages.recovery.attemptLabel}：${attemptLabel(selected.restore)} · ${new Date(selected.restore.atMs).toLocaleString()}`}
@@ -431,8 +462,8 @@ export function RecoveryDialog({
               <article key={record.id} className="space-y-1 rounded border p-3">
                 <h3 className="break-all font-mono font-semibold">{record.target}</h3>
                 <p>{new Date(record.createdAtMs).toLocaleString()} · {record.bytes} {messages.recovery.bytes}</p>
-                <p>{record.source === "discardHunk" ? messages.recovery.sourceHunk : messages.recovery.sourceFile}</p>
-                <p>{messages.recovery[record.status]}</p>
+                <p>{sourceLabel(record.source)}</p>
+                <p>{statusLabel(record.source, record.status)}</p>
                 {record.restore ? (
                   <p className={record.restore.state === "needsVerification" ? "text-destructive" : "text-muted-foreground"}>
                     {`${messages.recovery.attemptLabel}：${attemptLabel(record.restore)} · ${new Date(record.restore.atMs).toLocaleString()}`}

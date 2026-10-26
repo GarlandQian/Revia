@@ -10,16 +10,16 @@
 //! - 结果按 worktree 缓存，可手动重新加载。
 
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use wait_timeout::ChildExt;
 
 use crate::error::{AppError, Result};
+
+#[cfg(unix)]
+mod capture;
 
 /// 登录 shell 的硬超时。
 pub const SHELL_TIMEOUT: Duration = Duration::from_secs(5);
@@ -129,37 +129,6 @@ fn fallback_env(home: &Path) -> Vec<(String, String)> {
     vars
 }
 
-#[cfg(unix)]
-fn dump_path(worktree: &Path) -> String {
-    worktree.join(".revia-env.dump").display().to_string()
-}
-
-#[cfg(unix)]
-/// 转储脚本：把环境写成 `KEY=VALUE\0`，只保留选定变量，静默执行。
-///
-/// 用 zsh 自己的 `>&` 重定向打开转储文件，不继承应用进程的任何文件描述符；
-/// stdout / stderr 都被丢弃，避免 `.zshrc` 里的提示输出混进结果。
-/// `${(P)__revia_k}` 是 zsh 的间接取值；`${+parameters[...]}` 判断变量是否存在。
-fn dump_script(worktree: &Path) -> String {
-    let dump = dump_path(worktree);
-    format!(
-        "typeset -a __revia_keep\n\
-         __revia_keep=(PATH HOME SHELL USER LOGNAME LANG LC_ALL LC_CTYPE TMPDIR SSH_AUTH_SOCK \
-         DISPLAY XDG_CONFIG_HOME GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS \
-         FNM_DIR FNM_NODE_DIST_MIRROR NVM_DIR NVM_BIN NVM_INC NVM_CD_FLAGS NVM_RC_VERSION \
-         VOLTA_HOME BUN_INSTALL DENO_INSTALL PNPM_HOME ASDF_DIR ASDF_DATA_DIR PYENV_ROOT)\n\
-         exec {{__revia_fd}}> {dump:?} || exit 1\n\
-         for __revia_k in $__revia_keep; do\n\
-         \x20 if (( ${{+parameters[$__revia_k]}} )); then\n\
-         \x20   print -rn -- \"$__revia_k=${{(P)__revia_k}}\"$'\\0' >&$__revia_fd || exit 1\n\
-         \x20 fi\n\
-         done\n\
-         exec {{__revia_fd}}>&-\n\
-         kill -USR1 $$\n",
-        dump = dump
-    )
-}
-
 fn sanitize(mut vars: HashMap<String, String>) -> HashMap<String, String> {
     for key in EXCLUDED_KEYS {
         vars.remove(*key);
@@ -184,94 +153,14 @@ pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
         );
     }
 
-    let _ = std::fs::remove_file(dump_path(worktree));
-    let script = dump_script(worktree);
-
-    let mut command = Command::new(&shell);
-    command
-        .current_dir(worktree)
-        .args(["-l", "-i", "-c", &script])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .env_clear();
-    for (key, value) in base_env(home) {
-        command.env(key, value);
-    }
-
-    let mut child = match command.spawn() {
-        Ok(child) => child,
-        Err(error) => {
-            return fallback(
-                home,
-                worktree,
-                &shell_path,
-                started,
-                Some(format!("启动 {shell_path} 失败：{error}")),
-            );
+    let captured = match capture::run(&shell, home, worktree) {
+        Ok(captured) => captured,
+        Err(diagnostics) => {
+            return fallback(home, worktree, &shell_path, started, Some(diagnostics));
         }
     };
-
-    let mut stderr = child.stderr.take();
-    let timed_out = match child.wait_timeout(SHELL_TIMEOUT) {
-        Ok(Some(_)) => false,
-        Ok(None) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            true
-        }
-        Err(error) => {
-            let _ = child.kill();
-            return fallback(
-                home,
-                worktree,
-                &shell_path,
-                started,
-                Some(format!("等待 shell 失败：{error}")),
-            );
-        }
-    };
-
-    let mut diagnostics = None;
-    if let Some(mut pipe) = stderr.take() {
-        let mut text = String::new();
-        let _ = pipe.read_to_string(&mut text);
-        let text = text.trim();
-        if !text.is_empty() {
-            diagnostics = Some(truncate(text, 2000));
-        }
-    }
-
-    if timed_out {
-        let _ = std::fs::remove_file(dump_path(worktree));
-        return fallback(
-            home,
-            worktree,
-            &shell_path,
-            started,
-            Some(format!(
-                "登录 shell 在 {} 毫秒内没有返回，已终止并使用最小环境",
-                SHELL_TIMEOUT.as_millis()
-            )),
-        );
-    }
-
-    let dump = std::fs::read(dump_path(worktree));
-    let _ = std::fs::remove_file(dump_path(worktree));
     let elapsed_ms = started.elapsed().as_millis() as u64;
-
-    let vars = match dump {
-        Ok(bytes) => parse_dump(&bytes),
-        Err(error) => {
-            return fallback(
-                home,
-                worktree,
-                &shell_path,
-                started,
-                Some(format!("读取环境转储失败：{error}")),
-            );
-        }
-    };
+    let vars = parse_dump(&captured.environment);
 
     if vars.is_empty() {
         return fallback(
@@ -304,7 +193,7 @@ pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
             used_fallback: false,
             var_count: vars.len(),
             path_entries: path.clone(),
-            diagnostics,
+            diagnostics: captured.diagnostics,
         },
         vars: {
             let mut vars = vars;
@@ -443,17 +332,6 @@ fn parse_dump(bytes: &[u8]) -> HashMap<String, String> {
         }
     }
     vars
-}
-
-fn truncate(text: &str, max: usize) -> String {
-    if text.len() <= max {
-        return text.to_string();
-    }
-    let mut end = max;
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    format!("{}…", &text[..end])
 }
 
 /// 按 worktree 缓存的环境解析结果。

@@ -148,10 +148,26 @@ pub fn capture_files(root: &Path, paths: &[String]) -> Result<Vec<SavedFile>> {
     }).collect()
 }
 
+/// 记录来源。`commitSnapshot` 是提交前对部分暂存文件的完整工作区快照（M3 F05），
+/// 与丢弃来源区分；回收区 UI 不得把它描述成「已丢弃」。
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub enum RecoverySource { DiscardFile, DiscardHunk }
+pub enum RecoverySource { DiscardFile, DiscardHunk, CommitSnapshot }
+
+impl RecoverySource {
+    pub fn is_commit_snapshot(self) -> bool {
+        matches!(self, RecoverySource::CommitSnapshot)
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            RecoverySource::DiscardFile => "discardFile",
+            RecoverySource::DiscardHunk => "discardHunk",
+            RecoverySource::CommitSnapshot => "commitSnapshot",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -502,14 +518,45 @@ pub struct RecoveryMaintenance {
     pub error: Option<String>,
 }
 
+/// Value, publication and retry are one transaction under the maintenance lock.
+struct MaintenanceState {
+    value: RecoveryMaintenance,
+    dirty: bool,
+}
+
+impl MaintenanceState {
+    fn record_purge(&mut self, directory: &Path, at: u64, result: &Result<u64>) {
+        self.value.last_purge_at_ms = Some(at);
+        match result {
+            Ok(removed) => {
+                self.value.last_purge_removed = *removed;
+                self.value.error = None;
+            }
+            Err(error) => self.value.error = Some(error.to_string()),
+        }
+        self.dirty = true;
+        self.persist_if_dirty(directory);
+    }
+
+    fn snapshot(&mut self, directory: &Path) -> RecoveryMaintenance {
+        self.persist_if_dirty(directory);
+        self.value.clone()
+    }
+
+    fn persist_if_dirty(&mut self, directory: &Path) {
+        if self.dirty {
+            // Keep the newest in-memory value available when storage is temporarily unwritable.
+            self.dirty = write_maintenance(directory, &self.value).is_err();
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct RecoveryStore {
     directory: PathBuf,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     /// 自动清理的可查询状态（持久化到回收区目录，重启后仍能看到失败）。
-    maintenance: Arc<Mutex<RecoveryMaintenance>>,
-    /// 上次持久化失败：保留内存状态并在下次读取时重试，避免只读窗口里彻底丢掉提示。
-    maintenance_dirty: Arc<Mutex<bool>>,
+    maintenance: Arc<Mutex<MaintenanceState>>,
     /// 在途记录 ID → 持有者数量。清理与删除在**同一把锁内**完成检查与删除，
     /// 因此不存在「检查完释放锁再删」的 TOCTOU 窗口（Q91）。
     in_use: Arc<Mutex<HashMap<String, usize>>>,
@@ -547,8 +594,7 @@ impl RecoveryStore {
             directory,
             clock,
             in_use: Arc::new(Mutex::new(HashMap::new())),
-            maintenance: Arc::new(Mutex::new(maintenance)),
-            maintenance_dirty: Arc::new(Mutex::new(false)),
+            maintenance: Arc::new(Mutex::new(MaintenanceState { value: maintenance, dirty: false })),
         }
     }
 
@@ -1351,24 +1397,7 @@ impl RecoveryStore {
                 .maintenance
                 .lock()
                 .map_err(|_| AppError::internal("回收区维护状态锁失败"))?;
-            maintenance.last_purge_at_ms = Some(at);
-            match &result {
-                Ok(removed) => {
-                    maintenance.last_purge_removed = *removed;
-                    maintenance.error = None;
-                }
-                Err(error) => {
-                    maintenance.error = Some(error.to_string());
-                }
-            }
-            if write_maintenance(&self.directory, &maintenance).is_err() {
-                // 目录暂时不可写：保留内存状态，下次读取时再落盘。
-                if let Ok(mut dirty) = self.maintenance_dirty.lock() {
-                    *dirty = true;
-                }
-            } else if let Ok(mut dirty) = self.maintenance_dirty.lock() {
-                *dirty = false;
-            }
+            maintenance.record_purge(&self.directory, at, &result);
         }
         result
     }
@@ -1377,18 +1406,14 @@ impl RecoveryStore {
     ///
     /// 若上次落盘失败，这里会重试；内存中的失败原因不会因为一次只读窗口而丢失。
     pub fn maintenance(&self) -> RecoveryMaintenance {
-        let value = self.maintenance.lock().map(|value| value.clone()).unwrap_or(RecoveryMaintenance {
-            last_purge_at_ms: None,
-            last_purge_removed: 0,
-            error: Some("回收区维护状态不可读".into()),
-        });
-        let dirty = self.maintenance_dirty.lock().map(|dirty| *dirty).unwrap_or(false);
-        if dirty && write_maintenance(&self.directory, &value).is_ok() {
-            if let Ok(mut dirty) = self.maintenance_dirty.lock() {
-                *dirty = false;
-            }
+        match self.maintenance.lock() {
+            Ok(mut state) => state.snapshot(&self.directory),
+            Err(_) => RecoveryMaintenance {
+                last_purge_at_ms: None,
+                last_purge_removed: 0,
+                error: Some("回收区维护状态不可读".into()),
+            },
         }
-        value
     }
 
     /// 清空回收区（用户明确确认后调用）。在途记录保留。
@@ -1703,3 +1728,34 @@ pub fn unchanged(before: &[SavedFile], after: &[SavedFile]) -> bool {
     before == after
 }
 
+
+#[cfg(test)]
+mod maintenance_tests {
+    use super::*;
+
+    #[test]
+    fn publication_retry_keeps_the_newest_value_and_snapshot_does_not_republish_old_data() {
+        let temp = tempfile::tempdir().unwrap();
+        let directory = temp.path().join("recovery");
+        fs::write(&directory, b"not a directory").unwrap();
+        let mut state = MaintenanceState {
+            value: RecoveryMaintenance { last_purge_at_ms: None, last_purge_removed: 0, error: None },
+            dirty: false,
+        };
+        state.record_purge(&directory, 1, &Err(AppError::environment("old failure")));
+        assert!(state.dirty);
+        let old = state.snapshot(&directory);
+        state.record_purge(&directory, 2, &Ok(4));
+        assert!(state.dirty);
+        fs::remove_file(&directory).unwrap();
+        let new = state.snapshot(&directory);
+        assert!(!state.dirty);
+        assert_eq!(new.last_purge_at_ms, Some(2));
+        assert_eq!(new.last_purge_removed, 4);
+        assert!(new.error.is_none());
+        assert!(old.error.is_some());
+        let persisted = read_maintenance(&directory);
+        assert_eq!(persisted.last_purge_at_ms, Some(2));
+        assert!(persisted.error.is_none());
+    }
+}

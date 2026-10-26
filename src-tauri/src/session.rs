@@ -1095,6 +1095,20 @@ impl WorktreeSession {
         self.identity.as_ref()?.revalidate(&self.git)
     }
 
+    /// 提交草稿归属用的身份（M3 F02.5）：
+    ///
+    /// - 身份成立：返回当前重新确认过的身份；
+    /// - 打开会话时就没能捕获身份，或现在已不成立（同路径重建、移动）：显式报错，
+    ///   不从同路径的旧身份继承，也不保存新草稿（与审阅标记同一边界，Q87）。
+    pub fn captured_identity(&self) -> Result<Option<WorktreeIdentity>> {
+        match &self.identity {
+            Some(identity) => Ok(identity.revalidate(&self.git)),
+            None => Err(AppError::environment(
+                "worktree 身份不可用，不能读写提交草稿",
+            )),
+        }
+    }
+
     /// 身份不可用时的审阅状态：全部未审阅，进度按去重路径统计。
     fn empty_review(&self, entries: &[ChangeEntry]) -> ReviewMarks {
         let mut paths: Vec<String> = Vec::new();

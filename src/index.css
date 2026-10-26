@@ -494,6 +494,41 @@
   .status-warn > svg {
     color: var(--banner-warn-icon);
   }
+
+  /* 提交信息框（M3 F02.2）：JetBrains Mono、岛屿底色、无网站式圆角卡片。 */
+  .commit-message {
+    display: block;
+    width: 100%;
+    min-height: 72px;
+    max-height: 40vh;
+    padding: 6px 8px;
+    border-radius: 5px;
+    background: var(--island);
+    box-shadow: inset 0 0 0 1px var(--btn-edge);
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 18px;
+    resize: vertical;
+    outline: none;
+  }
+
+  .commit-message::placeholder {
+    color: var(--fg-3);
+  }
+
+  .commit-message:hover:not(:disabled) {
+    box-shadow: inset 0 0 0 1px var(--edge);
+  }
+
+  .commit-message:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ring);
+  }
+
+  .commit-message:disabled {
+    color: var(--fg-2);
+    cursor: default;
+  }
 }
 
 /* ---------- diff 视图与语法配色（浅色 / 深色两套，Q50；配色照 JetBrains，Q107） ---------- */

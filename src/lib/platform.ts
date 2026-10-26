@@ -79,3 +79,22 @@ export function isTextInputOrDialog(target: EventTarget | null): boolean {
   const inDialog = target.closest("[role='dialog']") !== null || target.closest("dialog") !== null;
   return isInput || inDialog;
 }
+
+/**
+ * 判断是否触发了「提交」快捷键（⌘K / Ctrl+K，M3 F06.5）。
+ *
+ * 只认主修饰键 + K；信息框内的 ⌘K 由信息框自己处理（那里允许直接提交），
+ * 其它输入控件与弹窗保留自己的行为，不穿透（Q93）。
+ */
+export function isCommitShortcut(event: KeyboardEvent | React.KeyboardEvent): boolean {
+  return isPrimaryModifier(event) && !event.altKey && !event.shiftKey && event.code === "KeyK";
+}
+
+/** 提交快捷键的展示文案（macOS 用 ⌘，其他平台用 Ctrl）。 */
+export const COMMIT_SHORTCUT_LABEL = isMac ? "⌘K" : "Ctrl+K";
+
+/** 判断焦点是否落在提交信息框里（那里允许 ⌘K 直接提交）。 */
+export function isCommitMessageTarget(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  return target.closest("[data-commit-message]") !== null;
+}
