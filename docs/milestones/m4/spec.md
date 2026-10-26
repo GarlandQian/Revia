@@ -2,12 +2,9 @@
 
 **Status:** needs-info
 
-依据：Q117–Q129；ADR-0003、ADR-0004、ADR-0005、ADR-0009、ADR-0010、ADR-0011；[产品方向](../../product-direction.md#实施顺序)、[UI 方向](../../ui-direction.md)、[安全边界](../../product-direction.md#安全边界)。外观数据见 [Rebased 参照](./rebased-reference.md)。
+依据：Q117–Q130；ADR-0003、ADR-0004、ADR-0005、ADR-0009、ADR-0010、ADR-0011；[产品方向](../../product-direction.md#实施顺序)、[UI 方向](../../ui-direction.md)、[安全边界](../../product-direction.md#安全边界)。外观数据见 [Rebased 参照](./rebased-reference.md)。
 
-本规格是草稿。两件事定下后改为 `ready-for-agent`：
-
-1. 图标用哪一套（追问中）。
-2. 在 Rebased 窗口里逐屏截图实测（见参照末节），把实测的尺寸与交互补进下文。
+本规格是草稿。在 Rebased 窗口里逐屏截图实测（见参照末节），把实测的尺寸与交互补进下文后，改为 `ready-for-agent`。
 
 ## 目标
 
@@ -34,7 +31,7 @@
 
 1. 设计变量全部取自 Islands Light / Islands Dark（参照数据），跟随系统深浅色。Q107 时期的近似值全部替换：现在的窗口底色、工具窗口底色、选中色和 diff 配色都与 Rebased 不同。
 2. Inter 与 JetBrains Mono 继续随应用打包；字号与行高按实测。
-3. 图标：待定。
+3. 图标（Q130）：界面图标用 Codicons，取代现在的 lucide-react；文件类型图标用 Material Icon Theme，取代现在自绘的文件类型图标。图标的尺寸、位置和用在哪个操作上照 Rebased，只换图形。两套图标的版本与来源记在仓库中，“关于 Revia”注明 Codicons（CC BY 4.0）与 Material Icon Theme（MIT）的版权与许可。
 4. 文件名按状态上色，颜色取 `FILESTATUS_*`，不再显示状态字母（Q128）。
 
 ## F02 主窗口框架
@@ -97,5 +94,4 @@
 
 ## 待定
 
-1. 图标集：追问中。
-2. Rebased 实测项：见参照末节，需要用户在 Mac 前批准屏幕操控。
+- Rebased 实测项：见参照末节，需要用户在 Mac 前批准屏幕操控。

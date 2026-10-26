@@ -5,6 +5,6 @@ Revia 的功能和界面以 Rebased（JetBrains Git 功能单独发布的客户�
 ## Consequences
 
 - 界面与交互的验收以本机安装的 Rebased 1.1.22 为基准：每一屏与它并排截图对照（Q117、Q125）。
-- 配色、尺寸和图标直接取自 IntelliJ 社区版的开源主题与图标（Apache 2.0），按其许可保留版权与许可声明。
+- 配色和尺寸直接取自 IntelliJ 社区版的开源主题（Apache 2.0），按其许可保留版权与许可声明。图标不照抄：界面图标用 Codicons，文件类型图标用 Material Icon Theme（Q130）。
 - 技术栈、Git 读写由 Rust 层调用系统 Git 命令行（ADR-0002）等既有决定不变。
 - 以后若想改为基于 IntelliJ 平台，需要先重新评估本决定。

@@ -157,6 +157,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的功能和界面，做
 | Q127 | M3 后端与自动化验证照常收尾，提交区界面不再打磨。应用户要求，M2、M3 已于 2026-10-26 先各自压成一个提交合入 main（69d4f39、246e191）；剩余与界面无关的验收继续，任务 13 由 M4 取代，截图、D06 等界面验收在 M4 新界面上重做。M4 从合并后的 main 开 `m4`，动手前先在 Rebased 上逐屏截图与实测，并写 M4 规格和任务单 | 第一、五轮“按推荐”；确认清单时用户要求“m3合并到main然后再做，其他可以” |
 | Q128 | 文件状态表示照 Rebased：文件名按 Git 状态上色，行右侧不再显示状态字母，颜色在 M4 按 Rebased 实测和 IntelliJ 主题写定；取代 Q31 | 用户于 2026-10-26 对 Q31 与一比一照抄的冲突回复“照rebased” |
 | Q129 | 早于 Q119 的界面决定与 Rebased 冲突时，一律照 Rebased，不再逐项追问用户；安全边界（产品方向“安全边界”一节与 Q123）和 Revia 独有功能（审阅标记、回收区、写前校验、结果待核对、提交前快照）除外 | 用户于 2026-10-26 回复“旧界面决定和 Rebased 冲突时一律照 Rebased，不用再逐项问；安全边界和 Revia 独有功能除外” |
+| Q130 | 图标不用 IntelliJ 原装图标：界面图标用 Codicons（VS Code 源代码管理与 GitLens 所用，CC BY 4.0），文件类型图标用 Material Icon Theme（VS Code 安装量最高的文件图标主题，MIT）；在“关于 Revia”中注明两者的版权与许可。取代 Q117 中“图标取自 IntelliJ 社区版”的部分，配色与尺寸仍取自 Rebased | 用户于 2026-10-26 问“图标是不是可以不用他的”“要看 git 客户端最流行的”，对比主流 Git 客户端所用图标后选择“图标用 Codicons，文件类型图标用 Material Icon Theme” |
 
 各项的完整说明见对应的方向文档。
 
@@ -165,7 +166,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的功能和界面，做
 ```text
 Revia
 |-- 产品定位与取舍顺序 [Q5 已确认；定位按 Q118 改为照 Rebased]
-|-- 照 Rebased 重做 [Q117-Q129 已确认]
+|-- 照 Rebased 重做 [Q117-Q130 已确认]
 |   |-- 继续自研，不 fork；Rebased 1.1.22 为验收基准 [Q117，ADR-0011]
 |   |-- 界面一比一与独有功能的位置 [Q119]
 |   |-- 提交工具窗口两种模式 [Q120，ADR-0003]
@@ -176,7 +177,8 @@ Revia
 |   |-- 分工：界面 Claude、后端 Pi [Q125]
 |   |-- 里程碑 M3-M8 与 M2、M3 合入 main [Q126/Q127]
 |   |-- 文件名按状态上色，不再显示状态字母 [Q128，取代 Q31]
-|   `-- 旧界面决定与 Rebased 冲突时照 Rebased，安全边界与独有功能除外 [Q129]
+|   |-- 旧界面决定与 Rebased 冲突时照 Rebased，安全边界与独有功能除外 [Q129]
+|   `-- 图标：Codicons，文件类型图标 Material Icon Theme [Q130]
 |-- 技术栈：Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS [T1/Q1/Q6/Q7 已确认]
 |   |-- Git 执行：Rust 层受控调用 Git CLI [Q7 已确认]
 |   |   |-- Git 程序：登录 shell PATH 中的 git，不自带 [Q27 已确认]
