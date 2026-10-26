@@ -13,7 +13,7 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 
 ## 当前阶段：M4 界面重做准备中
 
-用户于 2026-10-26 确认功能和界面都照 Rebased（Q117–Q127）。M4 把现有功能按本机安装的 Rebased 1.1.22 的布局与交互、VS Code 的外观和颜色主题重做（Q131–Q133），范围见 [产品方向](docs/product-direction.md#实施顺序)。M4 全部代码由 Pi 按 [整包交接](docs/milestones/m4/paseo-batch.md) 一次实现，做完后统一审查与验收，中间不逐项派发（Q136）；用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型顺序与换模、返修规则按 Q110、Q112、Q113。旧界面决定冲突时，布局与交互照 Rebased，外观照 VS Code，不必再问用户；安全边界和 Revia 独有功能保持原决定（Q129、Q131）。
+用户于 2026-10-26 确认功能和界面都照 Rebased（Q117–Q127）。M4 把现有功能按本机安装的 Rebased 1.1.22 的布局与交互、VS Code 的外观和颜色主题重做（Q131–Q133），范围见 [产品方向](docs/product-direction.md#实施顺序)。M4 全部代码由 Pi 按 [整包交接](docs/milestones/m4/paseo-batch.md) 一次实现，做完后统一审查与验收，中间不逐项派发（Q136）；用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，出错时按 Q137 的顺序换模型。旧界面决定冲突时，布局与交互照 Rebased，外观照 VS Code，不必再问用户；安全边界和 Revia 独有功能保持原决定（Q129、Q131）。
 
 M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
@@ -28,7 +28,7 @@ M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界�
 | 1 | 规划方与用户 | 用 grill-with-docs 追问这个里程碑还没定的细节（包括测试接缝），更新决策、术语表和 ADR |
 | 2 | 规划方 | 用 to-spec 写 `spec.md` |
 | 3 | 规划方 | 用 to-tickets 拆成 `issues/`，标好依赖 |
-| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型优先顺序、换模重试与一次返修后的接管按 [Q109–Q113](docs/README.md)，保留已有改动和失败原件 |
+| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型按 GLM-5.3-Flash → GLM-5.3 → deepseek-v4.1-flash → gemini-3.8-flash 的顺序，当前模型请求出错就换下一个，四个都失败由规划方接手（[Q137](docs/README.md)）；返修最多一次（Q113）；保留已有改动和失败原件 |
 | 5 | 规划方 | 用 code-review 审查 `m<N>` 相对 main 的改动，对照 `spec.md`；意见写进对应任务文件的 `## Comments` |
 | 6 | 实施方 | 按 `## Comments` 修改，回到第 5 步 |
 | 7 | 实施方 | 写 `report.md`：实测数据、验收结论、遗留问题 |
