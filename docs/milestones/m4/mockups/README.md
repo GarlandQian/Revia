@@ -21,4 +21,4 @@
 | 界面图标 `codicon.ttf`、`codicon.css` | @vscode/codicons 0.0.46-24 | 图标 CC BY 4.0，[licenses/codicons-CC-BY-4.0.txt](./licenses/codicons-CC-BY-4.0.txt) |
 | 文件类型图标 `icons/` | VS Code 扩展 pkief.material-icon-theme 5.39.0 | MIT，[licenses/material-icon-theme-MIT.txt](./licenses/material-icon-theme-MIT.txt) |
 
-效果图中的 hunk 操作文字（“暂存此 hunk”）沿用当时的术语，界面用词以术语表为准。
+效果图中的“暂存此 hunk”“丢弃此 hunk”画于 Q135 之前；实现时写“暂存此块”“丢弃此块”。

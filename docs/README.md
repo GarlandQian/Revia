@@ -162,6 +162,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的布局和功能，配
 | Q132 | 支持颜色主题：浅色、深色各选一套，随系统深浅色切换。M4 内置四套：VS Code Light 2026、Atom One Light、VS Code Dark 2026、One Dark Pro；首次打开时浅色默认 Atom One Light，深色默认 One Dark Pro。颜色主题按 VS Code 颜色主题的格式实现；导入任意 VS Code 主题文件放到 M7 | 用户要求“可以做成换肤的吗，因为我更喜欢 vscode 的 one dark pro”“要做成浅色和深色各自可以设置皮肤的”，并问“One Dark Pro 浅色的时候用哪个皮肤”；默认值与导入时机同上一轮“按推荐” |
 | Q133 | 代码字体和字号可以在设置中修改（同 VS Code），默认仍用随应用打包的 JetBrains Mono；填写的字体本机没有安装时退回默认字体。取代 Q39 中“不提供字体选择”的部分 | 同上一轮“按推荐” |
 | Q134 | 界面和文档把这一功能统一叫“颜色主题”，与 VS Code 中文版一致，不叫“皮肤”“换肤” | 同上一轮“按推荐” |
+| Q135 | hunk 在界面上叫“块”，与 Git 官方中文翻译一致，按钮写“暂存此块”“取消暂存此块”“丢弃此块”；文档和代码中可以继续写 hunk。取代 Q40 中 hunk 保留英文的部分 | 用户于 2026-10-26 问“hunk 是什么叫法，太奇怪了吧”，随后确认“hunk 在界面上叫‘块’，按钮写‘暂存此块’‘丢弃此块’” |
 
 各项的完整说明见对应的方向文档。
 
@@ -170,7 +171,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的布局和功能，配
 ```text
 Revia
 |-- 产品定位与取舍顺序 [Q5 已确认；定位按 Q118 改为照 Rebased]
-|-- 照 Rebased 重做 [Q117-Q134 已确认]
+|-- 照 Rebased 重做 [Q117-Q135 已确认]
 |   |-- 继续自研，不 fork；Rebased 1.1.22 为验收基准 [Q117，ADR-0011]
 |   |-- 界面一比一与独有功能的位置 [Q119]
 |   |-- 提交工具窗口两种模式 [Q120，ADR-0003]
@@ -185,7 +186,8 @@ Revia
 |   |-- 图标：Codicons，文件类型图标 Material Icon Theme [Q130]
 |   |-- 外观改照 VS Code，布局与功能仍照 Rebased [Q131]
 |   |-- 颜色主题：浅色、深色各选一套，内置四套 [Q132/Q134]
-|   `-- 代码字体与字号可设置 [Q133]
+|   |-- 代码字体与字号可设置 [Q133]
+|   `-- hunk 在界面上叫“块” [Q135]
 |-- 技术栈：Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS [T1/Q1/Q6/Q7 已确认]
 |   |-- Git 执行：Rust 层受控调用 Git CLI [Q7 已确认]
 |   |   |-- Git 程序：登录 shell PATH 中的 git，不自带 [Q27 已确认]

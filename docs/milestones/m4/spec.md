@@ -2,7 +2,7 @@
 
 **Status:** needs-info
 
-依据：Q117–Q134；ADR-0003、ADR-0004、ADR-0005、ADR-0009、ADR-0010、ADR-0011；[产品方向](../../product-direction.md#实施顺序)、[UI 方向](../../ui-direction.md)、[安全边界](../../product-direction.md#安全边界)。布局与交互参照见 [Rebased 参照](./rebased-reference.md)，外观见已确认的 [效果图](./mockups/)。
+依据：Q117–Q135；ADR-0003、ADR-0004、ADR-0005、ADR-0009、ADR-0010、ADR-0011；[产品方向](../../product-direction.md#实施顺序)、[UI 方向](../../ui-direction.md)、[安全边界](../../product-direction.md#安全边界)。布局与交互参照见 [Rebased 参照](./rebased-reference.md)，外观见已确认的 [效果图](./mockups/)。
 
 本规格是草稿。在 Rebased 窗口里逐屏截图实测布局与交互（见参照末节）并补进下文后，改为 `ready-for-agent`。
 
@@ -62,7 +62,7 @@
 ## F05 diff 页签
 
 1. 页签标题、差异导航、并排与统一切换照 Rebased 的 diff 查看器。
-2. hunk 级暂存、取消暂存、丢弃的入口照 Rebased 暂存区模式下的 diff。操作对象仍是 Git 生成的 hunk，执行前校验指纹（ADR-0004、ADR-0005、ADR-0009）。
+2. 块（hunk）级暂存、取消暂存、丢弃的入口照 Rebased 暂存区模式下的 diff，按钮写“暂存此块”“取消暂存此块”“丢弃此块”；界面文案中的 hunk 全部改为“块”（Q135）。操作对象仍是 Git 生成的 hunk，执行前校验指纹（ADR-0004、ADR-0005、ADR-0009）。
 3. 工具栏放“标记为已审阅”按钮（Q121）。
 4. lock 文件、二进制和超大文件默认收起（Q32），说明用编辑器提示条。
 5. 渲染与滚动保持 M2 规格 D06 的性能门槛。
