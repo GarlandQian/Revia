@@ -13,7 +13,7 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 
 ## 当前阶段：M4 界面重做准备中
 
-用户于 2026-10-26 确认功能和界面都照 Rebased（Q117–Q127）。M4 把现有功能按本机安装的 Rebased 1.1.22 一比一重做，范围见 [产品方向](docs/product-direction.md#实施顺序)。界面由 Claude 实现，每完成一屏与 Rebased 并排截图、经用户认可再继续；后端照常派给 Pi（Q125）。动手前先在 Rebased 上逐屏截图与实测，再写 M4 规格和任务单（Q127）。
+用户于 2026-10-26 确认功能和界面都照 Rebased（Q117–Q127）。M4 把现有功能按本机安装的 Rebased 1.1.22 一比一重做，范围见 [产品方向](docs/product-direction.md#实施顺序)。界面由 Claude 实现，每完成一屏与 Rebased 并排截图、经用户认可再继续；后端照常派给 Pi（Q125）。动手前先在 Rebased 上逐屏截图与实测，再写 M4 规格和任务单（Q127）。旧界面决定与 Rebased 冲突时照 Rebased，不必再问用户；安全边界和 Revia 独有功能保持原决定（Q129）。
 
 M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
