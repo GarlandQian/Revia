@@ -1,8 +1,8 @@
 # Revia 协作指南
 
-Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M5（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
+Revia 是一个照 Rebased 的功能和界面做的轻量桌面 Git 客户端（[ADR-0011](docs/adr/0011-rebuild-like-rebased-not-fork.md)），核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M8（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
-总体设计与 M2 访谈已确认，M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成。
+M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见各自报告）。
 
 ## 开始前必读
 
@@ -11,15 +11,13 @@ Revia 是一个轻量的桌面 Git 客户端，核心工作流是“审阅 diff 
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M2 准备中
+## 当前阶段：M4 界面重做准备中
 
-M1 已合并进 main。下一个里程碑是 M2：先复现并验证长时间运行问题，发现故障先修复，未复现时按 Q78 留证验收（见 [长期运行验收](docs/product-direction.md#m2-长期运行验收)）；然后做暂存与取消暂存、丢弃与回收区、diff 指纹校验、审阅标记和文件监视，范围见 [产品方向](docs/product-direction.md#实施顺序)。
+用户于 2026-10-26 确认功能和界面都照 Rebased（Q117–Q127）。M4 把现有功能按本机安装的 Rebased 1.1.22 一比一重做，范围见 [产品方向](docs/product-direction.md#实施顺序)。界面由 Claude 实现，每完成一屏与 Rebased 并排截图、经用户认可再继续；后端照常派给 Pi（Q125）。动手前先在 Rebased 上逐屏截图与实测，再写 M4 规格和任务单（Q127）。
 
-M2 访谈已完成（Q78–Q104，其中 Q99–Q104 为界面清理与美化），接下来按 [M2 规格](docs/milestones/m2/spec.md)和[任务单](docs/milestones/m2/issues/)交接实施；只有依赖全部完成的任务才能开始，首先通过长期运行基线验收。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
+M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
 ## 工作流程
-
-本轮M2按[Q106](docs/README.md)整包实施、完成后总体验证；具体执行见[整包交接](docs/milestones/m2/paseo-batch.md)。它覆盖下表的逐任务停等顺序及本轮“前置任务必须先验收done才实施”的限制，不改变最终完成门槛或任务13效果图确认。其他里程碑仍按常规流程。
 
 不同会话和工具之间通过仓库中的文件交接，不依赖用户转述。需求规格、任务单和报告的位置与写法见 [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)。
 
@@ -64,7 +62,7 @@ M2 访谈已完成（Q78–Q104，其中 Q99–Q104 为界面清理与美化）�
   - 写操作执行前校验 diff 指纹；
   - 不删除 `index.lock`；
   - 不修改用户的 Git 配置；
-  - 丢弃改动前先存入回收区。
+  - 丢弃改动，以及中止、跳过或其他会覆盖工作区内容的操作之前，先存入回收区。
 
   完整列表见 [产品方向](docs/product-direction.md#安全边界)。
 - **不写死 macOS 假设**：从 M2 起，平台相关的代码（登录 shell 环境解析、窗口外观、快捷键修饰键等）集中放在少数模块中，其他代码保持平台无关（Q55）。

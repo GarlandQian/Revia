@@ -123,7 +123,7 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 ## 分发
 
 - 应用标识（Tauri `identifier`）为 `io.github.garlandqian.revia`，数据目录随之为 `~/Library/Application Support/io.github.garlandqian.revia/`（Q49）。签名、公证和自动更新都使用这个标识，更改需要迁移用户数据。
-- 目标平台：macOS Apple Silicon（arm64）与 Windows x64；不做 Intel Mac、ARM 版 Windows 和 Linux，见 [ADR-0007](./adr/0007-target-platforms.md)。首版只发布 macOS，Windows 在 M5（Q55）。
+- 目标平台：macOS Apple Silicon（arm64）与 Windows x64；不做 Intel Mac、ARM 版 Windows 和 Linux，见 [ADR-0007](./adr/0007-target-platforms.md)。首版只发布 macOS，Windows 在 M8（Q55、Q126）。
 - **构建**：GitHub Actions 分别在 macOS（Apple Silicon）与 Windows 机器上构建，不在 Mac 上交叉编译 Windows 版。推送到 main 时只做编译检查（从 M2 起包括 Windows）；打版本标签才生成安装包和便携包（Q62）。本机开发仍可用 Homebrew 安装的 Rust 构建 macOS 版。
 - **M2 验收授权**：允许给 `m2` 增加仅编译、不发布的 CI 入口，并在 M2 验收期间按需将 `m2` 正常推送到现有 `origin`，取得真实 Windows x64 编译结果；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包（Q97）。工作流文件存在不等于已经编译通过。
 - **Windows 安装版**：NSIS 生成的 `.exe` 安装程序，默认只为当前用户安装、不需要管理员权限；不做 MSI（Q57）。
@@ -137,7 +137,7 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
   | Windows 便携版 | `Revia-<版本>-windows-x64-portable.zip`、`Revia-<版本>-windows-x64-portable.exe` |
   | 校验文件 | `macos-SHA256SUMS.txt`、`windows-SHA256SUMS.txt` |
 
-  GitHub 发布页的标签为 `v<版本>`，标题为 `Revia <版本>`。自动更新所需文件（Tauri 使用 `.app.tar.gz` 等格式）的命名到 M4 实现自动更新时再定。应用标识保持 `io.github.garlandqian.revia`（Q49、Q67）。
+  GitHub 发布页的标签为 `v<版本>`，标题为 `Revia <版本>`。自动更新所需文件（Tauri 使用 `.app.tar.gz` 等格式）的命名到 M7 实现自动更新时再定（Q126）。应用标识保持 `io.github.garlandqian.revia`（Q49、Q67）。
 - **平台相关代码**：从 M2 起集中放在少数模块中（例如登录 shell 的环境解析、窗口外观、快捷键修饰键），其他代码不写死 macOS 假设（Q55）。
 - **签名**：暂不做任何代码签名，首版完成几个月后再根据情况决定（Q63）。在此之前：Mac 版在别人的电脑上首次打开时，需要在“系统设置 → 隐私与安全性”中点“仍要打开”；Windows 版会出现 SmartScreen 提示，点“更多信息 → 仍要运行”。到时可考虑的方案：Mac 只能通过 Apple 开发者计划（个人每年 99 美元）签名和公证；Windows 可以申请 SignPath 基金会为开源项目提供的免费签名。
 - 自用阶段不做自动更新。试用阶段使用 Tauri 的更新插件，从 GitHub Releases 获取新版本；启动时检查，提示后由用户确认安装，不静默更新（Q41）。更新插件需要另外生成一对更新包签名密钥，它是自己生成的，与代码签名证书无关。
