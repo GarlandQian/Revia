@@ -1,0 +1,118 @@
+{
+  "startedAt": "2026-10-23T15:17:01.697+08:00",
+  "finishedAt": "2026-10-23T15:17:01.764+08:00",
+  "repo": "L",
+  "target": "10-target.ts",
+  "gitProgram": "/opt/homebrew/Cellar/git/2.56.0_1/bin/git",
+  "readOnly": true,
+  "consistency": "Sequential observations, not an atomic cross-command snapshot",
+  "paths": {
+    "worktree": "/private/tmp/revia-task06-2fuu2r92/L",
+    "gitDir": "/private/tmp/revia-task06-2fuu2r92/A/.git/worktrees/L",
+    "commonDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+    "index": "/private/tmp/revia-task06-2fuu2r92/A/.git/worktrees/L/index"
+  },
+  "worktreeFile": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/L/10-target.ts",
+    "exists": true,
+    "sha256": "28f29b954915bcd102742aaee6d3e009bcaed47411773996f8ce6151049e1a55",
+    "bytes": 5119,
+    "lines": 180,
+    "mode": "0644",
+    "inode": 163276606,
+    "mtimeNs": 1792739821649422599
+  },
+  "indexFile": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/A/.git/worktrees/L/index",
+    "exists": true,
+    "sha256": "e8a41789e7ac844ef18506764e9f28428ab1a21acea97d9f8fced89983f2f803",
+    "bytes": 446,
+    "lines": 3,
+    "mode": "0644",
+    "inode": 163276551,
+    "mtimeNs": 1792739789537327375
+  },
+  "indexBlobs": [
+    {
+      "path": "10-target.ts",
+      "mode": "100644",
+      "oid": "685fe5be86e09161e9146c495809bb4405ecf0d1",
+      "stage": 0,
+      "bytes": 5118,
+      "sha256": "f9a20e7fbf4e596815525a0b91d26dd1f10658cdffe183bb60b99e9c350c5beb"
+    }
+  ],
+  "git": {
+    "head": {
+      "args": [
+        "rev-parse",
+        "--verify",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 5.534,
+      "stdoutText": "4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\n",
+      "stdoutBase64": "NDYxOWI0YjNmMGU3Y2IxYTcxZjYwNzBkZjdiNjdiYzhiMDhlNDM2Ygo=",
+      "stderrText": ""
+    },
+    "status": {
+      "args": [
+        "status",
+        "--porcelain=v2",
+        "--branch",
+        "-z",
+        "--untracked-files=all"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.032,
+      "stdoutText": "# branch.oid 4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\u0000# branch.head task06-linked\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 00-first.ts\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 05-before.ts\u00001 MM N... 100644 100644 100644 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 685fe5be86e09161e9146c495809bb4405ecf0d1 10-target.ts\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 20-after.ts\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 99-last.ts\u0000",
+      "stdoutBase64": "IyBicmFuY2gub2lkIDQ2MTliNGIzZjBlN2NiMWE3MWY2MDcwZGY3YjY3YmM4YjA4ZTQzNmIAIyBicmFuY2guaGVhZCB0YXNrMDYtbGlua2VkADEgLk0gTi4uLiAxMDA2NDQgMTAwNjQ0IDEwMDY0NCA1ODQ1NjU2MjdkNmI3MDQ3ZGRlMDc1OTIxZGIzY2UwNmQ3MTFhOWQ5IDU4NDU2NTYyN2Q2YjcwNDdkZGUwNzU5MjFkYjNjZTA2ZDcxMWE5ZDkgMDAtZmlyc3QudHMAMSAuTSBOLi4uIDEwMDY0NCAxMDA2NDQgMTAwNjQ0IDU4NDU2NTYyN2Q2YjcwNDdkZGUwNzU5MjFkYjNjZTA2ZDcxMWE5ZDkgNTg0NTY1NjI3ZDZiNzA0N2RkZTA3NTkyMWRiM2NlMDZkNzExYTlkOSAwNS1iZWZvcmUudHMAMSBNTSBOLi4uIDEwMDY0NCAxMDA2NDQgMTAwNjQ0IGZmNjJjNWYzMGM1M2U5ODJlMTE4ZTI4M2IzOWUxZTE1NTVjYmQzZjcgNjg1ZmU1YmU4NmUwOTE2MWU5MTQ2YzQ5NTgwOWJiNDQwNWVjZjBkMSAxMC10YXJnZXQudHMAMSAuTSBOLi4uIDEwMDY0NCAxMDA2NDQgMTAwNjQ0IDU4NDU2NTYyN2Q2YjcwNDdkZGUwNzU5MjFkYjNjZTA2ZDcxMWE5ZDkgNTg0NTY1NjI3ZDZiNzA0N2RkZTA3NTkyMWRiM2NlMDZkNzExYTlkOSAyMC1hZnRlci50cwAxIC5NIE4uLi4gMTAwNjQ0IDEwMDY0NCAxMDA2NDQgNTg0NTY1NjI3ZDZiNzA0N2RkZTA3NTkyMWRiM2NlMDZkNzExYTlkOSA1ODQ1NjU2MjdkNmI3MDQ3ZGRlMDc1OTIxZGIzY2UwNmQ3MTFhOWQ5IDk5LWxhc3QudHMA",
+      "stderrText": ""
+    },
+    "indexEntry": {
+      "args": [
+        "ls-files",
+        "--stage",
+        "-z",
+        "--",
+        "10-target.ts"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 6.679,
+      "stdoutText": "100644 685fe5be86e09161e9146c495809bb4405ecf0d1 0\t10-target.ts\u0000",
+      "stdoutBase64": "MTAwNjQ0IDY4NWZlNWJlODZlMDkxNjFlOTE0NmM0OTU4MDliYjQ0MDVlY2YwZDEgMAkxMC10YXJnZXQudHMA",
+      "stderrText": ""
+    },
+    "diff": {
+      "args": [
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.225,
+      "stdoutText": "diff --git a/00-first.ts b/00-first.ts\nindex 5845656..f4afbd2 100644\n--- a/00-first.ts\n+++ b/00-first.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"L_v1_00-first.ts\";\ndiff --git a/05-before.ts b/05-before.ts\nindex 5845656..13487e0 100644\n--- a/05-before.ts\n+++ b/05-before.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"L_v1_05-before.ts\";\ndiff --git a/10-target.ts b/10-target.ts\nindex 685fe5b..73ebaa0 100644\n--- a/10-target.ts\n+++ b/10-target.ts\n@@ -77,7 +77,7 @@ export const value076 = 76;\n export const value077 = 77;\n export const value078 = 78;\n export const value079 = 79;\n-export const value080 = \"L_v7\";\n+export const value080 = false; \n export const value081 = 81;\n export const value082 = 82;\n export const value083 = 83;\n@@ -137,7 +137,7 @@ export const value136 = 136;\n export const value137 = 137;\n export const value138 = 138;\n export const value139 = 139;\n-export const value140 = 140;\n+export const value140 = 3140;\n export const value141 = 141;\n export const value142 = 142;\n export const value143 = 143;\ndiff --git a/20-after.ts b/20-after.ts\nindex 5845656..7f438fe 100644\n--- a/20-after.ts\n+++ b/20-after.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"L_v1_20-after.ts\";\ndiff --git a/99-last.ts b/99-last.ts\nindex 5845656..2667c9e 100644\n--- a/99-last.ts\n+++ b/99-last.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"L_v1_99-last.ts\";\n",
+      "stdoutBase64": "ZGlmZiAtLWdpdCBhLzAwLWZpcnN0LnRzIGIvMDAtZmlyc3QudHMKaW5kZXggNTg0NTY1Ni4uZjRhZmJkMiAxMDA2NDQKLS0tIGEvMDAtZmlyc3QudHMKKysrIGIvMDAtZmlyc3QudHMKQEAgLTEgKzEgQEAKLWV4cG9ydCBjb25zdCBtYXJrZXIgPSAiSEVBRCI7CitleHBvcnQgY29uc3QgbWFya2VyID0gIkxfdjFfMDAtZmlyc3QudHMiOwpkaWZmIC0tZ2l0IGEvMDUtYmVmb3JlLnRzIGIvMDUtYmVmb3JlLnRzCmluZGV4IDU4NDU2NTYuLjEzNDg3ZTAgMTAwNjQ0Ci0tLSBhLzA1LWJlZm9yZS50cworKysgYi8wNS1iZWZvcmUudHMKQEAgLTEgKzEgQEAKLWV4cG9ydCBjb25zdCBtYXJrZXIgPSAiSEVBRCI7CitleHBvcnQgY29uc3QgbWFya2VyID0gIkxfdjFfMDUtYmVmb3JlLnRzIjsKZGlmZiAtLWdpdCBhLzEwLXRhcmdldC50cyBiLzEwLXRhcmdldC50cwppbmRleCA2ODVmZTViLi43M2ViYWEwIDEwMDY0NAotLS0gYS8xMC10YXJnZXQudHMKKysrIGIvMTAtdGFyZ2V0LnRzCkBAIC03Nyw3ICs3Nyw3IEBAIGV4cG9ydCBjb25zdCB2YWx1ZTA3NiA9IDc2OwogZXhwb3J0IGNvbnN0IHZhbHVlMDc3ID0gNzc7CiBleHBvcnQgY29uc3QgdmFsdWUwNzggPSA3ODsKIGV4cG9ydCBjb25zdCB2YWx1ZTA3OSA9IDc5OwotZXhwb3J0IGNvbnN0IHZhbHVlMDgwID0gIkxfdjciOworZXhwb3J0IGNvbnN0IHZhbHVlMDgwID0gZmFsc2U7IAogZXhwb3J0IGNvbnN0IHZhbHVlMDgxID0gODE7CiBleHBvcnQgY29uc3QgdmFsdWUwODIgPSA4MjsKIGV4cG9ydCBjb25zdCB2YWx1ZTA4MyA9IDgzOwpAQCAtMTM3LDcgKzEzNyw3IEBAIGV4cG9ydCBjb25zdCB2YWx1ZTEzNiA9IDEzNjsKIGV4cG9ydCBjb25zdCB2YWx1ZTEzNyA9IDEzNzsKIGV4cG9ydCBjb25zdCB2YWx1ZTEzOCA9IDEzODsKIGV4cG9ydCBjb25zdCB2YWx1ZTEzOSA9IDEzOTsKLWV4cG9ydCBjb25zdCB2YWx1ZTE0MCA9IDE0MDsKK2V4cG9ydCBjb25zdCB2YWx1ZTE0MCA9IDMxNDA7CiBleHBvcnQgY29uc3QgdmFsdWUxNDEgPSAxNDE7CiBleHBvcnQgY29uc3QgdmFsdWUxNDIgPSAxNDI7CiBleHBvcnQgY29uc3QgdmFsdWUxNDMgPSAxNDM7CmRpZmYgLS1naXQgYS8yMC1hZnRlci50cyBiLzIwLWFmdGVyLnRzCmluZGV4IDU4NDU2NTYuLjdmNDM4ZmUgMTAwNjQ0Ci0tLSBhLzIwLWFmdGVyLnRzCisrKyBiLzIwLWFmdGVyLnRzCkBAIC0xICsxIEBACi1leHBvcnQgY29uc3QgbWFya2VyID0gIkhFQUQiOworZXhwb3J0IGNvbnN0IG1hcmtlciA9ICJMX3YxXzIwLWFmdGVyLnRzIjsKZGlmZiAtLWdpdCBhLzk5LWxhc3QudHMgYi85OS1sYXN0LnRzCmluZGV4IDU4NDU2NTYuLjI2NjdjOWUgMTAwNjQ0Ci0tLSBhLzk5LWxhc3QudHMKKysrIGIvOTktbGFzdC50cwpAQCAtMSArMSBAQAotZXhwb3J0IGNvbnN0IG1hcmtlciA9ICJIRUFEIjsKK2V4cG9ydCBjb25zdCBtYXJrZXIgPSAiTF92MV85OS1sYXN0LnRzIjsK",
+      "stderrText": ""
+    },
+    "diffCached": {
+      "args": [
+        "diff",
+        "--cached",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.706,
+      "stdoutText": "diff --git a/10-target.ts b/10-target.ts\nindex ff62c5f..685fe5b 100644\n--- a/10-target.ts\n+++ b/10-target.ts\n@@ -7,7 +7,7 @@ export const value006 = 6;\n export const value007 = 7;\n export const value008 = 8;\n export const value009 = 9;\n-export const value010 = 10;\n+export const value010 = 3010;\n export const value011 = 11;\n export const value012 = 12;\n export const value013 = 13;\n@@ -77,7 +77,7 @@ export const value076 = 76;\n export const value077 = 77;\n export const value078 = 78;\n export const value079 = 79;\n-export const value080 = 80;\n+export const value080 = \"L_v7\";\n export const value081 = 81;\n export const value082 = 82;\n export const value083 = 83;\n",
+      "stdoutBase64": "ZGlmZiAtLWdpdCBhLzEwLXRhcmdldC50cyBiLzEwLXRhcmdldC50cwppbmRleCBmZjYyYzVmLi42ODVmZTViIDEwMDY0NAotLS0gYS8xMC10YXJnZXQudHMKKysrIGIvMTAtdGFyZ2V0LnRzCkBAIC03LDcgKzcsNyBAQCBleHBvcnQgY29uc3QgdmFsdWUwMDYgPSA2OwogZXhwb3J0IGNvbnN0IHZhbHVlMDA3ID0gNzsKIGV4cG9ydCBjb25zdCB2YWx1ZTAwOCA9IDg7CiBleHBvcnQgY29uc3QgdmFsdWUwMDkgPSA5OwotZXhwb3J0IGNvbnN0IHZhbHVlMDEwID0gMTA7CitleHBvcnQgY29uc3QgdmFsdWUwMTAgPSAzMDEwOwogZXhwb3J0IGNvbnN0IHZhbHVlMDExID0gMTE7CiBleHBvcnQgY29uc3QgdmFsdWUwMTIgPSAxMjsKIGV4cG9ydCBjb25zdCB2YWx1ZTAxMyA9IDEzOwpAQCAtNzcsNyArNzcsNyBAQCBleHBvcnQgY29uc3QgdmFsdWUwNzYgPSA3NjsKIGV4cG9ydCBjb25zdCB2YWx1ZTA3NyA9IDc3OwogZXhwb3J0IGNvbnN0IHZhbHVlMDc4ID0gNzg7CiBleHBvcnQgY29uc3QgdmFsdWUwNzkgPSA3OTsKLWV4cG9ydCBjb25zdCB2YWx1ZTA4MCA9IDgwOworZXhwb3J0IGNvbnN0IHZhbHVlMDgwID0gIkxfdjciOwogZXhwb3J0IGNvbnN0IHZhbHVlMDgxID0gODE7CiBleHBvcnQgY29uc3QgdmFsdWUwODIgPSA4MjsKIGV4cG9ydCBjb25zdCB2YWx1ZTA4MyA9IDgzOwo=",
+      "stderrText": ""
+    }
+  }
+}

@@ -1,0 +1,11 @@
+collision_restore_ok=true
+unrelated_file_exists_after_restore=false
+inflight_cleared=1
+discard_after_clear_error=NeedsVerification
+discarded_content_is_gone=true
+remaining_records=0
+unmerged_stages_present=true
+unmerged_inspection_state=Ready
+unmerged_restore_ok=true
+unmerged_worktree_written=true
+unmerged_index_unchanged=true

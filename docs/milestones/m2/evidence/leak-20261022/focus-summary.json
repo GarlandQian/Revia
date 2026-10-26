@@ -1,0 +1,721 @@
+[
+ {
+  "label": "idle",
+  "mode": "idle",
+  "build": "修复前",
+  "binarySha256": "31cea0c130dcefd7878b9a96b2239053f42581531c1d5176eef5a5d5c8c441de",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 95.554,
+    "webContentFootprintMb": 37.3,
+    "webContentMallocAllocatedMb": 8.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 201.412,
+    "webContentFootprintMb": 37.6,
+    "webContentMallocAllocatedMb": 8.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 306.95,
+    "webContentFootprintMb": 37.8,
+    "webContentMallocAllocatedMb": 8.4,
+    "valid": true
+   },
+   {
+    "elapsedSec": 413.478,
+    "webContentFootprintMb": 37.9,
+    "webContentMallocAllocatedMb": 8.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 520.271,
+    "webContentFootprintMb": 38.0,
+    "webContentMallocAllocatedMb": 8.3,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 0.12,
+  "mallocSlopeMbPerMinute": 0.004,
+  "counters": {
+   "totalFileSwitches": 1,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 67,
+   "get_rows": 2,
+   "highlight_range": 1
+  },
+  "visibilityInterruptions": 0,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "ipc",
+  "mode": "ipc",
+  "build": "修复前",
+  "binarySha256": "31cea0c130dcefd7878b9a96b2239053f42581531c1d5176eef5a5d5c8c441de",
+  "runCompleted": false,
+  "errors": [
+   "应用未成功完成：Error: 可见连续合成中断：{\"state\":\"hidden\",\"hidden\":true,\"viewportWidth\":1280,\"viewportHeight\":800,\"devicePixelRatio\":2,\"rafPerSecond\":0,\"focused\":false,\"maxFrameGapMs\":4165,\"hiddenTransitions\":1}",
+   "前端连续操作时长不足",
+   "诊断静置时长不足",
+   "缺少必需的操作负载"
+  ],
+  "pressureSamples": [
+   {
+    "elapsedSec": 92.414,
+    "webContentFootprintMb": 38.4,
+    "webContentMallocAllocatedMb": 8.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 199.046,
+    "webContentFootprintMb": 38.8,
+    "webContentMallocAllocatedMb": 8.8,
+    "valid": true
+   },
+   {
+    "elapsedSec": 305.615,
+    "webContentFootprintMb": 39.1,
+    "webContentMallocAllocatedMb": 9.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 412.132,
+    "webContentFootprintMb": 39.5,
+    "webContentMallocAllocatedMb": 9.2,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 0.39,
+  "mallocSlopeMbPerMinute": 0.1094,
+  "counters": {
+   "totalFileSwitches": null,
+   "totalViewSwitches": null,
+   "totalScrolls": null,
+   "totalJumps": null,
+   "totalIpcRequests": null,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 52,
+   "get_rows": 18343,
+   "highlight_range": 1
+  },
+  "visibilityInterruptions": 0,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "scroll",
+  "mode": "scroll",
+  "build": "修复前",
+  "binarySha256": "31cea0c130dcefd7878b9a96b2239053f42581531c1d5176eef5a5d5c8c441de",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 92.517,
+    "webContentFootprintMb": 61.2,
+    "webContentMallocAllocatedMb": 9.5,
+    "valid": true
+   },
+   {
+    "elapsedSec": 199.013,
+    "webContentFootprintMb": 64.0,
+    "webContentMallocAllocatedMb": 9.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 305.802,
+    "webContentFootprintMb": 67.9,
+    "webContentMallocAllocatedMb": 9.9,
+    "valid": true
+   },
+   {
+    "elapsedSec": 412.236,
+    "webContentFootprintMb": 69.8,
+    "webContentMallocAllocatedMb": 9.8,
+    "valid": true
+   },
+   {
+    "elapsedSec": 518.798,
+    "webContentFootprintMb": 70.1,
+    "webContentMallocAllocatedMb": 10.3,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 0.7,
+  "mallocSlopeMbPerMinute": 0.1132,
+  "counters": {
+   "totalFileSwitches": 11,
+   "totalViewSwitches": 0,
+   "totalScrolls": 12518,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 67,
+   "get_rows": 120,
+   "highlight_range": 28
+  },
+  "visibilityInterruptions": 0,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "jump",
+  "mode": "jump",
+  "build": "修复前",
+  "binarySha256": "31cea0c130dcefd7878b9a96b2239053f42581531c1d5176eef5a5d5c8c441de",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 92.533,
+    "webContentFootprintMb": 73.0,
+    "webContentMallocAllocatedMb": 9.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 199.132,
+    "webContentFootprintMb": 62.5,
+    "webContentMallocAllocatedMb": 9.2,
+    "valid": true
+   },
+   {
+    "elapsedSec": 305.751,
+    "webContentFootprintMb": 63.7,
+    "webContentMallocAllocatedMb": 9.7,
+    "valid": true
+   },
+   {
+    "elapsedSec": 412.33,
+    "webContentFootprintMb": 64.2,
+    "webContentMallocAllocatedMb": 9.9,
+    "valid": true
+   },
+   {
+    "elapsedSec": 519.017,
+    "webContentFootprintMb": 65.5,
+    "webContentMallocAllocatedMb": 10.2,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 1.0,
+  "mallocSlopeMbPerMinute": 0.1817,
+  "counters": {
+   "totalFileSwitches": 11,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 12898,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 67,
+   "get_rows": 120,
+   "highlight_range": 18
+  },
+  "visibilityInterruptions": 0,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "open",
+  "mode": "open",
+  "build": "修复前",
+  "binarySha256": "fc8895e39f30a3ad2d56def5e19de0f8704950806d67b20fe691c54417d8a1e5",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 95.613,
+    "webContentFootprintMb": 118.8,
+    "webContentMallocAllocatedMb": 27.7,
+    "valid": true
+   },
+   {
+    "elapsedSec": 201.315,
+    "webContentFootprintMb": 108.8,
+    "webContentMallocAllocatedMb": 32.7,
+    "valid": true
+   },
+   {
+    "elapsedSec": 307.944,
+    "webContentFootprintMb": 120.6,
+    "webContentMallocAllocatedMb": 39.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 414.72,
+    "webContentFootprintMb": 132.0,
+    "webContentMallocAllocatedMb": 43.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 522.273,
+    "webContentFootprintMb": 152.1,
+    "webContentMallocAllocatedMb": 46.5,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 13.8,
+  "mallocSlopeMbPerMinute": 2.5457,
+  "counters": {
+   "totalFileSwitches": 6115,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 67,
+   "get_rows": 36580,
+   "highlight_range": 8726
+  },
+  "visibilityInterruptions": 3,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "view",
+  "mode": "view",
+  "build": "修复前",
+  "binarySha256": "fc8895e39f30a3ad2d56def5e19de0f8704950806d67b20fe691c54417d8a1e5",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 92.895,
+    "webContentFootprintMb": 65.7,
+    "webContentMallocAllocatedMb": 10.4,
+    "valid": true
+   },
+   {
+    "elapsedSec": 199.671,
+    "webContentFootprintMb": 70.7,
+    "webContentMallocAllocatedMb": 11.5,
+    "valid": true
+   },
+   {
+    "elapsedSec": 306.265,
+    "webContentFootprintMb": 71.8,
+    "webContentMallocAllocatedMb": 11.4,
+    "valid": true
+   },
+   {
+    "elapsedSec": 412.89,
+    "webContentFootprintMb": 74.5,
+    "webContentMallocAllocatedMb": 11.7,
+    "valid": true
+   },
+   {
+    "elapsedSec": 519.613,
+    "webContentFootprintMb": 75.2,
+    "webContentMallocAllocatedMb": 11.8,
+    "valid": true
+   },
+   {
+    "elapsedSec": 626.181,
+    "webContentFootprintMb": 77.8,
+    "webContentMallocAllocatedMb": 12.8,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 1.3,
+  "mallocSlopeMbPerMinute": 0.1688,
+  "counters": {
+   "totalFileSwitches": 13,
+   "totalViewSwitches": 7312,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 71,
+   "get_rows": 168163,
+   "highlight_range": 21,
+   "row_index_for_line": 7312
+  },
+  "visibilityInterruptions": 6,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "channel",
+  "mode": "channel",
+  "build": "修复前",
+  "binarySha256": "579431cb240dc1514b9bd7c106244e8302d6d59f7c524eb85251ef85e64ed388",
+  "runCompleted": false,
+  "errors": [
+   "应用未成功完成：Error: 同阶段内存采样准备失败",
+   "前端连续操作时长不足",
+   "诊断静置时长不足",
+   "缺少必需的操作负载"
+  ],
+  "pressureSamples": [
+   {
+    "elapsedSec": 101.991,
+    "webContentFootprintMb": 56.8,
+    "webContentMallocAllocatedMb": 8.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 309.351,
+    "webContentFootprintMb": 60.1,
+    "webContentMallocAllocatedMb": 8.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 465.211,
+    "webContentFootprintMb": 60.6,
+    "webContentMallocAllocatedMb": 8.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 571.1,
+    "webContentFootprintMb": 61.3,
+    "webContentMallocAllocatedMb": 8.7,
+    "valid": true
+   },
+   {
+    "elapsedSec": 1012.825,
+    "webContentFootprintMb": 58.6,
+    "webContentMallocAllocatedMb": 8.8,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 0.15,
+  "mallocSlopeMbPerMinute": 0.0126,
+  "counters": {
+   "totalFileSwitches": null,
+   "totalViewSwitches": null,
+   "totalScrolls": null,
+   "totalJumps": null,
+   "totalIpcRequests": null,
+   "totalYieldedTasks": null
+  },
+  "ipcStarted": {
+   "debug_log": 50,
+   "get_rows": 2,
+   "highlight_range": 1
+  },
+  "visibilityInterruptions": 10,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "remount",
+  "mode": "remount",
+  "build": "修复前",
+  "binarySha256": "99b5221df9c08ecf346094291fd827f89222dbae45ca19a4f0000cece5262e1d",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 95.963,
+    "webContentFootprintMb": 50.9,
+    "webContentMallocAllocatedMb": 17.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 202.282,
+    "webContentFootprintMb": 79.6,
+    "webContentMallocAllocatedMb": 25.7,
+    "valid": true
+   },
+   {
+    "elapsedSec": 308.109,
+    "webContentFootprintMb": 106.5,
+    "webContentMallocAllocatedMb": 30.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 414.67,
+    "webContentFootprintMb": 107.6,
+    "webContentMallocAllocatedMb": 32.9,
+    "valid": true
+   },
+   {
+    "elapsedSec": 521.055,
+    "webContentFootprintMb": 110.4,
+    "webContentMallocAllocatedMb": 38.2,
+    "valid": true
+   },
+   {
+    "elapsedSec": 627.717,
+    "webContentFootprintMb": 113.2,
+    "webContentMallocAllocatedMb": 39.3,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 13.6,
+  "mallocSlopeMbPerMinute": 1.9794,
+  "counters": {
+   "totalFileSwitches": 7501,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": 0
+  },
+  "ipcStarted": {
+   "debug_log": 70,
+   "get_rows": 7502,
+   "highlight_range": 3751
+  },
+  "visibilityInterruptions": 1,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "switch",
+  "mode": "switch",
+  "build": "修复前",
+  "binarySha256": "99b5221df9c08ecf346094291fd827f89222dbae45ca19a4f0000cece5262e1d",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 95.778,
+    "webContentFootprintMb": 79.4,
+    "webContentMallocAllocatedMb": 20.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 201.65,
+    "webContentFootprintMb": 83.4,
+    "webContentMallocAllocatedMb": 25.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 307.219,
+    "webContentFootprintMb": 85.6,
+    "webContentMallocAllocatedMb": 31.2,
+    "valid": true
+   },
+   {
+    "elapsedSec": 413.343,
+    "webContentFootprintMb": 88.3,
+    "webContentMallocAllocatedMb": 34.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 519.899,
+    "webContentFootprintMb": 94.5,
+    "webContentMallocAllocatedMb": 40.3,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 15.3,
+  "mallocSlopeMbPerMinute": 2.7543,
+  "counters": {
+   "totalFileSwitches": 7329,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": 0
+  },
+  "ipcStarted": {
+   "debug_log": 68,
+   "get_rows": 14660,
+   "highlight_range": 14656
+  },
+  "visibilityInterruptions": 1,
+  "mountedRootSamples": null
+ },
+ {
+  "label": "highlight",
+  "mode": "highlight",
+  "build": "修复前",
+  "binarySha256": "ae9d4bac5ebea0394891328d295595640ed2ba15800097031af5169a561e4a18",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 110.953,
+    "webContentFootprintMb": 39.1,
+    "webContentMallocAllocatedMb": 8.9,
+    "valid": true
+   },
+   {
+    "elapsedSec": 287.756,
+    "webContentFootprintMb": 39.3,
+    "webContentMallocAllocatedMb": 8.9,
+    "valid": true
+   },
+   {
+    "elapsedSec": 393.873,
+    "webContentFootprintMb": 41.6,
+    "webContentMallocAllocatedMb": 9.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 500.15,
+    "webContentFootprintMb": 64.3,
+    "webContentMallocAllocatedMb": 20.5,
+    "valid": true
+   },
+   {
+    "elapsedSec": 606.641,
+    "webContentFootprintMb": 66.7,
+    "webContentMallocAllocatedMb": 20.6,
+    "valid": true
+   },
+   {
+    "elapsedSec": 713.208,
+    "webContentFootprintMb": 67.5,
+    "webContentMallocAllocatedMb": 20.8,
+    "valid": true
+   },
+   {
+    "elapsedSec": 1122.099,
+    "webContentFootprintMb": 68.2,
+    "webContentMallocAllocatedMb": 20.9,
+    "valid": true
+   },
+   {
+    "elapsedSec": 1532.143,
+    "webContentFootprintMb": 68.4,
+    "webContentMallocAllocatedMb": 20.9,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 11.96,
+  "mallocSlopeMbPerMinute": 0.4894,
+  "counters": {
+   "totalFileSwitches": 1,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 39852,
+   "totalYieldedTasks": 0
+  },
+  "ipcStarted": {
+   "debug_log": 83,
+   "get_rows": 22,
+   "highlight_range": 39856
+  },
+  "visibilityInterruptions": 11,
+  "mountedRootSamples": []
+ },
+ {
+  "label": "switch-fixed",
+  "mode": "switch",
+  "build": "修复后",
+  "binarySha256": "30e1cdf45283f1ed73a93f9aacd9a69325d634a1b64e0c784f2ae292b17078e4",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 96.955,
+    "webContentFootprintMb": 62.5,
+    "webContentMallocAllocatedMb": 11.4,
+    "valid": true
+   },
+   {
+    "elapsedSec": 203.4,
+    "webContentFootprintMb": 65.5,
+    "webContentMallocAllocatedMb": 11.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 309.921,
+    "webContentFootprintMb": 68.3,
+    "webContentMallocAllocatedMb": 12.3,
+    "valid": true
+   },
+   {
+    "elapsedSec": 416.438,
+    "webContentFootprintMb": 70.4,
+    "webContentMallocAllocatedMb": 12.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 523.057,
+    "webContentFootprintMb": 74.9,
+    "webContentMallocAllocatedMb": 14.1,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 2.8,
+  "mallocSlopeMbPerMinute": 0.4562,
+  "counters": {
+   "totalFileSwitches": 7231,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": 0
+  },
+  "ipcStarted": {
+   "debug_log": 68,
+   "get_rows": 14464,
+   "highlight_range": 14460
+  },
+  "visibilityInterruptions": 0,
+  "mountedRootSamples": []
+ },
+ {
+  "label": "open-fixed",
+  "mode": "open",
+  "build": "修复后",
+  "binarySha256": "30e1cdf45283f1ed73a93f9aacd9a69325d634a1b64e0c784f2ae292b17078e4",
+  "runCompleted": true,
+  "errors": [],
+  "pressureSamples": [
+   {
+    "elapsedSec": 95.628,
+    "webContentFootprintMb": 67.1,
+    "webContentMallocAllocatedMb": 10.4,
+    "valid": true
+   },
+   {
+    "elapsedSec": 201.085,
+    "webContentFootprintMb": 64.4,
+    "webContentMallocAllocatedMb": 10.5,
+    "valid": true
+   },
+   {
+    "elapsedSec": 311.543,
+    "webContentFootprintMb": 69.3,
+    "webContentMallocAllocatedMb": 9.8,
+    "valid": true
+   },
+   {
+    "elapsedSec": 420.165,
+    "webContentFootprintMb": 82.1,
+    "webContentMallocAllocatedMb": 11.0,
+    "valid": true
+   },
+   {
+    "elapsedSec": 526.794,
+    "webContentFootprintMb": 82.8,
+    "webContentMallocAllocatedMb": 11.2,
+    "valid": true
+   }
+  ],
+  "mallocMaxRiseMb": 0.7,
+  "mallocSlopeMbPerMinute": 0.1815,
+  "counters": {
+   "totalFileSwitches": 6072,
+   "totalViewSwitches": 0,
+   "totalScrolls": 0,
+   "totalJumps": 0,
+   "totalIpcRequests": 0,
+   "totalYieldedTasks": 0
+  },
+  "ipcStarted": {
+   "debug_log": 68,
+   "get_rows": 36313,
+   "highlight_range": 8655
+  },
+  "visibilityInterruptions": 6,
+  "mountedRootSamples": []
+ }
+]

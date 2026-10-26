@@ -1,0 +1,80 @@
+Process:         com.apple.WebKit.WebContent [97190]
+Path:            /System/Volumes/Preboot/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent
+Load Address:    0x1009e8000
+Identifier:      com.apple.WebKit.WebContent
+Version:         22625 (22625.1.29.11.28)
+Code Type:       ARM64E
+Platform:        macOS
+Parent Process:  launchd [1]
+Target Type:     live task
+
+Date/Time:       2026-10-21 15:42:50.775 +0800
+Launch Time:     2026-10-21 15:12:11.706 +0800
+OS Version:      macOS 27.0.1 (26A434)
+Report Version:  7
+Analysis Tool:   /usr/bin/vmmap
+
+Physical footprint:         303.7M
+Physical footprint (peak):  376.8M
+Idle exit:                  clean
+----
+
+ReadOnly portion of Libraries: Total=2.4G resident=559.0M(22%) swapped_out_or_unallocated=1.9G(78%)
+Writable regions: Total=68.3G written=431.7M(1%) resident=460.8M(1%) swapped_out=40.4M(0%) unallocated=67.8G(99%)
+
+                                VIRTUAL RESIDENT    DIRTY  SWAPPED VOLATILE   NONVOL    EMPTY   REGION 
+REGION TYPE                        SIZE     SIZE     SIZE     SIZE     SIZE     SIZE     SIZE    COUNT (non-coalesced) 
+===========                     ======= ========    =====  ======= ========   ======    =====  ======= 
+App-Specific Tag 1                  64K       0K       0K       0K       0K       0K      64K        3 
+App-Specific Tag 2                 320K       0K       0K      80K       0K       0K       0K        4 
+ColorSync                           32K      16K      16K      16K       0K       0K       0K        2 
+CoreServices                        16K       0K       0K      16K       0K       0K       0K        1 
+Dyld Private Memory                172K       72       72      12K       0K       0K       0K        5 
+Foundation                          16K      16K      16K       0K       0K       0K       0K        1 
+Guard                            385.3G       0K       0K       0K       0K       0K       0K       76 
+JS JIT Generated Code            512.0M    4496K    4496K     512K       0K       0K       0K        3 
+JS VM Reservations                 1.4G     720K     720K      32K       0K       0K       0K        3 
+JS VM Reservations (reserved)     66.6G       0K       0K       0K       0K       0K       0K        3         reserved VM address space (unallocated)
+Malloc Guard Page                 3360K       0K       0K       0K       0K       0K       0K        4         see MALLOC ZONE table below
+Malloc Metadata                    144K      80K      80K      64K       0K       0K       0K        3         see MALLOC ZONE table below
+Malloc Metadata metadata          1120K     240K     240K       0K       0K       0K       0K        2         see MALLOC ZONE table below
+Malloc Small                      15.6M    3456K    3328K     736K       0K       0K       0K      356         see MALLOC ZONE table below
+Malloc Small (empty)              12.4M     112K      16K       0K       0K       0K       0K       80         see MALLOC ZONE table below
+Malloc Tiny                       4096K     224K     224K       0K       0K       0K       0K        1         see MALLOC ZONE table below
+OS Alloc Once                       32K      16K      16K       0K       0K       0K       0K        1 
+Stack                             15.4M     608K     576K      16K       0K       0K       0K       15 
+Stack Guard                       56.2M       0K       0K       0K       0K       0K       0K       15 
+Untagged                          21.2M    3936K    3936K    1440K       0K    2208K       0K       42 
+WebKit Malloc                    683.6M   380.9M   306.7M    37.6M       0K       0K       0K       44 
+WebKit Malloc metadata           148.5M    12.3M    1280K       0K       0K       0K       0K        4 
+__AUTH                            3894K    1085K      80K      79K       0K       0K       0K      376 
+__AUTH_CONST                      62.6M    16.1M       0K       0K       0K       0K       0K      620 
+__CTF                               824      824       0K       0K       0K       0K       0K        1 
+__DATA                            21.6M    7326K     525K     254K       0K       0K       0K      626 
+__DATA_CONST                      29.2M    15.1M       0K       0K       0K       0K       0K      620 
+__DATA_DIRTY                      9450K    1821K    1029K     342K       0K       0K       0K      552 
+__FONT_DATA                        2352     2352       0K       0K       0K       0K       0K        1 
+__LINKEDIT                         1.6G    89.7M       0K       0K       0K       0K       0K        3 
+__OBJC_RO                        118.0M    60.7M       0K       0K       0K       0K       0K        1 
+__OBJC_RW                         2735K    2335K      47K       0K       0K       0K       0K        1 
+__TEXT                           895.8M   469.3M       0K       0K       0K       0K       0K      700 
+__TPRO_CONST                       132K      32K      32K      20K       0K       0K       0K        4 
+mapped file                      145.4M    6896K       0K       0K       0K       0K       0K       29 
+owned unmapped (graphics)         73.1M    53.1M    49.0M      16K       0K       0K       0K       94 
+page table in kernel               945K     945K     945K       0K       0K       0K       0K        1 
+shared memory                       48K      48K      48K       0K       0K       0K       0K        2 
+unused but dirty shlib __DATA      300K     111K     111K     189K       0K       0K       0K      205 
+===========                     ======= ========    =====  ======= ========   ======    =====  ======= 
+TOTAL                            457.6G     1.1G   373.1M    41.3M       0K    2208K      64K     4504 
+TOTAL, minus reserved VM space   391.0G     1.1G   373.1M    41.3M       0K    2208K      64K     4504 
+
+                                          VIRTUAL   RESIDENT      DIRTY    SWAPPED ALLOCATION      BYTES DIRTY+SWAP          REGION
+MALLOC ZONE                                  SIZE       SIZE       SIZE       SIZE      COUNT  ALLOCATED  FRAG SIZE  % FRAG   COUNT
+===========                               =======  =========  =========  =========  =========  =========  =========  ======  ======
+WebKit Malloc_0x10200e678                    1.6G     387.0M     311.0M      38.1M     791461     190.5M     158.6M     46%      39
+DefaultMallocZone_0x1011d0000               33.0M      3984K      3760K       736K      18511      2793K      1703K     38%     436
+objc-class_rw_t_0x10126c000                   48K        48K        48K         0K       1204        28K        20K     42%       3
+WebKit Using System Malloc_0x100bd0000         0K         0K         0K         0K          0         0K         0K      0%       0
+===========                               =======  =========  =========  =========  =========  =========  =========  ======  ======
+TOTAL                                        1.6G     391.0M     314.7M      38.8M     811176     193.2M     160.3M     46%     478
+

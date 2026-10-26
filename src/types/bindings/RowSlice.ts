@@ -7,8 +7,19 @@ import type { ViewMode } from "./ViewMode";
 /**
  * 一段显示行。
  */
-export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number, rows: Array<RenderRow>, fingerprint: string, 
+export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number, rows: Array<RenderRow>, fingerprint: string,
+/**
+ * 生成这段行的快照版本；前端据此拒绝晚到的旧行（Q88、T05）。
+ */
+revision: number,
 /**
  * 该文件最新的列表元数据（未跟踪文件在此时才补全）。
  */
-entry: ChangeEntry, };
+entry: ChangeEntry,
+/**
+ * 这次读取**实际观察到**的审阅水位：`entry.reviewed` 对应的真实提交序号。
+ *
+ * 与 `entry` 在同一把锁内取出，所以它精确描述「这份 entry 的审阅状态新到哪一步」。
+ * 前端不能用界面上的 revision 或快照 seq 去猜（ST07-R12-2）。
+ */
+reviewSeq: number, };

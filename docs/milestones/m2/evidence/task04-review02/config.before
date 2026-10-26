@@ -1,0 +1,14 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+	autocrlf = false
+	attributesFile = /private/tmp/revia-task04-review02-1sbdt0cx/external-attributes
+[user]
+	name = Review Fixture
+	email = fixture@example.invalid
+[commit]
+	gpgsign = false

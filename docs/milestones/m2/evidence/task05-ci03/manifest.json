@@ -1,0 +1,70 @@
+{
+  "sourceCommit": "3d70aa8c2bcbbddddfe7bedb390e6ff51456ce88",
+  "reviewRange": "ebe9f921cede1b5dd07da04f327b7180572b230a...3d70aa8c2bcbbddddfe7bedb390e6ff51456ce88",
+  "boundary": "Independent fixed-source static review Standards0/Spec0. Mac discard_recovery71 passed/1ignored. Sensitivity experiment has narrative and original source backup only; no experiment stdout/stderr/exit. Windows, Release, desktop, D06 not completed.",
+  "sourceHashChecks": [
+    {
+      "path": "src-tauri/tests/discard_recovery.rs",
+      "sha256": "f09e13412dd046480aed23f2c90dcc82ea82c6fd496073fd0b46d0c64fb7e635"
+    }
+  ],
+  "restoredProductionSourceSha256": "e45533a888c20feac5f8cc828cdbb8705bd3a13420787160e893a9871eef0749",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/MANIFEST.md",
+      "stored": "MANIFEST.md.gz",
+      "sourceBytes": 1300,
+      "storedBytes": 958,
+      "sourceSha256": "7123de1108cbf38e6579865aba1d30eda08564b0456afca02a5bac81476e17f4",
+      "storedSha256": "7eff53ce8f6eed2b06e1a5417b4ac9eecc47e6eb1a006e9509a2290c3eb3ed8e"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/base-sha.txt",
+      "stored": "base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 60,
+      "sourceSha256": "5df0ae39b8f520a15a2bc358741a746624f96ba77d06777b0c60b90828e88227",
+      "storedSha256": "212581ef802151d7e7a164dab2bacd3164cde729823e3a899383556506998772"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/discard_recovery.err",
+      "stored": "discard_recovery.err.gz",
+      "sourceBytes": 1889,
+      "storedBytes": 708,
+      "sourceSha256": "e098505af6a83bd35d98fb38f42739d3f9aaed3c0eaef2b1aff1db5e16aff948",
+      "storedSha256": "0a0e541035df474281a7a7ebe19185e8188f2b89cb6103e47c5460486170fa3d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/discard_recovery.exit",
+      "stored": "discard_recovery.exit.gz",
+      "sourceBytes": 24,
+      "storedBytes": 44,
+      "sourceSha256": "8d8aa0719fc6ae95e75b3392a50d4a82467666a4f9f366271d8a78b901aff236",
+      "storedSha256": "6698c0fd6a9c41ca8b9247d2f4215aee38bf80fe8b226b731b9d619998b0bfc3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/discard_recovery.out",
+      "stored": "discard_recovery.out.gz",
+      "sourceBytes": 5055,
+      "storedBytes": 1870,
+      "sourceSha256": "1a4c7ea18d16606d9531a5436e1d389287471ee096f9189db95a5d0715d45dfe",
+      "storedSha256": "beb756ae6e757a702464653dafb395eccb1aa9f8a48c5c3747d1e6776a62fc6a"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/history/recovery.rs.original.bak",
+      "stored": "history/recovery.rs.original.bak.gz",
+      "sourceBytes": 75389,
+      "storedBytes": 20333,
+      "sourceSha256": "e45533a888c20feac5f8cc828cdbb8705bd3a13420787160e893a9871eef0749",
+      "storedSha256": "2576ecc04a1549c44baa2a7e26544efa12a2a027ba7495e9d2a1caf0d3ebfc68"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci03-IaNg8P/source-sha256-before-check.txt",
+      "stored": "source-sha256-before-check.txt.gz",
+      "sourceBytes": 102,
+      "storedBytes": 107,
+      "sourceSha256": "d4fb758cbf18ed87543dba9a8a6e49cae8a7f99e390f093b56ce547e84bf3a90",
+      "storedSha256": "cb5d0c875024c7fdbcceab28532490e89a57caae29b5922a3c3111280effe793"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "fill": {
+    "automatic-gradient": "srgb:0.97,0.96,0.89,1.0"
+  },
+  "groups": [
+    {
+      "name": "Revia",
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "graph.svg",
+          "name": "graph"
+        },
+        {
+          "glass": true,
+          "image-name": "upper.svg",
+          "name": "upper"
+        },
+        {
+          "glass": true,
+          "image-name": "lower.svg",
+          "name": "lower"
+        }
+      ],
+      "lighting": "combined",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.4
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

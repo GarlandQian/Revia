@@ -1,0 +1,31 @@
+{
+  "fixture": "/tmp/revia-spec04-r2-gepyo7g3",
+  "multilineFilter": {
+    "sourceConfigOutput": "filter.copy.clean cat\nfilter.copy.smudge :\ncat\nfilter.copy.required true\n",
+    "copiedEntries": [
+      [
+        "filter.copy.clean",
+        "cat"
+      ],
+      [
+        "filter.copy.smudge",
+        ":"
+      ],
+      [
+        "filter.copy.required",
+        "true"
+      ]
+    ],
+    "sameEffectiveAttrs": true,
+    "scratchApplyExit": 128,
+    "realApplyExit": 0,
+    "scratchResult": "",
+    "realResult": "alpha\nbeta\n"
+  },
+  "linkedInfo": {
+    "privateInfoExists": false,
+    "actualEffectiveAttrs": "file.txt: text: set\nfile.txt: eol: crlf\n",
+    "scratchEffectiveAttrs": ""
+  },
+  "gitConfigEnvWritesOriginal": true
+}

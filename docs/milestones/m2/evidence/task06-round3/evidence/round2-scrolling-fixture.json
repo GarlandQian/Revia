@@ -1,0 +1,9 @@
+{
+  "caseId": "prepare-B-scrolling-fixture",
+  "repo": "B",
+  "path": "/private/tmp/revia-task06-2fuu2r92/B/many.ts",
+  "lines": 1000,
+  "head": "14e403a026ca0c6dc41a25f4a0acbb7caa8ea7f7",
+  "diffNumstat": "1000\t1000\tmany.ts\n",
+  "note": "Only the new many.ts was committed; existing five fixture changes remain unstaged."
+}

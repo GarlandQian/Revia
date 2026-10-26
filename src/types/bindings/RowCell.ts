@@ -4,7 +4,7 @@ import type { LineKind } from "./LineKind";
 /**
  * 并排视图里的一格。
  */
-export type RowCell = { 
+export type RowCell = {
 /**
  * 该格在对应版本里的行号（1 基）。
  */

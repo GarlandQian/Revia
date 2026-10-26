@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-10-23T16:04:59.491+08:00",
+  "path": "/private/tmp/revia-task06-2fuu2r92/B/many.ts",
+  "sha256": "3449809a680d91176fb4b1c90ef60ab49846a8cc2c3b134b48ba98aa8f806a37",
+  "bytes": 30000,
+  "line200": "export const item0200 = 4243;",
+  "line260": "export const item0260 = 4242;",
+  "git": {
+    "args": [
+      "diff",
+      "--no-ext-diff",
+      "--numstat",
+      "--",
+      "many.ts"
+    ],
+    "exitCode": 0,
+    "elapsedMs": 8.229,
+    "stdoutText": "1000\t1000\tmany.ts\n",
+    "stdoutBase64": "MTAwMAkxMDAwCW1hbnkudHMK",
+    "stderrText": ""
+  }
+}

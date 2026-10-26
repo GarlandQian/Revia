@@ -1,0 +1,58 @@
+[
+  {
+    "source": "/private/tmp/revia-m2-baseline-03-20261021.json",
+    "archive": "revia-m2-baseline-03-20261021.json",
+    "sourceSha256": "7f1f01ff923a7255ef6835ae6147bc2f8a5d7078b03d98c32f51b684611719a8",
+    "archiveSha256": "7f1f01ff923a7255ef6835ae6147bc2f8a5d7078b03d98c32f51b684611719a8",
+    "sourceBytes": 231536,
+    "archiveBytes": 231536
+  },
+  {
+    "source": "/private/tmp/revia-m2-baseline-03-20261021.json.frontend.log",
+    "archive": "baseline-03-operations.log.gz",
+    "sourceSha256": "f0bbb7d3153a27dda8bdc3fde2c03e7196dd599ba4c3a52fc94d7cd6e90aead9",
+    "archiveSha256": "400597a035b97acdc8fe3a979109f685c243202fd395cac93d0c224b9f06be00",
+    "sourceBytes": 16060302,
+    "archiveBytes": 1293505
+  },
+  {
+    "source": "/private/tmp/revia-m2-baseline-03-20261021.json.frontend.json",
+    "archive": "baseline-03-frontend.json.gz",
+    "sourceSha256": "52171baf9322d22b16c83e4976cbe9e921f1408c47a5c456b3a8cd958e89a8ae",
+    "archiveSha256": "4cd291d2bc280c587cea3b1a5c0d305558dd393696570d7694b80e69c35ec222",
+    "sourceBytes": 95381,
+    "archiveBytes": 4003
+  },
+  {
+    "source": "/private/tmp/revia-m2-baseline-03-20261021.json.samples.jsonl",
+    "archive": "baseline-03-samples.jsonl",
+    "sourceSha256": "9c76ba5fc97850c5b63e18de4ef210db8f35c50811b04ad52641043c62ec149c",
+    "archiveSha256": "9c76ba5fc97850c5b63e18de4ef210db8f35c50811b04ad52641043c62ec149c",
+    "sourceBytes": 58439,
+    "archiveBytes": 58439
+  },
+  {
+    "source": "/private/tmp/revia-m2-baseline-03-20261021.json.phase-samples.jsonl",
+    "archive": "baseline-03-phase-samples.jsonl",
+    "sourceSha256": "abc0209b2068d68363af5a910f908e90aa4f4acebd3cdef7c8a367ea86ae1610",
+    "archiveSha256": "abc0209b2068d68363af5a910f908e90aa4f4acebd3cdef7c8a367ea86ae1610",
+    "sourceBytes": 26407,
+    "archiveBytes": 26407
+  },
+  {
+    "source": "/private/tmp/revia-memory-analysis-123.json",
+    "archive": "memory-analysis-123.json",
+    "sourceSha256": "2ae735b066ffdf679fc40e0fe029ad39f89d502549e9409fd9d8182d0f3e51a0",
+    "archiveSha256": "2ae735b066ffdf679fc40e0fe029ad39f89d502549e9409fd9d8182d0f3e51a0",
+    "sourceBytes": 39404,
+    "archiveBytes": 39404
+  },
+  {
+    "source": "/private/tmp/revia-analyze-evidence.py",
+    "archive": "analyze-runs.py",
+    "sourceSha256": "ec7617c22da0a51314e02427d59dc4929aeaa67ed9f494936a18cd0ae4bd999c",
+    "archiveSha256": "ec7617c22da0a51314e02427d59dc4929aeaa67ed9f494936a18cd0ae4bd999c",
+    "sourceBytes": 2949,
+    "archiveBytes": 2949
+  }
+]

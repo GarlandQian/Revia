@@ -1,0 +1,1927 @@
+{
+  "test": "long_running_baseline",
+  "runCompleted": false,
+  "acceptance": "pending desktop evidence, performance regression and memory trend review",
+  "diagnostic": null,
+  "minimalSoakLogging": true,
+  "startedAt": "2026-10-22T19:07:33.970942+08:00",
+  "endedAt": "2026-10-22T19:09:30.605821+08:00",
+  "targetDurationSeconds": 1800,
+  "actualDurationSeconds": 116.63,
+  "reviaPid": 88708,
+  "webkitAttribution": "launchctl print pid/<exact child PID>: services table",
+  "binarySha256": "8c76c971ec2b03b11a34af9c9cb6724c7f8e9d46ae45a94f781ebbfaac2e68e3",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "isolatedDataDir": "/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-soak-data-wyzysnh0",
+  "repo": "/private/tmp/revia-m1-fixtures/diffs",
+  "errors": [
+    "应用未成功完成：Error: 可见连续合成中断：{\"state\":\"visible\",\"hidden\":false,\"viewportWidth\":1280,\"viewportHeight\":800,\"devicePixelRatio\":2,\"rafPerSecond\":39.80099502487562,\"focused\":false,\"maxFrameGapMs\":839,\"hiddenTransitions\":1}",
+    "前端连续操作时长不足",
+    "缺少必需的操作负载"
+  ],
+  "frontend": {
+    "acceptance": "pending review",
+    "diagnostic": null,
+    "error": "Error: 可见连续合成中断：{\"state\":\"visible\",\"hidden\":false,\"viewportWidth\":1280,\"viewportHeight\":800,\"devicePixelRatio\":2,\"rafPerSecond\":39.80099502487562,\"focused\":false,\"maxFrameGapMs\":839,\"hiddenTransitions\":1}",
+    "files": [
+      {
+        "changes": "unstaged",
+        "path": "assets/icon.png",
+        "rowCountSplit": 0,
+        "rowCountUnified": 0
+      },
+      {
+        "changes": "unstaged",
+        "path": "logs/app.log",
+        "rowCountSplit": 5001,
+        "rowCountUnified": 10001
+      },
+      {
+        "changes": "unstaged",
+        "path": "pnpm-lock.yaml",
+        "rowCountSplit": 2404,
+        "rowCountUnified": 3004
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/App.vue",
+        "rowCountSplit": 20,
+        "rowCountUnified": 24
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/Model.swift",
+        "rowCountSplit": 20,
+        "rowCountUnified": 23
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/generated.ts",
+        "rowCountSplit": 8309,
+        "rowCountUnified": 13435
+      },
+      {
+        "changes": "staged",
+        "path": "src/staged.ts",
+        "rowCountSplit": 2,
+        "rowCountUnified": 2
+      }
+    ],
+    "ipcFinal": {
+      "callbacks": {
+        "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+        "available": true,
+        "baselineOverflow": 0,
+        "baselineRegistrySize": 4,
+        "baselineStillRegistered": 4,
+        "baselineStillRegisteredIsLowerBound": false,
+        "baselineTrackedIds": 4,
+        "countsAreNotRequestCounts": true,
+        "idLimit": 512,
+        "newIdCount": 0,
+        "nonBaselineRegistryCount": 0,
+        "observationOverflow": 0,
+        "oldestObservedAgeMs": 0,
+        "registrySize": 4,
+        "trackedObservedIds": 0
+      },
+      "dom": {
+        "diffRows": 201,
+        "elements": 1495
+      },
+      "fetch": {
+        "commandOverflowRequests": 0,
+        "commands": {
+          "debug_log": {
+            "active": 0,
+            "failed": 0,
+            "headersSettled": 13,
+            "maxActive": 1,
+            "maxHeaderLatencyMs": 4,
+            "started": 13,
+            "synchronousThrows": 0,
+            "totalHeaderLatencyMs": 30
+          },
+          "get_rows": {
+            "active": 0,
+            "failed": 0,
+            "headersSettled": 5818,
+            "maxActive": 3,
+            "maxHeaderLatencyMs": 773,
+            "started": 5818,
+            "synchronousThrows": 0,
+            "totalHeaderLatencyMs": 17782
+          },
+          "highlight_range": {
+            "active": 0,
+            "failed": 0,
+            "headersSettled": 391,
+            "maxActive": 1,
+            "maxHeaderLatencyMs": 39,
+            "started": 391,
+            "synchronousThrows": 0,
+            "totalHeaderLatencyMs": 3669
+          },
+          "row_index_for_line": {
+            "active": 0,
+            "failed": 0,
+            "headersSettled": 470,
+            "maxActive": 1,
+            "maxHeaderLatencyMs": 692,
+            "started": 470,
+            "synchronousThrows": 0,
+            "totalHeaderLatencyMs": 2093
+          }
+        },
+        "completionBoundary": "response headers, not body/callback completion",
+        "namedCommandLimit": 32,
+        "stringIpcUrlsOnly": true,
+        "total": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 6692,
+          "maxActive": 4,
+          "maxHeaderLatencyMs": 773,
+          "started": 6692,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 23574
+        }
+      },
+      "fetchHookStillInstalled": true,
+      "observationErrors": 0,
+      "observedAtMs": 114768,
+      "resourceTimingEntries": 0,
+      "stopped": false
+    },
+    "ipcInitial": {
+      "callbacks": {
+        "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+        "available": true,
+        "baselineOverflow": 0,
+        "baselineRegistrySize": 4,
+        "baselineStillRegistered": 4,
+        "baselineStillRegisteredIsLowerBound": false,
+        "baselineTrackedIds": 4,
+        "countsAreNotRequestCounts": true,
+        "idLimit": 512,
+        "newIdCount": 0,
+        "nonBaselineRegistryCount": 0,
+        "observationOverflow": 0,
+        "oldestObservedAgeMs": 0,
+        "registrySize": 4,
+        "trackedObservedIds": 0
+      },
+      "dom": {
+        "diffRows": 0,
+        "elements": 85
+      },
+      "fetch": {
+        "commandOverflowRequests": 0,
+        "commands": {},
+        "completionBoundary": "response headers, not body/callback completion",
+        "namedCommandLimit": 32,
+        "stringIpcUrlsOnly": true,
+        "total": {
+          "active": 0,
+          "failed": 0,
+          "headersSettled": 0,
+          "maxActive": 0,
+          "maxHeaderLatencyMs": 0,
+          "started": 0,
+          "synchronousThrows": 0,
+          "totalHeaderLatencyMs": 0
+        }
+      },
+      "fetchHookStillInstalled": true,
+      "observationErrors": 0,
+      "observedAtMs": 1528,
+      "resourceTimingEntries": 0,
+      "stopped": false
+    },
+    "minimalSoakLogging": true,
+    "ok": false,
+    "operationsStartedAt": "2026-10-22T11:07:36.681Z",
+    "phaseCheckpoints": [
+      {
+        "cycle": 23,
+        "endedAt": "2026-10-22T11:08:44.514Z",
+        "file": "src/staged.ts",
+        "ipcAfter": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 2,
+            "elements": 105
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 8,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 8,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 16
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 3404,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 3404,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 11903
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 230,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 230,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2186
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 276,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 276,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1761
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 3918,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 3918,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 15866
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 69361,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "ipcBefore": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 2,
+            "elements": 105
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 6,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 6,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 10
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 3404,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 3404,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 11903
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 230,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 230,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2186
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 276,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 276,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1761
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 3916,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 3916,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 15860
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 65853,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "pressure": false,
+        "startedAt": "2026-10-22T11:08:41.006Z",
+        "view": "split"
+      }
+    ],
+    "readiness": [
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": false,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 25,
+        "rafPerSecond": 59.94005994005994,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    ],
+    "samples": [
+      {
+        "cycle": 4,
+        "elapsedSec": 10,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 20,
+            "elements": 335
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 522,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 522,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 3190
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 37,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 37,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 401
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 44,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 9,
+                "started": 44,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 64
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 603,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 603,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 3655
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 12682,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 8,
+        "elapsedSec": 20,
+        "file": "src/App.vue",
+        "highlightLines": 34,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 20,
+            "elements": 442
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 1,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 1,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 3
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 1108,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 1108,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 4117
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 75,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 75,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 773
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 90,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 9,
+                "started": 90,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 125
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 1274,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 1274,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 5018
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 22881,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 12,
+        "elapsedSec": 31,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 201,
+            "elements": 1495
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 2,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 2,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 4
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 1674,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 1674,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 6889
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 111,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 111,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1080
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 134,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 663,
+                "started": 134,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 843
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 1921,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 1921,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 8816
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 33166,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 18.92430278884462,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 16,
+        "elapsedSec": 41,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 201,
+            "elements": 1495
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 3,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 3,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 4
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 2266,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 2266,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 7860
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 151,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 151,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1433
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 182,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 663,
+                "started": 182,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 926
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 2602,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 2602,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 10223
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 43586,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 20,
+        "elapsedSec": 52,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 201,
+            "elements": 1495
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 4,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 4,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 6
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 2858,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 2858,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 8895
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 191,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 191,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1801
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 230,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 663,
+                "started": 230,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 998
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 3283,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 3283,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 11700
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 54086,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 23,
+        "elapsedSec": 62,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 145,
+            "elements": 3191
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 5,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 5,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 8
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 3322,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 3322,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 11767
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 223,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 223,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2127
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 268,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 268,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1746
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 3818,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 3818,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 15648
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 64105,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 25,
+        "elapsedSec": 72,
+        "file": "src/App.vue",
+        "highlightLines": 34,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 20,
+            "elements": 442
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 8,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 8,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 16
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 3624,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 3624,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 12359
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 245,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 245,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2325
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 294,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 294,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1785
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 4171,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 4171,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 16485
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 74118,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 29,
+        "elapsedSec": 82,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 145,
+            "elements": 3191
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 9,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 9,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 19
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 4210,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 4210,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 13360
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 283,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 283,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2692
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 340,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 340,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1846
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 4842,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 4842,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 17917
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 84446,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 32,
+        "elapsedSec": 92,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 20,
+            "elements": 335
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 10,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 3,
+                "started": 10,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 22
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 4666,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 4666,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 15618
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 317,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 317,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2968
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 380,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 380,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1901
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 5373,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 5373,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 20509
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 94474,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 36,
+        "elapsedSec": 102,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 145,
+            "elements": 3191
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 11,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 4,
+                "started": 11,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 26
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 5246,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 5246,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 16651
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 353,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 353,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 3336
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 424,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 424,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 1975
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 6034,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 6034,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 21988
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 104667,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 40,
+        "elapsedSec": 112,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "ipc": {
+          "callbacks": {
+            "ageMeaning": "lower bound from consecutive observations, not exact registration time",
+            "available": true,
+            "baselineOverflow": 0,
+            "baselineRegistrySize": 4,
+            "baselineStillRegistered": 4,
+            "baselineStillRegisteredIsLowerBound": false,
+            "baselineTrackedIds": 4,
+            "countsAreNotRequestCounts": true,
+            "idLimit": 512,
+            "newIdCount": 0,
+            "nonBaselineRegistryCount": 0,
+            "observationOverflow": 0,
+            "oldestObservedAgeMs": 0,
+            "registrySize": 4,
+            "trackedObservedIds": 0
+          },
+          "dom": {
+            "diffRows": 201,
+            "elements": 1495
+          },
+          "fetch": {
+            "commandOverflowRequests": 0,
+            "commands": {
+              "debug_log": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 12,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 4,
+                "started": 12,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 29
+              },
+              "get_rows": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 5818,
+                "maxActive": 3,
+                "maxHeaderLatencyMs": 773,
+                "started": 5818,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 17782
+              },
+              "highlight_range": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 391,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 39,
+                "started": 391,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 3669
+              },
+              "row_index_for_line": {
+                "active": 0,
+                "failed": 0,
+                "headersSettled": 470,
+                "maxActive": 1,
+                "maxHeaderLatencyMs": 692,
+                "started": 470,
+                "synchronousThrows": 0,
+                "totalHeaderLatencyMs": 2093
+              }
+            },
+            "completionBoundary": "response headers, not body/callback completion",
+            "namedCommandLimit": 32,
+            "stringIpcUrlsOnly": true,
+            "total": {
+              "active": 0,
+              "failed": 0,
+              "headersSettled": 6691,
+              "maxActive": 4,
+              "maxHeaderLatencyMs": 773,
+              "started": 6691,
+              "synchronousThrows": 0,
+              "totalHeaderLatencyMs": 23573
+            }
+          },
+          "fetchHookStillInstalled": true,
+          "observationErrors": 0,
+          "observedAtMs": 114766,
+          "resourceTimingEntries": 0,
+          "stopped": false
+        },
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": false,
+          "hidden": false,
+          "hiddenTransitions": 1,
+          "maxFrameGapMs": 839,
+          "rafPerSecond": 39.80099502487562,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      }
+    ],
+    "session": {
+      "checks": [
+        {
+          "detail": "/opt/homebrew/bin/git（git version 2.56.0）",
+          "hint": "需要 Git 2.11 或更高版本",
+          "name": "git",
+          "ok": true
+        },
+        {
+          "detail": "/bin/zsh · 174 毫秒",
+          "hint": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
+          "name": "shell",
+          "ok": true
+        }
+      ],
+      "gitPath": "/opt/homebrew/bin/git",
+      "gitVersion": "git version 2.56.0",
+      "shell": "/bin/zsh",
+      "shellElapsedMs": 174
+    },
+    "setupSeconds": 1.429,
+    "targetDurationSeconds": 1800,
+    "worktree": {
+      "bare": false,
+      "branch": "main",
+      "detached": false,
+      "head": "566b6de67e03f140a59095379e9849a748990a8a",
+      "id": "565996f4230d980e",
+      "isMain": true,
+      "path": "/private/tmp/revia-m1-fixtures/diffs"
+    }
+  },
+  "memoryTimeSeries": [
+    {
+      "rustRssMb": 116.81,
+      "webContentRssMb": 64.86,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 15.09,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 35.8,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 232.56,
+      "serviceDomain": "pid/88708",
+      "rustFootprintMb": 41.5,
+      "webContentFootprintMb": 137.5,
+      "elapsedSec": 2.04,
+      "timestamp": "2026-10-22T19:07:38.390333+08:00",
+      "samplingStartedAt": "2026-10-22T19:07:36.007828+08:00"
+    },
+    {
+      "rustRssMb": 134.33,
+      "webContentRssMb": 250.09,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.94,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.52,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 459.88,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 12.18,
+      "timestamp": "2026-10-22T19:07:46.170808+08:00",
+      "samplingStartedAt": "2026-10-22T19:07:46.154364+08:00"
+    },
+    {
+      "rustRssMb": 135.7,
+      "webContentRssMb": 260.27,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.94,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.67,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 471.58,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 22.22,
+      "timestamp": "2026-10-22T19:07:56.203726+08:00",
+      "samplingStartedAt": "2026-10-22T19:07:56.187100+08:00"
+    },
+    {
+      "rustRssMb": 135.61,
+      "webContentRssMb": 262.66,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.94,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.8,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 474.0,
+      "serviceDomain": "pid/88708",
+      "rustFootprintMb": 59.7,
+      "webContentFootprintMb": 144.7,
+      "elapsedSec": 32.24,
+      "timestamp": "2026-10-22T19:08:08.166456+08:00",
+      "samplingStartedAt": "2026-10-22T19:08:06.215037+08:00"
+    },
+    {
+      "rustRssMb": 137.91,
+      "webContentRssMb": 264.39,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.84,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.84,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 477.98,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 42.35,
+      "timestamp": "2026-10-22T19:08:16.346465+08:00",
+      "samplingStartedAt": "2026-10-22T19:08:16.323769+08:00"
+    },
+    {
+      "rustRssMb": 137.81,
+      "webContentRssMb": 266.75,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.86,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.7,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 480.12,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 52.37,
+      "timestamp": "2026-10-22T19:08:26.356829+08:00",
+      "samplingStartedAt": "2026-10-22T19:08:26.339765+08:00"
+    },
+    {
+      "rustRssMb": 137.88,
+      "webContentRssMb": 267.22,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.86,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.75,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 480.7,
+      "serviceDomain": "pid/88708",
+      "rustFootprintMb": 60.8,
+      "webContentFootprintMb": 161.5,
+      "elapsedSec": 62.38,
+      "timestamp": "2026-10-22T19:08:38.195976+08:00",
+      "samplingStartedAt": "2026-10-22T19:08:36.346638+08:00"
+    },
+    {
+      "rustRssMb": 137.84,
+      "webContentRssMb": 277.97,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.86,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.12,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 490.8,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 72.41,
+      "timestamp": "2026-10-22T19:08:46.399262+08:00",
+      "samplingStartedAt": "2026-10-22T19:08:46.383583+08:00"
+    },
+    {
+      "rustRssMb": 137.89,
+      "webContentRssMb": 291.94,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.81,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.86,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 505.5,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 82.43,
+      "timestamp": "2026-10-22T19:08:56.422062+08:00",
+      "samplingStartedAt": "2026-10-22T19:08:56.398172+08:00"
+    },
+    {
+      "rustRssMb": 137.89,
+      "webContentRssMb": 292.31,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.81,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.75,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 505.77,
+      "serviceDomain": "pid/88708",
+      "rustFootprintMb": 60.8,
+      "webContentFootprintMb": 180.0,
+      "elapsedSec": 92.46,
+      "timestamp": "2026-10-22T19:09:08.352788+08:00",
+      "samplingStartedAt": "2026-10-22T19:09:06.429062+08:00"
+    },
+    {
+      "rustRssMb": 137.89,
+      "webContentRssMb": 301.47,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 29.38,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.77,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 516.5,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 102.48,
+      "timestamp": "2026-10-22T19:09:16.464715+08:00",
+      "samplingStartedAt": "2026-10-22T19:09:16.448574+08:00"
+    },
+    {
+      "rustRssMb": 137.95,
+      "webContentRssMb": 303.45,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 29.38,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.84,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 518.62,
+      "serviceDomain": "pid/88708",
+      "elapsedSec": 112.49,
+      "timestamp": "2026-10-22T19:09:26.480710+08:00",
+      "samplingStartedAt": "2026-10-22T19:09:26.463320+08:00"
+    }
+  ],
+  "memoryAnalysis": {
+    "warmupSeconds": 180,
+    "steadySampleCount": 0,
+    "series": {}
+  },
+  "phaseMemoryTimeSeries": [
+    {
+      "checkpointId": 23,
+      "phase": "staged/split/settled",
+      "pressure": false,
+      "checkpointObservedElapsedSec": 67.076,
+      "samplingStartedElapsedSec": 67.076,
+      "timestamp": "2026-10-22T19:08:41.046766+08:00",
+      "valid": true,
+      "rustRssMb": 137.84,
+      "webContentRssMb": 268.03,
+      "webContentPids": [
+        88711
+      ],
+      "networkingRssMb": 27.86,
+      "networkingPids": [
+        88712
+      ],
+      "gpuRssMb": 47.42,
+      "gpuPids": [
+        88710
+      ],
+      "totalRssMb": 481.16,
+      "serviceDomain": "pid/88708",
+      "rustFootprintMb": 60.7,
+      "webContentVmmap": [
+        {
+          "pid": 88711,
+          "footprintMb": 133.6,
+          "webkitMallocAllocatedMb": 105.7
+        }
+      ],
+      "webContentFootprintMb": 133.6,
+      "webContentMallocAllocatedMb": 105.7,
+      "servicesAfterSampling": {
+        "WebContent": [
+          88711
+        ],
+        "Networking": [
+          88712
+        ],
+        "GPU": [
+          88710
+        ]
+      },
+      "samplingEndedElapsedSec": 68.941,
+      "samplingDurationSeconds": 1.865,
+      "samplingEndedAt": "2026-10-22T19:08:42.912061+08:00",
+      "errors": [],
+      "samplingChecksPassed": true,
+      "validation": "final",
+      "checkpointEndConfirmed": true
+    }
+  ],
+  "q98MemoryVerdict": {
+    "rule": "Q98",
+    "warmupSeconds": 180,
+    "maxRiseMb": 10.0,
+    "maxSlopeMbPerMinute": 0.5,
+    "pressureSettleSeconds": 10.0,
+    "pressureSource": "notifyutil -p org.WebKit.lowMemory",
+    "pressureSampleCount": 0,
+    "series": {
+      "webContentFootprintMb": {
+        "sampleCount": 0,
+        "passed": false,
+        "reason": "热身后样本不足 2 个，无法判定趋势"
+      },
+      "webContentMallocAllocatedMb": {
+        "sampleCount": 0,
+        "passed": false,
+        "reason": "热身后样本不足 2 个，无法判定趋势"
+      },
+      "rustFootprintMb": {
+        "sampleCount": 0,
+        "passed": false,
+        "reason": "热身后样本不足 2 个，无法判定趋势"
+      }
+    },
+    "errors": [
+      "webContentFootprintMb：热身后样本不足 2 个，无法判定趋势",
+      "webContentMallocAllocatedMb：热身后样本不足 2 个，无法判定趋势",
+      "rustFootprintMb：热身后样本不足 2 个，无法判定趋势",
+      "热身后有效压力后样本 0 个，少于 3 个"
+    ],
+    "passed": false
+  },
+  "phaseMemorySummary": {
+    "sampleCount": 1,
+    "validSampleCount": 1,
+    "invalidSampleCount": 0,
+    "allocationSource": "vmmap MALLOC ZONE / WebKit Malloc_* / BYTES ALLOCATED",
+    "acceptance": "pending manual same-phase sample sufficiency and trend review"
+  }
+}

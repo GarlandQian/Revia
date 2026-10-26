@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="utf-8">
+<title>Revia M2 · 任务 13 静态效果图</title>
+<!--
+  任务 13 的浅色 / 深色静态效果图源文件（纯静态，不接应用、不产生任何功能）。
+
+  覆盖任务单要求的状态：
+  - 工具栏、侧栏头部、文件列表与分组、diff 区、hunk 操作
+  - 各类提示：空文件、二进制、默认收起、只读、冲突、
+    操作被拒绝、结果待核对、自动刷新不可用
+
+  视觉参照 docs/ui-direction.md：macOS 原生质感 + 开发工具信息密度，
+  系统字体、系统强调色作选中色、细分隔线、图标按钮，颜色只表达 Git 状态。
+
+  打开方式：直接用浏览器打开本文件；切换 <html class="dark"> 查看深色。
+-->
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-elevated: #fbfbfd;
+    --sidebar: rgba(246, 246, 248, 0.82);
+    --sidebar-solid: #f5f5f7;
+    --fg: #1d1d1f;
+    --fg-muted: #6e6e73;
+    --fg-faint: #8e8e93;
+    --border: rgba(0, 0, 0, 0.09);
+    --border-strong: rgba(0, 0, 0, 0.16);
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.12);
+    --row-hover: rgba(0, 0, 0, 0.035);
+    --diff-add-bg: #e6ffec;
+    --diff-del-bg: #ffebe9;
+    --diff-hunk-bg: #f6f8fa;
+    --diff-hunk-fg: #57606a;
+    --diff-gutter: #9aa0a6;
+    --staged: #1a7f37;
+    --modified: #9a6700;
+    --deleted: #cf222e;
+    --conflict: #8250df;
+    --untracked: #6e7781;
+    --warn-bg: #fff8c5;
+    --warn-border: #d4a72c;
+    --danger-bg: #ffebe9;
+    --danger-border: #cf222e;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --radius: 6px;
+  }
+
+  html.dark {
+    --bg: #1c1c1e;
+    --bg-elevated: #232325;
+    --sidebar: rgba(38, 38, 40, 0.82);
+    --sidebar-solid: #262628;
+    --fg: #f5f5f7;
+    --fg-muted: #a1a1a6;
+    --fg-faint: #8e8e93;
+    --border: rgba(255, 255, 255, 0.11);
+    --border-strong: rgba(255, 255, 255, 0.2);
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.22);
+    --row-hover: rgba(255, 255, 255, 0.05);
+    --diff-add-bg: rgba(46, 160, 67, 0.18);
+    --diff-del-bg: rgba(248, 81, 73, 0.16);
+    --diff-hunk-bg: rgba(255, 255, 255, 0.045);
+    --diff-hunk-fg: #a1a1a6;
+    --diff-gutter: #7c7c80;
+    --staged: #3fb950;
+    --modified: #d29922;
+    --deleted: #f85149;
+    --conflict: #bc8cff;
+    --untracked: #8b949e;
+    --warn-bg: rgba(187, 128, 9, 0.16);
+    --warn-border: #9e6a03;
+    --danger-bg: rgba(248, 81, 73, 0.14);
+    --danger-border: #f85149;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #d8d8dc;
+    font: 12px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: var(--fg);
+    padding: 24px;
+  }
+  html.dark body { background: #101012; }
+
+  h1 { font-size: 13px; font-weight: 600; margin: 0 0 4px; color: #333; }
+  html.dark h1 { color: #ddd; }
+  .hint { font-size: 11px; color: #666; margin: 0 0 16px; }
+  html.dark .hint { color: #999; }
+
+  .frame {
+    width: 1180px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+    color: var(--fg);
+  }
+
+  /* ---------- 工具栏：红绿灯融入，图标按钮，细分隔线 ---------- */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    padding: 0 10px 0 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+  .lights { display: flex; gap: 8px; margin-right: 6px; }
+  .light { width: 12px; height: 12px; border-radius: 50%; }
+  .light.r { background: #ff5f57; }
+  .light.y { background: #febc2e; }
+  .light.g { background: #28c840; }
+
+  .toolbar .title {
+    font-weight: 600;
+    font-size: 12px;
+    margin-right: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .branch-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-muted);
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+  }
+
+  .icon-btn {
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: 12px;
+    cursor: default;
+  }
+  .icon-btn:hover { background: var(--row-hover); }
+  .icon-btn.active { background: var(--accent-soft); color: var(--accent); }
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .segmented > span {
+    padding: 3px 9px;
+    font-size: 11px;
+    color: var(--fg-muted);
+    border-right: 1px solid var(--border);
+  }
+  .segmented > span:last-child { border-right: none; }
+  .segmented > span.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  /* ---------- 提示条 ---------- */
+  .banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 11.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .banner.warn { background: var(--warn-bg); border-bottom-color: var(--warn-border); }
+  .banner.danger { background: var(--danger-bg); border-bottom-color: var(--danger-border); }
+  .banner .dismiss {
+    margin-left: auto;
+    color: var(--fg-muted);
+    font-size: 11px;
+    text-decoration: underline;
+  }
+
+  /* ---------- 主体三栏 ---------- */
+  .body { display: grid; grid-template-columns: 216px 268px 1fr; height: 620px; }
+
+  /* 侧栏：半透明材质 */
+  .sidebar {
+    background: var(--sidebar);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding-top: 6px;
+  }
+  .sidebar-head {
+    padding: 6px 12px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .repo {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .repo.sel { background: var(--accent-soft); }
+  .repo .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--staged); }
+  .repo .path { color: var(--fg-faint); font-size: 10.5px; font-family: var(--mono); }
+  .worktree {
+    padding: 5px 12px 5px 28px;
+    font-size: 11.5px;
+    color: var(--fg-muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .worktree.sel { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .sidebar-foot {
+    margin-top: auto;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    font-size: 10.5px;
+    color: var(--fg-faint);
+  }
+
+  /* 中间：变更列表 */
+  .changes { border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    color: var(--fg-muted);
+  }
+  .tab.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  .group-head {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px 5px;
+    font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .group-head .count { font-weight: 400; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 10px 0 12px;
+    font-size: 12px;
+  }
+  .row:hover { background: var(--row-hover); }
+  .row.sel { background: var(--accent-soft); }
+  .row .name { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .dir { color: var(--fg-faint); }
+  .letter { font-weight: 700; font-size: 11px; width: 10px; text-align: center; }
+  .letter.m { color: var(--modified); }
+  .letter.a { color: var(--staged); }
+  .letter.d { color: var(--deleted); }
+  .letter.u { color: var(--conflict); }
+  .letter.q { color: var(--untracked); }
+  .check {
+    width: 13px; height: 13px; border-radius: 3px;
+    border: 1px solid var(--border-strong);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; color: transparent;
+  }
+  .check.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .check.off-lock { border-style: dashed; }
+
+  .badge-ro {
+    font-size: 9.5px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid var(--border-strong);
+    color: var(--fg-faint);
+  }
+  .row-note {
+    padding: 0 12px 8px 34px;
+    font-size: 10.5px;
+    color: var(--fg-faint);
+  }
+
+  .changes-foot {
+    margin-top: auto;
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--fg-muted);
+  }
+  .primary-btn {
+    margin-left: auto;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 4px 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  /* ---------- diff 区 ---------- */
+  .diff { display: flex; flex-direction: column; overflow: hidden; }
+  .diff-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11.5px;
+    color: var(--fg-muted);
+  }
+  .diff-head .file { font-family: var(--mono); color: var(--fg); }
+  .diff-body { flex: 1; overflow: hidden; font-family: var(--mono); font-size: 11.5px; }
+
+  .hunk {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--diff-hunk-bg);
+    color: var(--diff-hunk-fg);
+    padding: 3px 10px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .hunk .range { flex: 1; }
+  .readonly-hint {
+    font-size: 10px;
+    color: var(--fg-faint);
+    font-family: -apple-system, sans-serif;
+  }
+  .hunk-btn {
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--fg-muted);
+    font-family: inherit;
+  }
+  .line { display: grid; grid-template-columns: 40px 40px 1fr; }
+  .line .no { color: var(--diff-gutter); text-align: right; padding-right: 8px; font-size: 10.5px; }
+  .line .code { padding-left: 10px; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+  .line.add { background: var(--diff-add-bg); }
+  .line.del { background: var(--diff-del-bg); }
+  .line.add .code::before { content: "+"; color: var(--staged); margin-right: 6px; }
+  .line.del .code::before { content: "-"; color: var(--deleted); margin-right: 6px; }
+  .line .code::before { content: " "; }
+
+  .empty-state {
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--fg-faint);
+    font-size: 12px;
+    font-family: -apple-system, sans-serif;
+  }
+  .empty-state .big { font-size: 13px; color: var(--fg-muted); margin-bottom: 4px; }
+
+  .callout {
+    margin: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    font-family: -apple-system, sans-serif;
+    font-size: 11.5px;
+    color: var(--fg-muted);
+    display: flex;
+    gap: 8px;
+  }
+  .callout.warn { border-color: var(--warn-border); background: var(--warn-bg); color: var(--fg); }
+  .callout.danger { border-color: var(--danger-border); background: var(--danger-bg); color: var(--fg); }
+  .callout .k { font-weight: 600; }
+
+  /* ---------- 各类状态（分开展示真实能力） ---------- */
+  .states {
+    width: 1180px;
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .state-card {
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--fg);
+  }
+  .state-title { font-size: 11.5px; font-weight: 600; margin-bottom: 4px; }
+  .state-body { font-size: 10.5px; color: var(--fg-muted); line-height: 1.5; }
+  .state-card.readonly { border-left: 3px solid var(--untracked); }
+  .state-card.conflict { border-left: 3px solid var(--conflict); }
+  .state-card.rejected { border-left: 3px solid var(--deleted); }
+  .state-card.pending { border-left: 3px solid var(--warn-border); }
+  .state-card.watcher { border-left: 3px solid var(--modified); }
+
+  /* ---------- 图例 ---------- */
+  .legend {
+    margin-top: 14px;
+    width: 1180px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    font-size: 10.5px;
+    color: #444;
+  }
+  html.dark .legend { color: #bbb; }
+  .legend div { background: rgba(255, 255, 255, 0.7); border-radius: 5px; padding: 6px 8px; }
+  html.dark .legend div { background: rgba(255, 255, 255, 0.06); }
+</style>
+</head>
+<body>
+
+<h1>Revia M2 · 任务 13 静态效果图（深色）</h1>
+<p class="hint">
+  仅静态源文件，用于确认视觉方向，不含任何新功能。浅色版见 mockup.html。
+  覆盖：工具栏、侧栏头部、文件列表与分组、diff 区、hunk 操作，以及空文件／二进制／默认收起／只读／冲突／操作被拒绝／结果待核对／自动刷新不可用。
+</p>
+
+<div class="frame">
+  <!-- 工具栏：红绿灯融入、图标按钮、系统强调色、无 Git 版本与文件数、无 A−/A+ -->
+  <div class="toolbar">
+    <div class="lights"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+    <div class="title">Revia <span class="branch-chip">feature/diff-stream</span></div>
+    <div class="segmented"><span class="on">分栏</span><span>统一</span></div>
+    <button class="icon-btn active" title="刷新">⟳</button>
+    <button class="icon-btn" title="暂存">＋</button>
+    <button class="icon-btn" title="取消暂存">−</button>
+    <button class="icon-btn" title="丢弃…">⤺</button>
+    <button class="icon-btn" title="回收区">🗄</button>
+  </div>
+
+  <!-- 提示条：自动刷新不可用 + 结果待核对 -->
+  <div class="banner warn">
+    <span>⚠</span>
+    <span><b>自动刷新不可用</b> · 文件监视启动失败，请手动刷新；写入前仍会校验文件指纹。</span>
+    <span class="dismiss">关闭</span>
+  </div>
+  <div class="banner danger">
+    <span>⛔</span>
+    <span><b>结果待核对</b> · 丢弃 <code>src/generated.ts</code> 的执行结果无法确定，请检查工作区后再操作。</span>
+    <span class="dismiss">关闭</span>
+  </div>
+
+  <div class="body">
+    <!-- 侧栏：半透明材质、仓库与 worktree -->
+    <aside class="sidebar">
+      <div class="sidebar-head">当前仓库</div>
+      <div class="repo sel">
+        <span class="dot"></span>
+        <div>
+          <div>Revia</div>
+          <div class="path">~/project/Revia</div>
+        </div>
+      </div>
+      <div class="sidebar-foot">
+        仓库与 worktree 由工具栏下拉选择<br>（当前 M2 已有的入口）
+      </div>
+    </aside>
+
+    <!-- 中间：分组列表（含默认收起、只读、冲突、未跟踪） -->
+    <div class="changes">
+      <div class="tabs"><span class="tab on">变更</span></div>
+
+      <div class="group-head">未暂存 <span class="count">3</span></div>
+      <div class="row sel">
+        <span class="letter m">M</span>
+        <span class="name"><span class="dir">src/</span>App.tsx</span>
+        <span class="badge-ro" title="只读：符号链接">只读</span>
+        <span class="check"></span>
+      </div>
+      <div class="row">
+        <span class="letter m">M</span>
+        <span class="name"><span class="dir">src/features/diff/</span>DiffView.tsx</span>
+        <span></span>
+        <span class="check on">✓</span>
+      </div>
+      <div class="row">
+        <span class="letter u">U</span>
+        <span class="name"><span class="dir">src/</span>conflict.ts</span>
+        <span class="badge-ro" title="只读：未解决的冲突">只读</span>
+        <span class="check off-lock" title="版本无法确认，不能标记"></span>
+      </div>
+
+      <div class="group-head">未跟踪 <span class="count">1</span> ▸</div>
+      <div class="row-note">默认收起：只显示数量，展开后才列出文件</div>
+
+      <div class="group-head">已暂存 <span class="count">2</span></div>
+      <div class="row">
+        <span class="letter a">A</span>
+        <span class="name"><span class="dir">src/lib/</span>refreshGate.ts</span>
+        <span></span>
+        <span class="check on">✓</span>
+      </div>
+      <div class="row">
+        <span class="letter d">D</span>
+        <span class="name"><span class="dir">src/</span>legacy.ts</span>
+        <span></span>
+        <span class="check"></span>
+      </div>
+
+      <div class="changes-foot">
+        <span>已审阅 2/6</span>
+      </div>
+    </div>
+
+    <!-- diff 区：hunk 操作、空文件、二进制、被拒绝提示 -->
+    <div class="diff">
+      <div class="diff-head">
+        <span class="file">src/App.tsx</span>
+        <span>· 分栏 · 18px 行高</span>
+      </div>
+      <div class="diff-body">
+        <div class="hunk">
+          <span class="range">@@ -118,6 +118,9 @@ export function App()</span>
+          <span class="readonly-hint">只读：符号链接，不能暂存或丢弃</span>
+        </div>
+        <div class="line"><span class="no">118</span><span class="no">118</span><span class="code">  const [busy, setBusy] = useState(false);</span></div>
+        <div class="line"><span class="no">119</span><span class="no">119</span><span class="code">  const gateRef = useRef(new SnapshotGate());</span></div>
+        <div class="line del"><span class="no">120</span><span class="no"></span><span class="code">  const [error, setError] = useState(null);</span></div>
+        <div class="line add"><span class="no"></span><span class="no">120</span><span class="code">  const [worktreeErrors, setWorktreeErrors] = useState({});</span></div>
+        <div class="line add"><span class="no"></span><span class="no">121</span><span class="code">  const closeCoordinatorRef = useRef(new CloseCoordinator());</span></div>
+        <div class="line"><span class="no">121</span><span class="no">122</span><span class="code">  const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;</span></div>
+
+        <div class="hunk">
+          <span class="range">@@ -402,7 +405,7 @@ 统一的快照接收入口</span>
+          <button class="hunk-btn">暂存 hunk</button>
+          <button class="hunk-btn">丢弃 hunk</button>
+        </div>
+        <div class="line"><span class="no">405</span><span class="no">408</span><span class="code">  const acceptSnapshot = useCallback((token, snap) =&gt; {</span></div>
+        <div class="line del"><span class="no">406</span><span class="no"></span><span class="code">    applyRefreshedSnapshot(snap);</span></div>
+        <div class="line add"><span class="no"></span><span class="no">409</span><span class="code">    applyRefreshedSnapshot(read.deliver(snap));</span></div>
+
+        <div class="callout danger">
+          <span>⛔</span>
+          <div><span class="k">操作被拒绝</span> · 文件已变化，请重新确认后再操作。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 各类状态分开展示：每种只展示它真实具备的能力 -->
+<div class="states">
+  <div class="state-card">
+    <div class="state-title">空文件</div>
+    <div class="state-body">新增文件没有内容，diff 区不显示行；可以整体暂存。</div>
+  </div>
+  <div class="state-card">
+    <div class="state-title">二进制文件</div>
+    <div class="state-body">无法显示文本 diff；只能整体暂存或丢弃，没有 hunk 操作。</div>
+  </div>
+  <div class="state-card">
+    <div class="state-title">默认收起</div>
+    <div class="state-body">未跟踪组默认收起，只显示数量；展开后才列出文件。</div>
+  </div>
+  <div class="state-card readonly">
+    <div class="state-title">只读</div>
+    <div class="state-body">符号链接／子模块／非 UTF-8：勾选框不可用，diff 区没有暂存或丢弃 hunk 按钮。</div>
+  </div>
+  <div class="state-card conflict">
+    <div class="state-title">冲突</div>
+    <div class="state-body">U 字母 + 只读徽标；未解决前不可暂存、不可标记已审阅。</div>
+  </div>
+  <div class="state-card rejected">
+    <div class="state-title">操作被拒绝</div>
+    <div class="state-body">文件已变化：提示要求重新确认，不自动重试。</div>
+  </div>
+  <div class="state-card pending">
+    <div class="state-title">结果待核对</div>
+    <div class="state-body">独立提示条；先核对真实状态，再决定继续关闭或留在应用。</div>
+  </div>
+  <div class="state-card watcher">
+    <div class="state-title">自动刷新不可用</div>
+    <div class="state-body">独立提示条；可手动刷新，写入前仍校验指纹。</div>
+  </div>
+</div>
+
+<div class="legend">
+  <div>工具栏：无 Git 版本、无文件数、无 A−/A+</div>
+  <div>侧栏：半透明材质 + 系统强调色选中</div>
+  <div>状态色只用于 Git 状态字母与 diff 行</div>
+  <div>hunk 操作靠右、描边按钮，不堆色块</div>
+  <div>默认收起：未跟踪组只显示数量</div>
+  <div>只读：符号链接／子模块／冲突／非 UTF-8</div>
+  <div>提示：待核对与自动刷新不可用各有独立条</div>
+  <div>信息密度参照 Fork，行高紧凑</div>
+</div>
+
+</body>
+</html>

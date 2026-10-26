@@ -1,0 +1,64 @@
+{
+  "buildSource": "de8979655f44ceb7531d64e13b6a12a97f7c0417",
+  "binarySha256": "05316c294400392019e7215cd1f329041d48082fd8d9f527e178a026fed20268",
+  "boundary": "Ordinary UI in isolated acceptance directory, five production-generated recovery records; no application restore or deletion executed.",
+  "result": "Not accepted; return confirmation-label defect to Pi before continuing functional desktop acceptance",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-desktop-46oHkH/desktop-evidence/after-cancelled-confirmations.json",
+      "stored": "after-cancelled-confirmations.json.gz",
+      "sourceBytes": 421944,
+      "storedBytes": 10454,
+      "sourceSha256": "cfcf02443467541a78c61d65d775968b564bc3073f7016f792a1f5806ca241d5",
+      "storedSha256": "4bf312320d5c2952c104447ab5d12807b8559e3a2211193d0da26d51a5169406"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-46oHkH/desktop-evidence/before-ui.json",
+      "stored": "before-ui.json.gz",
+      "sourceBytes": 421944,
+      "storedBytes": 10454,
+      "sourceSha256": "1b6a242885b73a5818335cd714b52b5000f47326ebef962d69daadb173138205",
+      "storedSha256": "51e55bfe3a06e564b5482d0d5ca7ec3424fee6bbb9e1be764c9edea4c9f6f919"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-46oHkH/desktop-evidence/observations.json",
+      "stored": "observations.json.gz",
+      "sourceBytes": 1512,
+      "storedBytes": 884,
+      "sourceSha256": "8f4efb0238c8d715429bdd68710693f95319896fefe2c766c7acb7d26bf43322",
+      "storedSha256": "98f1ff13ec5157e9b5e9681f8771c11b8ccc3b30d4af4437a8d9907581c25bb8"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-46oHkH/desktop-evidence/run-1/commands.log",
+      "stored": "run-1-commands.log.gz",
+      "sourceBytes": 1254,
+      "storedBytes": 621,
+      "sourceSha256": "55f41a968daecdb32673d1da3514aeaffd9aaab3a2a9861c920a23e9c0c45486",
+      "storedSha256": "dd650dd9f9bcc5a937ba5cd5ab29d8408a2921ed60d9acffac89be071ad09c42"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-46oHkH/desktop-evidence/run-1/launch.json",
+      "stored": "run-1-launch.json.gz",
+      "sourceBytes": 780,
+      "storedBytes": 458,
+      "sourceSha256": "f4ec9bae0a7b6cb21e5151d1102da0233b7ac770a48e09c28409e9167b543301",
+      "storedSha256": "53c35fac27e25dbfefc4219f7dc551255b231ac43e23e5a51fb6b04a4421c359"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-46oHkH/desktop-evidence/run-1/stdout.log",
+      "stored": "run-1-stdout.log.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-run.py",
+      "stored": "desktop-run.py.gz",
+      "sourceBytes": 4655,
+      "storedBytes": 2012,
+      "sourceSha256": "3f41b66f6cf8e6da33415f97707309d27f9ef3d795c495a773c54695a03a1ee0",
+      "storedSha256": "f8708bc82ad3016f939b64d4c70096689dbe27da98ba63873d9570e2682f8ba2"
+    }
+  ]
+}

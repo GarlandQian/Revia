@@ -1,0 +1,266 @@
+{
+  "buildSource": "de8979655f44ceb7531d64e13b6a12a97f7c0417",
+  "binarySha256": "05316c294400392019e7215cd1f329041d48082fd8d9f527e178a026fed20268",
+  "productSourceAtArchiveMatchesBuild": true,
+  "boundary": "Four visible-window automatic performance runs with screenshots inspected through CUA; no local screenshot files claimed. Ordinary UI manual scrolling and task05 functional desktop acceptance not yet completed. These runs do not replace the final Q98 thirty-minute same-process test.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-release-6ifrxd1q/build.exit",
+      "stored": "release-build.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-task05-release-6ifrxd1q/build.stderr",
+      "stored": "release-build.stderr.gz",
+      "sourceBytes": 1746,
+      "storedBytes": 768,
+      "sourceSha256": "c5044eeab6a6cff52170eca1e2854c9e889902d62ea4fefe7ca53a4588ebd458",
+      "storedSha256": "a5463afa1c13c5e9988ae5f3b7444b40b5d6ab005e5e815bc72b084b5f5f03af"
+    },
+    {
+      "source": "/private/tmp/revia-task05-release-6ifrxd1q/build.stdout",
+      "stored": "release-build.stdout.gz",
+      "sourceBytes": 352,
+      "storedBytes": 242,
+      "sourceSha256": "0680fa9605852ed9bf70bd7dfbdbf98a8815ab2ea73710b7b1e1cf255cfa2944",
+      "storedSha256": "f312bc4926e3b90a61faf7ad4fb6cd5d44776d32541bf69e164bef93b6417e05"
+    },
+    {
+      "source": "/private/tmp/revia-task05-release-6ifrxd1q/release.json",
+      "stored": "release-release.json.gz",
+      "sourceBytes": 657,
+      "storedBytes": 371,
+      "sourceSha256": "702b912cf1fc36338d110830211df2791a412384a18d61ab9d3608be92911c51",
+      "storedSha256": "079b3adf2ec5be30f493072332dbc19a673f7ca89dfbab00c4496cab0a65d9ec"
+    },
+    {
+      "source": "/private/tmp/revia-task05-release-6ifrxd1q/source.json",
+      "stored": "release-source.json.gz",
+      "sourceBytes": 272,
+      "storedBytes": 217,
+      "sourceSha256": "1f11a623d286e3f3d99053632b7a1e3fcca682d5d706aa8ae639454a6495039b",
+      "storedSha256": "648635f72f762a8a72ad016831928b526d7e977d65961c8521bdea711e5701bc"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-launch.py",
+      "stored": "perf-launch.py.gz",
+      "sourceBytes": 2196,
+      "storedBytes": 1193,
+      "sourceSha256": "eb9b5883bf32ae131c373fab2957d43c7d136edf0aab555f06683b5f1af86c8b",
+      "storedSha256": "48e3c8d1281c0409c849e631bf49c554a03121bfa7df916ce01a7cec08baa457"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/evidence/perf-setup-cold.json",
+      "stored": "perf-setup-cold.json.gz",
+      "sourceBytes": 320,
+      "storedBytes": 225,
+      "sourceSha256": "880851363a69b8d53d6104a37d47fd116670776d7d78e66735cae90ee098669d",
+      "storedSha256": "a8395efa088d0ae91a6e6f1a2e001a07403adf288eeecc2722bc4b2724d06ff2"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/evidence/perf-setup-cold.stderr",
+      "stored": "perf-setup-cold.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/evidence/perf-setup-cold.stdout",
+      "stored": "perf-setup-cold.stdout.gz",
+      "sourceBytes": 45,
+      "storedBytes": 65,
+      "sourceSha256": "2f6952e567239f13fabf5247ab13d1883c0f454c3bd4d26527d6466cec596882",
+      "storedSha256": "7ebf7ced52052418599bece735ee812b19f3a75aa77601d851b14a9b2fb9c5e6"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/evidence/perf-setup-standard.json",
+      "stored": "perf-setup-standard.json.gz",
+      "sourceBytes": 315,
+      "storedBytes": 215,
+      "sourceSha256": "3891768330fc2091c512dc2f5ec6f0bbd0c42bc9cb780df9d7a88efda38ea1c1",
+      "storedSha256": "4d894b11acf54579f4104ad586735914e80488d7ece8ec49b8d1f9eb7abfa6af"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/evidence/perf-setup-standard.stderr",
+      "stored": "perf-setup-standard.stderr.gz",
+      "sourceBytes": 88,
+      "storedBytes": 111,
+      "sourceSha256": "996d14483e782212164c3d1d023c9486a06a94bd61a6575bbc9ba79a522fb634",
+      "storedSha256": "5890e9cf0f65c679271527e44b753dded09ac677979d4c2b75b08dceca451ea7"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/evidence/perf-setup-standard.stdout",
+      "stored": "perf-setup-standard.stdout.gz",
+      "sourceBytes": 843,
+      "storedBytes": 321,
+      "sourceSha256": "5605d29bd522923a3b5af8d6f673f990c6f38b83ed3ad7d8db6cf5bd465d8bac",
+      "storedSha256": "98ce8d7f4474466a79e3f0a9724bff02b420296545b817f3ef6cd6df055b02ba"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/normal-split-1/result.json",
+      "stored": "normal-split-1-result.json.gz",
+      "sourceBytes": 7936,
+      "storedBytes": 1439,
+      "sourceSha256": "047a882606235ade417a7b59c8b5f98048f38aa32096e9cf94e33462b8f6f9c1",
+      "storedSha256": "7feed1d4c6f7bfe3df0632904686a2ef2987ed39c5880faed8384da11c126fb5"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/normal-split-1/launch.json",
+      "stored": "normal-split-1-launch.json.gz",
+      "sourceBytes": 765,
+      "storedBytes": 427,
+      "sourceSha256": "d96ede9f8cd4a5d1e83b97cf0f6d7797c788f7dd02eec97e7dbdc3cdc559b67a",
+      "storedSha256": "21f547eaab3f2285feb49b19cf0eb6cba8ed6dd3af6c135db53d3c5840ee649d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/normal-split-1/stdout.log",
+      "stored": "normal-split-1-stdout.log.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/normal-unified-1/result.json",
+      "stored": "normal-unified-1-result.json.gz",
+      "sourceBytes": 7713,
+      "storedBytes": 1413,
+      "sourceSha256": "af406d79a4431f8c5fed83ea94989eb6e447e7f19f60253b0345ceb947e12ca3",
+      "storedSha256": "9447bf93129a457c6a3a5434d51fd483838730b7bebc9986f9d0ba1fc632b5de"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/normal-unified-1/launch.json",
+      "stored": "normal-unified-1-launch.json.gz",
+      "sourceBytes": 771,
+      "storedBytes": 427,
+      "sourceSha256": "d38edfec128417406a05e5a9c1f83d60107768683da58271ff9ed179159b0134",
+      "storedSha256": "3afcabf49640f1ec8e6a406b2bee1464ee58d76f1c95ba150bcd2f87d497e403"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/normal-unified-1/stdout.log",
+      "stored": "normal-unified-1-stdout.log.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/cold-split-1/result.json",
+      "stored": "cold-split-1-result.json.gz",
+      "sourceBytes": 7920,
+      "storedBytes": 1471,
+      "sourceSha256": "3ddb3ce8aa37078b454526a428ea0fd9c28a6aad0e23fbf277d7f3b50a2244af",
+      "storedSha256": "b7039f30eb9c5b07b8b6e2af1ff3a359afff399f732c611aa17dd8bd457d3e7c"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/cold-split-1/launch.json",
+      "stored": "cold-split-1-launch.json.gz",
+      "sourceBytes": 740,
+      "storedBytes": 438,
+      "sourceSha256": "59f98cf09ffbb31cd64361b7ce015e5dd8f14bf18c82782090bf566ed2ce7029",
+      "storedSha256": "d0655c57171655be76c8b189c367b7cd5fbd0f33351676d69ae391a42ea2b778"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/cold-split-1/stdout.log",
+      "stored": "cold-split-1-stdout.log.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/cold-unified-1/result.json",
+      "stored": "cold-unified-1-result.json.gz",
+      "sourceBytes": 7693,
+      "storedBytes": 1450,
+      "sourceSha256": "3d10072210bef89434dd51c7b49a7caa148163f3a94989e847faa5634994643c",
+      "storedSha256": "5a7173b29bf69e520c1a24b7e705c14e1155a7205dd89ae71916c242421967be"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/cold-unified-1/launch.json",
+      "stored": "cold-unified-1-launch.json.gz",
+      "sourceBytes": 746,
+      "storedBytes": 439,
+      "sourceSha256": "5ddd20690f990ee73cb13ed0a7ba439ac0160eed92e8c5f7953c916ef9f39cb2",
+      "storedSha256": "80c7f62c316e4605861c1d79427e13247377bc3be1b5ad7a9fa69384e0b323b6"
+    },
+    {
+      "source": "/private/tmp/revia-task05-mbnrk698/perf-runs/cold-unified-1/stdout.log",
+      "stored": "cold-unified-1-stdout.log.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ],
+  "runs": [
+    {
+      "run": "normal-split-1",
+      "pid": 10166,
+      "firstScreenMs": 117,
+      "rows": 8309,
+      "originalAppearMs": 9,
+      "originalWarmAppearMs": 3,
+      "originalColorRestoreMs": 33,
+      "domOutTextMs": 3,
+      "domReturnTextMs": 1,
+      "domReturnColorMs": 33,
+      "frameMaxMs": 19,
+      "slowFrames": 0,
+      "allAssertionsPassed": true,
+      "quitVerified": true
+    },
+    {
+      "run": "normal-unified-1",
+      "pid": 11615,
+      "firstScreenMs": 111,
+      "rows": 13435,
+      "originalAppearMs": 16,
+      "originalWarmAppearMs": 7,
+      "originalColorRestoreMs": 25,
+      "domOutTextMs": 1,
+      "domReturnTextMs": 1,
+      "domReturnColorMs": 34,
+      "frameMaxMs": 18,
+      "slowFrames": 0,
+      "allAssertionsPassed": true,
+      "quitVerified": true
+    },
+    {
+      "run": "cold-split-1",
+      "pid": 11938,
+      "firstScreenMs": 118,
+      "rows": 30001,
+      "originalAppearMs": 9,
+      "originalWarmAppearMs": 3,
+      "originalColorRestoreMs": 25,
+      "domOutTextMs": 5,
+      "domReturnTextMs": 1,
+      "domReturnColorMs": 30,
+      "frameMaxMs": 23,
+      "slowFrames": 1,
+      "allAssertionsPassed": true,
+      "quitVerified": true
+    },
+    {
+      "run": "cold-unified-1",
+      "pid": 12191,
+      "firstScreenMs": 116,
+      "rows": 60001,
+      "originalAppearMs": 14,
+      "originalWarmAppearMs": 2,
+      "originalColorRestoreMs": 24,
+      "domOutTextMs": 7,
+      "domReturnTextMs": 1,
+      "domReturnColorMs": 30,
+      "frameMaxMs": 18,
+      "slowFrames": 0,
+      "allAssertionsPassed": true,
+      "quitVerified": true
+    }
+  ]
+}

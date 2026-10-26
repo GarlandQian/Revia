@@ -1,0 +1,415 @@
+{
+  "sourceCommit": "a96d0e000f67c7f3dca4e57bd0f75a2402245fdc",
+  "reviewRange": "3c8a0b87288900d444383830d8553cb110f6f141...a96d0e000f67c7f3dca4e57bd0f75a2402245fdc",
+  "sourceHashChecks": [
+    {
+      "path": "src/lib/refreshGate.ts",
+      "sha256": "2ec1be800affffa776d2a4896885297de28e4685b25aff4eb91d549e90bc7768"
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "63ac75905fd3dd271ba4b09ce78e5d9783ee0a1e0a7ef36ba2664c9dbc6b2f4f"
+    },
+    {
+      "path": "tools/test-refresh-gate.mjs",
+      "sha256": "f514ac624275df7998e4adfe48c3b45ef29f25d158493723ca8afc055b6726ec"
+    }
+  ],
+  "sensitivityOutputSummaries": [
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens1-baseline-after-read.out",
+      "tests": 33,
+      "pass": 30,
+      "fail": 3,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "写结果：经共享入口发起，期间成功的标记不被回退（ST07-R7-1）",
+        "写结果期间取消同样保留（ST07-R7-1 反向）",
+        "重开仓库（再次添加当前仓库）经共享入口，不能直接发布 rawSnapshot（SP07-R7-4）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens2-record-after-gate.out",
+      "tests": 33,
+      "pass": 32,
+      "fail": 1,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "生产入口真的接入了分界与记账（辅助定位，不当作时序证明）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens3-untracked-wholesale.out",
+      "tests": 33,
+      "pass": 32,
+      "fail": 1,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "生产入口真的接入了分界与记账（辅助定位，不当作时序证明）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens4-reopen-bypass.out",
+      "tests": 33,
+      "pass": 32,
+      "fail": 1,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "生产入口真的接入了分界与记账（辅助定位，不当作时序证明）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens5-only-target-record.out",
+      "tests": 33,
+      "pass": 32,
+      "fail": 1,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "A/B 并发：只登记 B 会漏掉 A，按完整成功集合记账才不漏（ST07-R7-3 / SP07-R7-2）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens1-write-baseline-late.out",
+      "tests": 32,
+      "pass": 32,
+      "fail": 0,
+      "exit": "exit=0",
+      "uniqueFailedTests": []
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens2-record-after-gate.out",
+      "tests": 32,
+      "pass": 31,
+      "fail": 1,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "生产入口真的接入了分界与记账（辅助定位，不当作时序证明）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens3-untracked-wholesale.out",
+      "tests": 32,
+      "pass": 31,
+      "fail": 1,
+      "exit": "exit=1",
+      "uniqueFailedTests": [
+        "生产入口真的接入了分界与记账（辅助定位，不当作时序证明）"
+      ]
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens4-reopen-bypass.out",
+      "tests": 32,
+      "pass": 32,
+      "fail": 0,
+      "exit": "exit=0",
+      "uniqueFailedTests": []
+    }
+  ],
+  "boundary": "Mac frontend checks only: Node33 and tsc/lint/build exit0. Eighth independent limited review: Standards2 P2, Spec2 P2; request ordering and full-set version provenance still unsafe. Sensitivity output totals come from the test-run summary, not duplicate failure lines. Three second-round mutants fail only the source-string assertion; those are not dynamic proof of App integration. No Release, GUI, D06, new CI or long run.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/MANIFEST.md",
+      "stored": "original/MANIFEST.md.gz",
+      "sourceBytes": 1687,
+      "storedBytes": 1121,
+      "sourceSha256": "e38422bf82509149998406034edcd472c764c1c78fe66128fa3bde64fc132b28",
+      "storedSha256": "f7ceb1c237b93cf48e005ed2fdf10e739636397e1cb78687b0ab9d4f6ef4817e"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/base-sha.txt",
+      "stored": "original/base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "95a5f0ce1d4fd152c5c93b058c6b2bde3524cdf81659dcea6524d8562a201670",
+      "storedSha256": "bb425f3d5686675fa3383646efb002c285ff88870245e1b3629c0e966cdc0f65"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/build.err",
+      "stored": "original/build.err.gz",
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/build.exit",
+      "stored": "original/build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/build.out",
+      "stored": "original/build.out.gz",
+      "sourceBytes": 352,
+      "storedBytes": 237,
+      "sourceSha256": "f438277efe9bf6de0300f8fe57993383eb49e085c709075d0fb5b7c9b04b361e",
+      "storedSha256": "24ce2c7436c7efeae70c4c39023b1a9852ed30d0bd2776ec96e8823399a8e4f5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/changed-files.txt",
+      "stored": "original/changed-files.txt.gz",
+      "sourceBytes": 72,
+      "storedBytes": 77,
+      "sourceSha256": "e307f07337179eddba379b4a8cbaf27c295177e9fd0699c397e739386cb0f179",
+      "storedSha256": "4ab5de4f8b13c360275ecd8468eb920e501b21ba238885b1233e71f4fc9bd97d"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/lint.err",
+      "stored": "original/lint.err.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/lint.exit",
+      "stored": "original/lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/lint.out",
+      "stored": "original/lint.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/refresh-gate.err",
+      "stored": "original/refresh-gate.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/refresh-gate.exit",
+      "stored": "original/refresh-gate.exit.gz",
+      "sourceBytes": 20,
+      "storedBytes": 40,
+      "sourceSha256": "f835fe692be046a5de522b4ecdcae59a7f3761866077ccc3bc369c62d6642651",
+      "storedSha256": "aa98c27c5a4bef70b17a3de2eab8e2f161b684c501389e277a29bf4f1ac06ef5"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/refresh-gate.out",
+      "stored": "original/refresh-gate.out.gz",
+      "sourceBytes": 2999,
+      "storedBytes": 1536,
+      "sourceSha256": "0a8cdcce320c8150067a2ec53b2c00230d5699ceb1f5609ff601a0220a8bb9d3",
+      "storedSha256": "f504ed5ef30bb7925fa61ca8bdf2c689d2fddb7ffd2ee012aed2daae0bdaea15"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens1-baseline-after-read.exit",
+      "stored": "original/sensitivity/2-sens1-baseline-after-read.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens1-baseline-after-read.out",
+      "stored": "original/sensitivity/2-sens1-baseline-after-read.out.gz",
+      "sourceBytes": 4993,
+      "storedBytes": 2011,
+      "sourceSha256": "68c7e87527532095072d490b44486ec15ce7e46dfa0e3ca215cdb5a59320f14a",
+      "storedSha256": "64d9ef97724adf4505bfb52c25288a7c1bb7ad2d205729bb10bf2cc7dc9669ee"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens2-record-after-gate.exit",
+      "stored": "original/sensitivity/2-sens2-record-after-gate.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens2-record-after-gate.out",
+      "stored": "original/sensitivity/2-sens2-record-after-gate.out.gz",
+      "sourceBytes": 3645,
+      "storedBytes": 1894,
+      "sourceSha256": "dec17362f2d313beca835385706c0a087e64f7a52f56a25b36db49f70b3b84f9",
+      "storedSha256": "8a2b35b0fc863247db1cb41effbcce5eaeffe9ee3af3fb28303ed450c6e671e7"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens3-untracked-wholesale.exit",
+      "stored": "original/sensitivity/2-sens3-untracked-wholesale.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens3-untracked-wholesale.out",
+      "stored": "original/sensitivity/2-sens3-untracked-wholesale.out.gz",
+      "sourceBytes": 4194,
+      "storedBytes": 2179,
+      "sourceSha256": "8a85636ad4aa0dcb9cae9f52d65db23decb440991f3d5dd4e28522c547880c1f",
+      "storedSha256": "0046bac474405e49ffe7f388b95bab2f07de991837067533cfe1bb6e466f84b4"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens4-reopen-bypass.exit",
+      "stored": "original/sensitivity/2-sens4-reopen-bypass.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens4-reopen-bypass.out",
+      "stored": "original/sensitivity/2-sens4-reopen-bypass.out.gz",
+      "sourceBytes": 3662,
+      "storedBytes": 1914,
+      "sourceSha256": "c4149fde2e80db1f34af6cf6086af2ad26fa895d51f0c159b75fd806ec228525",
+      "storedSha256": "772046f41521fb6fcf3bfff77f37a319437dc599c29a038db56eb8ada4644f88"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens5-only-target-record.exit",
+      "stored": "original/sensitivity/2-sens5-only-target-record.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/2-sens5-only-target-record.out",
+      "stored": "original/sensitivity/2-sens5-only-target-record.out.gz",
+      "sourceBytes": 3931,
+      "storedBytes": 1969,
+      "sourceSha256": "5714931a5fece3e5d10e907c62351cba3d5e27eba75be6e9c112704e895ad023",
+      "storedSha256": "d101c1eda99de73494cf3d33b4ae2f745ad386feed9681af462f303c9cedbc48"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/App.tsx.orig",
+      "stored": "original/sensitivity/App.tsx.orig.gz",
+      "sourceBytes": 118744,
+      "storedBytes": 31201,
+      "sourceSha256": "991f955dd89804e723dab7d0de889de4b9909bbbe06112a66e3f9f87c1f88344",
+      "storedSha256": "8ca7f95c0c15d80ed371df1b6aecf66978c6e34755b152f182dd8818a8abb851"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/App.tsx.orig2",
+      "stored": "original/sensitivity/App.tsx.orig2.gz",
+      "sourceBytes": 118023,
+      "storedBytes": 30988,
+      "sourceSha256": "63ac75905fd3dd271ba4b09ce78e5d9783ee0a1e0a7ef36ba2664c9dbc6b2f4f",
+      "storedSha256": "9ae8c1a7955444eda12ca9b2f58deadead5f505fcd5bb093442483282ab4312d"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/refreshGate.ts.orig",
+      "stored": "original/sensitivity/refreshGate.ts.orig.gz",
+      "sourceBytes": 15166,
+      "storedBytes": 5260,
+      "sourceSha256": "36620bcffefebcebc1c37e1e1cf92dba5ca86ecfc8a60004bbe8c3b2f56f63e0",
+      "storedSha256": "8423467cf9f07574177b339ee537d672363080404cb95eb35f32b4430c74b655"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/refreshGate.ts.orig2",
+      "stored": "original/sensitivity/refreshGate.ts.orig2.gz",
+      "sourceBytes": 18239,
+      "storedBytes": 6241,
+      "sourceSha256": "2ec1be800affffa776d2a4896885297de28e4685b25aff4eb91d549e90bc7768",
+      "storedSha256": "b917861b05e62f742a82627ba8ff9790756744e222984ac6f12568f374fe4e72"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens1-write-baseline-late.exit",
+      "stored": "original/sensitivity/sens1-write-baseline-late.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "storedSha256": "490f70fc729c412fb4530871885a3c7cbf7f6b871925c93ac664973d5efe5ebf"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens1-write-baseline-late.out",
+      "stored": "original/sensitivity/sens1-write-baseline-late.out.gz",
+      "sourceBytes": 2906,
+      "storedBytes": 1503,
+      "sourceSha256": "559459fcc20d0d6f1a7f9e806a4b282436401cf304e368cb38703aeedfc0521d",
+      "storedSha256": "18a43249b6a5dcb14a7718e830a6fd8807854da9eec213464b87f33d5ff9ad19"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens2-record-after-gate.exit",
+      "stored": "original/sensitivity/sens2-record-after-gate.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens2-record-after-gate.out",
+      "stored": "original/sensitivity/sens2-record-after-gate.out.gz",
+      "sourceBytes": 3527,
+      "storedBytes": 1835,
+      "sourceSha256": "b65ec291a55eb74fd012ca8e81bbb3721c38cbc11aaea1500d8e2fda7e4bd50c",
+      "storedSha256": "374951383714d2e8aa464b0b0aeffc82fe8f5a80892496da3b183c04f9d92662"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens3-untracked-wholesale.exit",
+      "stored": "original/sensitivity/sens3-untracked-wholesale.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "cf205dbb8cea84897b488abcc281bf96698d5e94b1096b16657b4caba9082a22",
+      "storedSha256": "47abbbd21eefca6ddab3879ee3b1fd82b9c407111a6745013cc391b484fbc974"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens3-untracked-wholesale.out",
+      "stored": "original/sensitivity/sens3-untracked-wholesale.out.gz",
+      "sourceBytes": 4107,
+      "storedBytes": 2139,
+      "sourceSha256": "a6b64c7b93e4c594ef61b97a743db5d27f08414f82d7797b5ef4016be6bf86b0",
+      "storedSha256": "57bff68f869a77d71d581f9c8fec9ed8972c8ede5190325998685974270edad8"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens4-reopen-bypass.exit",
+      "stored": "original/sensitivity/sens4-reopen-bypass.exit.gz",
+      "sourceBytes": 7,
+      "storedBytes": 27,
+      "sourceSha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "storedSha256": "490f70fc729c412fb4530871885a3c7cbf7f6b871925c93ac664973d5efe5ebf"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/sensitivity/sens4-reopen-bypass.out",
+      "stored": "original/sensitivity/sens4-reopen-bypass.out.gz",
+      "sourceBytes": 2891,
+      "storedBytes": 1488,
+      "sourceSha256": "e14fb5aff01da27d1be2600ebd16377e9a7319bdd045e8fbea828c3e44f328cf",
+      "storedSha256": "2133f343ef49b6eea1c6e69169b0635d3fc159293471db7fc2d879ea26952fd1"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/source-sha256-before-check.txt",
+      "stored": "original/source-sha256-before-check.txt.gz",
+      "sourceBytes": 261,
+      "storedBytes": 206,
+      "sourceSha256": "867ce813da2f366c5bebf9588f2ad53765bd0f22c87f9209556d819b16ff1b52",
+      "storedSha256": "eb1dde49ee3ba96fd862fdbc12659a52854a93e9f3aa5427440cefad9752304b"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/tsc.err",
+      "stored": "original/tsc.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/tsc.exit",
+      "stored": "original/tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task07-r8-9j0mZv/tsc.out",
+      "stored": "original/tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

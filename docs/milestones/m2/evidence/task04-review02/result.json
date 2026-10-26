@@ -1,0 +1,42 @@
+{
+  "root": "/private/tmp/revia-task04-review02-1sbdt0cx",
+  "gitConfigRedirect": {
+    "beforeSHA256": "f4726f870289794355082774efface0d8d6a9d71793fe568be91412f4f1c6da6",
+    "afterSHA256": "f4cd1aebd9c2ac0d17ccd524b4e15f33cac5debd6faa88fd293eea93a873c6aa",
+    "configuredAttributesBefore": "/private/tmp/revia-task04-review02-1sbdt0cx/external-attributes",
+    "configuredAttributesAfter": "/private/tmp/revia-task04-review02-1sbdt0cx/config-preview/.attributes-file",
+    "originalConfigChanged": true,
+    "windowsReachability": "static shell.rs process-env inheritance; not a Windows desktop run"
+  },
+  "linkedInfoAttributes": {
+    "perWorktreeGitDir": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo/.git/worktrees/linked",
+    "attemptedSourceExists": false,
+    "actualInfoAttributes": "/private/tmp/revia-task04-review02-1sbdt0cx/main-repo/.git/info/attributes",
+    "realCheckAttrHex": "7461726765742e747874007465787400736574007461726765742e74787400656f6c0063726c6600",
+    "scratchCheckAttrHex": "",
+    "equalityCheckWouldReject": true,
+    "actualGitApplySucceeded": true,
+    "indexUnchanged": true
+  },
+  "multilineFilter": {
+    "sourceConfigOutput": "filter.copy.clean cat\nfilter.copy.smudge :\ncat\nfilter.copy.required true\n",
+    "copiedEntries": [
+      [
+        "filter.copy.clean",
+        "cat"
+      ],
+      [
+        "filter.copy.smudge",
+        ":"
+      ],
+      [
+        "filter.copy.required",
+        "true"
+      ]
+    ],
+    "sameEffectiveAttributes": true,
+    "scratchApplyExit": 128,
+    "realApplyExit": 0,
+    "realRestoredBytesHex": "616c7068610a626574610a"
+  }
+}

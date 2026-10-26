@@ -1,0 +1,9 @@
+{
+  "base": "35da167f8a2202b19a211ade2c311f5ff430cd90",
+  "logDirectory": "/private/tmp/revia-task13-check01-ukzmi5rb",
+  "sourceUnchanged": false,
+  "allExpectedExits": false,
+  "commands": 15,
+  "afterSourceSha256": "4dfbaf3ec5e0e7368913c8b74ae1f1891b8858138f1520adfdfff8b601dc07e0",
+  "boundary": "Uncommitted task13 corrections; no Release/GUI/D06/CI/long-run or merge. Baseline sensitivity uses the same regression tests against 35da167 modules, not production execution."
+}

@@ -1,0 +1,210 @@
+{
+  "origin": "/Volumes/T7 Shield/project/Revia",
+  "target": "/Users/garland/.codex/worktrees/revia-m2/Revia",
+  "authorization": "User confirmed the self-designed icons and associated changes belong to this M2 task.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 9343,
+      "sha256": "2bbf20984b5d2ab69f4f732b0a013c665d5ac3978a0866a31cc6866ac90f6823"
+    },
+    {
+      "path": "src-tauri/icons/128x128.png",
+      "bytes": 11074,
+      "sha256": "c58d25aaedc0dadb7d58c2fd147821d6de4528fef4f030b91cb34d287b625b61"
+    },
+    {
+      "path": "src-tauri/icons/128x128@2x.png",
+      "bytes": 26772,
+      "sha256": "0861af0c427e4a075e57faa29a414d0800e17316c7bf10a6e1a7139141ab344d"
+    },
+    {
+      "path": "src-tauri/icons/32x32.png",
+      "bytes": 1877,
+      "sha256": "c9b9251803258cc0366f5fbc6de3c404b242a9b2e8555023fc16b333ba65e338"
+    },
+    {
+      "path": "src-tauri/icons/Assets.car",
+      "bytes": 1840424,
+      "sha256": "ff4ac17511472e405b87d2cb5005b140b6d0df82fe3e9557f41230c50b152fd6"
+    },
+    {
+      "path": "src-tauri/icons/Revia.icon/Assets/graph.svg",
+      "bytes": 789,
+      "sha256": "61919ec999cec398aff4c0592e03f6a3600a3725eb40023a65e2b252e7107e5f"
+    },
+    {
+      "path": "src-tauri/icons/Revia.icon/Assets/lower.svg",
+      "bytes": 207,
+      "sha256": "a316af4108b03fb021d47116ed8dc9644ce9d3cc4e8fc200e991660bc541af29"
+    },
+    {
+      "path": "src-tauri/icons/Revia.icon/Assets/upper.svg",
+      "bytes": 209,
+      "sha256": "d94b8463c6b2c61e6eb88b2a5cc43514d79ddbfd444d21204f8d0d0a624656ee"
+    },
+    {
+      "path": "src-tauri/icons/Revia.icon/icon.json",
+      "bytes": 757,
+      "sha256": "eeef7af058fcb4592ab86e7fd0130e72c3237608a259c69f19daca5d1a767c2d"
+    },
+    {
+      "path": "src-tauri/icons/Square107x107Logo.png",
+      "bytes": 8905,
+      "sha256": "a0ae44e5dd463280f397ab637de4287136fb123d052b06c18e98c374db96f343"
+    },
+    {
+      "path": "src-tauri/icons/Square142x142Logo.png",
+      "bytes": 13122,
+      "sha256": "382f15a5e5f22a136c51b88fcafab1e9f62923955f3b4f13e4ae2153f85b9c94"
+    },
+    {
+      "path": "src-tauri/icons/Square150x150Logo.png",
+      "bytes": 13836,
+      "sha256": "ab2dd093ae9a7ac7161e579df827f752049bf20779d8135bf7a39ec460c1236a"
+    },
+    {
+      "path": "src-tauri/icons/Square284x284Logo.png",
+      "bytes": 32168,
+      "sha256": "18da4c770853a93977117c2694e41fd57ef661dcbdc09822b3809a947a2b384c"
+    },
+    {
+      "path": "src-tauri/icons/Square30x30Logo.png",
+      "bytes": 1861,
+      "sha256": "d9059c9f2d8114a7c11d847d18ee94f7e2a5dd692d959c1bf6645579e91125a9"
+    },
+    {
+      "path": "src-tauri/icons/Square310x310Logo.png",
+      "bytes": 36829,
+      "sha256": "9009ec8473707266431d26d6ae71169120d716c18c78b75a15e4f8c61ad826c1"
+    },
+    {
+      "path": "src-tauri/icons/Square44x44Logo.png",
+      "bytes": 2741,
+      "sha256": "4be0fb6183168bb922e9524d1e05cdebc9d7ebb5dc002d6ac95fad75ef2a7d22"
+    },
+    {
+      "path": "src-tauri/icons/Square71x71Logo.png",
+      "bytes": 5263,
+      "sha256": "23da112acef75ba0d135f85139e6cf9197e3fac79933dac15ed99a6f3a5a1b34"
+    },
+    {
+      "path": "src-tauri/icons/Square89x89Logo.png",
+      "bytes": 7161,
+      "sha256": "7b5e315e51d41c849350734bc8913ec5b483b0d485753bba1a58d948a781dcbc"
+    },
+    {
+      "path": "src-tauri/icons/StoreLogo.png",
+      "bytes": 3397,
+      "sha256": "54da2fa0daf831e5856edcfd7a7b8872606801227e69ba40a19f5b54e6bb897c"
+    },
+    {
+      "path": "src-tauri/icons/icon.icns",
+      "bytes": 477300,
+      "sha256": "4f2d515af20de8fe1f740c69e9b6be5341751cf1435dfa72c0f0a7439b348356"
+    },
+    {
+      "path": "src-tauri/icons/icon.ico",
+      "bytes": 39428,
+      "sha256": "e48ede3e770425d31ad242117268f38262f0604a7267fc2362fb631ed4bd4af8"
+    },
+    {
+      "path": "src-tauri/icons/icon.png",
+      "bytes": 75190,
+      "sha256": "8f34ef535155ec6e5c070ce18b63afc9127ee2caa2c06522af698cb3444c5373"
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "bytes": 842,
+      "sha256": "4ba4cd63ec88688ca7c7777048897c793af55125f2206b280705050c0d4f781c"
+    },
+    {
+      "path": "tools/export-app-icon.py",
+      "bytes": 3366,
+      "sha256": "81f2831f34a9d35f4e378e165b80587aefb08a7be1d3f26eb254c04678ae6978"
+    }
+  ],
+  "pngDimensions": [
+    {
+      "path": "src-tauri/icons/128x128.png",
+      "width": 128,
+      "height": 128
+    },
+    {
+      "path": "src-tauri/icons/128x128@2x.png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "path": "src-tauri/icons/32x32.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "path": "src-tauri/icons/Square107x107Logo.png",
+      "width": 107,
+      "height": 107
+    },
+    {
+      "path": "src-tauri/icons/Square142x142Logo.png",
+      "width": 142,
+      "height": 142
+    },
+    {
+      "path": "src-tauri/icons/Square150x150Logo.png",
+      "width": 150,
+      "height": 150
+    },
+    {
+      "path": "src-tauri/icons/Square284x284Logo.png",
+      "width": 284,
+      "height": 284
+    },
+    {
+      "path": "src-tauri/icons/Square30x30Logo.png",
+      "width": 30,
+      "height": 30
+    },
+    {
+      "path": "src-tauri/icons/Square310x310Logo.png",
+      "width": 310,
+      "height": 310
+    },
+    {
+      "path": "src-tauri/icons/Square44x44Logo.png",
+      "width": 44,
+      "height": 44
+    },
+    {
+      "path": "src-tauri/icons/Square71x71Logo.png",
+      "width": 71,
+      "height": 71
+    },
+    {
+      "path": "src-tauri/icons/Square89x89Logo.png",
+      "width": 89,
+      "height": 89
+    },
+    {
+      "path": "src-tauri/icons/StoreLogo.png",
+      "width": 50,
+      "height": 50
+    },
+    {
+      "path": "src-tauri/icons/icon.png",
+      "width": 512,
+      "height": 512
+    }
+  ],
+  "validation": [
+    "exact source byte copies",
+    "Python AST parses",
+    "JSON parses",
+    "all configured icon paths exist",
+    "PNG headers and square dimensions"
+  ],
+  "pending": [
+    "independent review",
+    "final release bundle and Windows CI"
+  ]
+}

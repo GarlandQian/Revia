@@ -1,0 +1,8 @@
+{
+  "reviewed_commit": "36a39a1073223ae9835480ff54f3301e5f9c2fb2",
+  "linked_prebuilt_library": "/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps/librevia_lib.rlib",
+  "library_sha256": "9f7a76f7f23c88c38217c693ae414f4f7ea85177738bfc12d0708d9374f0c6d6",
+  "library_mtime_ns": 1792777199329339585,
+  "boundary": "External rustc client linked existing prebuilt production library. No project rebuild; prebuilt library commit provenance not independently established. All executed Git/filesystem writes confined to this isolated temporary directory.",
+  "exit": 0
+}

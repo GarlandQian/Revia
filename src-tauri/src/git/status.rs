@@ -34,6 +34,32 @@ pub enum FileStatus {
     TypeChanged,
 }
 
+/// 只读限制原因（Q81、Q82、规格第 2 节）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ReadonlyReason {
+    Symlink,
+    Submodule,
+    NestedRepo,
+    Conflict,
+    NonUtf8Path,
+    Unreadable,
+}
+
+impl ReadonlyReason {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Symlink => "符号链接为只读类型，不支持在应用内暂存或取消暂存",
+            Self::Submodule => "子模块为只读类型，不支持在应用内暂存或取消暂存",
+            Self::NestedRepo => "嵌套仓库为只读类型，不支持在应用内暂存",
+            Self::Conflict => "文件存在未解决的冲突，不支持通过普通操作暂存",
+            Self::NonUtf8Path => "非 UTF-8 路径无法无损处理，仅供只读查看",
+            Self::Unreadable => "文件无法读取或无访问权限，仅供只读查看",
+        }
+    }
+}
+
 impl FileStatus {
     pub fn letter(self) -> &'static str {
         match self {
@@ -69,6 +95,18 @@ pub struct StatusEntry {
     pub status: FileStatus,
     /// 是否处于 unmerged（冲突）状态。
     pub unmerged: bool,
+    /// 只读限制原因，None 表示支持写操作。
+    pub readonly_reason: Option<ReadonlyReason>,
+    #[serde(skip)]
+    pub mode_head: Option<String>,
+    #[serde(skip)]
+    pub mode_index: Option<String>,
+    #[serde(skip)]
+    pub mode_worktree: Option<String>,
+    #[serde(skip)]
+    pub oid_head: Option<String>,
+    #[serde(skip)]
+    pub oid_index: Option<String>,
 }
 
 /// 读取并解析状态。
@@ -130,6 +168,31 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
                     None
                 };
 
+                let is_symlink = head.get(3).is_some_and(|m| *m == "120000")
+                    || head.get(4).is_some_and(|m| *m == "120000")
+                    || head.get(5).is_some_and(|m| *m == "120000");
+                let is_submodule = head.get(2).is_some_and(|s| s.starts_with('S'))
+                    || head.get(3).is_some_and(|m| *m == "160000")
+                    || head.get(4).is_some_and(|m| *m == "160000")
+                    || head.get(5).is_some_and(|m| *m == "160000");
+                let has_non_utf8 = path.contains('\u{FFFD}')
+                    || original_path.as_deref().is_some_and(|orig| orig.contains('\u{FFFD}'));
+                let readonly_reason = if is_symlink {
+                    Some(ReadonlyReason::Symlink)
+                } else if is_submodule {
+                    Some(ReadonlyReason::Submodule)
+                } else if has_non_utf8 {
+                    Some(ReadonlyReason::NonUtf8Path)
+                } else {
+                    None
+                };
+
+                let mode_head = head.get(3).map(|s| s.to_string());
+                let mode_index = head.get(4).map(|s| s.to_string());
+                let mode_worktree = head.get(5).map(|s| s.to_string());
+                let oid_head = head.get(6).map(|s| s.to_string());
+                let oid_index = head.get(7).map(|s| s.to_string());
+
                 if x != '.' {
                     status.entries.push(StatusEntry {
                         path: path.to_string(),
@@ -137,6 +200,12 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
                         changes: ChangesKind::Staged,
                         status: status_from_letter(x),
                         unmerged: false,
+                        readonly_reason: readonly_reason.clone(),
+                        mode_head: mode_head.clone(),
+                        mode_index: mode_index.clone(),
+                        mode_worktree: mode_worktree.clone(),
+                        oid_head: oid_head.clone(),
+                        oid_index: oid_index.clone(),
                     });
                 }
                 if y != '.' {
@@ -146,28 +215,55 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
                         changes: ChangesKind::Unstaged,
                         status: status_from_letter(y),
                         unmerged: false,
+                        readonly_reason,
+                        mode_head,
+                        mode_index,
+                        mode_worktree,
+                        oid_head,
+                        oid_index,
                     });
                 }
             }
             b'u' => {
                 // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
-                let (_head, path) = split_head(&text, 11);
+                let (_head, path) = split_head(&text, 10);
                 status.entries.push(StatusEntry {
                     path: path.to_string(),
                     original_path: None,
                     changes: ChangesKind::Unstaged,
                     status: FileStatus::Conflict,
                     unmerged: true,
+                    readonly_reason: Some(ReadonlyReason::Conflict),
+                    mode_head: None,
+                    mode_index: None,
+                    mode_worktree: None,
+                    oid_head: None,
+                    oid_index: None,
                 });
             }
             b'?' => {
                 let path = text[2..].to_string();
+                let is_non_utf8 = path.contains('\u{FFFD}');
+                let is_nested_repo = path.ends_with('/') || path.ends_with("/.git");
+                let readonly_reason = if is_non_utf8 {
+                    Some(ReadonlyReason::NonUtf8Path)
+                } else if is_nested_repo {
+                    Some(ReadonlyReason::NestedRepo)
+                } else {
+                    None
+                };
                 status.entries.push(StatusEntry {
                     path,
                     original_path: None,
                     changes: ChangesKind::Untracked,
                     status: FileStatus::Untracked,
                     unmerged: false,
+                    readonly_reason,
+                    mode_head: None,
+                    mode_index: None,
+                    mode_worktree: None,
+                    oid_head: None,
+                    oid_index: None,
                 });
             }
             // `!` 被忽略的文件：M1 不显示（Q30）

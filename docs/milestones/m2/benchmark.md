@@ -1,0 +1,167 @@
+# 长期运行基线的复现方法
+
+本工具只验证 M2 任务 01，不实施暂存等后续能力。运行结束不等于验收通过：还需检查真实桌面、内存趋势和 M1 性能回归。
+
+## 准备与启动
+
+在 `m2` worktree 执行；测试期间不要重建同一路径的应用或修改 fixture。
+
+```bash
+# fixture 尚不存在时生成；不要对正在受测的 fixture 再次执行。
+tools/fixtures/setup.sh /tmp/revia-m1-fixtures
+
+# 每次先构建当前源码，再启动单进程 30 分钟测试。
+tools/run-long-benchmark.sh 30
+
+# 已确认 bundle 与源码一致时，也可指定独立输出名直接运行。
+caffeinate -di python3 tools/bench-long-running.py \
+  --minutes 30 --repo /tmp/revia-m1-fixtures/diffs \
+  --output /tmp/revia-baseline-new.json
+```
+
+将标题带 PID 的受测 Revia 窗口置于前台，保持可见，不最小化或锁屏。工具最多等待 120 秒取得真实合成帧；等待不计入 30 分钟操作时长。`caffeinate -di` 仅在命令存活期间避免空闲睡眠，不改变持久系统设置，也不能解除锁屏或防止手动隐藏窗口。
+
+## 负载与证据
+
+- 固定 `diffs` 的一个主 worktree、7 个改动条目：二进制 PNG、日志、lock 文件、Vue、Swift、大 TypeScript 文件、已暂存 TypeScript 文件。该任务不修改工作区、暂存区或 Git 配置。
+- 同一应用进程循环打开全部条目；文本文件实际展开、切换并排/统一视图、滚动及中部跳转。等待加载失败、视图按钮未切换成功都会中断。
+- 每约 10 秒记录真实 rAF 频率、可见性、最长合成帧间隔、操作位置和缓存计数；隐藏事件或超过 2 秒的合成中断使本次无效。2 秒是检测长时间停绘的工具保护，不是取代 Q84 的滚动性能指标。
+- 约每分钟在已暂存的 `src/staged.ts`、并排视图、顶部停留约 4 秒，记录 BEGIN/END 检查点；准备和采样停顿从主动操作时长中扣除，因此 30 分钟主动操作需要更长的实际运行时间。检查点不清缓存、不强制 GC，rAF 监视持续运行；当前追踪请求计数归零不等于所有旧 IPC 均已结束。
+- 系统侧按应用 PID 的 launchd `services` 表识别 WebContent、GPU、Networking；不使用系统新增 PID 差集。每个样本记录进程归属与 RSS，另每 3 次采样记录 Rust 和 WebContent 的 physical footprint。两种口径分别保留，不用一种替代另一种。进程改变或采样缺失不能作为同一 WebView 的长测通过。
+- 使用新建的独立应用数据目录，避免把 fixture 添加到真实用户的仓库列表。路径记录在报告中；不自动删除原始现场。
+- 驱动只控制自己启动的进程，不按应用名/路径批量终止；超时、没有前端结果或操作时长不足以非零状态退出。
+- 启动前固定二进制 SHA-256；结束核对未被替换或移除。测试中途重建应用会使构建证据无效。
+
+检查点内额外采集 RSS、Rust/WebContent footprint 和 `vmmap MALLOC ZONE / WebKit Malloc_* / BYTES ALLOCATED`。实时阶段样本的 `samplingChecksPassed` 只代表采样过程有效；`valid` 在结束前始终为 false，最终须匹配已落盘 END、前端同一文件/视图及完整时间区间才有效。超过 3500ms、进程归属改变、日志截断或缺失均保留无效原因。没有有效阶段样本不表示内存通过；保留并分析全部阶段样本与常规时序，不挑选最小值。
+
+输出包括汇总 `.json`、前端原始 `.json.frontend.json`、逐条落盘的 `.json.samples.jsonl`、阶段采样 `.json.phase-samples.jsonl`、标准输出 `.json.log` 和前端/Rust 步骤 `.json.frontend.log`。输出已存在时拒绝覆盖。日志仅含本地测试信息，不上传。
+
+增量留证使用原非退出日志通道：`[SOAK_PROGRESS] {json}`。每轮恰有一个 `kind: "run"`
+锚点，绑定本轮最终前端输出路径、fixture、目标时长、真实 setup 和操作开始时间；已闭合
+阶段写 `kind: "checkpoint"`，含相同 runId、cycle、file/view、pressure、真实起止、
+hiddenDuringHold，以及当时的累计负载和暂停秒数。最终报告必须含完整 checkpoint 集合，
+并与增量的身份、集合、元数据和累计值相符。缺失、重复、跨运行、损坏 JSON 或未闭合尾行
+均阻断成功；尾行文本另存 `progressEvidence.unterminatedTail`，原始字节仍在前端日志中。
+增量只用于诊断，不能替代最终报告或提供权威 Q98 样本；缺真实 setup 时不猜暖机起点。
+
+采样外部命令另存 `.json.evidence.jsonl`，记录 stdout/stderr、超时已得输出、异常及时间。
+launchctl 仅保存必要的 WebKit services 归属行并注明裁剪，不保存可能含凭据的完整环境。
+`partialCandidates` 只属于本次失败尝试，不沿用上一轮 RSS/footprint；已取得的归属和解析值
+仍保留。清理在每次 terminate/kill/wait 调用前后追加记录，两次 wait 各有 5 秒上限；
+尝试、返回、异常与实际信号交付未知分开记录，清理异常仍生成汇总。执行过清理或有失败
+候选时不算完整成功，exit0 不证明未发信号。
+
+内存分析保留完整时序，另列操作开始后 180 秒的热身分界、稳态分段均值和线性趋势；短测不产生稳态结论。不能仅凭进程退出码、一个峰值或斜率自动宣布通过。还需结合真实桌面截图和时序判定是否持续增长，必要时定位、修复后重新长测。
+
+## 性能回归
+
+M1 的首屏、跳转、滚动指标保留原计时边界，自动测量先等待可见窗口。`ok: true` 只表示测量流程完成，不自动表示 D06 达标。自动测量可使用 `REVIA_MEASURE_DATA_DIR` 隔离其设置：
+
+```bash
+REVIA_MEASURE=1 REVIA_MEASURE_ONLY=split \
+REVIA_MEASURE_REPO=/tmp/revia-m1-fixtures/diffs \
+REVIA_MEASURE_PATH=src/generated.ts \
+REVIA_MEASURE_DATA_DIR="$(mktemp -d /tmp/revia-perf.XXXXXX)" \
+REVIA_MEASURE_LOG=/tmp/revia-perf-split-new.json \
+src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia
+```
+
+每个视图独立进程，启动后置前窗口；统一视图用 `REVIA_MEASURE_ONLY=unified`。显式自动性能测量的标题带 PID，开始前要求前台聚焦，测量期间任一 `blur` 使本次无效；`focusLosses` 是饱和 0/1 标志，不是累计次数。需要测后取证时增加 `REVIA_MEASURE_KEEP_OPEN=1`，结果写入后原窗口不退出，核对 PID、文件和视图后用 Cmd-Q 退出；未设置时仍自动退出，长测与 smoke 不受影响。测后截图不冒充计时期间截图。前端结束报告的 `ok` 和可见性必须有效，再检查首屏、跳转、颜色恢复与未覆盖帧，不接受隐藏窗口的计时数据。失败尝试的 JSON 和日志原样保留，补测使用新输出名，不覆盖无效样本。
+
+`REVIA_MEASURE_DATA_DIR` 仅在自动测量、长测或 `REVIA_SMOKE` 模式生效。只设置该变量和日志路径再普通启动，仍使用正常应用数据目录，不能称为隔离运行；核对启动日志的实际 `data_dir`。本节普通呈现核验只浏览已有 fixture，不执行 Git 写入。任务 02／03 等写入验收另建独立 fixture，并用临时 HOME 和 Git 配置隔离普通实例；必须按启动日志核对实际数据目录。
+
+## 工具回归检查
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 tools/test_bench_long_running.py
+node tools/test-ipc-diagnostics.mjs
+node tools/test-visible-highlight-lines.mjs
+```
+
+Python 标准库测试覆盖压力取样与 Q98 判定、单项诊断的负载要求、静置期间遮挡判无效、无结果/短时长不能通过、只归属目标进程服务、短测没有稳态结论、受测二进制替换/删除，以及阶段日志增量读取、重复/过期边界、退出/归属变化、缺 END 和前端区间不覆盖等无效路径。失败留证回归通过真实生产 main 或生产清理/采样入口，在外部命令、进程和时钟等边界模拟故障；不向真实进程发信号或系统通知。不引入新的测试框架。另有 11 项 Node 原生 IPC 诊断回归和 13 项可见高亮行回归，后者覆盖两视图、旧/新行号偏移、离散 hunk、纯增删及半开可见窗口。
+
+## 跳转与颜色诊断的口径
+
+- 原 `appearMs`、`warmAppearMs` 保留；新 `timing` / `warmTiming` 分别记录优先取数、同步滚动调用、数据等待及消息任务等待。原总值不是纯渲染或上屏时间，不用较短分段替换旧值。
+- `targetWasCached` / `warmTargetWasCached` 记录发起前的真实数据状态。已被后台预取的目标不能称为冷跳；`targetCovered` / `warmCovered` 为 false 时不能用一个耗时数字宣称成功。
+- 原 `colorRestoreMs` 实际只记录 compact 退出；不证明旧、新双侧颜色都已缓存或显示。
+- 原测量和滚动全部结束后才执行独立 `jumpDom` 诊断。准备阶段显式补齐源位置的旧、新高亮缓存，再正常滚动离开、返回，核对行号、文字和 token DOM。准备失败保留 `preparationError`，不生成颜色恢复耗时；异常保留 `jumpDomError`，不抹掉先前样本。
+- `textDomMs`、`colorDomMs` 和 `immediateDomMs` 都包含探针开销，表示从跳转开始到语义 DOM 核对完成的上界，不是屏幕上屏时间。`immediateDomMs` 包含 `scrollCallMs`。真实桌面检查仍不可省略。
+- 同次跳转前登记 MutationObserver 与首个 rAF，实际滚动后核验目标完整文字、行位置、画布几何和占位底图。`firstFrame.checkedMs` 与 `frameReady` 表示正常首渲染机会前 DOM 就绪，不是 GPU 扫描时间；它和原 appear/warm 来自不同目标的操作，不能倒填替换旧值。保留所有超帧、失败及占位观察；0ms 只代表毫秒计时精度。
+- 首帧先有底图或已到齐的文字均如实记录；同步观察到占位不表示它已显示过一帧。缓存返回颜色的预热测试不能替代首次打开静置自动补色，需在普通桌面分别核对两视图。
+- 滚动报告区分完成屏数、`rafFrames` 和 `fallbackFrames`。检查完整 60 屏及无定时器兜底；`uncoveredFrames` 只说明行数据覆盖，不能独自证明最终画面不露白。
+
+真正未缓存的跳转使用另一个临时仓库，保留普通 fixture 用于同负载首屏与热跳对照：
+
+```bash
+# 输出目录必须尚不存在；不覆盖任何已有目录，不继承外部 GIT_* 目标变量。
+python3 tools/fixtures/setup-cold-jump.py /tmp/revia-cold-jump-new
+# 按前面的性能命令运行，每种视图独立进程；只替换以下两项：
+# REVIA_MEASURE_REPO=/tmp/revia-cold-jump-new
+# REVIA_MEASURE_PATH=cold.ts
+```
+
+`cold.ts` 有 30,000 行全部修改，两种视图都超过 20,000 显示行，沿用正常生产缓存策略；不能把更大负载的首屏结果混入普通 fixture 的 150ms 首屏验收。仍要核验每次跳转前确实存在缺失行，而不是按文件大小推定冷跳。
+
+
+## IPC 与内存短诊断（不算长期运行验收）
+
+先在同一 Release bundle 上运行以下对照，各使用新的应用数据目录。固定完整循环数保证文件、视图、滚动、跳转次数相同；实际 Git/IPC 请求量仍要根据报告核对，不能从循环数推定字节量相同。这里的 900 秒只是安全上限，不是目标主动时长。
+
+```bash
+caffeinate -di python3 tools/bench-long-running.py --seconds 900 \
+  --diagnostic-cycles 120 --diagnostic-logging verbose --idle-seconds 90 \
+  --output /tmp/revia-ipc-verbose-new.json
+# 前一次退出后运行；不要并行争用可见窗口。
+caffeinate -di python3 tools/bench-long-running.py --seconds 900 \
+  --diagnostic-cycles 120 --diagnostic-logging minimal --idle-seconds 90 \
+  --output /tmp/revia-ipc-minimal-new.json
+```
+
+- `minimal` 只关闭前端逐步骤日志 IPC 与 Rust 逐请求落盘；关键心跳、检查点、静置与最终报告照常保留。日志面板与布局保持一致。它比较的是整组日志行为，不能单独区分 IPC 开销和磁盘 I/O。
+- 最后固定在已暂存 `src/staged.ts`、并排视图、顶部静置 90 秒；静置与准备时间不计主动操作。无清缓存、无强制 GC，持续监视可见性。
+- 仅显式 IPC 短诊断或 `--baseline-minimal-logging` 正式基线包装 `fetch`；普通启动不启用。返回原 Promise/Response，不读取 body。`active` 只到响应头，不能表示 Tauri body 解析或 callback 已完成；同时只读真实 callback Map，包含持久事件回调，不能用其大小直接换算请求数。基线/观测 ID 集合各上限 512，溢出会显示；年龄是连续观测下界。
+- 心跳与固定阶段记录 IPC 分类计数、callback 状态、DOM/行数、Resource Timing 数。静置中继续采样。自定义协议失败可能使 Tauri 回退到 postMessage，因此 `failed` 必须一起检查。
+- 诊断每个常规样本都采 Rust/WebContent/Networking footprint，WebContent 同次 `vmmap` 还解析 malloc allocated；采样比普通长测更密，会影响负载，两组使用相同配置。保留 RSS、footprint、allocated 三种口径及采样起止，不混为 JS heap。
+- 驱动标记 `ipc_memory_diagnostic`，没有长期运行通过结论，且不把静置混入原来的热身后趋势统计。完整循环或静置未完成、前后端配置不一致、缺 IPC 报告均失败。固定负载完成后仍须单独完成 30 分钟验收。
+
+
+### 使用关键日志复核正式基线
+
+固定循环对照发现详细日志会增加大量 IPC，但没有证明它是内存增长根因。需要正式复核时使用独立开关，不把短诊断报告改称通过：
+
+```bash
+caffeinate -di python3 tools/bench-long-running.py --minutes 30 \
+  --baseline-minimal-logging --output /tmp/revia-baseline-minimal-new.json
+```
+
+它仍运行同进程 30 分钟主动负载、既定检查点和 180 秒热身分界；不启用固定循环或结束静置。关键心跳、阶段边界、最终报告与只读 IPC 观察仍保存，逐步骤日志不发送，面板布局不变。驱动核对前端日志模式并要求完整时长与 IPC 报告；`runCompleted` 仍不表示内存趋势或 D06 已通过。
+
+
+## 压力取样与 Q98 判定
+
+长测每第 5 个固定阶段（约 5 分钟）是压力阶段：前端静置 16 秒，驱动发送 `notifyutil -p org.WebKit.lowMemory`，约 10 秒后取样。报告的 `q98MemoryVerdict` 按 Q98 判定：热身后压力后样本的 WebContent footprint 与 WebKit malloc allocated 不超过首个样本 10 MiB、线性趋势不超过 0.5 MiB/分钟；Rust 主进程按常规取样同样判定。普通取样照常记录，不单独作为不通过依据。
+
+## 单项诊断（定位用，不算验收）
+
+`--focus` 只重复一类操作，约每 90 秒回到固定阶段压力取样，用于定位压力后仍保留的增长来自哪类操作：
+
+```bash
+caffeinate -di python3 tools/bench-long-running.py --seconds 540 \
+  --diagnostic-logging minimal --idle-seconds 0 --focus open --keep-on-top \
+  --output /tmp/revia-focus-open-new.json
+```
+
+| 模式 | 只做什么 |
+| --- | --- |
+| `idle` | 静止在固定文件 |
+| `ipc` / `highlight` | 只取行 / 只取两个小文件的高亮，丢弃结果，界面不变 |
+| `channel` | 只反复调用 `nextTask` |
+| `open` | 依次打开全部文件 |
+| `switch` / `remount` | 两个小文本文件交替 / 小文件与二进制文件交替（diff 视图反复卸载、挂载，并用弱引用统计未回收的视口元素） |
+| `scroll` / `jump` / `view` | 在大文件内滚动 / 跳转 / 切换视图 |
+
+- 单项诊断遇窗口被遮挡时暂停到恢复可见，记录中断并从主动时长中扣除；静置期间被遮挡的阶段样本判无效。正式长测仍在任何遮挡时中止。
+- 报告同样输出 Q98 数值供对比，但诊断结果不能作为长期运行验收。
+- 需要对象级证据时，先 `notifyutil -p org.WebKit.lowMemory` 强制回收，约 8 秒后对 WebContent 进程运行 `heap -sortBySize <pid>`，隔一段时间再取一次，比较回收后仍增加的类型。
+

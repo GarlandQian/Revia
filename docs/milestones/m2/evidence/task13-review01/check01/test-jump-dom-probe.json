@@ -1,0 +1,12 @@
+{
+  "name": "test-jump-dom-probe",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "node",
+    "tools/test-jump-dom-probe.mjs"
+  ],
+  "startedAt": "2026-10-24T13:23:14.688658+00:00",
+  "expectedExit": 0,
+  "exit": 0,
+  "endedAt": "2026-10-24T13:23:14.756222+00:00"
+}

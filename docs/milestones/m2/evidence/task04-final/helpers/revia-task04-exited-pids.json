@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T17:24:09.387974+00:00",
+  "pidsConfirmedAbsent": [
+    54348,
+    5871,
+    6449,
+    7012,
+    7479
+  ],
+  "method": "normal CUA Cmd-Q followed by ps -p checks",
+  "source": "764d13e0629c3e43c32b17015bdf20916a339233",
+  "binarySHA256": "246618d92c041ab723741e8140cdadb957870d1cea961e5aa0d532cb88176f71"
+}

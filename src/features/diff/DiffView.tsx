@@ -10,17 +10,21 @@
  * `.diff-canvas` 底图里“加载中的行”。
  */
 
-import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { FileVersion } from "@/types/bindings/FileVersion";
+import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RenderRow } from "@/types/bindings/RenderRow";
 import type { RowCell } from "@/types/bindings/RowCell";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import { ipc } from "@/lib/ipc";
+import { messages } from "@/lib/i18n/zh-CN";
 import { logToBackend } from "./log";
 import type { HighlightStore } from "./highlightStore";
 import type { RowWindowStore } from "./rowWindowStore";
+import { visibleHighlightLines } from "./visibleHighlightLines";
+import { matchesHunkAction } from "./hunkAction";
 
 export const ROW_HEIGHT = 18;
 /** 滚动停止多久之后才请求新高亮（毫秒）。 */
@@ -58,13 +62,16 @@ interface DiffViewProps {
   fontSize: number;
   rows: RowWindowStore;
   highlights: HighlightStore;
+  isWriting?: boolean;
+  onHunkAction?: (action: HunkAction) => void;
+  onHunkDiscard?: (action: HunkAction, section: string) => void;
   handleRef?: React.Ref<DiffViewHandle>;
   /** 每帧采样：用于测量「可见区域里还没有数据的行数」。 */
   onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
 }
 
 export function DiffView(props: DiffViewProps) {
-  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample } = props;
+  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample, isWriting, onHunkAction, onHunkDiscard } = props;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -82,7 +89,9 @@ export function DiffView(props: DiffViewProps) {
   const jumpRestoreRaf = useRef<number | null>(null);
   const jumpRestoreTimer = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const version = useRowVersion(rows);
+  const rowSnapshot = useSyncExternalStore(rows.subscribe, rows.getSnapshot);
+  const version = rowSnapshot.version;
+  const highlightSnapshot = useSyncExternalStore(highlights.subscribe, highlights.getSnapshot);
 
   const rowCount = rows.rowCountValue;
   const contentHeight = rowCount * ROW_HEIGHT;
@@ -265,6 +274,15 @@ export function DiffView(props: DiffViewProps) {
     if (element.scrollLeft !== 0) element.scrollLeft = 0;
   }, []);
 
+  const revealHunk = useCallback((top: number) => {
+    // Tab 可进入预渲染区的按钮，滚动仍须经过自绘入口，不能依赖浏览器自动滚动。
+    const current = scrollTopRef.current;
+    if (top < current) applyScroll(top);
+    else if (top + ROW_HEIGHT > current + geometry.current.viewportHeight) {
+      applyScroll(top + ROW_HEIGHT - geometry.current.viewportHeight);
+    }
+  }, [applyScroll]);
+
   const onTrackPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const track = trackRef.current;
@@ -317,15 +335,21 @@ export function DiffView(props: DiffViewProps) {
     if (version === 0) {
       rows.logWindow?.();
     }
+    onSample?.({ from: visibleFrom, to: visibleTo, uncovered: rows.uncovered(visibleFrom, visibleTo) });
+  }, [onSample, rows, scrollIdle, version, visibleFrom, visibleTo]);
+
+  useEffect(() => {
+    if (!scrollIdle || !highlightSnapshot.supported || highlightSnapshot.pending > 0
+      || !rows.isCovered(visibleFrom, visibleTo)) return;
     // 高亮等可见行文本就绪之后再请求，且滚动期间不请求：两者共用同一条 IPC 与 JS 主线程，
     // 首屏和滚动时优先保证文本（ADR-0006：先纯文本、再异步着色）。滚动停下后再补齐颜色。
-    const range = lineRange(rows, visibleFrom, visibleTo);
-    if (range && scrollIdle && rows.isCovered(visibleFrom, visibleTo)) {
-      highlights.ensure("new", range.from, range.to);
-      highlights.ensure("old", range.from, range.to);
+    // 请求结束的快照会再次触发 effect，继续补齐被单请求背压跳过的块和旧版本。
+    // 只请求实际呈现的行，不把两版本或离散 hunk 之间的空洞扩成连续区间。
+    const lines = visibleHighlightLines((index) => rows.getRow(index), visibleFrom, visibleTo, view);
+    for (const fileVersion of ["new", "old"] as const) {
+      for (const line of lines[fileVersion]) highlights.ensure(fileVersion, line, line);
     }
-    onSample?.({ from: visibleFrom, to: visibleTo, uncovered: rows.uncovered(visibleFrom, visibleTo) });
-  }, [highlights, onSample, rows, scrollIdle, version, visibleFrom, visibleTo]);
+  }, [highlights, highlightSnapshot, rows, scrollIdle, version, view, visibleFrom, visibleTo]);
 
   useImperativeHandle(
     handleRef,
@@ -395,11 +419,22 @@ export function DiffView(props: DiffViewProps) {
               top={index * ROW_HEIGHT}
               view={view}
               highlights={highlights}
+              highlightVersion={compact ? 0 : highlightSnapshot.version}
               plainTextOnly={compact}
+              onHunkAction={onHunkAction}
+              onHunkDiscard={onHunkDiscard}
+              onHunkFocus={revealHunk}
+              hunkDisabled={isWriting || !!rowSnapshot.error || !row.hunkAction
+                || !matchesHunkAction(row.hunkAction, worktreeId, entry)}
             />
           ) : null;
         })}
       </div>
+      {rowSnapshot.error ? (
+        <div role="status" className="absolute inset-x-0 top-0 bg-background/95 px-3 py-2 font-sans text-xs text-destructive">
+          {rowSnapshot.error}
+        </div>
+      ) : null}
       <div ref={trackRef} className="diff-scrollbar" onPointerDown={onTrackPointerDown}>
         <div ref={thumbRef} className="diff-scrollbar-thumb" />
       </div>
@@ -419,41 +454,28 @@ function thumbGeometry(
   return { size, offset: (top / maxTop) * (viewportHeight - size) };
 }
 
-/** 订阅行窗口版本：块到达时重新渲染。 */
-function useRowVersion(rows: RowWindowStore): number {
-  const [version, setVersion] = useState(0);
-  useEffect(() => rows.subscribe(() => setVersion(rows.getSnapshot().version)), [rows]);
-  return version;
-}
-
-/** 可见范围内的文件行号区间（旧、新版本取并集，便于两个版本一起请求高亮）。 */
-function lineRange(rows: RowWindowStore, from: number, to: number): { from: number; to: number } | null {
-  let min: number | null = null;
-  let max: number | null = null;
-  for (let index = from; index < to; index += 1) {
-    const row = rows.getRow(index);
-    if (!row || row.kind === "hunk") continue;
-    for (const line of [row.oldLine, row.newLine, row.left?.line, row.right?.line]) {
-      if (line == null) continue;
-      min = min == null ? line : Math.min(min, line);
-      max = max == null ? line : Math.max(max, line);
-    }
-  }
-  return min != null && max != null ? { from: min, to: max } : null;
-}
-
 const RowView = memo(function RowView({
   row,
   top,
   view,
   highlights,
   plainTextOnly,
+  onHunkAction,
+  onHunkDiscard,
+  onHunkFocus,
+  hunkDisabled,
 }: {
   row: RenderRow;
   top: number;
   view: ViewMode;
   highlights: HighlightStore;
+  /** 缓存对象保持不变时，让 memo 行在 token 到达后仍能补绘。 */
+  highlightVersion: number;
   plainTextOnly: boolean;
+  onHunkAction?: (action: HunkAction) => void;
+  onHunkDiscard?: (action: HunkAction, section: string) => void;
+  onHunkFocus: (top: number) => void;
+  hunkDisabled: boolean;
 }) {
   const style: React.CSSProperties = { top, contain: "strict" };
 
@@ -461,9 +483,30 @@ const RowView = memo(function RowView({
     !plainTextOnly && line != null ? highlights.get(version, line) : undefined;
 
   if (row.kind === "hunk") {
+    const action = row.hunkAction;
+    const label = action?.changes === "staged" ? messages.changes.unstageHunk : messages.changes.stageHunk;
     return (
       <div className="row row-hunk" style={style} title={row.section ?? ""}>
-        {row.section ?? ""}
+        <span className="hunk-section">{row.section ?? ""}</span>
+        {action && onHunkAction ? (
+          <button
+            type="button"
+            className="hunk-action"
+            disabled={hunkDisabled}
+            aria-label={`${label}：${row.section ?? ""}`}
+            onFocus={() => onHunkFocus(top)}
+            onClick={() => onHunkAction(action)}
+          >
+            {label}
+          </button>
+        ) : null}
+        {action?.changes === "unstaged" && onHunkDiscard ? (
+          <button type="button" className="hunk-action" disabled={hunkDisabled}
+            aria-label={`${messages.changes.discardHunk}：${row.section ?? ""}`}
+            onFocus={() => onHunkFocus(top)} onClick={() => onHunkDiscard(action, row.section ?? "")}>
+            {messages.changes.discardHunk}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -471,12 +514,14 @@ const RowView = memo(function RowView({
   if (view === "unified") {
     const version: FileVersion = row.lineKind === "addition" ? "new" : "old";
     const line = row.lineKind === "addition" ? row.newLine : row.oldLine;
+    const tone = toneOf(row.lineKind, row.modified);
     return (
       <div className="row row-unified" style={style}>
-        <span className="gutter">{row.oldLine ?? ""}</span>
-        <span className="gutter">{row.newLine ?? ""}</span>
+        <span className={gutterClass(tone)}>{row.oldLine ?? ""}</span>
+        <span className={gutterClass(tone)}>{row.newLine ?? ""}</span>
         <Cell
           text={row.text ?? ""}
+          tone={tone}
           kind={row.lineKind ?? "context"}
           marker={markerFor(row.lineKind)}
           tokens={getTokens(version, line)}
@@ -486,17 +531,22 @@ const RowView = memo(function RowView({
     );
   }
 
+  const leftTone = toneOf(row.left?.kind, row.modified);
+  const rightTone = toneOf(row.right?.kind, row.modified);
   return (
     <div className="row row-split" style={style}>
-      <span className="gutter">{row.left?.line ?? ""}</span>
+      <span className={row.left ? gutterClass(leftTone) : "gutter gutter-none"}>{row.left?.line ?? ""}</span>
       <SplitCell
         cell={row.left}
+        tone={leftTone}
         highlights={highlights}
         tokens={getTokens("old", row.left?.line)}
       />
-      <span className="gutter">{row.right?.line ?? ""}</span>
+      <span className={`mid${leftTone || rightTone ? ` mid-${row.modified ? "mod" : (rightTone ?? leftTone)}` : ""}`} />
+      <span className={row.right ? gutterClass(rightTone) : "gutter gutter-none"}>{row.right?.line ?? ""}</span>
       <SplitCell
         cell={row.right}
+        tone={rightTone}
         highlights={highlights}
         tokens={getTokens("new", row.right?.line)}
       />
@@ -504,30 +554,57 @@ const RowView = memo(function RowView({
   );
 });
 
+/** 行的着色：修改块蓝、纯新增绿、纯删除灰（JetBrains diff 配色，Q107）。 */
+type LineTone = "mod" | "ins" | "del" | null;
+
+function toneOf(kind: RenderRow["lineKind"] | RowCell["kind"] | undefined, modified: boolean): LineTone {
+  if (kind === "addition") return modified ? "mod" : "ins";
+  if (kind === "deletion") return modified ? "mod" : "del";
+  return null;
+}
+
+function gutterClass(tone: LineTone): string {
+  return tone ? `gutter gutter-${tone}` : "gutter";
+}
+
 function markerFor(kind?: RenderRow["lineKind"] | RowCell["kind"]): string {
   if (kind === "addition") return "+";
   if (kind === "deletion") return "-";
   return " ";
 }
 
+/**
+ * 只有 token 拼回来的文本与显示文本完全一致时才用高亮结果。
+ * 高亮来自另一个版本时（例如未刷新前外部等长改写），宁可显示纯文本，
+ * 也不能让渲染出的文字与 Git hunk / 写指纹不一致（Q88、T05）。
+ */
+function tokensMatchText(tokens: ReturnType<HighlightStore["get"]>, text: string): boolean {
+  if (!tokens) return false;
+  let joined = "";
+  for (const token of tokens) joined += token.text;
+  return joined === text;
+}
+
 function Cell({
   text,
+  tone,
   kind,
   marker,
   tokens,
   highlights,
 }: {
   text: string;
+  tone: LineTone;
   kind: RowCell["kind"];
   marker: string;
   tokens: ReturnType<HighlightStore["get"]>;
   highlights: HighlightStore;
 }) {
   return (
-    <span className={`cell cell-${kind}`}>
+    <span className={`cell cell-${kind}${tone ? ` cell-${tone}` : ""}`}>
       <span className="marker">{marker}</span>
-      {tokens
-        ? tokens.map((token, index) => (
+      {tokensMatchText(tokens, text)
+        ? tokens!.map((token, index) => (
             <span key={index} className={highlights.categoryClass(token.category)}>
               {token.text}
             </span>
@@ -539,19 +616,21 @@ function Cell({
 
 function SplitCell({
   cell,
+  tone,
   highlights,
   tokens,
 }: {
   cell: RowCell | null;
+  tone: LineTone;
   highlights: HighlightStore;
   tokens: ReturnType<HighlightStore["get"]>;
 }) {
   if (!cell) return <span className="cell empty" />;
   return (
-    <span className={`cell cell-${cell.kind}`}>
+    <span className={`cell cell-${cell.kind}${tone ? ` cell-${tone}` : ""}`}>
       <span className="marker">{markerFor(cell.kind)}</span>
-      {tokens
-        ? tokens.map((token, index) => (
+      {tokensMatchText(tokens, cell.text)
+        ? tokens!.map((token, index) => (
             <span key={index} className={highlights.categoryClass(token.category)}>
               {token.text}
             </span>

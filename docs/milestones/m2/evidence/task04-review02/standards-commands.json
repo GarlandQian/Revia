@@ -1,0 +1,479 @@
+[
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "init",
+      "-q"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "filter.demo.clean",
+      "cat"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "filter.demo.smudge",
+      "cat"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "init",
+      "-q"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get",
+      "core.autocrlf"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get",
+      "core.eol"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get",
+      "core.safecrlf"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get",
+      "core.attributesFile"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get",
+      "core.ignorecase"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "core.ignorecase",
+      "true"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get",
+      "core.filemode"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "true\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "core.filemode",
+      "true"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/real",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--get-regexp",
+      "^filter."
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "filter.demo.clean cat\nfilter.demo.smudge cat\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--add",
+      "filter.demo.clean",
+      "cat"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "config",
+      "--add",
+      "filter.demo.smudge",
+      "cat"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+      "GIT_CONFIG": "/private/tmp/revia-review04-round2-ol8lamwo/real/.git/config"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/main",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "init",
+      "-q"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/main",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "add",
+      "target.txt"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/main",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "commit",
+      "-qm",
+      "base"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/main",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "worktree",
+      "add",
+      "-q",
+      "-b",
+      "linked",
+      "/private/tmp/revia-review04-round2-ol8lamwo/linked"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/linked",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-dir"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "/private/tmp/revia-review04-round2-ol8lamwo/main/.git/worktrees/linked\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/linked",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-path",
+      "info/attributes"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "/private/tmp/revia-review04-round2-ol8lamwo/main/.git/info/attributes\n",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/linked",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "check-attr",
+      "-a",
+      "-z",
+      "--",
+      "target.txt"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "target.txt\u0000text\u0000set\u0000target.txt\u0000eol\u0000crlf\u0000",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/linked-scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "init",
+      "-q"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cwd": "/private/tmp/revia-review04-round2-ol8lamwo/linked-scratch",
+    "argv": [
+      "/opt/homebrew/bin/git",
+      "check-attr",
+      "-a",
+      "-z",
+      "--",
+      "target.txt"
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/garland/.codex/tmp/arg0-macos/codex-arg0z05ywo:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/garland/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/garland/.antigravity/antigravity/bin:/Users/garland/.local/state/fnm_multishells/1014_1792756788324/bin:/Users/garland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+      "HOME": "/private/tmp/revia-review04-round2-ol8lamwo/home",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C"
+    },
+    "status": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

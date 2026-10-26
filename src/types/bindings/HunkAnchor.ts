@@ -3,11 +3,11 @@
 /**
  * hunk 在某个视图里的位置，供 F7 / ⇧F7 跳转使用。
  */
-export type HunkAnchor = { index: number, header: string, section: string, 
+export type HunkAnchor = { index: number, header: string, section: string,
 /**
  * 统一视图里的行下标。
  */
-rowUnified: number, 
+rowUnified: number,
 /**
  * 并排视图里的行下标。
  */

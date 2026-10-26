@@ -1,0 +1,175 @@
+{
+  "reviewBase": "73791d61263e6a116da91ef032974f2b599c705d",
+  "reviewedSource": "69d6527af8a10aa8324a2b7483931b8407bb8684",
+  "boundary": "Pi implementation logs. Seven pre-check source SHA256 values independently match fixed commit 69d6527. Raw outputs show discard_recovery 70 passes, lib 94 passes and tsc/lint/build exit 0. Sensitivity experiment is described only in sensitivity.md, without separate raw output or exit status. Static reviewers did not independently run tests, build or GUI. Not desktop, D06, CI or final milestone acceptance.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/MANIFEST.md",
+      "stored": "pi-checks/MANIFEST.md.gz",
+      "sourceBytes": 1111,
+      "storedBytes": 765,
+      "sourceSha256": "15296faf791d66d74ea95faf5ee11069628329bec0053e9e5ca8d50bc92dfdba",
+      "storedSha256": "865bbd8431b222c420fd9df9cd31bf9aa36c0c246e3cb658d16608c1acdec995"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/base-sha.txt",
+      "stored": "pi-checks/base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "32919051c25c8a2162831353dadfcef3f6921f74430d3a6fdffbb120523c2a36",
+      "storedSha256": "cfdf5f56dedaa661a20e34daf6c8918ec0ab4ccc795ebc68b8f661c0cbb15861"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/build.err",
+      "stored": "pi-checks/build.err.gz",
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/build.exit",
+      "stored": "pi-checks/build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/build.out",
+      "stored": "pi-checks/build.out.gz",
+      "sourceBytes": 352,
+      "storedBytes": 243,
+      "sourceSha256": "1df8e7bd2c3b893cccd34739802c0e933fd7bec01e33582d334e66d67df16f3e",
+      "storedSha256": "2aaf6518b73ba9bd474331b908aa9faf74f0696ff33d9b576cb219b59343d695"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/cargo-discard.err",
+      "stored": "pi-checks/cargo-discard.err.gz",
+      "sourceBytes": 1884,
+      "storedBytes": 703,
+      "sourceSha256": "3c6a291a92e54b6b13cf05c2d24036dba3658977cc7fb83cae73a74ab3a843fc",
+      "storedSha256": "bec751c18b8ae6947a30c32a0ac8f3055b4ae54ed545e5342f0348f8f1b6bd06"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/cargo-discard.exit",
+      "stored": "pi-checks/cargo-discard.exit.gz",
+      "sourceBytes": 24,
+      "storedBytes": 44,
+      "sourceSha256": "8d8aa0719fc6ae95e75b3392a50d4a82467666a4f9f366271d8a78b901aff236",
+      "storedSha256": "6698c0fd6a9c41ca8b9247d2f4215aee38bf80fe8b226b731b9d619998b0bfc3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/cargo-discard.out",
+      "stored": "pi-checks/cargo-discard.out.gz",
+      "sourceBytes": 4862,
+      "storedBytes": 1709,
+      "sourceSha256": "f7d367a07834be4c8fae5b4e458d31566365d02f828496510cbe5aa982d58006",
+      "storedSha256": "904a4c0fd01a95f8cbd4ed2c47d71deda0a6b084f350ff4034537d3f0006bdd3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/cargo-lib.err",
+      "stored": "pi-checks/cargo-lib.err.gz",
+      "sourceBytes": 249,
+      "storedBytes": 208,
+      "sourceSha256": "422e43c0c8edb7ae014b5ed7bc5ef567e8f97bff0ba8f5172fcc4ff34ebe43fe",
+      "storedSha256": "c4dca895251510074b6bda7e12e829d6f25dfa1bd200c4a16983f9a5e02c12a4"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/cargo-lib.exit",
+      "stored": "pi-checks/cargo-lib.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "e6ab2b48288b32b110c3261b9df6addcd2625874718f95536c0daff51d1dfbdd",
+      "storedSha256": "4013511973fe91406bc16f9d8b4783d8be03aca6e7efac979454cb20cef3b8ed"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/cargo-lib.out",
+      "stored": "pi-checks/cargo-lib.out.gz",
+      "sourceBytes": 6006,
+      "storedBytes": 1657,
+      "sourceSha256": "d67cc1c44a9fd1479b875654a34dd7095899949bc43b7cea62bde84313d13543",
+      "storedSha256": "84a2ea1e0b4bf1a2c143e8f677a6f2f49fe19a4ad8de4dc5e0171097e58300b2"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/history/recovery.rs.before-sensitivity.bak",
+      "stored": "pi-checks/history/recovery.rs.before-sensitivity.bak.gz",
+      "sourceBytes": 73160,
+      "storedBytes": 19580,
+      "sourceSha256": "2510aac1177e2c6c8f3fa945d7932561ad9bd5cd55f115b3a640e0b3d67d40f1",
+      "storedSha256": "d38364c2810068788b78af9d11a0bfab7f366098a7fc3157440c4a12196d269d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/history/sensitivity.md",
+      "stored": "pi-checks/history/sensitivity.md.gz",
+      "sourceBytes": 653,
+      "storedBytes": 506,
+      "sourceSha256": "056d64cd440643b1cdefe089b3e175c5262d67333d87638ae5a079210cf483cf",
+      "storedSha256": "50a101ae287e8afe6fead5b048b9d4af4e2780d79f540bef193e5baacd1bef58"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/lint.err",
+      "stored": "pi-checks/lint.err.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/lint.exit",
+      "stored": "pi-checks/lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/lint.out",
+      "stored": "pi-checks/lint.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/pre-change.diff",
+      "stored": "pi-checks/pre-change.diff.gz",
+      "sourceBytes": 27790,
+      "storedBytes": 8489,
+      "sourceSha256": "b0c584b8ae05dee9017134a211d28b7de26842494160965a7943a5a852a5b79b",
+      "storedSha256": "8baf5fe4fc924406af06955f98bd44ab9d5b14c593eec48574814100c281173c"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/source-sha256-before-check.txt",
+      "stored": "pi-checks/source-sha256-before-check.txt.gz",
+      "sourceBytes": 637,
+      "storedBytes": 403,
+      "sourceSha256": "db73d430349e7f1e1c1f9bec635db98758a5153b2300c88e4b23dc436e15d058",
+      "storedSha256": "ac1d707489d328fe68af437321a78f3322dcdadefb6a8e7314563cb1cd488c1f"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/tsc.err",
+      "stored": "pi-checks/tsc.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/tsc.exit",
+      "stored": "pi-checks/tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r4-1792799672/tsc.out",
+      "stored": "pi-checks/tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

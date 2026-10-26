@@ -1,0 +1,9 @@
+{
+  "reviewedSource": "cb828361d0f248ee4aa5e45f9bc40c7edc94e075",
+  "linkedLibrary": "/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/debug/deps/librevia_lib.rlib",
+  "librarySHA256": "b829ac27b6e67f8cf9357abe0da55d9820b79b91f1713cac0fabddfa2bc9c17c",
+  "libraryMtimeNs": 1792779491486630718,
+  "compileExit": 0,
+  "runExit": 0,
+  "boundary": "External rustc client uses existing library; source commit provenance of prebuilt library not independently established. No project rebuild, GUI or changes to project sources. All Git writes are isolated under this temporary root."
+}

@@ -1,0 +1,7750 @@
+{
+  "test": "long_running_baseline",
+  "runCompleted": true,
+  "acceptance": "pending desktop evidence, performance regression and memory trend review",
+  "startedAt": "2026-10-21T15:12:11.544244+08:00",
+  "endedAt": "2026-10-21T15:43:10.298343+08:00",
+  "targetDurationSeconds": 1800,
+  "actualDurationSeconds": 1858.75,
+  "reviaPid": 97185,
+  "webkitAttribution": "launchctl print pid/<exact child PID>: services table",
+  "binarySha256": "bbb05da09700e5578f90ebe6c40b03f3c5457c94b567a2832e5f8da0b438f44a",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "isolatedDataDir": "/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-soak-data-hgxuoupn",
+  "repo": "/private/tmp/revia-m1-fixtures/diffs",
+  "errors": [],
+  "frontend": {
+    "actualDurationSeconds": 1801.021,
+    "files": [
+      {
+        "changes": "unstaged",
+        "path": "assets/icon.png",
+        "rowCountSplit": 0,
+        "rowCountUnified": 0
+      },
+      {
+        "changes": "unstaged",
+        "path": "logs/app.log",
+        "rowCountSplit": 5001,
+        "rowCountUnified": 10001
+      },
+      {
+        "changes": "unstaged",
+        "path": "pnpm-lock.yaml",
+        "rowCountSplit": 2404,
+        "rowCountUnified": 3004
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/App.vue",
+        "rowCountSplit": 20,
+        "rowCountUnified": 24
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/Model.swift",
+        "rowCountSplit": 20,
+        "rowCountUnified": 23
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/generated.ts",
+        "rowCountSplit": 8309,
+        "rowCountUnified": 13435
+      },
+      {
+        "changes": "staged",
+        "path": "src/staged.ts",
+        "rowCountSplit": 2,
+        "rowCountUnified": 2
+      }
+    ],
+    "finalVisibility": {
+      "devicePixelRatio": 2,
+      "focused": true,
+      "hidden": false,
+      "hiddenTransitions": 0,
+      "maxFrameGapMs": 814,
+      "rafPerSecond": 59.82053838484546,
+      "state": "visible",
+      "viewportHeight": 800,
+      "viewportWidth": 1280
+    },
+    "ok": true,
+    "operationsStartedAt": "2026-10-21T07:13:07.595Z",
+    "readiness": [
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 887,
+        "rafPerSecond": 0.999000999000999,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 1987,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 3132,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 4231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 5325,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 6422,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 7522,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 8623,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 9723,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 10823,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 12231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 14223,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 16223,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 18231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 20223,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 22226,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 24232,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 26231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 28232,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 30232,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 32232,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 34231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 36232,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 38224,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 40224,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 42224,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 44231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 46235,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 48231,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 50232,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 52234,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 54236,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": false,
+        "hiddenTransitions": 1,
+        "maxFrameGapMs": 55026,
+        "rafPerSecond": 12.987012987012989,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    ],
+    "samples": [
+      {
+        "cycle": 4,
+        "elapsedSec": 10,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 765,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 8,
+        "elapsedSec": 20,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 765,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 12,
+        "elapsedSec": 30,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 765,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 15,
+        "elapsedSec": 40,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 19,
+        "elapsedSec": 51,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 23,
+        "elapsedSec": 61,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 26,
+        "elapsedSec": 71,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 30,
+        "elapsedSec": 81,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 34,
+        "elapsedSec": 91,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 37,
+        "elapsedSec": 101,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 41,
+        "elapsedSec": 112,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 45,
+        "elapsedSec": 122,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 780,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 48,
+        "elapsedSec": 133,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 52,
+        "elapsedSec": 143,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 56,
+        "elapsedSec": 153,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 59,
+        "elapsedSec": 164,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 63,
+        "elapsedSec": 174,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 67,
+        "elapsedSec": 184,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 70,
+        "elapsedSec": 194,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 74,
+        "elapsedSec": 204,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 78,
+        "elapsedSec": 214,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 81,
+        "elapsedSec": 225,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 85,
+        "elapsedSec": 235,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 89,
+        "elapsedSec": 245,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 92,
+        "elapsedSec": 255,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 96,
+        "elapsedSec": 265,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 100,
+        "elapsedSec": 275,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 103,
+        "elapsedSec": 286,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 107,
+        "elapsedSec": 296,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 111,
+        "elapsedSec": 306,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 114,
+        "elapsedSec": 316,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 118,
+        "elapsedSec": 326,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.523809523809526,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 122,
+        "elapsedSec": 337,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 125,
+        "elapsedSec": 347,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 129,
+        "elapsedSec": 357,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 132,
+        "elapsedSec": 367,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 136,
+        "elapsedSec": 377,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 139,
+        "elapsedSec": 388,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 143,
+        "elapsedSec": 398,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 147,
+        "elapsedSec": 408,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 150,
+        "elapsedSec": 418,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 154,
+        "elapsedSec": 429,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 158,
+        "elapsedSec": 439,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.87824351297405,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 161,
+        "elapsedSec": 449,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 165,
+        "elapsedSec": 460,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 48.85343968095713,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 169,
+        "elapsedSec": 470,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 172,
+        "elapsedSec": 480,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 176,
+        "elapsedSec": 491,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 15.952143569292124,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 180,
+        "elapsedSec": 501,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 184,
+        "elapsedSec": 511,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 188,
+        "elapsedSec": 521,
+        "file": "assets/icon.png",
+        "highlightLines": 0,
+        "loadedChunks": 0,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 15,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 191,
+        "elapsedSec": 531,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 195,
+        "elapsedSec": 541,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 199,
+        "elapsedSec": 553,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 202,
+        "elapsedSec": 563,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 206,
+        "elapsedSec": 573,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 210,
+        "elapsedSec": 584,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 214,
+        "elapsedSec": 594,
+        "file": "assets/icon.png",
+        "highlightLines": 0,
+        "loadedChunks": 0,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 217,
+        "elapsedSec": 604,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 221,
+        "elapsedSec": 615,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 225,
+        "elapsedSec": 625,
+        "file": "assets/icon.png",
+        "highlightLines": 0,
+        "loadedChunks": 0,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 228,
+        "elapsedSec": 635,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 232,
+        "elapsedSec": 645,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 235,
+        "elapsedSec": 656,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 239,
+        "elapsedSec": 666,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 243,
+        "elapsedSec": 676,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 246,
+        "elapsedSec": 686,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 250,
+        "elapsedSec": 697,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 254,
+        "elapsedSec": 707,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 257,
+        "elapsedSec": 717,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 261,
+        "elapsedSec": 728,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 265,
+        "elapsedSec": 738,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.51587301587302,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 268,
+        "elapsedSec": 748,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 272,
+        "elapsedSec": 759,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 276,
+        "elapsedSec": 769,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 279,
+        "elapsedSec": 779,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 283,
+        "elapsedSec": 789,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 287,
+        "elapsedSec": 800,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 290,
+        "elapsedSec": 810,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 294,
+        "elapsedSec": 820,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 298,
+        "elapsedSec": 831,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.87824351297405,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 301,
+        "elapsedSec": 841,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 305,
+        "elapsedSec": 852,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 309,
+        "elapsedSec": 862,
+        "file": "assets/icon.png",
+        "highlightLines": 0,
+        "loadedChunks": 0,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 312,
+        "elapsedSec": 872,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 316,
+        "elapsedSec": 882,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 319,
+        "elapsedSec": 892,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 323,
+        "elapsedSec": 902,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 327,
+        "elapsedSec": 913,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 330,
+        "elapsedSec": 923,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 334,
+        "elapsedSec": 933,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 337,
+        "elapsedSec": 943,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 341,
+        "elapsedSec": 954,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 344,
+        "elapsedSec": 964,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 348,
+        "elapsedSec": 974,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.87824351297405,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 352,
+        "elapsedSec": 984,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.93906093906094,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 355,
+        "elapsedSec": 995,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 359,
+        "elapsedSec": 1005,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 363,
+        "elapsedSec": 1016,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 366,
+        "elapsedSec": 1026,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 370,
+        "elapsedSec": 1036,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 15.888778550148958,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 374,
+        "elapsedSec": 1047,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 378,
+        "elapsedSec": 1057,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 381,
+        "elapsedSec": 1067,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 15,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 385,
+        "elapsedSec": 1077,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 389,
+        "elapsedSec": 1087,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 392,
+        "elapsedSec": 1097,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 6.265664160401003,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 396,
+        "elapsedSec": 1108,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 400,
+        "elapsedSec": 1118,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 403,
+        "elapsedSec": 1128,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 7.1132187314759925,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 407,
+        "elapsedSec": 1138,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 411,
+        "elapsedSec": 1148,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 414,
+        "elapsedSec": 1159,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 16.932270916334662,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 418,
+        "elapsedSec": 1169,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 422,
+        "elapsedSec": 1180,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 426,
+        "elapsedSec": 1191,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 429,
+        "elapsedSec": 1201,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 433,
+        "elapsedSec": 1211,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 437,
+        "elapsedSec": 1222,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 440,
+        "elapsedSec": 1232,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 444,
+        "elapsedSec": 1242,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.87824351297405,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 447,
+        "elapsedSec": 1252,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 451,
+        "elapsedSec": 1263,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 455,
+        "elapsedSec": 1273,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 458,
+        "elapsedSec": 1283,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 462,
+        "elapsedSec": 1293,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 466,
+        "elapsedSec": 1303,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 812,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 469,
+        "elapsedSec": 1313,
+        "file": "src/App.vue",
+        "highlightLines": 34,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 473,
+        "elapsedSec": 1324,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 477,
+        "elapsedSec": 1334,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 480,
+        "elapsedSec": 1344,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60.87824351297405,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 484,
+        "elapsedSec": 1354,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 487,
+        "elapsedSec": 1364,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 491,
+        "elapsedSec": 1374,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 494,
+        "elapsedSec": 1385,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 498,
+        "elapsedSec": 1395,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60.87824351297405,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 502,
+        "elapsedSec": 1405,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 505,
+        "elapsedSec": 1416,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 509,
+        "elapsedSec": 1426,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 513,
+        "elapsedSec": 1436,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 516,
+        "elapsedSec": 1447,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 520,
+        "elapsedSec": 1457,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 524,
+        "elapsedSec": 1468,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 527,
+        "elapsedSec": 1478,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 531,
+        "elapsedSec": 1488,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 535,
+        "elapsedSec": 1498,
+        "file": "assets/icon.png",
+        "highlightLines": 0,
+        "loadedChunks": 0,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 538,
+        "elapsedSec": 1508,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 542,
+        "elapsedSec": 1519,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 545,
+        "elapsedSec": 1529,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 549,
+        "elapsedSec": 1539,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 553,
+        "elapsedSec": 1549,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 556,
+        "elapsedSec": 1560,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 560,
+        "elapsedSec": 1570,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 564,
+        "elapsedSec": 1580,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 567,
+        "elapsedSec": 1590,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 571,
+        "elapsedSec": 1600,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 575,
+        "elapsedSec": 1610,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 578,
+        "elapsedSec": 1620,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 582,
+        "elapsedSec": 1630,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 585,
+        "elapsedSec": 1640,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 589,
+        "elapsedSec": 1651,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 592,
+        "elapsedSec": 1661,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 596,
+        "elapsedSec": 1671,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 600,
+        "elapsedSec": 1682,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.880239520958085,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 603,
+        "elapsedSec": 1692,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 607,
+        "elapsedSec": 1702,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 611,
+        "elapsedSec": 1712,
+        "file": "assets/icon.png",
+        "highlightLines": 0,
+        "loadedChunks": 0,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 614,
+        "elapsedSec": 1722,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.701492537313435,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 618,
+        "elapsedSec": 1733,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 621,
+        "elapsedSec": 1743,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 625,
+        "elapsedSec": 1753,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 629,
+        "elapsedSec": 1763,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 632,
+        "elapsedSec": 1773,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.82053838484546,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 636,
+        "elapsedSec": 1784,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 61.87624750499002,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 640,
+        "elapsedSec": 1794,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 641,
+        "elapsedSec": 1800,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 27,
+        "view": "unified",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 814,
+          "rafPerSecond": 60.756972111553786,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      }
+    ],
+    "samplesCount": 176,
+    "session": {
+      "checks": [
+        {
+          "detail": "/opt/homebrew/bin/git（git version 2.56.0）",
+          "hint": "需要 Git 2.11 或更高版本",
+          "name": "git",
+          "ok": true
+        },
+        {
+          "detail": "/bin/zsh · 127 毫秒",
+          "hint": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
+          "name": "shell",
+          "ok": true
+        }
+      ],
+      "gitPath": "/opt/homebrew/bin/git",
+      "gitVersion": "git version 2.56.0",
+      "shell": "/bin/zsh",
+      "shellElapsedMs": 127
+    },
+    "setupSeconds": 55.663,
+    "targetDurationSeconds": 1800,
+    "totalCycles": 641,
+    "totalFileSwitches": 4486,
+    "totalJumps": 3846,
+    "totalScrolls": 21151,
+    "totalViewSwitches": 7689,
+    "worktree": {
+      "bare": false,
+      "branch": "main",
+      "detached": false,
+      "head": "566b6de67e03f140a59095379e9849a748990a8a",
+      "id": "565996f4230d980e",
+      "isMain": true,
+      "path": "/private/tmp/revia-m1-fixtures/diffs"
+    }
+  },
+  "memoryTimeSeries": [
+    {
+      "rustRssMb": 116.33,
+      "webContentRssMb": 61.12,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.53,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 32.64,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 222.62,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 41.0,
+      "webContentFootprintMb": 44.0,
+      "elapsedSec": 2.05,
+      "timestamp": "2026-10-21T15:12:15.492732+08:00"
+    },
+    {
+      "rustRssMb": 116.25,
+      "webContentRssMb": 60.8,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.42,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 32.38,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 221.84,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 12.1,
+      "timestamp": "2026-10-21T15:12:23.666739+08:00"
+    },
+    {
+      "rustRssMb": 116.23,
+      "webContentRssMb": 60.8,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 32.36,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 221.8,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 22.1,
+      "timestamp": "2026-10-21T15:12:33.668194+08:00"
+    },
+    {
+      "rustRssMb": 117.62,
+      "webContentRssMb": 61.44,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 32.36,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 223.83,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 41.6,
+      "webContentFootprintMb": 41.8,
+      "elapsedSec": 32.29,
+      "timestamp": "2026-10-21T15:12:45.525593+08:00"
+    },
+    {
+      "rustRssMb": 117.52,
+      "webContentRssMb": 61.42,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 32.36,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 223.7,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 42.29,
+      "timestamp": "2026-10-21T15:12:53.864020+08:00"
+    },
+    {
+      "rustRssMb": 117.53,
+      "webContentRssMb": 61.66,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 32.36,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 223.95,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 52.48,
+      "timestamp": "2026-10-21T15:13:04.051159+08:00"
+    },
+    {
+      "rustRssMb": 140.28,
+      "webContentRssMb": 237.36,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.45,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.73,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 433.83,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 60.9,
+      "webContentFootprintMb": 213.8,
+      "elapsedSec": 62.5,
+      "timestamp": "2026-10-21T15:13:15.973978+08:00"
+    },
+    {
+      "rustRssMb": 142.31,
+      "webContentRssMb": 403.22,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.45,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.23,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 601.22,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 72.58,
+      "timestamp": "2026-10-21T15:13:24.137706+08:00"
+    },
+    {
+      "rustRssMb": 142.41,
+      "webContentRssMb": 482.52,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.45,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.41,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 680.78,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 82.59,
+      "timestamp": "2026-10-21T15:13:34.148696+08:00"
+    },
+    {
+      "rustRssMb": 142.97,
+      "webContentRssMb": 482.56,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.58,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.28,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 681.39,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 61.0,
+      "webContentFootprintMb": 268.5,
+      "elapsedSec": 92.6,
+      "timestamp": "2026-10-21T15:13:46.084122+08:00"
+    },
+    {
+      "rustRssMb": 143.0,
+      "webContentRssMb": 482.55,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.58,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.36,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 681.48,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 102.69,
+      "timestamp": "2026-10-21T15:13:54.253362+08:00"
+    },
+    {
+      "rustRssMb": 141.25,
+      "webContentRssMb": 482.98,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.58,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.28,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 680.09,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 112.71,
+      "timestamp": "2026-10-21T15:14:04.273917+08:00"
+    },
+    {
+      "rustRssMb": 141.73,
+      "webContentRssMb": 483.44,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.58,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.38,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 681.12,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 54.1,
+      "webContentFootprintMb": 261.8,
+      "elapsedSec": 122.9,
+      "timestamp": "2026-10-21T15:14:16.350185+08:00"
+    },
+    {
+      "rustRssMb": 143.06,
+      "webContentRssMb": 484.08,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.83,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.34,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 683.31,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 132.95,
+      "timestamp": "2026-10-21T15:14:24.517000+08:00"
+    },
+    {
+      "rustRssMb": 143.06,
+      "webContentRssMb": 485.02,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.83,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.3,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 684.2,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 143.15,
+      "timestamp": "2026-10-21T15:14:34.711398+08:00"
+    },
+    {
+      "rustRssMb": 143.45,
+      "webContentRssMb": 486.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.83,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.3,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 686.08,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 55.4,
+      "webContentFootprintMb": 246.3,
+      "elapsedSec": 153.35,
+      "timestamp": "2026-10-21T15:14:46.791206+08:00"
+    },
+    {
+      "rustRssMb": 143.5,
+      "webContentRssMb": 487.91,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.84,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.34,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 687.59,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 163.41,
+      "timestamp": "2026-10-21T15:14:54.969061+08:00"
+    },
+    {
+      "rustRssMb": 143.5,
+      "webContentRssMb": 488.86,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.86,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.3,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 688.52,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 173.42,
+      "timestamp": "2026-10-21T15:15:04.979458+08:00"
+    },
+    {
+      "rustRssMb": 143.59,
+      "webContentRssMb": 490.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 12.86,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.31,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 690.27,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 54.6,
+      "webContentFootprintMb": 266.2,
+      "elapsedSec": 183.43,
+      "timestamp": "2026-10-21T15:15:16.950421+08:00"
+    },
+    {
+      "rustRssMb": 143.59,
+      "webContentRssMb": 505.44,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.45,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 713.56,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 193.56,
+      "timestamp": "2026-10-21T15:15:25.119626+08:00"
+    },
+    {
+      "rustRssMb": 142.72,
+      "webContentRssMb": 506.75,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.45,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 714.0,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 203.75,
+      "timestamp": "2026-10-21T15:15:35.313131+08:00"
+    },
+    {
+      "rustRssMb": 142.28,
+      "webContentRssMb": 509.97,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.52,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 716.84,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 254.5,
+      "elapsedSec": 213.75,
+      "timestamp": "2026-10-21T15:15:47.211932+08:00"
+    },
+    {
+      "rustRssMb": 142.3,
+      "webContentRssMb": 511.84,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 718.78,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 223.82,
+      "timestamp": "2026-10-21T15:15:55.377842+08:00"
+    },
+    {
+      "rustRssMb": 142.3,
+      "webContentRssMb": 513.22,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.48,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 720.08,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 233.82,
+      "timestamp": "2026-10-21T15:16:05.386617+08:00"
+    },
+    {
+      "rustRssMb": 143.61,
+      "webContentRssMb": 514.14,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.45,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 722.28,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.9,
+      "webContentFootprintMb": 268.4,
+      "elapsedSec": 243.82,
+      "timestamp": "2026-10-21T15:16:17.266748+08:00"
+    },
+    {
+      "rustRssMb": 142.3,
+      "webContentRssMb": 514.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.52,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 721.52,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 253.88,
+      "timestamp": "2026-10-21T15:16:25.442634+08:00"
+    },
+    {
+      "rustRssMb": 143.61,
+      "webContentRssMb": 516.45,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.45,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 724.59,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 263.89,
+      "timestamp": "2026-10-21T15:16:35.450087+08:00"
+    },
+    {
+      "rustRssMb": 142.31,
+      "webContentRssMb": 518.19,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.53,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 725.11,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.5,
+      "webContentFootprintMb": 258.8,
+      "elapsedSec": 273.89,
+      "timestamp": "2026-10-21T15:16:47.376403+08:00"
+    },
+    {
+      "rustRssMb": 143.89,
+      "webContentRssMb": 521.52,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.95,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 730.44,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 283.99,
+      "timestamp": "2026-10-21T15:16:55.547934+08:00"
+    },
+    {
+      "rustRssMb": 144.02,
+      "webContentRssMb": 521.77,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 21.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.98,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 730.84,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 293.99,
+      "timestamp": "2026-10-21T15:17:05.555342+08:00"
+    },
+    {
+      "rustRssMb": 143.58,
+      "webContentRssMb": 524.06,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 25.08,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.95,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 736.67,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.0,
+      "webContentFootprintMb": 276.2,
+      "elapsedSec": 304.0,
+      "timestamp": "2026-10-21T15:17:17.516070+08:00"
+    },
+    {
+      "rustRssMb": 144.02,
+      "webContentRssMb": 548.22,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 28.92,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.98,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 765.14,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 314.1,
+      "timestamp": "2026-10-21T15:17:25.670541+08:00"
+    },
+    {
+      "rustRssMb": 144.02,
+      "webContentRssMb": 548.75,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 28.92,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 44.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 765.8,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 324.11,
+      "timestamp": "2026-10-21T15:17:35.666830+08:00"
+    },
+    {
+      "rustRssMb": 142.81,
+      "webContentRssMb": 550.36,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 28.92,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 43.92,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 766.02,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.1,
+      "webContentFootprintMb": 276.4,
+      "elapsedSec": 334.12,
+      "timestamp": "2026-10-21T15:17:47.589438+08:00"
+    },
+    {
+      "rustRssMb": 144.17,
+      "webContentRssMb": 552.14,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 28.92,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 44.02,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 769.25,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 344.21,
+      "timestamp": "2026-10-21T15:17:55.768505+08:00"
+    },
+    {
+      "rustRssMb": 144.17,
+      "webContentRssMb": 553.34,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 28.92,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 44.02,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 770.45,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 354.41,
+      "timestamp": "2026-10-21T15:18:05.967036+08:00"
+    },
+    {
+      "rustRssMb": 133.22,
+      "webContentRssMb": 547.66,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.25,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.5,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 744.62,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 56.5,
+      "webContentFootprintMb": 267.8,
+      "elapsedSec": 364.55,
+      "timestamp": "2026-10-21T15:18:18.069321+08:00"
+    },
+    {
+      "rustRssMb": 133.33,
+      "webContentRssMb": 549.67,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.25,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.66,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 746.91,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 374.59,
+      "timestamp": "2026-10-21T15:18:26.152558+08:00"
+    },
+    {
+      "rustRssMb": 133.33,
+      "webContentRssMb": 550.09,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.25,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.62,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 747.3,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 384.72,
+      "timestamp": "2026-10-21T15:18:36.281901+08:00"
+    },
+    {
+      "rustRssMb": 133.36,
+      "webContentRssMb": 550.64,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.25,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 747.81,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 56.5,
+      "webContentFootprintMb": 272.5,
+      "elapsedSec": 394.81,
+      "timestamp": "2026-10-21T15:18:48.302668+08:00"
+    },
+    {
+      "rustRssMb": 132.52,
+      "webContentRssMb": 554.17,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.25,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.5,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 750.44,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 405.0,
+      "timestamp": "2026-10-21T15:18:56.561484+08:00"
+    },
+    {
+      "rustRssMb": 132.52,
+      "webContentRssMb": 554.27,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.27,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.64,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 750.69,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 415.17,
+      "timestamp": "2026-10-21T15:19:06.731749+08:00"
+    },
+    {
+      "rustRssMb": 133.81,
+      "webContentRssMb": 554.3,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.27,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.66,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 752.03,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 56.5,
+      "webContentFootprintMb": 263.8,
+      "elapsedSec": 425.33,
+      "timestamp": "2026-10-21T15:19:18.808906+08:00"
+    },
+    {
+      "rustRssMb": 133.84,
+      "webContentRssMb": 554.36,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.27,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.64,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 752.11,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 435.34,
+      "timestamp": "2026-10-21T15:19:26.902795+08:00"
+    },
+    {
+      "rustRssMb": 133.84,
+      "webContentRssMb": 554.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.36,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.75,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 752.58,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 445.47,
+      "timestamp": "2026-10-21T15:19:37.035320+08:00"
+    },
+    {
+      "rustRssMb": 132.55,
+      "webContentRssMb": 554.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.36,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.73,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 751.27,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 54.3,
+      "webContentFootprintMb": 270.5,
+      "elapsedSec": 455.61,
+      "timestamp": "2026-10-21T15:19:49.126802+08:00"
+    },
+    {
+      "rustRssMb": 133.89,
+      "webContentRssMb": 555.33,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.36,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.8,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 753.38,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 465.67,
+      "timestamp": "2026-10-21T15:19:57.225952+08:00"
+    },
+    {
+      "rustRssMb": 132.14,
+      "webContentRssMb": 555.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.36,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.84,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 751.84,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 475.81,
+      "timestamp": "2026-10-21T15:20:07.373808+08:00"
+    },
+    {
+      "rustRssMb": 133.91,
+      "webContentRssMb": 555.58,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.39,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.84,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 753.72,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.0,
+      "webContentFootprintMb": 264.8,
+      "elapsedSec": 485.97,
+      "timestamp": "2026-10-21T15:20:19.477831+08:00"
+    },
+    {
+      "rustRssMb": 133.91,
+      "webContentRssMb": 555.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.39,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.94,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 753.86,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 495.98,
+      "timestamp": "2026-10-21T15:20:27.544213+08:00"
+    },
+    {
+      "rustRssMb": 133.91,
+      "webContentRssMb": 556.02,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.39,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.94,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 754.25,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 506.12,
+      "timestamp": "2026-10-21T15:20:37.690844+08:00"
+    },
+    {
+      "rustRssMb": 133.91,
+      "webContentRssMb": 557.78,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 24.39,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.92,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 756.0,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.7,
+      "webContentFootprintMb": 277.5,
+      "elapsedSec": 516.26,
+      "timestamp": "2026-10-21T15:20:49.818819+08:00"
+    },
+    {
+      "rustRssMb": 133.91,
+      "webContentRssMb": 568.86,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.0,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 776.64,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 526.36,
+      "timestamp": "2026-10-21T15:20:57.922189+08:00"
+    },
+    {
+      "rustRssMb": 133.91,
+      "webContentRssMb": 568.94,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 776.75,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 536.55,
+      "timestamp": "2026-10-21T15:21:08.111707+08:00"
+    },
+    {
+      "rustRssMb": 133.97,
+      "webContentRssMb": 568.98,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 776.94,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.7,
+      "webContentFootprintMb": 261.5,
+      "elapsedSec": 546.62,
+      "timestamp": "2026-10-21T15:21:20.127689+08:00"
+    },
+    {
+      "rustRssMb": 133.97,
+      "webContentRssMb": 569.67,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 777.56,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 556.73,
+      "timestamp": "2026-10-21T15:21:28.292455+08:00"
+    },
+    {
+      "rustRssMb": 133.97,
+      "webContentRssMb": 569.72,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 777.61,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 566.93,
+      "timestamp": "2026-10-21T15:21:38.489332+08:00"
+    },
+    {
+      "rustRssMb": 133.97,
+      "webContentRssMb": 569.73,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 777.69,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.7,
+      "webContentFootprintMb": 259.0,
+      "elapsedSec": 576.93,
+      "timestamp": "2026-10-21T15:21:50.420741+08:00"
+    },
+    {
+      "rustRssMb": 133.97,
+      "webContentRssMb": 569.84,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 777.8,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 587.02,
+      "timestamp": "2026-10-21T15:21:58.581078+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 569.84,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.02,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 597.22,
+      "timestamp": "2026-10-21T15:22:08.778249+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 570.28,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.27,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.64,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.9,
+      "webContentFootprintMb": 263.7,
+      "elapsedSec": 607.23,
+      "timestamp": "2026-10-21T15:22:20.716205+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 570.25,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.09,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.44,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 617.31,
+      "timestamp": "2026-10-21T15:22:28.871562+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 570.28,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.16,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.53,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 627.32,
+      "timestamp": "2026-10-21T15:22:38.885676+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 570.34,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.2,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.64,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.2,
+      "webContentFootprintMb": 264.4,
+      "elapsedSec": 637.32,
+      "timestamp": "2026-10-21T15:22:50.812827+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 570.41,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.19,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.69,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 647.39,
+      "timestamp": "2026-10-21T15:22:58.957332+08:00"
+    },
+    {
+      "rustRssMb": 134.23,
+      "webContentRssMb": 570.61,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.16,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.88,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 657.4,
+      "timestamp": "2026-10-21T15:23:08.959646+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 568.77,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.91,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 776.77,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 259.6,
+      "elapsedSec": 667.41,
+      "timestamp": "2026-10-21T15:23:20.928096+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 569.38,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 777.52,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 677.54,
+      "timestamp": "2026-10-21T15:23:29.092475+08:00"
+    },
+    {
+      "rustRssMb": 134.22,
+      "webContentRssMb": 569.61,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 777.73,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 687.73,
+      "timestamp": "2026-10-21T15:23:39.295492+08:00"
+    },
+    {
+      "rustRssMb": 132.91,
+      "webContentRssMb": 569.95,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 776.78,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.8,
+      "webContentFootprintMb": 253.3,
+      "elapsedSec": 697.93,
+      "timestamp": "2026-10-21T15:23:51.392615+08:00"
+    },
+    {
+      "rustRssMb": 134.23,
+      "webContentRssMb": 570.0,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.94,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.05,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 708.0,
+      "timestamp": "2026-10-21T15:23:59.562900+08:00"
+    },
+    {
+      "rustRssMb": 134.23,
+      "webContentRssMb": 571.12,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.27,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 718.0,
+      "timestamp": "2026-10-21T15:24:09.564675+08:00"
+    },
+    {
+      "rustRssMb": 134.25,
+      "webContentRssMb": 571.11,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.97,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.2,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 273.3,
+      "elapsedSec": 728.01,
+      "timestamp": "2026-10-21T15:24:21.476411+08:00"
+    },
+    {
+      "rustRssMb": 133.81,
+      "webContentRssMb": 571.14,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.94,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 778.77,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 738.08,
+      "timestamp": "2026-10-21T15:24:29.644435+08:00"
+    },
+    {
+      "rustRssMb": 133.98,
+      "webContentRssMb": 571.28,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.19,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.47,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 748.28,
+      "timestamp": "2026-10-21T15:24:39.845567+08:00"
+    },
+    {
+      "rustRssMb": 133.95,
+      "webContentRssMb": 571.44,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.45,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.6,
+      "webContentFootprintMb": 265.8,
+      "elapsedSec": 758.47,
+      "timestamp": "2026-10-21T15:24:51.917574+08:00"
+    },
+    {
+      "rustRssMb": 133.95,
+      "webContentRssMb": 571.38,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.38,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 768.53,
+      "timestamp": "2026-10-21T15:25:00.093865+08:00"
+    },
+    {
+      "rustRssMb": 133.95,
+      "webContentRssMb": 571.36,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.41,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 778.54,
+      "timestamp": "2026-10-21T15:25:10.106567+08:00"
+    },
+    {
+      "rustRssMb": 133.95,
+      "webContentRssMb": 571.78,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.78,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.6,
+      "webContentFootprintMb": 254.3,
+      "elapsedSec": 788.56,
+      "timestamp": "2026-10-21T15:25:22.031740+08:00"
+    },
+    {
+      "rustRssMb": 133.95,
+      "webContentRssMb": 571.75,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.75,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 798.64,
+      "timestamp": "2026-10-21T15:25:30.207150+08:00"
+    },
+    {
+      "rustRssMb": 133.95,
+      "webContentRssMb": 571.7,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.75,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 808.66,
+      "timestamp": "2026-10-21T15:25:40.225952+08:00"
+    },
+    {
+      "rustRssMb": 133.97,
+      "webContentRssMb": 572.52,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.94,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 780.44,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.6,
+      "webContentFootprintMb": 282.4,
+      "elapsedSec": 818.86,
+      "timestamp": "2026-10-21T15:25:52.321901+08:00"
+    },
+    {
+      "rustRssMb": 132.67,
+      "webContentRssMb": 572.53,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.2,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.42,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 828.92,
+      "timestamp": "2026-10-21T15:26:00.485972+08:00"
+    },
+    {
+      "rustRssMb": 133.98,
+      "webContentRssMb": 572.58,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.16,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 780.73,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 838.93,
+      "timestamp": "2026-10-21T15:26:10.493996+08:00"
+    },
+    {
+      "rustRssMb": 133.98,
+      "webContentRssMb": 572.66,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.19,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 780.84,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.6,
+      "webContentFootprintMb": 271.1,
+      "elapsedSec": 849.08,
+      "timestamp": "2026-10-21T15:26:22.546916+08:00"
+    },
+    {
+      "rustRssMb": 134.0,
+      "webContentRssMb": 573.08,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.17,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 781.27,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 859.27,
+      "timestamp": "2026-10-21T15:26:30.835048+08:00"
+    },
+    {
+      "rustRssMb": 133.98,
+      "webContentRssMb": 573.0,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.19,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 781.19,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 869.42,
+      "timestamp": "2026-10-21T15:26:40.976950+08:00"
+    },
+    {
+      "rustRssMb": 132.67,
+      "webContentRssMb": 573.14,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.95,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.3,
+      "webContentFootprintMb": 267.6,
+      "elapsedSec": 879.61,
+      "timestamp": "2026-10-21T15:26:53.074846+08:00"
+    },
+    {
+      "rustRssMb": 133.98,
+      "webContentRssMb": 573.11,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.16,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 781.27,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 889.63,
+      "timestamp": "2026-10-21T15:27:01.188335+08:00"
+    },
+    {
+      "rustRssMb": 134.06,
+      "webContentRssMb": 574.09,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 782.3,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 899.82,
+      "timestamp": "2026-10-21T15:27:11.383027+08:00"
+    },
+    {
+      "rustRssMb": 134.06,
+      "webContentRssMb": 574.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 782.83,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.6,
+      "webContentFootprintMb": 262.5,
+      "elapsedSec": 909.95,
+      "timestamp": "2026-10-21T15:27:23.413191+08:00"
+    },
+    {
+      "rustRssMb": 131.0,
+      "webContentRssMb": 574.69,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.23,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 779.94,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 920.14,
+      "timestamp": "2026-10-21T15:27:31.700613+08:00"
+    },
+    {
+      "rustRssMb": 134.06,
+      "webContentRssMb": 574.88,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.22,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 783.17,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 930.32,
+      "timestamp": "2026-10-21T15:27:41.872297+08:00"
+    },
+    {
+      "rustRssMb": 134.06,
+      "webContentRssMb": 574.89,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.16,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 783.12,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.5,
+      "webContentFootprintMb": 268.5,
+      "elapsedSec": 940.47,
+      "timestamp": "2026-10-21T15:27:53.918155+08:00"
+    },
+    {
+      "rustRssMb": 134.02,
+      "webContentRssMb": 574.94,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.02,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 783.09,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 950.66,
+      "timestamp": "2026-10-21T15:28:02.216234+08:00"
+    },
+    {
+      "rustRssMb": 129.19,
+      "webContentRssMb": 436.72,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.7,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 639.59,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 960.82,
+      "timestamp": "2026-10-21T15:28:12.379642+08:00"
+    },
+    {
+      "rustRssMb": 131.03,
+      "webContentRssMb": 416.11,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.95,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 621.08,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 58.1,
+      "webContentFootprintMb": 272.5,
+      "elapsedSec": 970.96,
+      "timestamp": "2026-10-21T15:28:24.484879+08:00"
+    },
+    {
+      "rustRssMb": 131.03,
+      "webContentRssMb": 419.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.95,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 624.59,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 981.03,
+      "timestamp": "2026-10-21T15:28:32.594072+08:00"
+    },
+    {
+      "rustRssMb": 131.05,
+      "webContentRssMb": 420.38,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.91,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 625.31,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 991.21,
+      "timestamp": "2026-10-21T15:28:42.766375+08:00"
+    },
+    {
+      "rustRssMb": 131.05,
+      "webContentRssMb": 424.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.86,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 629.05,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 57.9,
+      "webContentFootprintMb": 262.6,
+      "elapsedSec": 1001.36,
+      "timestamp": "2026-10-21T15:28:54.859105+08:00"
+    },
+    {
+      "rustRssMb": 131.05,
+      "webContentRssMb": 424.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.92,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 629.78,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1011.4,
+      "timestamp": "2026-10-21T15:29:02.962939+08:00"
+    },
+    {
+      "rustRssMb": 131.05,
+      "webContentRssMb": 426.09,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.88,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.0,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1021.58,
+      "timestamp": "2026-10-21T15:29:13.141619+08:00"
+    },
+    {
+      "rustRssMb": 131.05,
+      "webContentRssMb": 426.09,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.89,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.02,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 55.3,
+      "webContentFootprintMb": 275.2,
+      "elapsedSec": 1031.73,
+      "timestamp": "2026-10-21T15:29:25.223016+08:00"
+    },
+    {
+      "rustRssMb": 131.02,
+      "webContentRssMb": 430.53,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.89,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 635.42,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1041.79,
+      "timestamp": "2026-10-21T15:29:33.351876+08:00"
+    },
+    {
+      "rustRssMb": 129.75,
+      "webContentRssMb": 436.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.95,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 640.52,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1051.97,
+      "timestamp": "2026-10-21T15:29:43.529106+08:00"
+    },
+    {
+      "rustRssMb": 129.75,
+      "webContentRssMb": 436.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.91,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 640.47,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.7,
+      "webContentFootprintMb": 279.3,
+      "elapsedSec": 1061.97,
+      "timestamp": "2026-10-21T15:29:55.450544+08:00"
+    },
+    {
+      "rustRssMb": 131.06,
+      "webContentRssMb": 436.91,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 642.0,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1071.98,
+      "timestamp": "2026-10-21T15:30:03.549852+08:00"
+    },
+    {
+      "rustRssMb": 129.75,
+      "webContentRssMb": 437.0,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.02,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 640.75,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1082.16,
+      "timestamp": "2026-10-21T15:30:13.734945+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 437.33,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 642.86,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.3,
+      "webContentFootprintMb": 269.1,
+      "elapsedSec": 1092.34,
+      "timestamp": "2026-10-21T15:30:25.809280+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 439.2,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.98,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 644.67,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1102.54,
+      "timestamp": "2026-10-21T15:30:34.103632+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 457.02,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.22,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 662.72,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1112.73,
+      "timestamp": "2026-10-21T15:30:44.290834+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 457.02,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 662.61,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.3,
+      "webContentFootprintMb": 261.6,
+      "elapsedSec": 1122.89,
+      "timestamp": "2026-10-21T15:30:56.382209+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 457.05,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 662.58,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1132.91,
+      "timestamp": "2026-10-21T15:31:04.467088+08:00"
+    },
+    {
+      "rustRssMb": 131.47,
+      "webContentRssMb": 458.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 664.0,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1143.04,
+      "timestamp": "2026-10-21T15:31:14.607296+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 458.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.05,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 664.03,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.2,
+      "webContentFootprintMb": 265.8,
+      "elapsedSec": 1153.2,
+      "timestamp": "2026-10-21T15:31:26.671769+08:00"
+    },
+    {
+      "rustRssMb": 131.5,
+      "webContentRssMb": 458.41,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 663.92,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1163.22,
+      "timestamp": "2026-10-21T15:31:34.784073+08:00"
+    },
+    {
+      "rustRssMb": 130.19,
+      "webContentRssMb": 458.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 662.7,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1173.41,
+      "timestamp": "2026-10-21T15:31:44.969871+08:00"
+    },
+    {
+      "rustRssMb": 126.27,
+      "webContentRssMb": 458.55,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 658.92,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.8,
+      "webContentFootprintMb": 281.7,
+      "elapsedSec": 1183.57,
+      "timestamp": "2026-10-21T15:31:57.064386+08:00"
+    },
+    {
+      "rustRssMb": 126.27,
+      "webContentRssMb": 458.59,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.09,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 658.94,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1193.59,
+      "timestamp": "2026-10-21T15:32:05.153249+08:00"
+    },
+    {
+      "rustRssMb": 126.27,
+      "webContentRssMb": 458.61,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.06,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 658.92,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1203.77,
+      "timestamp": "2026-10-21T15:32:15.336655+08:00"
+    },
+    {
+      "rustRssMb": 126.27,
+      "webContentRssMb": 458.61,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 658.98,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.8,
+      "webContentFootprintMb": 266.1,
+      "elapsedSec": 1213.92,
+      "timestamp": "2026-10-21T15:32:27.400528+08:00"
+    },
+    {
+      "rustRssMb": 126.27,
+      "webContentRssMb": 459.77,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.09,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 660.11,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1223.96,
+      "timestamp": "2026-10-21T15:32:35.518639+08:00"
+    },
+    {
+      "rustRssMb": 125.03,
+      "webContentRssMb": 459.81,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.09,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 658.92,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1234.12,
+      "timestamp": "2026-10-21T15:32:45.681379+08:00"
+    },
+    {
+      "rustRssMb": 126.34,
+      "webContentRssMb": 459.78,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.2,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 660.31,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.8,
+      "webContentFootprintMb": 266.4,
+      "elapsedSec": 1244.3,
+      "timestamp": "2026-10-21T15:32:57.781243+08:00"
+    },
+    {
+      "rustRssMb": 126.34,
+      "webContentRssMb": 459.84,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.98,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 40.09,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 660.27,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1254.35,
+      "timestamp": "2026-10-21T15:33:05.914099+08:00"
+    },
+    {
+      "rustRssMb": 123.14,
+      "webContentRssMb": 401.02,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 18.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.48,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 582.52,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1264.52,
+      "timestamp": "2026-10-21T15:33:16.081535+08:00"
+    },
+    {
+      "rustRssMb": 123.09,
+      "webContentRssMb": 403.0,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 18.88,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.47,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 584.44,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 55.3,
+      "webContentFootprintMb": 273.2,
+      "elapsedSec": 1274.71,
+      "timestamp": "2026-10-21T15:33:28.231397+08:00"
+    },
+    {
+      "rustRssMb": 123.31,
+      "webContentRssMb": 403.34,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 18.89,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.52,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 585.06,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1284.76,
+      "timestamp": "2026-10-21T15:33:36.319148+08:00"
+    },
+    {
+      "rustRssMb": 123.31,
+      "webContentRssMb": 403.59,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 18.89,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 585.36,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1294.9,
+      "timestamp": "2026-10-21T15:33:46.467434+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 403.5,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 18.89,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.53,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 585.66,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 55.5,
+      "webContentFootprintMb": 296.0,
+      "elapsedSec": 1305.07,
+      "timestamp": "2026-10-21T15:33:58.615732+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 425.17,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 42.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.52,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.2,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1315.15,
+      "timestamp": "2026-10-21T15:34:06.707367+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 425.19,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 42.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.27,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1325.32,
+      "timestamp": "2026-10-21T15:34:16.877909+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 425.45,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 42.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.5,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.47,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 54.0,
+      "webContentFootprintMb": 272.1,
+      "elapsedSec": 1335.52,
+      "timestamp": "2026-10-21T15:34:29.033257+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 425.56,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 42.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.64,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.72,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1345.57,
+      "timestamp": "2026-10-21T15:34:37.134271+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 425.73,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 42.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.81,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1355.73,
+      "timestamp": "2026-10-21T15:34:47.297576+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 425.7,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 42.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.53,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 631.75,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.5,
+      "webContentFootprintMb": 285.5,
+      "elapsedSec": 1365.89,
+      "timestamp": "2026-10-21T15:34:59.453112+08:00"
+    },
+    {
+      "rustRssMb": 123.73,
+      "webContentRssMb": 427.81,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.53,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.48,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1375.97,
+      "timestamp": "2026-10-21T15:35:07.535386+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 427.81,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.53,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1386.12,
+      "timestamp": "2026-10-21T15:35:17.685702+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.06,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.53,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.75,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.4,
+      "webContentFootprintMb": 270.8,
+      "elapsedSec": 1396.29,
+      "timestamp": "2026-10-21T15:35:29.774777+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.08,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.52,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.75,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1406.3,
+      "timestamp": "2026-10-21T15:35:37.857720+08:00"
+    },
+    {
+      "rustRssMb": 123.31,
+      "webContentRssMb": 428.09,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.56,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.38,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1416.46,
+      "timestamp": "2026-10-21T15:35:48.024809+08:00"
+    },
+    {
+      "rustRssMb": 123.31,
+      "webContentRssMb": 428.11,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.53,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.36,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.8,
+      "webContentFootprintMb": 261.0,
+      "elapsedSec": 1426.63,
+      "timestamp": "2026-10-21T15:36:00.118517+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.11,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.44,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.7,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1436.63,
+      "timestamp": "2026-10-21T15:36:08.195198+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.11,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.44,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.7,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1446.82,
+      "timestamp": "2026-10-21T15:36:18.386908+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.47,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.78,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.4,
+      "webContentFootprintMb": 265.3,
+      "elapsedSec": 1457.03,
+      "timestamp": "2026-10-21T15:36:30.518216+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.17,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.44,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.77,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1467.07,
+      "timestamp": "2026-10-21T15:36:38.633790+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.17,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.47,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.8,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1477.08,
+      "timestamp": "2026-10-21T15:36:48.641342+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.17,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.47,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.8,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 265.5,
+      "elapsedSec": 1487.27,
+      "timestamp": "2026-10-21T15:37:00.753173+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.19,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.41,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.44,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.78,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1497.29,
+      "timestamp": "2026-10-21T15:37:08.851899+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.28,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.38,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.48,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.89,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1507.49,
+      "timestamp": "2026-10-21T15:37:19.055946+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.38,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.45,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.73,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 261.2,
+      "elapsedSec": 1517.69,
+      "timestamp": "2026-10-21T15:37:31.146407+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.38,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.42,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.7,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1527.7,
+      "timestamp": "2026-10-21T15:37:39.263132+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.38,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.42,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.7,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1537.86,
+      "timestamp": "2026-10-21T15:37:49.424418+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.38,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.39,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.67,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 261.3,
+      "elapsedSec": 1548.01,
+      "timestamp": "2026-10-21T15:38:01.507574+08:00"
+    },
+    {
+      "rustRssMb": 123.75,
+      "webContentRssMb": 428.17,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 43.38,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.42,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 634.72,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1558.06,
+      "timestamp": "2026-10-21T15:38:09.618622+08:00"
+    },
+    {
+      "rustRssMb": 123.22,
+      "webContentRssMb": 412.95,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.89,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 38.97,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 609.03,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1568.18,
+      "timestamp": "2026-10-21T15:38:19.740911+08:00"
+    },
+    {
+      "rustRssMb": 123.22,
+      "webContentRssMb": 413.92,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.89,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 38.97,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 610.0,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 267.1,
+      "elapsedSec": 1578.31,
+      "timestamp": "2026-10-21T15:38:31.866296+08:00"
+    },
+    {
+      "rustRssMb": 123.23,
+      "webContentRssMb": 413.94,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 610.11,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1588.4,
+      "timestamp": "2026-10-21T15:38:39.965619+08:00"
+    },
+    {
+      "rustRssMb": 123.25,
+      "webContentRssMb": 414.48,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 38.98,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 610.62,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1598.55,
+      "timestamp": "2026-10-21T15:38:50.114839+08:00"
+    },
+    {
+      "rustRssMb": 123.27,
+      "webContentRssMb": 414.66,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.02,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 610.84,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.0,
+      "webContentFootprintMb": 262.5,
+      "elapsedSec": 1608.74,
+      "timestamp": "2026-10-21T15:39:02.255739+08:00"
+    },
+    {
+      "rustRssMb": 121.52,
+      "webContentRssMb": 415.12,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.02,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 609.56,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1618.78,
+      "timestamp": "2026-10-21T15:39:10.339091+08:00"
+    },
+    {
+      "rustRssMb": 121.12,
+      "webContentRssMb": 415.22,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.03,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 609.28,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1628.95,
+      "timestamp": "2026-10-21T15:39:20.516145+08:00"
+    },
+    {
+      "rustRssMb": 121.56,
+      "webContentRssMb": 415.23,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 609.81,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.3,
+      "webContentFootprintMb": 262.8,
+      "elapsedSec": 1639.09,
+      "timestamp": "2026-10-21T15:39:32.598779+08:00"
+    },
+    {
+      "rustRssMb": 122.44,
+      "webContentRssMb": 415.69,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.09,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 611.12,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1649.12,
+      "timestamp": "2026-10-21T15:39:40.688418+08:00"
+    },
+    {
+      "rustRssMb": 122.89,
+      "webContentRssMb": 415.72,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.02,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 611.53,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1659.3,
+      "timestamp": "2026-10-21T15:39:50.863963+08:00"
+    },
+    {
+      "rustRssMb": 123.36,
+      "webContentRssMb": 415.77,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 612.11,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.0,
+      "webContentFootprintMb": 267.2,
+      "elapsedSec": 1669.44,
+      "timestamp": "2026-10-21T15:40:02.950324+08:00"
+    },
+    {
+      "rustRssMb": 123.38,
+      "webContentRssMb": 415.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.31,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 612.42,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1679.46,
+      "timestamp": "2026-10-21T15:40:11.016143+08:00"
+    },
+    {
+      "rustRssMb": 123.38,
+      "webContentRssMb": 415.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.14,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 612.25,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1689.6,
+      "timestamp": "2026-10-21T15:40:21.162755+08:00"
+    },
+    {
+      "rustRssMb": 123.38,
+      "webContentRssMb": 416.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.17,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 612.61,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.5,
+      "webContentFootprintMb": 280.1,
+      "elapsedSec": 1699.78,
+      "timestamp": "2026-10-21T15:40:33.310804+08:00"
+    },
+    {
+      "rustRssMb": 123.38,
+      "webContentRssMb": 416.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 612.55,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1709.83,
+      "timestamp": "2026-10-21T15:40:41.388229+08:00"
+    },
+    {
+      "rustRssMb": 121.83,
+      "webContentRssMb": 416.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.14,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 611.03,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1719.98,
+      "timestamp": "2026-10-21T15:40:51.536975+08:00"
+    },
+    {
+      "rustRssMb": 122.17,
+      "webContentRssMb": 416.16,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.14,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 611.38,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.7,
+      "webContentFootprintMb": 267.8,
+      "elapsedSec": 1730.13,
+      "timestamp": "2026-10-21T15:41:03.636822+08:00"
+    },
+    {
+      "rustRssMb": 122.61,
+      "webContentRssMb": 416.19,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 611.78,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1740.34,
+      "timestamp": "2026-10-21T15:41:11.897845+08:00"
+    },
+    {
+      "rustRssMb": 123.92,
+      "webContentRssMb": 416.31,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 613.25,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1750.51,
+      "timestamp": "2026-10-21T15:41:22.071956+08:00"
+    },
+    {
+      "rustRssMb": 123.92,
+      "webContentRssMb": 418.66,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 33.91,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.12,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 615.61,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.9,
+      "webContentFootprintMb": 276.5,
+      "elapsedSec": 1760.68,
+      "timestamp": "2026-10-21T15:41:34.239676+08:00"
+    },
+    {
+      "rustRssMb": 123.92,
+      "webContentRssMb": 426.95,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.17,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 624.83,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1770.8,
+      "timestamp": "2026-10-21T15:41:42.356209+08:00"
+    },
+    {
+      "rustRssMb": 122.61,
+      "webContentRssMb": 426.95,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.25,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 623.59,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1780.93,
+      "timestamp": "2026-10-21T15:41:52.489213+08:00"
+    },
+    {
+      "rustRssMb": 122.61,
+      "webContentRssMb": 426.95,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.16,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 623.5,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 51.6,
+      "webContentFootprintMb": 282.0,
+      "elapsedSec": 1791.1,
+      "timestamp": "2026-10-21T15:42:04.624698+08:00"
+    },
+    {
+      "rustRssMb": 123.92,
+      "webContentRssMb": 426.97,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.19,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 624.86,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1801.17,
+      "timestamp": "2026-10-21T15:42:12.729236+08:00"
+    },
+    {
+      "rustRssMb": 124.06,
+      "webContentRssMb": 432.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.14,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 630.61,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1811.3,
+      "timestamp": "2026-10-21T15:42:22.855544+08:00"
+    },
+    {
+      "rustRssMb": 122.73,
+      "webContentRssMb": 432.62,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 629.22,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 53.1,
+      "webContentFootprintMb": 302.7,
+      "elapsedSec": 1821.5,
+      "timestamp": "2026-10-21T15:42:35.056278+08:00"
+    },
+    {
+      "rustRssMb": 124.11,
+      "webContentRssMb": 432.92,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.11,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 630.92,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1831.67,
+      "timestamp": "2026-10-21T15:42:43.227359+08:00"
+    },
+    {
+      "rustRssMb": 124.11,
+      "webContentRssMb": 432.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.08,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 630.8,
+      "serviceDomain": "pid/97185",
+      "elapsedSec": 1841.87,
+      "timestamp": "2026-10-21T15:42:53.426509+08:00"
+    },
+    {
+      "rustRssMb": 124.11,
+      "webContentRssMb": 432.83,
+      "webContentPids": [
+        97190
+      ],
+      "networkingRssMb": 34.78,
+      "networkingPids": [
+        97191
+      ],
+      "gpuRssMb": 39.17,
+      "gpuPids": [
+        97189
+      ],
+      "totalRssMb": 630.89,
+      "serviceDomain": "pid/97185",
+      "rustFootprintMb": 52.8,
+      "webContentFootprintMb": 297.8,
+      "elapsedSec": 1851.87,
+      "timestamp": "2026-10-21T15:43:05.409220+08:00"
+    }
+  ],
+  "memoryAnalysis": {
+    "warmupSeconds": 180,
+    "steadySampleCount": 160,
+    "series": {
+      "rustRssMb": {
+        "firstMb": 143.61,
+        "lastMb": 124.11,
+        "minMb": 121.12,
+        "maxMb": 144.17,
+        "regressionMbPerMinute": -0.7088,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 495.98,
+            "meanMb": 138.03
+          },
+          {
+            "fromSec": 506.12,
+            "toSec": 758.47,
+            "meanMb": 134.04
+          },
+          {
+            "fromSec": 768.53,
+            "toSec": 1021.58,
+            "meanMb": 132.91
+          },
+          {
+            "fromSec": 1031.73,
+            "toSec": 1284.76,
+            "meanMb": 128.58
+          },
+          {
+            "fromSec": 1294.9,
+            "toSec": 1548.01,
+            "meanMb": 123.69
+          },
+          {
+            "fromSec": 1558.06,
+            "toSec": 1811.3,
+            "meanMb": 123.0
+          },
+          {
+            "fromSec": 1821.5,
+            "toSec": 1851.87,
+            "meanMb": 123.77
+          }
+        ]
+      },
+      "webContentRssMb": {
+        "firstMb": 514.14,
+        "lastMb": 432.83,
+        "minMb": 401.02,
+        "maxMb": 574.94,
+        "regressionMbPerMinute": -7.1207,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 495.98,
+            "meanMb": 543.46
+          },
+          {
+            "fromSec": 506.12,
+            "toSec": 758.47,
+            "meanMb": 569.05
+          },
+          {
+            "fromSec": 768.53,
+            "toSec": 1021.58,
+            "meanMb": 532.95
+          },
+          {
+            "fromSec": 1031.73,
+            "toSec": 1284.76,
+            "meanMb": 444.87
+          },
+          {
+            "fromSec": 1294.9,
+            "toSec": 1548.01,
+            "meanMb": 425.61
+          },
+          {
+            "fromSec": 1558.06,
+            "toSec": 1811.3,
+            "meanMb": 418.41
+          },
+          {
+            "fromSec": 1821.5,
+            "toSec": 1851.87,
+            "meanMb": 432.8
+          }
+        ]
+      },
+      "networkingRssMb": {
+        "firstMb": 21.08,
+        "lastMb": 34.78,
+        "minMb": 18.88,
+        "maxMb": 43.41,
+        "regressionMbPerMinute": 0.4411,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 495.98,
+            "meanMb": 24.48
+          },
+          {
+            "fromSec": 506.12,
+            "toSec": 758.47,
+            "meanMb": 33.16
+          },
+          {
+            "fromSec": 768.53,
+            "toSec": 1021.58,
+            "meanMb": 34.01
+          },
+          {
+            "fromSec": 1031.73,
+            "toSec": 1284.76,
+            "meanMb": 32.24
+          },
+          {
+            "fromSec": 1294.9,
+            "toSec": 1548.01,
+            "meanMb": 41.37
+          },
+          {
+            "fromSec": 1558.06,
+            "toSec": 1811.3,
+            "meanMb": 34.44
+          },
+          {
+            "fromSec": 1821.5,
+            "toSec": 1851.87,
+            "meanMb": 34.78
+          }
+        ]
+      },
+      "gpuRssMb": {
+        "firstMb": 43.45,
+        "lastMb": 39.17,
+        "minMb": 38.97,
+        "maxMb": 44.11,
+        "regressionMbPerMinute": -0.0946,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 495.98,
+            "meanMb": 41.6
+          },
+          {
+            "fromSec": 506.12,
+            "toSec": 758.47,
+            "meanMb": 40.06
+          },
+          {
+            "fromSec": 768.53,
+            "toSec": 1021.58,
+            "meanMb": 40.06
+          },
+          {
+            "fromSec": 1031.73,
+            "toSec": 1284.76,
+            "meanMb": 39.99
+          },
+          {
+            "fromSec": 1294.9,
+            "toSec": 1548.01,
+            "meanMb": 39.5
+          },
+          {
+            "fromSec": 1558.06,
+            "toSec": 1811.3,
+            "meanMb": 39.11
+          },
+          {
+            "fromSec": 1821.5,
+            "toSec": 1851.87,
+            "meanMb": 39.11
+          }
+        ]
+      },
+      "totalRssMb": {
+        "firstMb": 722.28,
+        "lastMb": 630.89,
+        "minMb": 582.52,
+        "maxMb": 783.17,
+        "regressionMbPerMinute": -7.483,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 495.98,
+            "meanMb": 747.56
+          },
+          {
+            "fromSec": 506.12,
+            "toSec": 758.47,
+            "meanMb": 776.31
+          },
+          {
+            "fromSec": 768.53,
+            "toSec": 1021.58,
+            "meanMb": 739.92
+          },
+          {
+            "fromSec": 1031.73,
+            "toSec": 1284.76,
+            "meanMb": 645.68
+          },
+          {
+            "fromSec": 1294.9,
+            "toSec": 1548.01,
+            "meanMb": 630.17
+          },
+          {
+            "fromSec": 1558.06,
+            "toSec": 1811.3,
+            "meanMb": 614.96
+          },
+          {
+            "fromSec": 1821.5,
+            "toSec": 1851.87,
+            "meanMb": 630.46
+          }
+        ]
+      },
+      "rustFootprintMb": {
+        "firstMb": 53.9,
+        "lastMb": 52.8,
+        "minMb": 51.1,
+        "maxMb": 58.1,
+        "regressionMbPerMinute": -0.0386,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 485.97,
+            "meanMb": 53.92
+          },
+          {
+            "fromSec": 516.26,
+            "toSec": 758.47,
+            "meanMb": 53.2
+          },
+          {
+            "fromSec": 788.56,
+            "toSec": 1031.73,
+            "meanMb": 53.94
+          },
+          {
+            "fromSec": 1061.97,
+            "toSec": 1305.07,
+            "meanMb": 53.41
+          },
+          {
+            "fromSec": 1335.52,
+            "toSec": 1578.31,
+            "meanMb": 53.28
+          },
+          {
+            "fromSec": 1608.74,
+            "toSec": 1851.87,
+            "meanMb": 52.43
+          }
+        ]
+      },
+      "webContentFootprintMb": {
+        "firstMb": 268.4,
+        "lastMb": 297.8,
+        "minMb": 253.3,
+        "maxMb": 302.7,
+        "regressionMbPerMinute": 0.4048,
+        "windows": [
+          {
+            "fromSec": 243.82,
+            "toSec": 485.97,
+            "meanMb": 268.8
+          },
+          {
+            "fromSec": 516.26,
+            "toSec": 758.47,
+            "meanMb": 264.23
+          },
+          {
+            "fromSec": 788.56,
+            "toSec": 1031.73,
+            "meanMb": 268.52
+          },
+          {
+            "fromSec": 1061.97,
+            "toSec": 1305.07,
+            "meanMb": 273.24
+          },
+          {
+            "fromSec": 1335.52,
+            "toSec": 1578.31,
+            "meanMb": 267.76
+          },
+          {
+            "fromSec": 1608.74,
+            "toSec": 1851.87,
+            "meanMb": 277.71
+          }
+        ]
+      }
+    }
+  }
+}

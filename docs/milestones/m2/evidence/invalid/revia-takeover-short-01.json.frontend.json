@@ -1,0 +1,25 @@
+{
+  "error": "Error: 窗口不可见或合成帧不足，长测无效",
+  "ok": false,
+  "samples": [],
+  "session": {
+    "checks": [
+      {
+        "detail": "/opt/homebrew/bin/git（git version 2.56.0）",
+        "hint": "需要 Git 2.11 或更高版本",
+        "name": "git",
+        "ok": true
+      },
+      {
+        "detail": "/bin/zsh · 134 毫秒",
+        "hint": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
+        "name": "shell",
+        "ok": true
+      }
+    ],
+    "gitPath": "/opt/homebrew/bin/git",
+    "gitVersion": "git version 2.56.0",
+    "shell": "/bin/zsh",
+    "shellElapsedMs": 134
+  }
+}

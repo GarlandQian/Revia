@@ -1,0 +1,63 @@
+{
+  "sourceCommit": "56a142500f72a3826b95ed10d7b8711dc650f70b",
+  "reviewBase": "de8979655f44ceb7531d64e13b6a12a97f7c0417",
+  "boundary": "test-only fixture preparation, not desktop acceptance; cargo build --tests has no separately preserved raw output; original manifest has mislabeled file hashes and reversed deletion prose, corrected in subsequent work without rewriting these originals",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/MANIFEST.md",
+      "stored": "MANIFEST.md.gz",
+      "sourceBytes": 1155,
+      "storedBytes": 788,
+      "sourceSha256": "e0e7eb5b0032bf08a83409227994df7b9503dcb44263c74a23977ef6753bedf1",
+      "storedSha256": "805d9f955f25d48283ea0b04e2e274f70497e6d7f4fb9f9587cfbd310aadf4e1"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/base-sha.txt",
+      "stored": "base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 60,
+      "sourceSha256": "68ae627175962b9c18e5e02b235978bda568bf91537c4275c4aca32ddf681383",
+      "storedSha256": "b379eda488e5b25032b4705b0baf0e3de63ba94515c672c6e447c315a8ee9a73"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/fixture.err",
+      "stored": "fixture.err.gz",
+      "sourceBytes": 1804,
+      "storedBytes": 658,
+      "sourceSha256": "476d9accb4c04bc34ffbcc56680ddce95e81129850fcf3c4ffcb715280467fa0",
+      "storedSha256": "2a511505b6a27d8dacec992b03d81bc01a505edd0a75ab3c6bccf56dfb28c3db"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/fixture.exit",
+      "stored": "fixture.exit.gz",
+      "sourceBytes": 15,
+      "storedBytes": 35,
+      "sourceSha256": "6ed4ab0d2c958b2db901af89faa291176e0fdbbd71b7c5af2463bad0985da57d",
+      "storedSha256": "166862d583febd101d08ed9c79ea4aa683116c54c8d3767cf3ecaa35e7c945d3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/fixture.json",
+      "stored": "fixture.json.gz",
+      "sourceBytes": 5987,
+      "storedBytes": 1814,
+      "sourceSha256": "c4de179a6ea1682cca2123fc312758d6626cafc48ce0326e8c98d9b8dbe8a30b",
+      "storedSha256": "567ca55a47ad8fff121f81546ce6f1e1fb6502f114863b25914fe3dc21e37de4"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/fixture.out",
+      "stored": "fixture.out.gz",
+      "sourceBytes": 6172,
+      "storedBytes": 1926,
+      "sourceSha256": "d141f2c8f9b838ad682bef4c892e9e6f8eaca8b8568e243845e318c574209bba",
+      "storedSha256": "976526edf09bc2ba0661fe200cd8e99a8c8b6db8635cd5cb21a4a945a6010406"
+    },
+    {
+      "source": "/private/tmp/revia-task05-desktop-prep-WPwb8N/tests-sha256-before.txt",
+      "stored": "tests-sha256-before.txt.gz",
+      "sourceBytes": 102,
+      "storedBytes": 108,
+      "sourceSha256": "a8d313366b4c2321fb9f9156850b89811e6be5fdb4bceccae64c7adbcda08a63",
+      "storedSha256": "26bd8352b9dd0f1508ef4b1eb1075a26b80816a4fbf4e501ee7a7ac778b788ee"
+    }
+  ]
+}

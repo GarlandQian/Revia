@@ -1,0 +1,111 @@
+{
+  "sourceCommit": "804d88dbd344b13992e773c34f3403775fe5653c",
+  "reviewBase": "a588181651e29c90191a5c0cec0aa24678b94315",
+  "boundary": "Frontend labels only; static review and implementation logs, not rebuilt desktop acceptance",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/MANIFEST.md",
+      "stored": "MANIFEST.md.gz",
+      "sourceBytes": 1009,
+      "storedBytes": 759,
+      "sourceSha256": "08932024b1a1a6d92214f8a623588c9e5a084f17c212c7552ca139e380aa3be9",
+      "storedSha256": "529a4ab9a6a26e113ed2ffe45a146b13a7dd6400f76aeec1fbbcf65623383737"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/base-sha.txt",
+      "stored": "base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "3fe83a745d3ec009bc00f54fd64ad4c6b81e9eda94b812bd1f9171db2da4941c",
+      "storedSha256": "9e922625649607b9593282a4e3066cbf473c97ca17ad9c3bfb9af5a5609cd63f"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/build.err",
+      "stored": "build.err.gz",
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/build.exit",
+      "stored": "build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/build.out",
+      "stored": "build.out.gz",
+      "sourceBytes": 352,
+      "storedBytes": 240,
+      "sourceSha256": "4b20891be2c5f570ce16584be3e5d0a50a1a81e57357e814f38a74137b71411f",
+      "storedSha256": "d0a0727cd45c4c8c681bd0159c8161f9952908ff7e2b2e46b13f7c7ef531cae1"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/lint.err",
+      "stored": "lint.err.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/lint.exit",
+      "stored": "lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/lint.out",
+      "stored": "lint.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/pre-change.diff",
+      "stored": "pre-change.diff.gz",
+      "sourceBytes": 2483,
+      "storedBytes": 909,
+      "sourceSha256": "3293725ab5a22c5c3ba81cbad6be13b2ee4bd00294cfee8ae194aadc5acea2a1",
+      "storedSha256": "c3475e5224e734c9b1505f30c7b25cfa97a11c566349074fc1aecbc3512f53ed"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/source-sha256-before-check.txt",
+      "stored": "source-sha256-before-check.txt.gz",
+      "sourceBytes": 193,
+      "storedBytes": 173,
+      "sourceSha256": "ba8b197571edeac48f8527cfdc441f5f96b3a1d7748c12e8f0b3043745896240",
+      "storedSha256": "6cfd6d7977f56f70c27349d7af1f6fd6a75ccfad3d3c98df1e099e59648d498a"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/tsc.err",
+      "stored": "tsc.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/tsc.exit",
+      "stored": "tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task05-d1-3XVh2E/tsc.out",
+      "stored": "tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+late_edit_restore_ok=true
+late_edit_overwritten=true
+initial_unmerged_restore_error=Rejected
+initial_unmerged_target_preserved=true
+late_unmerged_present=true
+late_unmerged_restore_ok=true
+late_unmerged_worktree_written=true
+completion_io_error=Environment
+completion_target_already_written=true
+completion_disk_journal=Pending
+reopened_list_status=Completed
+retry_inspection_state=Ready
+retry_restore_error=AppError { kind: Environment, message: "IO 错误：File exists (os error 17)" }

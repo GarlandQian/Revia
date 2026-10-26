@@ -1,0 +1,183 @@
+{
+  "reviewBase": "cb828361d0f248ee4aa5e45f9bc40c7edc94e075",
+  "reviewedSource": "6071b599ba29a905c2f47549d76909da05c08bbd",
+  "boundary": "Pi implementation logs, not independent fixed-source integration acceptance. source-sha.txt records the pre-fix baseline 11a4a71; MANIFEST.md later names 6071b59. No per-file tested-source hash was captured. Raw results corroborate reported checks, not every production-path assertion or all claimed sensitivity/repetition runs. Reviewers performed static review only; no GUI, Release build or external test client.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/MANIFEST.md",
+      "stored": "pi-checks/MANIFEST.md.gz",
+      "sourceBytes": 1476,
+      "storedBytes": 857,
+      "sourceSha256": "eaf972a11b6eb93a75781a4a3c469a500197cb2450f9d1419ff97e669488af14",
+      "storedSha256": "0de7a6250440f4fd3273b0b625708361bea9a9dbca06c4effd731375674d17a2"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/build.exit",
+      "stored": "pi-checks/build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/build.out",
+      "stored": "pi-checks/build.out.gz",
+      "sourceBytes": 679,
+      "storedBytes": 466,
+      "sourceSha256": "058a8e53948aa3f243523d6a6c086408c173f2c2513751573d88f616788c84f5",
+      "storedSha256": "15368b4a0e6935d04ae0ddc4ae535dbe843bf0b6862d00b15f45e7fbc422b0dd"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/cargo-test.err",
+      "stored": "pi-checks/cargo-test.err.gz",
+      "sourceBytes": 3157,
+      "storedBytes": 991,
+      "sourceSha256": "7ba21f520ec6f1825e5de0f761ad2585a1a8bb3d2fba31339bcb24dd6ab7b6ca",
+      "storedSha256": "3111b7eff13bcf0848cf9b53985d14b0e694a85d4b2696f9e76e795ea290e29e"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/cargo-test.exit",
+      "stored": "pi-checks/cargo-test.exit.gz",
+      "sourceBytes": 18,
+      "storedBytes": 38,
+      "sourceSha256": "7a9ece8b349bb5656b5d7e6bb350410c21537efd459bc2269abe76bda7cd45bd",
+      "storedSha256": "a271494abf6bc571e5fbf25f89d9a8965e6473a3eaf7352afacbf1f23407f429"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/cargo-test.out",
+      "stored": "pi-checks/cargo-test.out.gz",
+      "sourceBytes": 14672,
+      "storedBytes": 4113,
+      "sourceSha256": "32f9556799fd19d82f4b86e33cc11eed5ef9b0e05d4351bbf4aa62b56f823f8c",
+      "storedSha256": "da1d0cdcec76233eb18ca83bee7d79baa4b4d6725fcdf7b94e036fdec8cc0175"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/diffstat.txt",
+      "stored": "pi-checks/diffstat.txt.gz",
+      "sourceBytes": 769,
+      "storedBytes": 315,
+      "sourceSha256": "41ab3303ef1c6332174e8e591860b5425caaa6b115e34f419906c9443cdae08f",
+      "storedSha256": "0db7d2260b7c5dcb9d3a6ecf64a43869002c8d6d1531825c5bae20184d71278a"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/history/cargo-test-run1.err",
+      "stored": "pi-checks/history/cargo-test-run1.err.gz",
+      "sourceBytes": 3185,
+      "storedBytes": 1031,
+      "sourceSha256": "903b0d6d75c60ceb4050082944518ab395cdaf03be21d25fa0eaa600c5a04103",
+      "storedSha256": "96b45606b35ba305e801680abd3e0ee341e266e971cfbd4213271e4ee4316ed3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/history/cargo-test-run1.exit",
+      "stored": "pi-checks/history/cargo-test-run1.exit.gz",
+      "sourceBytes": 20,
+      "storedBytes": 40,
+      "sourceSha256": "b4058eea04b369a6e88f37c3f72c419e149df37d8ffca03ed82d38a41b9d2f15",
+      "storedSha256": "fcd3ac9bdc44be0870c0b2b65f719f40e99ff95e761ffb12009b3794a9410e92"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/history/cargo-test-run1.out",
+      "stored": "pi-checks/history/cargo-test-run1.out.gz",
+      "sourceBytes": 15321,
+      "storedBytes": 4561,
+      "sourceSha256": "18c4d102d8ab4df3ac131185b7cfad589d754aa33908d51f16226456fc8f6e2a",
+      "storedSha256": "ccaef1d485a0326305b5cda3846f57e49da36026fb96af0decb78b384b68c878"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/lint.exit",
+      "stored": "pi-checks/lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/lint.out",
+      "stored": "pi-checks/lint.out.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/node-tests.exit",
+      "stored": "pi-checks/node-tests.exit.gz",
+      "sourceBytes": 158,
+      "storedBytes": 107,
+      "sourceSha256": "298b9e6e959c34375b79367caec3f213145ee0415710d05fcaaf860fda251819",
+      "storedSha256": "f1c84b0341c2c5eb9431eca704ceb630e2a578efbb8f877b8f248d3af7cee5ee"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/python-tests.exit",
+      "stored": "pi-checks/python-tests.exit.gz",
+      "sourceBytes": 14,
+      "storedBytes": 34,
+      "sourceSha256": "e031b42faaa9916d22a722835605621e16a30fce889690ef11a32b59bbc4c01f",
+      "storedSha256": "f67c7e204876025e6b23612a3b0fc9aa832098134b418820869054712f70e805"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/python-tests.out",
+      "stored": "pi-checks/python-tests.out.gz",
+      "sourceBytes": 119,
+      "storedBytes": 55,
+      "sourceSha256": "cec8806e24af4311cc4923143096493c92c663a9bb9d416a56143bce4abb75bb",
+      "storedSha256": "953713eda27393c8eb2e42795fb5c916979d65f700a6aa1dab88f2dbe44dfcb4"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/source-sha.txt",
+      "stored": "pi-checks/source-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "c69c5a7a0805effc8b4060e3b19938265883f19343701b85519a1a714a3284a9",
+      "storedSha256": "ba6a0a33ee20604a99f3e6585df3026dfabe341175cb4a5e277a8d75d8057bd3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/test-ipc-diagnostics.mjs.out",
+      "stored": "pi-checks/test-ipc-diagnostics.mjs.out.gz",
+      "sourceBytes": 1148,
+      "storedBytes": 638,
+      "sourceSha256": "bbc53e2c2d66f8431cd4ce5dda9d0e0769ea6470a00e6d3314cdc0fb05309ed7",
+      "storedSha256": "8f46f8438322a4b535a53a4ff86228ae1e2ae9540356df0bd31d3f834f443967"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/test-refresh-gate.mjs.out",
+      "stored": "pi-checks/test-refresh-gate.mjs.out.gz",
+      "sourceBytes": 1665,
+      "storedBytes": 942,
+      "sourceSha256": "0b22f44bb9369f9336d7003ae1ba90ef29c73687178594a0a2511c8a655ffb5a",
+      "storedSha256": "7231e7b29c54ec3839411f706a9afddf65b657d4916bf1cd9a61dcb2888d7394"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/test-row-window-store.mjs.out",
+      "stored": "pi-checks/test-row-window-store.mjs.out.gz",
+      "sourceBytes": 2381,
+      "storedBytes": 706,
+      "sourceSha256": "a582da4eb0cbb30d845dc12762237c519b9d2602da6b8803dd28bd3901c0059c",
+      "storedSha256": "7de31c42e21de79dcd4a5953cc519d742f3d383a2b5316b5836156bfcd9a063d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/test-visible-highlight-lines.mjs.out",
+      "stored": "pi-checks/test-visible-highlight-lines.mjs.out.gz",
+      "sourceBytes": 1212,
+      "storedBytes": 542,
+      "sourceSha256": "b4eca40c13be37584ce0975648494b3af46a77adb6e9f1370dd276ee9e4a07a8",
+      "storedSha256": "c52fe5364166077bdbe9c7cf770e50907a6d8a1e34a01cd7233d39fad1201a9b"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/tsc.exit",
+      "stored": "pi-checks/tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task05-r2-1792786030/tsc.out",
+      "stored": "pi-checks/tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

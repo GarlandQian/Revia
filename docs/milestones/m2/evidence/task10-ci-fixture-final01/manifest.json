@@ -1,0 +1,2363 @@
+{
+  "schemaVersion": 1,
+  "createdAtUtc": "2026-10-25T08:24:25.980506+00:00",
+  "archiveKind": "completed-ci-fixture-repair-and-documentation-evidence",
+  "scope": "Preserve existing files only. No repository, fixture, product, GUI, benchmark or CI command was executed or modified during archival.",
+  "statusMeaning": "Statuses describe each original historical record, not milestone acceptance. Invalid controls, expected identity failures and missing evidence remain explicit.",
+  "versions": {
+    "baseAndReviewStart": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+    "testFixtureFix": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+    "documentationCorrectionAndCiHead": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4"
+  },
+  "excluded": [
+    "Full fixtures and repositories",
+    "home and isolated-home",
+    "cargo and target",
+    "node_modules, .git and __pycache__",
+    ".app bundles and binaries",
+    "Application data",
+    "All Q98 and other active logs or desktop evidence"
+  ],
+  "knownLimitations": {
+    "STATIC_ARCHIVE_ONLY": "Only existing evidence bytes were packaged; no acceptance action was performed.",
+    "RECORDER_TEXT_AND_PARTIAL_ENV": "Original recorder uses text=True and omits PATH from recorded environment; missing binary capture or environment details were not reconstructed.",
+    "HASH_LIST_SCOPE_DIFFERS": "Final before/after lists cover the test source only; committed list additionally covers task documentation. Equality is asserted only for their shared test-file entry.",
+    "NOT_MISSING_NOTIFY_FAILURE": "Existing root and final test records are success/exit0. They are not the reportedly earlier unisolated-HOME notify offline failure101 whose raw output is missing.",
+    "NOT_SAME_CONDITION_POSITIVE_CONTROL": "Final ordinary 31/0 run uses empty fixture global configuration, not the missing fixed-code useConfigOnly positive control. Later CI cannot retroactively supply that control.",
+    "NO_RECREATED_MISSING_LOGS": "Missing fixed-code same-condition positive control and earlier notify failure logs were not recreated. Their absence does not prove those runs never happened; disclosed deletion history is not erased.",
+    "SENSITIVITY_PROVENANCE_PARTIAL": "Available sensitivity output, exit text, fixed source and config are preserved. Independent complete argv/environment/timing records do not exist in this selected material.",
+    "OUTER_CONFIG_CONTROL_INVALID": "The old-code pass under outer configuration is an invalid sensitivity control because fixture env_clear replaced that configuration.",
+    "DOC_ONLY_NO_PRODUCT_RERUN": "f10 is a documentation-only correction; its local validation is diff-check, not another product test.",
+    "DOCUMENTATION_CHECK_METADATA_PARTIAL": "Doc correction retains textual exit=0 and hashes but lacks separately recorded exact argv, environment and timing.",
+    "REVIEWS_PRECEDE_CORRECTION": "Original Standards and Spec findings cover 2a51...d952 before f10. They are not rewritten as a new zero-finding post-correction review.",
+    "HISTORICAL_PENDING_CI_NOT_CURRENT_STATUS": "Historical Windows-pending statements keep their original time boundary; later terminal CI evidence is separately associated.",
+    "DISPATCH_NOT_EXECUTION": "Instructions are preserved as instructions, not as proof of execution.",
+    "CI_NOT_DESKTOP_OR_PACKAGING": "CI success and release binary compilation do not establish installer publication, Windows desktop, D06, Q98 or whole-M2 acceptance.",
+    "CI_QUERY_METADATA_PARTIAL": "CI query/download stdout, stderr and exit are retained but their exact argv, full environment and start/end are not independently recorded. Push has separate command/cwd/time records.",
+    "NONTERMINAL_OBSERVATION_PRESERVED": "Earlier successful query still reports the new run in_progress and old failures. It is retained unchanged rather than replaced by terminal status."
+  },
+  "selectionBasis": {
+    "source": "/private/tmp/revia-ci-fixture-archive.zP817m/selection-before-ci-terminal.json",
+    "sha256": "3791521c33c7b6e1137d8ca3b5e62a97e07079bcdbcd4be3d4ea4c5d160d76b8",
+    "initialStaticOriginals": 47,
+    "terminalCiOriginals": 22,
+    "initialSelectedSha256Rechecked": true
+  },
+  "recordedLocalCommands": [
+    {
+      "originalMetadata": "/private/tmp/revia-ci-submod-lvvaQ9/invocations.json",
+      "group": "repair-records",
+      "record": {
+        "stem": "00-_opt_homebrew_bin_cargo-test",
+        "argv": [
+          "/opt/homebrew/bin/cargo",
+          "test",
+          "--manifest-path",
+          "src-tauri/Cargo.toml",
+          "--offline",
+          "--locked",
+          "--test",
+          "review_marks"
+        ],
+        "cwd": "/Users/garland/.codex/worktrees/m2-close-finish/Revia",
+        "env_overrides": {
+          "HOME": "/private/tmp/revia-ci-submod-lvvaQ9/isolated-home",
+          "GIT_CONFIG_GLOBAL": "/private/tmp/revia-ci-submod-lvvaQ9/isolated-home/.gitconfig",
+          "GIT_CONFIG_NOSYSTEM": "1",
+          "CARGO_HOME": "/Users/garland/.cargo",
+          "CARGO_NET_OFFLINE": "true",
+          "NO_COLOR": "1"
+        },
+        "started_at": 1792913825.837664,
+        "ended_at": 1792913834.340043,
+        "exit": 0
+      }
+    },
+    {
+      "originalMetadata": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/invocations.json",
+      "group": "final-local-run",
+      "record": {
+        "stem": "00-_opt_homebrew_bin_cargo-test",
+        "argv": [
+          "/opt/homebrew/bin/cargo",
+          "test",
+          "--manifest-path",
+          "src-tauri/Cargo.toml",
+          "--offline",
+          "--locked",
+          "--test",
+          "review_marks"
+        ],
+        "cwd": "/Users/garland/.codex/worktrees/m2-close-finish/Revia",
+        "env_overrides": {
+          "HOME": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/isolated-home",
+          "GIT_CONFIG_GLOBAL": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/isolated-home/.gitconfig",
+          "GIT_CONFIG_NOSYSTEM": "1",
+          "CARGO_HOME": "/Users/garland/.cargo",
+          "CARGO_NET_OFFLINE": "true",
+          "NO_COLOR": "1"
+        },
+        "started_at": 1792913984.455083,
+        "ended_at": 1792913989.3401642,
+        "exit": 0
+      }
+    }
+  ],
+  "recordedSourceComparisons": {
+    "testFile": "src-tauri/tests/review_marks.rs",
+    "fixedTestSha256": "a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9",
+    "finalLocalLists": {
+      "source-sha256-before.txt": {
+        "src-tauri/tests/review_marks.rs": "a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9"
+      },
+      "source-sha256-after.txt": {
+        "src-tauri/tests/review_marks.rs": "a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9"
+      },
+      "source-sha256-committed.txt": {
+        "src-tauri/tests/review_marks.rs": "a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9",
+        "docs/milestones/m2/issues/10-integrated-verification.md": "b428feda242a1d08f9d47ce124fa7bbca508d637d3675ebde117d25dc187e602"
+      }
+    },
+    "rootBeforeTestMatches": true,
+    "fixedSnapshotMatches": true,
+    "documentationCorrectionListsEqualWithinCorrection": true,
+    "documentationCorrectionLists": {
+      "source-sha256-before.txt": {
+        "docs/milestones/m2/issues/10-integrated-verification.md": "bed594534561f85de3b8681196734e35b554114d09ff162bfc1eae24c4388cca"
+      },
+      "source-sha256-after.txt": {
+        "docs/milestones/m2/issues/10-integrated-verification.md": "bed594534561f85de3b8681196734e35b554114d09ff162bfc1eae24c4388cca"
+      },
+      "source-sha256-committed.txt": {
+        "docs/milestones/m2/issues/10-integrated-verification.md": "bed594534561f85de3b8681196734e35b554114d09ff162bfc1eae24c4388cca"
+      }
+    },
+    "comparisonScope": "Recorded evidence only; no current source tree or Git comparison was run."
+  },
+  "recordedCi": {
+    "runId": 40174661706,
+    "headSha": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+    "url": "https://github.com/GarlandQian/Revia/actions/runs/40174661706",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "Windows x64 (msvc)",
+        "jobId": 121112639687,
+        "url": "https://github.com/GarlandQian/Revia/actions/runs/40174661706/job/121112639687",
+        "status": "completed",
+        "conclusion": "success",
+        "testCounts": {
+          "passed": 243,
+          "failed": 0,
+          "ignored": 1
+        },
+        "suiteResults": [
+          [
+            104,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            57,
+            0,
+            1
+          ],
+          [
+            16,
+            0,
+            0
+          ],
+          [
+            19,
+            0,
+            0
+          ],
+          [
+            15,
+            0,
+            0
+          ],
+          [
+            29,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "reviewMarksPassed": 29,
+        "testResultLogLineNumbers": [
+          800,
+          806,
+          870,
+          892,
+          917,
+          938,
+          973,
+          982,
+          988
+        ],
+        "targetTestLogLineNumbers": [
+          964
+        ],
+        "releaseCommandLogLineNumbers": [
+          990,
+          991
+        ],
+        "releaseFinishedLogLineNumbers": [
+          1045
+        ],
+        "requiredStepsSucceeded": [
+          "Check frontend types",
+          "Lint frontend",
+          "Build frontend",
+          "Run Rust tests",
+          "Build release binary"
+        ]
+      },
+      {
+        "name": "macOS Apple Silicon (arm64)",
+        "jobId": 121112639820,
+        "url": "https://github.com/GarlandQian/Revia/actions/runs/40174661706/job/121112639820",
+        "status": "completed",
+        "conclusion": "success",
+        "testCounts": {
+          "passed": 271,
+          "failed": 0,
+          "ignored": 1
+        },
+        "suiteResults": [
+          [
+            107,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            71,
+            0,
+            1
+          ],
+          [
+            20,
+            0,
+            0
+          ],
+          [
+            24,
+            0,
+            0
+          ],
+          [
+            15,
+            0,
+            0
+          ],
+          [
+            31,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "reviewMarksPassed": 31,
+        "testResultLogLineNumbers": [
+          1795,
+          1801,
+          1879,
+          1906,
+          1935,
+          1957,
+          1993,
+          2002,
+          2008
+        ],
+        "targetTestLogLineNumbers": [
+          1977
+        ],
+        "releaseCommandLogLineNumbers": [
+          2010,
+          2011
+        ],
+        "releaseFinishedLogLineNumbers": [
+          2020
+        ],
+        "requiredStepsSucceeded": [
+          "Check frontend types",
+          "Lint frontend",
+          "Build frontend",
+          "Run Rust tests",
+          "Build release binary"
+        ]
+      }
+    ],
+    "logCountsMatchOriginalDerivedFile": true,
+    "targetTest": "deinitialized_submodule_is_not_confirmed_and_cannot_be_claimed",
+    "logDownloadExit": 0,
+    "initialApiQueryExit": 1,
+    "normalPushExit": 0
+  },
+  "summary": {
+    "originalFiles": 69,
+    "rawBytes": 347640,
+    "gzipBytes": 72917,
+    "emptyOriginalFiles": 10,
+    "countsByGroup": {
+      "correction-dispatch": 1,
+      "documentation-correction": 10,
+      "final-local-run": 15,
+      "independent-review": 2,
+      "repair-records": 11,
+      "sensitivity": 8,
+      "terminal-ci": 22
+    },
+    "allOriginalBytesRoundTripVerified": true,
+    "allSelectedSourcesUnchangedDuringArchive": true
+  },
+  "packagingArtifacts": [
+    {
+      "stored": "archive.py",
+      "sha256": "ae8a626332c6ac698163c334febc73637be3c76e567fd428a65f62dd01d977e8",
+      "category": "new-archive-tool-or-scope-note-not-historical-evidence"
+    },
+    {
+      "stored": "verify.py",
+      "sha256": "f3116869082c413b9de0dd6454c94976337b0376177604da87c6f9721fa2009d",
+      "category": "new-archive-tool-or-scope-note-not-historical-evidence"
+    },
+    {
+      "stored": "README.md",
+      "sha256": "cb4246fc3fffd06e1faa60d5a75cc74d75db02cae3c0a9d15d8cffe8e18fed8c",
+      "category": "new-archive-tool-or-scope-note-not-historical-evidence"
+    }
+  ],
+  "files": [
+    {
+      "source": "/private/tmp/revia-ci-fixture-evidence-correction.md",
+      "stored": "payload/correction-dispatch/revia-ci-fixture-evidence-correction.md.gz",
+      "group": "correction-dispatch",
+      "contentCategory": "original-analysis-dispatch-or-identity-record",
+      "evidenceStatus": "context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": null,
+        "sourcePhase": "instruction-not-execution-result",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DISPATCH_NOT_EXECUTION"
+      ],
+      "sourceBytes": 1928,
+      "sourceSha256": "965627bb75c8cc34bb036c8abf484ebe5eea0416ce67fe3ffd96a5e50beca49a",
+      "storedBytes": 1340,
+      "storedSha256": "1d65d8584b810e7a8fa8dbd6479e535e9da41e24169e5416cfce92e790589f5c",
+      "sourceMtimeNs": 1792914646962029390,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/MANIFEST.md",
+      "stored": "payload/documentation-correction/MANIFEST.md.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-analysis-dispatch-or-identity-record",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 48,
+      "sourceSha256": "7ea8e70a1bbaddd4a5a7d4bacaa5b13dbdc6820c8de7cfa618fe79c039e3d6a8",
+      "storedBytes": 68,
+      "storedSha256": "ed03dbb5cdd79a6765f2b0e2b71bba9a7415b0643facb64414a3f3a3e0f84f77",
+      "sourceMtimeNs": 1792914937011883897,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/base-branch.txt",
+      "stored": "payload/documentation-correction/base-branch.txt.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 3,
+      "sourceSha256": "808d06b879e48e9448adccba1e4dbde8e4614988ddb263ed52b0aa786c42a2ea",
+      "storedBytes": 23,
+      "storedSha256": "821641add8811f422b0ed81a1b627f2fcbcdbcde228e2c9d7051695270ed1680",
+      "sourceMtimeNs": 1792914858947037722,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/base-sha.txt",
+      "stored": "payload/documentation-correction/base-sha.txt.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 41,
+      "sourceSha256": "3bbe6375bef44c337c24b9730f817870a17c4f57c12bb6777e6ba85fa81a91bb",
+      "storedBytes": 59,
+      "storedSha256": "aa1a3015a9dada31380eede0ceb01d97567c2fed009557336ff1e48eefe7b707",
+      "sourceMtimeNs": 1792914858937744780,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/changed-files.txt",
+      "stored": "payload/documentation-correction/changed-files.txt.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 59,
+      "sourceSha256": "510f5c2099685ae5f2ff0f6d95a5a46a77b14d5241c83a6f089271ecd95e8cc3",
+      "storedBytes": 76,
+      "storedSha256": "443534c78984d84104860cae5397d9cc140717ea2942b4ce6697e8ced9d0d52d",
+      "sourceMtimeNs": 1792914858977032512,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/git-diff-check.err",
+      "stored": "payload/documentation-correction/git-diff-check.err.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792914859004837088,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/git-diff-check.exit",
+      "stored": "payload/documentation-correction/git-diff-check.exit.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 18,
+      "sourceSha256": "7676199b5c1053b6eb1616a03e84e739a3cecc5c963d0aa16286f97407279566",
+      "storedBytes": 38,
+      "storedSha256": "6aba9c704391a38c6824a4d688f79a97eef3368d4199823e3f5395b818946000",
+      "sourceMtimeNs": 1792914859024053432,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/git-diff-check.out",
+      "stored": "payload/documentation-correction/git-diff-check.out.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792914859004699587,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/source-sha256-after.txt",
+      "stored": "payload/documentation-correction/source-sha256-after.txt.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 122,
+      "sourceSha256": "30a7230b2eedf765aaa2f2eaa05a950298cacefb70f27d8dcaa24c5280ecf405",
+      "storedBytes": 120,
+      "storedSha256": "c1225190d6f75ccd6d2bc04405b615e9e70079e794a09b0c0d9d04daa3b10b32",
+      "sourceMtimeNs": 1792914873498668323,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/source-sha256-before.txt",
+      "stored": "payload/documentation-correction/source-sha256-before.txt.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 122,
+      "sourceSha256": "30a7230b2eedf765aaa2f2eaa05a950298cacefb70f27d8dcaa24c5280ecf405",
+      "storedBytes": 120,
+      "storedSha256": "c1225190d6f75ccd6d2bc04405b615e9e70079e794a09b0c0d9d04daa3b10b32",
+      "sourceMtimeNs": 1792914859003069416,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-docfix-sk2QnK/source-sha256-committed.txt",
+      "stored": "payload/documentation-correction/source-sha256-committed.txt.gz",
+      "group": "documentation-correction",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "documentation-only-diff-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "documentation-only-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "DOC_ONLY_NO_PRODUCT_RERUN",
+        "DOCUMENTATION_CHECK_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 122,
+      "sourceSha256": "30a7230b2eedf765aaa2f2eaa05a950298cacefb70f27d8dcaa24c5280ecf405",
+      "storedBytes": 120,
+      "storedSha256": "c1225190d6f75ccd6d2bc04405b615e9e70079e794a09b0c0d9d04daa3b10b32",
+      "sourceMtimeNs": 1792914937024874391,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/00-_opt_homebrew_bin_cargo-test.err",
+      "stored": "payload/final-local-run/00-_opt_homebrew_bin_cargo-test.err.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 693,
+      "sourceSha256": "d63be6c6d591679c077dd4ab4238957b808fccbf504852f7920ae68f0c158859",
+      "storedBytes": 433,
+      "storedSha256": "527c8712fafe209e7f9bb0653f4844e7240c96db50d6b0562a951b5149b85841",
+      "sourceMtimeNs": 1792913989340597456,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/00-_opt_homebrew_bin_cargo-test.exit",
+      "stored": "payload/final-local-run/00-_opt_homebrew_bin_cargo-test.exit.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792913989340710290,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/00-_opt_homebrew_bin_cargo-test.out",
+      "stored": "payload/final-local-run/00-_opt_homebrew_bin_cargo-test.out.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 1961,
+      "sourceSha256": "10b57552e1649a75eb674f452eb2dee139ca6224383617362ca216f9167026fd",
+      "storedBytes": 784,
+      "storedSha256": "40782851e4b95fb134b14ae4ecf8d6cb5681e79ee790ef6f988a080a2999b148",
+      "sourceMtimeNs": 1792913989340433414,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/MANIFEST.md",
+      "stored": "payload/final-local-run/MANIFEST.md.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-analysis-dispatch-or-identity-record",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 48,
+      "sourceSha256": "5ffc5c2dc93406f5febe14d7d17ee8ffc26c2f50665c9cc3fa822df6e907cbea",
+      "storedBytes": 68,
+      "storedSha256": "73dbc6eb9a582815aaac610955d355bee132a9781cd5a0824544940f61921553",
+      "sourceMtimeNs": 1792914063669485822,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/base-branch.txt",
+      "stored": "payload/final-local-run/base-branch.txt.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 3,
+      "sourceSha256": "808d06b879e48e9448adccba1e4dbde8e4614988ddb263ed52b0aa786c42a2ea",
+      "storedBytes": 23,
+      "storedSha256": "821641add8811f422b0ed81a1b627f2fcbcdbcde228e2c9d7051695270ed1680",
+      "sourceMtimeNs": 1792913970943446378,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/base-sha.txt",
+      "stored": "payload/final-local-run/base-sha.txt.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 41,
+      "sourceSha256": "5703a8fb11223400c767e6eee974627f9c290e7bab45df4e9852d055bf083cc3",
+      "storedBytes": 59,
+      "storedSha256": "6e9174e1fdbbbc57d58514e82bdedc16046304c7c69b152d9fa2968fe46017ee",
+      "sourceMtimeNs": 1792913970935211434,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/changed-files.txt",
+      "stored": "payload/final-local-run/changed-files.txt.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 35,
+      "sourceSha256": "6110b99342cd8cf0295752399683787e7ecaff0c4e3abd744594b6950365c5b8",
+      "storedBytes": 55,
+      "storedSha256": "8fdda7f3ff4b1137e3291e6c905395f04064a3512d5dc7cd1ea49911d605a15f",
+      "sourceMtimeNs": 1792913970964992825,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/git-diff-check.err",
+      "stored": "payload/final-local-run/git-diff-check.err.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792914005645233523,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/git-diff-check.exit",
+      "stored": "payload/final-local-run/git-diff-check.exit.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 18,
+      "sourceSha256": "7676199b5c1053b6eb1616a03e84e739a3cecc5c963d0aa16286f97407279566",
+      "storedBytes": 38,
+      "storedSha256": "6aba9c704391a38c6824a4d688f79a97eef3368d4199823e3f5395b818946000",
+      "sourceMtimeNs": 1792914005664209920,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/git-diff-check.out",
+      "stored": "payload/final-local-run/git-diff-check.out.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792914005645132398,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/invocations.json",
+      "stored": "payload/final-local-run/invocations.json.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 768,
+      "sourceSha256": "76f2ac1681dec6990214de90f50ff5826a1115e7559c3002dfc9b0d9374e65fe",
+      "storedBytes": 413,
+      "storedSha256": "0d62069a2bccce0c8780933ac74e01da1b831dcd528c9c0e0ba3fa41ddcd881e",
+      "sourceMtimeNs": 1792913989340866832,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/record2.py",
+      "stored": "payload/final-local-run/record2.py.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-recorder-preserved-not-executed",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 1727,
+      "sourceSha256": "c63d8d6c35e4aaab8f7bbcfcb47405aa17a48a1972f9b78a9d5b239de4251a2f",
+      "storedBytes": 914,
+      "storedSha256": "280ed828aad2e6572c4c85e90bfbfc843394e1a92347f80342c53d90bc2ca4d2",
+      "sourceMtimeNs": 1792913970921899098,
+      "sourceMode": "0o755",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/source-sha256-after.txt",
+      "stored": "payload/final-local-run/source-sha256-after.txt.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 98,
+      "sourceSha256": "5c1813b16382e45314b9525d860c418cf81ffa608d4ae13bbce0f3d87466fd1c",
+      "storedBytes": 107,
+      "storedSha256": "fe6ddefc3af2b356827f56331516d9e4f3529ce351e51b9d602c43cfd6e5be86",
+      "sourceMtimeNs": 1792914005679720888,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/source-sha256-before.txt",
+      "stored": "payload/final-local-run/source-sha256-before.txt.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 98,
+      "sourceSha256": "5c1813b16382e45314b9525d860c418cf81ffa608d4ae13bbce0f3d87466fd1c",
+      "storedBytes": 107,
+      "storedSha256": "fe6ddefc3af2b356827f56331516d9e4f3529ce351e51b9d602c43cfd6e5be86",
+      "sourceMtimeNs": 1792913970980660002,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/run-final-ZUIsp1/source-sha256-committed.txt",
+      "stored": "payload/final-local-run/source-sha256-committed.txt.gz",
+      "group": "final-local-run",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE",
+        "NOT_SAME_CONDITION_POSITIVE_CONTROL"
+      ],
+      "sourceBytes": 220,
+      "sourceSha256": "b99388d24a2d125d9584ce091ce94b90784c564de3df87c611ea403934f7d184",
+      "storedBytes": 184,
+      "storedSha256": "a4e61f7bd86a3b6933fbd2847bdbe2fa5dbd9450580bb6db812e5c88a26c3433",
+      "sourceMtimeNs": 1792914063745679951,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-fixture-spec-btOIT5/spec-review.md",
+      "stored": "payload/independent-review/spec-review.md.gz",
+      "group": "independent-review",
+      "contentCategory": "original-analysis-dispatch-or-identity-record",
+      "evidenceStatus": "original-findings-preserved",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "review-of-2a51-to-d952-before-doc-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "REVIEWS_PRECEDE_CORRECTION",
+        "HISTORICAL_PENDING_CI_NOT_CURRENT_STATUS"
+      ],
+      "sourceBytes": 2125,
+      "sourceSha256": "4d8f7311dc97c63273db4e10cb02f6cb88fd666c3d8bbbc3f5a5bb7511b5cedd",
+      "storedBytes": 1442,
+      "storedSha256": "eefb4a12b8580337aa449ccc8acd6ae79efb3f69ad04f1738c0cecebf6863aa7",
+      "sourceMtimeNs": 1792914451554419049,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-fixture-standards-1PUoKq/standards.md",
+      "stored": "payload/independent-review/standards.md.gz",
+      "group": "independent-review",
+      "contentCategory": "original-analysis-dispatch-or-identity-record",
+      "evidenceStatus": "original-findings-preserved",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "review-of-2a51-to-d952-before-doc-correction",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "REVIEWS_PRECEDE_CORRECTION",
+        "HISTORICAL_PENDING_CI_NOT_CURRENT_STATUS"
+      ],
+      "sourceBytes": 1998,
+      "sourceSha256": "0d11a875f8d9049dc73406ce359217d6f5305417336f737f8acf1691dd1f1344",
+      "storedBytes": 1352,
+      "storedSha256": "95eda5b61756fcf4c57122c03c8fa8e427580ca61974ec092baf1726dea16ee9",
+      "sourceMtimeNs": 1792914447075189347,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/00-_opt_homebrew_bin_cargo-test.err",
+      "stored": "payload/repair-records/00-_opt_homebrew_bin_cargo-test.err.gz",
+      "group": "repair-records",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 693,
+      "sourceSha256": "384692c0d892985631fc02f3b0ddee994c0c46ddae2bc5903b908085edc04311",
+      "storedBytes": 433,
+      "storedSha256": "e37c2ecb315bb5d9af587e3dbea9613434c39308fb11ccfd47bca5ad608593cf",
+      "sourceMtimeNs": 1792913834340440068,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/00-_opt_homebrew_bin_cargo-test.exit",
+      "stored": "payload/repair-records/00-_opt_homebrew_bin_cargo-test.exit.gz",
+      "group": "repair-records",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792913834340540485,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/00-_opt_homebrew_bin_cargo-test.out",
+      "stored": "payload/repair-records/00-_opt_homebrew_bin_cargo-test.out.gz",
+      "group": "repair-records",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 1961,
+      "sourceSha256": "e919c663e382b369a133e9119f665c725dc27c87cba4563e396cd3f1af1e42f9",
+      "storedBytes": 783,
+      "storedSha256": "d53c51341af77e378bb070007de7b86a779bd782e93b956f0ef7ca2af9c56429",
+      "sourceMtimeNs": 1792913834340290609,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/base-branch.txt",
+      "stored": "payload/repair-records/base-branch.txt.gz",
+      "group": "repair-records",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 3,
+      "sourceSha256": "808d06b879e48e9448adccba1e4dbde8e4614988ddb263ed52b0aa786c42a2ea",
+      "storedBytes": 23,
+      "storedSha256": "821641add8811f422b0ed81a1b627f2fcbcdbcde228e2c9d7051695270ed1680",
+      "sourceMtimeNs": 1792913710558464820,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/base-sha.txt",
+      "stored": "payload/repair-records/base-sha.txt.gz",
+      "group": "repair-records",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 41,
+      "sourceSha256": "5703a8fb11223400c767e6eee974627f9c290e7bab45df4e9852d055bf083cc3",
+      "storedBytes": 59,
+      "storedSha256": "6e9174e1fdbbbc57d58514e82bdedc16046304c7c69b152d9fa2968fe46017ee",
+      "sourceMtimeNs": 1792913710547415659,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/changed-files.txt",
+      "stored": "payload/repair-records/changed-files.txt.gz",
+      "group": "repair-records",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 35,
+      "sourceSha256": "6110b99342cd8cf0295752399683787e7ecaff0c4e3abd744594b6950365c5b8",
+      "storedBytes": 55,
+      "storedSha256": "8fdda7f3ff4b1137e3291e6c905395f04064a3512d5dc7cd1ea49911d605a15f",
+      "sourceMtimeNs": 1792913710585693244,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/final-run-subdir.txt",
+      "stored": "payload/repair-records/final-run-subdir.txt.gz",
+      "group": "repair-records",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 53,
+      "sourceSha256": "de1a1f3794e16cd7fc6f4b2e9dae6b706f0fc8300859c5e467c3156033a28ee4",
+      "storedBytes": 73,
+      "storedSha256": "2df436f7d47224cf504f96f9e16e2ffb090bcd2467105d8fff46ed3e7b5bab8d",
+      "sourceMtimeNs": 1792913970916188121,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/invocations.json",
+      "stored": "payload/repair-records/invocations.json.gz",
+      "group": "repair-records",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 733,
+      "sourceSha256": "19dcb82a3ac77fd0ae89d1b4d05198ba51f0e3a88ce18282811947b6ef4331c8",
+      "storedBytes": 400,
+      "storedSha256": "dd5a475f503b16781d7960286b85ec15b9fbeb5db7dde1a47213832918872771",
+      "sourceMtimeNs": 1792913834340692527,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/record.py",
+      "stored": "payload/repair-records/record.py.gz",
+      "group": "repair-records",
+      "contentCategory": "original-recorder-preserved-not-executed",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 1426,
+      "sourceSha256": "b5a2ebf965d69afa3003c2fd4adea44df08d4b74089df58b4ede09cd664a5633",
+      "storedBytes": 829,
+      "storedSha256": "92838a3b4aa718bfa2e8945dd63c4494606a5a0c6c976c0f07b54c02335c0866",
+      "sourceMtimeNs": 1792913710535079784,
+      "sourceMode": "0o755",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/record2.py",
+      "stored": "payload/repair-records/record2.py.gz",
+      "group": "repair-records",
+      "contentCategory": "original-recorder-preserved-not-executed",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 1727,
+      "sourceSha256": "c63d8d6c35e4aaab8f7bbcfcb47405aa17a48a1972f9b78a9d5b239de4251a2f",
+      "storedBytes": 914,
+      "storedSha256": "280ed828aad2e6572c4c85e90bfbfc843394e1a92347f80342c53d90bc2ca4d2",
+      "sourceMtimeNs": 1792913806506791441,
+      "sourceMode": "0o755",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/source-sha256-before.txt",
+      "stored": "payload/repair-records/source-sha256-before.txt.gz",
+      "group": "repair-records",
+      "contentCategory": "original-source-hash-list",
+      "evidenceStatus": "recorded-check-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "precommit-working-test-content-matches-fix-recorded-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "RECORDER_TEXT_AND_PARTIAL_ENV",
+        "HASH_LIST_SCOPE_DIFFERS",
+        "NOT_MISSING_NOTIFY_FAILURE"
+      ],
+      "sourceBytes": 220,
+      "sourceSha256": "1e2c28c9426f1aec83f2cab8b3771d27e2c3405acffc11afe3c6701fe36c6520",
+      "storedBytes": 184,
+      "storedSha256": "64ab26376bb29149c184510000ac19f1cfa7e944dc77fc3e97f072cf165c1bc4",
+      "sourceMtimeNs": 1792913710609416198,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/isolated.gitconfig",
+      "stored": "payload/sensitivity/isolated.gitconfig.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL"
+      ],
+      "sourceBytes": 29,
+      "sourceSha256": "7a6848420860e8f5b618e720865a66c08bf4bd04e9afd5d16485ba4ae9d77788",
+      "storedBytes": 47,
+      "storedSha256": "ad87108fe3cfb31efd5a6e784bf3de035d009a85b29ee4d6ed664aa638dd5f16",
+      "sourceMtimeNs": 1792913848582480110,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/pre-fix-useconfigonly.err",
+      "stored": "payload/sensitivity/pre-fix-useconfigonly.err.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "preserved-pre-fix-identity-failure",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL"
+      ],
+      "sourceBytes": 749,
+      "sourceSha256": "cae0b3d2befe414b4a28d364ecbd551f316e228e83e8cc08339823b16028560b",
+      "storedBytes": 458,
+      "storedSha256": "9f0530402ba96c2d9425ba4b7f66f0bd6835b6309b6b7f0f0a9bfd85457f8e52",
+      "sourceMtimeNs": 1792913891456134296,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/pre-fix-useconfigonly.exit",
+      "stored": "payload/sensitivity/pre-fix-useconfigonly.exit.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "preserved-pre-fix-identity-failure",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL"
+      ],
+      "sourceBytes": 17,
+      "sourceSha256": "20b31ba568e19be7483cfdb688d1b738186141778436bf8d6749121cdb6035d3",
+      "storedBytes": 37,
+      "storedSha256": "604ed3804e4a5116ab864aa32e28cbf9c3d669fbc3cdbf0e46e489c6f8b967f6",
+      "sourceMtimeNs": 1792913891463737155,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/pre-fix-useconfigonly.out",
+      "stored": "payload/sensitivity/pre-fix-useconfigonly.out.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "preserved-pre-fix-identity-failure",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL"
+      ],
+      "sourceBytes": 936,
+      "sourceSha256": "1c041d2b72fc49c691e673b0d117f4240736531bde7805bd0dc43ff774953f65",
+      "storedBytes": 615,
+      "storedSha256": "79401a3e8b40a91806887171e1dbf1fd3078fab7e719744a1b24e3b51eb46f38",
+      "sourceMtimeNs": 1792913891455107209,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/pre-fix.err",
+      "stored": "payload/sensitivity/pre-fix.err.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "invalid-control-despite-exit-zero",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL",
+        "OUTER_CONFIG_CONTROL_INVALID"
+      ],
+      "sourceBytes": 693,
+      "sourceSha256": "3dd5f6236d491065a22f7e2b07339747fed10b1c220773b8f741aad5f9464aee",
+      "storedBytes": 432,
+      "storedSha256": "8893f030d83f9aabfb0e8414667aae1bad29560f0fc3f6c4561e1e4c8a46073c",
+      "sourceMtimeNs": 1792913869995540327,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/pre-fix.exit",
+      "stored": "payload/sensitivity/pre-fix.exit.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "invalid-control-despite-exit-zero",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL",
+        "OUTER_CONFIG_CONTROL_INVALID"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792913869995657827,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/pre-fix.out",
+      "stored": "payload/sensitivity/pre-fix.out.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "invalid-control-despite-exit-zero",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": null,
+        "sourcePhase": "control-variant-or-fixed-snapshot-not-exact-committed-tree",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL",
+        "OUTER_CONFIG_CONTROL_INVALID"
+      ],
+      "sourceBytes": 188,
+      "sourceSha256": "c40d2cb14580fc4afa9c53705387a32676fe602e1eeb831a444a11acd9fa6f17",
+      "storedBytes": 152,
+      "storedSha256": "6bdf17af92bf1e4948b4aadfde98c0b4ace0b95eac56ff6d427a705f7f80d7c8",
+      "sourceMtimeNs": 1792913869995394243,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-ci-submod-lvvaQ9/sensitivity/review_marks.rs.fixed",
+      "stored": "payload/sensitivity/review_marks.rs.fixed.gz",
+      "group": "sensitivity",
+      "contentCategory": "original-fixed-test-source-snapshot",
+      "evidenceStatus": "context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "sourcePhase": "fixed-test-file-snapshot-matches-recorded-test-hash",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable"
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "NO_RECREATED_MISSING_LOGS",
+        "SENSITIVITY_PROVENANCE_PARTIAL"
+      ],
+      "sourceBytes": 62339,
+      "sourceSha256": "a2ff3004f9458a8aeab61571bddd0a00f199caaf69d90776d7b7ecca67d4f9f9",
+      "storedBytes": 14129,
+      "storedSha256": "0aea6f332c799a0f52fa48af0734d861fd57f12caa95b99256f6ac05272cb8a0",
+      "sourceMtimeNs": 1792913848578701639,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-check01.exit",
+      "stored": "payload/terminal-ci/ci-check01.exit.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "recorded-terminal-ci-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792915577228001935,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-check01.stderr",
+      "stored": "payload/terminal-ci/ci-check01.stderr.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "recorded-terminal-ci-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792915574067432394,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-counts-derived.json",
+      "stored": "payload/terminal-ci/ci-counts-derived.json.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-derived-summary-not-raw-execution",
+      "evidenceStatus": "derived-counts-cross-checked-against-original-log",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 1401,
+      "sourceSha256": "9f1f4ec4e6c5bf34be112e989e1a65fd6d7525fa42bc8112d0460a954916776a",
+      "storedBytes": 266,
+      "storedSha256": "b645dad9a2fcf24fca67805dee0ab914cde3128cd928a482eab6ba8f51451a9e",
+      "sourceMtimeNs": 1792916125535533636,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-log.exit",
+      "stored": "payload/terminal-ci/ci-log.exit.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "recorded-terminal-ci-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792915800405316820,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-log.stderr",
+      "stored": "payload/terminal-ci/ci-log.stderr.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "recorded-terminal-ci-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792915796978438136,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-run-40174661706-check01.json",
+      "stored": "payload/terminal-ci/ci-run-40174661706-check01.json.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-terminal-ci-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 6164,
+      "sourceSha256": "b8a6d4114eb522a1f33ef5b12e1c0778bd397bb0019513f73df4f9e0a8bb283f",
+      "storedBytes": 792,
+      "storedSha256": "4dc740e3f12ad7c69ec540f8a77bb9be8578ac003d143ec9da4c5cbc08abb0fd",
+      "sourceMtimeNs": 1792915577223598717,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-run-40174661706.log",
+      "stored": "payload/terminal-ci/ci-run-40174661706.log.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "recorded-terminal-ci-pass",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 254920,
+      "sourceSha256": "a707419de0659caac09a664b1b78df56d02ef7767823a3ee532c10ce579c09c5",
+      "storedBytes": 43170,
+      "storedSha256": "3c633353f616d89a1c4f727ae1e14fad862a84ab6c7b719462ce08a25a896dcb",
+      "sourceMtimeNs": 1792915800403009481,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-runs-escalated.exit",
+      "stored": "payload/terminal-ci/ci-runs-escalated.exit.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "historical-in-progress-query-success",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL",
+        "NONTERMINAL_OBSERVATION_PRESERVED"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792915064165664893,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-runs-escalated.json",
+      "stored": "payload/terminal-ci/ci-runs-escalated.json.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "historical-in-progress-query-success",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL",
+        "NONTERMINAL_OBSERVATION_PRESERVED"
+      ],
+      "sourceBytes": 684,
+      "sourceSha256": "6f85c710ef346d252ac767cd547257c550b4bbe2c662e818622bc8448badc9e4",
+      "storedBytes": 318,
+      "storedSha256": "f2985512ee90f46f9f357358eb9a12164439f1e67da375158e24a4eb7b42f0bb",
+      "sourceMtimeNs": 1792915064162625352,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-runs-escalated.stderr",
+      "stored": "payload/terminal-ci/ci-runs-escalated.stderr.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "historical-in-progress-query-success",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL",
+        "NONTERMINAL_OBSERVATION_PRESERVED"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792915062967762921,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-runs.exit",
+      "stored": "payload/terminal-ci/ci-runs.exit.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "preserved-api-connection-failure",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "storedBytes": 22,
+      "storedSha256": "c28cc69d141393e44a931229323624ef7b8c5bde3ee047ca9b87332daef23c82",
+      "sourceMtimeNs": 1792915049204119362,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-runs.json",
+      "stored": "payload/terminal-ci/ci-runs.json.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "preserved-api-connection-failure",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792915049060616730,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/ci-runs.stderr",
+      "stored": "payload/terminal-ci/ci-runs.stderr.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "preserved-api-connection-failure",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 94,
+      "sourceSha256": "eed65211f0fcee1b82c2661764250c1adaebcb36f0cb78a702d59632f056c439",
+      "storedBytes": 92,
+      "storedSha256": "f6863d89398ab288aa32461afe7608c0101484ffd52e06d27c8f629ee8430bd0",
+      "sourceMtimeNs": 1792915049202551176,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push-command.txt",
+      "stored": "payload/terminal-ci/push-command.txt.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 19,
+      "sourceSha256": "0ca562b986435df8791e5b6841c15f243dfe40f75ccba69a21d3e16cb56ac7b7",
+      "storedBytes": 39,
+      "storedSha256": "aef4496d32eb6166e99945a8015794c8729148df7fee469cd25234af6687da0c",
+      "sourceMtimeNs": 1792914963935699641,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push-cwd.txt",
+      "stored": "payload/terminal-ci/push-cwd.txt.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 54,
+      "sourceSha256": "1de2670b7941e08d9fcf15131c1c5ecdda6e684f70bdd07afad628d4288a91d7",
+      "storedBytes": 74,
+      "storedSha256": "2bed6a2ddbf7b1bed5c55f09bccaef4cabf3cbecc291fa679f2f20bdceb03837",
+      "sourceMtimeNs": 1792914963935808266,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push-end.txt",
+      "stored": "payload/terminal-ci/push-end.txt.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 21,
+      "sourceSha256": "473d3d92d736a769819f0dd4d6e1d0d50e935875e3e5bede6d5adbfc83c07d9b",
+      "storedBytes": 41,
+      "storedSha256": "831bd1a5be9b1b34537695ada0aaf5a38d8602a01b4aa8191571abc1bb4b6672",
+      "sourceMtimeNs": 1792914968691726634,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push-start.txt",
+      "stored": "payload/terminal-ci/push-start.txt.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 21,
+      "sourceSha256": "b209f43c58b04c4b13f67269a6bb5b874828cc1f220e7fc46a877734be0ee4d0",
+      "storedBytes": 41,
+      "storedSha256": "4f12ff07e9a2cc4a316d924e6475e94a092946ba30fc817333edede95af2359b",
+      "sourceMtimeNs": 1792914963940425529,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push.exit",
+      "stored": "payload/terminal-ci/push.exit.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-exit-record-preserving-format",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 2,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedBytes": 22,
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "sourceMtimeNs": 1792914968688997919,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push.stderr",
+      "stored": "payload/terminal-ci/push.stderr.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-stderr",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 66,
+      "sourceSha256": "21d13fdea6bd2992c751016144ad4a9d018cd935d1a469e078cdb0ff7f9df3d0",
+      "storedBytes": 83,
+      "storedSha256": "6d47495f4574e61199c0defced3c761a6ae69e020ba8035f3f811e7d9089eabc",
+      "sourceMtimeNs": 1792914968683278362,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/push.stdout",
+      "stored": "payload/terminal-ci/push.stdout.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-command-output",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792914963941382448,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/source-commit.txt",
+      "stored": "payload/terminal-ci/source-commit.txt.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 41,
+      "sourceSha256": "c8239999a1c578f9046b23b20b7b71bad4a82e5bd639f383e8b5d9814f505beb",
+      "storedBytes": 59,
+      "storedSha256": "91845542d2fcdca8ee725f6e0c6b93d9a389baa92f7e448a12bb66f0907c05ed",
+      "sourceMtimeNs": 1792914963911170866,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    },
+    {
+      "source": "/private/tmp/revia-m2-ci-final.cXI0qX/status-before.txt",
+      "stored": "payload/terminal-ci/status-before.txt.gz",
+      "group": "terminal-ci",
+      "contentCategory": "original-metadata-or-configuration",
+      "evidenceStatus": "recorded-normal-push-context",
+      "association": {
+        "relatedTestFixCommit": "d952a857b3faef2a4101ab5a6582217bd5a7c8e0",
+        "relatedDocumentationCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "recordedBaseCommit": "2a51b160d1c3871b9c67fee81ae6f082910bc1f8",
+        "sourceCommit": "f10fc971c14e556c239cb4648cabfbbfc28ad4b4",
+        "sourcePhase": "push-and-ci-on-fixed-head",
+        "pid": null,
+        "pidMeaning": "not-recorded-or-not-applicable",
+        "ciRunId": 40174661706
+      },
+      "knownLimitations": [
+        "STATIC_ARCHIVE_ONLY",
+        "CI_NOT_DESKTOP_OR_PACKAGING",
+        "CI_QUERY_METADATA_PARTIAL"
+      ],
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceMtimeNs": 1792914963912500536,
+      "sourceMode": "0o644",
+      "originalBytesVerified": true
+    }
+  ]
+}

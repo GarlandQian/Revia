@@ -2,18 +2,23 @@
 //!
 //! 边界：所有 Git 调用都在 Rust 层完成（ADR-0002）；前端只调用固定、带类型的命令。
 
+pub mod acceptance;
 pub mod commands;
 pub mod error;
 pub mod git;
+pub mod platform;
+pub mod recovery;
+pub mod review;
 pub mod session;
 pub mod settings;
 pub mod shell;
+pub mod watch;
 
 use commands::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             use tauri::Manager;
@@ -21,12 +26,72 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("找不到数据目录：{error}"))?;
+            // Explicit diagnostic runs can isolate settings without affecting normal launches.
+            let measuring = commands::soak_seconds().is_some()
+                || commands::is_measure_auto_run()
+                || std::env::var_os("REVIA_SMOKE").is_some();
+            let acceptance_dir = acceptance::data_directory(&data_dir)?;
+            let data_dir = if let Some(directory) = &acceptance_dir {
+                directory.clone()
+            } else if measuring {
+                match std::env::var_os("REVIA_MEASURE_DATA_DIR").map(std::path::PathBuf::from) {
+                    Some(path) if path.is_absolute() => path,
+                    Some(_) => return Err("测量数据目录必须是绝对路径".into()),
+                    None if commands::soak_seconds().is_some() => return Err("长测必须指定独立数据目录".into()),
+                    None => data_dir,
+                }
+            } else {
+                data_dir
+            };
             commands::log_measure(&format!(
                 "Rust 启动：data_dir={} autoRun={:?}",
                 data_dir.display(),
                 std::env::var("REVIA_MEASURE").ok()
             ));
-            app.manage(AppState::new(data_dir));
+            if commands::is_measure_auto_run()
+                && commands::soak_seconds().is_none()
+                && std::env::var_os("REVIA_SMOKE").is_none()
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&format!("Revia - 性能测量 PID {}", std::process::id()))?;
+                }
+            }
+            if commands::soak_seconds().is_some() {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&format!("Revia - 长测 PID {}", std::process::id()))?;
+                    // 诊断时可选：窗口保持在最前并出现在所有桌面空间，避免被其他窗口遮挡导致长测因不可见而中断。
+                    if std::env::var_os("REVIA_SOAK_ON_TOP").is_some() {
+                        window.set_always_on_top(true)?;
+                        #[cfg(target_os = "macos")]
+                        window.set_visible_on_all_workspaces(true)?;
+                    }
+                }
+            }
+            let mut state = AppState::new(data_dir);
+            state.acceptance = acceptance_dir.map(acceptance::Acceptance::new).transpose()?.map(std::sync::Arc::new);
+
+            // 回收区到期自动清理：启动时一次，之后每小时一次（Q9、规格实现决策 4）。
+            // 失败不静默：状态持久化到回收区目录，普通模式下也能查询并显示（不依赖测量日志）。
+            let recovery = state.recovery.clone();
+            let startup_purge = commands::purge_expired_now(&recovery);
+            match &startup_purge {
+                Ok(removed) => commands::log_measure(&format!("回收区启动清理：删除 {removed} 条")),
+                Err(error) => commands::log_measure(&format!("回收区启动清理失败：{error}")),
+            }
+            let periodic = recovery.clone();
+            std::thread::Builder::new()
+                .name("revia-recovery-purge".into())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(3600));
+                    match commands::purge_expired_now(&periodic) {
+                        Ok(0) => {}
+                        Ok(removed) => commands::log_measure(&format!("回收区定期清理：删除 {removed} 条")),
+                        Err(error) => commands::log_measure(&format!("回收区定期清理失败：{error}")),
+                    }
+                })
+                .ok();
+
+            app.manage(state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -36,17 +101,56 @@ pub fn run() {
             commands::select_repo,
             commands::set_diff_font_size,
             commands::open_worktree,
+            commands::watch_worktree,
+            commands::stop_watch,
+            commands::watch_status,
             commands::list_changes,
+            commands::set_review_mark,
             commands::get_rows,
             commands::highlight_range,
             commands::row_index_for_line,
             commands::syntax_categories,
             commands::command_log_snapshot,
+            commands::stage_file,
+            commands::unstage_file,
+            commands::stage_hunk,
+            commands::unstage_hunk,
+            commands::discard_file,
+            commands::discard_hunk,
+            commands::list_recovery,
+            commands::inspect_recovery,
+            commands::restore_recovery,
+            commands::save_recovery_as,
+            commands::recovery_text_diff,
+            commands::recovery_maintenance,
+            commands::recovery_save_as_owner,
+            commands::clear_recovery,
+            commands::purge_recovery,
             commands::change_entry,
             commands::measure_config,
             commands::write_measurement,
             commands::debug_log,
+            commands::set_exit_blocked,
+            commands::request_exit,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("Revia 启动失败");
+    platform::install_exit_interceptor(app.handle()).expect("原生退出保护安装失败");
+    app.run(|app, event| {
+        use tauri::{Emitter, Manager};
+        // Runtime 退出的最后一道保护；macOS terminate: 在平台层先转交同一前端驱动。
+        // 前端窗口已销毁时放行，避免进程无法结束。
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            let Some(window) = app.get_webview_window("main") else { return };
+            // 只有前端明确报告「有在途写或待核对结果」时才阻止。
+            let blocked = app
+                .try_state::<AppState>()
+                .map(|state| state.exit_blocked())
+                .unwrap_or(false);
+            if blocked {
+                api.prevent_exit();
+                let _ = window.emit("revia://exit-requested", ());
+            }
+        }
+    });
 }

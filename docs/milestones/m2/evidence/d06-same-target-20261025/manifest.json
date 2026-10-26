@@ -1,0 +1,1665 @@
+{
+  "recordedAt": "2026-10-25T23:57:43.076055+08:00",
+  "runRoot": "/private/tmp/revia-m2-d06-samejump.dtLTuT",
+  "sourceHead": "b185f6cc18265181f917d0f18b04dad89492510c",
+  "binarySha256": "b7ec64a2ba602196f6fa2bb34fef87cfd9a38955259f9de625f2f92f130bf0a3",
+  "ciRunId": 40208392193,
+  "ciStatusAtSnapshot": "in_progress / pending",
+  "boundary": "Same-target DOM/rAF evidence only; legacy timings and historical failures retained. No repeated Q98; no new testing after user requested implementation only.",
+  "verification": "Each gzip decompressed and byte-compared against original; SHA256 is of original bytes. Archival integrity only, not a new product test.",
+  "fileCount": 119,
+  "files": [
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/analyze-d06.py",
+      "archive": "analyze-d06.py.gz",
+      "bytes": 3840,
+      "sha256": "412cbf917f12aafbdd0f261e298961979b6d456a54ea5cbc311668d89ddfa7c0"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/apps-after-unlock.json",
+      "archive": "apps-after-unlock.json.gz",
+      "bytes": 4921,
+      "sha256": "56ba1cf9d933766168fde3a86ccf6e4c702b5f557e7f59d93821f726dce6f730"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/01-push-m2.err",
+      "archive": "ci/01-push-m2.err.gz",
+      "bytes": 314,
+      "sha256": "fd140fb7d582bdac8dd565e1826c0cb7dedf88426153b089c79917b716bc5da6"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/01-push-m2.exit",
+      "archive": "ci/01-push-m2.exit.gz",
+      "bytes": 4,
+      "sha256": "56292515f7d3a7110811eb8de26b3f75f82a0766aa5a1fd66ebcfcb84fe6d5ff"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/01-push-m2.json",
+      "archive": "ci/01-push-m2.json.gz",
+      "bytes": 1840,
+      "sha256": "7d5c82158395f0fe11c1c60d1243c4b0bddb37dae62a9c8c255e11a2bce7a70a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/01-push-m2.out",
+      "archive": "ci/01-push-m2.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/02-push-m2-after-unlock.err",
+      "archive": "ci/02-push-m2-after-unlock.err.gz",
+      "bytes": 66,
+      "sha256": "d62912059ec77952ee750fe8cd49956be03253cc8546fba35f9fff50b2807ec3"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/02-push-m2-after-unlock.exit",
+      "archive": "ci/02-push-m2-after-unlock.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/02-push-m2-after-unlock.json",
+      "archive": "ci/02-push-m2-after-unlock.json.gz",
+      "bytes": 1877,
+      "sha256": "c585cb944612365d33130f9265f79d8b5b127a0f2e6f05476a48afdb7371b519"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/02-push-m2-after-unlock.out",
+      "archive": "ci/02-push-m2-after-unlock.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/03-discover-compile-run.err",
+      "archive": "ci/03-discover-compile-run.err.gz",
+      "bytes": 94,
+      "sha256": "eed65211f0fcee1b82c2661764250c1adaebcb36f0cb78a702d59632f056c439"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/03-discover-compile-run.exit",
+      "archive": "ci/03-discover-compile-run.exit.gz",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/03-discover-compile-run.json",
+      "archive": "ci/03-discover-compile-run.json.gz",
+      "bytes": 2141,
+      "sha256": "bb9a68d1a86f473983ffaa211e41c539f684e529462e451072ec1243dfac7fc9"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/03-discover-compile-run.out",
+      "archive": "ci/03-discover-compile-run.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/04-discover-compile-run-network.err",
+      "archive": "ci/04-discover-compile-run-network.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/04-discover-compile-run-network.exit",
+      "archive": "ci/04-discover-compile-run-network.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/04-discover-compile-run-network.json",
+      "archive": "ci/04-discover-compile-run-network.json.gz",
+      "bytes": 2165,
+      "sha256": "852e78ed32f9bb1e9be594c4d2612870db6fff131210bc21ae04f3f665283677"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/04-discover-compile-run-network.out",
+      "archive": "ci/04-discover-compile-run-network.out.gz",
+      "bytes": 261,
+      "sha256": "e8d85df5d9d740b717edd69584e31a0b5332571d0ce4bf0fb69fd9056b122f89"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/05-compile-run-after-unlock.err",
+      "archive": "ci/05-compile-run-after-unlock.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/05-compile-run-after-unlock.exit",
+      "archive": "ci/05-compile-run-after-unlock.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/05-compile-run-after-unlock.json",
+      "archive": "ci/05-compile-run-after-unlock.json.gz",
+      "bytes": 2020,
+      "sha256": "a0f992c23eaa32ec8bd86c7aafd136ec79955c4888b4fb30354435f595c7c697"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/05-compile-run-after-unlock.out",
+      "archive": "ci/05-compile-run-after-unlock.out.gz",
+      "bytes": 5961,
+      "sha256": "6f0a29fc77d62ef253a4cd5a17242d34d3862f2a77c87a2f6084f159241e2630"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/06-existing-run-final-state.err",
+      "archive": "ci/06-existing-run-final-state.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/06-existing-run-final-state.exit",
+      "archive": "ci/06-existing-run-final-state.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/06-existing-run-final-state.json",
+      "archive": "ci/06-existing-run-final-state.json.gz",
+      "bytes": 2020,
+      "sha256": "50892d470bf4ddd1ca4c82789c03b165e2e2f454444d37ca5531f774cafcb810"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/06-existing-run-final-state.out",
+      "archive": "ci/06-existing-run-final-state.out.gz",
+      "bytes": 5961,
+      "sha256": "6f0a29fc77d62ef253a4cd5a17242d34d3862f2a77c87a2f6084f159241e2630"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/invocations.json",
+      "archive": "ci/invocations.json.gz",
+      "bytes": 12408,
+      "sha256": "b0fcb9ce76f511a6b16a854170967b5614e46390a5f6e466e0a3935d672cdfab"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/ci/record.py",
+      "archive": "ci/record.py.gz",
+      "bytes": 2832,
+      "sha256": "8da54c70cb04312eacb69d5a64ad23ecac3071e31f247ef9b56bfc80a67d3817"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold-split-ax.txt",
+      "archive": "cold-split-ax.txt.gz",
+      "bytes": 6353,
+      "sha256": "6c82e07203c1f9c2aedee1e1aec2b2d3eea4671b209a0d0acb23dad56c83d0a2"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold-split.png",
+      "archive": "cold-split.png.gz",
+      "bytes": 503279,
+      "sha256": "be3166880592430fc8100b5da76acfb5a074f4a0ea8801b5296b7cb1449241e9"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold-unified-ax.txt",
+      "archive": "cold-unified-ax.txt.gz",
+      "bytes": 4403,
+      "sha256": "437b8151fb97ed41718890ecb2d8580c634a27de94c8e1a1f2ee134d2a7c80fb"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold-unified.png",
+      "archive": "cold-unified.png.gz",
+      "bytes": 353687,
+      "sha256": "0be7c671d91e2efe94dbfba677acbb8831906ce31840976751829b55321154ec"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/01-node-jump-dom.err",
+      "archive": "commands/01-node-jump-dom.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/01-node-jump-dom.exit",
+      "archive": "commands/01-node-jump-dom.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/01-node-jump-dom.json",
+      "archive": "commands/01-node-jump-dom.json.gz",
+      "bytes": 716,
+      "sha256": "7754cfa1cced2edcd964a3ee3c83a164137a607f1ef6e8536ea8ce210e52ff7a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/01-node-jump-dom.out",
+      "archive": "commands/01-node-jump-dom.out.gz",
+      "bytes": 1083,
+      "sha256": "014023351edfcee709e486d3ebe44d3edb76a9d872c09e7bb7afa8891c040ade"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/02-frontend-lint.err",
+      "archive": "commands/02-frontend-lint.err.gz",
+      "bytes": 9,
+      "sha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/02-frontend-lint.exit",
+      "archive": "commands/02-frontend-lint.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/02-frontend-lint.json",
+      "archive": "commands/02-frontend-lint.json.gz",
+      "bytes": 677,
+      "sha256": "71686cd2885cdcaa6fec5fbe2396300c605ef785d89be4cb20d752628d7c39b0"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/02-frontend-lint.out",
+      "archive": "commands/02-frontend-lint.out.gz",
+      "bytes": 5105,
+      "sha256": "962908d3153f0a456f08e2c9e6d7c5ecce3d0328cc5f8e4ef2c85a3b50ed6e6c"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/03-frontend-build.err",
+      "archive": "commands/03-frontend-build.err.gz",
+      "bytes": 69,
+      "sha256": "52e93fc1cf1302cfd344a20e8ab1a08e7a90e631e693acc880edd532c61c70b4"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/03-frontend-build.exit",
+      "archive": "commands/03-frontend-build.exit.gz",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/03-frontend-build.json",
+      "archive": "commands/03-frontend-build.json.gz",
+      "bytes": 681,
+      "sha256": "795cabaea8fa897e58ddd7249e0ea512ffaa6513e6b9085800e12075098136eb"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/03-frontend-build.out",
+      "archive": "commands/03-frontend-build.out.gz",
+      "bytes": 546,
+      "sha256": "b71fb89fb7c9a147fc52a76617e5bb82ad4e8635a9740bdd40458a3e2100d722"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/04-frontend-build-unsandboxed.err",
+      "archive": "commands/04-frontend-build-unsandboxed.err.gz",
+      "bytes": 327,
+      "sha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/04-frontend-build-unsandboxed.exit",
+      "archive": "commands/04-frontend-build-unsandboxed.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/04-frontend-build-unsandboxed.json",
+      "archive": "commands/04-frontend-build-unsandboxed.json.gz",
+      "bytes": 717,
+      "sha256": "7aaf741d988efdb01667d58b0b050474061a3ebbcd3ba5404ca4e56e824f80e0"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/04-frontend-build-unsandboxed.out",
+      "archive": "commands/04-frontend-build-unsandboxed.out.gz",
+      "bytes": 997,
+      "sha256": "24bb6a8bedcd09ebca0a9caaa46205a6371644372872268fe6d573ae8bb5e790"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/05-source-diff-check.err",
+      "archive": "commands/05-source-diff-check.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/05-source-diff-check.exit",
+      "archive": "commands/05-source-diff-check.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/05-source-diff-check.json",
+      "archive": "commands/05-source-diff-check.json.gz",
+      "bytes": 1859,
+      "sha256": "b012fd67081b3a481a7a29e358f3bea51b99dc8471ad9db8dd0ace8dcda000ab"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/05-source-diff-check.out",
+      "archive": "commands/05-source-diff-check.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/06-standard-fixture.err",
+      "archive": "commands/06-standard-fixture.err.gz",
+      "bytes": 344,
+      "sha256": "7ae460ee51ae2a2c5c01b0fc39504c3b4ba1df275f3c2af5e65677c8cb535d59"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/06-standard-fixture.exit",
+      "archive": "commands/06-standard-fixture.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/06-standard-fixture.json",
+      "archive": "commands/06-standard-fixture.json.gz",
+      "bytes": 2220,
+      "sha256": "a4e9c5eea2929466edd12dce7c1347f27d3c7f64ed04c52efaaa41638798534f"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/06-standard-fixture.out",
+      "archive": "commands/06-standard-fixture.out.gz",
+      "bytes": 861,
+      "sha256": "82412fcf68224b549ca5ffddd3cf108de1d4f18ba038541691b02639c7376807"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/07-cold-fixture.err",
+      "archive": "commands/07-cold-fixture.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/07-cold-fixture.exit",
+      "archive": "commands/07-cold-fixture.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/07-cold-fixture.json",
+      "archive": "commands/07-cold-fixture.json.gz",
+      "bytes": 2212,
+      "sha256": "cb62c3e4eecad60bde03b2a895e5ee43a842820dc3e5137cf720b31fe754450a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/07-cold-fixture.out",
+      "archive": "commands/07-cold-fixture.out.gz",
+      "bytes": 47,
+      "sha256": "5e93c31257beb4fdc68e7d0234ab01a41eed1e1d9317a0200aa8a9a7fb53d141"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/08-source-freeze.err",
+      "archive": "commands/08-source-freeze.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/08-source-freeze.exit",
+      "archive": "commands/08-source-freeze.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/08-source-freeze.json",
+      "archive": "commands/08-source-freeze.json.gz",
+      "bytes": 1905,
+      "sha256": "503435fe4e6e8eae16c55c3b288f4f3f84ef4af92a5750e12b7946a1adf1ac84"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/08-source-freeze.out",
+      "archive": "commands/08-source-freeze.out.gz",
+      "bytes": 97,
+      "sha256": "76a296a9e1ff02202a512143c8d0f49a36d06d27a22419912ff7ae0677b7f3de"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/09-release-app.err",
+      "archive": "commands/09-release-app.err.gz",
+      "bytes": 1026,
+      "sha256": "008b72b9d6cbc5628bff4de6bb91f5e773e46a68366bb1309dd1f0cc20567d07"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/09-release-app.exit",
+      "archive": "commands/09-release-app.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/09-release-app.json",
+      "archive": "commands/09-release-app.json.gz",
+      "bytes": 2175,
+      "sha256": "d989f798f927d6a6048ed09f81bee21f68b9a8af7a40c69b4c9cb6a54c3e5534"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/09-release-app.out",
+      "archive": "commands/09-release-app.out.gz",
+      "bytes": 997,
+      "sha256": "f00eefbe6ad8bde135de9b675f2bfcf208fb13258e2448bc351e8385ce58fd37"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/10-post-build-source.err",
+      "archive": "commands/10-post-build-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/10-post-build-source.exit",
+      "archive": "commands/10-post-build-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/10-post-build-source.json",
+      "archive": "commands/10-post-build-source.json.gz",
+      "bytes": 1917,
+      "sha256": "bcb6991137b619a312dfab0a3b855dd6f2fbbfd9d4afb3ab3d815d07fa446630"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/10-post-build-source.out",
+      "archive": "commands/10-post-build-source.out.gz",
+      "bytes": 96,
+      "sha256": "ab4791c925d0732d4b6770a4c5b08861cc605bbebb04ab2e6cf0edb6f6e64a9a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/11-d06-standard-split.err",
+      "archive": "commands/11-d06-standard-split.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/11-d06-standard-split.exit",
+      "archive": "commands/11-d06-standard-split.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/11-d06-standard-split.json",
+      "archive": "commands/11-d06-standard-split.json.gz",
+      "bytes": 2595,
+      "sha256": "04f67fd59489dedb981ccd691916201d0cbce17826789105796fef82f704be3b"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/11-d06-standard-split.out",
+      "archive": "commands/11-d06-standard-split.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/12-d06-standard-unified.err",
+      "archive": "commands/12-d06-standard-unified.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/12-d06-standard-unified.exit",
+      "archive": "commands/12-d06-standard-unified.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/12-d06-standard-unified.json",
+      "archive": "commands/12-d06-standard-unified.json.gz",
+      "bytes": 2607,
+      "sha256": "89fbaf142619bc6e1dbc9c87846b68aa4aa8edf0a1d2b88a6b421b0842b1eb64"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/12-d06-standard-unified.out",
+      "archive": "commands/12-d06-standard-unified.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/13-d06-cold-split.err",
+      "archive": "commands/13-d06-cold-split.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/13-d06-cold-split.exit",
+      "archive": "commands/13-d06-cold-split.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/13-d06-cold-split.json",
+      "archive": "commands/13-d06-cold-split.json.gz",
+      "bytes": 2556,
+      "sha256": "10c86f5a97c611d2367332191c79e463f82e38a8fa55c99c9829b98c038b2596"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/13-d06-cold-split.out",
+      "archive": "commands/13-d06-cold-split.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/14-d06-cold-unified.err",
+      "archive": "commands/14-d06-cold-unified.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/14-d06-cold-unified.exit",
+      "archive": "commands/14-d06-cold-unified.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/14-d06-cold-unified.json",
+      "archive": "commands/14-d06-cold-unified.json.gz",
+      "bytes": 2568,
+      "sha256": "037846da4df3e4e0f961c88424c32be20dc55ce02c3035259ccee4331e241535"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/14-d06-cold-unified.out",
+      "archive": "commands/14-d06-cold-unified.out.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/15-post-measurement-source.err",
+      "archive": "commands/15-post-measurement-source.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/15-post-measurement-source.exit",
+      "archive": "commands/15-post-measurement-source.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/15-post-measurement-source.json",
+      "archive": "commands/15-post-measurement-source.json.gz",
+      "bytes": 1942,
+      "sha256": "ef52735b0f43d46d3fadc9207343875c164e172d0a68534c9e75747501df4fc4"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/15-post-measurement-source.out",
+      "archive": "commands/15-post-measurement-source.out.gz",
+      "bytes": 103,
+      "sha256": "59c398dbe84b639a85ff6b7419100b34f2ba8b0c48e0383d28bc7f79e803305b"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/16-independent-d06-analysis.err",
+      "archive": "commands/16-independent-d06-analysis.err.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/16-independent-d06-analysis.exit",
+      "archive": "commands/16-independent-d06-analysis.exit.gz",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/16-independent-d06-analysis.json",
+      "archive": "commands/16-independent-d06-analysis.json.gz",
+      "bytes": 1922,
+      "sha256": "b03e5d4b4991000287cbec20d52ea9eb6d4eb9ee470a13199c8839ef47d383ce"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/16-independent-d06-analysis.out",
+      "archive": "commands/16-independent-d06-analysis.out.gz",
+      "bytes": 350,
+      "sha256": "cf7cd7b9ba0b4618b0735b31067b3c145d1d6e414f73f850b3f25e9b4b72e934"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/invocations.json",
+      "archive": "commands/invocations.json.gz",
+      "bytes": 30128,
+      "sha256": "957c6da3211a36651492b8d6266779dc722c0143c86a3bd93a5e6c68dc39a233"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/commands/record.py",
+      "archive": "commands/record.py.gz",
+      "bytes": 2832,
+      "sha256": "8da54c70cb04312eacb69d5a64ad23ecac3071e31f247ef9b56bfc80a67d3817"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-analysis.json",
+      "archive": "d06-analysis.json.gz",
+      "bytes": 31950,
+      "sha256": "a00814a066dadef73b2093b323fbe117ba541e64e524c91a1e045715872b7fa7"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-cold-split.json",
+      "archive": "d06-cold-split.json.gz",
+      "bytes": 14114,
+      "sha256": "db06ec47c0f884096ad981fb05da7d339979db2e4ff94747a3c60ff0298b6fb6"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-cold-split.log",
+      "archive": "d06-cold-split.log.gz",
+      "bytes": 4325,
+      "sha256": "8d4e9389c01eec4cdda5bf76b0396d8db8aee90ee20499a7d34c91626e9efd56"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-cold-unified.json",
+      "archive": "d06-cold-unified.json.gz",
+      "bytes": 13320,
+      "sha256": "af1aad25bd044ae9a250efbef7f690a3454be0ab47b069e5363e67eeb7fc2712"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-cold-unified.log",
+      "archive": "d06-cold-unified.log.gz",
+      "bytes": 3441,
+      "sha256": "efd2d8c5a7769837d7d8a8bd5239e36e86fc1f0270ed970a36ebf4529b62ad89"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-standard-split.json",
+      "archive": "d06-standard-split.json.gz",
+      "bytes": 14132,
+      "sha256": "3e814b2500c217fa5ec0afce470a2179aff8f02490eea135f5e5deb1302c8afd"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-standard-split.log",
+      "archive": "d06-standard-split.log.gz",
+      "bytes": 6827,
+      "sha256": "155e66e68ae3ee8d27d1434bed531b9e4272742d8532453e06495540f92daf22"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-standard-unified.json",
+      "archive": "d06-standard-unified.json.gz",
+      "bytes": 13337,
+      "sha256": "4e672718da272b6653362c5938e9d2241e434813618dde483d40520f027728d9"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/d06-standard-unified.log",
+      "archive": "d06-standard-unified.log.gz",
+      "bytes": 5461,
+      "sha256": "08204e4c04992bd0b914859e05ee0f2dd11351ef912a77c2c985f7265c09cf7f"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/implementation-only-request.md",
+      "archive": "implementation-only-request.md.gz",
+      "bytes": 441,
+      "sha256": "465e8231e97a71f09d9792109fbe43348ed0f2e3292d6e5da131fc0d1456ae39"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/review-spec.md",
+      "archive": "review-spec.md.gz",
+      "bytes": 1445,
+      "sha256": "111312da9a0524be7bc5759355e4d12ac805d56b4e16b6b3c20a9383aa03e15d"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/review-standards.md",
+      "archive": "review-standards.md.gz",
+      "bytes": 1486,
+      "sha256": "74b6ae4f19b4249dde7df0f7f03ee63c7bee5bed5576315cd96c03fea97cb979"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/scope.md",
+      "archive": "scope.md.gz",
+      "bytes": 320,
+      "sha256": "cf0cc85725ed13226e5d3e8028a7f4d41d998fbc6c65f174716ba7cbed6e7020"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/snapshot-after-build.json",
+      "archive": "snapshot-after-build.json.gz",
+      "bytes": 16895,
+      "sha256": "b50dc49f5b6ad87b2dd9faf1970043597f5826f422a2827b78d7eb382529dcb7"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/snapshot-after-measurements.json",
+      "archive": "snapshot-after-measurements.json.gz",
+      "bytes": 16902,
+      "sha256": "17f6247bbfc3b6616f0b63106e220a4f5c6f69cfb3256fedbcbbee7e77b4c764"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/snapshot-before-build.json",
+      "archive": "snapshot-before-build.json.gz",
+      "bytes": 16860,
+      "sha256": "752b2ed572b4c0006b7d4c601d6c0096ed0631ee79521b193bb9307efd5b8809"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/snapshot.py",
+      "archive": "snapshot.py.gz",
+      "bytes": 1880,
+      "sha256": "901df8574fb057bbac7cdf9427f979f9af3d584597a6e00c0ae674b4a404686a"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/standard-split-ax.txt",
+      "archive": "standard-split-ax.txt.gz",
+      "bytes": 7143,
+      "sha256": "927282b8a956928189242964f80043602a1361b8af8f95de6886091315cf07fa"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/standard-split.png",
+      "archive": "standard-split.png.gz",
+      "bytes": 501607,
+      "sha256": "aba595f8abaad9a50a861d59d1508d415d57b2584514e388615cecf124200c93"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/standard-unified-ax.txt",
+      "archive": "standard-unified-ax.txt.gz",
+      "bytes": 5770,
+      "sha256": "c7a4f7df82ad95603ef75bcf65a8cb9d02c33fa59e1d58f5b773e1eb1a8a1126"
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/standard-unified.png",
+      "archive": "standard-unified.png.gz",
+      "bytes": 407544,
+      "sha256": "2ec9101035d198113c6d75c427b003e7c9c84b5cedbc88f03679f5b7bb0f3bce"
+    }
+  ],
+  "excluded": [
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/COMMIT_EDITMSG",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/config",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/description",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/applypatch-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/post-update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/pre-applypatch.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/pre-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/pre-merge-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/pre-push.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/pre-rebase.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/pre-receive.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/push-to-checkout.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/sendemail-validate.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/hooks/update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/index",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/info/exclude",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/logs/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/logs/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/objects/23/027f276853e3124c8af9a6da60df603f369d81",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/objects/b4/d9dc53202668464153ccdcf19277507db7fc85",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/objects/f9/1d25cc8e2521485702e5b788d04a88790e5426",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/.git/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/cold/cold.ts",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-cold-split/recovery/maintenance.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-cold-split/settings.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-cold-unified/recovery/maintenance.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-cold-unified/settings.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-standard-split/recovery/maintenance.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-standard-split/settings.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-standard-unified/recovery/maintenance.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/data-standard-unified/settings.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/COMMIT_EDITMSG",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/config",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/description",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/applypatch-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/post-update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/pre-applypatch.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/pre-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/pre-merge-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/pre-push.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/pre-rebase.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/pre-receive.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/push-to-checkout.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/sendemail-validate.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/hooks/update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/index",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/info/exclude",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/logs/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/logs/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/0e/6e973058304fa19ea20801d09b53d5fd180832",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/4a/b2f154ab402fe6664e3b923040c4f9a901aa5a",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/58/5e7fc4a18a6ab7075e76c7b5c304d468a7f24a",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/5a/40bea7c5a7aa064257720aff98eeefe779ee59",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/65/7b0964ab3d989b387271933f44650906895e82",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/9f/0bf742f002f703511c6c039288f281b4c68c37",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/a6/16cada826bd0389cca7c92250f786db738d5ae",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/b0/319ed36680b8fa5924b3568bab9b80550ca7d6",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/b8/dcb0c830150b2b9a75df686528ffbdc61bac9b",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/ba/171bcd921aaa2ffcb438f2e6d4fca6874a7bd1",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/c8/d80d7d67b5d4a95a048225c1a9fe16a47eda03",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/d8/9d59905bf0d553cb86a73674866440d193dd2c",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/d9/1200561862a942a86b58c0ead6cc7408bcc18c",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/ea/cd4817d95c4c6615bb634e567997a350c95d74",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/objects/f5/7f79f2721160ef96125e32278ecb1b29c5e82c",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.git/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/.node-version",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/README.md",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/assets/icon.png",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/logs/app.log",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/pnpm-lock.yaml",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/src/App.vue",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/src/Model.swift",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/src/generated.ts",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/src/large.ts",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/diffs/src/staged.ts",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/COMMIT_EDITMSG",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/config",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/description",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/applypatch-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/post-update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/pre-applypatch.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/pre-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/pre-merge-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/pre-push.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/pre-rebase.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/pre-receive.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/push-to-checkout.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/sendemail-validate.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/hooks/update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/index",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/info/exclude",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/logs/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/logs/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/objects/47/98ad6145bdd3c12130f7cd6a5ef0f2c175b419",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/objects/8d/0777e2c88535bbd86ac5c4bd8fd43f43e2835b",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/objects/e5/8e67c09a54b9a7356598775b476fde5609f646",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/.git/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/mergetool/README.txt",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/COMMIT_EDITMSG",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/config",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/description",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/applypatch-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/post-update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/pre-applypatch.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/pre-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/pre-merge-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/pre-push.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/pre-rebase.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/pre-receive.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/push-to-checkout.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/sendemail-validate.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/hooks/update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/index",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/info/exclude",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/logs/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/logs/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/objects/5b/29ac203eeee886431e1f96a6d3157fda8b531c",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/objects/87/24eabb75cb47104e917284b4ca082ccfaa61ba",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/objects/93/963b6bced38a23bf5e677ca8f196ae001e4e44",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/objects/9d/e44db35f8b70d204e9eb9d7f814dc36b1318f4",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/objects/af/893a69e06f8e5daf4d70dfe1c19c46ee24b510",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/objects/fa/69513b4182cf2679d3ceeee390f24ed426e234",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.git/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/.husky/pre-commit",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/README.md",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-default/package.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/COMMIT_EDITMSG",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/config",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/description",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/applypatch-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/fsmonitor-watchman.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/post-update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/pre-applypatch.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/pre-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/pre-merge-commit.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/pre-push.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/pre-rebase.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/pre-receive.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/prepare-commit-msg.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/push-to-checkout.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/sendemail-validate.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/hooks/update.sample",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/index",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/info/exclude",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/logs/HEAD",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/logs/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/23/4f116d2396e74792e2ae94cbdbe3a436f912f7",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/4f/6cb1d68690899eb316c61f09c963d1216d77c1",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/5b/29ac203eeee886431e1f96a6d3157fda8b531c",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/87/24eabb75cb47104e917284b4ca082ccfaa61ba",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/8e/f0a5258f8f4133e6f4a93596c798f521b31290",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/93/963b6bced38a23bf5e677ca8f196ae001e4e44",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/objects/e0/a4721f5ba29fb55ce8b925e44b9e7ca42351a0",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.git/refs/heads/main",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.husky/pre-commit",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/.node-version",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/README.md",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/fixtures/node-versioned/package.json",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/__future__.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_bootlocale.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_collections_abc.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_compression.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_sitebuiltins.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/_weakrefset.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/abc.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/argparse.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/bisect.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/bz2.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/codecs.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/collections/__init__.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/collections/abc.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/copyreg.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/__init__.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/aliases.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/cp437.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/latin_1.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/encodings/utf_8.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/enum.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/fnmatch.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/functools.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/genericpath.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/gettext.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/heapq.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/io.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/__init__.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/decoder.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/encoder.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/scanner.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/keyword.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/locale.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/lzma.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ntpath.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/operator.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/os.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/posixpath.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/random.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/re.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/reprlib.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/selectors.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/shutil.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/signal.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/site.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_compile.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_constants.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/sre_parse.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/stat.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/struct.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/types.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/__init__.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/parse.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/home/Library/Caches/com.apple.python/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/warnings.cpython-39.pyc",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    },
+    {
+      "source": "/private/tmp/revia-m2-d06-samejump.dtLTuT/tmp/xcrun_db",
+      "reason": "Live runtime/fixture/cache or mutable stream; retained on disk; run04 frozen copy archived separately."
+    }
+  ]
+}

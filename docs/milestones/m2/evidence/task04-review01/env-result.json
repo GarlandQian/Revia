@@ -1,0 +1,22 @@
+[
+  {
+    "case": "git-dir",
+    "repo": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/repo",
+    "scratch": "/private/tmp/revia-review04-env-2_ajnstp/git-dir/preview",
+    "statusBefore": "1 .M N... 100644 100644 100644 4b48deed3a433909bfd6b6ab3d4b91348b6af464 4b48deed3a433909bfd6b6ab3d4b91348b6af464 target.txt\u0000",
+    "initExit": 0,
+    "beforeSHA256": "58af9794057ad6dd88256f7499c9f089d09814177d9ff2810b2c6573f2dea9ed",
+    "afterSHA256": "338c13c88753754eb7123d48bbe558871ea04052f8bf2275c08e5a15bea0fcfc",
+    "configDiff": "--- config.before\n+++ config.after\n@@ -1,6 +1,6 @@\n [core]\n \trepositoryformatversion = 0\n-\tfilemode = false\n+\tfilemode = true\n \tbare = false\n \tlogallrefupdates = true\n \tignorecase = true\n"
+  },
+  {
+    "case": "git-dir-and-work-tree",
+    "repo": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/repo",
+    "scratch": "/private/tmp/revia-review04-env-2_ajnstp/git-dir-and-work-tree/preview",
+    "statusBefore": "1 .M N... 100644 100644 100644 4b48deed3a433909bfd6b6ab3d4b91348b6af464 4b48deed3a433909bfd6b6ab3d4b91348b6af464 target.txt\u0000",
+    "initExit": 0,
+    "beforeSHA256": "58af9794057ad6dd88256f7499c9f089d09814177d9ff2810b2c6573f2dea9ed",
+    "afterSHA256": "338c13c88753754eb7123d48bbe558871ea04052f8bf2275c08e5a15bea0fcfc",
+    "configDiff": "--- config.before\n+++ config.after\n@@ -1,6 +1,6 @@\n [core]\n \trepositoryformatversion = 0\n-\tfilemode = false\n+\tfilemode = true\n \tbare = false\n \tlogallrefupdates = true\n \tignorecase = true\n"
+  }
+]

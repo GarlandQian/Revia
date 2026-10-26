@@ -1,0 +1,799 @@
+{
+  "sourceCommit": "6b3ddf5d3046e5745e65c81076806bbda441b359",
+  "binarySha256": "b0b2a64e324cda9156a301fd73b9e823094942eb0c16b31691ca758a956efb61",
+  "boundary": "Partial task13 light desktop and D06; no dark desktop, final M2, Windows CI or merge. ui-dark-main.png is a failed light screenshot attempt, not dark evidence.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/archive.py",
+      "stored": "original/archive.py.gz",
+      "gzip": true,
+      "sourceBytes": 1853,
+      "storedBytes": 887,
+      "sourceSha256": "605dc441ee9e5a9a9c6f12b407c7c3b9db3dfb4c1d6af0b76816d30fb3a946b5",
+      "storedSha256": "0a45419730bdcd51bcb7a6b31863f07240bc9c282d8694b11ae2328c1a575e8f"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/binary.json",
+      "stored": "original/binary.json.gz",
+      "gzip": true,
+      "sourceBytes": 222,
+      "storedBytes": 197,
+      "sourceSha256": "347ec7d9f89ac6e37cfeb2f2591cb4290cdbcdf6908147c7698eeb380bdb56d3",
+      "storedSha256": "062a4bece9c6f39b05317720646c5d625449cbf9615615d431099b8d3afbe59c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-0.json",
+      "stored": "original/build-0.json.gz",
+      "gzip": true,
+      "sourceBytes": 181,
+      "storedBytes": 159,
+      "sourceSha256": "5dbd6e8625e21f855d73ebbc49b6561b5927c58a881be5365e44a0d0303d9746",
+      "storedSha256": "de0c63f1663927e75c4ca28d60df22cc17c733545f585c19abe00fcd2866cb18"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-0.stderr",
+      "stored": "original/build-0.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-0.stdout",
+      "stored": "original/build-0.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 997,
+      "storedBytes": 402,
+      "sourceSha256": "42a98ec97aa352d84c4b30517680c70e6b249f70cb47ba6e24f7853879ee3f53",
+      "storedSha256": "8d7e5ceb1389e59b2058a5d8af8bd97ce8b59953215d263a9b31872c9ab8b769"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-1.json",
+      "stored": "original/build-1.json.gz",
+      "gzip": true,
+      "sourceBytes": 196,
+      "storedBytes": 165,
+      "sourceSha256": "4f184fab7cb15e70746bd630f861e7575b5bf3684471121cbece89cac3df6668",
+      "storedSha256": "1f7bc094f807f0f7a137c966a07b6d902b6b73f745747b70125a2bb080353508"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-1.stderr",
+      "stored": "original/build-1.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-1.stdout",
+      "stored": "original/build-1.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-2.json",
+      "stored": "original/build-2.json.gz",
+      "gzip": true,
+      "sourceBytes": 316,
+      "storedBytes": 220,
+      "sourceSha256": "8433edc6f705dc984dfb3ae475e5ccc40a16fcb5c11fb4798433f7e17dade4c9",
+      "storedSha256": "dccb38d4134bac8478a81bf3921a52e9ed3a0cc3fa7174ab52ec605cccc8b8bf"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-2.stderr",
+      "stored": "original/build-2.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 772,
+      "storedBytes": 378,
+      "sourceSha256": "d9a0f876dc748320c0449bfc5092c2b3f0613bbc774f2d5fb7dc9fc6dad07273",
+      "storedSha256": "19643a55a6c0db35645d230f181124999499c749c766a339a31f994108ffd8a9"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build-2.stdout",
+      "stored": "original/build-2.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/build.py",
+      "stored": "original/build.py.gz",
+      "gzip": true,
+      "sourceBytes": 1769,
+      "storedBytes": 851,
+      "sourceSha256": "d31f2a9df095b2538679a96ef6fbbb5152f87bb320175d22969d8fda6d19661e",
+      "storedSha256": "2388475a7a4c209ae45c8e84e3e3d167b62acd178375b58496857eff8129298c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/cold.stderr",
+      "stored": "original/cold.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/cold.stdout",
+      "stored": "original/cold.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 44,
+      "storedBytes": 64,
+      "sourceSha256": "d4ebaf8065a024208f2f295a814cbf48760633b21388897fea1976a1af9dfe44",
+      "storedSha256": "9e82bbbb17d569d56508b64cb91045b9e01f54194a1906fba91faf1c9ee970eb"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/fixtures.stderr",
+      "stored": "original/fixtures.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/fixtures.stdout",
+      "stored": "original/fixtures.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 834,
+      "storedBytes": 320,
+      "sourceSha256": "76e97932c6fa415e14151c0e2dbc2c2abfed7672e042284ee1d43f6658799969",
+      "storedSha256": "19ab8dcb02e4f3a3db467f586098fba1b2198d3eb9a2710568df3b4a77aa9afd"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split-window.png",
+      "stored": "original/perf-cold-split-window.png",
+      "gzip": false,
+      "sourceBytes": 569433,
+      "storedBytes": 569433,
+      "sourceSha256": "a68e8681fdba1dcfa2f524e5ce24b46a0584408cf522c9c7e8dac344e801a69a",
+      "storedSha256": "a68e8681fdba1dcfa2f524e5ce24b46a0584408cf522c9c7e8dac344e801a69a"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split.exit.json",
+      "stored": "original/perf-cold-split.exit.json.gz",
+      "gzip": true,
+      "sourceBytes": 79,
+      "storedBytes": 90,
+      "sourceSha256": "5fa95aa57b97b25293ba676ad9b67ae9ec4243bd82b616d1889ffb5b7639d200",
+      "storedSha256": "2576a66039413c68c3b2af90047478774fe18d93962e5221318ad1143555ef82"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split.json",
+      "stored": "original/perf-cold-split.json.gz",
+      "gzip": true,
+      "sourceBytes": 8094,
+      "storedBytes": 1468,
+      "sourceSha256": "a5ab344a2176a2059017c7f5508f82c352b9b6e547418e642de9de2c5553adfc",
+      "storedSha256": "895b87ea5cd37174f147bfd5c178d69d67655ef481d9a1261773401b1e6adca5"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split.launch.json",
+      "stored": "original/perf-cold-split.launch.json.gz",
+      "gzip": true,
+      "sourceBytes": 615,
+      "storedBytes": 327,
+      "sourceSha256": "6b3f323a4cafa8023230d1d029cd07421bee3855d623ada22eee5bccb81b808e",
+      "storedSha256": "21f5fbd75121ab5dc85b154167a795e20e6bd082148289d566c08108b44d40ce"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split.log",
+      "stored": "original/perf-cold-split.log.gz",
+      "gzip": true,
+      "sourceBytes": 6045,
+      "storedBytes": 1435,
+      "sourceSha256": "54848302320be71f8834dd8b7d07aa287b52479536ef40dd6287979d6592155e",
+      "storedSha256": "67b7bc42f242a40bf62158b139a1f53d555ad2eb445234efe117a66fccb6ff5e"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split.stderr",
+      "stored": "original/perf-cold-split.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-split.stdout",
+      "stored": "original/perf-cold-split.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified-window.ax.txt",
+      "stored": "original/perf-cold-unified-window.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 4316,
+      "storedBytes": 1678,
+      "sourceSha256": "b275364b460b618f7933e08a1b66b83acf52269710534a1c8ba51dda7a80a796",
+      "storedSha256": "4adec13011d2f61748d95e706dd43647906e308cfff573ba19feb6ea9989de07"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified-window.png",
+      "stored": "original/perf-cold-unified-window.png",
+      "gzip": false,
+      "sourceBytes": 387332,
+      "storedBytes": 387332,
+      "sourceSha256": "362e42344f514f15402d2ac927519a4d850ca1e1e8a31dce79a5611a1ad26542",
+      "storedSha256": "362e42344f514f15402d2ac927519a4d850ca1e1e8a31dce79a5611a1ad26542"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified.exit.json",
+      "stored": "original/perf-cold-unified.exit.json.gz",
+      "gzip": true,
+      "sourceBytes": 78,
+      "storedBytes": 89,
+      "sourceSha256": "c2b8cc6c26afc5cf79c07463728418a835ed4c1e06a1896a91f8825849a02e39",
+      "storedSha256": "c96227c6982d412d99bc85905c1d439ee60add5ab5f630e140142fb253623506"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified.json",
+      "stored": "original/perf-cold-unified.json.gz",
+      "gzip": true,
+      "sourceBytes": 7681,
+      "storedBytes": 1428,
+      "sourceSha256": "0b81b6618415fda8ddaaa199265ed0358379fa6437bc933286707c69d6caabc3",
+      "storedSha256": "30ffce59120d6bac06467dfc3569740c9ca6222ca4abfee70acffae959b571f2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified.launch.json",
+      "stored": "original/perf-cold-unified.launch.json.gz",
+      "gzip": true,
+      "sourceBytes": 620,
+      "storedBytes": 328,
+      "sourceSha256": "997bb1aa8b63ec7d5042c4c94b7163b80eca791827714f32a959e969868efe9b",
+      "storedSha256": "98fe7879e7a1232d98ffe0286743abaaf083996943b95fee41b7983e42a4abc1"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified.log",
+      "stored": "original/perf-cold-unified.log.gz",
+      "gzip": true,
+      "sourceBytes": 3523,
+      "storedBytes": 1186,
+      "sourceSha256": "15fdfe81b7f20fd874fd065e2370c23c8282856a17b53dea200bfabfb9fce5d7",
+      "storedSha256": "5ca3333e36fb9bfb81862e28b2505194c29576d6b89f84e912dceda97e63e136"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified.stderr",
+      "stored": "original/perf-cold-unified.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-cold-unified.stdout",
+      "stored": "original/perf-cold-unified.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split-window.png",
+      "stored": "original/perf-standard-split-window.png",
+      "gzip": false,
+      "sourceBytes": 548849,
+      "storedBytes": 548849,
+      "sourceSha256": "cc7f90ec864822d578b2c961dfc350a62e2cbe1e231c83cb59ab005fdc82799e",
+      "storedSha256": "cc7f90ec864822d578b2c961dfc350a62e2cbe1e231c83cb59ab005fdc82799e"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split.exit.json",
+      "stored": "original/perf-standard-split.exit.json.gz",
+      "gzip": true,
+      "sourceBytes": 78,
+      "storedBytes": 89,
+      "sourceSha256": "b769e5e01f0dde2e4e72765f4f64a81bce0723256b077b5c2a9d9838bb0a1010",
+      "storedSha256": "428872536be1153f9ffb86c99491f9c87168a9735c09228b04429f65ee829747"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split.json",
+      "stored": "original/perf-standard-split.json.gz",
+      "gzip": true,
+      "sourceBytes": 8129,
+      "storedBytes": 1464,
+      "sourceSha256": "a63428c708af527afef72cfe98789a15eb580b14af4c7315097952787ffe8319",
+      "storedSha256": "63800627014e4d1d4c9d181639c4680d67ecd0b7a33c0f3f2fb144423cb3d760"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split.launch.json",
+      "stored": "original/perf-standard-split.launch.json.gz",
+      "gzip": true,
+      "sourceBytes": 640,
+      "storedBytes": 346,
+      "sourceSha256": "0d2d3cbf95ec69bd20c3aa929c7bfa4c4dd2bc066001c5f6d24c000f584896fb",
+      "storedSha256": "e8515b5220a7724a0120c4849862cffcb297ae36d23e1a4efe51d1224517f0cc"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split.log",
+      "stored": "original/perf-standard-split.log.gz",
+      "gzip": true,
+      "sourceBytes": 7322,
+      "storedBytes": 1492,
+      "sourceSha256": "dacdcbe597a0dda15331d777904c6fa3768652b28fa4da5425b66f1bed74c509",
+      "storedSha256": "5b80028b7f1bd015eb9232dfbbf20a9434645ff9d487a3c78b0cf33871f2b828"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split.stderr",
+      "stored": "original/perf-standard-split.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-split.stdout",
+      "stored": "original/perf-standard-split.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified-window.png",
+      "stored": "original/perf-standard-unified-window.png",
+      "gzip": false,
+      "sourceBytes": 440377,
+      "storedBytes": 440377,
+      "sourceSha256": "bc8cd42bdeea029eb1690fac8d412cb5e284b71270afb994b019cf8b65807aaf",
+      "storedSha256": "bc8cd42bdeea029eb1690fac8d412cb5e284b71270afb994b019cf8b65807aaf"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified.exit.json",
+      "stored": "original/perf-standard-unified.exit.json.gz",
+      "gzip": true,
+      "sourceBytes": 78,
+      "storedBytes": 89,
+      "sourceSha256": "7fbab818d9a09756179948d8873cf0c78693e976d4c50c27163a8d6abc0d1964",
+      "storedSha256": "2705822d27db31826cebe5770c836ae27843585770509e46edf83d6c2eec03c1"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified.json",
+      "stored": "original/perf-standard-unified.json.gz",
+      "gzip": true,
+      "sourceBytes": 7701,
+      "storedBytes": 1404,
+      "sourceSha256": "e2b71bd4d7e571170d97256b4be5af4eb80cdce1be01da01c28be0fd5c2c984d",
+      "storedSha256": "bfb736ef22867a97fb63e2675b1396705f86489e8f9f9bf601a52d1a9201d963"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified.launch.json",
+      "stored": "original/perf-standard-unified.launch.json.gz",
+      "gzip": true,
+      "sourceBytes": 646,
+      "storedBytes": 347,
+      "sourceSha256": "ae3605474c2f1ecc73af492b7c39a99b3920428131c350c0f18208c96ac46ed4",
+      "storedSha256": "4d7761bf440357ddd6fb7df6f7b39ed35ba656a3b94b74983f922628b7b76fc4"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified.log",
+      "stored": "original/perf-standard-unified.log.gz",
+      "gzip": true,
+      "sourceBytes": 5610,
+      "storedBytes": 1400,
+      "sourceSha256": "80ab1df9a18e34fece1350f72886dcb8033f69ddc36cd44ed214488a567ed5bb",
+      "storedSha256": "0bcc803e750d48aaa9715fe8ff374ee70911edc8e0917e1ecc0eb81a000c41cb"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified.stderr",
+      "stored": "original/perf-standard-unified.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf-standard-unified.stdout",
+      "stored": "original/perf-standard-unified.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/perf.py",
+      "stored": "original/perf.py.gz",
+      "gzip": true,
+      "sourceBytes": 1597,
+      "storedBytes": 795,
+      "sourceSha256": "5519b1985daaa1e2185cc60d8b3f06ca1ec5b8f23f3ded7079dd1b4ff8ca12e5",
+      "storedSha256": "ae995095a08ddd6e405b8d123e7669edda5911ca895498c37bd1ab300d571b0b"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/prepare-ui.py",
+      "stored": "original/prepare-ui.py.gz",
+      "gzip": true,
+      "sourceBytes": 3072,
+      "storedBytes": 1345,
+      "sourceSha256": "7df5e237d05c06518a334cee789fdf58913e002dc2faf0d92372da148f07f77e",
+      "storedSha256": "8ff297c83835c9bbe8249e54c0d10a567ecdfe2ac06e5c91c88f872d76ce9714"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/select-focus.ax.txt",
+      "stored": "original/select-focus.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 181,
+      "storedBytes": 184,
+      "sourceSha256": "6537b88fddcbf270624386c80b471747c43739e42db73f03dc9cf18d5320a87c",
+      "storedSha256": "ed09d63dc63b9a6f71bcbdfc055adec78259810cc2a323d531135e69e2afca42"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/source-after.json",
+      "stored": "original/source-after.json.gz",
+      "gzip": true,
+      "sourceBytes": 255761,
+      "storedBytes": 68179,
+      "sourceSha256": "b2d706e1c8438cab828ec4a8058aeae06aabfeabd914975752eeedff6b8128c1",
+      "storedSha256": "d80aa9d5e3b9fa434a2ee833b218d380d5adc8e2ed1241f2e137894909ff7c55"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/source-before.json",
+      "stored": "original/source-before.json.gz",
+      "gzip": true,
+      "sourceBytes": 255761,
+      "storedBytes": 68179,
+      "sourceSha256": "b2d706e1c8438cab828ec4a8058aeae06aabfeabd914975752eeedff6b8128c1",
+      "storedSha256": "d80aa9d5e3b9fa434a2ee833b218d380d5adc8e2ed1241f2e137894909ff7c55"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/source.txt",
+      "stored": "original/source.txt.gz",
+      "gzip": true,
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "1bc86d93604931446993913d9540c186feae35cd20f7d62a505108c165325f4a",
+      "storedSha256": "d99cc870fb0446e92595c3ade2bc8627a295206392507d86307a97760cfe4440"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/split-scroll-down.ax.txt",
+      "stored": "original/split-scroll-down.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 328,
+      "storedBytes": 265,
+      "sourceSha256": "ef93bebb4b8f3d3bd1d727d1ebbcb8a3ca702ac52290c1107c1cf6700632ee9c",
+      "storedSha256": "dc9d44bd50b2a8bb8cd815fadea696ca29b9154736e55a610359d75475e5f5fb"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/split-scroll-down.png",
+      "stored": "original/split-scroll-down.png",
+      "gzip": false,
+      "sourceBytes": 618560,
+      "storedBytes": 618560,
+      "sourceSha256": "47808ad195c3ee947a3a3f322c6bd93a7c0f947f77f1ccfb912fbef552326751",
+      "storedSha256": "47808ad195c3ee947a3a3f322c6bd93a7c0f947f77f1ccfb912fbef552326751"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/split-scroll-return.ax.txt",
+      "stored": "original/split-scroll-return.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 179,
+      "storedBytes": 180,
+      "sourceSha256": "2b844efa065e079bb64815bb9abc823d6d8ebec80128ab48193158bc8d154fe1",
+      "storedSha256": "55819b708cd8c58bdcb13cbda62b009cd7ffece59065b5288ec2cf9afc20a720"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/split-scroll-return.png",
+      "stored": "original/split-scroll-return.png",
+      "gzip": false,
+      "sourceBytes": 626073,
+      "storedBytes": 626073,
+      "sourceSha256": "01f954cfd76fa6a6c19b206a7ddca847a2486736bf249022c1e94197392b3afc",
+      "storedSha256": "01f954cfd76fa6a6c19b206a7ddca847a2486736bf249022c1e94197392b3afc"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/summarize.py",
+      "stored": "original/summarize.py.gz",
+      "gzip": true,
+      "sourceBytes": 2583,
+      "storedBytes": 1127,
+      "sourceSha256": "9dfc7329a8a51e6484255358e1c3a3b56c67a5caf10de4e320b12b70f67e7cf2",
+      "storedSha256": "9d04fd63d316d5d4fa7d6e7496b1a50aee205b496b3ec5cdbd72cb66c46ffc24"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/summary.json",
+      "stored": "original/summary.json.gz",
+      "gzip": true,
+      "sourceBytes": 29636,
+      "storedBytes": 2498,
+      "sourceSha256": "6c50873b345be44960197aeba3b1547e5d3fdbfda993b36da062a39c28edbf38",
+      "storedSha256": "2bbf6b7041c82c2b60add1a887b5266dc2fbeb776ff372c84e3a58a4ff76e8be"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/task13-desktop01.md",
+      "stored": "original/task13-desktop01.md.gz",
+      "gzip": true,
+      "sourceBytes": 7773,
+      "storedBytes": 4531,
+      "sourceSha256": "a9ed051892bb6f3a9ddb1df156920578f24fa9af17d8f12b878dcb012657ff92",
+      "storedSha256": "b9b5e4d117ca9653350b51eacb2d07713ab14a6ab22cb0a2c34fa988ef211b8d"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-binary.ax.txt",
+      "stored": "original/ui-binary.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 767,
+      "storedBytes": 481,
+      "sourceSha256": "53171738a7c875c7a77a65de0693ffef68416ccbb7d10f69d2e860716369dc65",
+      "storedSha256": "570e2ac32e36f05a1b05e94b2d62130459821d1246dbb2b2dda41607b0c2395c"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-binary.png",
+      "stored": "original/ui-binary.png",
+      "gzip": false,
+      "sourceBytes": 203461,
+      "storedBytes": 203461,
+      "sourceSha256": "de6a2abd5b4bfdbbdd08db1419c1a7ccf8ee947dc679e0346870a89720501278",
+      "storedSha256": "de6a2abd5b4bfdbbdd08db1419c1a7ccf8ee947dc679e0346870a89720501278"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-conflict.ax.txt",
+      "stored": "original/ui-conflict.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 656,
+      "storedBytes": 454,
+      "sourceSha256": "7e25cf69db1789959ee6eadabf164a2c0c104b59487a122b4d7c8d0d8b4ffe4f",
+      "storedSha256": "2518107febf5ee1fe184bc78a79b36b842eebf0a0e34b2c7a9d0c8a88b43b240"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-conflict.png",
+      "stored": "original/ui-conflict.png",
+      "gzip": false,
+      "sourceBytes": 216432,
+      "storedBytes": 216432,
+      "sourceSha256": "75dbe179ff667ae6b7c62a86fecaf8a356835376065f27030dabe9e9c52d6a3d",
+      "storedSha256": "75dbe179ff667ae6b7c62a86fecaf8a356835376065f27030dabe9e9c52d6a3d"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-dark-main.png",
+      "stored": "original/ui-dark-main.png",
+      "gzip": false,
+      "sourceBytes": 498689,
+      "storedBytes": 498689,
+      "sourceSha256": "9c48a9a7f45aa99f3fcc1fc4588ce7df11fba2247c51eda6c53ffe9e5eaec14e",
+      "storedSha256": "9c48a9a7f45aa99f3fcc1fc4588ce7df11fba2247c51eda6c53ffe9e5eaec14e"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-dark.exit",
+      "stored": "original/ui-dark.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-dark.pid",
+      "stored": "original/ui-dark.pid.gz",
+      "gzip": true,
+      "sourceBytes": 5,
+      "storedBytes": 25,
+      "sourceSha256": "6f3199af1f120cc80397291d44be818c3f59a4b70f8c5b8267caac2c6130b2a5",
+      "storedSha256": "1bd620999fccaaa0e06dc5054fad2944c6adde7c8195a092cd149c424ebb5cc0"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-dark.stderr",
+      "stored": "original/ui-dark.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-dark.stdout",
+      "stored": "original/ui-dark.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-data-dark/settings.json",
+      "stored": "original/ui-data-dark/settings.json.gz",
+      "gzip": true,
+      "sourceBytes": 122,
+      "storedBytes": 133,
+      "sourceSha256": "d53a27cfab4e01be79dc858698cd0c8b07fe694f3983c5cee548fb4899c58639",
+      "storedSha256": "99f9c94815ad4601d6ee7bf58b354083afe39951194f86f9b54d0f9192835813"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-data-light/settings.json",
+      "stored": "original/ui-data-light/settings.json.gz",
+      "gzip": true,
+      "sourceBytes": 122,
+      "storedBytes": 133,
+      "sourceSha256": "d53a27cfab4e01be79dc858698cd0c8b07fe694f3983c5cee548fb4899c58639",
+      "storedSha256": "99f9c94815ad4601d6ee7bf58b354083afe39951194f86f9b54d0f9192835813"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-discard-dialog.ax.txt",
+      "stored": "original/ui-discard-dialog.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 715,
+      "storedBytes": 496,
+      "sourceSha256": "9fcdb140d81806bd8b83f5fd99402b662c2f8e407b90f592f4c96ba36f5a73ca",
+      "storedSha256": "3d1580974a17e63c479102c0a80b58e7ae48623fc2ae07e31509f7aab9ce6449"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-discard-dialog.png",
+      "stored": "original/ui-discard-dialog.png",
+      "gzip": false,
+      "sourceBytes": 361365,
+      "storedBytes": 361365,
+      "sourceSha256": "0f168ed6eee7b590a0866e7a7f67c97d4da23c6cc6b87899a7642556cfab222b",
+      "storedSha256": "0f168ed6eee7b590a0866e7a7f67c97d4da23c6cc6b87899a7642556cfab222b"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-empty.ax.txt",
+      "stored": "original/ui-empty.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 672,
+      "storedBytes": 415,
+      "sourceSha256": "9fcdaccdca205ca0c71abaa31ea689bb547d6e5c58f7070c2c97af222cb16da1",
+      "storedSha256": "5e3b5dfe4f039560c9fbf9a6f1c4e6ce95bb936c960b30a20bfe76c66922ab58"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-fixture-verification.json",
+      "stored": "original/ui-fixture-verification.json.gz",
+      "gzip": true,
+      "sourceBytes": 1610,
+      "storedBytes": 656,
+      "sourceSha256": "4c548c8daf66a706238c5bb2f8f8de5b875087c99cdec3f6da735bb6f2343bcd",
+      "storedSha256": "9a2f189c2064037c4ed52ac81781d38f1c3727e077620f88133f6c9ce1192631"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light-main.png",
+      "stored": "original/ui-light-main.png",
+      "gzip": false,
+      "sourceBytes": 499229,
+      "storedBytes": 499229,
+      "sourceSha256": "5fed248446228980fb534391a341f6f820985a4b3e75ad68f3f7800c471805f1",
+      "storedSha256": "5fed248446228980fb534391a341f6f820985a4b3e75ad68f3f7800c471805f1"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light-unified.png",
+      "stored": "original/ui-light-unified.png",
+      "gzip": false,
+      "sourceBytes": 391160,
+      "storedBytes": 391160,
+      "sourceSha256": "a45a864dcfcaf5889282ad325df7363f1b248eb38543bc51300b4f8b6c62e3bf",
+      "storedSha256": "a45a864dcfcaf5889282ad325df7363f1b248eb38543bc51300b4f8b6c62e3bf"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light.stderr",
+      "stored": "original/ui-light.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light.stdout",
+      "stored": "original/ui-light.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light02.exit",
+      "stored": "original/ui-light02.exit.gz",
+      "gzip": true,
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light02.pid",
+      "stored": "original/ui-light02.pid.gz",
+      "gzip": true,
+      "sourceBytes": 5,
+      "storedBytes": 25,
+      "sourceSha256": "dacc96cc83e66944141f29ba22554396c2e54e743a92a7f6fae9afffb07b27e6",
+      "storedSha256": "f5c57e284cd8cb0f187a407443cbbf03da86baf5b8c62a71c31e3a6fa2d5ee26"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light02.stderr",
+      "stored": "original/ui-light02.stderr.gz",
+      "gzip": true,
+      "sourceBytes": 103,
+      "storedBytes": 122,
+      "sourceSha256": "de4ba412f8a98bc2bcb5a92376f40a8eab91601fd0acd0ef5b22eb8cdd9a5ae8",
+      "storedSha256": "9cdace57977f8b26db35bc3303b0902677d35cbc27d85bd04e6ef58cad7f1dc2"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-light02.stdout",
+      "stored": "original/ui-light02.stdout.gz",
+      "gzip": true,
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-preparation.json",
+      "stored": "original/ui-preparation.json.gz",
+      "gzip": true,
+      "sourceBytes": 5412,
+      "storedBytes": 1021,
+      "sourceSha256": "039930fd21009c28cb54499920b3d920a9a7d21ea8878004bb83902fab4c9804",
+      "storedSha256": "49470ed6761ab5493992352fd2d404fd2300488d6d72bb2437e25d4548023a9a"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-readonly.ax.txt",
+      "stored": "original/ui-readonly.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 668,
+      "storedBytes": 464,
+      "sourceSha256": "8608abfe7fc587abcf9e06eab81f793b1ffb2159764eeb6bf874e3b619c50788",
+      "storedSha256": "0d38596cb706b045b3b598d0d930dd7f014d64a27ab3cbdc5cba2b41129af903"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/ui-readonly.png",
+      "stored": "original/ui-readonly.png",
+      "gzip": false,
+      "sourceBytes": 209057,
+      "storedBytes": 209057,
+      "sourceSha256": "161684002b30a01f00a312790689992d8ec8c523542dd94af0262b77fb1288e0",
+      "storedSha256": "161684002b30a01f00a312790689992d8ec8c523542dd94af0262b77fb1288e0"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/unified-scroll-down.ax.txt",
+      "stored": "original/unified-scroll-down.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 4659,
+      "storedBytes": 1086,
+      "sourceSha256": "706b10196700c1dd03cc931fff55ccd2ea61d7a91decb77344f85c4051025341",
+      "storedSha256": "dc7912b228b90b10e56890140ea56adf121b34330944ce48ac0aa84e4eb116df"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/unified-scroll-down.png",
+      "stored": "original/unified-scroll-down.png",
+      "gzip": false,
+      "sourceBytes": 472549,
+      "storedBytes": 472549,
+      "sourceSha256": "7ffa99c2ee128ed1c90b75c2e3027b579e777ea3d2bafef7a9cedb88427e9847",
+      "storedSha256": "7ffa99c2ee128ed1c90b75c2e3027b579e777ea3d2bafef7a9cedb88427e9847"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/unified-scroll-return.ax.txt",
+      "stored": "original/unified-scroll-return.ax.txt.gz",
+      "gzip": true,
+      "sourceBytes": 5370,
+      "storedBytes": 1210,
+      "sourceSha256": "55c7692d6fa29400d36fad7a51098c8b3e48025e54cb2ccdd37cecdc627f244b",
+      "storedSha256": "76f59697294589bfb259d234335ba20adcd53dbe756aca9be556a5d81f110403"
+    },
+    {
+      "source": "/private/tmp/revia-task13-final-HW71Io/unified-scroll-return.png",
+      "stored": "original/unified-scroll-return.png",
+      "gzip": false,
+      "sourceBytes": 463390,
+      "storedBytes": 463390,
+      "sourceSha256": "0014b50140cbfcab39a5f7dd614a29d948f124ba4f0b9ea6f3927b724bb843d4",
+      "storedSha256": "0014b50140cbfcab39a5f7dd614a29d948f124ba4f0b9ea6f3927b724bb843d4"
+    }
+  ]
+}

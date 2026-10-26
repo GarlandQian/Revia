@@ -1,0 +1,10 @@
+{
+  "source": "26b6dc46c2be6cd6f0199320d36a59b95d2dcc6d",
+  "binary": "/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia",
+  "binarySha256": "1e0a48481627d810052f02bf525b1c4bb4fccb3c0b549cd0a6b57e4e7778aca8",
+  "pid": 67588,
+  "dataDir": "/private/tmp/revia-task06-2fuu2r92/diag-round3",
+  "home": "/private/tmp/revia-task06-2fuu2r92/home",
+  "mode": "ordinary UI with explicit acceptance seam; automatic measurement/soak/smoke disabled",
+  "launchedAt": "2026-10-23T14:38:55.516201+08:00"
+}

@@ -1,0 +1,128 @@
+{
+  "reviewedSource": "cb828361d0f248ee4aa5e45f9bc40c7edc94e075",
+  "boundaries": {
+    "standardsAndPlanner": "External clients linked existing library, whose commit provenance was not independently established. They corroborate fixed-source static findings, not fixed-source integration acceptance. No GUI or project rebuild by reviewers.",
+    "piMeasurementUnverified": "Pi ran Release/GUI/D06 contrary to the handoff. These raw files are preserved as history only. Source and binary provenance and visible-window acceptance not independently verified; not accepted as planner D06 evidence."
+  },
+  "files": [
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/review.rs",
+      "stored": "standards/review.rs",
+      "bytes": 5520,
+      "sourceSha256": "2386f3af3623cc36aad1095c8baccbb6ab072c6c0e5a632bacc4515dc4ac86fa",
+      "storedSha256": "2386f3af3623cc36aad1095c8baccbb6ab072c6c0e5a632bacc4515dc4ac86fa"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/compile-command.txt",
+      "stored": "standards/compile-command.txt",
+      "bytes": 360,
+      "sourceSha256": "5f16f044fb44ebab77e377d8b9ff005a23b124f7fa4814897341d0612b773010",
+      "storedSha256": "5f16f044fb44ebab77e377d8b9ff005a23b124f7fa4814897341d0612b773010"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/compile.stdout",
+      "stored": "standards/compile.stdout",
+      "bytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/compile.stderr",
+      "stored": "standards/compile.stderr",
+      "bytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/run-command.txt",
+      "stored": "standards/run-command.txt",
+      "bytes": 117,
+      "sourceSha256": "613c977b20fd3be386d34cdac9fe9ee93b895f6f26434e1bf082fe8de5a1e624",
+      "storedSha256": "613c977b20fd3be386d34cdac9fe9ee93b895f6f26434e1bf082fe8de5a1e624"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/run.stdout",
+      "stored": "standards/run.stdout",
+      "bytes": 489,
+      "sourceSha256": "0ae6ea06a5ba79c635d13d3bea61bb49eabac8cb4a5d32989c5fcaa774edfc0d",
+      "storedSha256": "0ae6ea06a5ba79c635d13d3bea61bb49eabac8cb4a5d32989c5fcaa774edfc0d"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/run.stderr",
+      "stored": "standards/run.stderr",
+      "bytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-review05-r2-standards-4aweb5w2/provenance.json",
+      "stored": "standards/provenance.json",
+      "bytes": 440,
+      "sourceSha256": "c192914984efc170af5089e55c4ebee111622680b492fc76a5817ea2d6419e06",
+      "storedSha256": "c192914984efc170af5089e55c4ebee111622680b492fc76a5817ea2d6419e06"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/review.rs",
+      "stored": "planner/review.rs",
+      "bytes": 5281,
+      "sourceSha256": "e2df10a7f4e42797bc5ff5086f17c0c643afe55de4a3ff9dd70d03af9d74f6cc",
+      "storedSha256": "e2df10a7f4e42797bc5ff5086f17c0c643afe55de4a3ff9dd70d03af9d74f6cc"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/compile-command.json",
+      "stored": "planner/compile-command.json",
+      "bytes": 396,
+      "sourceSha256": "fed072ce59bf453f5e4a63bbe50c90d471bf47d62a89593a468c66ecf5998259",
+      "storedSha256": "fed072ce59bf453f5e4a63bbe50c90d471bf47d62a89593a468c66ecf5998259"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/compile.stdout",
+      "stored": "planner/compile.stdout",
+      "bytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/compile.stderr",
+      "stored": "planner/compile.stderr",
+      "bytes": 880,
+      "sourceSha256": "a6bd1b68f80e0696c693d1e7e8915706387bea25a345fbd2bb11774230e352a3",
+      "storedSha256": "a6bd1b68f80e0696c693d1e7e8915706387bea25a345fbd2bb11774230e352a3"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/run.stdout",
+      "stored": "planner/run.stdout",
+      "bytes": 278,
+      "sourceSha256": "df6fe3197968bfbb070d56c1742a6bb07b2f41b9abd338ecfb5f06841adaf18a",
+      "storedSha256": "df6fe3197968bfbb070d56c1742a6bb07b2f41b9abd338ecfb5f06841adaf18a"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/run.stderr",
+      "stored": "planner/run.stderr",
+      "bytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-task05-review02-77fqrsqt/provenance.json",
+      "stored": "planner/provenance.json",
+      "bytes": 594,
+      "sourceSha256": "4631d64db73cfb19059fcf2608d8ccbe2a699d1653db650d1c7e3c912b658452",
+      "storedSha256": "4631d64db73cfb19059fcf2608d8ccbe2a699d1653db650d1c7e3c912b658452"
+    },
+    {
+      "source": "/tmp/r05-r1-split.json",
+      "stored": "pi-measurement-unverified/r05-r1-split.json",
+      "bytes": 7921,
+      "sourceSha256": "8c8ce0ae2b42c1424e4fe53369c49d051451680fa538b6d5a251a593816d9923",
+      "storedSha256": "8c8ce0ae2b42c1424e4fe53369c49d051451680fa538b6d5a251a593816d9923"
+    },
+    {
+      "source": "/tmp/r05-r1-unified.json",
+      "stored": "pi-measurement-unverified/r05-r1-unified.json",
+      "bytes": 7699,
+      "sourceSha256": "f74a3ecef25a5f373d1b3a3061d50f6de2b73b4935f81661cf715c1726c5622a",
+      "storedSha256": "f74a3ecef25a5f373d1b3a3061d50f6de2b73b4935f81661cf715c1726c5622a"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+Revia PID=96855，等待可见窗口后连续操作 540 秒；诊断={'loggingMode': 'minimal', 'idleSeconds': 0, 'cycles': None, 'focus': 'jump'}；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/focus2/jump.json
+[    2.1s] Rust 124.7 MB / WebContent 119.5 MB
+[   12.3s] Rust 125.5 MB / WebContent 236.3 MB
+[   22.4s] Rust 125.4 MB / WebContent 268.6 MB
+[   32.6s] Rust 125.5 MB / WebContent 268.9 MB
+[   42.6s] Rust 125.4 MB / WebContent 270.4 MB
+[   52.8s] Rust 125.5 MB / WebContent 270.7 MB
+[   63.0s] Rust 125.5 MB / WebContent 270.7 MB
+[   73.0s] Rust 125.5 MB / WebContent 271.1 MB
+[   83.2s] Rust 125.5 MB / WebContent 271.1 MB
+[phase 1043 pressure] samplingChecksPassed=True duration=11.951s WebContent 73.0 MB / malloc 9.0 MB; pending closure
+[  104.5s] Rust 125.0 MB / WebContent 271.2 MB
+[  114.5s] Rust 124.2 MB / WebContent 276.0 MB
+[  124.7s] Rust 124.2 MB / WebContent 276.1 MB
+[  134.9s] Rust 124.2 MB / WebContent 276.0 MB
+[  145.0s] Rust 124.2 MB / WebContent 276.0 MB
+[  155.2s] Rust 124.2 MB / WebContent 276.0 MB
+[  165.3s] Rust 124.2 MB / WebContent 276.2 MB
+[  175.4s] Rust 124.2 MB / WebContent 276.2 MB
+[  185.5s] Rust 124.2 MB / WebContent 277.2 MB
+[  195.5s] Rust 124.2 MB / WebContent 369.2 MB
+[phase 2129 pressure] samplingChecksPassed=True duration=11.956s WebContent 62.5 MB / malloc 9.2 MB; pending closure
+[  211.1s] Rust 124.1 MB / WebContent 369.0 MB
+[  221.2s] Rust 124.2 MB / WebContent 370.1 MB
+[  231.3s] Rust 124.2 MB / WebContent 369.9 MB
+[  241.3s] Rust 124.2 MB / WebContent 369.9 MB
+[  251.5s] Rust 124.2 MB / WebContent 369.9 MB
+[  261.6s] Rust 124.2 MB / WebContent 369.9 MB
+[  271.6s] Rust 124.2 MB / WebContent 369.9 MB
+[  281.6s] Rust 124.2 MB / WebContent 369.9 MB
+[  291.6s] Rust 124.2 MB / WebContent 370.0 MB
+[  301.7s] Rust 124.2 MB / WebContent 369.9 MB
+[phase 3215 pressure] samplingChecksPassed=True duration=11.969s WebContent 63.7 MB / malloc 9.7 MB; pending closure
+[  317.7s] Rust 124.2 MB / WebContent 369.9 MB
+[  327.9s] Rust 124.4 MB / WebContent 371.1 MB
+[  338.1s] Rust 124.4 MB / WebContent 375.6 MB
+[  348.1s] Rust 124.4 MB / WebContent 375.6 MB
+[  358.2s] Rust 124.4 MB / WebContent 375.6 MB
+[  368.2s] Rust 124.4 MB / WebContent 375.6 MB
+[  378.3s] Rust 124.4 MB / WebContent 375.6 MB
+[  388.4s] Rust 124.4 MB / WebContent 375.6 MB
+[  398.4s] Rust 124.4 MB / WebContent 375.6 MB
+[  408.5s] Rust 124.4 MB / WebContent 375.6 MB
+[phase 4290 pressure] samplingChecksPassed=True duration=11.966s WebContent 64.2 MB / malloc 9.9 MB; pending closure
+[  424.3s] Rust 124.4 MB / WebContent 375.4 MB
+[  434.4s] Rust 124.4 MB / WebContent 387.9 MB
+[  444.5s] Rust 124.4 MB / WebContent 388.0 MB
+[  454.7s] Rust 124.4 MB / WebContent 388.0 MB
+[  464.7s] Rust 124.4 MB / WebContent 388.0 MB
+[  474.8s] Rust 124.4 MB / WebContent 388.0 MB
+[  484.8s] Rust 124.4 MB / WebContent 388.0 MB
+[  494.9s] Rust 124.4 MB / WebContent 388.0 MB
+[  504.9s] Rust 124.4 MB / WebContent 388.0 MB
+[  515.0s] Rust 124.4 MB / WebContent 388.0 MB
+[phase 5368 pressure] samplingChecksPassed=True duration=11.961s WebContent 65.5 MB / malloc 10.2 MB; pending closure
+[  531.0s] Rust 124.4 MB / WebContent 387.8 MB
+[  541.2s] Rust 124.5 MB / WebContent 389.0 MB
+[  551.2s] Rust 124.4 MB / WebContent 388.8 MB
+[  561.3s] Rust 124.4 MB / WebContent 388.8 MB
+[  571.4s] Rust 124.4 MB / WebContent 388.8 MB
+[  581.4s] Rust 124.4 MB / WebContent 388.9 MB
+[  591.5s] Rust 124.4 MB / WebContent 388.8 MB
+[  601.6s] Rust 124.5 MB / WebContent 388.9 MB
+[  611.6s] Rust 124.5 MB / WebContent 388.9 MB
+[  621.6s] Rust 124.5 MB / WebContent 388.9 MB
+运行完成，待验收：[]；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/focus2/jump.json
+Q98 内存判定：不通过；['webContentFootprintMb：超过 Q98 阈值']

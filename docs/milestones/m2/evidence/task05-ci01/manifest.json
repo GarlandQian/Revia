@@ -1,0 +1,55 @@
+{
+  "sourceCommit": "234f248175ada05d44dbf639655e07a2957a9dac",
+  "binarySha256": "0056277c807da30663181418be79e54cb248e5722abb00616e18b0309fb3d21a",
+  "boundary": "Exact234f248 compile-only CI: macOS passed; Windows5 recovery tests failed, release skipped.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-ci01-61W9Ut/ci.log",
+      "stored": "ci.log.gz",
+      "sourceBytes": 218097,
+      "storedBytes": 36912,
+      "sourceSha256": "038fda9f434af7b171b9c917f00b1e4585decd9445c3a491f7a4288dddd81022",
+      "storedSha256": "cf048608da0e16e93aa1b70a25c881ac9afd99c43896669dae35850130d3783f"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci01-61W9Ut/log.exit",
+      "stored": "log.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci01-61W9Ut/log.stderr",
+      "stored": "log.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci01-61W9Ut/status.exit",
+      "stored": "status.exit.gz",
+      "sourceBytes": 2,
+      "storedBytes": 22,
+      "sourceSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "storedSha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci01-61W9Ut/status.json",
+      "stored": "status.json.gz",
+      "sourceBytes": 6094,
+      "storedBytes": 797,
+      "sourceSha256": "3e04dc9ac0a95740dae8f90b1e7359fb2dfb832c9d465dbc1ce90cebcc6e3341",
+      "storedSha256": "6af7a108101fc828ee93c464ce0478fda54b22067172b45a1d5b6580180b6e04"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci01-61W9Ut/status.stderr",
+      "stored": "status.stderr.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "sourceCommit": "d71ca5b",
+  "binarySha256": "ce01397a75ecd615254b3271ade6e9169d3b0ea4123cbbf2e7f182cc58b6a2df",
+  "note": "Short diagnostic only. Four frame reports use this same bundle; UI screenshots are in the conversation, not invented local PNGs.",
+  "files": [
+    {
+      "source": "/tmp/revia-ipc-verbose-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/verbose-01.json",
+      "sourceSha256": "5722edd3cd02ab0e98c392dde32bd2aa5a185e4ab6dabe5b4ef1c072350cb53e",
+      "storedSha256": "5722edd3cd02ab0e98c392dde32bd2aa5a185e4ab6dabe5b4ef1c072350cb53e",
+      "sourceBytes": 280051,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-verbose-01-20261021.json.frontend.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/verbose-01.json.frontend.json",
+      "sourceSha256": "0a4fbf7d16167f97a7f5612bc6bc3ec21a7ad70dadff2d036b35bfef4d982a74",
+      "storedSha256": "0a4fbf7d16167f97a7f5612bc6bc3ec21a7ad70dadff2d036b35bfef4d982a74",
+      "sourceBytes": 214094,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-verbose-01-20261021.json.samples.jsonl",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/verbose-01.json.samples.jsonl",
+      "sourceSha256": "bc6c1154ea6eb952c4da864e607b5885cb14b9fd8f160d02461dd57d6a246784",
+      "storedSha256": "bc6c1154ea6eb952c4da864e607b5885cb14b9fd8f160d02461dd57d6a246784",
+      "sourceBytes": 31102,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-verbose-01-20261021.json.phase-samples.jsonl",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/verbose-01.json.phase-samples.jsonl",
+      "sourceSha256": "508566f623b1b7c20df7fba6a65ff1a5e393bbbf290884fb44421fa20cf2a466",
+      "storedSha256": "508566f623b1b7c20df7fba6a65ff1a5e393bbbf290884fb44421fa20cf2a466",
+      "sourceBytes": 5694,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-verbose-01-20261021.json.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/verbose-01.json.log.gz",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceBytes": 0,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-ipc-verbose-01-20261021.json.frontend.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/verbose-01.json.frontend.log.gz",
+      "sourceSha256": "b1f66fd961fb272ca2d3c58eea6ca049c5f3bb9bd1a7ec77d39ea7c2e934424c",
+      "storedSha256": "76c243ca6238442d96473545aea42c77f5b31673785e08997131075b5a3c1d23",
+      "sourceBytes": 3247209,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-ipc-minimal-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/minimal-01.json",
+      "sourceSha256": "186674d17f5e4563361614deb3ad45573332e044b557d0588bf542212217cb4f",
+      "storedSha256": "186674d17f5e4563361614deb3ad45573332e044b557d0588bf542212217cb4f",
+      "sourceBytes": 261065,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-minimal-01-20261021.json.frontend.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/minimal-01.json.frontend.json",
+      "sourceSha256": "afe813cb719083a9a693f01828e5d208f086c509728730489f539a8601d1c895",
+      "storedSha256": "afe813cb719083a9a693f01828e5d208f086c509728730489f539a8601d1c895",
+      "sourceBytes": 199116,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-minimal-01-20261021.json.samples.jsonl",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/minimal-01.json.samples.jsonl",
+      "sourceSha256": "4140b86809f8b4f50680c6c5b384588fffe92dd5ca3d538abe1d6fa06cea3e77",
+      "storedSha256": "4140b86809f8b4f50680c6c5b384588fffe92dd5ca3d538abe1d6fa06cea3e77",
+      "sourceBytes": 28910,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-minimal-01-20261021.json.phase-samples.jsonl",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/minimal-01.json.phase-samples.jsonl",
+      "sourceSha256": "1753ebaa814f96660e269f11d50097421defe34398a229862eb70c22e6842108",
+      "storedSha256": "1753ebaa814f96660e269f11d50097421defe34398a229862eb70c22e6842108",
+      "sourceBytes": 5694,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-minimal-01-20261021.json.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/minimal-01.json.log.gz",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "sourceBytes": 0,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-ipc-minimal-01-20261021.json.frontend.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/minimal-01.json.frontend.log.gz",
+      "sourceSha256": "6fb3111931118132b3e5c93aa1162b35423df4e0b6a2f4d77a250ced383349eb",
+      "storedSha256": "f76ad2f65cfc99d1a3969f117a4da483b1bb29c809f04e3eb9560283d007188c",
+      "sourceBytes": 92875,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-split-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-split-01.json",
+      "sourceSha256": "627cefb326445a1fac0393c8b091153dfbeaf881606124c7b6fcf7ddc6eea90d",
+      "storedSha256": "627cefb326445a1fac0393c8b091153dfbeaf881606124c7b6fcf7ddc6eea90d",
+      "sourceBytes": 7917,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-frame-split-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-split-01.log.gz",
+      "sourceSha256": "cf882f6f0924a630ff33fe20ebe210ab801b384d4068e0916b8a433d6db623a7",
+      "storedSha256": "a9edd8fd68c4b3ad79c1d12dd682bcb2aae23b128b98f58266f71c19c6928bc5",
+      "sourceBytes": 4074,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-unified-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-unified-01.json",
+      "sourceSha256": "1588b14339387727c34a854f973de67206533f336ff6098e6b2cf04ce2f93d83",
+      "storedSha256": "1588b14339387727c34a854f973de67206533f336ff6098e6b2cf04ce2f93d83",
+      "sourceBytes": 7677,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-frame-unified-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-unified-01.log.gz",
+      "sourceSha256": "e143407233227b16ca1338603507e7a0ea7afed66120afcf38e84fe5abd14eca",
+      "storedSha256": "be96de286df98b1a379cf1138032a8157fb2a444f1c984a22801a7a7cb913bda",
+      "sourceBytes": 5447,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-cold-split-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-cold-split-01.json",
+      "sourceSha256": "0a96cc982f43d64cbd8383240fc8aaeb11601c23a1cee4716beede5455c627d4",
+      "storedSha256": "0a96cc982f43d64cbd8383240fc8aaeb11601c23a1cee4716beede5455c627d4",
+      "sourceBytes": 7901,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-frame-cold-split-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-cold-split-01.log.gz",
+      "sourceSha256": "8bd0c15a66e91a9552dc85f3050d0f6502186c28183191ad25ae1fd50a3477f2",
+      "storedSha256": "1068cbf2c0c2510a8f84370f7bebba1628cf84ef56ff0d0382e92cfbf6459c79",
+      "sourceBytes": 3765,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-cold-unified-01-20261021.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-cold-unified-01.json",
+      "sourceSha256": "36aa13641f11a8b0208fc892e93f2065312b80c4e00fdc6b999f51ff78b45831",
+      "storedSha256": "36aa13641f11a8b0208fc892e93f2065312b80c4e00fdc6b999f51ff78b45831",
+      "sourceBytes": 7670,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-frame-cold-unified-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/frame-cold-unified-01.log.gz",
+      "sourceSha256": "c4c131f631da3d99656c27e1dae4962db6e46960684e2cfd50901ffefa36a757",
+      "storedSha256": "7e522673d892c8b9eb536e4d79edde6542aad258125b9347df845bf7630e4393",
+      "sourceBytes": 3520,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-frame-desktop-01-20261021.log",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/desktop-before-highlight-fix.log.gz",
+      "sourceSha256": "b6d1a535f0a0fdfc90e04aef9067b0e22efe27e0733e03ce03947f0167a17bb9",
+      "storedSha256": "facc967c5df4e435e6b1b2b8a85b5d343775688dc6039ad183e290d795413344",
+      "sourceBytes": 2810,
+      "gzip": true
+    },
+    {
+      "source": "/tmp/revia-analyze-ipc.py",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/analyze-ipc.py",
+      "sourceSha256": "e3134c8092fb6b71530bf2dca90af8c129f0b56064e0ac4be98d209366957711",
+      "storedSha256": "e3134c8092fb6b71530bf2dca90af8c129f0b56064e0ac4be98d209366957711",
+      "sourceBytes": 5324,
+      "gzip": false
+    },
+    {
+      "source": "/tmp/revia-ipc-analysis-ab-01.json",
+      "path": "docs/milestones/m2/evidence/ipc-20261021/analysis-ab-01.json",
+      "sourceSha256": "06c391dbbfe70568623269b80d1bd87174845ff8ce92c1ad6f65b746351d7156",
+      "storedSha256": "06c391dbbfe70568623269b80d1bd87174845ff8ce92c1ad6f65b746351d7156",
+      "sourceBytes": 48072,
+      "gzip": false
+    }
+  ]
+}

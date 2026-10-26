@@ -1,0 +1,12 @@
+{
+  "name": "sensitivity-ui-input",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "node",
+    "/private/tmp/revia-task13-check01-ukzmi5rb/sensitivity-ui-input.mjs"
+  ],
+  "startedAt": "2026-10-24T13:23:46.178659+00:00",
+  "expectedExit": 1,
+  "exit": 1,
+  "endedAt": "2026-10-24T13:23:46.243080+00:00"
+}

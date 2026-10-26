@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-10-23T14:59:11.343+08:00",
+  "command": "set-line80",
+  "repo": "A",
+  "path": "/private/tmp/revia-task06-2fuu2r92/A/10-target.ts",
+  "mode": "atomic",
+  "dryRun": false,
+  "value": "83",
+  "paddingSpaces": 0,
+  "bytesBefore": 5112,
+  "bytesAfter": 5112,
+  "linesBefore": 180,
+  "linesAfter": 180,
+  "sha256Before": "268c4a779a68a740b77dd4cd8a22a88482e27435470deb1afb9ff82fe999370e",
+  "sha256After": "8f77c639fcd73256668260da20f69d213c84f8ee6da5a02279ea51f5db19206d",
+  "fileMode": "0644",
+  "actual": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/A/10-target.ts",
+    "exists": true,
+    "sha256": "8f77c639fcd73256668260da20f69d213c84f8ee6da5a02279ea51f5db19206d",
+    "bytes": 5112,
+    "lines": 180,
+    "mode": "0644",
+    "inode": 163274385,
+    "mtimeNs": 1792738751343468054
+  },
+  "recordedAt": "/private/tmp/revia-task06-2fuu2r92/evidence/mutations.jsonl"
+}

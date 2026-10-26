@@ -1,0 +1,33 @@
+{
+  "git_version": "git version 2.56.0",
+  "GIT_CONFIG_user_config_unchanged": true,
+  "config_before_sha256": "da8a8d0d08190d6d3d7eabbcca5b5ac89a3af4c1473ab8b4ae5f89a20d8ce503",
+  "config_after_sha256": "da8a8d0d08190d6d3d7eabbcca5b5ac89a3af4c1473ab8b4ae5f89a20d8ce503",
+  "filter_null_roundtrip_equal": true,
+  "decoded_filter_entries": [
+    [
+      "filter.copy.clean",
+      "cat"
+    ],
+    [
+      "filter.copy.smudge",
+      ":\ncat"
+    ],
+    [
+      "filter.copy.required",
+      "true"
+    ],
+    [
+      "filter.other.note",
+      ""
+    ],
+    [
+      "filter.other.note",
+      " first\nlast "
+    ]
+  ],
+  "linked_resolved_path": "/private/tmp/revia-review04-round3-cyho0lxr/repo/.git/info/attributes",
+  "linked_attributes_equal": true,
+  "linked_attrs": "target.txt|text|set|target.txt|eol|crlf|",
+  "boundary": "Standalone real Git reproduction of revised environment/config/path logic, not Rust/app tests or Windows execution."
+}

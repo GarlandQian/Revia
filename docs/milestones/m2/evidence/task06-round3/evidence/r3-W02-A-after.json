@@ -1,0 +1,118 @@
+{
+  "startedAt": "2026-10-23T14:48:57.751+08:00",
+  "finishedAt": "2026-10-23T14:48:57.814+08:00",
+  "repo": "A",
+  "target": "10-target.ts",
+  "gitProgram": "/opt/homebrew/Cellar/git/2.56.0_1/bin/git",
+  "readOnly": true,
+  "consistency": "Sequential observations, not an atomic cross-command snapshot",
+  "paths": {
+    "worktree": "/private/tmp/revia-task06-2fuu2r92/A",
+    "gitDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+    "commonDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+    "index": "/private/tmp/revia-task06-2fuu2r92/A/.git/index"
+  },
+  "worktreeFile": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/A/10-target.ts",
+    "exists": true,
+    "sha256": "c8fd05c9f37409465d858d85a0469879c86e6b9a4c5768b7c3f23592f75d72df",
+    "bytes": 5112,
+    "lines": 180,
+    "mode": "0644",
+    "inode": 163271968,
+    "mtimeNs": 1792737794619718142
+  },
+  "indexFile": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/A/.git/index",
+    "exists": true,
+    "sha256": "ad9ce33c6de2f1b6de90f40858aabbe7f384bf57931c1a474af832995a670e03",
+    "bytes": 446,
+    "lines": 3,
+    "mode": "0644",
+    "inode": 163272336,
+    "mtimeNs": 1792737941650721295
+  },
+  "indexBlobs": [
+    {
+      "path": "10-target.ts",
+      "mode": "100644",
+      "oid": "ff62c5f30c53e982e118e283b39e1e1555cbd3f7",
+      "stage": 0,
+      "bytes": 5112,
+      "sha256": "c8fd05c9f37409465d858d85a0469879c86e6b9a4c5768b7c3f23592f75d72df"
+    }
+  ],
+  "git": {
+    "head": {
+      "args": [
+        "rev-parse",
+        "--verify",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 5.614,
+      "stdoutText": "4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\n",
+      "stdoutBase64": "NDYxOWI0YjNmMGU3Y2IxYTcxZjYwNzBkZjdiNjdiYzhiMDhlNDM2Ygo=",
+      "stderrText": ""
+    },
+    "status": {
+      "args": [
+        "status",
+        "--porcelain=v2",
+        "--branch",
+        "-z",
+        "--untracked-files=all"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.317,
+      "stdoutText": "# branch.oid 4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\u0000# branch.head main\u0000? untracked.txt\u0000",
+      "stdoutBase64": "IyBicmFuY2gub2lkIDQ2MTliNGIzZjBlN2NiMWE3MWY2MDcwZGY3YjY3YmM4YjA4ZTQzNmIAIyBicmFuY2guaGVhZCBtYWluAD8gdW50cmFja2VkLnR4dAA=",
+      "stderrText": ""
+    },
+    "indexEntry": {
+      "args": [
+        "ls-files",
+        "--stage",
+        "-z",
+        "--",
+        "10-target.ts"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 5.45,
+      "stdoutText": "100644 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 0\t10-target.ts\u0000",
+      "stdoutBase64": "MTAwNjQ0IGZmNjJjNWYzMGM1M2U5ODJlMTE4ZTI4M2IzOWUxZTE1NTVjYmQzZjcgMAkxMC10YXJnZXQudHMA",
+      "stderrText": ""
+    },
+    "diff": {
+      "args": [
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 5.332,
+      "stdoutText": "",
+      "stdoutBase64": "",
+      "stderrText": ""
+    },
+    "diffCached": {
+      "args": [
+        "diff",
+        "--cached",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.149,
+      "stdoutText": "",
+      "stdoutBase64": "",
+      "stderrText": ""
+    }
+  }
+}

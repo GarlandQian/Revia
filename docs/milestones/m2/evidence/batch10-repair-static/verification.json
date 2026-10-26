@@ -1,0 +1,22 @@
+{
+  "verifiedAtUtc": "2026-10-25T07:22:34.895964+00:00",
+  "archive": "/private/tmp/revia-b10-static-archive.F6h9KZ",
+  "manifestSha256": "c26f9a77aac18c6e302fb30c72578a636c08fc8710b6303c4b3e5ae38c4ae2c1",
+  "verifiedOriginalFiles": 103,
+  "sourceComparisons": 103,
+  "gzipAndOriginalSha256Matches": 103,
+  "mismatches": [],
+  "rawBytes": 2976374,
+  "gzipBytes": 565098,
+  "emptyOriginalFiles": 22,
+  "countsByGroup": {
+    "historical-5f-failure-context": 1,
+    "integration-build": 11,
+    "integration-checks": 45,
+    "repair-build": 16,
+    "repair-context": 6,
+    "repair-resolve": 9,
+    "repair-rust-checks": 15
+  },
+  "scope": "Static archive verification only; no product or GUI test was run."
+}

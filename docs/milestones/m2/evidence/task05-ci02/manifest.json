@@ -1,0 +1,78 @@
+{
+  "sourceCommit": "05513aae522c596a86dbac55dc540f9a265bf016",
+  "reviewRange": "1056557c338137de6a61d81ca48212dd57d40d75...05513aae522c596a86dbac55dc540f9a265bf016",
+  "recordedAfterCommit": "84a17a8e76440686b48d6c9c6d1c72a7dbb4ee37",
+  "boundary": "Mac implementation checks only: Rust240 passed. Standards1 P2 and Spec1 P2: identity regression can pass through content rejection. No new Windows CI, Release, desktop, D06 or long run.",
+  "sourceHashChecks": [
+    {
+      "path": "src-tauri/src/recovery.rs",
+      "sha256": "81b268711e831b799b226e9a401f4240a8b0009ddabc134a9b4ba782b77a4f93"
+    },
+    {
+      "path": "src-tauri/src/platform.rs",
+      "sha256": "66235b97cf5539443a2f4b81494329e0c2806c51b57b115df835a94cc26f2294"
+    },
+    {
+      "path": "src-tauri/tests/discard_recovery.rs",
+      "sha256": "5871c181ec2cf79c51c032788fbd43ff0b2105b23683cd2726637190e5793090"
+    }
+  ],
+  "files": [
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/MANIFEST.md",
+      "stored": "MANIFEST.md.gz",
+      "sourceBytes": 1083,
+      "storedBytes": 823,
+      "sourceSha256": "2fe07ea074f4d8a82c6d78d83d5f921e9d5e1f192b21a9443f9a0732c08a2175",
+      "storedSha256": "6821b741fa77c5aa8c791ac745d2dc6087ec6ffab6750314204470bcd44334f9"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/base-sha.txt",
+      "stored": "base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 58,
+      "sourceSha256": "67391a2a1c9355b2733a282dec474eca7eda82badb1afa5487d9c6450450036c",
+      "storedSha256": "f6f67d47d313e2efd1aa2ee1fe7f4e98d72651d522fcd5d68dfea9c4d572890e"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/cargo-test.err",
+      "stored": "cargo-test.err.gz",
+      "sourceBytes": 4076,
+      "storedBytes": 1159,
+      "sourceSha256": "0807266d38361c2fe200883a5a5a96acbfa6b64e06611c4d84d8e5ae1f5bf53a",
+      "storedSha256": "0cae44df06dfb6cdea55297fc9c45047bdac083dae0f7be9980fd2982de0e4df"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/cargo-test.exit",
+      "stored": "cargo-test.exit.gz",
+      "sourceBytes": 18,
+      "storedBytes": 38,
+      "sourceSha256": "7a9ece8b349bb5656b5d7e6bb350410c21537efd459bc2269abe76bda7cd45bd",
+      "storedSha256": "a271494abf6bc571e5fbf25f89d9a8965e6473a3eaf7352afacbf1f23407f429"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/cargo-test.out",
+      "stored": "cargo-test.out.gz",
+      "sourceBytes": 16546,
+      "storedBytes": 4724,
+      "sourceSha256": "f954d0c402aae89ff68172e885006ae6d78972c56c2555dac50c54e7130ae017",
+      "storedSha256": "1667e6b787691d89de27f0b5b152b20778c74a850a57a7609c5891319840d29d"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/pre-change.diff",
+      "stored": "pre-change.diff.gz",
+      "sourceBytes": 11999,
+      "storedBytes": 4659,
+      "sourceSha256": "8b1c4dbb2b9e6dcbe78a81f6e46cb0e6d35b590785d9f3dfee60f14564062e32",
+      "storedSha256": "3f0dc5977fa578202da6cf74a964b38b4e20ceffb3f962d40b67bf4c9a5ca682"
+    },
+    {
+      "source": "/private/tmp/revia-task05-ci02-AJvoza/source-sha256-before-check.txt",
+      "stored": "source-sha256-before-check.txt.gz",
+      "sourceBytes": 286,
+      "storedBytes": 204,
+      "sourceSha256": "56fe743a872c279ae671a0f542e3e365f91b24b3191eff5e41592d22a047e684",
+      "storedSha256": "cbe818373c908d7657edd40d52a241bae171e7464345caf0bb1f5dd6e0ace2d8"
+    }
+  ]
+}

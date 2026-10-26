@@ -1,0 +1,630 @@
+{
+  "test": "long_running_baseline",
+  "runCompleted": true,
+  "acceptance": "pending desktop evidence, performance regression and memory trend review",
+  "startedAt": "2026-10-21T14:23:41.882832+08:00",
+  "endedAt": "2026-10-21T14:25:01.692406+08:00",
+  "targetDurationSeconds": 60,
+  "actualDurationSeconds": 79.81,
+  "reviaPid": 90714,
+  "webkitAttribution": "launchctl print pid/<exact child PID>: services table",
+  "binarySha256": "e5b90ac74f028cd4864189c5adb86e3afec0b329eeb50e224e0ea74efd59892f",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "isolatedDataDir": "/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-soak-data-f8ijmutx",
+  "repo": "/private/tmp/revia-m1-fixtures/diffs",
+  "errors": [],
+  "frontend": {
+    "actualDurationSeconds": 61.036,
+    "files": [
+      {
+        "changes": "unstaged",
+        "path": "assets/icon.png",
+        "rowCountSplit": 0,
+        "rowCountUnified": 0
+      },
+      {
+        "changes": "unstaged",
+        "path": "logs/app.log",
+        "rowCountSplit": 5001,
+        "rowCountUnified": 10001
+      },
+      {
+        "changes": "unstaged",
+        "path": "pnpm-lock.yaml",
+        "rowCountSplit": 2404,
+        "rowCountUnified": 3004
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/App.vue",
+        "rowCountSplit": 20,
+        "rowCountUnified": 24
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/Model.swift",
+        "rowCountSplit": 20,
+        "rowCountUnified": 23
+      },
+      {
+        "changes": "unstaged",
+        "path": "src/generated.ts",
+        "rowCountSplit": 8309,
+        "rowCountUnified": 13435
+      },
+      {
+        "changes": "staged",
+        "path": "src/staged.ts",
+        "rowCountSplit": 2,
+        "rowCountUnified": 2
+      }
+    ],
+    "finalVisibility": {
+      "devicePixelRatio": 2,
+      "focused": true,
+      "hidden": false,
+      "hiddenTransitions": 0,
+      "maxFrameGapMs": 47,
+      "rafPerSecond": 59.94005994005994,
+      "state": "visible",
+      "viewportHeight": 800,
+      "viewportWidth": 1280
+    },
+    "ok": true,
+    "operationsStartedAt": "2026-10-21T06:23:58.977Z",
+    "readiness": [
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 1530,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 2718,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 3904,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 5095,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 6292,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 7491,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": true,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 15286,
+        "rafPerSecond": 0,
+        "state": "hidden",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      },
+      {
+        "devicePixelRatio": 2,
+        "focused": true,
+        "hidden": false,
+        "hiddenTransitions": 0,
+        "maxFrameGapMs": 15287,
+        "rafPerSecond": 59.94005994005994,
+        "state": "visible",
+        "viewportHeight": 800,
+        "viewportWidth": 1280
+      }
+    ],
+    "samples": [
+      {
+        "cycle": 4,
+        "elapsedSec": 10,
+        "file": "src/staged.ts",
+        "highlightLines": 1,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 47,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 8,
+        "elapsedSec": 20,
+        "file": "src/Model.swift",
+        "highlightLines": 29,
+        "loadedChunks": 1,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 47,
+          "rafPerSecond": 59.94005994005994,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 12,
+        "elapsedSec": 31,
+        "file": "pnpm-lock.yaml",
+        "highlightLines": 800,
+        "loadedChunks": 5,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 47,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 16,
+        "elapsedSec": 41,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 47,
+          "rafPerSecond": 59.7609561752988,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 19,
+        "elapsedSec": 51,
+        "file": "src/generated.ts",
+        "highlightLines": 800,
+        "loadedChunks": 17,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 47,
+          "rafPerSecond": 60.81754735792622,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      },
+      {
+        "cycle": 23,
+        "elapsedSec": 60,
+        "file": "logs/app.log",
+        "highlightLines": 0,
+        "loadedChunks": 11,
+        "view": "split",
+        "visibility": {
+          "devicePixelRatio": 2,
+          "focused": true,
+          "hidden": false,
+          "hiddenTransitions": 0,
+          "maxFrameGapMs": 47,
+          "rafPerSecond": 60.93906093906094,
+          "state": "visible",
+          "viewportHeight": 800,
+          "viewportWidth": 1280
+        }
+      }
+    ],
+    "samplesCount": 6,
+    "session": {
+      "checks": [
+        {
+          "detail": "/opt/homebrew/bin/git（git version 2.56.0）",
+          "hint": "需要 Git 2.11 或更高版本",
+          "name": "git",
+          "ok": true
+        },
+        {
+          "detail": "/bin/zsh · 135 毫秒",
+          "hint": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
+          "name": "shell",
+          "ok": true
+        }
+      ],
+      "gitPath": "/opt/homebrew/bin/git",
+      "gitVersion": "git version 2.56.0",
+      "shell": "/bin/zsh",
+      "shellElapsedMs": 135
+    },
+    "setupSeconds": 16.288,
+    "targetDurationSeconds": 60,
+    "totalCycles": 23,
+    "totalFileSwitches": 156,
+    "totalJumps": 132,
+    "totalScrolls": 728,
+    "totalViewSwitches": 264,
+    "worktree": {
+      "bare": false,
+      "branch": "main",
+      "detached": false,
+      "head": "566b6de67e03f140a59095379e9849a748990a8a",
+      "id": "565996f4230d980e",
+      "isMain": true,
+      "path": "/private/tmp/revia-m1-fixtures/diffs"
+    }
+  },
+  "memoryTimeSeries": [
+    {
+      "rustRssMb": 114.94,
+      "webContentRssMb": 61.45,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 11.98,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 32.78,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 221.16,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 2.07,
+      "timestamp": "2026-10-21T14:23:43.969782+08:00"
+    },
+    {
+      "rustRssMb": 114.77,
+      "webContentRssMb": 61.67,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.0,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 32.47,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 220.91,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 7.24,
+      "timestamp": "2026-10-21T14:23:49.148744+08:00"
+    },
+    {
+      "rustRssMb": 110.86,
+      "webContentRssMb": 61.67,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 11.95,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 32.47,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 216.95,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 12.37,
+      "timestamp": "2026-10-21T14:23:54.285614+08:00"
+    },
+    {
+      "rustRssMb": 114.64,
+      "webContentRssMb": 96.06,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 11.95,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 37.88,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 260.53,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 17.5,
+      "timestamp": "2026-10-21T14:23:59.392833+08:00"
+    },
+    {
+      "rustRssMb": 135.22,
+      "webContentRssMb": 206.28,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.0,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 44.58,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 398.08,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 22.61,
+      "timestamp": "2026-10-21T14:24:04.501978+08:00"
+    },
+    {
+      "rustRssMb": 135.31,
+      "webContentRssMb": 210.75,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.0,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 44.73,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 402.8,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 27.7,
+      "timestamp": "2026-10-21T14:24:09.596142+08:00"
+    },
+    {
+      "rustRssMb": 136.38,
+      "webContentRssMb": 212.84,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.0,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.31,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 406.53,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 32.8,
+      "timestamp": "2026-10-21T14:24:14.701222+08:00"
+    },
+    {
+      "rustRssMb": 136.39,
+      "webContentRssMb": 213.59,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.0,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.11,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 407.09,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 37.91,
+      "timestamp": "2026-10-21T14:24:19.814844+08:00"
+    },
+    {
+      "rustRssMb": 136.39,
+      "webContentRssMb": 214.78,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.0,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 44.98,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 408.16,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 43.02,
+      "timestamp": "2026-10-21T14:24:24.924445+08:00"
+    },
+    {
+      "rustRssMb": 136.39,
+      "webContentRssMb": 215.48,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.03,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.14,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 409.05,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 48.12,
+      "timestamp": "2026-10-21T14:24:30.029084+08:00"
+    },
+    {
+      "rustRssMb": 136.72,
+      "webContentRssMb": 217.11,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.12,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.05,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 411.0,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 53.24,
+      "timestamp": "2026-10-21T14:24:35.130667+08:00"
+    },
+    {
+      "rustRssMb": 137.09,
+      "webContentRssMb": 218.17,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.12,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.31,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 412.7,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 58.34,
+      "timestamp": "2026-10-21T14:24:40.242942+08:00"
+    },
+    {
+      "rustRssMb": 135.78,
+      "webContentRssMb": 219.09,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.12,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.33,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 412.33,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 63.45,
+      "timestamp": "2026-10-21T14:24:45.355168+08:00"
+    },
+    {
+      "rustRssMb": 137.22,
+      "webContentRssMb": 219.66,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.12,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.38,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 414.38,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 68.57,
+      "timestamp": "2026-10-21T14:24:50.485763+08:00"
+    },
+    {
+      "rustRssMb": 135.42,
+      "webContentRssMb": 224.25,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.12,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.33,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 417.12,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 73.67,
+      "timestamp": "2026-10-21T14:24:55.566932+08:00"
+    },
+    {
+      "rustRssMb": 137.17,
+      "webContentRssMb": 224.81,
+      "webContentPids": [
+        90717
+      ],
+      "networkingRssMb": 12.12,
+      "networkingPids": [
+        90718
+      ],
+      "gpuRssMb": 45.36,
+      "gpuPids": [
+        90716
+      ],
+      "totalRssMb": 419.47,
+      "serviceDomain": "pid/90714",
+      "elapsedSec": 78.77,
+      "timestamp": "2026-10-21T14:25:00.670062+08:00"
+    }
+  ],
+  "memoryAnalysis": {
+    "warmupSeconds": 180,
+    "steadySampleCount": 0,
+    "series": {}
+  }
+}

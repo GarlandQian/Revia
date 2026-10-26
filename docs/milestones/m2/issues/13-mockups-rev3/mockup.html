@@ -1,0 +1,586 @@
+<meta charset="utf-8">
+<title>Revia 界面效果图</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 布局：效果图画廊——窗口按设计尺寸绘制后整体缩放；窗口照 JetBrains 新版界面（Rebased）的岛屿布局，浅色、深色各一套固定配色。 */
+:root {
+  --pg-bg: #e9eaee;
+  --pg-fg: #1e1f22;
+  --pg-fg2: #5d616c;
+  --pg-line: rgba(30, 31, 34, 0.12);
+  --pg-card: #f6f7f9;
+  --pg-mark: #3574f0;
+  --ui: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pg-bg: #101113; --pg-fg: #e2e4e8; --pg-fg2: #9a9ea6; --pg-line: rgba(255, 255, 255, 0.12);
+    --pg-card: #1b1c1f; --pg-mark: #548af7; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --pg-bg: #101113; --pg-fg: #e2e4e8; --pg-fg2: #9a9ea6; --pg-line: rgba(255, 255, 255, 0.12);
+  --pg-card: #1b1c1f; --pg-mark: #548af7; color-scheme: dark;
+}
+
+body { background: var(--pg-bg); color: var(--pg-fg); font-family: var(--ui); }
+.page {
+  max-width: 1280px; margin: 0 auto; padding-block: 36px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 44px;
+}
+.intro { display: grid; gap: 14px; max-width: 880px; }
+.eyebrow { font-size: 12px; letter-spacing: 0.04em; color: var(--pg-fg2); }
+.intro h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+.intro p { margin: 0; font-size: 15px; line-height: 1.65; color: var(--pg-fg2); max-width: 68ch; }
+.choices { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.choices li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 10px; font-size: 14px; line-height: 1.6; }
+.choices li::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--pg-mark); margin-top: 9px; }
+section.block { display: grid; gap: 16px; }
+section.block > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+section.block h2 { margin: 0; font-size: 19px; font-weight: 600; text-wrap: balance; }
+section.block > header p { margin: 0; font-size: 13px; color: var(--pg-fg2); }
+.fit { position: relative; padding: 6px 4px 26px; min-width: 0; overflow: hidden; }
+.fit > .jw { transform-origin: 0 0; }
+.states { display: grid; gap: 28px; }
+.state { display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid var(--pg-line); }
+.state h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.state p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--pg-fg2); max-width: 80ch; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.pair .fit { padding-bottom: 18px; }
+@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.note { background: var(--pg-card); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; }
+.note h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.note p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--pg-fg2); }
+
+/* ---------- 窗口配色：JetBrains 新版界面 Islands Light / Islands Dark ---------- */
+.jw.light {
+  --frame: #ebecf0; --island: #ffffff; --tool: #f7f8fa; --edge: #dfe1e5; --sep: #ebecf0;
+  --text: #1e1f22; --text-2: #6c707e; --text-3: #a8adbd; --icon: #6c707e;
+  --hover: #dfe1e5; --row-hover: #edeef2; --sel: #d4e2ff; --stripe-sel: #dfe1e5;
+  --accent: #3574f0; --on-accent: #ffffff; --link: #2e6ae1;
+  --btn-bg: #ffffff; --btn-edge: #c9ccd6; --badge: #e8794a;
+  --info-bg: #edf3ff; --info-edge: #c2d6fc; --warn-bg: #fff6de; --warn-edge: #fed277; --err-bg: #fff7f7; --err-edge: #fad4d8;
+  --i-info: #3574f0; --i-warn: #e5a213; --i-err: #db3b4b;
+  --st-M: #2f65ca; --st-A: #3e8a42; --st-D: #7f838e; --st-R: #2f65ca; --st-U: #d02e2e; --st-Q: #b4462b;
+  --d-bg: #ffffff; --d-ln: #a8adbd; --d-hunk: #f2f3f5; --d-hunk-fg: #8c90a0; --d-mid: #f7f8fa;
+  --d-ins: #e4f5e6; --d-ins-g: #c9ebcf; --d-del: #eeeff2; --d-del-g: #dcdee3; --d-mod: #e5eefe; --d-mod-g: #cadcfd; --d-none: #f9fafb;
+  --sx-plain: #080808; --sx-kw: #0033b3; --sx-str: #067d17; --sx-num: #1750eb; --sx-type: #080808;
+  --sx-fn: #00627a; --sx-tag: #0033b3; --sx-attr: #174ad4; --sx-punc: #080808; --sx-com: #8c8c8c;
+  --dim: rgba(0, 0, 0, 0.16); --dlg: #ffffff;
+  --shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.22), 0 22px 50px -14px rgba(0, 0, 0, 0.32);
+}
+.jw.dark {
+  --frame: #141519; --island: #1e1f22; --tool: #1e1f22; --edge: #2b2d30; --sep: #2b2d30;
+  --text: #dfe1e5; --text-2: #868a91; --text-3: #5a5d63; --icon: #a9acb3;
+  --hover: #2b2d30; --row-hover: #26282b; --sel: #2e436e; --stripe-sel: #2b2d30;
+  --accent: #3574f0; --on-accent: #ffffff; --link: #548af7;
+  --btn-bg: transparent; --btn-edge: #4e5157; --badge: #c76a3f;
+  --info-bg: #25324d; --info-edge: #35538f; --warn-bg: #3d3223; --warn-edge: #5e4d33; --err-bg: #402929; --err-edge: #5e3838;
+  --i-info: #548af7; --i-warn: #f2c55c; --i-err: #f75464;
+  --st-M: #548af7; --st-A: #73bd79; --st-D: #868a91; --st-R: #548af7; --st-U: #f75464; --st-Q: #d1675a;
+  --d-bg: #1e1f22; --d-ln: #4b5059; --d-hunk: #25272b; --d-hunk-fg: #6f737a; --d-mid: #1b1c1f;
+  --d-ins: #253a2b; --d-ins-g: #2f4a35; --d-del: #34363a; --d-del-g: #404247; --d-mod: #24344d; --d-mod-g: #2e4466; --d-none: #212226;
+  --sx-plain: #bcbec4; --sx-kw: #cf8e6d; --sx-str: #6aab73; --sx-num: #2aacb8; --sx-type: #bcbec4;
+  --sx-fn: #56a8f5; --sx-tag: #d5b778; --sx-attr: #bababa; --sx-punc: #bcbec4; --sx-com: #7a7e85;
+  --dim: rgba(0, 0, 0, 0.45); --dlg: #2b2d30;
+  --shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.6), 0 22px 50px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- 窗口结构：主工具栏 / 图标条 + 变更工具窗口 + diff 编辑区 / 状态栏 ---------- */
+.jw {
+  position: relative; display: grid; grid-template-columns: 40px 300px minmax(0, 1fr); grid-template-rows: 40px minmax(0, 1fr) 24px;
+  border-radius: 12px; overflow: hidden; background: var(--frame); color: var(--text);
+  font: 13px/18px var(--ui); box-shadow: var(--shadow); -webkit-font-smoothing: antialiased;
+}
+.jw.mini { grid-template-columns: 36px 228px minmax(0, 1fr); grid-template-rows: 36px minmax(0, 1fr) 22px; border-radius: 10px; }
+.jw *, .jw *::before { box-sizing: border-box; }
+.ic { flex: none; display: block; }
+
+.mt { grid-column: 1 / -1; display: flex; align-items: center; gap: 2px; padding: 0 10px 0 14px; }
+.lights { display: flex; gap: 8px; margin-right: 18px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2); }
+.lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.wdg { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; white-space: nowrap; font-weight: 500; }
+.wdg .ic { color: var(--icon); }
+.wdg .chev { width: 10px; height: 10px; color: var(--text-2); }
+.pbadge { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; background: var(--badge); color: #ffffff; font-size: 11px; font-weight: 600; }
+.mt .sp { flex: 1; }
+.chip { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--text); background: var(--warn-bg); box-shadow: inset 0 0 0 1px var(--warn-edge); white-space: nowrap; }
+.chip .ic { color: var(--i-warn); }
+
+.stripe { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 2px; }
+.stripe span { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; color: var(--icon); }
+.stripe span.on { background: var(--stripe-sel); color: var(--text); }
+.stripe .ic { width: 18px; height: 18px; }
+.mini .stripe span { width: 26px; height: 26px; }
+.mini .stripe .ic { width: 16px; height: 16px; }
+
+.tw { min-height: 0; display: flex; flex-direction: column; margin: 0 3px 4px 0; border-radius: 8px; background: var(--tool); box-shadow: 0 0 0 1px var(--edge); overflow: hidden; }
+.twh { height: 34px; flex: none; display: flex; align-items: center; padding: 0 10px 0 12px; font-weight: 600; }
+.mini .twh { height: 30px; }
+.twt { height: 30px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 10px 0 6px; }
+.twt .tb { width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; color: var(--icon); }
+.twt .tb.dis { color: var(--text-3); }
+.twt .vsep { width: 1px; height: 16px; background: var(--sep); margin: 0 4px; }
+.twt .rv { margin-left: auto; font-size: 12px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.list { flex: 1; min-height: 0; overflow: hidden; padding: 2px 0 8px; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.grp { height: 24px; display: flex; align-items: center; gap: 4px; padding: 0 10px 0 8px; white-space: nowrap; }
+.grp .ic { width: 12px; height: 12px; color: var(--icon); }
+.grp .blank { width: 12px; flex: none; }
+.grp b { font-weight: 600; }
+.grp .cnt { color: var(--text-2); margin-left: 4px; }
+.row { height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 26px; }
+.row .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .dir { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+.row .tag { font-size: 11px; height: 18px; line-height: 18px; padding: 0 6px; border-radius: 4px; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--edge); white-space: nowrap; }
+.row .lk { color: var(--text-2); }
+.row.hov { background: var(--row-hover); }
+.row.sel { background: var(--sel); }
+.st { width: 12px; flex: none; text-align: center; font-size: 12px; font-weight: 600; }
+.st-M { color: var(--st-M); } .st-A { color: var(--st-A); } .st-D { color: var(--st-D); }
+.st-R { color: var(--st-R); } .st-U { color: var(--st-U); } .st-Q { color: var(--st-Q); }
+.chk { width: 14px; height: 14px; flex: none; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--btn-edge); background: var(--btn-bg); display: grid; place-items: center; color: transparent; }
+.chk .ic { width: 10px; height: 10px; stroke-width: 2.2; }
+.chk.on { background: var(--accent); box-shadow: none; color: var(--on-accent); }
+.addbtn { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; color: var(--icon); background: var(--hover); }
+.addbtn .ic { width: 12px; height: 12px; stroke-width: 1.8; }
+.addbtn.dis { color: var(--text-3); }
+.fic { width: 16px; height: 16px; flex: none; }
+
+.ed { min-width: 0; min-height: 0; display: flex; flex-direction: column; margin: 0 6px 4px 3px; border-radius: 8px; background: var(--island); box-shadow: 0 0 0 1px var(--edge); overflow: hidden; }
+.tabs { height: 36px; flex: none; display: flex; align-items: stretch; padding: 0 6px; box-shadow: inset 0 -1px 0 var(--sep); }
+.mini .tabs { height: 32px; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 0 12px; box-shadow: inset 0 -2px 0 var(--accent); white-space: nowrap; }
+.tab .p { color: var(--text-2); font-size: 12px; }
+.dtb { height: 32px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 8px; box-shadow: inset 0 -1px 0 var(--sep); }
+.dtb .tb { width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; color: var(--icon); }
+.dtb .tb.dis { color: var(--text-3); }
+.dtb .vsep { width: 1px; height: 16px; background: var(--sep); margin: 0 6px; }
+.dd { height: 26px; display: inline-flex; align-items: center; gap: 5px; padding: 0 6px; border-radius: 5px; white-space: nowrap; }
+.dd .ic { color: var(--icon); }
+.dd .chev { width: 10px; height: 10px; color: var(--text-2); }
+.dtb .sp { flex: 1; }
+.btn { height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; border-radius: 5px; background: var(--btn-bg); box-shadow: inset 0 0 0 1px var(--btn-edge); font-size: 12.5px; white-space: nowrap; margin-left: 6px; }
+.btn.pri { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+.btn.dis { color: var(--text-3); }
+.btn .ic { color: inherit; }
+.rotag { height: 22px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 4px; color: var(--text-2); font-size: 12px; box-shadow: inset 0 0 0 1px var(--edge); }
+
+.ban { flex: none; display: flex; align-items: flex-start; gap: 8px; padding: 7px 12px; font-size: 12.5px; line-height: 18px; box-shadow: inset 0 -1px 0 var(--b-edge); background: var(--b-bg); }
+.ban.info { --b-bg: var(--info-bg); --b-edge: var(--info-edge); }
+.ban.warn { --b-bg: var(--warn-bg); --b-edge: var(--warn-edge); }
+.ban.err { --b-bg: var(--err-bg); --b-edge: var(--err-edge); }
+.ban .ic { margin-top: 2px; }
+.ban.info .ic { color: var(--i-info); } .ban.warn .ic { color: var(--i-warn); } .ban.err .ic { color: var(--i-err); }
+.ban .msg { flex: 1; min-width: 0; }
+.ban .msg b { font-weight: 600; margin-right: 6px; }
+.ban .act { color: var(--link); white-space: nowrap; }
+
+.df { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--d-bg); font: 12px/18px var(--mono); color: var(--sx-plain); }
+.dr { height: 18px; display: grid; white-space: pre; }
+.df.split .dr { grid-template-columns: 46px minmax(0, 1fr) 12px 46px minmax(0, 1fr); }
+.df.unified .dr { grid-template-columns: 42px 42px minmax(0, 1fr); }
+.g { text-align: right; padding-right: 10px; color: var(--d-ln); font-size: 11.5px; }
+.mid { background: var(--d-mid); box-shadow: inset 1px 0 0 var(--sep), inset -1px 0 0 var(--sep); }
+.mid.ins { background: var(--d-ins-g); } .mid.mod { background: var(--d-mod-g); } .mid.del { background: var(--d-del-g); }
+.cc { overflow: hidden; padding-left: 6px; }
+.cc.ins { background: var(--d-ins); } .g.ins { background: var(--d-ins-g); color: var(--text-2); }
+.cc.mod { background: var(--d-mod); } .g.mod { background: var(--d-mod-g); color: var(--text-2); }
+.cc.del { background: var(--d-del); } .g.del { background: var(--d-del-g); color: var(--text-2); }
+.cc.none, .g.none { background: var(--d-none); }
+.hr { height: 18px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 12px; background: var(--d-hunk); color: var(--d-hunk-fg); font-size: 11.5px; }
+.hr > span:first-child { flex: none; white-space: nowrap; }
+.hr .ctx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.hr .sp { flex: 1; }
+.hl { font: 12px/18px var(--ui); color: var(--link); white-space: nowrap; }
+.hl.dis { color: var(--text-3); }
+.hl + .hl::before { content: "·"; color: var(--text-3); margin-right: 8px; }
+.thumb { position: absolute; right: 2px; width: 7px; border-radius: 4px; background: var(--text-3); opacity: 0.55; }
+.k { color: var(--sx-kw); } .s { color: var(--sx-str); } .n { color: var(--sx-num); }
+.t { color: var(--sx-type); } .f { color: var(--sx-fn); } .tg { color: var(--sx-tag); }
+.a { color: var(--sx-attr); } .p { color: var(--sx-punc); } .c { color: var(--sx-com); font-style: italic; }
+
+.empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 24px; text-align: center; font: 13px/19px var(--ui); color: var(--text-2); }
+.empty .h { color: var(--text); }
+.empty .act { color: var(--link); }
+
+.sbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 14px; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; }
+.sbar .crumb { color: var(--text-3); }
+.sbar .sp { flex: 1; }
+.sbar .warn { color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
+.sbar .warn .ic { color: var(--i-warn); }
+
+.veil { position: absolute; inset: 0; background: var(--dim); display: grid; place-items: center; z-index: 3; }
+.dlg { width: 380px; border-radius: 10px; background: var(--dlg); box-shadow: 0 0 0 1px var(--edge), 0 18px 40px -10px rgba(0, 0, 0, 0.45); font-family: var(--ui); overflow: hidden; }
+.dlg .dt { height: 36px; display: flex; align-items: center; padding: 0 16px; font-weight: 600; }
+.dlg .db { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 4px 16px 14px; }
+.dlg .db .ic { width: 28px; height: 28px; color: var(--i-warn); }
+.dlg .db .h { font-weight: 600; }
+.dlg .db .path { font: 12px/17px var(--mono); color: var(--text-2); margin-top: 2px; }
+.dlg .db .d { font-size: 12.5px; line-height: 18px; color: var(--text-2); margin-top: 4px; }
+.dlg .df2 { display: flex; justify-content: flex-end; gap: 8px; padding: 0 16px 14px; }
+.dlg .df2 .btn { margin: 0; height: 28px; padding: 0 14px; }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <span class="eyebrow">M2 · 任务 13 · 静态效果图修订稿 rev3 · 2026-10-24</span>
+    <h1>Revia 界面效果图</h1>
+    <p>按 Q107 照 Rebased（JetBrains 新版界面）的布局和外观重画。只覆盖 M2 已有的功能：仓库与 worktree 选择、变更列表三组、diff 与 hunk 操作、各类提示和丢弃确认。确认后按此实现，再实测 D06。</p>
+    <ul class="choices">
+      <li>布局：顶部主工具栏放仓库和 worktree 组件；左侧工具窗口图标条只有“变更”和“回收区”两项；“变更”工具窗口有一排图标按钮和扁平文件列表；右侧 diff 编辑区有文件标题、差异导航、视图下拉和文件级操作；底部状态栏显示当前路径。</li>
+      <li>外观：岛屿面板、JetBrains 新版界面的浅色和深色配色、Inter 与 JetBrains Mono（随应用打包）；diff 按 JetBrains 配色，新增绿、删除灰、修改蓝。</li>
+      <li>沿用已确认的行为：文件名不上色，右侧单字母标状态（Q31）；已审阅勾选在行右侧（Q37）；未跟踪一组默认收起（Q30）；hunk 头保留“暂存此 hunk／丢弃此 hunk”。</li>
+      <li>不新增功能：没有提交区、Shelf、历史和设置页；diff 只有一个文件标签，不做多标签（Q16）。</li>
+      <li>diff 行高保持 18px 不变，虚拟滚动和 D06 的测量方式都不受影响。</li>
+    </ul>
+  </header>
+
+  <section class="block" aria-labelledby="h-light">
+    <header><h2 id="h-light">主界面 · 浅色</h2><p>选中未暂存的 src/App.tsx，并排视图；DiffView.tsx 一行展示悬停时的暂存按钮。</p></header>
+    <div class="fit" data-w="1180"><div id="win-light"></div></div>
+  </section>
+
+  <section class="block" aria-labelledby="h-dark">
+    <header><h2 id="h-dark">主界面 · 深色</h2><p>同一状态，跟随系统深色外观。</p></header>
+    <div class="fit" data-w="1180"><div id="win-dark"></div></div>
+  </section>
+
+  <section class="block" aria-labelledby="h-states">
+    <header><h2 id="h-states">各类状态</h2><p>每种状态只展示它真实具备的操作。左浅色，右深色。</p></header>
+    <div class="states" id="states"></div>
+  </section>
+
+  <section class="block" aria-labelledby="h-notes">
+    <header><h2 id="h-notes">实现要点</h2><p>确认后按这些数值实现；需要实测的项目在报告里写明数据。</p></header>
+    <div class="notes">
+      <div class="note"><h4>尺寸与密度</h4><p>主工具栏 40px，图标条 40px 宽，工具窗口标题 34px、图标工具条 30px，文件行 24px；编辑区标签 36px、diff 工具条 32px；状态栏 24px；diff 正文 12px JetBrains Mono、行高 18px（与现在相同）。</p></div>
+      <div class="note"><h4>字体</h4><p>Inter 与 JetBrains Mono 都是 OFL 许可，随应用打包，离线可用；中文回退到系统字体（苹方、微软雅黑）。</p></div>
+      <div class="note"><h4>颜色</h4><p>界面配色取 JetBrains 新版界面 Islands Light／Dark；diff 新增绿、删除灰、修改蓝；状态字母按 JetBrains 文件状态色；提示条按信息、警告、错误三种底色。</p></div>
+      <div class="note"><h4>窗口外观</h4><p>macOS 红绿灯放在主工具栏左端；Windows 的窗口按钮在右端（Q60）。平台相关代码集中在平台模块（Q55）。</p></div>
+      <div class="note"><h4>不变的部分</h4><p>键盘行为、选择衔接、焦点不穿透、提示出现的位置、文案来源（i18n）和 Git 调用都不改；只调整按钮位置和外观。</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const DOC = '<path d="M4 2.5h4.8L12 5.7v7.8H4z"/><path d="M8.6 2.5v3.3H12"/>';
+  const I = {
+    plus: '<path d="M8 3.5v9M3.5 8h9"/>',
+    minus: '<path d="M3.5 8h9"/>',
+    branch: '<circle cx="5" cy="3.6" r="1.5"/><circle cx="5" cy="12.4" r="1.5"/><circle cx="11" cy="5.4" r="1.5"/><path d="M5 5.1v5.8M11 6.9c0 2.6-6 2-6 4"/>',
+    chevD: '<path d="M4.5 6.5 8 10l3.5-3.5"/>',
+    chevR: '<path d="M6.5 4.5 10 8l-3.5 3.5"/>',
+    refresh: '<path d="M12.8 8.6A4.9 4.9 0 1 1 11.4 4.6"/><path d="M12.6 2.6v2.6H10"/>',
+    rollback: '<path d="M5.5 3.5 2.8 6.2l2.7 2.7"/><path d="M3 6.2h6.2a3.6 3.6 0 0 1 0 7.2H6"/>',
+    tray: '<path d="M2.5 9.5 4 4h8l1.5 5.5V13h-11z"/><path d="M2.5 9.5h3.2l.8 1.4h3l.8-1.4h3.2"/>',
+    commit: '<circle cx="8" cy="8" r="2.6"/><path d="M1.8 8h3.6M10.6 8h3.6"/>',
+    check: '<path d="M4.2 8.4 6.8 11l5-6"/>',
+    lock: '<rect x="3.5" y="7" width="9" height="6.5" rx="1.6"/><path d="M5.5 7V5.3a2.5 2.5 0 0 1 5 0V7"/>',
+    up: '<path d="M8 13V3M4 7l4-4 4 4"/>',
+    down: '<path d="M8 3v10M4 9l4 4 4-4"/>',
+    split: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M8 3v10"/>',
+    unified: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M4.8 6.3h6.4M4.8 8.6h6.4M4.8 10.9h3.6"/>',
+    warn: '<path d="M8 2.6 14 13H2z"/><path d="M8 6.6v3.1M8 11.4v.1"/>',
+    stop: '<circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4"/>',
+    info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v4M8 4.9v.1"/>',
+    ok: '<circle cx="8" cy="8" r="6"/><path d="M5.3 8.2 7.2 10l3.5-3.8"/>',
+    refreshOff: '<path d="M12.8 8.6A4.9 4.9 0 1 1 11.4 4.6"/><path d="M12.6 2.6v2.6H10M2.6 2.6l10.8 10.8"/>',
+    spin: '<path d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"/>',
+    link: '<path d="M6.8 9.2l2.4-2.4M7.4 5.6l.9-.9a2.1 2.1 0 0 1 3 3l-.9.9M8.6 10.4l-.9.9a2.1 2.1 0 0 1-3-3l.9-.9"/>',
+  };
+  const ic = (name, cls = "", w = 16) =>
+    `<svg class="ic ${cls}" viewBox="0 0 16 16" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[name]}</svg>`;
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  /* JetBrains 风格的彩色文件类型图标：圆角方块加两个字母。 */
+  const FT = { ts: ["#3178c6", "TS"], tsx: ["#3178c6", "TX"], yaml: ["#c9634f", "Y"], md: ["#5b8bd0", "M"], png: ["#9c6ade", "P"], sql: ["#d98e2b", "SQ"] };
+  function fileIcon(name, kind) {
+    if (kind === "link") return ic("link", "fic");
+    const ext = (name.match(/\.([a-z]+)$/) ?? [])[1] ?? "md";
+    const [color, label] = FT[ext] ?? ["#8c90a0", "?"];
+    return `<svg class="fic" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="${color}"/>`
+      + `<text x="8" y="10.6" text-anchor="middle" font-family="Inter, sans-serif" font-size="${label.length > 1 ? 6.4 : 7.6}" font-weight="700" fill="#ffffff">${label}</text></svg>`;
+  }
+
+  const KW = new Set("const let return new if else function export import from true false null typeof await async".split(" "));
+  const RULES = [
+    [/^\/\/.*/, "c"],
+    [/^"(?:[^"\\]|\\.)*"|^'(?:[^'\\]|\\.)*'|^`[^`]*`/, "s"],
+    [/^<\/?[A-Za-z][\w.]*/, "tg"],
+    [/^\d+(?:\.\d+)?/, "n"],
+    [/^[A-Za-z_$][\w$]*/, "id"],
+    [/^\s+/, ""],
+    [/^./, "p"],
+  ];
+  function hl(src) {
+    let out = "";
+    let i = 0;
+    while (i < src.length) {
+      const rest = src.slice(i);
+      for (const [re, kind] of RULES) {
+        const m = rest.match(re);
+        if (!m) continue;
+        const tok = m[0];
+        let cls = kind;
+        if (kind === "id") {
+          const after = rest.slice(tok.length);
+          cls = KW.has(tok) ? "k" : /^=["{]/.test(after) ? "a" : /^\s*\(/.test(after) ? "f" : /^[A-Z]/.test(tok) ? "t" : "";
+        }
+        out += cls ? `<span class="${cls}">${esc(tok)}</span>` : esc(tok);
+        i += tok.length;
+        break;
+      }
+    }
+    return out;
+  }
+
+  /* diff 内容取自 Revia 自己的代码；hunk 头的行号与行数自洽。p = 修改（成对），a = 新增，d = 删除。 */
+  const HUNKS = [
+    { head: "@@ -118,6 +118,8 @@", ctx: "export function App()", rows: [
+      ["c", 118, 118, "  const [busy, setBusy] = useState(false);"],
+      ["c", 119, 119, "  const gateRef = useRef(new SnapshotGate());"],
+      ["p", 120, 120, "  const writing = useRef(false);", "  const [writingWorktrees, setWritingWorktrees] = useState(new Set<string>());"],
+      ["a", null, 121, "", "  const closeCoordinatorRef = useRef(new CloseCoordinator());"],
+      ["a", null, 122, "", "  const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;"],
+      ["c", 121, 123, "  const diffRef = useRef<DiffViewHandle>(null);"],
+      ["c", 122, 124, ""],
+      ["c", 123, 125, "  const [view, setView] = useState<ViewMode>(\"split\");"],
+    ] },
+    { head: "@@ -402,5 +404,6 @@", ctx: "const acceptSnapshot = useCallback(", rows: [
+      ["c", 402, 404, "  const acceptSnapshot = useCallback((token: GateToken, next: ChangesSnapshot) => {"],
+      ["c", 403, 405, "    if (!gateRef.current.accepts(token)) return;"],
+      ["p", 404, 406, "    setSnapshot(next);", "    setSnapshot((current) => mergeReview(current, next));"],
+      ["a", null, 407, "", "    setReviewNotice(null);"],
+      ["c", 405, 408, "    restoreSelection(next);"],
+      ["c", 406, 409, "  }, [restoreSelection]);"],
+    ] },
+    { head: "@@ -611,11 +614,11 @@", ctx: "function Toolbar({", rows: [
+      ["c", 611, 614, "  return ("],
+      ["p", 612, 615, "    <div className=\"flex items-center gap-3 border-b px-3 py-1.5\">", "    <header className=\"main-toolbar\" data-tauri-drag-region>"],
+      ["a", null, 616, "", "      <ProjectWidget repo={activeRepo} worktreeId={worktreeId} />"],
+      ["c", 613, 617, "      <ToggleGroup value={[view]} onValueChange={onViewChange}>"],
+      ["c", 614, 618, "        <ToggleGroupItem value=\"split\">{messages.diff.split}</ToggleGroupItem>"],
+      ["c", 615, 619, "        <ToggleGroupItem value=\"unified\">{messages.diff.unified}</ToggleGroupItem>"],
+      ["c", 616, 620, "      </ToggleGroup>"],
+      ["p", 617, 621, "      <Button variant=\"ghost\" size=\"sm\" onClick={onRefresh} disabled={busy}>", "      <ActionIcon icon=\"refresh\" label={messages.changes.refresh}"],
+      ["p", 618, 622, "        {messages.changes.refresh}", "        onClick={onRefresh} disabled={busy} />"],
+      ["d", 619, null, "      </Button>", ""],
+      ["c", 620, 623, "      {selectedEntry ? ("],
+      ["c", 621, 624, "        <>"],
+    ] },
+    { head: "@@ -702,4 +705,6 @@", ctx: "function ErrorBanner({ error, onDismiss }", rows: [
+      ["c", 702, 705, "  return ("],
+      ["p", 703, 706, "    <div className=\"flex items-start gap-3 border-b bg-destructive/10 px-3 py-2\">", "    <EditorBanner tone={toneFor(error.kind)}>"],
+      ["a", null, 707, "", "      <Icon name=\"error\" />"],
+      ["c", 704, 708, "      <strong className=\"shrink-0\">{title}</strong>"],
+      ["c", 705, 709, "      <pre className=\"min-w-0 flex-1 whitespace-pre-wrap\">{error.message}</pre>"],
+      ["a", null, 710, "", "      <BannerLink onClick={onDismiss}>{messages.errors.dismiss}</BannerLink>"],
+    ] },
+  ];
+
+  const cell = (cls, text) => `<span class="cc ${cls}">${hl(text)}</span>`;
+  const gut = (cls, n) => `<span class="g ${cls}">${n ?? ""}</span>`;
+  function hunkHead(h, act, disabled) {
+    const d = disabled ? " dis" : "";
+    const links = act === "staged" ? `<span class="hl${d}">取消暂存此 hunk</span>`
+      : act === "unstaged" ? `<span class="hl${d}">暂存此 hunk</span><span class="hl${d}">丢弃此 hunk</span>` : "";
+    return `<div class="hr"><span>${h.head}</span><span class="ctx">${esc(h.ctx)}</span><span class="sp"></span>${links}</div>`;
+  }
+  function splitHunk(h, act = "unstaged", disabled = false) {
+    let out = hunkHead(h, act, disabled);
+    for (const [k, o, n, a, b] of h.rows) {
+      if (k === "c") out += `<div class="dr">${gut("", o)}${cell("", a)}<span class="mid"></span>${gut("", n)}${cell("", a)}</div>`;
+      if (k === "p") out += `<div class="dr">${gut("mod", o)}${cell("mod", a)}<span class="mid mod"></span>${gut("mod", n)}${cell("mod", b)}</div>`;
+      if (k === "a") out += `<div class="dr">${gut("none", null)}${cell("none", "")}<span class="mid ins"></span>${gut("ins", n)}${cell("ins", b)}</div>`;
+      if (k === "d") out += `<div class="dr">${gut("del", o)}${cell("del", a)}<span class="mid del"></span>${gut("none", null)}${cell("none", "")}</div>`;
+    }
+    return out;
+  }
+  function unifiedHunk(h, act = "unstaged") {
+    let out = hunkHead(h, act, false);
+    for (const [k, o, n, a, b] of h.rows) {
+      if (k === "c") out += `<div class="dr">${gut("", o)}${gut("", n)}${cell("", a)}</div>`;
+      if (k === "p") out += `<div class="dr">${gut("mod", o)}${gut("mod", null)}${cell("mod", a)}</div><div class="dr">${gut("mod", null)}${gut("mod", n)}${cell("mod", b)}</div>`;
+      if (k === "d") out += `<div class="dr">${gut("del", o)}${gut("del", null)}${cell("del", a)}</div>`;
+      if (k === "a") out += `<div class="dr">${gut("ins", null)}${gut("ins", n)}${cell("ins", b)}</div>`;
+    }
+    return out;
+  }
+
+  function row(it) {
+    const cls = ["row", it.sel && "sel", it.hov && "hov"].filter(Boolean).join(" ");
+    const key = it.st === "?" ? "Q" : it.st;
+    return `<div class="${cls}">${fileIcon(it.name, it.ft)}<span class="nm">${it.name}</span><span class="dir">${it.dir ?? ""}</span>`
+      + (it.tag ? `<span class="tag">${it.tag}</span>` : "")
+      + (it.ro ? `<span class="lk">${ic("lock", "", 14)}</span>` : "")
+      + (it.hov && !it.ro ? `<span class="addbtn${it.busy ? " dis" : ""}">${ic(it.staged ? "minus" : "plus")}</span>` : "")
+      + `<span class="st st-${key}">${it.st}</span><span class="chk${it.rv ? " on" : ""}">${ic("check")}</span></div>`;
+  }
+  function mainToolbar(o = {}) {
+    return `<div class="mt"><span class="lights"><i></i><i></i><i></i></span>`
+      + `<span class="wdg"><span class="pbadge">R</span>Revia${ic("chevD", "chev")}</span>`
+      + `<span class="wdg">${ic("branch")}feature/diff-stream${ic("chevD", "chev")}</span>`
+      + `<span class="sp"></span>${o.watchOff ? `<span class="chip">${ic("refreshOff", "", 14)}自动刷新不可用</span>` : ""}</div>`;
+  }
+  const stripe = () => `<div class="stripe"><span class="on" title="变更">${ic("commit")}</span><span title="回收区">${ic("tray")}</span></div>`;
+  function toolWindow(groups, progress, sel) {
+    const ro = sel?.ro;
+    const staged = sel?.staged;
+    let out = `<aside class="tw"><div class="twh">变更</div><div class="twt">`
+      + `<span class="tb" title="刷新">${ic("refresh")}</span><span class="vsep"></span>`
+      + `<span class="tb${ro || staged || !sel ? " dis" : ""}" title="暂存（⌥⌘A）">${ic("plus")}</span>`
+      + `<span class="tb${ro || !staged ? " dis" : ""}" title="取消暂存">${ic("minus")}</span>`
+      + `<span class="tb${ro || staged || !sel ? " dis" : ""}" title="丢弃文件改动（⌥⌘Z）">${ic("rollback")}</span>`
+      + `<span class="rv">已审阅 ${progress[0]}/${progress[1]}</span></div><div class="list">`;
+    for (const g of groups) {
+      const count = g.count ?? g.items.length;
+      out += `<div class="grp">${g.closed ? ic("chevR") : ic("chevD")}<b>${g.title}</b><span class="cnt">${count} 个文件</span></div>`;
+      if (!g.closed) out += g.items.map(row).join("");
+    }
+    return out + "</div></aside>";
+  }
+  function editor(o) {
+    if (!o.file) return `<section class="ed"><div class="df">${o.body}</div></section>`;
+    const f = o.file;
+    let actions = "";
+    if (f.ctl === "stage") actions = f.writing ? `<span class="btn dis">${ic("spin", "spin", 14)}操作中…</span>` : `<span class="btn">${ic("plus", "", 14)}暂存文件</span>`;
+    if (f.ctl === "unstage") actions = `<span class="btn">${ic("minus", "", 14)}取消暂存文件</span>`;
+    if (f.ctl === "ro") actions = `<span class="rotag">${ic("lock", "", 14)}只读</span>`;
+    if (f.discard) actions += `<span class="btn${f.writing ? " dis" : ""}">${ic("rollback", "", 14)}丢弃</span>`;
+    const view = o.view === "unified"
+      ? `<span class="dd">${ic("unified")}统一查看${ic("chevD", "chev")}</span>`
+      : `<span class="dd">${ic("split")}并排查看${ic("chevD", "chev")}</span>`;
+    const nav = o.body.startsWith('<div class="df') ? "" : " dis";
+    return `<section class="ed"><div class="tabs"><span class="tab">${fileIcon(f.name, f.ft)}<span>${f.name}</span><span class="p">${f.path}</span></span></div>`
+      + `<div class="dtb"><span class="tb${nav}" title="上一处差异（⇧F7）">${ic("up")}</span><span class="tb${nav}" title="下一处差异（F7）">${ic("down")}</span><span class="vsep"></span>${view}<span class="sp"></span>${actions}</div>`
+      + (o.banner ?? "") + (o.body.startsWith('<div class="df') ? o.body : `<div class="df">${o.body}</div>`) + `</section>`;
+  }
+  function statusBar(crumbs, o = {}) {
+    return `<div class="sbar">${crumbs.map((c, i) => (i ? '<span class="crumb">›</span>' : "") + `<span>${c}</span>`).join("")}<span class="sp"></span>`
+      + (o.watchOff ? `<span class="warn">${ic("refreshOff", "", 14)}自动刷新不可用</span>` : "") + `</div>`;
+  }
+  const banner = (tone, icon, title, msg, act) =>
+    `<div class="ban ${tone}" role="status">${ic(icon)}<span class="msg"><b>${title}</b>${msg}</span>${act ? `<span class="act">${act}</span>` : ""}</div>`;
+  const empty = (h, d, act) => `<div class="empty"><div class="h">${h}</div>${d ? `<div>${d}</div>` : ""}${act ? `<div class="act">${act}</div>` : ""}</div>`;
+
+  const FILES = {
+    app: { name: "App.tsx", dir: "src", st: "M" },
+    diffView: { name: "DiffView.tsx", dir: "src/features/diff", st: "M", rv: true },
+    conflict: { name: "conflict.ts", dir: "src/lib", st: "U", ro: true },
+    lock: { name: "pnpm-lock.yaml", dir: "", st: "M", tag: "默认收起" },
+    gate: { name: "refreshGate.ts", dir: "src/lib", st: "A", rv: true, staged: true },
+    measure: { name: "measure.ts", dir: "src/lib · 原 diagnostics.ts", st: "R", rv: true, staged: true },
+    legacy: { name: "legacy.ts", dir: "src/lib", st: "D", staged: true },
+  };
+  const pick = (base, extra) => ({ ...base, ...extra });
+  const APP = { name: "App.tsx", path: "src · 未暂存", ctl: "stage", discard: true };
+  const APP_CRUMBS = ["Revia", "feature/diff-stream", "src", "App.tsx"];
+
+  const mainGroups = [
+    { title: "未暂存", items: [pick(FILES.app, { sel: true }), pick(FILES.diffView, { hov: true }), FILES.conflict, FILES.lock] },
+    { title: "未跟踪", closed: true, count: 4, items: [] },
+    { title: "已暂存", items: [FILES.gate, FILES.measure, FILES.legacy] },
+  ];
+  function mainWindow(theme) {
+    return `<div class="jw ${theme}" style="width:1180px;height:720px">${mainToolbar()}${stripe()}${toolWindow(mainGroups, [3, 11], FILES.app)}`
+      + editor({ file: APP, body: `<div class="df split">${HUNKS.map((h) => splitHunk(h)).join("")}<span class="thumb" style="top:6px;height:110px"></span></div>` })
+      + statusBar(APP_CRUMBS) + `</div>`;
+  }
+
+  const diffSlice = (act = "unstaged", disabled = false) => `<div class="df split">${splitHunk(HUNKS[1], act, disabled)}${splitHunk(HUNKS[0], act, disabled)}</div>`;
+  const STATES = [
+    { title: "空文件", desc: "新建的空文件没有 hunk：编辑区说明原因，仍可整文件暂存；未跟踪文件不提供丢弃，差异导航不可用。",
+      groups: [{ title: "未暂存", items: [FILES.app] }, { title: "未跟踪", items: [{ name: "notes.md", dir: "docs", st: "?", sel: true }, { name: "seed.sql", dir: "tools/fixtures", st: "?" }] }],
+      sel: { name: "notes.md" }, crumbs: ["Revia", "feature/diff-stream", "docs", "notes.md"],
+      ed: { file: { name: "notes.md", path: "docs · 未跟踪", ctl: "stage" }, body: empty("没有可显示的 hunk", "这个文件没有内容改动，例如刚建的空文件。仍可整文件暂存。") } },
+    { title: "二进制文件", desc: "不显示内容；可以整文件暂存或丢弃，丢弃前先存入回收区。",
+      groups: [{ title: "未暂存", items: [FILES.app, { name: "logo.png", dir: "assets", st: "M", sel: true }] }],
+      sel: { name: "logo.png" }, crumbs: ["Revia", "feature/diff-stream", "assets", "logo.png"],
+      ed: { file: { name: "logo.png", path: "assets · 未暂存", ctl: "stage", discard: true }, body: empty("二进制文件，不显示内容", "可以整文件暂存或丢弃；丢弃前会先存入回收区。") } },
+    { title: "默认收起", desc: "lock 文件、二进制和超大文件默认不渲染，点“展开”才渲染（Q32）。未跟踪一组默认收起，只显示数量（Q30）。",
+      groups: [{ title: "未暂存", items: [FILES.app, pick(FILES.lock, { sel: true })] }, { title: "未跟踪", closed: true, count: 4, items: [] }],
+      sel: { name: "pnpm-lock.yaml" }, crumbs: ["Revia", "feature/diff-stream", "pnpm-lock.yaml"],
+      ed: { file: { name: "pnpm-lock.yaml", path: "仓库根目录 · 未暂存", ctl: "stage", discard: true }, body: empty("默认收起", "lock 文件、二进制和超大文件默认不渲染。", "展开 diff") } },
+    { title: "只读", desc: "符号链接、子模块、嵌套仓库、非 UTF-8 路径等只读类型：行内带锁，编辑区只显示“只读”，工具窗口的暂存和丢弃按钮不可用。",
+      groups: [{ title: "未暂存", items: [FILES.app, { name: "current", dir: "releases", st: "M", ro: true, sel: true, ft: "link" }] }],
+      sel: { name: "current", ro: true }, crumbs: ["Revia", "feature/diff-stream", "releases", "current"],
+      ed: { file: { name: "current", path: "releases · 未暂存", ctl: "ro", ft: "link" }, body: empty("只读", "符号链接为只读类型，不支持在应用内暂存或取消暂存。") } },
+    { title: "冲突", desc: "状态字母 U；暂不显示 diff，也不能在这里暂存或取消暂存。",
+      groups: [{ title: "未暂存", items: [FILES.app, pick(FILES.conflict, { sel: true })] }],
+      sel: { name: "conflict.ts", ro: true }, crumbs: ["Revia", "feature/diff-stream", "src", "lib", "conflict.ts"],
+      ed: { file: { name: "conflict.ts", path: "src/lib · 未暂存" }, banner: banner("err", "warn", "有未解决的冲突", "暂不显示 diff，也不能在这里暂存或取消暂存。"), body: empty("这个文件有未解决的冲突", "") } },
+    { title: "操作被拒绝", desc: "diff 指纹对不上或锁文件被占用：编辑区顶部出现错误提示条，同时自动刷新。",
+      groups: [{ title: "未暂存", items: [pick(FILES.app, { sel: true }), FILES.diffView] }],
+      sel: FILES.app, crumbs: APP_CRUMBS,
+      ed: { file: APP, banner: banner("err", "stop", "操作被拒绝", "文件已变化，请重新确认。列表和 diff 已刷新。", "关闭"), body: diffSlice() } },
+    { title: "结果待核对", desc: "写操作的结果无法确定时，警告提示条说明是哪个文件、哪个 worktree，请用户先核对真实状态。",
+      groups: [{ title: "未暂存", items: [pick(FILES.app, { sel: true }), FILES.diffView] }],
+      sel: FILES.app, crumbs: APP_CRUMBS,
+      ed: { file: APP, banner: banner("warn", "warn", "结果待核对", "丢弃 src/generated.ts（feature/diff-stream）的结果无法确定，请先查看工作区真实状态再操作。", "关闭"), body: diffSlice() } },
+    { title: "自动刷新不可用", desc: "监视失败时持续显示：主工具栏和状态栏都有常驻标记，编辑区顶部说明影响；手动刷新和回到前台核对仍可用（Q95）。",
+      watchOff: true,
+      groups: [{ title: "未暂存", items: [pick(FILES.app, { sel: true }), FILES.diffView] }],
+      sel: FILES.app, crumbs: APP_CRUMBS,
+      ed: { file: APP, banner: banner("warn", "refreshOff", "自动刷新不可用", "文件变化不会自动出现，请手动刷新或回到前台重新核对；写入前仍会校验真实状态。", "刷新"), body: diffSlice() } },
+    { title: "写操作进行中", desc: "同一 worktree 的其他写入口暂时禁用，仍可浏览、切换文件和 worktree（Q90）。",
+      groups: [{ title: "未暂存", items: [pick(FILES.app, { sel: true }), pick(FILES.diffView, { hov: true, busy: true })] }],
+      sel: FILES.app, crumbs: APP_CRUMBS,
+      ed: { file: { ...APP, writing: true }, body: diffSlice("unstaged", true) } },
+    { title: "已暂存文件与统一视图", desc: "选中已暂存的文件：编辑区按钮变为“取消暂存文件”，hunk 头只有“取消暂存此 hunk”。这里同时展示统一视图。",
+      groups: [{ title: "已暂存", items: [pick(FILES.gate, { sel: true }), FILES.measure, FILES.legacy] }],
+      sel: FILES.gate, crumbs: ["Revia", "feature/diff-stream", "src", "lib", "refreshGate.ts"],
+      ed: { file: { name: "refreshGate.ts", path: "src/lib · 已暂存", ctl: "unstage" }, view: "unified", body: `<div class="df unified">${unifiedHunk(HUNKS[0], "staged")}</div>` } },
+    { title: "全部已审阅", desc: "按 ⌥⌘R 标记到最后一个文件后，停在当前文件并提示一次；工具窗口的进度同步更新。",
+      progress: [4, 4],
+      groups: [{ title: "未暂存", items: [pick(FILES.app, { sel: true, rv: true }), FILES.diffView] }, { title: "已暂存", items: [FILES.gate, FILES.measure] }],
+      sel: FILES.app, crumbs: APP_CRUMBS,
+      ed: { file: APP, banner: banner("info", "ok", "全部文件都已审阅", ""), body: diffSlice() } },
+    { title: "未选择文件", desc: "没有选中文件时不显示文件标签和 diff 工具条，编辑区只给一句提示。",
+      groups: [{ title: "未暂存", items: [FILES.app, FILES.diffView] }, { title: "已暂存", items: [FILES.gate] }],
+      sel: null, crumbs: ["Revia", "feature/diff-stream"],
+      ed: { body: empty("选择左侧文件查看 diff", "") } },
+    { title: "丢弃确认", h: 330, desc: "丢弃前说明会先保存到回收区、暂存区不变；对话框按 JetBrains 样式，确认按钮在右侧。",
+      groups: [{ title: "未暂存", items: [pick(FILES.app, { sel: true }), FILES.diffView] }],
+      sel: FILES.app, crumbs: APP_CRUMBS,
+      ed: { file: APP, body: diffSlice() },
+      overlay: `<div class="veil"><div class="dlg"><div class="dt">丢弃改动</div><div class="db">${ic("warn")}<div>`
+        + `<div class="h">丢弃整个文件的未暂存改动？</div><div class="path">src/App.tsx · feature/diff-stream</div>`
+        + `<div class="d">执行前会先保存完整文件状态到回收区；暂存区不变。</div></div></div>`
+        + `<div class="df2"><span class="btn">取消</span><span class="btn pri">保存到回收区并丢弃</span></div></div></div>` },
+  ];
+  function miniWindow(theme, s) {
+    return `<div class="jw mini ${theme}" style="width:760px;height:${s.h ?? 270}px">${mainToolbar({ watchOff: s.watchOff })}${stripe()}`
+      + toolWindow(s.groups, s.progress ?? [1, 4], s.sel) + editor(s.ed) + statusBar(s.crumbs, { watchOff: s.watchOff })
+      + (s.overlay ?? "") + `</div>`;
+  }
+
+  document.getElementById("win-light").outerHTML = mainWindow("light");
+  document.getElementById("win-dark").outerHTML = mainWindow("dark");
+  document.getElementById("states").innerHTML = STATES.map((s) =>
+    `<article class="state"><h3>${s.title}</h3><p>${s.desc}</p><div class="pair">`
+    + `<div class="fit" data-w="760">${miniWindow("light", s)}</div><div class="fit" data-w="760">${miniWindow("dark", s)}</div></div></article>`).join("");
+
+  /* 窗口按设计尺寸绘制，再整体缩放到容器宽度。 */
+  function fit() {
+    for (const box of document.querySelectorAll(".fit")) {
+      const win = box.firstElementChild;
+      if (!win) continue;
+      const scale = Math.min(1, (box.clientWidth - 8) / Number(box.dataset.w));
+      win.style.transform = `scale(${scale})`;
+      box.style.height = `${Math.ceil(win.offsetHeight * scale) + 32}px`;
+    }
+  }
+  fit();
+  addEventListener("resize", fit);
+  document.fonts?.ready.then(fit);
+})();
+</script>

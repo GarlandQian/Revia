@@ -1,0 +1,8 @@
+external_edit_restore_ok=true
+external_edit_was_overwritten=true
+completion_loss_error=Internal
+completion_loss_worktree_written=true
+completion_loss_journal=Pending
+completion_loss_list_status=Completed
+identity_switch_restore_ok=true
+identity_switch_new_worktree_written=true

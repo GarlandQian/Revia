@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-23T14:00:46.487782+00:00",
+  "source": "36dad654fe0d2d337e34d7bd69aaae04d833903f",
+  "binary": "/Users/garland/.codex/worktrees/revia-m2/Revia/src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia",
+  "binarySHA256": "6e119703a7ecf9db37b0f2db0072bbb802f6088432b59b819caeebab21d8dfc9",
+  "pid": 79082,
+  "dataDirectory": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/data-ui-r1",
+  "home": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/home-ui-r1",
+  "commandLog": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/evidence/desktop-r1/run-persistence/app.log",
+  "diagnosticWrapper": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-task04-dv8o95m8/home-ui-r1/bin/git",
+  "wrapperInactiveUnlessExplicitlyArmed": true
+}

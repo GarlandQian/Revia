@@ -1,0 +1,254 @@
+{
+  "timestamp": "2026-10-23T14:45:41.644+08:00",
+  "command": "unstage",
+  "repo": "A",
+  "file": "untracked.txt",
+  "dryRun": false,
+  "gitArgs": [
+    "restore",
+    "--staged",
+    "--",
+    "untracked.txt"
+  ],
+  "before": {
+    "startedAt": "2026-10-23T14:45:41.579+08:00",
+    "finishedAt": "2026-10-23T14:45:41.644+08:00",
+    "repo": "A",
+    "target": "untracked.txt",
+    "gitProgram": "/opt/homebrew/Cellar/git/2.56.0_1/bin/git",
+    "readOnly": true,
+    "consistency": "Sequential observations, not an atomic cross-command snapshot",
+    "paths": {
+      "worktree": "/private/tmp/revia-task06-2fuu2r92/A",
+      "gitDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+      "commonDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+      "index": "/private/tmp/revia-task06-2fuu2r92/A/.git/index"
+    },
+    "worktreeFile": {
+      "path": "/private/tmp/revia-task06-2fuu2r92/A/untracked.txt",
+      "exists": true,
+      "sha256": "4146b53f1dce86fcdcf59766ee6c0540ae8cdfb2bdd7f226b84f124c763b3ace",
+      "bytes": 20,
+      "lines": 1,
+      "mode": "0644",
+      "inode": 163272239,
+      "mtimeNs": 1792737893069870347
+    },
+    "indexFile": {
+      "path": "/private/tmp/revia-task06-2fuu2r92/A/.git/index",
+      "exists": true,
+      "sha256": "56bd20b0a72f7fa47adc39c5d57902b85abbeb822de9c85e2e91b65530e1566f",
+      "bytes": 526,
+      "lines": 4,
+      "mode": "0644",
+      "inode": 163272286,
+      "mtimeNs": 1792737918176775368
+    },
+    "indexBlobs": [
+      {
+        "path": "untracked.txt",
+        "mode": "100644",
+        "oid": "a2aabcf77e7c87f6c86b2715dfb7b3069d08c267",
+        "stage": 0,
+        "bytes": 20,
+        "sha256": "4146b53f1dce86fcdcf59766ee6c0540ae8cdfb2bdd7f226b84f124c763b3ace"
+      }
+    ],
+    "git": {
+      "head": {
+        "args": [
+          "rev-parse",
+          "--verify",
+          "HEAD"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.151,
+        "stdoutText": "4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\n",
+        "stdoutBase64": "NDYxOWI0YjNmMGU3Y2IxYTcxZjYwNzBkZjdiNjdiYzhiMDhlNDM2Ygo=",
+        "stderrText": ""
+      },
+      "status": {
+        "args": [
+          "status",
+          "--porcelain=v2",
+          "--branch",
+          "-z",
+          "--untracked-files=all"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 7.776,
+        "stdoutText": "# branch.oid 4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\u0000# branch.head main\u00001 A. N... 000000 100644 100644 0000000000000000000000000000000000000000 a2aabcf77e7c87f6c86b2715dfb7b3069d08c267 untracked.txt\u0000",
+        "stdoutBase64": "IyBicmFuY2gub2lkIDQ2MTliNGIzZjBlN2NiMWE3MWY2MDcwZGY3YjY3YmM4YjA4ZTQzNmIAIyBicmFuY2guaGVhZCBtYWluADEgQS4gTi4uLiAwMDAwMDAgMTAwNjQ0IDEwMDY0NCAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIGEyYWFiY2Y3N2U3Yzg3ZjZjODZiMjcxNWRmYjdiMzA2OWQwOGMyNjcgdW50cmFja2VkLnR4dAA=",
+        "stderrText": ""
+      },
+      "indexEntry": {
+        "args": [
+          "ls-files",
+          "--stage",
+          "-z",
+          "--",
+          "untracked.txt"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.981,
+        "stdoutText": "100644 a2aabcf77e7c87f6c86b2715dfb7b3069d08c267 0\tuntracked.txt\u0000",
+        "stdoutBase64": "MTAwNjQ0IGEyYWFiY2Y3N2U3Yzg3ZjZjODZiMjcxNWRmYjdiMzA2OWQwOGMyNjcgMAl1bnRyYWNrZWQudHh0AA==",
+        "stderrText": ""
+      },
+      "diff": {
+        "args": [
+          "diff",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--binary",
+          "--"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.207,
+        "stdoutText": "",
+        "stdoutBase64": "",
+        "stderrText": ""
+      },
+      "diffCached": {
+        "args": [
+          "diff",
+          "--cached",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--binary",
+          "--"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.604,
+        "stdoutText": "diff --git a/untracked.txt b/untracked.txt\nnew file mode 100644\nindex 0000000..a2aabcf\n--- /dev/null\n+++ b/untracked.txt\n@@ -0,0 +1 @@\n+task06-untracked-v1\n",
+        "stdoutBase64": "ZGlmZiAtLWdpdCBhL3VudHJhY2tlZC50eHQgYi91bnRyYWNrZWQudHh0Cm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4IDAwMDAwMDAuLmEyYWFiY2YKLS0tIC9kZXYvbnVsbAorKysgYi91bnRyYWNrZWQudHh0CkBAIC0wLDAgKzEgQEAKK3Rhc2swNi11bnRyYWNrZWQtdjEK",
+        "stderrText": ""
+      }
+    }
+  },
+  "gitResult": {
+    "args": [
+      "restore",
+      "--staged",
+      "--",
+      "untracked.txt"
+    ],
+    "exitCode": 0,
+    "elapsedMs": 6.728,
+    "stdoutText": "",
+    "stdoutBase64": "",
+    "stderrText": ""
+  },
+  "after": {
+    "startedAt": "2026-10-23T14:45:41.651+08:00",
+    "finishedAt": "2026-10-23T14:45:41.680+08:00",
+    "repo": "A",
+    "target": "untracked.txt",
+    "gitProgram": "/opt/homebrew/Cellar/git/2.56.0_1/bin/git",
+    "readOnly": true,
+    "consistency": "Sequential observations, not an atomic cross-command snapshot",
+    "paths": {
+      "worktree": "/private/tmp/revia-task06-2fuu2r92/A",
+      "gitDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+      "commonDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+      "index": "/private/tmp/revia-task06-2fuu2r92/A/.git/index"
+    },
+    "worktreeFile": {
+      "path": "/private/tmp/revia-task06-2fuu2r92/A/untracked.txt",
+      "exists": true,
+      "sha256": "4146b53f1dce86fcdcf59766ee6c0540ae8cdfb2bdd7f226b84f124c763b3ace",
+      "bytes": 20,
+      "lines": 1,
+      "mode": "0644",
+      "inode": 163272239,
+      "mtimeNs": 1792737893069870347
+    },
+    "indexFile": {
+      "path": "/private/tmp/revia-task06-2fuu2r92/A/.git/index",
+      "exists": true,
+      "sha256": "ad9ce33c6de2f1b6de90f40858aabbe7f384bf57931c1a474af832995a670e03",
+      "bytes": 446,
+      "lines": 3,
+      "mode": "0644",
+      "inode": 163272336,
+      "mtimeNs": 1792737941650721295
+    },
+    "indexBlobs": [],
+    "git": {
+      "head": {
+        "args": [
+          "rev-parse",
+          "--verify",
+          "HEAD"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 5.252,
+        "stdoutText": "4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\n",
+        "stdoutBase64": "NDYxOWI0YjNmMGU3Y2IxYTcxZjYwNzBkZjdiNjdiYzhiMDhlNDM2Ygo=",
+        "stderrText": ""
+      },
+      "status": {
+        "args": [
+          "status",
+          "--porcelain=v2",
+          "--branch",
+          "-z",
+          "--untracked-files=all"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 6.537,
+        "stdoutText": "# branch.oid 4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\u0000# branch.head main\u0000? untracked.txt\u0000",
+        "stdoutBase64": "IyBicmFuY2gub2lkIDQ2MTliNGIzZjBlN2NiMWE3MWY2MDcwZGY3YjY3YmM4YjA4ZTQzNmIAIyBicmFuY2guaGVhZCBtYWluAD8gdW50cmFja2VkLnR4dAA=",
+        "stderrText": ""
+      },
+      "indexEntry": {
+        "args": [
+          "ls-files",
+          "--stage",
+          "-z",
+          "--",
+          "untracked.txt"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 5.599,
+        "stdoutText": "",
+        "stdoutBase64": "",
+        "stderrText": ""
+      },
+      "diff": {
+        "args": [
+          "diff",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--binary",
+          "--"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 5.876,
+        "stdoutText": "",
+        "stdoutBase64": "",
+        "stderrText": ""
+      },
+      "diffCached": {
+        "args": [
+          "diff",
+          "--cached",
+          "--no-color",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--binary",
+          "--"
+        ],
+        "exitCode": 0,
+        "elapsedMs": 5.965,
+        "stdoutText": "",
+        "stdoutBase64": "",
+        "stderrText": ""
+      }
+    }
+  },
+  "recordedAt": "/private/tmp/revia-task06-2fuu2r92/evidence/mutations.jsonl"
+}

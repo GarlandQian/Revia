@@ -1,0 +1,13 @@
+{
+  "capturedAtMs": 1792742248744,
+  "command": "row_index_for_line",
+  "contentVersion": null,
+  "entryFingerprint": null,
+  "id": "R05AnchorB",
+  "outcome": "ok",
+  "path": "many.ts",
+  "payloadSha256": "5c14c4bb65ed9c06593d18dd3e677909d637d3f37121bdced53bec5483c54903",
+  "pid": 72290,
+  "revision": null,
+  "worktreeId": "152026f32c2f5840"
+}

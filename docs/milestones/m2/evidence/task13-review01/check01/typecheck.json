@@ -1,0 +1,14 @@
+{
+  "name": "typecheck",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "pnpm",
+    "exec",
+    "tsc",
+    "-b"
+  ],
+  "startedAt": "2026-10-24T13:23:10.306963+00:00",
+  "expectedExit": 0,
+  "exit": 0,
+  "endedAt": "2026-10-24T13:23:12.149291+00:00"
+}

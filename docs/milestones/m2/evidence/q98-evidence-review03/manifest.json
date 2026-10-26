@@ -1,0 +1,845 @@
+{
+  "recordedAt": "2026-10-25T19:48:12.693217+08:00",
+  "reviewBase": "85a2f5c569302ee43af07f0bd768f995478bc2df",
+  "reviewTarget": "ddb9da5bda35162131b3f0011a56303f4937685f",
+  "standards": {
+    "hardFindings": 0,
+    "heuristics": 0
+  },
+  "specFindings": 0,
+  "fileCount": 131,
+  "files": [
+    {
+      "source": "/private/tmp/revia-q98-r3-standards.9qUKFp/fixed-source-sha256.txt",
+      "archive": "standards/fixed-source-sha256.txt.gz",
+      "bytes": 377,
+      "sha256": "072a9ffe9c6d5ee4a1d47d2a378db410168d64cb7f909911475b12ca6b285f1b"
+    },
+    {
+      "source": "/private/tmp/revia-q98-r3-standards.9qUKFp/review.diff",
+      "archive": "standards/review.diff.gz",
+      "bytes": 87327,
+      "sha256": "c15d49c177b379bd5ef2cc0ff79448676caaf5d6bad88ef9eab80d27977c5b98"
+    },
+    {
+      "source": "/private/tmp/revia-q98-r3-standards.9qUKFp/standards.md",
+      "archive": "standards/standards.md.gz",
+      "bytes": 2317,
+      "sha256": "1ee9307c8f44c955c7fc20140911f504ee0ce53eda59022f7bd05961ece1205e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/App-fixed.tsx",
+      "archive": "spec/App-fixed.tsx.gz",
+      "bytes": 154521,
+      "sha256": "7d6c62532a2ed39fdd7b127eaf25ba70dd1b0b64cae4f97888a9a197f950b0be"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/bench-fixed.py",
+      "archive": "spec/bench-fixed.py.gz",
+      "bytes": 58056,
+      "sha256": "c1c65c9bbde1f1148c2d11bfd1294c52591a85284ef6c29fcc40da00e9523687"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/evidence.md",
+      "archive": "spec/evidence.md.gz",
+      "bytes": 5019,
+      "sha256": "4995d11968cc9201fb1fda15a3139a4a023e1cac0fb3c25706456bd93db21e01"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/driver.stdout.gz",
+      "bytes": 987,
+      "sha256": "d1861ff9b302abbac61399eafb0bceb6035451eb5b6b8d66a6afee8609f26c99"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.gz",
+      "bytes": 7950,
+      "sha256": "a5a56f4571d9df4ab410d2bf86ffa0ca9e0848cc9ae7f34fba7e2e93cf767ca0"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "6b55fc0776d442a7565dd8963dcbc861ba2f21d8f07423abf238031c726f22ab"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.frontend.log.gz",
+      "bytes": 1577,
+      "sha256": "06d4e4bc067e6b63a54c620b17cb396f6be8a5236cfd205e5d38b1bc9a15d4dc"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/anchor_path_control/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "2ac489dfe75a85a130d7b4f83c99423f99abee97ac437fef356bb9f5614fbd7e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/driver.stdout.gz",
+      "bytes": 825,
+      "sha256": "ad9c0b91e102d5321f9ea927191ead19b39198edd31ccc8e75412257fe1dcfac"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.gz",
+      "bytes": 8046,
+      "sha256": "f2a4d5a35a9d3759adddb65c00bbff5bc673171c7974c36ec1ac051aea34989e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "e909cfda217c819570730ba520c60498d4f23ec48a7d866e0a61b04bf7ab8370"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.frontend.log.gz",
+      "bytes": 2021,
+      "sha256": "1f68f0f3bf0fda0e7c09d034b840af985049b0e8565ff993ba0dae63c5773919"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/bad_json_control/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "9c21acf779f5b8d10e581a0f347f1db8fc4549674d217759ac5d6a96ae6be7f2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/cleanup_failed_kill/evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/cleanup_failed_kill/evidence.jsonl.gz",
+      "bytes": 5486,
+      "sha256": "f130fd383728156158e8d6e22a9c32e5bb4a4783a690c88ab7f00afc544ff0c4"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/cleanup_failed_kill/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/cleanup_failed_kill/result.json.gz",
+      "bytes": 11555,
+      "sha256": "eb5c8d7d4d189f94b162883f08f98573e3d360b04684f16539e48acb1357796a"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/command_timeout_controls/checkpoint.log",
+      "archive": "spec/execution-ix5h0yfp/cases/command_timeout_controls/checkpoint.log.gz",
+      "bytes": 35,
+      "sha256": "22c08ad12b60ba14bf56c045097f43cfe084e9ef1d96edc627ae89415526a120"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/command_timeout_controls/notifyutil.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/command_timeout_controls/notifyutil.evidence.jsonl.gz",
+      "bytes": 348,
+      "sha256": "13c28b4cb6b51b7919654822299e150a794c30295646d147cbf448f2ac7c84e2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/command_timeout_controls/ps.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/command_timeout_controls/ps.evidence.jsonl.gz",
+      "bytes": 852,
+      "sha256": "e1b65ab5f94d4cb76620eda71de05d769418153371a6d65a182653874092cf61"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/driver.stdout.gz",
+      "bytes": 829,
+      "sha256": "5a4cab6dfd1857370310f9a8bd9e84176f5cf036a664bf7b14985d99f4fe43dc"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.gz",
+      "bytes": 8079,
+      "sha256": "5e63beac8c2ecd30500d60901fb9b8ec904d8dec8a9e81a6c00a9b74b14341cd"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "04121125551305db6a899d34cc624d39b52e111e88c0bcb7f934310e592144b1"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.frontend.log.gz",
+      "bytes": 2500,
+      "sha256": "34449fcdf86ea0e10fd4201289181e0b9fd2ab80b9113fbf1239cc7804dad4f9"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/duplicate_same_anchor/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "5ad0ac89e35d762608bbac437520ffdd114bc2190f646bfa2d6f3628947131fb"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/driver.stdout.gz",
+      "bytes": 837,
+      "sha256": "c6314b03ce2bdb7cca91eeb7886be71999ca32ac93915d2bd3629b69756bafe3"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/mock-calls.json.gz",
+      "bytes": 506,
+      "sha256": "828b76ddc656bcf5e91fb85e47523586410ec2af7f9c3be476d2765caab086e3"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.gz",
+      "bytes": 7677,
+      "sha256": "afdd92f87d567619db648f6116e53f34cab69cb594f29734fff93c00733c04c2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.evidence.jsonl.gz",
+      "bytes": 2073,
+      "sha256": "78bd02bd6e6096548791d0fa6040c07ce9bdbd5c6086d1ec9444b446e43a01e9"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.frontend.log.gz",
+      "bytes": 2000,
+      "sha256": "9275a7f887dc41d2048cf8fe0160bfc5258078a7d6786eefa89e7dccd98a2d07"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/first_rss_timeout/result.json.samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_mismatched_progress_metadata/boundaries.log",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_mismatched_progress_metadata/boundaries.log.gz",
+      "bytes": 72,
+      "sha256": "d3e323e5ac3fedc55ae7135422d5473e776fdf351fe544648d56cf990dfb6de7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_mismatched_progress_metadata/inputs.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_mismatched_progress_metadata/inputs.json.gz",
+      "bytes": 3653,
+      "sha256": "6850a353602a3a9f81b668a8ef9ea7ac51965bf8d6fc3fd01e15425f20b1fac6"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_mismatched_progress_metadata/results.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_mismatched_progress_metadata/results.json.gz",
+      "bytes": 5108,
+      "sha256": "2845260889613b5af217886ddf3a70685bd5f36eb6b57a2ee48b83248e8981f6"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_missing_all_progress_checkpoints/boundaries.log",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_missing_all_progress_checkpoints/boundaries.log.gz",
+      "bytes": 72,
+      "sha256": "d3e323e5ac3fedc55ae7135422d5473e776fdf351fe544648d56cf990dfb6de7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_missing_all_progress_checkpoints/inputs.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_missing_all_progress_checkpoints/inputs.json.gz",
+      "bytes": 2415,
+      "sha256": "78e2b30864e6fcd9503122f0f632c6823b23a400a2867c35ce2ab81e77da3dea"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_missing_all_progress_checkpoints/results.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_missing_all_progress_checkpoints/results.json.gz",
+      "bytes": 3774,
+      "sha256": "2194cbb9dcba15d07c6f10e1bde16fbadf8e0f03ac815b365b907452d1cb0c58"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_missing_final_checkpoints/boundaries.log",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_missing_final_checkpoints/boundaries.log.gz",
+      "bytes": 72,
+      "sha256": "d3e323e5ac3fedc55ae7135422d5473e776fdf351fe544648d56cf990dfb6de7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_missing_final_checkpoints/inputs.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_missing_final_checkpoints/inputs.json.gz",
+      "bytes": 2883,
+      "sha256": "e76c57d480e8d9e47a054332ecefc32913ab25dad0beec12a7faa4e342bc41d9"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_missing_final_checkpoints/results.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_missing_final_checkpoints/results.json.gz",
+      "bytes": 4051,
+      "sha256": "94027d35c35301c9c52854ced594727195651d2c2241ad969a4bfed6e56627e2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_valid_progress_control/boundaries.log",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_valid_progress_control/boundaries.log.gz",
+      "bytes": 72,
+      "sha256": "d3e323e5ac3fedc55ae7135422d5473e776fdf351fe544648d56cf990dfb6de7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_valid_progress_control/inputs.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_valid_progress_control/inputs.json.gz",
+      "bytes": 3674,
+      "sha256": "f0c4476bce9b23f5b19ea8798114cff0d34db4a8d97b8eb7e1de390f206625b2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/helper_valid_progress_control/results.json",
+      "archive": "spec/execution-ix5h0yfp/cases/helper_valid_progress_control/results.json.gz",
+      "bytes": 3646,
+      "sha256": "f6dbda77adbcabe7693d8220795679182b14f3a23788f89f69347cd9ed547fa9"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/driver.stdout.gz",
+      "bytes": 838,
+      "sha256": "bb302ea4db4db5f599602e8f59ebdc6ef15a4a6c5c0b989e24d4a3d0706ef689"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.gz",
+      "bytes": 8276,
+      "sha256": "ade253cd3df56deff15194787da5c07fc0c7f1e624c1e332a7010410dd568418"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.evidence.jsonl.gz",
+      "bytes": 3544,
+      "sha256": "304b930efc0c6d6af236bfa0e18c7285f53e89c5da3aef0036e7f709d99b7b27"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.frontend.log.gz",
+      "bytes": 2000,
+      "sha256": "38e05653a4130b755a8d22c835d643afa36b10bbf03d101be686530d2c50a9e2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/later_rss_timeout/result.json.samples.jsonl.gz",
+      "bytes": 385,
+      "sha256": "8c89921cd94f339034b73448d20530b4bc3f3c174a266a095fd130c540613fd3"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/driver.stdout.gz",
+      "bytes": 1130,
+      "sha256": "13c4019e9f4523913975b9af13c0fe6d49c50bef67a08f29fc1753c5f74b85b4"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.gz",
+      "bytes": 6627,
+      "sha256": "31e3294377b0a34a7cb6c25929a52e32a49f3db6c2abce5b8b20c9d1eeb3958c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "d6584972aa0915c8485a9e398e9927daba158d35950ba659056260464ef249b2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.frontend.log.gz",
+      "bytes": 2045,
+      "sha256": "9fe0cc4ed3255d8ec651937bd03c56907b5829537d4fac00efa2cd565089fc18"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/mismatched_progress_metadata/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "0e1366309d29f72215c444401c33dcc559f75d029b7e4f97dc44d492b082ff4e"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/driver.stdout.gz",
+      "bytes": 889,
+      "sha256": "319d0cb77a8d73b09e2b7712f1dc4533e05cd64a6c55a093869bd43b0546c958"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.gz",
+      "bytes": 6200,
+      "sha256": "187ccdf8b82bd40892bed10f3698eceae8a120ab37e6a97c6398a02391d9f878"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "0cd95f082e15b3c3af31bb0db64b23fdf70ed5999fb9b515f54dbdc40cca00da"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.frontend.log.gz",
+      "bytes": 509,
+      "sha256": "ab7840a96a27522bac2a0b8a9bc4026c6a30412b1f5a6639ca5ee047294d6f48"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "c39bb491c0d5b1b1bb6155429df54a6109dd37e1a350571c5025c7c6d02add78"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/driver.stdout.gz",
+      "bytes": 857,
+      "sha256": "1380c1a0b055ab4e9342a12dec49f566bea8d607afc385e6b117d786a0a0f69f"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.gz",
+      "bytes": 7294,
+      "sha256": "9f62c09b242b8394378320ee3ed24147c43b6e36b587cf6132caaf1081955f39"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "058891b32dd96e3672c89f1e760309a63391e8704796f36b29909af84b48b234"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.frontend.json.gz",
+      "bytes": 314,
+      "sha256": "672b466740c6c63185cf7525ab183340d5b6bc1a7a4bfdffcb5e14ee15a53987"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.frontend.log.gz",
+      "bytes": 2048,
+      "sha256": "907d839c07321d6ade1c981bba4ea6f66d5f9927c1beaf878c0c0a984a68017a"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/missing_final_checkpoints/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "dc1f4cd1c0438bd8f86812740f830411b48a96a64293b8fcaa62ec2c2d4e8078"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/results.json",
+      "archive": "spec/execution-ix5h0yfp/cases/results.json.gz",
+      "bytes": 24348,
+      "sha256": "04645469e847aab5ecac148583ca9e8780393435b1dadde78c6b9be533b09291"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/driver.stdout.gz",
+      "bytes": 845,
+      "sha256": "5ef4d3794fe8f54a404677c490731c26325afa088d0c729c3a60b7a5badeaf51"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.gz",
+      "bytes": 8131,
+      "sha256": "1375424b5c65ea59a4d40be5fafa2c24fa7d3783ac472c32e00350b144b6417f"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "81d9cd4acc2417e3fbfd9d837e8ae21e572713ee93e41290fd06e1b4654f123f"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.frontend.log.gz",
+      "bytes": 2036,
+      "sha256": "f406102b3febae7defe44f586fda61b608e34c1ee35c5047a24c7e626d2930de"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/unterminated_tail/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "c87cc800645766b3acfd82c05f4c15eea2d2768b9eff4a34cb8c515b832ce186"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/driver.stdout.gz",
+      "bytes": 739,
+      "sha256": "9f188aaa49915af76177e05f4b0b419d2b7d253228480cf6631c6532555ec64b"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/mock-calls.json.gz",
+      "bytes": 1390,
+      "sha256": "286ec3b045d443205d6e0b8baaad68ccbe554f1ab4c5ca99280478aec8e1e949"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.gz",
+      "bytes": 7963,
+      "sha256": "d22955d9f0c05f7c5ea1c91ca8480a23d17d8bc1078866925aec731ea254929d"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.evidence.jsonl.gz",
+      "bytes": 3053,
+      "sha256": "baaf2cf69b0d84703b927f9b1eef2a3d2829b4f9b0f7129d9cb06aba0b5e7c24"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.frontend.log.gz",
+      "bytes": 2030,
+      "sha256": "ea3863ab230d85980cc546fd8d4f6b5b5ea23fd1dd325d50d5e269c080819717"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/valid_progress_control/result.json.samples.jsonl.gz",
+      "bytes": 712,
+      "sha256": "6032497cedb69118ad58331647f139d9f1713606285a29cce9cfd7a686192cb2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/driver.stdout",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/driver.stdout.gz",
+      "bytes": 819,
+      "sha256": "a4268b58d024d16adcd059be4ca6b4962e892662b3c505788704f0d722cc7617"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/mock-calls.json",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/mock-calls.json.gz",
+      "bytes": 928,
+      "sha256": "7b7d72b1264c0aa760fa284cb989980f65126ccc27bf185b69fca44b9f8de3e7"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.gz",
+      "bytes": 8133,
+      "sha256": "b387c169d3b6613ba42c2707c8852c6d8066aa72ee373f37e9aea073d3665b31"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.evidence.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.evidence.jsonl.gz",
+      "bytes": 2890,
+      "sha256": "7df79ca9383f6a944f2a7c90bc53e77af89da86cfdb6c876a99fdd1db2a2f308"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.frontend.json",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.frontend.json.gz",
+      "bytes": 885,
+      "sha256": "35702c42ff9604760637fa203624f9d2be8f3f2f259481e1998d6f2bbe78838c"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.frontend.log",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.frontend.log.gz",
+      "bytes": 2042,
+      "sha256": "d2d195b6e42b8730ea07d60b8142471a819cdad93463c3fa15f60a2db37ca477"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.log",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.phase-samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.phase-samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.samples.jsonl",
+      "archive": "spec/execution-ix5h0yfp/cases/webcontent_parse_failure/result.json.samples.jsonl.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/invocation-start.json",
+      "archive": "spec/execution-ix5h0yfp/invocation-start.json.gz",
+      "bytes": 940,
+      "sha256": "c0b818b1043fc4c86854dc43105bf7e85f6477387916b7c0107a2eb3e7240c70"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/invocation.json",
+      "archive": "spec/execution-ix5h0yfp/invocation.json.gz",
+      "bytes": 17928,
+      "sha256": "f45ef000b84aede36f824b897b9749f466c3061a6da67ab58614233e74b7dadc"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/stderr.txt",
+      "archive": "spec/execution-ix5h0yfp/stderr.txt.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/stdout.txt",
+      "archive": "spec/execution-ix5h0yfp/stdout.txt.gz",
+      "bytes": 24348,
+      "sha256": "04645469e847aab5ecac148583ca9e8780393435b1dadde78c6b9be533b09291"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/record-run.py",
+      "archive": "spec/record-run.py.gz",
+      "bytes": 2028,
+      "sha256": "e4a99fd0d2389ca64b82c0779b105a6a82e5fdc0e7fd9f27e231a80fe1077016"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/reproduce.py",
+      "archive": "spec/reproduce.py.gz",
+      "bytes": 17008,
+      "sha256": "d452c05ed8fc72daf63249747533271ff6a2da6bfde7620a62d6dfe66e3be2d2"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/spec.md",
+      "archive": "spec/spec.md.gz",
+      "bytes": 2629,
+      "sha256": "37225fecdf71bfb36252eaf44f1dee5dbccad0940143227021ba699790e87d80"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/test-fixed.py",
+      "archive": "spec/test-fixed.py.gz",
+      "bytes": 59358,
+      "sha256": "0c4b9ef1f5b2b2e6b812ef5c2d9f78e439044aeae3d2e41e07cc7ec9030b1e6e"
+    }
+  ],
+  "excluded": [
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/anchor_path_control/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/bad_json_control/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/duplicate_same_anchor/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/first_rss_timeout/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/later_rss_timeout/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/mismatched_progress_metadata/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_all_progress_checkpoints/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/missing_final_checkpoints/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/unterminated_tail/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/valid_progress_control/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    },
+    {
+      "source": "/private/tmp/revia-q98-spec-review03.UD0IJZ/execution-ix5h0yfp/cases/webcontent_parse_failure/Revia.app/Contents/MacOS/revia",
+      "reason": "Mock app/cache/symlink; not real application evidence"
+    }
+  ]
+}

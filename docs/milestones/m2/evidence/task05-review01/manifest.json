@@ -1,0 +1,41 @@
+{
+  "reviewedSource": "36a39a1073223ae9835480ff54f3301e5f9c2fb2",
+  "boundary": "External rustc client linked existing library; prebuilt library commit provenance not independently established. Static findings are pinned to the reviewed source. No GUI or project rebuild.",
+  "files": [
+    {
+      "source": "/private/tmp/revia-review05-standards-53_7h84n/review.rs",
+      "stored": "review.rs",
+      "bytes": 4774,
+      "sourceSha256": "d167d68f648b5171fc98e765818eed088b6be61edb51869bfe617e2217086c54",
+      "storedSha256": "d167d68f648b5171fc98e765818eed088b6be61edb51869bfe617e2217086c54"
+    },
+    {
+      "source": "/private/tmp/revia-review05-standards-53_7h84n/compile-command.txt",
+      "stored": "compile-command.txt",
+      "bytes": 381,
+      "sourceSha256": "ea9679d8345a547237ee4bd9b705efc4b4ea26ee3022a6ac253b89e13ae91c50",
+      "storedSha256": "ea9679d8345a547237ee4bd9b705efc4b4ea26ee3022a6ac253b89e13ae91c50"
+    },
+    {
+      "source": "/private/tmp/revia-review05-standards-53_7h84n/run.stdout",
+      "stored": "run.stdout",
+      "bytes": 329,
+      "sourceSha256": "76a868530ef90944fd64872f6b95a505ec568d7fcc00f47ab3f3c71fffc1a014",
+      "storedSha256": "76a868530ef90944fd64872f6b95a505ec568d7fcc00f47ab3f3c71fffc1a014"
+    },
+    {
+      "source": "/private/tmp/revia-review05-standards-53_7h84n/run.stderr",
+      "stored": "run.stderr",
+      "bytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/private/tmp/revia-review05-standards-53_7h84n/provenance.json",
+      "stored": "provenance.json",
+      "bytes": 588,
+      "sourceSha256": "0be944d3797cbd3dae3b9b7f91dd23709fa876af75da460bb60afbd969e558d9",
+      "storedSha256": "0be944d3797cbd3dae3b9b7f91dd23709fa876af75da460bb60afbd969e558d9"
+    }
+  ]
+}

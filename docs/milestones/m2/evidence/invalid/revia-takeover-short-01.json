@@ -1,0 +1,117 @@
+{
+  "test": "long_running_baseline",
+  "runCompleted": false,
+  "acceptance": "pending: visible desktop evidence and WebKit PID attribution require review",
+  "webkitAttribution": "unverified launch-time candidates, not proven ownership",
+  "isolatedDataDir": "/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-soak-data-lx1jqjc8",
+  "frontendReportPath": "/tmp/revia-takeover-short-01.json.frontend.json",
+  "startedAt": "2026-10-21T14:11:38.735257",
+  "endedAt": "2026-10-21T14:11:53.280084",
+  "targetDurationSeconds": 60,
+  "actualDurationSeconds": 14.5,
+  "reviaPid": 88545,
+  "frontend": {
+    "error": "Error: 窗口不可见或合成帧不足，长测无效",
+    "ok": false,
+    "samples": [],
+    "session": {
+      "checks": [
+        {
+          "detail": "/opt/homebrew/bin/git（git version 2.56.0）",
+          "hint": "需要 Git 2.11 或更高版本",
+          "name": "git",
+          "ok": true
+        },
+        {
+          "detail": "/bin/zsh · 134 毫秒",
+          "hint": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
+          "name": "shell",
+          "ok": true
+        }
+      ],
+      "gitPath": "/opt/homebrew/bin/git",
+      "gitVersion": "git version 2.56.0",
+      "shell": "/bin/zsh",
+      "shellElapsedMs": 134
+    }
+  },
+  "memoryAnalysis": {
+    "sampleCount": 3,
+    "warmupCutoffSeconds": 15,
+    "rust": {
+      "initialMb": 117.5,
+      "steadyStartMb": 117.5,
+      "steadyEndMb": 119.97,
+      "peakMb": 119.97,
+      "growthRateMbPerHour": 889.2
+    },
+    "webContent": {
+      "initialMb": 102.91,
+      "steadyStartMb": 102.91,
+      "steadyEndMb": 138.98,
+      "peakMb": 138.98,
+      "growthRateMbPerHour": 12985.2
+    },
+    "total": {
+      "initialMb": 270.81,
+      "peakMb": 310.53,
+      "finalMb": 310.53
+    }
+  },
+  "memoryTimeSeries": [
+    {
+      "elapsedSec": 0.0,
+      "timestamp": "2026-10-21T14:11:40.793734",
+      "rustRssMb": 117.5,
+      "webContentRssMb": 102.91,
+      "networkingRssMb": 11.94,
+      "gpuRssMb": 38.47,
+      "totalRssMb": 270.81,
+      "webContentPids": [
+        88549
+      ],
+      "gpuPids": [
+        88548
+      ],
+      "networkingPids": [
+        88550
+      ]
+    },
+    {
+      "elapsedSec": 5.0,
+      "timestamp": "2026-10-21T14:11:45.814560",
+      "rustRssMb": 119.81,
+      "webContentRssMb": 133.28,
+      "networkingRssMb": 11.97,
+      "gpuRssMb": 39.98,
+      "totalRssMb": 305.05,
+      "webContentPids": [
+        88549
+      ],
+      "gpuPids": [
+        88548
+      ],
+      "networkingPids": [
+        88550
+      ]
+    },
+    {
+      "elapsedSec": 10.0,
+      "timestamp": "2026-10-21T14:11:50.843017",
+      "rustRssMb": 119.97,
+      "webContentRssMb": 138.98,
+      "networkingRssMb": 11.92,
+      "gpuRssMb": 39.66,
+      "totalRssMb": 310.53,
+      "webContentPids": [
+        88549
+      ],
+      "gpuPids": [
+        88548
+      ],
+      "networkingPids": [
+        88550
+      ]
+    }
+  ]
+}

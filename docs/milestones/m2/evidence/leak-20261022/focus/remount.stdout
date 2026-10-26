@@ -1,0 +1,71 @@
+Revia PID=7609，等待可见窗口后连续操作 540 秒；诊断={'loggingMode': 'minimal', 'idleSeconds': 0, 'cycles': None, 'focus': 'remount'}；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/focus6/remount.json
+[    2.0s] Rust 115.8 MB / WebContent 64.6 MB
+[   12.2s] Rust 116.1 MB / WebContent 110.6 MB
+[   22.3s] Rust 117.4 MB / WebContent 135.8 MB
+[   32.5s] Rust 117.4 MB / WebContent 145.6 MB
+[   42.6s] Rust 117.3 MB / WebContent 150.3 MB
+[   52.7s] Rust 117.3 MB / WebContent 157.6 MB
+[   62.8s] Rust 117.4 MB / WebContent 161.5 MB
+[   72.8s] Rust 117.3 MB / WebContent 164.6 MB
+[   82.9s] Rust 117.3 MB / WebContent 168.2 MB
+[   93.1s] Rust 117.3 MB / WebContent 175.4 MB
+[phase 531 pressure] samplingChecksPassed=True duration=12.060s WebContent 50.9 MB / malloc 17.0 MB; pending closure
+[  108.0s] Rust 116.8 MB / WebContent 175.3 MB
+[  118.2s] Rust 116.8 MB / WebContent 186.5 MB
+[  128.3s] Rust 116.8 MB / WebContent 191.8 MB
+[  138.4s] Rust 115.8 MB / WebContent 192.3 MB
+[  148.5s] Rust 110.3 MB / WebContent 187.7 MB
+[  158.6s] Rust 110.3 MB / WebContent 188.5 MB
+[  168.7s] Rust 110.3 MB / WebContent 188.8 MB
+[  178.9s] Rust 102.6 MB / WebContent 199.8 MB
+[  189.0s] Rust 101.6 MB / WebContent 182.7 MB
+[  199.1s] Rust 93.2 MB / WebContent 172.9 MB
+[phase 1167 pressure] samplingChecksPassed=True duration=12.041s WebContent 79.6 MB / malloc 25.7 MB; pending closure
+[  214.3s] Rust 93.3 MB / WebContent 179.4 MB
+[  224.4s] Rust 93.4 MB / WebContent 182.6 MB
+[  234.5s] Rust 93.6 MB / WebContent 193.2 MB
+[  244.6s] Rust 93.5 MB / WebContent 202.6 MB
+[  254.8s] Rust 93.5 MB / WebContent 205.3 MB
+[  265.0s] Rust 93.5 MB / WebContent 207.4 MB
+[  275.0s] Rust 93.5 MB / WebContent 208.0 MB
+[  285.1s] Rust 93.5 MB / WebContent 211.7 MB
+[  295.2s] Rust 93.5 MB / WebContent 212.6 MB
+[  305.2s] Rust 93.5 MB / WebContent 215.3 MB
+[phase 1815 pressure] samplingChecksPassed=True duration=12.011s WebContent 106.5 MB / malloc 30.3 MB; pending closure
+[  320.1s] Rust 93.5 MB / WebContent 215.6 MB
+[  330.2s] Rust 93.6 MB / WebContent 216.7 MB
+[  340.2s] Rust 93.5 MB / WebContent 219.9 MB
+[  350.4s] Rust 93.7 MB / WebContent 214.3 MB
+[  360.4s] Rust 93.6 MB / WebContent 216.3 MB
+[  370.5s] Rust 93.6 MB / WebContent 216.6 MB
+[  380.5s] Rust 93.6 MB / WebContent 216.9 MB
+[  390.6s] Rust 93.7 MB / WebContent 218.0 MB
+[  400.6s] Rust 93.6 MB / WebContent 218.1 MB
+[  410.7s] Rust 93.5 MB / WebContent 225.7 MB
+[phase 2446 pressure] samplingChecksPassed=True duration=12.081s WebContent 107.6 MB / malloc 32.9 MB; pending closure
+[  426.8s] Rust 93.5 MB / WebContent 225.8 MB
+[  436.9s] Rust 93.5 MB / WebContent 226.3 MB
+[  447.1s] Rust 93.6 MB / WebContent 226.7 MB
+[  457.1s] Rust 93.6 MB / WebContent 226.7 MB
+[  467.1s] Rust 93.7 MB / WebContent 226.8 MB
+[  477.2s] Rust 93.6 MB / WebContent 226.8 MB
+[  487.2s] Rust 93.6 MB / WebContent 227.0 MB
+[  497.4s] Rust 93.6 MB / WebContent 227.1 MB
+[  507.5s] Rust 93.6 MB / WebContent 227.5 MB
+[  517.6s] Rust 93.6 MB / WebContent 265.9 MB
+[phase 3084 pressure] samplingChecksPassed=True duration=12.131s WebContent 110.4 MB / malloc 38.2 MB; pending closure
+[  533.2s] Rust 93.5 MB / WebContent 265.8 MB
+[  543.2s] Rust 93.5 MB / WebContent 231.8 MB
+[  553.4s] Rust 93.7 MB / WebContent 251.4 MB
+[  563.5s] Rust 93.6 MB / WebContent 253.9 MB
+[  573.7s] Rust 93.6 MB / WebContent 248.9 MB
+[  583.8s] Rust 93.5 MB / WebContent 245.9 MB
+[  593.8s] Rust 93.5 MB / WebContent 235.3 MB
+[  604.0s] Rust 93.5 MB / WebContent 239.1 MB
+[  614.2s] Rust 93.6 MB / WebContent 239.6 MB
+[  624.4s] Rust 93.6 MB / WebContent 241.6 MB
+[phase 3693 pressure] samplingChecksPassed=True duration=12.089s WebContent 113.2 MB / malloc 39.3 MB; pending closure
+[  639.8s] Rust 93.5 MB / WebContent 242.6 MB
+[  649.9s] Rust 93.5 MB / WebContent 223.3 MB
+运行完成，待验收：[]；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/focus6/remount.json
+Q98 内存判定：不通过；['webContentFootprintMb：超过 Q98 阈值', 'webContentMallocAllocatedMb：超过 Q98 阈值']

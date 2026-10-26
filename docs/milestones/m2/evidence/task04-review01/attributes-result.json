@@ -1,0 +1,23 @@
+{
+  "root": "/private/tmp/revia-task04-review-attributes-7yhkwrom",
+  "gitVersion": "git version 2.56.0",
+  "changedContext": {
+    "normalizedPatchUnchanged": true,
+    "workingBytesUnchangedBeforeApply": true,
+    "expectedLF": 180,
+    "expectedCRLF": 0,
+    "actualLF": 180,
+    "actualCRLF": 180,
+    "expectedSHA256": "5dcaeff63b0df79e5432bbb4f1db1e23b671a10d0186a8a536008894de113c2b",
+    "actualSHA256": "d85ad7caca0bf4edd18dced2767da96d1a7d6bd2a84799afbf19b279da69dae5",
+    "unselectedHunkLFChanged": true,
+    "indexUnchanged": true
+  },
+  "infoAttributes": {
+    "previewExitCode": 1,
+    "previewStderr": "error: patch failed: target.txt:7\nerror: target.txt: patch does not apply\n",
+    "realApplyExitCode": 0,
+    "actualRestoredCRLF": true,
+    "indexUnchanged": true
+  }
+}

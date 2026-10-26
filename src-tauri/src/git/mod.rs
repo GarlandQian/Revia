@@ -14,7 +14,7 @@ pub mod rows;
 pub mod status;
 
 use std::collections::VecDeque;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -166,6 +166,58 @@ impl Git {
         }
     }
 
+    /// 在**完全隔离**的目录里执行：去掉所有把 Git 定位或配置重定向到别处的环境变量。
+    ///
+    /// 只改工作目录不够：从设置了 `GIT_DIR` / `GIT_WORK_TREE` 的终端启动时（Windows
+    /// 分支会继承进程全部环境），`git init` 仍会作用在原仓库上，等于修改用户的 Git 配置。
+    /// 这里按大小写不敏感的方式剔除（Windows 环境变量名不区分大小写）。
+    pub fn in_isolated_directory(&self, directory: &Path) -> Self {
+        const REDIRECT_VARS: &[&str] = &[
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            // 配置重定向：`GIT_CONFIG` 指向单个配置文件，`GIT_CONFIG_COUNT` /
+            // `GIT_CONFIG_PARAMETERS` / `GIT_CONFIG_KEY_*` 可在环境里注入配置。
+            // 保留任一都会让 scratch 的 `config` 写进用户配置。
+            "GIT_CONFIG",
+            "GIT_CONFIG_COUNT",
+            "GIT_CONFIG_PARAMETERS",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_COMMON_DIR",
+            "GIT_NAMESPACE",
+            "GIT_PREFIX",
+            "GIT_CEILING_DIRECTORIES",
+            "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+            "GIT_SHALLOW_FILE",
+            "GIT_GRAFT_FILE",
+            "GIT_REPLACE_REF_BASE",
+        ];
+        let env = self
+            .env
+            .iter()
+            .filter(|(key, _)| {
+                if key
+                    .to_ascii_uppercase()
+                    .starts_with("GIT_CONFIG_KEY_")
+                    || key.to_ascii_uppercase().starts_with("GIT_CONFIG_VALUE_")
+                {
+                    return false;
+                }
+                !REDIRECT_VARS
+                    .iter()
+                    .any(|name| key.eq_ignore_ascii_case(name))
+            })
+            .cloned()
+            .collect();
+        Self {
+            program: self.program.clone(),
+            directory: directory.to_path_buf(),
+            env: Arc::new(env),
+            log: self.log.clone(),
+        }
+    }
+
     pub fn version(&self) -> Result<String> {
         let output = self.run_ok(&["--version"], "读取 git 版本")?;
         Ok(output.stdout_lossy().trim().to_string())
@@ -219,12 +271,17 @@ impl Git {
     }
 
     fn run_once(&self, args: &[&str]) -> Result<GitOutput> {
+        self.run_once_with_input(args, None)
+    }
+
+    fn run_once_with_input(&self, args: &[&str], input: Option<Vec<u8>>) -> Result<GitOutput> {
         let started = Instant::now();
+        let has_input = input.is_some();
         let mut command = Command::new(&self.program);
         command
             .current_dir(&self.directory)
             .args(args)
-            .stdin(Stdio::null())
+            .stdin(if has_input { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .env_clear();
@@ -241,51 +298,66 @@ impl Git {
         })?;
 
         let sequence = self.log.next_sequence();
-        // 必须并发读取管道：diff 等命令的输出可能远大于管道缓冲区，
-        // 先等待子进程结束会死锁。
+        // 三条管道并发处理；stdin 大补丁也必须受同一超时约束。
         let stdout_pipe = child.stdout.take();
         let stderr_pipe = child.stderr.take();
         let stdout_reader = std::thread::spawn(move || read_pipe(stdout_pipe));
         let stderr_reader = std::thread::spawn(move || read_pipe(stderr_pipe));
+        let stdin_writer = input.map(|bytes| {
+            let pipe = child.stdin.take();
+            std::thread::spawn(move || -> io::Result<()> {
+                let mut pipe = pipe.ok_or_else(|| io::Error::other("Git stdin 管道不可用"))?;
+                pipe.write_all(&bytes)
+            })
+        });
 
-        let timed_out = match child.wait_timeout(GIT_TIMEOUT) {
-            Ok(Some(_)) => false,
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                true
-            }
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(AppError::environment(format!("等待 git 失败：{error}")));
-            }
-        };
-
-        let status = child
-            .wait()
-            .map_err(|error| AppError::environment(format!("等待 git 结束失败：{error}")))?;
+        let waited = child.wait_timeout(GIT_TIMEOUT.saturating_sub(started.elapsed()));
+        let timed_out = matches!(&waited, Ok(None));
+        if timed_out || waited.is_err() {
+            let _ = child.kill();
+        }
+        let status = child.wait();
+        // 包括超时/中断路径：先结束子进程，再回收全部管道线程。
+        let input_error = stdin_writer.and_then(|writer| match writer.join() {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error.to_string()),
+            Err(_) => Some("Git stdin 写入线程中断".to_string()),
+        });
         let stdout = stdout_reader.join().unwrap_or_default();
         let stderr_bytes = stderr_reader.join().unwrap_or_default();
         let elapsed = started.elapsed();
         let stderr = String::from_utf8_lossy(&stderr_bytes).into_owned();
+        let exit_code = status.as_ref().ok().and_then(|value| value.code()).unwrap_or(-1);
 
         self.log.record(CommandRecord {
             sequence,
             program: self.program.display().to_string(),
             args: args.iter().map(|arg| arg.to_string()).collect(),
             directory: self.directory.display().to_string(),
-            exit_code: status.code().unwrap_or(-1),
+            exit_code,
             elapsed_ms: elapsed.as_millis() as u64,
             timed_out,
             stdout_bytes: stdout.len(),
             stderr_excerpt: truncate(stderr.trim(), 2000),
         });
 
+        if let Some(error) = waited.err().or_else(|| status.err()) {
+            return Err(if has_input {
+                AppError::needs_verification(format!("等待 Git 写入结果失败，结果待核对：{error}"))
+            } else {
+                AppError::environment(format!("等待 git 结束失败：{error}"))
+            });
+        }
+        if exit_code == 0 {
+            if let Some(error) = input_error {
+                return Err(AppError::needs_verification(format!("无法确认补丁完整写入，结果待核对：{error}")));
+            }
+        }
+        // Git 因锁占用等先退出时，stdin 的 BrokenPipe 不覆盖真实退出原因。
         Ok(GitOutput {
             stdout,
             stderr,
-            exit_code: status.code().unwrap_or(-1),
+            exit_code,
             elapsed,
             timed_out,
         })
@@ -321,9 +393,13 @@ impl Git {
         (!name.is_empty() && name != "HEAD").then(|| name.to_string())
     }
 
-    /// 某个版本中的文件内容：`HEAD:<path>`、`:<path>`（暂存区）。
+    /// 某个版本中的文件内容：`HEAD:<path>`、`:0:<path>`（暂存区 stage 0，审查意见 3）。
     pub fn file_at(&self, scope: &str, path: &str) -> Option<String> {
-        let spec = format!("{scope}:{path}");
+        let spec = if scope.is_empty() || scope == "index" || scope == ":" {
+            format!(":0:{path}")
+        } else {
+            format!("{scope}:{path}")
+        };
         let output = self.run(&["show", &spec]).ok()?;
         if output.exit_code != 0 {
             return None;
@@ -336,6 +412,28 @@ impl Git {
         std::fs::read(self.directory.join(path))
             .ok()
             .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    /// 读取某个前缀下的全部配置项，返回（键, 值）。
+    ///
+    /// 必须使用 `--null`：配置值可以合法包含换行（例如 `smudge = ":\ncat"`），
+    /// 按行拆分会把多行命令截断，复制到预览仓库后与原仓库语义不同。
+    pub fn config_entries(&self, prefix: &str) -> Result<Vec<(String, String)>> {
+        let pattern = format!("^{prefix}");
+        let output = self.run(&["config", "--null", "--get-regexp", &pattern])?;
+        if output.exit_code == 1 {
+            return Ok(Vec::new());
+        }
+        let output = output.into_success("读取 Git 配置")?;
+        Ok(parse_config_null(&output.stdout))
+    }
+
+    /// Git 自己解析出的真实路径（例如 `info/attributes` 在 linked worktree 下位于 commonDir）。
+    /// 返回值可能是相对路径，调用方按工作目录解析。
+    pub fn git_path(&self, name: &str) -> Option<PathBuf> {
+        let text = self.try_run(&["rev-parse", "--git-path", name])?;
+        let path = text.trim();
+        (!path.is_empty()).then(|| PathBuf::from(path))
     }
 
     /// `git config --get`；未设置时返回 None。
@@ -355,8 +453,69 @@ impl Git {
         self.diff(Some("--staged"), path)
     }
 
+    /// 暂存区相对 HEAD 的 diff（已暂存改动）。支持传入 original_path（重命名场景）。
+    pub fn diff_index_with_orig(&self, path: &str, orig_path: Option<&str>) -> Result<Vec<u8>> {
+        let mut args: Vec<&str> = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.push("--staged");
+        args.push("--");
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        Ok(self.run_ok(&args, "读取已暂存 diff")?.stdout)
+    }
+
+    /// 整文件暂存：调用 git --literal-pathspecs add -A -- <paths>（Q8、Q79、Q83、审查 1）。
+    pub fn stage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "add", "-A", "--"];
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        self.run_once(&args)
+    }
+
+    /// 整文件取消暂存：调用 git --literal-pathspecs reset -- <paths>（Q8、Q79、T04、审查 1）。
+    pub fn unstage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "reset", "--"];
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        self.run_once(&args)
+    }
+
+    /// 单次应用已校验的原始 hunk，只写暂存区；锁重试由会话层重新校验后决定。
+    pub fn apply_index_patch(&self, patch: Vec<u8>, reverse: bool) -> Result<GitOutput> {
+        let mut args = vec![
+            "-c", "apply.ignoreWhitespace=no", "apply", "--cached", "--whitespace=nowarn",
+        ];
+        if reverse {
+            args.push("--reverse");
+        }
+        args.push("-");
+        self.run_once_with_input(&args, Some(patch))
+    }
+
+    pub fn discard_patch(&self, path: &str) -> Result<Vec<u8>> {
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.extend_from_slice(&["--binary", "--full-index", "--", path]);
+        Ok(self.run_ok(&args, "读取完整丢弃补丁")?.stdout)
+    }
+
+    /// No --index/--cached/--3way: discarding must not change the index.
+    pub fn apply_worktree_patch(&self, patch: Vec<u8>) -> Result<GitOutput> {
+        self.run_once_with_input(&["-c", "apply.ignoreWhitespace=no", "apply", "--reverse", "--whitespace=nowarn", "-"], Some(patch))
+    }
+
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {
-        let mut args: Vec<&str> = vec!["-c", "core.quotePath=false", "diff"];
+        let mut args: Vec<&str> = Vec::new();
+        if path.is_some() {
+            args.push("--literal-pathspecs");
+        }
+        args.extend_from_slice(&["-c", "core.quotePath=false", "diff"]);
         args.extend_from_slice(DIFF_FLAGS);
         if let Some(extra) = extra {
             args.push(extra);
@@ -370,8 +529,37 @@ impl Git {
 
     /// 未跟踪文件：用 `git diff --no-index -- /dev/null <路径>` 生成 diff，
     /// 保证 hunk 也来自 Git（ADR-0004）。有差异时退出码是 1，不是失败。
+    /// 两个目录外文件之间的只读 diff（用于回收区「保存版本 vs 当前内容」）。
+    ///
+    /// 走 `git diff --no-index`，因此 hunk 仍由 Git 生成（ADR-0004）；
+    /// 两个文件都在临时目录里，不往用户仓库写任何东西。
+    pub fn diff_no_index(&self, old: &Path, new: &Path) -> Result<Vec<u8>> {
+        let old_text = old.display().to_string();
+        let new_text = new.display().to_string();
+        let args: Vec<&str> = vec![
+            "--no-pager",
+            "-c",
+            "core.quotePath=false",
+            "diff",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+            "--unified=3",
+            "--no-index",
+            "--",
+            &old_text,
+            &new_text,
+        ];
+        Ok(self
+            .run_allow_difference(&args, "生成回收内容对比 diff")?
+            .stdout)
+    }
+
     pub fn diff_untracked(&self, path: &str) -> Result<Vec<u8>> {
         let args: Vec<&str> = vec![
+            "--literal-pathspecs",
             "-c",
             "core.quotePath=false",
             "diff",
@@ -401,7 +589,27 @@ fn read_pipe(pipe: Option<impl Read>) -> Vec<u8> {
     buffer
 }
 
-fn is_lock_error(output: &GitOutput) -> bool {
+/// 解析 `git config --null --get-regexp` 的输出：每条记录是 `key\nvalue\0`。
+/// 值内部可以包含换行与空白，必须原样保留。
+fn parse_config_null(bytes: &[u8]) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    for chunk in bytes.split(|byte| *byte == 0) {
+        if chunk.is_empty() {
+            continue;
+        }
+        match chunk.iter().position(|byte| *byte == b'\n') {
+            Some(index) => entries.push((
+                String::from_utf8_lossy(&chunk[..index]).into_owned(),
+                String::from_utf8_lossy(&chunk[index + 1..]).into_owned(),
+            )),
+            // 没有分隔符时是「值为真」的布尔配置。
+            None => entries.push((String::from_utf8_lossy(chunk).into_owned(), "true".into())),
+        }
+    }
+    entries
+}
+
+pub fn is_lock_error(output: &GitOutput) -> bool {
     output.exit_code != 0 && output.stderr.contains("index.lock")
 }
 

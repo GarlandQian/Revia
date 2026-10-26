@@ -18,7 +18,8 @@
         "minWidth": 900,
         "minHeight": 520,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 20 }
       }
     ],
     "security": {
@@ -33,7 +34,8 @@
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/Assets.car"
     ]
   }
 }

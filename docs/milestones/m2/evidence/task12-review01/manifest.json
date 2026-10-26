@@ -1,0 +1,149 @@
+{
+  "sourceCommit": "48482656b7bf46223e371e44d1d1dddb6f60903b",
+  "reviewRange": "ff2fc640d3a6fa771d1d6b8a5514a3d7471ab347...48482656b7bf46223e371e44d1d1dddb6f60903b",
+  "boundary": "Mac implementation checks only. Independent static review Standards0/Spec0. No Release, desktop, D06, new Windows CI or long run. No new test framework for UI cleanup.",
+  "sourceHashChecks": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "c3859baca864f55ed84564d8d3ab91e1d5ecdb6ec8da27e1b595e2afe3e3542f"
+    },
+    {
+      "path": "src/lib/ipc.ts",
+      "sha256": "fe2dd84edeb474eb143a01136ab842e739125f9e3ff227d082352eebd3da4a7b"
+    },
+    {
+      "path": "src-tauri/src/commands.rs",
+      "sha256": "d823d89b04993c9684980863900a30898c015cabfcb99b9168cf3072b4fbf407"
+    }
+  ],
+  "files": [
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/MANIFEST.md",
+      "stored": "MANIFEST.md.gz",
+      "sourceBytes": 968,
+      "storedBytes": 696,
+      "sourceSha256": "89f325ca4f0c933e3c22f42f3e37300e058ac4280ecf633f1bda7665f2bf0152",
+      "storedSha256": "bed857484efa082b7fe60e6957d189cfb820ae944e2498041fd7c7aca4c0c1a9"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/base-sha.txt",
+      "stored": "base-sha.txt.gz",
+      "sourceBytes": 41,
+      "storedBytes": 59,
+      "sourceSha256": "9540af9945104a0c8ce227a574a0f228f1278d50c0208f77357c437b91b51952",
+      "storedSha256": "0aeb6b724f2be769926f06712d1c6301f29725209ccf1a481fcc25296632dc96"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/build.err",
+      "stored": "build.err.gz",
+      "sourceBytes": 327,
+      "storedBytes": 268,
+      "sourceSha256": "cc76b18d8f17391a894cd884e4c760361c66d536d27216c2548e9a395bf32f2c",
+      "storedSha256": "5ad5b09b12b51761acfac63a65d87b46a986499230bf673e04c355efddc88748"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/build.exit",
+      "stored": "build.exit.gz",
+      "sourceBytes": 13,
+      "storedBytes": 33,
+      "sourceSha256": "eebaab80b1d5a43142ef55ac3a918ad91ffaa8b3b15f9616382c64d9d405499a",
+      "storedSha256": "3322325c19ad436ae44db8e23e15c9f116f7b92a8a7404ffc00bcd03abf0038e"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/build.out",
+      "stored": "build.out.gz",
+      "sourceBytes": 352,
+      "storedBytes": 241,
+      "sourceSha256": "ac49491a3704555fe98b2c19a56dd50d970665f68083df1c72be9d03120837dd",
+      "storedSha256": "ab055c8357e89473dcb304957120411ee66cbf3d6a2df291f8be89d21d7ef4fc"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/cargo-test.err",
+      "stored": "cargo-test.err.gz",
+      "sourceBytes": 3810,
+      "storedBytes": 1088,
+      "sourceSha256": "e17f935ba3b480c8c8cf6757e21a09aa8cc4abe137794e4db43fc382e334e118",
+      "storedSha256": "b283f56288172b21309636d9d59d879380d7933be621bec793e0bed9b9651801"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/cargo-test.exit",
+      "stored": "cargo-test.exit.gz",
+      "sourceBytes": 18,
+      "storedBytes": 38,
+      "sourceSha256": "7a9ece8b349bb5656b5d7e6bb350410c21537efd459bc2269abe76bda7cd45bd",
+      "storedSha256": "a271494abf6bc571e5fbf25f89d9a8965e6473a3eaf7352afacbf1f23407f429"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/cargo-test.out",
+      "stored": "cargo-test.out.gz",
+      "sourceBytes": 16973,
+      "storedBytes": 4825,
+      "sourceSha256": "c6a3327f25ddf693361eec2519d7b8917b3d80265839700fbb20692e667d962c",
+      "storedSha256": "15190f99e9ad0e080b94c8134bf28819c8c7aab57f98d9ce6c9ebcc56c189e01"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/changed-files.txt",
+      "stored": "changed-files.txt.gz",
+      "sourceBytes": 62,
+      "storedBytes": 70,
+      "sourceSha256": "e3c7741acff135a97010e51e0257c20d57d1f7f3827980e0dd20611fc8a4f9d9",
+      "storedSha256": "308b5d045c407ee6c944921384078a875df1a6d5bb209ff7186b53ffc6c9f3bf"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/lint.err",
+      "stored": "lint.err.gz",
+      "sourceBytes": 9,
+      "storedBytes": 29,
+      "sourceSha256": "fe82195262b09727902d8ea57ceb3e12a09e5df0c6f26157db77f5c51b45d9f5",
+      "storedSha256": "a2f69344b19a8a0e31ec224c75e894463db27b934d4dd7221403a0516b00247d"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/lint.exit",
+      "stored": "lint.exit.gz",
+      "sourceBytes": 12,
+      "storedBytes": 32,
+      "sourceSha256": "8343f61e1be9560b234eef3f8c5a8160e982dbc596b43d9344ad68eb4a652df2",
+      "storedSha256": "8782bea0bdb2f70c6b4c6e766d361c71af9ef671b0f25f51f399363cace11ae5"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/lint.out",
+      "stored": "lint.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/source-sha256-before-check.txt",
+      "stored": "source-sha256-before-check.txt.gz",
+      "sourceBytes": 251,
+      "storedBytes": 196,
+      "sourceSha256": "a8f4cf735eb12e9659eecc9685293fe84eee0fe22ca3c08b9792cc54b88981cb",
+      "storedSha256": "ebb2efb809419987a14585e1799df465eb0a148a4222b05068816f4fa836c9c1"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/tsc.err",
+      "stored": "tsc.err.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/tsc.exit",
+      "stored": "tsc.exit.gz",
+      "sourceBytes": 11,
+      "storedBytes": 31,
+      "sourceSha256": "a6ce7f41eaf235b981cdbfe9a3d6a5d9a3502b6bd605ffc2acf78679a4ee9a2f",
+      "storedSha256": "cb6bfdb6fcb3cde8c7d97a936af78aeb1d876f98c3e9e152db6263f86a523a61"
+    },
+    {
+      "source": "/private/tmp/revia-task12-zyZuUB/tsc.out",
+      "stored": "tsc.out.gz",
+      "sourceBytes": 0,
+      "storedBytes": 20,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

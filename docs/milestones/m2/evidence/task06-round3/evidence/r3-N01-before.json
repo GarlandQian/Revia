@@ -1,0 +1,118 @@
+{
+  "startedAt": "2026-10-23T14:39:22.895+08:00",
+  "finishedAt": "2026-10-23T14:39:22.971+08:00",
+  "repo": "A",
+  "target": "10-target.ts",
+  "gitProgram": "/opt/homebrew/Cellar/git/2.56.0_1/bin/git",
+  "readOnly": true,
+  "consistency": "Sequential observations, not an atomic cross-command snapshot",
+  "paths": {
+    "worktree": "/private/tmp/revia-task06-2fuu2r92/A",
+    "gitDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+    "commonDir": "/private/tmp/revia-task06-2fuu2r92/A/.git",
+    "index": "/private/tmp/revia-task06-2fuu2r92/A/.git/index"
+  },
+  "worktreeFile": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/A/10-target.ts",
+    "exists": true,
+    "sha256": "279f54dff3fb5034f419036511916ff7252875950d265ea8763c2fba19b227d9",
+    "bytes": 5119,
+    "lines": 180,
+    "mode": "0644",
+    "inode": 163123334,
+    "mtimeNs": 1792716843651430963
+  },
+  "indexFile": {
+    "path": "/private/tmp/revia-task06-2fuu2r92/A/.git/index",
+    "exists": true,
+    "sha256": "27f5f5a4a5f84c9799682983983361271a774fcdac9ce04cdaee0b30bd15a2ea",
+    "bytes": 465,
+    "lines": 3,
+    "mode": "0644",
+    "inode": 163269762,
+    "mtimeNs": 1792737061560913505
+  },
+  "indexBlobs": [
+    {
+      "path": "10-target.ts",
+      "mode": "100644",
+      "oid": "ff62c5f30c53e982e118e283b39e1e1555cbd3f7",
+      "stage": 0,
+      "bytes": 5112,
+      "sha256": "c8fd05c9f37409465d858d85a0469879c86e6b9a4c5768b7c3f23592f75d72df"
+    }
+  ],
+  "git": {
+    "head": {
+      "args": [
+        "rev-parse",
+        "--verify",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 5.986,
+      "stdoutText": "4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\n",
+      "stdoutBase64": "NDYxOWI0YjNmMGU3Y2IxYTcxZjYwNzBkZjdiNjdiYzhiMDhlNDM2Ygo=",
+      "stderrText": ""
+    },
+    "status": {
+      "args": [
+        "status",
+        "--porcelain=v2",
+        "--branch",
+        "-z",
+        "--untracked-files=all"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 9.788,
+      "stdoutText": "# branch.oid 4619b4b3f0e7cb1a71f6070df7b67bc8b08e436b\u0000# branch.head main\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 00-first.ts\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 05-before.ts\u00001 .M N... 100644 100644 100644 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 10-target.ts\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 20-after.ts\u00001 .M N... 100644 100644 100644 584565627d6b7047dde075921db3ce06d711a9d9 584565627d6b7047dde075921db3ce06d711a9d9 99-last.ts\u0000",
+      "stdoutBase64": "IyBicmFuY2gub2lkIDQ2MTliNGIzZjBlN2NiMWE3MWY2MDcwZGY3YjY3YmM4YjA4ZTQzNmIAIyBicmFuY2guaGVhZCBtYWluADEgLk0gTi4uLiAxMDA2NDQgMTAwNjQ0IDEwMDY0NCA1ODQ1NjU2MjdkNmI3MDQ3ZGRlMDc1OTIxZGIzY2UwNmQ3MTFhOWQ5IDU4NDU2NTYyN2Q2YjcwNDdkZGUwNzU5MjFkYjNjZTA2ZDcxMWE5ZDkgMDAtZmlyc3QudHMAMSAuTSBOLi4uIDEwMDY0NCAxMDA2NDQgMTAwNjQ0IDU4NDU2NTYyN2Q2YjcwNDdkZGUwNzU5MjFkYjNjZTA2ZDcxMWE5ZDkgNTg0NTY1NjI3ZDZiNzA0N2RkZTA3NTkyMWRiM2NlMDZkNzExYTlkOSAwNS1iZWZvcmUudHMAMSAuTSBOLi4uIDEwMDY0NCAxMDA2NDQgMTAwNjQ0IGZmNjJjNWYzMGM1M2U5ODJlMTE4ZTI4M2IzOWUxZTE1NTVjYmQzZjcgZmY2MmM1ZjMwYzUzZTk4MmUxMThlMjgzYjM5ZTFlMTU1NWNiZDNmNyAxMC10YXJnZXQudHMAMSAuTSBOLi4uIDEwMDY0NCAxMDA2NDQgMTAwNjQ0IDU4NDU2NTYyN2Q2YjcwNDdkZGUwNzU5MjFkYjNjZTA2ZDcxMWE5ZDkgNTg0NTY1NjI3ZDZiNzA0N2RkZTA3NTkyMWRiM2NlMDZkNzExYTlkOSAyMC1hZnRlci50cwAxIC5NIE4uLi4gMTAwNjQ0IDEwMDY0NCAxMDA2NDQgNTg0NTY1NjI3ZDZiNzA0N2RkZTA3NTkyMWRiM2NlMDZkNzExYTlkOSA1ODQ1NjU2MjdkNmI3MDQ3ZGRlMDc1OTIxZGIzY2UwNmQ3MTFhOWQ5IDk5LWxhc3QudHMA",
+      "stderrText": ""
+    },
+    "indexEntry": {
+      "args": [
+        "ls-files",
+        "--stage",
+        "-z",
+        "--",
+        "10-target.ts"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 6.719,
+      "stdoutText": "100644 ff62c5f30c53e982e118e283b39e1e1555cbd3f7 0\t10-target.ts\u0000",
+      "stdoutBase64": "MTAwNjQ0IGZmNjJjNWYzMGM1M2U5ODJlMTE4ZTI4M2IzOWUxZTE1NTVjYmQzZjcgMAkxMC10YXJnZXQudHMA",
+      "stderrText": ""
+    },
+    "diff": {
+      "args": [
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.737,
+      "stdoutText": "diff --git a/00-first.ts b/00-first.ts\nindex 5845656..f551152 100644\n--- a/00-first.ts\n+++ b/00-first.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"A_v1_00-first.ts\";\ndiff --git a/05-before.ts b/05-before.ts\nindex 5845656..b13226e 100644\n--- a/05-before.ts\n+++ b/05-before.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"A_v1_05-before.ts\";\ndiff --git a/10-target.ts b/10-target.ts\nindex ff62c5f..1d63306 100644\n--- a/10-target.ts\n+++ b/10-target.ts\n@@ -7,7 +7,7 @@ export const value006 = 6;\n export const value007 = 7;\n export const value008 = 8;\n export const value009 = 9;\n-export const value010 = 10;\n+export const value010 = 1010;\n export const value011 = 11;\n export const value012 = 12;\n export const value013 = 13;\n@@ -77,7 +77,7 @@ export const value076 = 76;\n export const value077 = 77;\n export const value078 = 78;\n export const value079 = 79;\n-export const value080 = 80;\n+export const value080 = \"A_v1\";\n export const value081 = 81;\n export const value082 = 82;\n export const value083 = 83;\n@@ -137,7 +137,7 @@ export const value136 = 136;\n export const value137 = 137;\n export const value138 = 138;\n export const value139 = 139;\n-export const value140 = 140;\n+export const value140 = 1140;\n export const value141 = 141;\n export const value142 = 142;\n export const value143 = 143;\ndiff --git a/20-after.ts b/20-after.ts\nindex 5845656..7ae82c4 100644\n--- a/20-after.ts\n+++ b/20-after.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"A_v1_20-after.ts\";\ndiff --git a/99-last.ts b/99-last.ts\nindex 5845656..342b599 100644\n--- a/99-last.ts\n+++ b/99-last.ts\n@@ -1 +1 @@\n-export const marker = \"HEAD\";\n+export const marker = \"A_v1_99-last.ts\";\n",
+      "stdoutBase64": "ZGlmZiAtLWdpdCBhLzAwLWZpcnN0LnRzIGIvMDAtZmlyc3QudHMKaW5kZXggNTg0NTY1Ni4uZjU1MTE1MiAxMDA2NDQKLS0tIGEvMDAtZmlyc3QudHMKKysrIGIvMDAtZmlyc3QudHMKQEAgLTEgKzEgQEAKLWV4cG9ydCBjb25zdCBtYXJrZXIgPSAiSEVBRCI7CitleHBvcnQgY29uc3QgbWFya2VyID0gIkFfdjFfMDAtZmlyc3QudHMiOwpkaWZmIC0tZ2l0IGEvMDUtYmVmb3JlLnRzIGIvMDUtYmVmb3JlLnRzCmluZGV4IDU4NDU2NTYuLmIxMzIyNmUgMTAwNjQ0Ci0tLSBhLzA1LWJlZm9yZS50cworKysgYi8wNS1iZWZvcmUudHMKQEAgLTEgKzEgQEAKLWV4cG9ydCBjb25zdCBtYXJrZXIgPSAiSEVBRCI7CitleHBvcnQgY29uc3QgbWFya2VyID0gIkFfdjFfMDUtYmVmb3JlLnRzIjsKZGlmZiAtLWdpdCBhLzEwLXRhcmdldC50cyBiLzEwLXRhcmdldC50cwppbmRleCBmZjYyYzVmLi4xZDYzMzA2IDEwMDY0NAotLS0gYS8xMC10YXJnZXQudHMKKysrIGIvMTAtdGFyZ2V0LnRzCkBAIC03LDcgKzcsNyBAQCBleHBvcnQgY29uc3QgdmFsdWUwMDYgPSA2OwogZXhwb3J0IGNvbnN0IHZhbHVlMDA3ID0gNzsKIGV4cG9ydCBjb25zdCB2YWx1ZTAwOCA9IDg7CiBleHBvcnQgY29uc3QgdmFsdWUwMDkgPSA5OwotZXhwb3J0IGNvbnN0IHZhbHVlMDEwID0gMTA7CitleHBvcnQgY29uc3QgdmFsdWUwMTAgPSAxMDEwOwogZXhwb3J0IGNvbnN0IHZhbHVlMDExID0gMTE7CiBleHBvcnQgY29uc3QgdmFsdWUwMTIgPSAxMjsKIGV4cG9ydCBjb25zdCB2YWx1ZTAxMyA9IDEzOwpAQCAtNzcsNyArNzcsNyBAQCBleHBvcnQgY29uc3QgdmFsdWUwNzYgPSA3NjsKIGV4cG9ydCBjb25zdCB2YWx1ZTA3NyA9IDc3OwogZXhwb3J0IGNvbnN0IHZhbHVlMDc4ID0gNzg7CiBleHBvcnQgY29uc3QgdmFsdWUwNzkgPSA3OTsKLWV4cG9ydCBjb25zdCB2YWx1ZTA4MCA9IDgwOworZXhwb3J0IGNvbnN0IHZhbHVlMDgwID0gIkFfdjEiOwogZXhwb3J0IGNvbnN0IHZhbHVlMDgxID0gODE7CiBleHBvcnQgY29uc3QgdmFsdWUwODIgPSA4MjsKIGV4cG9ydCBjb25zdCB2YWx1ZTA4MyA9IDgzOwpAQCAtMTM3LDcgKzEzNyw3IEBAIGV4cG9ydCBjb25zdCB2YWx1ZTEzNiA9IDEzNjsKIGV4cG9ydCBjb25zdCB2YWx1ZTEzNyA9IDEzNzsKIGV4cG9ydCBjb25zdCB2YWx1ZTEzOCA9IDEzODsKIGV4cG9ydCBjb25zdCB2YWx1ZTEzOSA9IDEzOTsKLWV4cG9ydCBjb25zdCB2YWx1ZTE0MCA9IDE0MDsKK2V4cG9ydCBjb25zdCB2YWx1ZTE0MCA9IDExNDA7CiBleHBvcnQgY29uc3QgdmFsdWUxNDEgPSAxNDE7CiBleHBvcnQgY29uc3QgdmFsdWUxNDIgPSAxNDI7CiBleHBvcnQgY29uc3QgdmFsdWUxNDMgPSAxNDM7CmRpZmYgLS1naXQgYS8yMC1hZnRlci50cyBiLzIwLWFmdGVyLnRzCmluZGV4IDU4NDU2NTYuLjdhZTgyYzQgMTAwNjQ0Ci0tLSBhLzIwLWFmdGVyLnRzCisrKyBiLzIwLWFmdGVyLnRzCkBAIC0xICsxIEBACi1leHBvcnQgY29uc3QgbWFya2VyID0gIkhFQUQiOworZXhwb3J0IGNvbnN0IG1hcmtlciA9ICJBX3YxXzIwLWFmdGVyLnRzIjsKZGlmZiAtLWdpdCBhLzk5LWxhc3QudHMgYi85OS1sYXN0LnRzCmluZGV4IDU4NDU2NTYuLjM0MmI1OTkgMTAwNjQ0Ci0tLSBhLzk5LWxhc3QudHMKKysrIGIvOTktbGFzdC50cwpAQCAtMSArMSBAQAotZXhwb3J0IGNvbnN0IG1hcmtlciA9ICJIRUFEIjsKK2V4cG9ydCBjb25zdCBtYXJrZXIgPSAiQV92MV85OS1sYXN0LnRzIjsK",
+      "stderrText": ""
+    },
+    "diffCached": {
+      "args": [
+        "diff",
+        "--cached",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--binary",
+        "--"
+      ],
+      "exitCode": 0,
+      "elapsedMs": 7.321,
+      "stdoutText": "",
+      "stdoutBase64": "",
+      "stderrText": ""
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "normalize-bindings",
+  "cwd": "/Volumes/T7 Shield/project/Revia-m2-ui",
+  "command": [
+    "node",
+    "tools/strip-binding-whitespace.mjs"
+  ],
+  "startedAt": "2026-10-24T13:27:41.609811+00:00",
+  "exit": 0,
+  "endedAt": "2026-10-24T13:27:41.653010+00:00"
+}

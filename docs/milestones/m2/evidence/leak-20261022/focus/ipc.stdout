@@ -1,0 +1,55 @@
+Revia PID=98975，等待可见窗口后连续操作 540 秒；诊断={'loggingMode': 'minimal', 'idleSeconds': 0, 'cycles': None, 'focus': 'ipc'}；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/focus3/ipc.json
+[    2.0s] Rust 123.7 MB / WebContent 64.9 MB
+[   12.1s] Rust 124.0 MB / WebContent 84.9 MB
+[   22.2s] Rust 124.0 MB / WebContent 85.1 MB
+[   32.3s] Rust 123.0 MB / WebContent 85.3 MB
+[   42.5s] Rust 123.0 MB / WebContent 85.4 MB
+[   52.6s] Rust 123.0 MB / WebContent 85.3 MB
+[   62.7s] Rust 123.0 MB / WebContent 85.5 MB
+[   72.7s] Rust 123.0 MB / WebContent 85.6 MB
+[   82.8s] Rust 123.0 MB / WebContent 85.7 MB
+[phase 3939 pressure] samplingChecksPassed=True duration=11.921s WebContent 38.4 MB / malloc 8.6 MB; pending closure
+[  104.3s] Rust 122.5 MB / WebContent 85.8 MB
+[  114.5s] Rust 122.5 MB / WebContent 86.0 MB
+[  124.6s] Rust 122.5 MB / WebContent 86.2 MB
+[  134.6s] Rust 122.5 MB / WebContent 86.2 MB
+[  144.7s] Rust 122.6 MB / WebContent 86.2 MB
+[  154.8s] Rust 122.6 MB / WebContent 86.2 MB
+[  164.8s] Rust 122.6 MB / WebContent 86.3 MB
+[  174.9s] Rust 122.5 MB / WebContent 86.2 MB
+[  184.9s] Rust 122.5 MB / WebContent 86.5 MB
+[  195.0s] Rust 122.5 MB / WebContent 86.5 MB
+[phase 7717 pressure] samplingChecksPassed=True duration=11.978s WebContent 38.8 MB / malloc 8.8 MB; pending closure
+[  211.0s] Rust 122.5 MB / WebContent 86.4 MB
+[  221.2s] Rust 122.5 MB / WebContent 87.0 MB
+[  231.3s] Rust 122.5 MB / WebContent 87.1 MB
+[  241.4s] Rust 122.5 MB / WebContent 87.1 MB
+[  251.5s] Rust 122.5 MB / WebContent 87.1 MB
+[  261.5s] Rust 122.5 MB / WebContent 87.1 MB
+[  271.5s] Rust 122.5 MB / WebContent 87.2 MB
+[  281.6s] Rust 122.5 MB / WebContent 87.2 MB
+[  291.7s] Rust 122.5 MB / WebContent 87.3 MB
+[  301.9s] Rust 122.5 MB / WebContent 87.3 MB
+[phase 11463 pressure] samplingChecksPassed=True duration=11.940s WebContent 39.1 MB / malloc 9.0 MB; pending closure
+[  317.6s] Rust 122.5 MB / WebContent 87.2 MB
+[  327.7s] Rust 122.6 MB / WebContent 87.5 MB
+[  337.9s] Rust 122.5 MB / WebContent 87.5 MB
+[  348.1s] Rust 122.5 MB / WebContent 87.5 MB
+[  358.2s] Rust 122.5 MB / WebContent 87.5 MB
+[  368.4s] Rust 122.5 MB / WebContent 87.6 MB
+[  378.6s] Rust 122.5 MB / WebContent 87.5 MB
+[  388.8s] Rust 122.5 MB / WebContent 87.6 MB
+[  399.0s] Rust 122.5 MB / WebContent 87.7 MB
+[  409.0s] Rust 122.5 MB / WebContent 87.7 MB
+[phase 15135 pressure] samplingChecksPassed=True duration=11.957s WebContent 39.5 MB / malloc 9.2 MB; pending closure
+[  424.1s] Rust 122.5 MB / WebContent 87.7 MB
+[  434.2s] Rust 122.5 MB / WebContent 87.8 MB
+[  444.2s] Rust 122.5 MB / WebContent 87.8 MB
+[  454.4s] Rust 122.5 MB / WebContent 87.9 MB
+[  464.6s] Rust 122.5 MB / WebContent 87.9 MB
+[  474.8s] Rust 122.5 MB / WebContent 119.0 MB
+[  484.9s] Rust 122.5 MB / WebContent 119.0 MB
+[  495.1s] Rust 122.6 MB / WebContent 119.0 MB
+[  505.1s] Rust 123.8 MB / WebContent 119.5 MB
+运行失败：['应用未成功完成：Error: 可见连续合成中断：{"state":"hidden","hidden":true,"viewportWidth":1280,"viewportHeight":800,"devicePixelRatio":2,"rafPerSecond":0,"focused":false,"maxFrameGapMs":4165,"hiddenTransitions":1}', '前端连续操作时长不足', '诊断静置时长不足', '缺少必需的操作负载']；报告 /private/tmp/claude-501/-Volumes-T7-Shield-project-Revia/41c88c9e-23a8-4bd4-867b-82e9c16af7c7/scratchpad/focus3/ipc.json
+Q98 内存判定：通过；[]
