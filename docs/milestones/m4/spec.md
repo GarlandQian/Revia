@@ -98,3 +98,20 @@
 - 在新界面上重做 D06 测量，以及 M2、M3 与界面相关的验收：截图、提示条、确认框、关闭询问（Q127）。
 - Rust 测试、前端脚本测试、测量与长测脚手架随新 DOM 更新后全部通过。
 - Windows 编译检查通过（Q55）。
+
+## Comments
+
+### 2026-10-27 用户反馈（验收前，规划方记录）
+
+来源：用户在 Pi 实施期间打开的 m4 构建；截图见 [feedback/2026-10-27-commit-options-clipped.png](./feedback/2026-10-27-commit-options-clipped.png)。审查和验收时逐项核对，并入返修。
+
+1. **界面整体僵硬。** 规划方初查到两处：
+   - 提交工具窗口宽度写死 330px（`src/index.css` 的 `--sidebar-width`），不能像 Rebased、VS Code 那样拖分隔条调宽；
+   - 悬停、展开收起、页签切换、弹层和通知出现几乎没有过渡，全部代码只有两处 `transition-colors`。
+
+   验收时逐屏与 Rebased、VS Code 对照后补全。
+2. **圆角等控件形状难看。** 截图中的提交信息框、提交按钮、勾选框、弹层观感不好。验收时用同一颜色主题与 VS Code 的对应控件和效果图对照，统一圆角、边框和填充。
+3. **弹层会被上下挡住。** 截图中提交选项弹层的下半截被窗口底部裁掉，还盖住了审阅进度。
+   - 原因：`src/components/ui/popover.tsx` 的弹层固定在锚点下方展开（`absolute top-full`），没有挂到顶层，也不会翻转或避让，外层容器又是 `overflow-hidden`。
+   - 影响范围：仓库、worktree、最近提交信息、提交选项、页签“更多”五处都用它。
+   - 要求：改用已在依赖中的 `@base-ui/react` 的 Popover / Menu（Portal 加 Positioner，空间不够时翻转、贴边平移），使所有弹层、菜单和悬浮提示在窗口任何位置都完整可见。
