@@ -1,0 +1,1208 @@
+{
+ "scheme": "Light",
+ "colors": {
+  "ADDED_LINES_COLOR": "7fc784",
+  "ANNOTATIONS_COLOR": "5a5d6b",
+  "ANNOTATIONS_LAST_COMMIT_COLOR": "0",
+  "ActionButton.hoverBackground": "dfdfdf",
+  "ActionButton.iconTextForeground": "6e6e6e",
+  "ActionButton.pressedBackground": "cfcfcf",
+  "BLOCK_TERMINAL_BLOCK_BACKGROUND_END": "FAFAFA",
+  "BLOCK_TERMINAL_BLOCK_BACKGROUND_START": "F0F2F5",
+  "BLOCK_TERMINAL_ERROR_BLOCK_STROKE_COLOR": "DB3B4B",
+  "BLOCK_TERMINAL_GENERATE_COMMAND_CARET_COLOR": "834DF0",
+  "BLOCK_TERMINAL_GENERATE_COMMAND_PLACEHOLDER_FOREGROUND": "BFA1F8",
+  "BLOCK_TERMINAL_HOVERED_BLOCK_BACKGROUND_END": "00000003",
+  "BLOCK_TERMINAL_HOVERED_BLOCK_BACKGROUND_START": "0000000A",
+  "BLOCK_TERMINAL_INACTIVE_SELECTED_BLOCK_BACKGROUND": "EBECF0",
+  "BLOCK_TERMINAL_INACTIVE_SELECTED_BLOCK_STROKE_COLOR": "C9CCD6",
+  "BLOCK_TERMINAL_PROMPT_SEPARATOR_COLOR": "EBECF0",
+  "BLOCK_TERMINAL_SELECTED_BLOCK_BACKGROUND": "EDF3FF",
+  "BLOCK_TERMINAL_SELECTED_BLOCK_STROKE_COLOR": "4682FA",
+  "Bookmark.Mnemonic.iconBackground": "FEF7EC",
+  "Bookmark.Mnemonic.iconBorderColor": "F4AF3D",
+  "Bookmark.Mnemonic.iconForeground": "000000",
+  "Bookmark.iconBackground": "F4AF3D",
+  "CARET_COLOR": "0",
+  "CARET_ROW_COLOR": "f5f8fe",
+  "CONSOLE_BACKGROUND_KEY": "ffffff",
+  "DELETED_LINES_COLOR": "767a8a",
+  "DIFF_SEPARATORS_BACKGROUND": "e4e6eb",
+  "DIFF_SEPARATOR_WAVE": "d0d0d0",
+  "DOCUMENTATION_COLOR": "ffffff",
+  "DOC_COMMENT_GUIDE": "e8e8e8",
+  "DOC_COMMENT_LINK": "4585be",
+  "ERROR_HINT": "FFE8E8",
+  "FILESTATUS_ADDED": "067D17",
+  "FILESTATUS_COPIED": "067D17",
+  "FILESTATUS_DELETED": "6C707E",
+  "FILESTATUS_HIJACKED": "b28c00",
+  "FILESTATUS_IDEA_FILESTATUS_DELETED_FROM_FILE_SYSTEM": "6C707E",
+  "FILESTATUS_IDEA_FILESTATUS_IGNORED": "8C4F00",
+  "FILESTATUS_IDEA_FILESTATUS_MERGED_WITH_BOTH_CONFLICTS": "DE1B2E",
+  "FILESTATUS_IDEA_FILESTATUS_MERGED_WITH_CONFLICTS": "DE1B2E",
+  "FILESTATUS_IDEA_FILESTATUS_MERGED_WITH_PROPERTY_CONFLICTS": "DE1B2E",
+  "FILESTATUS_MERGED": "643CB8",
+  "FILESTATUS_MODIFIED": "0033B3",
+  "FILESTATUS_NOT_CHANGED": "",
+  "FILESTATUS_NOT_CHANGED_IMMEDIATE": "0033B3",
+  "FILESTATUS_NOT_CHANGED_RECURSIVE": "0033B3",
+  "FILESTATUS_OBSOLETE": "7c7c00",
+  "FILESTATUS_RENAMED": "0033B3",
+  "FILESTATUS_SUPPRESSED": "",
+  "FILESTATUS_SWITCHED": "08978f",
+  "FILESTATUS_UNKNOWN": "B23247",
+  "FILESTATUS_addedOutside": "067D17",
+  "FILESTATUS_changelistConflict": "DE1B2E",
+  "FILESTATUS_modifiedOutside": "0033B3",
+  "FOLDED_TEXT_BORDER_COLOR": "ADD9C7",
+  "GRID_STRIPE_COLOR": "f5f8fe",
+  "GUTTER_BACKGROUND": "ffffff",
+  "IGNORED_ADDED_LINES_BORDER_COLOR": "7fc784",
+  "IGNORED_DELETED_LINES_BORDER_COLOR": "767a8a",
+  "IGNORED_MODIFIED_LINES_BORDER_COLOR": "88adf7",
+  "INDENT_GUIDE": "ebecf0",
+  "INFORMATION_HINT": "ffffff",
+  "INLINE_REFACTORING_SETTINGS_DEFAULT": "d8d8d88c",
+  "INLINE_REFACTORING_SETTINGS_FOCUSED": "B3B3B38c",
+  "INLINE_REFACTORING_SETTINGS_HOVERED": "B3B3B38c",
+  "LINE_NUMBERS_COLOR": "aeb3c2",
+  "LINE_NUMBER_ON_CARET_ROW_COLOR": "767a8a",
+  "LOOKUP_COLOR": "ffffff",
+  "MATCHED_BRACES_INDENT_GUIDE_COLOR": "62b3b3",
+  "METHOD_SEPARATORS_COLOR": "dfe1e5",
+  "MODIFIED_LINES_COLOR": "88adf7",
+  "MODIFIED_TAB_ICON": "4083C9",
+  "NOTIFICATION_BACKGROUND": "fff8e3",
+  "PROMOTION_PANE": "e7effd",
+  "QUESTION_HINT": "f5f8fe",
+  "READONLY_FRAGMENT_BACKGROUND": "cfe7ff",
+  "RECENT_LOCATIONS_SELECTION": "E7EFFD",
+  "RIGHT_MARGIN_COLOR": "ebecf0",
+  "SELECTED_INDENT_GUIDE": "aeb3c2",
+  "SELECTED_TEARLINE_COLOR": "9C9C9C",
+  "SELECTION_BACKGROUND": "a6d2ff",
+  "SELECTION_BACKGROUND_INACTIVE": "B5B7BD",
+  "SELECTION_FOREGROUND": "",
+  "SOFT_WRAP_SIGN_COLOR": "c0c0c0",
+  "STRING_CONTENT_INDENT_GUIDE": "afd5b5",
+  "ScrollBar.Mac.Transparent.hoverThumbBorderColor": "00000080",
+  "ScrollBar.Mac.Transparent.hoverThumbColor": "00000080",
+  "ScrollBar.Mac.Transparent.hoverTrackColor": "8080801A",
+  "ScrollBar.Mac.Transparent.thumbBorderColor": "00000000",
+  "ScrollBar.Mac.Transparent.thumbColor": "00000000",
+  "ScrollBar.Mac.Transparent.trackColor": "80808000",
+  "ScrollBar.Mac.hoverThumbBorderColor": "00000080",
+  "ScrollBar.Mac.hoverThumbColor": "00000080",
+  "ScrollBar.Mac.hoverTrackColor": "80808000",
+  "ScrollBar.Mac.thumbBorderColor": "00000033",
+  "ScrollBar.Mac.thumbColor": "00000033",
+  "ScrollBar.Mac.trackColor": "80808000",
+  "ScrollBar.Transparent.hoverThumbBorderColor": "59595947",
+  "ScrollBar.Transparent.hoverThumbColor": "73737347",
+  "ScrollBar.Transparent.hoverTrackColor": "8080801A",
+  "ScrollBar.Transparent.thumbBorderColor": "59595933",
+  "ScrollBar.Transparent.thumbColor": "73737333",
+  "ScrollBar.Transparent.trackColor": "80808000",
+  "ScrollBar.background": "F5F5F5",
+  "ScrollBar.hoverThumbBorderColor": "59595947",
+  "ScrollBar.hoverThumbColor": "73737347",
+  "ScrollBar.hoverTrackColor": "80808000",
+  "ScrollBar.thumbBorderColor": "59595933",
+  "ScrollBar.thumbColor": "73737333",
+  "ScrollBar.trackColor": "80808000",
+  "Scrollbar.Tabs.HoveredThumbColor": "7F7F7FFF",
+  "Scrollbar.Tabs.ThumbColor": "ABABABFF",
+  "Scrollbar.Tabs.TransparentThumbColor": "ABABAB00",
+  "TEARLINE_COLOR": "d4d4d4",
+  "Table.hoverBackground": "EDF5FC",
+  "VCS_ANNOTATIONS_COLOR_1": "a1bef7",
+  "VCS_ANNOTATIONS_COLOR_2": "c9dafb",
+  "VCS_ANNOTATIONS_COLOR_3": "dee8fc",
+  "VCS_ANNOTATIONS_COLOR_4": "edf2fa",
+  "VCS_ANNOTATIONS_COLOR_5": "f7f8fa",
+  "VISUAL_INDENT_GUIDE": "dae6fd",
+  "WHITESPACES": "adadad",
+  "WHITESPACES_MODIFIED_LINES_COLOR": "f7e2cb"
+ },
+ "attributes": {
+  "AI_INLAY_BUTTON_DEFAULT": {
+   "FOREGROUND": "494b57",
+   "EFFECT_COLOR": "834df0"
+  },
+  "AI_INLAY_BUTTON_FOCUSED": {
+   "FOREGROUND": "494b57",
+   "EFFECT_COLOR": "a177f4"
+  },
+  "AI_INLAY_BUTTON_HOVERED": {
+   "FOREGROUND": "494b57",
+   "EFFECT_COLOR": "a177f4"
+  },
+  "ANNOTATION_ATTRIBUTE_NAME_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null
+  },
+  "ANNOTATION_NAME_ATTRIBUTES": {
+   "baseAttributes": "DEFAULT_METADATA"
+  },
+  "BAD_CHARACTER": {
+   "FOREGROUND": null,
+   "BACKGROUND": "ffcccc",
+   "EFFECT_COLOR": null
+  },
+  "BEAN.ACTIVE": {
+   "FONT_TYPE": "0"
+  },
+  "BEAN.INACTIVE": {
+   "EFFECT_TYPE": "6",
+   "EFFECT_COLOR": "616161"
+  },
+  "BLINKING_HIGHLIGHTS_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "808080",
+   "EFFECT_TYPE": "0"
+  },
+  "BLOCK_TERMINAL_BLACK": {
+   "FOREGROUND": "0",
+   "BACKGROUND": "0",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_BLACK_BRIGHT": {
+   "FOREGROUND": "6C707E",
+   "BACKGROUND": "A8ADBD",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_BLUE": {
+   "FOREGROUND": "225CD6",
+   "BACKGROUND": "F5ED4",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_BLUE_BRIGHT": {
+   "FOREGROUND": "9DFF",
+   "BACKGROUND": "4DACFF",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_COMMAND": {
+   "FOREGROUND": "000000",
+   "FONT_TYPE": "1"
+  },
+  "BLOCK_TERMINAL_CURRENT_SEARCH_ENTRY": {
+   "FOREGROUND": "000000",
+   "BACKGROUND": "FF941A"
+  },
+  "BLOCK_TERMINAL_CYAN": {
+   "FOREGROUND": "7A80",
+   "BACKGROUND": "AA5AB",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_CYAN_BRIGHT": {
+   "FOREGROUND": "31C4B3",
+   "BACKGROUND": "2EDCE5",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_GENERATE_COMMAND_PROMPT_TEXT": {
+   "FOREGROUND": "7444D4"
+  },
+  "BLOCK_TERMINAL_GREEN": {
+   "FOREGROUND": "357D1F",
+   "BACKGROUND": "3DA154",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_GREEN_BRIGHT": {
+   "FOREGROUND": "3DCC3D",
+   "BACKGROUND": "4FE34F",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_MAGENTA": {
+   "FOREGROUND": "6E32E5",
+   "BACKGROUND": "A95EFF",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_MAGENTA_BRIGHT": {
+   "FOREGROUND": "D659FF",
+   "BACKGROUND": "EC73FF",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_RED": {
+   "FOREGROUND": "C93645",
+   "BACKGROUND": "D43B48",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_RED_BRIGHT": {
+   "FOREGROUND": "FF5462",
+   "BACKGROUND": "FA4352",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_SEARCH_ENTRY": {
+   "FOREGROUND": "000000",
+   "BACKGROUND": "FFEA00"
+  },
+  "BLOCK_TERMINAL_WHITE": {
+   "FOREGROUND": "BEC0C5",
+   "BACKGROUND": "DCDEE3",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_WHITE_BRIGHT": {
+   "FOREGROUND": "D2D4D9",
+   "BACKGROUND": "FFFFFF",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_YELLOW": {
+   "FOREGROUND": "B2A400",
+   "BACKGROUND": "BD8317",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BLOCK_TERMINAL_YELLOW_BRIGHT": {
+   "FOREGROUND": "D4BB00",
+   "BACKGROUND": "FFCD1A",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "BOOKMARKS_ATTRIBUTES": {
+   "ERROR_STRIPE_COLOR": "0"
+  },
+  "BREADCRUMBS_CURRENT": {
+   "FOREGROUND": "0",
+   "BACKGROUND": "ebecf0"
+  },
+  "BREADCRUMBS_DEFAULT": {
+   "FOREGROUND": "6c707e"
+  },
+  "BREADCRUMBS_HOVERED": {
+   "FOREGROUND": "0",
+   "BACKGROUND": "ebecf0"
+  },
+  "BREADCRUMBS_INACTIVE": {
+   "FOREGROUND": "a8adbd"
+  },
+  "BREAKPOINT_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "faeae6",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "ffc8c8"
+  },
+  "CODE_LENS_BORDER_COLOR": {
+   "EFFECT_COLOR": "818594",
+   "EFFECT_TYPE": "0"
+  },
+  "CONSOLE_BLACK_OUTPUT": {
+   "FOREGROUND": "000000",
+   "BACKGROUND": "000000",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_BLUE_BRIGHT_OUTPUT": {
+   "FOREGROUND": "2D61F0",
+   "BACKGROUND": "95C2FF",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_BLUE_OUTPUT": {
+   "FOREGROUND": "063FDB",
+   "BACKGROUND": "C4DBFA",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_CYAN_BRIGHT_OUTPUT": {
+   "FOREGROUND": "15C1C1",
+   "BACKGROUND": "8CF1F1",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_CYAN_OUTPUT": {
+   "FOREGROUND": "028E8E",
+   "BACKGROUND": "BFEEEE",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_DARKGRAY_OUTPUT": {
+   "FOREGROUND": "656565",
+   "BACKGROUND": "B7B7B7",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_ERROR_OUTPUT": {
+   "FOREGROUND": "7f0000",
+   "FONT_TYPE": null
+  },
+  "CONSOLE_GRAY_OUTPUT": {
+   "FOREGROUND": "929292",
+   "BACKGROUND": "E6E6E6",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_GREEN_BRIGHT_OUTPUT": {
+   "FOREGROUND": "16B42C",
+   "BACKGROUND": "85F399",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_GREEN_OUTPUT": {
+   "FOREGROUND": "067D17",
+   "BACKGROUND": "B5E7BE",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_MAGENTA_BRIGHT_OUTPUT": {
+   "FOREGROUND": "E617E6",
+   "BACKGROUND": "FBACFB",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_MAGENTA_OUTPUT": {
+   "FOREGROUND": "B309B3",
+   "BACKGROUND": "F3D2F3",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_NORMAL_OUTPUT": {
+   "FOREGROUND": "000000"
+  },
+  "CONSOLE_RED_BRIGHT_OUTPUT": {
+   "FOREGROUND": "FF1616",
+   "BACKGROUND": "FE7277",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_RED_OUTPUT": {
+   "FOREGROUND": "CE0505",
+   "BACKGROUND": "FCA4A7",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_SYSTEM_OUTPUT": {
+   "FOREGROUND": "00007f"
+  },
+  "CONSOLE_USER_INPUT": {
+   "FOREGROUND": "007f00",
+   "FONT_TYPE": "2"
+  },
+  "CONSOLE_WHITE_OUTPUT": {
+   "FOREGROUND": "C9C9C9",
+   "BACKGROUND": "FFFFFF",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_YELLOW_BRIGHT_OUTPUT": {
+   "FOREGROUND": "ECC32C",
+   "BACKGROUND": "FFE055",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CONSOLE_YELLOW_OUTPUT": {
+   "FOREGROUND": "B28C00",
+   "BACKGROUND": "F7E79F",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": null
+  },
+  "CTRL_CLICKABLE": {
+   "FOREGROUND": "6dcc",
+   "EFFECT_COLOR": "6dcc",
+   "EFFECT_TYPE": "1"
+  },
+  "CUSTOM_INVALID_STRING_ESCAPE_ATTRIBUTES": {
+   "FOREGROUND": "8000",
+   "BACKGROUND": "ffcccc",
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": null
+  },
+  "CUSTOM_KEYWORD1_ATTRIBUTES": {
+   "baseAttributes": "DEFAULT_KEYWORD"
+  },
+  "CUSTOM_KEYWORD2_ATTRIBUTES": {
+   "FOREGROUND": "74118c",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "CUSTOM_KEYWORD3_ATTRIBUTES": {
+   "FOREGROUND": "8080",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "CUSTOM_KEYWORD4_ATTRIBUTES": {
+   "FOREGROUND": "800000",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "CUSTOM_LINE_COMMENT_ATTRIBUTES": {
+   "FOREGROUND": "808080",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "2"
+  },
+  "CUSTOM_MULTI_LINE_COMMENT_ATTRIBUTES": {
+   "FOREGROUND": "808080",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "2"
+  },
+  "CUSTOM_NUMBER_ATTRIBUTES": {
+   "baseAttributes": "DEFAULT_NUMBER"
+  },
+  "CUSTOM_STRING_ATTRIBUTES": {
+   "baseAttributes": "DEFAULT_STRING"
+  },
+  "CUSTOM_VALID_STRING_ESCAPE_ATTRIBUTES": {
+   "FOREGROUND": "80",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "DEBUGGER_INLINED_VALUES": {
+   "FOREGROUND": "868686",
+   "FONT_TYPE": "2",
+   "EFFECT_TYPE": "0"
+  },
+  "DEBUGGER_INLINED_VALUES_EXECUTION_LINE": {
+   "FOREGROUND": "a9b7d6",
+   "FONT_TYPE": "2",
+   "EFFECT_TYPE": "0"
+  },
+  "DEBUGGER_INLINED_VALUES_MODIFIED": {
+   "FOREGROUND": "ca8021",
+   "FONT_TYPE": "2",
+   "EFFECT_TYPE": "0"
+  },
+  "DEBUGGER_SMART_STEP_INTO_SELECTION": {
+   "BACKGROUND": "F2B3FF",
+   "FOREGROUND": "000",
+   "EFFECT_COLOR": "CC29CC",
+   "EFFECT_TYPE": "0"
+  },
+  "DEBUGGER_SMART_STEP_INTO_TARGET": {
+   "BACKGROUND": "E2D3F0",
+   "FOREGROUND": "000"
+  },
+  "DEFAULT_ATTRIBUTE": {
+   "FOREGROUND": "174ad4",
+   "FONT_TYPE": "1"
+  },
+  "DEFAULT_BLOCK_COMMENT": {
+   "FOREGROUND": "8c8c8c",
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_COMMA": {},
+  "DEFAULT_CONSTANT": {
+   "FOREGROUND": "871094",
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_DOC_COMMENT": {
+   "FOREGROUND": "8c8c8c",
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_DOC_COMMENT_TAG": {
+   "EFFECT_COLOR": "999999",
+   "EFFECT_TYPE": "1",
+   "FONT_TYPE": "1"
+  },
+  "DEFAULT_DOC_COMMENT_TAG_VALUE": {
+   "FOREGROUND": "3d3d3d",
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_DOC_MARKUP": {
+   "FOREGROUND": null,
+   "BACKGROUND": "e2ffe2"
+  },
+  "DEFAULT_ENTITY": {
+   "FOREGROUND": "174be6",
+   "FONT_TYPE": "1"
+  },
+  "DEFAULT_FUNCTION_CALL": {},
+  "DEFAULT_FUNCTION_DECLARATION": {
+   "FOREGROUND": "627a"
+  },
+  "DEFAULT_HIGHLIGHTED_REFERENCE": {
+   "EFFECT_COLOR": "808080",
+   "EFFECT_TYPE": "1"
+  },
+  "DEFAULT_IDENTIFIER": {
+   "FOREGROUND": "0"
+  },
+  "DEFAULT_INSTANCE_FIELD": {
+   "FOREGROUND": "871094",
+   "FONT_TYPE": "1"
+  },
+  "DEFAULT_INVALID_STRING_ESCAPE": {
+   "FOREGROUND": "67d17",
+   "BACKGROUND": "ffcccc",
+   "FONT_TYPE": null
+  },
+  "DEFAULT_KEYWORD": {
+   "FOREGROUND": "33b3",
+   "FONT_TYPE": null
+  },
+  "DEFAULT_LABEL": {
+   "FONT_TYPE": "1",
+   "EFFECT_TYPE": "1",
+   "EFFECT_COLOR": "808080"
+  },
+  "DEFAULT_LINE_COMMENT": {
+   "FOREGROUND": "8c8c8c",
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_METADATA": {
+   "FOREGROUND": "9e880d"
+  },
+  "DEFAULT_NUMBER": {
+   "FOREGROUND": "1750eb",
+   "FONT_TYPE": null
+  },
+  "DEFAULT_PREDEFINED_SYMBOL": {
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_REASSIGNED_LOCAL_VARIABLE": {
+   "EFFECT_COLOR": "909090",
+   "EFFECT_TYPE": "1"
+  },
+  "DEFAULT_REASSIGNED_PARAMETER": {
+   "EFFECT_COLOR": "909090",
+   "EFFECT_TYPE": "1"
+  },
+  "DEFAULT_SEMICOLON": {},
+  "DEFAULT_STATIC_FIELD": {
+   "FOREGROUND": "871094",
+   "FONT_TYPE": "2"
+  },
+  "DEFAULT_STATIC_METHOD": {
+   "FONT_TYPE": "2",
+   "FOREGROUND": "627a"
+  },
+  "DEFAULT_STRING": {
+   "FOREGROUND": "67d17",
+   "FONT_TYPE": null
+  },
+  "DEFAULT_TAG": {
+   "BACKGROUND": "efefef"
+  },
+  "DEFAULT_TEMPLATE_LANGUAGE_COLOR": {
+   "BACKGROUND": "f7faff"
+  },
+  "DEFAULT_VALID_STRING_ESCAPE": {
+   "FOREGROUND": "37a6",
+   "FONT_TYPE": "1"
+  },
+  "DELETED_TEXT_ATTRIBUTES": {
+   "FOREGROUND": "c3c3c3",
+   "BACKGROUND": "f0f0f0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "1"
+  },
+  "DEPRECATED_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "404040",
+   "EFFECT_TYPE": "3"
+  },
+  "DIFF_ABSENT": {
+   "FOREGROUND": null,
+   "BACKGROUND": "f0f0f0",
+   "EFFECT_COLOR": null
+  },
+  "DIFF_CONFLICT": {
+   "FOREGROUND": null,
+   "BACKGROUND": "ffd5cc",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "ffc8bd"
+  },
+  "DIFF_DELETED": {
+   "FOREGROUND": null,
+   "BACKGROUND": "D6D6D6",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "C8C8C8"
+  },
+  "DIFF_DELETED_FROM_FS": {
+   "FOREGROUND": null,
+   "BACKGROUND": "387EE7",
+   "EFFECT_COLOR": null
+  },
+  "DIFF_INSERTED": {
+   "FOREGROUND": null,
+   "BACKGROUND": "BEE6BE",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "AADEAA"
+  },
+  "DIFF_MODIFIED": {
+   "FOREGROUND": null,
+   "BACKGROUND": "c2d8f2",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "b6d2f2"
+  },
+  "DIFF_UNKNOWN": {
+   "FOREGROUND": null,
+   "BACKGROUND": "DAE7C0",
+   "EFFECT_COLOR": null
+  },
+  "DOC_CODE_BLOCK": {
+   "FOREGROUND": "000000",
+   "BACKGROUND": "f8f8f9",
+   "EFFECT_COLOR": "EBECF0",
+   "EFFECT_TYPE": "0"
+  },
+  "DOC_CODE_INLINE": {
+   "FOREGROUND": "000000",
+   "BACKGROUND": "f3f3f4"
+  },
+  "DOC_TIPS_SHORTCUT": {
+   "FOREGROUND": "000000",
+   "EFFECT_COLOR": "A8ADBD",
+   "EFFECT_TYPE": "0"
+  },
+  "DO_NOT_SHOW": {
+   "ERROR_STRIPE_COLOR": "71B262"
+  },
+  "DUPLICATE_FROM_SERVER": {
+   "FOREGROUND": null,
+   "BACKGROUND": "f5f7f0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": null,
+   "ERROR_STRIPE_COLOR": null
+  },
+  "ERRORS_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "ff0000",
+   "EFFECT_TYPE": "2",
+   "FONT_TYPE": null,
+   "ERROR_STRIPE_COLOR": "cf5b56"
+  },
+  "EVALUATED_EXPRESSION_ATTRIBUTES": {
+   "BACKGROUND": "e5e5e5"
+  },
+  "EVALUATED_EXPRESSION_EXECUTION_LINE_ATTRIBUTES": {
+   "BACKGROUND": "bfbfbf"
+  },
+  "EXECUTIONPOINT_ATTRIBUTES": {
+   "BACKGROUND": "2154a6",
+   "FOREGROUND": "ffffff",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "2154a6"
+  },
+  "FILESTATUS_ERRORS": {
+   "EFFECT_TYPE": "2",
+   "EFFECT_COLOR": "ff0000",
+   "ERROR_STRIPE_COLOR": "cf5b56"
+  },
+  "FOLDED_TEXT_ATTRIBUTES": {
+   "FOREGROUND": "414d41",
+   "BACKGROUND": "e9f5e6",
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1",
+   "EFFECT_TYPE": "1"
+  },
+  "FOLLOWED_HYPERLINK_ATTRIBUTES": {
+   "FOREGROUND": "8552c6",
+   "BACKGROUND": "e9e9e9",
+   "EFFECT_COLOR": "8552c6",
+   "EFFECT_TYPE": "1"
+  },
+  "GENERIC_SERVER_ERROR_OR_WARNING": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "f49810",
+   "EFFECT_TYPE": "2",
+   "ERROR_STRIPE_COLOR": "e69317"
+  },
+  "GHERKIN_PYSTRING": {
+   "FOREGROUND": "8080"
+  },
+  "GHERKIN_REGEXP_PARAMETER": {
+   "FOREGROUND": "297bde"
+  },
+  "GO_BUILTIN_CONSTANT": {
+   "FOREGROUND": "33b3"
+  },
+  "GO_BUILTIN_FUNCTION_CALL": {
+   "FOREGROUND": "33b3"
+  },
+  "GO_BUILTIN_TYPE_REFERENCE": {
+   "FOREGROUND": "33b3"
+  },
+  "GO_BUILTIN_VARIABLE": {
+   "FOREGROUND": "33b3"
+  },
+  "GO_COMMENT_REFERENCE": {
+   "FOREGROUND": "525252"
+  },
+  "GO_EXPORTED_FUNCTION": {
+   "FOREGROUND": "286d73"
+  },
+  "GO_EXPORTED_FUNCTION_CALL": {
+   "FOREGROUND": "36666b"
+  },
+  "GO_LOCAL_CONSTANT": {
+   "FOREGROUND": "871094"
+  },
+  "GO_LOCAL_FUNCTION": {
+   "FOREGROUND": "286d73"
+  },
+  "GO_LOCAL_FUNCTION_CALL": {
+   "FOREGROUND": "36666b"
+  },
+  "GO_METHOD_RECEIVER": {
+   "FOREGROUND": "8a91"
+  },
+  "GO_PACKAGE": {
+   "FOREGROUND": "805900"
+  },
+  "GO_PACKAGE_EXPORTED_CONSTANT": {
+   "FOREGROUND": "871094"
+  },
+  "GO_PACKAGE_LOCAL_CONSTANT": {
+   "FOREGROUND": "871094"
+  },
+  "GO_SHADOWING_VARIABLE": {
+   "FOREGROUND": "708c00",
+   "FONT_TYPE": "0"
+  },
+  "GO_TYPE_REFERENCE": {
+   "FOREGROUND": "336ecc"
+  },
+  "GROOVY_KEYWORD": {
+   "baseAttributes": "JAVA_KEYWORD"
+  },
+  "HYPERLINK_ATTRIBUTES": {
+   "FOREGROUND": "6dcc",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "6dcc",
+   "EFFECT_TYPE": "1"
+  },
+  "IDENTIFIER_UNDER_CARET_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "edebfc",
+   "ERROR_STRIPE_COLOR": "d0a1ff",
+   "EFFECT_COLOR": null
+  },
+  "IMPLICIT_ANONYMOUS_CLASS_PARAMETER_ATTRIBUTES": {
+   "FOREGROUND": "851691",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null
+  },
+  "INACTIVE_HYPERLINK_ATTRIBUTES": {
+   "EFFECT_COLOR": "808080",
+   "EFFECT_TYPE": "1"
+  },
+  "INFORMATION_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": null
+  },
+  "INFO_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "cccccc",
+   "EFFECT_TYPE": "2",
+   "ERROR_STRIPE_COLOR": "d9cfad"
+  },
+  "INJECTED_LANGUAGE_FRAGMENT": {
+   "BACKGROUND": "edfced",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0"
+  },
+  "INLAY_BUTTON_DEFAULT": {
+   "FOREGROUND": "494B57",
+   "EFFECT_COLOR": "00000033"
+  },
+  "INLAY_BUTTON_FOCUSED": {
+   "FOREGROUND": "494B57",
+   "EFFECT_COLOR": "00000047"
+  },
+  "INLAY_BUTTON_HINT": {
+   "FOREGROUND": "818594"
+  },
+  "INLAY_BUTTON_HOVERED": {
+   "FOREGROUND": "494B57",
+   "EFFECT_COLOR": "00000047"
+  },
+  "INLAY_DEFAULT": {
+   "FOREGROUND": "7a7a7a",
+   "BACKGROUND": "ededed"
+  },
+  "INLAY_TEXT_WITHOUT_BACKGROUND": {
+   "FOREGROUND": "7a7a7a"
+  },
+  "INLINE_PARAMETER_HINT": {
+   "FOREGROUND": "7a7a7a",
+   "BACKGROUND": "ededed"
+  },
+  "INLINE_PARAMETER_HINT_CURRENT": {
+   "FOREGROUND": "5b5b5b",
+   "BACKGROUND": "bcdaf7"
+  },
+  "INLINE_PARAMETER_HINT_HIGHLIGHTED": {
+   "FOREGROUND": "5b5b5b",
+   "BACKGROUND": "cccccc"
+  },
+  "INLINE_PROMPT": {
+   "FOREGROUND": "7444D4"
+  },
+  "INLINE_PROMPT_PROGRESS_DARK": {
+   "FOREGROUND": "834DF0"
+  },
+  "INLINE_PROMPT_PROGRESS_LIGHT": {
+   "FOREGROUND": "DCCBFB"
+  },
+  "INLINE_STACK_FRAMES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "e6e0f1"
+  },
+  "INLINE_SUGGESTION": {
+   "FOREGROUND": "808080",
+   "FONT_TYPE": "2"
+  },
+  "INSTANCE_FIELD_ATTRIBUTES": {
+   "baseAttributes": "DEFAULT_INSTANCE_FIELD"
+  },
+  "JOIN_POINT": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "00FF00",
+   "EFFECT_TYPE": "1",
+   "FONT_TYPE": "1"
+  },
+  "JS.GLOBAL_VARIABLE": {
+   "FOREGROUND": "830091"
+  },
+  "JS.JSX_CLIENT_COMPONENT": {
+   "FOREGROUND": "AD6339"
+  },
+  "JS.LOCAL_VARIABLE": {
+   "FOREGROUND": "2A8C7C"
+  },
+  "JS.REGEXP": {
+   "FOREGROUND": "264eff"
+  },
+  "LINE_FULL_COVERAGE": {
+   "FOREGROUND": "ccffcc",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "LINE_NONE_COVERAGE": {
+   "FOREGROUND": "ffcccc",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "LINE_PARTIAL_COVERAGE": {
+   "FOREGROUND": "ffffcc",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "1"
+  },
+  "LIVE_TEMPLATE_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "0055ff",
+   "EFFECT_TYPE": "0"
+  },
+  "LIVE_TEMPLATE_INACTIVE_SEGMENT": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": "bfbfbf",
+   "EFFECT_TYPE": "0"
+  },
+  "LOG_DEBUG_OUTPUT": {
+   "FOREGROUND": "00cccc"
+  },
+  "LOG_ERROR_OUTPUT": {
+   "FOREGROUND": "cd0000",
+   "FONT_TYPE": null
+  },
+  "LOG_EXPIRED_ENTRY": {
+   "FOREGROUND": "555555"
+  },
+  "LOG_INFO_OUTPUT": {
+   "FOREGROUND": "00cd00"
+  },
+  "LOG_VERBOSE_OUTPUT": {
+   "FOREGROUND": "0000ee"
+  },
+  "LOG_WARNING_OUTPUT": {
+   "FOREGROUND": "a66f00"
+  },
+  "List/map to object conversion": {
+   "FOREGROUND": "ff"
+  },
+  "MARKED_FOR_REMOVAL_ATTRIBUTES": {
+   "EFFECT_COLOR": "ff0000",
+   "EFFECT_TYPE": "3"
+  },
+  "MATCHED_BRACE_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "93d9d9",
+   "EFFECT_COLOR": null
+  },
+  "MATCHED_TAG_NAME": {
+   "BACKGROUND": "c9ecec"
+  },
+  "NOT_TOP_FRAME_ATTRIBUTES": {
+   "BACKGROUND": "c0d0f0"
+  },
+  "NOT_USED_ELEMENT_ATTRIBUTES": {
+   "FOREGROUND": "808080",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "ebc700"
+  },
+  "NO_ANALYSIS": {
+   "ERROR_STRIPE_COLOR": "d3d3d3"
+  },
+  "PROPERTIES.KEY": {
+   "FOREGROUND": "83080"
+  },
+  "RAINBOW_COLOR0": {
+   "FOREGROUND": "9b3b6a"
+  },
+  "RAINBOW_COLOR1": {
+   "FOREGROUND": "114d77"
+  },
+  "RAINBOW_COLOR2": {
+   "FOREGROUND": "bc8650"
+  },
+  "RAINBOW_COLOR3": {
+   "FOREGROUND": "005910"
+  },
+  "RAINBOW_COLOR4": {
+   "FOREGROUND": "bc5150"
+  },
+  "REGEXP_MATCHED_GROUPS": {
+   "BACKGROUND": "d8d8d8"
+  },
+  "RUNTIME_ERROR": {
+   "EFFECT_COLOR": "f49810",
+   "ERROR_STRIPE_COLOR": "cf5b56",
+   "EFFECT_TYPE": "5"
+  },
+  "SASS_MIXIN": {
+   "FOREGROUND": "8080"
+  },
+  "SEARCH_RESULT_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "ccccff",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "8e8eb2"
+  },
+  "SPY-JS.EXCEPTION": {
+   "BACKGROUND": "FFCCCC",
+   "EFFECT_TYPE": "2"
+  },
+  "SPY-JS.FUNCTION_SCOPE": {
+   "BACKGROUND": "ffffd7",
+   "EFFECT_TYPE": "2"
+  },
+  "SPY-JS.PATH_LEVEL_ONE": {
+   "BACKGROUND": "E2FFE2",
+   "EFFECT_TYPE": "2"
+  },
+  "SPY-JS.PATH_LEVEL_TWO": {
+   "EFFECT_COLOR": "000000",
+   "EFFECT_TYPE": "1"
+  },
+  "SPY-JS.PROGRAM_SCOPE": {
+   "BACKGROUND": "ffffd7",
+   "EFFECT_TYPE": "2"
+  },
+  "SPY-JS.VALUE_HINT": {
+   "EFFECT_COLOR": "a9a9a9",
+   "EFFECT_TYPE": "0"
+  },
+  "STATIC_FIELD_ATTRIBUTES": {
+   "baseAttributes": "DEFAULT_STATIC_FIELD"
+  },
+  "STATIC_FINAL_FIELD_ATTRIBUTES": {
+   "baseAttributes": "STATIC_FIELD_ATTRIBUTES"
+  },
+  "STATIC_METHOD_ATTRIBUTES": {
+   "FONT_TYPE": "2"
+  },
+  "TEMPLATE_VARIABLE_ATTRIBUTES": {
+   "FOREGROUND": "7f0000",
+   "BACKGROUND": null,
+   "FONT_TYPE": "2"
+  },
+  "TERMINAL_CLASS_NAME_LOG_REFERENCE": {
+   "EFFECT_TYPE": "5",
+   "EFFECT_COLOR": "808080"
+  },
+  "TERMINAL_COMMAND_TO_RUN_USING_IDE": {
+   "BACKGROUND": "CFEFC6"
+  },
+  "TEXT": {
+   "EFFECT_COLOR": null,
+   "FOREGROUND": "80808",
+   "BACKGROUND": "ffffff"
+  },
+  "TEXT_SEARCH_RESULT_ATTRIBUTES": {
+   "FOREGROUND": "0",
+   "BACKGROUND": "fcd47e",
+   "FONT_TYPE": "0",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": "c47233"
+  },
+  "TODO_ATTRIBUTES": {
+   "FOREGROUND": "3a53cf",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "3"
+  },
+  "TODO_DEFAULT_ATTRIBUTES": {
+   "FOREGROUND": "8dde",
+   "BACKGROUND": null,
+   "FONT_TYPE": "2",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "0",
+   "ERROR_STRIPE_COLOR": "54aae3"
+  },
+  "TYPE_PARAMETER_NAME_ATTRIBUTES": {
+   "FOREGROUND": "7e8a",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null
+  },
+  "TYPO": {
+   "EFFECT_COLOR": "B0D1AB",
+   "EFFECT_TYPE": "2"
+  },
+  "UNMATCHED_BRACE_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "ffdcdc",
+   "EFFECT_COLOR": null
+  },
+  "WARNING_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "fcf4d4",
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": "1",
+   "ERROR_STRIPE_COLOR": "f2bf57"
+  },
+  "WRITE_IDENTIFIER_UNDER_CARET_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "fce8f4",
+   "ERROR_STRIPE_COLOR": "f0a8d2",
+   "EFFECT_COLOR": null
+  },
+  "WRITE_SEARCH_RESULT_ATTRIBUTES": {
+   "FOREGROUND": null,
+   "BACKGROUND": "ffcdff",
+   "EFFECT_COLOR": null,
+   "ERROR_STRIPE_COLOR": "b28fb2"
+  },
+  "WRONG_REFERENCES_ATTRIBUTES": {
+   "FOREGROUND": "f50000",
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "EFFECT_TYPE": null,
+   "FONT_TYPE": null
+  },
+  "XML_CUSTOM_TAG_NAME": {
+   "FOREGROUND": "008077"
+  },
+  "XML_PROLOGUE": {
+   "FOREGROUND": null,
+   "BACKGROUND": null,
+   "EFFECT_COLOR": null,
+   "FONT_TYPE": "2"
+  },
+  "XPATH.FUNCTION": {
+   "FOREGROUND": "174ad4",
+   "FONT_TYPE": "1"
+  },
+  "XPATH.KEYWORD": {
+   "FOREGROUND": "174ad4",
+   "FONT_TYPE": "1"
+  },
+  "XPATH.XPATH_NAME": {
+   "FOREGROUND": "33b3",
+   "FONT_TYPE": "1"
+  },
+  "YAML_ANCHOR": {
+   "FOREGROUND": "e6"
+  }
+ }
+}

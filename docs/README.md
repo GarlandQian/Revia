@@ -12,6 +12,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的功能和界面，做
 - [调研与初始方案](./research.md)：已核实的调研事实、初始方案的建议和已识别的难点；建议部分未经确认。
 - [M0 报告](./milestones/m0/report.md)：diff 渲染和运行环境原型的测量结果与结论。
 - [M2 规格](./milestones/m2/spec.md)与[任务单](./milestones/m2/issues/)：按已确认的 Q78–Q97 整理的实施与验收契约。
+- [M4 规格（草稿）](./milestones/m4/spec.md)与 [Rebased 参照](./milestones/m4/rebased-reference.md)：界面照 Rebased 重做的范围，以及从 Rebased 提取的配色与尺寸。
 - [术语表](../GLOSSARY.md)：已确认的领域术语和应避免的说法。
 - [里程碑](./milestones/)：每个里程碑的计划、评审意见与报告（`m<N>/`）。
 - [Agent 配置](./agents/)：任务记录与领域文档的约定，供工程类技能读取。
