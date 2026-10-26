@@ -10,7 +10,7 @@
 - 外观：配色、界面字体（系统字体）、控件样式与尺寸照 VS Code，配色来自所选的颜色主题（Q131、Q132）；界面图标用 Codicons，文件类型图标用 Material Icon Theme（Q130）。
 - 颜色主题：浅色、深色各选一套，随系统深浅色切换（Q50、Q132）。内置 VS Code Light 2026、Atom One Light、VS Code Dark 2026、One Dark Pro；默认浅色 Atom One Light，深色 One Dark Pro。
 - 文件名按状态上色，颜色取颜色主题中的 Git 状态色，不显示状态字母（Q128）。
-- 每完成一屏，与 Rebased（布局、交互）和 VS Code（外观）并排截图，经用户认可再继续（Q125）。界面文字用中文，沿用术语表（Q124）。
+- 验收时每一屏与 Rebased（布局、交互）和效果图（外观）并排截图，由用户认可（Q125、Q136）。界面文字用中文，沿用术语表（Q124）。
 - 确认的效果图见 [M4 效果图](./milestones/m4/mockups/)。
 
 Revia 独有的功能只用 Rebased 已有的控件形式表达，不自创控件（Q119）：
