@@ -185,6 +185,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的布局和功能，配
 | Q152 | 自动 fetch 默认关；开启后每 10 分钟对当前打开的仓库 fetch 一次，失败只在状态栏提示，不弹窗 | 同上 |
 | Q153 | 推送、拉取等需要密码或令牌时不弹输入框，使用用户在终端中已配置的凭据（credential helper、ssh-agent）；需要输入时立即失败，并提示到终端配置，不修改 Git 配置 | 同上 |
 | Q154 | M4、M5 带已知未达标项验收并合入 main：Q98 长测 WebContent footprint 最大增长 10.2 MiB（门槛 10 MiB）、统一视图首次大幅跳转首帧 25–29 ms（门槛 16.7 ms）、弹层偶发不可见未复现、四主题与 Rebased 完整对照及部分安全工作流的桌面验收未做完；这些转入 [backlog](./milestones/backlog/)，门槛不变。M6 由 Codex 开始；只有一个会话顺序工作时可直接在主目录的 `m6` 分支上进行，有并行实施方时再建 worktree | 用户于 2026-10-28 说“m5我觉得可以了”“我想让codex开启m6”，选择“先合并再交给 Codex”并删除旧 worktree；问“一定要建worktree吗”，规划方答复单会话顺序工作时不需要 |
+| Q155 | M6 仍按工作流程分工：Codex 做规划、审查与验收，派 Paseo 的 Pi 实施（模型顺序 Q137、返修 Q113）。规划方与 Pi 轮流工作（一方工作时另一方不改文件）时，Pi 直接在主目录的 `m6` 分支上实施；需要同时改文件时再给 Pi 建 worktree | 用户于 2026-10-28 说“还是继续codex派paseo的pi来做” |
 
 各项的完整说明见对应的方向文档。
 
@@ -193,7 +194,7 @@ Revia 照 Rebased（JetBrains 的独立 Git 客户端）的布局和功能，配
 ```text
 Revia
 |-- 产品定位与取舍顺序 [Q5 已确认；定位按 Q118 改为照 Rebased]
-|-- 照 Rebased 重做 [Q117-Q154 已确认]
+|-- 照 Rebased 重做 [Q117-Q155 已确认]
 |   |-- 继续自研，不 fork；Rebased 1.1.22 为验收基准 [Q117，ADR-0011]
 |   |-- 界面一比一与独有功能的位置 [Q119]
 |   |-- 提交工具窗口两种模式 [Q120，ADR-0003]
@@ -227,7 +228,8 @@ Revia
 |   |-- 日志索引移到 M7 [Q151]
 |   |-- 自动 fetch 每 10 分钟，默认关 [Q152]
 |   |-- 不弹凭据输入框，用终端已配置的凭据 [Q153]
-|   `-- M4、M5 带已知未达标项合入 main，开始 M6 [Q154]
+|   |-- M4、M5 带已知未达标项合入 main，开始 M6 [Q154]
+|   `-- M6 由 Codex 规划、派 Paseo 的 Pi 实施 [Q155]
 |-- 技术栈：Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS [T1/Q1/Q6/Q7 已确认]
 |   |-- Git 执行：Rust 层受控调用 Git CLI [Q7 已确认]
 |   |   |-- Git 程序：登录 shell PATH 中的 git，不自带 [Q27 已确认]
