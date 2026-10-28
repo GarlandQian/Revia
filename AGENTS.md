@@ -15,6 +15,8 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 
 M6“冲突与历史”的范围见 [产品方向](docs/product-direction.md#实施顺序) 的里程碑表：stash；继续、中止、跳过；在日志中 cherry-pick、revert、reset、改提交信息、交互式 rebase；文件历史与 blame；外部合并工具保留为可选（Q126、Q143、Q149）。从下面工作流程的第 1 步开始，先与用户追问未定细节，再写 `docs/milestones/m6/spec.md`；实施仍由 Codex 派 Paseo 的 Pi 完成（Q155）。
 
+M6 细节见 [产品方向：M6](docs/product-direction.md#m6冲突与历史追问中)（Q156–Q163）：stash 的独立回收存储、自动保存与冲突保留已确认；不做 Shelf、不加清理方式设置。简体中文 / English 与 x18n 文案维护已从 M7 提前到 M6，实施前读取该节及 UI 方向的“界面语言”。
+
 M4、M5 带已知未达标项合入 main（Q154）：Q98 长测、统一视图首次跳转与未做完的桌面验收在 `docs/milestones/backlog/` 04–06，不属于 M6 范围，除非用户在第 1 步中纳入。用户已要求把 [backlog 07](docs/milestones/backlog/07-log-date-column-wrap.md)（日志日期列折行）并入 M6 一起修复。
 
 布局与交互照本机 Rebased 1.1.22，外观沿用 VS Code 颜色主题（Q117、Q131–Q133）。旧决定冲突时按 Q129、Q131 处理，安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
