@@ -11,11 +11,11 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M6 第 1 步
+## 当前阶段：M6 整包实施准备
 
-M6“冲突与历史”的范围见 [产品方向](docs/product-direction.md#实施顺序) 的里程碑表：stash；继续、中止、跳过；在日志中 cherry-pick、revert、reset、改提交信息、交互式 rebase；文件历史与 blame；外部合并工具保留为可选（Q126、Q143、Q149）。从下面工作流程的第 1 步开始，先与用户追问未定细节，再写 `docs/milestones/m6/spec.md`；实施仍由 Codex 派 Paseo 的 Pi 完成（Q155）。
+M6 范围与整包验收见 [规格](docs/milestones/m6/spec.md)、[单一整包任务](docs/milestones/m6/issues/01-complete-m6.md) 与 [Pi 交接](docs/milestones/m6/paseo-batch.md)。按 Q172 一次交给同一个 Pi 会话完成全部功能后统一审查验收，不按功能拆派或启动多个实施代理；Pi 仍在独立 `m6` worktree 实施，主目录保留 main（Q155）。
 
-M6 细节见 [产品方向：M6](docs/product-direction.md#m6冲突与历史追问中)（Q156–Q168）：stash 独立回收、自动保存与冲突保留、edit 停点提交已确认；不做 Shelf、不加清理方式设置，import 自动解决仅入未排期 backlog。双语与 x18n 提前到 M6，首次按系统语言选择；Rust 用户报错也须结构化后由前端翻译。Pi 实施前读取该节、UI 方向的“界面语言”及已安装的 x18n skills，并核对其 MCP 实际加载状态。
+M6 细节见 [产品方向：M6](docs/product-direction.md#m6冲突与历史)（Q156–Q172）。双语与 x18n 提前到 M6，首次按系统语言选择，Rust 用户报错结构化；实施前读 [文案规则](docs/milestones/m6/i18n-proposal.md) 及 x18n skills，核对 MCP 实际加载与目标目录。函数文案占位符化、动态查表用完整字面量键；check 与 extract --list 分别验翻译和写死中文。
 
 M4、M5 带已知未达标项合入 main（Q154）：Q98 长测、统一视图首次跳转与未做完的桌面验收在 `docs/milestones/backlog/` 04–06，不属于 M6 范围，除非用户在第 1 步中纳入。用户已要求把 [backlog 07](docs/milestones/backlog/07-log-date-column-wrap.md)（日志日期列折行）并入 M6 一起修复。
 

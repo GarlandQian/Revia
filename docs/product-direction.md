@@ -147,9 +147,9 @@ M2 每次只操作一个文件或一个 hunk，不增加文件多选、“全部
 - 继续、中止、跳过在 M6。
 - 外部合并工具保留为可选设置，M6 实现：Revia 不修改用户的 Git 配置（Q12、Q28）；用户配置了 `merge.tool` 时直接使用；没有配置时，第一次需要时列出 Git 检测到的可用工具让用户选一次，保存在 Revia 的设置中。
 
-## M6：冲突与历史（追问中）
+## M6：冲突与历史
 
-以下为 Q156–Q168 已确认内容，尚不是就绪的实施规格。M6 仍由 Codex 规划、审查和验收，Paseo 的 Pi 在独立 `m6` worktree 实施（Q155）。日志日期列折行按 [backlog 07](./milestones/backlog/07-log-date-column-wrap.md) 一并修复，界面语言与 x18n 提前到 M6（Q163）；Q154 的其他已知问题不自动纳入。
+以下为 Q156–Q172 已确认内容，实施范围见 [M6 规格](./milestones/m6/spec.md)。Codex 规划、审查和验收，同一个 Paseo / Pi 会话在独立 `m6` worktree 一次整包实施，完成后统一审查验收（Q155、Q172）。日志日期列折行按 [backlog 07](./milestones/backlog/07-log-date-column-wrap.md) 一并修复，界面语言与 x18n 提前到 M6（Q163）；Q154 的其他已知问题不自动纳入。
 
 Rebased 安装资源与 x18n 官方工作流的事实、来源和未确认边界见 [M6 资料核对记录](./milestones/m6/references.md)；不能用静态核对代替运行时验收。
 
@@ -182,7 +182,8 @@ Rebased 安装资源与 x18n 官方工作流的事实、来源和未确认边界
 - 翻译和文案维护改用 [x18n Agent workflows](https://x18n.dev/agents/workflows)。官方工作流用 CLI 的 `--json` 查询与写入语言资源，再用 `x18n check` 校验；不把安装文案工具本身视为已经完成运行时语言切换。
 - Rust 用户可见报错也须双语：返回稳定错误类型和参数，由前端生成当前语言的文案，不把整段原中文错误藏进参数，见 [ADR-0013](./adr/0013-localize-structured-user-errors-at-presentation.md)。用户估计现有 Rust 层约 784 处中文字符串，实际实施须分类用户文案和内部日志，不能把数量当作完成依据。
 - 不把仓库内容、用户提交信息或 Git 原始输出混入待翻译的产品文案；调试与测量日志不翻译。
-- Pi 实施时使用用户已安装的 x18n MCP、`x18n` / `x18n-check` skills；派发前核对 Pi 实际可见的工具与技能，不能把 Codex 的安装状态当作 Pi 已加载。语言资源通过 x18n 查询、写入、校验，不直接手改；源语言、键结构、术语译法与检查策略在开始迁移前确认。
+- Pi 实施时使用用户已安装的 x18n MCP、`x18n` / `x18n-check` skills；派发前核对 Pi 实际可见的工具与技能，不能把 Codex 的安装状态当作 Pi 已加载。语言资源通过 x18n 查询、写入、校验，不直接手改；源语言 `zh-CN`、目标 `en`、语义分组和 camelCase 末级键保留，术语见 [文案规则](./milestones/m6/i18n-proposal.md)，提交前快照使用 `Snapshot Before Commit`（Q169、Q170）。
+- 现有函数式文案改为占位符，动态查表改为完整字面量键映射。check 验证翻译和占位符；独立的 extract --list 扫描发现可见写死中文时失败，调试与测量日志用 x18n-ignore 标注（Q169、Q171）。
 - 英文窄窗口须检查布局；x18n 须检查界面代码无写死中文。真实 Git 测试触发 Rust 生产错误，核对结构化载荷后经生产英文格式化链路断言最终可见英文，不能仅断言错误码或以模拟报错替代（Q168）。
 
 ### 不在本轮实施
