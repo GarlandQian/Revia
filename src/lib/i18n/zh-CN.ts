@@ -1,7 +1,19 @@
 /**
  * 界面文案集中管理（Q40：首版只提供简体中文，文案不写死在组件里）。
  * 以后增加英文时，只需要新增一个同样形状的字典。
+ *
+ * 快捷键文案按平台生成修饰键符号（返修 C11，Q55）：macOS 用 ⌘/⌥/⇧，
+ * 其他平台用 Ctrl+/Alt+/Shift+。
  */
+
+import type { ConflictSideState } from "@/types/bindings/ConflictSideState";
+import type { MergeSideRole } from "@/types/bindings/MergeSideRole";
+import type { MergeUnavailable } from "@/types/bindings/MergeUnavailable";
+import { COMMIT_SHORTCUT_LABEL, isMac, MOD_SYMBOLS } from "@/lib/platform";
+
+const KEY = `${MOD_SYMBOLS.alt}${MOD_SYMBOLS.primary}`;
+const COMMIT_SHORTCUT_TEXT = `提交（${COMMIT_SHORTCUT_LABEL}）`;
+const GIT_PATH_PLACEHOLDER = isMac ? "例如 /opt/homebrew/bin/git" : "例如 C:\\Program Files\\Git\\cmd\\git.exe";
 
 export const zhCN = {
   app: {
@@ -10,12 +22,22 @@ export const zhCN = {
   toolbar: {
     chooseRepo: "选择仓库文件夹…",
     toolWindows: "工具窗口",
+    repositories: "仓库",
+    addRepository: "添加仓库…",
+    worktrees: "worktree",
+    dirty: "有未提交改动",
+    clean: "没有未提交改动",
+    operation: (label: string) => `进行中的操作：${label}`,
+    inaccessible: "路径不可访问",
+  },
+  statusBar: {
+    upstreamHint: "领先和落后数按本地记录，截至上次 fetch；不会联网核对。",
+    asOfLastFetch: "截至上次 fetch",
   },
   firstRun: {
     title: "添加仓库",
     description: "选择本机文件系统中的一个 Git 仓库目录，或把文件夹拖进窗口。",
     addButton: "选择文件夹…",
-    dragHint: "也可以把文件夹拖到窗口里",
     notARepo: "这个目录不是 Git 仓库",
     failed: "添加失败",
   },
@@ -28,31 +50,61 @@ export const zhCN = {
     loading: "读取状态…",
     binary: "二进制文件，不显示内容",
     binaryDetail: "可以整文件暂存或丢弃；丢弃前会先存入回收区。",
-    emptyFile: "没有可显示的 hunk",
+    emptyFile: "没有可显示的块",
     emptyFileDetail: "这个文件没有内容改动，例如刚建的空文件。",
     loadingFile: "正在读取文件内容…",
     conflict: "这个文件有未解决的冲突：暂不显示 diff，也不能在这里暂存或取消暂存",
-    conflictTitle: "这个文件有未解决的冲突",
     collapsed: "默认收起",
     collapsedDetail: "lock 文件、二进制和超大文件默认不渲染。",
     expand: "展开",
     expandDiff: "展开 diff",
     collapse: "收起",
     noSelection: "选择左侧文件查看 diff",
-    hunks: "hunk",
+    noSelectionDetail: `从改动树选择文件；${COMMIT_SHORTCUT_LABEL} 提交、F7 下一处改动、${KEY}R 标记已审阅、${MOD_SYMBOLS.primary}O 添加仓库。`,
+    hunks: "块",
     linesAdded: "新增",
     linesDeleted: "删除",
     stage: "暂存",
     unstage: "取消暂存",
+    stageAll: "全部暂存",
+    unstageAll: "全部取消暂存",
+    discardSelected: "丢弃所选",
+    expandAll: "展开全部",
+    collapseAll: "收起全部",
+    more: "更多",
+    selectAll: "全选",
+    closeTab: "关闭页签",
+    closeAllTabs: "关闭全部页签",
+    hunkCount: (count: number) => `${count} 处改动`,
     stageFile: "暂存文件",
     unstageFile: "取消暂存文件",
-    stageHunk: "暂存此 hunk",
-    unstageHunk: "取消暂存此 hunk",
+    stageHunk: "暂存此块",
+    unstageHunk: "取消暂存此块",
+    stageSegment: "暂存此块",
+    unstageSegment: "取消暂存此块",
+    discardSegment: "丢弃此块",
+    segmentAt: (action: string, line: number) => `${action}（第 ${line} 行起）`,
+    segmentStaged: "已暂存这一块",
+    segmentUnstaged: "已取消暂存这一块",
+    segmentDiscarded: "已丢弃这一块（原内容已存入回收区）",
     discardFile: "丢弃文件改动",
-    discardHunk: "丢弃此 hunk",
+    discardHunk: "丢弃此块",
     discardShort: "丢弃",
     toolWindow: "变更",
+    resizeSidebar: "拖动调整工具窗口宽度",
+    viewByDirectory: "按目录分组",
+    viewFlat: "平铺文件列表",
     fileCount: (count: number) => `${count} 个文件`,
+    batchStaged: (count: number) => `已暂存 ${count} 个文件`,
+    batchUnstaged: (count: number) => `已取消暂存 ${count} 个文件`,
+    batchDiscarded: (count: number) => `已丢弃 ${count} 个文件的改动`,
+    batchPartial: (done: string, failed: number) => `${done}，${failed} 个未执行`,
+    batchNeedsCheck: "操作结果待核对",
+    batchNothing: "所选文件都是只读类型，未执行任何操作",
+    writeFailedTitle: "操作未完成",
+    batchFailedTitle: "批量操作失败",
+    notExecuted: "未执行",
+    nothingToDiscard: "所选文件没有可丢弃的改动",
     renamedFrom: (dir: string, original: string) => (dir ? `${dir} · 原 ${original}` : `原 ${original}`),
     repoRoot: "仓库根目录",
     detachedHead: "（detached HEAD）",
@@ -76,17 +128,18 @@ export const zhCN = {
     shortcuts: {
       stage: "暂存（空格）",
       unstage: "取消暂存（空格）",
-      stageFile: "暂存文件（⌥⌘A 或空格）",
-      unstageFile: "取消暂存文件（⌥⌘A 或空格）",
-      discardFile: "丢弃当前文件的未暂存改动（⌥⌘Z）",
-      review: "标记已审阅（⌥⌘R）",
-      reviewNext: "标记并跳到下一个未审阅文件（⌥⌘R）",
-      commit: "提交（⌘K / Ctrl+K）",
+      stageFile: `暂存文件（${KEY}A 或空格）`,
+      unstageFile: `取消暂存文件（${KEY}A 或空格）`,
+      discardFile: `丢弃当前文件的未暂存改动（${KEY}Z）`,
+      review: `标记已审阅（${KEY}R）`,
+      reviewNext: `标记并跳到下一个未审阅文件（${KEY}R）`,
+      commit: COMMIT_SHORTCUT_TEXT,
     },
   },
   review: {
     mark: "标记为已审阅",
     unmark: "取消审阅标记",
+    marked: "已审阅",
     progress: (reviewed: number, total: number) => `已审阅 ${reviewed}/${total}`,
     allReviewed: "全部文件都已审阅",
     saveFailed: "审阅标记保存失败",
@@ -97,16 +150,18 @@ export const zhCN = {
     title: "回收区",
     discardTitle: "丢弃改动",
     confirmFile: "丢弃整个文件的未暂存改动？",
-    confirmHunk: "丢弃此 hunk 的未暂存改动？",
-    safety: "执行前会先保存完整文件状态到回收区；暂存区不变。即使只丢弃一个 hunk，回收记录也保存整个文件。",
+    confirmFiles: (count: number) => `丢弃这 ${count} 个文件的未暂存改动？`,
+    confirmHunk: "丢弃此块的未暂存改动？",
+    safety: "执行前会先保存完整文件状态到回收区；暂存区不变。即使只丢弃一个块，回收记录也保存整个文件。",
     confirm: "保存到回收区并丢弃",
     cancel: "取消",
     close: "关闭",
     refresh: "刷新记录",
     loading: "读取回收记录…",
     empty: "暂无回收记录",
+    sourceMerge: "合并前的工作区内容",
     sourceFile: "整文件丢弃",
-    sourceHunk: "单 hunk 丢弃（保存完整文件）",
+    sourceHunk: "单块丢弃（保存完整文件）",
     /** 提交前快照：不是丢弃，文案不得写成「已丢弃」（M3 F05.4）。 */
     sourceCommit: "提交前快照（提交时的完整工作区状态，未丢弃任何内容）",
     completed: "已保存 · 丢弃完成",
@@ -123,7 +178,7 @@ export const zhCN = {
     stateLaterChanges: "丢弃之后又有修改：只能只读对比或另存，不能覆盖",
     stateNoBaseline: "没有可信的丢弃完成状态（结果待核对），不能直接恢复",
     stateIdentityMismatch: "原 worktree 身份无法确认，不能直接恢复到新目录",
-    restoreFullFile: "恢复的是完整文件内容（即使记录来自单个 hunk）",
+    restoreFullFile: "恢复的是完整文件内容（即使记录来自单个块）",
     restore: "恢复完整文件",
     confirmRestore: "确认恢复？会覆盖当前工作区内容，暂存区不变。",
     confirmRestoreAction: "恢复完整文件",
@@ -150,6 +205,7 @@ export const zhCN = {
     restoreDone: "已恢复完整文件内容（暂存区未改变）",
     restoreNeedsCheck: "恢复结果待核对：可能已写入部分路径，请重新核对真实状态",
     saveAsDone: "已另存保存版本",
+    saveAsFailed: "另存失败",
     attemptLabel: "最近一次恢复",
     attemptPending: "进行中（可能已写入部分路径，请核对）",
     attemptCompleted: "已完成",
@@ -160,17 +216,158 @@ export const zhCN = {
     bytes: "字节",
   },
   diff: {
+    /** 左右对照栏头（设计第 1 节的表；冲突文件见 3.2）。 */
+    sideLabels: (changes: "unstaged" | "staged" | "untracked", conflict: boolean) =>
+      conflict
+        ? { left: "HEAD", right: "工作区" }
+        : changes === "unstaged"
+          ? { left: "已暂存", right: "工作区" }
+          : changes === "staged"
+            ? { left: "HEAD", right: "已暂存" }
+            : { left: "空", right: "工作区" },
+    binaryNotCompared: "二进制文件不进入左右对照",
     split: "并排",
     unified: "统一",
     viewLabel: "视图",
     viewSplit: "并排查看",
     viewUnified: "统一查看",
+    switchToUnified: "切换到统一视图",
+    switchToSplit: "切换到并排视图",
     previousHunk: "上一处差异",
     nextHunk: "下一处差异",
-    previousHunkShortcut: "上一处差异（⇧F7）",
+    previousHunkShortcut: `上一处差异（${MOD_SYMBOLS.shift}F7）`,
     nextHunkShortcut: "下一处差异（F7）",
     fontSmaller: "缩小字号",
     fontLarger: "放大字号",
+    foldLines: (count: number) => `⋯ ${count} 行未改动，点击展开`,
+    changeCount: (count: number) => `${count} 处改动`,
+    filePosition: (index: number, total: number) => `第 ${index} / ${total} 个文件`,
+    previousFile: "上一个文件",
+    nextFile: "下一个文件",
+    options: "diff 显示选项",
+    ignoreWhitespace: "忽略空白",
+    ignoreWhitespaceLevels: {
+      off: "不忽略",
+      eol: "忽略行尾空白",
+      all: "忽略所有空白",
+      allBlank: "同时忽略空行",
+    },
+    ignoreWhitespaceReadonly: "同时忽略空行只用于查看；关闭这一档后可以按块操作",
+    highlightLabel: "差异高亮方式",
+    highlightLevels: {
+      word: "按词",
+      line: "按行",
+      char: "按字符",
+      none: "不高亮",
+    },
+    syncScroll: "同步滚动",
+    foldUnchanged: "折叠未改动部分",
+    showWhitespace: "显示空白字符",
+    softWrap: "软换行",
+    jumpToNextFile: "最后一处改动后跳到下一个文件",
+    contextLines: "上下文行数",
+    conflictBanner: "有未解决的冲突",
+    resolveConflict: "解决冲突",
+  },
+  merge: {
+    title: "合并",
+    tabTitle: (name: string) => `合并：${name}`,
+    conflictCount: (count: number) => (count > 0 ? `还有 ${count} 处冲突` : "没有未处理的冲突"),
+    apply: "应用",
+    applyHint: "应用时先把工作区文件存入回收区，再写入结果并标记为已解决",
+    cancel: "取消",
+    applyAllClean: "应用所有不冲突的改动",
+    busy: "当前 worktree 有正在进行的写操作，请稍候",
+    writeFailedTitle: "合并结果未写入",
+    acceptLeft: "全部接受左边",
+    acceptRight: "全部接受右边",
+    acceptYourVersion: "接受你的版本",
+    acceptTheirVersion: "接受对方的版本",
+    takeLeft: "把左边这一块放进结果",
+    takeRight: "把右边这一块放进结果",
+    ignoreSide: "忽略这一侧",
+    previousConflict: "上一处冲突（⇧F7）",
+    nextConflict: "下一处冲突（F7）",
+    result: "结果",
+    loadFailed: "读取合并内容失败",
+    reload: "重新打开",
+    /** 栏头：按进行中的操作写明是哪一侧（设计第 2 节的表）。 */
+    sideTitle: (side: "ours" | "theirs", role: MergeSideRole, name: string | null): string => {
+      const fallback = side === "ours" ? "你的版本" : "对方的版本";
+      const named = (prefix: string) => (name ? `${prefix} ${name}` : prefix);
+      switch (role) {
+        case "currentBranch":
+          return `${fallback}：${named("当前分支")}`;
+        case "mergedIn":
+          return `${fallback}：${named("合并进来的")}`;
+        case "upstream":
+          return `${fallback}：${named("上游")}`;
+        case "yourCommit":
+          return `${fallback}：${named("你的提交")}`;
+        case "head":
+          return `${fallback}：HEAD`;
+        case "appliedCommit":
+          return `${fallback}：${named("被应用的提交")}`;
+        case "ours":
+        case "theirs":
+          return fallback;
+      }
+    },
+    confirm: (kind: "apply" | "cancel" | "ours" | "theirs", conflicts: number) => {
+      switch (kind) {
+        case "apply":
+          return {
+            title: "还有冲突未解决",
+            body: conflicts > 0
+              ? `还有 ${conflicts} 处冲突未解决，仍要保存当前结果吗？`
+              : "结果里还有冲突标记，仍要保存当前结果吗？",
+            stay: "继续解决",
+            go: "保存当前结果",
+          };
+        case "cancel":
+          return { title: "放弃这次合并", body: "结果栏里的修改会丢掉，文件保持冲突状态。", stay: "继续合并", go: "放弃" };
+        case "ours":
+        case "theirs":
+          return {
+            title: kind === "ours" ? "整个文件接受左边" : "整个文件接受右边",
+            body: "结果栏里的修改会丢掉。工作区文件会先存入回收区，再写入并标记为已解决。",
+            stay: "继续合并",
+            go: kind === "ours" ? "接受左边" : "接受右边",
+          };
+      }
+    },
+    cannotMerge: "这个冲突不能三栏合并，只能整个文件接受一侧",
+    unavailable: {
+      bothDeleted: "两边都删除了这个文件。",
+      oursDeleted: "你的版本里已删除这个文件，对方的版本修改了它。",
+      theirsDeleted: "对方的版本里已删除这个文件，你的版本修改了它。",
+      binary: "这是二进制文件。",
+      symlink: "这是符号链接。",
+      submodule: "这是子模块。",
+      inconsistent: "按块分组的结果与 Git 的合并结果对不上（可能是 diff 相关的配置导致），不能按块合并。",
+    } satisfies Record<MergeUnavailable, string>,
+    acceptSideState: (side: "ours" | "theirs", state: ConflictSideState) => {
+      const base = side === "ours" ? "接受你的版本" : "接受对方的版本";
+      return state === "deleted" ? `${base}（删除这个文件）` : base;
+    },
+    conflictsGroup: "冲突",
+    resolveButton: "解决…",
+    conflictDialogTitle: "解决冲突",
+    conflictDialogHint: "选择一个或多个文件：接受你的版本、接受对方的版本，或者打开合并页签。接受一侧前先把工作区文件存入回收区。",
+    ourVersion: "你的版本",
+    theirVersion: "对方的版本",
+    modified: "已修改",
+    deleted: "已删除",
+    added: "已新增",
+    mergeButton: "合并…",
+    onlyAcceptSide: "只能接受一侧",
+  },
+  notices: {
+    close: "关闭通知",
+    collapseOutput: "收起输出",
+    expandOutput: (lines: number) => `展开输出（${lines} 行）`,
+    copied: "已复制",
+    copyOutput: "复制输出",
   },
   environment: {
     title: "环境问题",
@@ -192,9 +389,18 @@ export const zhCN = {
    */
   commit: {
     section: "提交",
+    tab: "提交",
+    options: "提交选项",
     placeholder: "提交信息（首行建议不超过 72 个字符）",
     messageLabel: "提交信息",
     firstLineHint: (length: number) => `首行 ${length} 个字符，超过建议的 72 个字符`,
+    warningsTitle: "提交前检查",
+    warningsDetail: "下列情况需要确认。可以继续提交，也可以取消后先处理。",
+    warningsContinue: "继续提交",
+    warningsCancel: "取消",
+    subjectTooLong: (length: number, limit: number) => `首行 ${length} 个字符，超过上限 ${limit}`,
+    blankLineMissing: "首行与正文之间需要空一行",
+    bodyLineTooLong: (line: number, length: number, limit: number) => `正文第 ${line} 行 ${length} 个字符，超过上限 ${limit}`,
     amend: "修改上一次提交",
     amendUnavailable: "当前不能修改上一次提交",
     amendUnavailableNoHead: "仓库还没有任何提交，不能修改上一次提交",
@@ -229,6 +435,9 @@ export const zhCN = {
     outputTitle: (worktree: string) => `提交输出（${worktree}）`,
     outputLive: "实时输出",
     outputWaiting: "等待 Git 输出…",
+    outputCollapse: "收起输出",
+    outputExpand: (count: number) => `展开输出（${count} 行）`,
+    running: "提交进行中，hooks 正在运行…",
     resultSuccess: (head: string) => `已创建提交 ${head.slice(0, 12)}`,
     resultAmend: (head: string) => `已修改提交，新 HEAD ${head.slice(0, 12)}`,
     resultNeedsVerification: "结果待核对：无法确认是否已创建提交，请核对真实状态后再继续",
@@ -241,8 +450,8 @@ export const zhCN = {
     recentPick: "使用这条信息",
     submit: "提交",
     submitting: "提交中…",
-    submitHint: "⌘K 或 Ctrl+K 提交",
-    conflictBlocked: (count: number) => `有 ${count} 个文件存在未解决冲突，先在终端解决后才能提交`,
+    submitHint: COMMIT_SHORTCUT_TEXT,
+    conflictBlocked: (count: number) => `有 ${count} 个文件存在未解决冲突，解决后才能提交（改动树顶部“冲突”组的“解决…”）`,
     operationMerge: "merge 进行中：解决冲突后可以直接提交完成合并",
     operationRebase: "rebase 进行中：请到终端处理，处理完再提交",
     operationCherryPick: "cherry-pick 进行中：请到终端处理，处理完再提交",
@@ -267,6 +476,7 @@ export const zhCN = {
     resultHookChanges: (worktree: string[], index: string[]) =>
       `hooks 修改过这些文件（Revia 不会自动撤销）：工作区 ${worktree.join(", ") || "（无）"}；暂存区 ${index.join(", ") || "（无）"}`,
     resultSnapshot: (id: string) => `提交前已保存快照记录 ${id}（回收区可查看）`,
+    resultSnapshotFiles: (paths: string[]) => `快照包含：${paths.join("、")}`,
     resultDraftKept: "草稿已保留（本次输入与提交时不同或保存失败）",
     resultDraftError: (detail: string) => `草稿收尾失败：${detail}`,
     resultCopy: "复制输出",
@@ -279,6 +489,85 @@ export const zhCN = {
     blockedWriting: "当前 worktree 有正在进行的写操作，请稍候",
     /** 关闭/退出前草稿落盘失败：不得静默销毁窗口。 */
     closeFlushFailed: (detail: string) => `提交草稿未能保存，已取消关闭以免丢失输入：${detail}`,
+  },
+  settings: {
+    open: "设置",
+    title: "设置",
+    appearance: "外观",
+    git: "Git",
+    about: "关于 Revia",
+    lightTheme: "浅色颜色主题",
+    darkTheme: "深色颜色主题",
+    themeHint: "浅色、深色各选一套，随系统深浅色切换。",
+    search: "搜索设置",
+    searchEmpty: "没有匹配的设置项",
+    commit: "提交",
+    diff: "diff",
+    notifications: "通知",
+    pages: {
+      theme: "颜色主题",
+      font: "字体与界面缩放",
+      commitMessage: "提交信息检查",
+      commitWarnings: "提交时警告",
+      diffDisplay: "diff 显示",
+      notifications: "通知",
+      gitTools: "Git 程序与工具",
+    },
+    uiZoom: "界面缩放",
+    uiZoomHint: `80%–150%；也可以用 ${MOD_SYMBOLS.control}${MOD_SYMBOLS.alt}= / ${MOD_SYMBOLS.control}${MOD_SYMBOLS.alt}- / ${MOD_SYMBOLS.control}${MOD_SYMBOLS.alt}0 调整。`,
+    uiZoomReset: "恢复 100%",
+    commitSubjectLimit: "首行长度上限",
+    commitSubjectLimitHint: "0 表示不检查；超出只在提交信息框里标出，不阻止提交。",
+    commitBodyLineLimit: "正文每行长度上限",
+    commitBodyLineLimitHint: "0 表示不检查。",
+    commitBlankLineRequired: "首行与正文之间空一行",
+    commitBlankLineRequiredHint: "不符合时在提交信息框里提示，不阻止提交。",
+    commitShowRuler: "显示右边界线",
+    commitShowRulerHint: "在提交信息框里按首行上限画出右边界。",
+    commitWarningsHint: "提交前检查下列情况，发现问题时先弹出可以继续或取消的提示。检查由 Rust 层完成。",
+    commitWarnCrlf: "CRLF 换行",
+    commitWarnDetached: "游离 HEAD 或 rebase 进行中",
+    commitWarnInvalidFilename: "在其他系统上不合法的文件名",
+    commitWarnLargeFile: "大文件阈值",
+    commitWarnLargeFileHint: "超过这个大小的文件会提示；0 表示不检查。",
+    notifyHint: "成功结果是否弹出通知；失败与结果待核对的通知始终弹出。",
+    notifyKinds: {
+      stage: "暂存、取消暂存成功",
+      discard: "丢弃成功",
+      commit: "提交成功",
+      recovery: "回收区操作成功（恢复、另存、清理）",
+    },
+    diffContextLines: "上下文行数",
+    diffContextLinesHint: "Git diff 的 -U 值，0–64；改动块的上下文行数。",
+    mergeAutoApply: "合并时自动应用无冲突改动",
+    mergeAutoApplyHint: "关闭后，合并页签初始结果用共同祖先，不冲突的改动等你点 » / « 或“应用所有不冲突的改动”。",
+    codeFont: "代码字体",
+    codeFontHint: "留空使用随应用打包的 JetBrains Mono；本机没有该字体时自动回退。",
+    fontSize: "代码字号",
+    fontSizeHint: `9–24；也可以用 ${MOD_SYMBOLS.primary}+ / ${MOD_SYMBOLS.primary}- 调整。`,
+    gitPath: "Git 程序路径",
+    gitPathHint: "留空使用登录 shell PATH 中的 git。",
+    gitPathPlaceholder: GIT_PATH_PLACEHOLDER,
+    detectedGit: "当前使用：",
+    /** 设置搜索框按这些词过滤（左上角搜索，E.1）。 */
+    keywords: {
+      theme: ["颜色主题", "浅色", "深色", "主题"],
+      font: ["代码字体", "字号", "界面缩放", "缩放", "字体"],
+      commitMessage: ["首行", "长度", "空行", "正文", "右边界线", "提交信息"],
+      commitWarnings: ["CRLF", "换行", "游离 HEAD", "rebase", "大文件", "文件名", "警告"],
+      diffDisplay: ["上下文", "折叠", "同步滚动", "高亮", "空白", "软换行", "忽略空白", "diff", "下一个文件"],
+      notifications: ["通知", "气泡", "弹出", "暂存", "丢弃", "提交", "恢复"],
+      gitTools: ["Git 程序", "路径", "重新加载环境", "Git", "合并", "自动应用", "冲突"],
+      about: ["关于", "版本", "许可", "Revia"],
+    },
+    reload: "重新加载环境",
+    reloadHint: "重新解析登录 shell 环境与 Git 程序，然后重新读取当前 worktree。",
+    reloaded: "已重新加载环境",
+    aboutText: "照 Rebased 的布局与交互、配上 VS Code 外观的轻量 Git 客户端。",
+    licenses: "随应用打包的素材与许可",
+    licenseCodicons: "界面图标：Codicons（Microsoft），CC BY 4.0",
+    licenseMaterial: "文件类型图标：Material Icon Theme（Philipp Kief），MIT",
+    licenseThemes: "颜色主题：VS Code Light / Dark 2026、Atom One Light、One Dark Pro，MIT",
   },
   measure: {
     title: "测量",

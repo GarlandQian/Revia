@@ -2,65 +2,60 @@
  * 应用外壳：文件列表与只读 diff；M2 提供目标明确的整文件和 hunk 暂存操作。
  */
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
+import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { ReviewMarks } from "@/types/bindings/ReviewMarks";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { HunkAction } from "@/types/bindings/HunkAction";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
-import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
+import type { WorktreeStatusEntry } from "@/types/bindings/WorktreeStatusEntry";
 import type { AmendConfirmation } from "@/types/bindings/AmendConfirmation";
 import type { CommitContext } from "@/types/bindings/CommitContext";
 import type { CommitOutputEvent } from "@/types/bindings/CommitOutputEvent";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  CircleCheck,
-  CircleX,
-  Columns2,
-  GitBranch,
-  GitCommitHorizontal,
-  Inbox,
-  Loader2,
-  Lock,
-  Minus,
-  Plus,
-  RefreshCwOff,
-  RotateCw,
-  Rows3,
-  TriangleAlert,
-  Undo2,
-  type LucideIcon,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { CommitComposer, messageSubmittable, type CommitResultView } from "@/components/app/CommitComposer";
+import { CommitArea, messageSubmittable, type CommitResultView } from "@/components/app/CommitComposer";
 import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitOutputStore } from "@/lib/commitOutput";
-import { ChangesList, type Selection } from "@/components/app/ChangesList";
-import { FileTypeIcon } from "@/components/app/FileTypeIcon";
-import { CloseRequestDialog, DiscardDialog, RecoveryDialog } from "@/components/app/RecoveryDialogs";
+import { ChangesTree, entryKey, treeOrder } from "@/components/app/ChangesTree";
+import { Breadcrumbs, EditorTabs, mergeTabKey, tabKey, type DiffToolbarOptions } from "@/components/app/EditorTabs";
+import { MergeView } from "@/features/diff/MergeView";
+import { ConflictDialog } from "@/components/app/ConflictDialog";
+import { CloseRequestDialog, CommitWarningDialog, DiscardDialog, type DiscardDialogTarget } from "@/components/app/Dialogs";
+import type { CommitWarning } from "@/types/bindings/CommitWarning";
+import { NotificationStack } from "@/components/app/Notifications";
+import { RecoveryPanel } from "@/components/app/RecoveryPanel";
+import { SettingsDialog, type SettingsPatch } from "@/components/app/SettingsDialog";
+import { ActivityBar, StatusBar, TitleBar, WelcomeScreen } from "@/components/app/Shell";
+import { Codicon } from "@/components/ui/codicon";
+import { MenuItem, MenuSeparator, Popover } from "@/components/ui/popover";
 import { logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
+import { SideBySideView, type SideBySideHandle, type DiffOptions } from "@/features/diff/SideBySideView";
+import { sameAnchorTarget, type AnchorTarget, type FileAnchor } from "@/features/diff/fileAnchor";
+import type { SideBySideLayout } from "@/types/bindings/SideBySideLayout";
+import type { SegmentAction } from "@/types/bindings/SegmentAction";
+import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
 import { matchesHunkAction } from "@/features/diff/hunkAction";
+import { runMergeWrite, type MergeWriteRequest } from "@/features/merge/mergeWrite";
+import { EditorView } from "@codemirror/view";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
 import { messages } from "@/lib/i18n/zh-CN";
-import { isButtonTarget, isCommitMessageTarget, isCommitShortcut, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog, MAIN_TOOLBAR_INSET } from "@/lib/platform";
+import { isButtonTarget, isCommitMessageTarget, isCommitShortcut, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
@@ -70,12 +65,19 @@ import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refres
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { getErrorMessage, toAppError } from "@/lib/error";
+import { useAppearance } from "@/hooks/useAppearance";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useTreeSelection } from "@/hooks/useTreeSelection";
+import { useEditorTabs } from "@/hooks/useEditorTabs";
+import { activeMergeEntry } from "@/hooks/editorTabsState";
+import { useBatchWrite } from "@/hooks/useBatchWrite";
 import {
   formatMs,
   measureScroll,
   nextTask,
   nextPaint,
   nowStamp,
+  percentile,
   probeRaf,
   visibilitySample,
   type FirstScreenSample,
@@ -99,9 +101,39 @@ interface MeasureConfig {
     focus: SoakFocus | null } | null;
 }
 
-type StagingTarget = Pick<HunkAction, "worktreeId" | "path" | "changes" | "fingerprint"> & { hunkId?: string };
+/** 文件列表里的选择（同一文件可同时出现在两组）。 */
+export interface Selection {
+  path: string;
+  changes: ChangesKind;
+}
+
+/**
+ * 写目标：整块（hunkId）或按段（segment）二选一。
+ * 整文件写走批量入口（performBatchWrite），不经过这里（返修 C15）。
+ */
+type StagingTarget = Pick<HunkAction, "worktreeId" | "path" | "changes" | "fingerprint"> &
+  (
+    | { hunkId: string; segment?: undefined }
+    /** 按段（块）操作时的段目标（返修 A1/Q142）：与显示同批签发。 */
+    | {
+        segment: { hunkIndex: number; segmentIndex: number; ignoreWhitespace: IgnoreWhitespace; credential: string };
+        hunkId?: undefined;
+      }
+  );
 type DiscardTarget = StagingTarget & { snapshotRevision: string };
-type DiscardConfirmation = { target: DiscardTarget; epoch: number; activation: number; worktree: string; section?: string };
+
+/** 一次丢弃确认：可含多个文件，或一个块。 */
+interface DiscardRequestState {
+  targets: DiscardDialogTarget[];
+  entries: ChangeEntry[];
+  worktree: string;
+  snapshotRevision: string;
+  activation: number;
+  /** 只丢弃一个块时保留原来的单块写入口。 */
+  hunk?: StagingTarget;
+  /** 只丢弃一段（块）时的段目标（返修 A1/Q142）。 */
+  segment?: StagingTarget;
+}
 
 type IpcDiagnosticSample = ReturnType<ReturnType<typeof startIpcDiagnostics>["snapshot"]>;
 
@@ -150,15 +182,79 @@ export function App() {
     error: null,
   });
   const [selected, setSelected] = useState<Selection | null>(null);
+  // 并排 / 统一视图：选择存在设置里（返修 C12），初始值由 loadSettings 后端值填充。
   const [view, setView] = useState<ViewMode>("split");
   const viewRef = useRef(view);
   viewRef.current = view;
 
+  // ---------- 返修 E：Q139/Q140 设置状态（存 Rust 设置，不用 localStorage） ----------
+  /** 提交工具窗口宽度（可拖动分隔条，B4）。 */
+  const [sidebarWidth, setSidebarWidth] = useState(330);
+  const sidebarDragRef = useRef<{
+    pointerId: number; clientX: number; width: number; scale: number; maxWidth: number; latestWidth: number;
+  } | null>(null);
+  /** 改动树按目录分组（false 为平铺，Q139/A2）。 */
+  const [treeGroupByDirectory, setTreeGroupByDirectory] = useState(false);
+  /** diff 显示选项（Q139）。 */
+  const [diffOptions, setDiffOptions] = useState({
+    contextLines: 3,
+    foldUnchanged: false,
+    syncScroll: true,
+    highlight: "word" as "word" | "line" | "char" | "none",
+    showWhitespace: false,
+    softWrap: false,
+    jumpToNextFile: true,
+    ignoreWhitespace: 0 as 0 | 1 | 2 | 3,
+  });
+  /** 提交信息检查与提交时警告（Q139）。 */
+  const [commitChecks, setCommitChecks] = useState({
+    subjectLimit: 72,
+    blankLineRequired: false,
+    bodyLineLimit: 0,
+    showRuler: false,
+    warnCrlf: true,
+    warnDetached: true,
+    warnLargeFileBytes: 50 * 1024 * 1024,
+    warnInvalidFilename: true,
+  });
+  const diffOptionsRef = useRef(diffOptions);
+  diffOptionsRef.current = diffOptions;
+
+  const { notifyKinds, setNotifyKinds, notify, setCommitResults, allNotices, dismissAllNotices } = useNotifications();
+  /** 合并时自动应用无冲突改动（Q143）。 */
+  const [mergeAutoApply, setMergeAutoApply] = useState(true);
+
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
 
-  const [fontSize, setFontSize] = useState(12);
+  const {
+    themeLight, setThemeLight, themeDark, setThemeDark, codeFontFamily, setCodeFontFamily,
+    fontSize, setFontSize, changeFontSize, uiZoom, setUiZoom, uiZoomRef,
+  } = useAppearance();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // ---------- M4 界面状态 ----------
+  /** 左侧工具窗口是否显示；点击图标条切换（F02.2）。 */
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sideTab, setSideTab] = useState<"commit" | "recovery">("commit");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** 冲突对话框（返修 F10）。 */
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  // 列表和页签共享导航入口；实际取数仍由 openEntry 的选择门校验。
+  const entryNavigationRef = useRef<((entry: ChangeEntry) => void) | null>(null);
+  const navigateEntry = useCallback((entry: ChangeEntry) => entryNavigationRef.current?.(entry), []);
+  const {
+    treeSelection, groupOpen, setGroupOpen, dirOpen, followActiveEntry,
+    expandToSelection, treeSelectedEntries, activateTreeEntry, moveTreeSelection,
+    selectAllEntries, toggleGroup, toggleDir,
+  } = useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry: navigateEntry });
+  /** worktree 下拉的只读状态（F02.1、F09.2）。 */
+  const [worktreeStatuses, setWorktreeStatuses] = useState<WorktreeStatusEntry[]>([]);
+  /** 丢弃确认（可含多个文件，或一个块）。 */
+  const [discardRequest, setDiscardRequest] = useState<DiscardRequestState | null>(null);
+
+  const [gitPath, setGitPath] = useState<string | null>(null);
+  const [mergeTool, setMergeTool] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /**
    * 状态文案。任务 12 起不再显示在工具栏（工具栏只保留日常操作），
@@ -241,14 +337,22 @@ export function App() {
   const [bootstrapDone, setBootstrapDone] = useState(false);
 
   const diffRef = useRef<DiffViewHandle | null>(null);
+  /** 左右对照视图（返修 A1/Q138）的操作句柄。 */
+  const sbsRef = useRef<SideBySideHandle | null>(null);
+  /** 左右对照布局：段数、改动处数与跳转目标（由视图回报）。 */
+  const [sideLayout, setSideLayout] = useState<SideBySideLayout | null>(null);
+  /** 冒烟检查用：转发到页签 hook 的合并入口。 */
+  const openMergeTabRef = useRef<((entry: ChangeEntry) => void) | null>(null);
   const rowStore = useMemo(
     () =>
       new RowWindowStore(async (request) => {
         const slice = await ipc.getRows(request);
-        return { rows: slice.rows, rowCount: slice.rowCount, revision: slice.revision, entry: slice.entry };
+        return { rows: slice.rows, rowCount: slice.rowCount, revision: slice.revision, entry: slice.entry, navigationRows: slice.navigationRows };
       }),
     [],
   );
+  const unifiedNavigationRows = useSyncExternalStore(rowStore.subscribe, rowStore.getNavigationRows);
+  const unifiedJumpRef = useRef<{ epoch: number; row: number; scrollTop: number } | null>(null);
   const highlightStore = useMemo(() => new HighlightStore(), []);
   const autoRan = useRef(false);
   const firstScreenRef = useRef<FirstScreenSample>({
@@ -263,7 +367,31 @@ export function App() {
     viewportHeight: null,
     devicePixelRatio: null,
   });
-  const pendingAnchor = useRef<{ line: number; version: "old" | "new"; view: ViewMode } | null>(null);
+  const pendingAnchor = useRef<(FileAnchor & AnchorTarget & { view: ViewMode }) | null>(null);
+
+  const clearEditorSelection = useCallback(() => {
+    selectionEpochRef.current += 1;
+    selectionGateRef.current.clear();
+    setSelected(null);
+    rowStore.setTarget({
+      worktreeId: worktreeIdRef.current ?? "", path: "", changes: "unstaged",
+      view: viewRef.current, fingerprint: "", snapshotRevision: "",
+    }, 0, null);
+  }, [rowStore]);
+  const selectMergeEntry = useCallback((entry: ChangeEntry) => {
+    // 激活合并页签也使仍在途的 diff 选择失效，避免旧回包夺回当前页。
+    selectionEpochRef.current += 1;
+    selectionGateRef.current.clear();
+    setSelected({ path: entry.path, changes: entry.changes });
+  }, []);
+  const {
+    tabs, mergeTabPath, mergeTabPathRef, mergeTabTargetRef, enterDiff, recordDiffTab, resetMergeTabs,
+    openMergeTab, activateTab, closeTab, closeMergeTab, closeAllTabs,
+  } = useEditorTabs({
+    snapshot, snapshotRef, selectedRef, worktreeIdRef,
+    openEntry: navigateEntry, selectMergeEntry, clearSelection: clearEditorSelection,
+  });
+  openMergeTabRef.current = openMergeTab;
 
   const selectedEntry: ChangeEntry | null = useMemo(() => {
     if (!snapshot || !selected) return null;
@@ -273,6 +401,14 @@ export function App() {
       ) ?? null
     );
   }, [selected, snapshot]);
+
+  // 计数与跳转只使用当前显示档位的段首；原始列表与写凭据不被改写。
+  const navigationRows = selectedEntry && worktreeId && view === "unified" && rowStore.isCurrent({
+    worktreeId, path: selectedEntry.path, changes: selectedEntry.changes, view,
+    ignoreWhitespace: ignoreWhitespaceOf(diffOptions.ignoreWhitespace),
+    fingerprint: selectedEntry.fingerprint, snapshotRevision: selectedEntry.snapshotRevision,
+  }) ? unifiedNavigationRows : null;
+  const displayChangeCount = view === "split" ? sideLayout?.segments.length ?? 0 : navigationRows?.length ?? 0;
 
   // ---------------- 打开仓库 / 刷新 ----------------
 
@@ -298,6 +434,7 @@ export function App() {
   const bindDiffTarget = useCallback((entry: ChangeEntry, id: string, targetView: ViewMode) => {
     const rowCount = targetView === "split" ? entry.rowCountSplit : entry.rowCountUnified;
     rowStore.setTarget({ worktreeId: id, path: entry.path, changes: entry.changes, view: targetView,
+      ignoreWhitespace: ignoreWhitespaceOf(diffOptionsRef.current.ignoreWhitespace),
       fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision }, rowCount, entry);
     highlightStore.setTarget({ worktreeId: id, path: entry.path, changes: entry.changes,
       fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision });
@@ -305,11 +442,12 @@ export function App() {
   }, [highlightStore, rowStore]);
 
   // 所有接收快照的入口都重绑版本；不能因路径、行数相同而沿用旧行和旧 hunk 凭据。
+  // 忽略空白档位变化时也要重绑：统一视图按同一档位重新取行（Q140）。
   useLayoutEffect(() => {
     if (selectedEntry && worktreeId && snapshot?.worktreeId === worktreeId) {
       bindDiffTarget(selectedEntry, worktreeId, view);
     }
-  }, [bindDiffTarget, selectedEntry, snapshot?.worktreeId, view, worktreeId]);
+  }, [bindDiffTarget, selectedEntry, snapshot?.worktreeId, view, worktreeId, diffOptions.ignoreWhitespace]);
 
   /**
    * `scheduleReviewRecovery` 的转发：`openEntry` 定义在它之前，
@@ -322,9 +460,13 @@ export function App() {
   );
 
   const openEntry = useCallback(
-    async (requested: ChangeEntry, target: { view: ViewMode; worktreeId: string; expand?: boolean }) => {
+    async (
+      requested: ChangeEntry,
+      target: { view: ViewMode; worktreeId: string; expand?: boolean; pin?: boolean; select?: boolean },
+    ) => {
       // 本次选择独占一个上下文：期间又选了别的文件或切走，本次结果一律作废（Q88）。
       selectionEpochRef.current += 1;
+      enterDiff();
       const gateToken = gateRef.current.token();
       const selectionContext = selectionGateRef.current.begin(
         target.worktreeId, requested.path, requested.changes, gateToken.activation,
@@ -396,8 +538,21 @@ export function App() {
       }
       const rowCount = bindDiffTarget(entry, target.worktreeId, target.view);
       setSelected(selection);
+      recordDiffTab(entry, target.pin === true);
+      followActiveEntry(entry, target.select === true);
       const covered = await waitUntil(
-        () => rowStore.isCovered(0, Math.min(rowCount, DEFAULT_VIEWPORT_ROWS)),
+        () => {
+          // 并排视图的行来自 side_lines（返修 A1），不用 RowWindowStore。
+          if (target.view === "split") {
+            const handle = sbsRef.current;
+            if (!handle || handle.getViewportHeight() <= 0) return false;
+            return (["left", "right"] as const).every((side) => {
+              const visible = handle.getVisibleRange(side);
+              return handle.isCovered(visible.from, visible.to, side);
+            });
+          }
+          return rowStore.isCovered(0, Math.min(rowCount, DEFAULT_VIEWPORT_ROWS));
+        },
         4000,
       );
       if (!covered) {
@@ -412,10 +567,22 @@ export function App() {
         devicePixelRatio: window.devicePixelRatio,
       };
     },
-    [bindDiffTarget, rowStore],
+    [bindDiffTarget, enterDiff, followActiveEntry, recordDiffTab, rowStore],
   );
+  entryNavigationRef.current = (entry) => {
+    if (worktreeIdRef.current) {
+      void openEntry(entry, { view: viewRef.current, worktreeId: worktreeIdRef.current });
+    }
+  };
 
   const applyRefreshedSnapshot = useCallback((next: ChangesSnapshot) => {
+    const merging = activeMergeEntry(mergeTabTargetRef.current, next);
+    if (merging) {
+      // 合并编辑器保留原布局、指纹和草稿；刷新只更新列表，不重新打开文件。
+      applySnapshot(next);
+      setSelected({ path: merging.path, changes: merging.changes });
+      return;
+    }
     const current = selectedRef.current;
     const previous = snapshotRef.current;
     const display = getDisplayOrderEntries(next);
@@ -432,15 +599,17 @@ export function App() {
       void openEntry(entry, { view: viewRef.current, worktreeId: next.worktreeId })
         .catch((caught) => setAppError(toAppError(caught), next.worktreeId));
     } else {
-      setSelected(null);
+      enterDiff();
+      clearEditorSelection();
     }
-  }, [applySnapshot, openEntry, pickFirstEntry, setAppError]);
+  }, [applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
 
   const openWorktree = useCallback(
     async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean } = {}) => {
       const targetView = options.view ?? view;
       setBusy(true);
       const openStart = performance.now();
+      if (id !== worktreeIdRef.current) resetMergeTabs();
       // 切换请求发起时立即改激活目标：此后旧 worktree 的响应一律丢弃（含 A→B→A）。
       gateRef.current.activate(id);
       const myToken = gateRef.current.token();
@@ -491,7 +660,12 @@ export function App() {
         setStatus(`${next.entries.length} 个文件`);
         const firstRowsStart = performance.now();
         debugLog(`选中文件：${entry.path}（${entry.changes}）`);
-        const opened = await openEntry(entry, { view: targetView, worktreeId: id, expand: options.expand });
+        const opened = await openEntry(entry, {
+          view: targetView,
+          worktreeId: id,
+          expand: options.expand,
+          select: true,
+        });
         debugLog(`首屏取行完成：covered=${opened.covered}`);
         const firstScreenMs = performance.now() - startedAt;
         return {
@@ -517,7 +691,7 @@ export function App() {
         if (gateRef.current.token().activation === myToken.activation) setBusy(false);
       }
     },
-    [applySnapshot, openEntry, pickFirstEntry, setAppError, view],
+    [applySnapshot, openEntry, pickFirstEntry, resetMergeTabs, setAppError, view],
   );
 
   /**
@@ -884,6 +1058,37 @@ export function App() {
       try {
         const [settings, list] = await Promise.all([ipc.listSettings(), ipc.listRepos()]);
         setFontSize(settings.diffFontSize);
+        setThemeLight(settings.themeLight);
+        setThemeDark(settings.themeDark);
+        setCodeFontFamily(settings.codeFontFamily);
+        setGitPath(settings.gitPath);
+        setMergeTool(settings.mergeTool);
+        setSidebarWidth(settings.sidebarWidth);
+        setView(settings.viewMode);
+        setUiZoom(settings.uiZoom);
+        setTreeGroupByDirectory(settings.treeGroupByDirectory);
+        setDiffOptions({
+          contextLines: settings.diffContextLines,
+          foldUnchanged: settings.diffFoldUnchanged,
+          syncScroll: settings.diffSyncScroll,
+          highlight: settings.diffHighlight,
+          showWhitespace: settings.diffShowWhitespace,
+          softWrap: settings.diffSoftWrap,
+          jumpToNextFile: settings.diffJumpToNextFile,
+          ignoreWhitespace: settings.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
+        });
+        setCommitChecks({
+          subjectLimit: settings.commitSubjectLimit,
+          blankLineRequired: settings.commitBlankLineRequired,
+          bodyLineLimit: settings.commitBodyLineLimit,
+          showRuler: settings.commitShowRuler,
+          warnCrlf: settings.commitWarnCrlf,
+          warnDetached: settings.commitWarnDetached,
+          warnLargeFileBytes: Number(settings.commitWarnLargeFileBytes),
+          warnInvalidFilename: settings.commitWarnInvalidFilename,
+        });
+        setNotifyKinds(settings.notify);
+        setMergeAutoApply(settings.mergeAutoApply);
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
@@ -964,21 +1169,29 @@ export function App() {
 
   const switchView = useCallback(
     async (next: ViewMode) => {
-      if (next === view || !selectedEntry) {
+      if (next === view) return;
+      if (!selectedEntry || !worktreeId) {
+        pendingAnchor.current = null;
         setView(next);
         return;
       }
-      const handle = diffRef.current;
-      const scrollTop = handle?.getScrollTop() ?? 0;
-      const anchorRow = Math.floor(scrollTop / ROW_HEIGHT);
-      const row = rowStore.getRow(anchorRow);
-      const line = row?.left?.line ?? row?.oldLine ?? row?.right?.line ?? row?.newLine ?? null;
-      const version: "old" | "new" = row?.left || row?.lineKind === "deletion" ? "old" : "new";
-      pendingAnchor.current = line != null ? { line, version, view: next } : null;
+      // 记住视图选择：写入设置（返修 C12），失败仍完成本次切换。
+      void ipc.updateSettings({ viewMode: next }).catch(() => {});
+      const target: AnchorTarget = {
+        worktreeId, entry: selectedEntry,
+        selectionEpoch: selectionEpochRef.current,
+        activation: gateRef.current.token().activation,
+        optionsKey: JSON.stringify(diffOptionsRef.current),
+      };
+      // 快速切回时保留尚未恢复的原锚点，不从临时首屏重新取位置。
+      const previous = pendingAnchor.current;
+      const anchor = previous && sameAnchorTarget(previous, target) ? previous
+        : (view === "split" ? sbsRef.current : diffRef.current)?.getFileAnchor();
+      pendingAnchor.current = anchor ? { ...anchor, ...target, view: next } : null;
       setView(next);
       if (worktreeId) bindDiffTarget(selectedEntry, worktreeId, next);
     },
-    [bindDiffTarget, rowStore, selectedEntry, view, worktreeId],
+    [bindDiffTarget, selectedEntry, view, worktreeId],
   );
 
   // 视图切换后把锚点行放回顶部（等数据到位再定位）
@@ -986,53 +1199,97 @@ export function App() {
     const anchor = pendingAnchor.current;
     if (!anchor || anchor.view !== view || !selectedEntry) return;
     let cancelled = false;
+    const isCurrent = () => {
+      const entry = snapshotRef.current?.entries.find((item) => item.path === anchor.entry.path
+        && item.changes === anchor.entry.changes);
+      return !!entry && !cancelled && pendingAnchor.current === anchor && viewRef.current === anchor.view
+        && !mergeTabPathRef.current
+        && selectedRef.current?.path === anchor.entry.path
+        && selectedRef.current?.changes === anchor.entry.changes
+        && sameAnchorTarget(anchor, {
+          worktreeId: worktreeIdRef.current ?? "", entry,
+          selectionEpoch: selectionEpochRef.current,
+          activation: gateRef.current.token().activation,
+          optionsKey: JSON.stringify(diffOptionsRef.current),
+        });
+    };
     void (async () => {
-      // 绑定发起时的选择与版本：迟到的行号结果不得挪动已经切换的视口（Q88）。
-      const anchorEpoch = selectionEpochRef.current;
-      const anchorGate = gateRef.current.token();
-      const anchorRevision = selectedEntry.snapshotRevision;
-      const index = await ipc.rowIndexForLine({
-        worktreeId: worktreeId ?? "",
-        path: selectedEntry.path,
-        changes: selectedEntry.changes,
-        view,
-        line: anchor.line,
-        version: anchor.version,
-      });
-      if (cancelled) return;
-      if (anchorEpoch !== selectionEpochRef.current
-        || gateRef.current.token().activation !== anchorGate.activation
-        || selectedRef.current?.path !== selectedEntry.path
-        || selectedRef.current?.changes !== selectedEntry.changes
-        || snapshotRef.current?.entries.find((entry) => entry.path === selectedEntry.path
-          && entry.changes === selectedEntry.changes)?.snapshotRevision !== anchorRevision) {
-        debugLog(`丢弃过期的行号定位结果：${selectedEntry.path}`);
-        return;
+      try {
+        if (!isCurrent()) return;
+        if (view === "split") {
+          await waitUntil(() => !isCurrent() || !!sbsRef.current?.restoreFileAnchor(anchor), 3000);
+          return;
+        }
+        const index = await ipc.rowIndexForLine({
+          worktreeId: anchor.worktreeId,
+          path: anchor.entry.path,
+          changes: anchor.entry.changes,
+          view,
+          line: anchor.line,
+          version: anchor.version,
+          ignoreWhitespace: ignoreWhitespaceOf(diffOptionsRef.current.ignoreWhitespace),
+          expectedFingerprint: anchor.entry.fingerprint,
+          expectedSnapshotRevision: anchor.entry.snapshotRevision,
+        });
+        if (!isCurrent()) return;
+        const covered = await waitUntil(() => !isCurrent() || rowStore.ensure(index, index + 1, 0), 3000);
+        if (isCurrent() && covered && rowStore.getRow(index)) diffRef.current?.scrollToRow(index);
+      } catch (caught) {
+        if (isCurrent()) debugLog(`恢复阅读位置失败：${getErrorMessage(caught)}`);
+      } finally {
+        if (!cancelled && pendingAnchor.current === anchor) pendingAnchor.current = null;
       }
-      await waitUntil(() => rowStore.isCovered(index, index + 1), 3000);
-      if (cancelled) return;
-      diffRef.current?.scrollToRow(index);
-      pendingAnchor.current = null;
     })();
     return () => {
       cancelled = true;
     };
-  }, [rowStore, selectedEntry, view, worktreeId]);
+  }, [rowStore, selectedEntry, view, worktreeId, diffOptions, mergeTabPathRef]);
 
+  /** focusNextFile 定义在后面；F7 走到最后一处时经这里切到下一个文件。 */
+  const focusNextFileRef = useRef<(direction: 1 | -1) => void>(() => {});
   const jumpToHunk = useCallback(
     (direction: 1 | -1) => {
       if (!selectedEntry) return;
-      const current = Math.floor((diffRef.current?.getScrollTop() ?? 0) / ROW_HEIGHT);
-      const candidates = selectedEntry.hunks
-        .map((hunk) => (view === "split" ? hunk.rowSplit : hunk.rowUnified))
-        .sort((a, b) => a - b);
-      const target =
-        direction > 0
-          ? candidates.find((row) => row > current)
-          : [...candidates].reverse().find((row) => row < current);
-      if (target != null) diffRef.current?.scrollToRow(target);
+      // 设置“最后一处改动后跳到下一个文件”（E.4）：往后已经没有改动时打开下一个文件。
+      const pastLast = () => {
+        if (direction > 0 && diffOptionsRef.current.jumpToNextFile) focusNextFileRef.current(1);
+      };
+      // 并排视图按段跳转（返修 A1/Q138）：段就是色带连起来的那一块。
+      if (view === "split") {
+        const layout = sideLayout;
+        const handle = sbsRef.current;
+        if (!layout || !handle || layout.segments.length === 0) return;
+        const top = handle.getScrollTop();
+        const height = handle.getViewportHeight();
+        const centerLine = (top + height / 2) / ROW_HEIGHT + 1;
+        let index = -1;
+        layout.segments.forEach((segment, position) => {
+          if (segment.leftStart + 1 <= centerLine) index = position;
+        });
+        const target = Math.min(
+          Math.max(0, index + direction),
+          layout.segments.length - 1,
+        );
+        if (target !== index) handle.jumpToSegment(target);
+        else pastLast();
+        return;
+      }
+      const handle = diffRef.current;
+      if (!handle || !navigationRows?.length) return;
+      const previous = unifiedJumpRef.current;
+      // 页尾不能滚到段首时仍记住刚跳过的块，避免 F7 永远停在同一块。
+      const current = previous?.epoch === rowStore.epochValue && previous.scrollTop === handle.getScrollTop()
+        ? previous.row
+        : handle.getVisibleRange().from;
+      const target = direction > 0
+        ? navigationRows.find((row) => row > current)
+        : [...navigationRows].reverse().find((row) => row < current);
+      if (target != null) {
+        handle.scrollToRow(target);
+        unifiedJumpRef.current = { epoch: rowStore.epochValue, row: target, scrollTop: handle.getScrollTop() };
+      } else pastLast();
     },
-    [selectedEntry, view],
+    [navigationRows, rowStore, selectedEntry, sideLayout, view],
   );
 
   const focusNextFile = useCallback(
@@ -1046,19 +1303,7 @@ export function App() {
     },
     [openEntry, selected, snapshot, view, worktreeId],
   );
-
-  const changeFontSize = useCallback(
-    async (delta: number) => {
-      const next = Math.min(24, Math.max(9, fontSize + delta));
-      setFontSize(next);
-      try {
-        await ipc.setDiffFontSize(next);
-      } catch {
-        // 字号保存失败不影响阅读
-      }
-    },
-    [fontSize],
-  );
+  focusNextFileRef.current = focusNextFile;
 
   // ---------------- 暂存写操作（Q79/Q89/Q90/Q93） ----------------
 
@@ -1085,8 +1330,6 @@ export function App() {
   /** reconcile 的转发（监听回调早于其定义注册）。 */
   const reconcileCloseRef = useRef<(() => void) | null>(null);
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
-  const [discardConfirmation, setDiscardConfirmation] = useState<DiscardConfirmation | null>(null);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
   /** 审阅进度提示（全部已审阅时留在原地提示）。 */
   /** 完成提示绑定 worktree 与当时的进度：切 worktree、取消标记或刷新失效后不再显示旧提示。 */
   const [reviewNotice, setReviewNotice] = useState<{ worktreeId: string; reviewedCount: number; total: number } | null>(null);
@@ -1195,6 +1438,41 @@ export function App() {
   applyEffectRef.current = applyEffect;
 
   /**
+   * 待核对结果闭环（任务 08）：逐个真实重读，全部核对成功后才继续关闭/退出。
+   * 核对失败或出现新的待核对时不关闭，按真实集合重新展示。
+   */
+  const confirmPendingReviewed = useCallback(async () => {
+    const coordinator = closeCoordinatorRef.current;
+    const requestGen = coordinator.generation();
+    const targets = coordinator
+      .pendingWorktrees()
+      .map((worktreeId) => ({ worktreeId, generation: coordinator.pendingGeneration(worktreeId) }));
+    let allConfirmed = true;
+    for (const { worktreeId, generation } of targets) {
+      if (coordinator.generation() !== requestGen) return;
+      if (!worktreeId.startsWith("save-as:")) {
+        let verified = false;
+        try {
+          verified = await refreshTarget(worktreeId);
+        } catch {
+          verified = false;
+        }
+        if (!verified) {
+          allConfirmed = false;
+          continue;
+        }
+      }
+      if (!coordinator.acknowledgePending(worktreeId, generation)) allConfirmed = false;
+    }
+    if (coordinator.generation() !== requestGen) return;
+    if (!allConfirmed) {
+      reconcileClose();
+      return;
+    }
+    applyEffect(closeDriver.handlePendingContinue());
+  }, [applyEffect, closeDriver, reconcileClose, refreshTarget]);
+
+  /**
    * 三个写入口共用的**共享异步编排**（任务 08）。
    *
    * 依赖全部经 ref/回调读取，所以实例稳定；App 与 Node 回归用同一个类。
@@ -1256,16 +1534,24 @@ export function App() {
       let next: ChangesSnapshot;
       // 写结果的审阅分界必须在**请求发起前**取（ST07-R7-1 / SP07-R7-1）。
       const reviewRead = reviewOverlayRef.current.beginRead();
-      if (discard) {
+      if (target.segment) {
+        // 按段（块）操作（返修 A1/Q142）：段目标原样传回，补丁由 Rust 从同一个 Git hunk 切开。
+        const segmentRequest = {
+          worktreeId: request.worktreeId,
+          path: request.path,
+          ...target.segment,
+        };
+        if (discard) {
+          if (!("snapshotRevision" in target)) throw { kind: "rejected", message: messages.changes.fileChanged };
+          next = await ipc.discardSegment({ ...segmentRequest, snapshotRevision: target.snapshotRevision });
+        } else {
+          next = await (unstaging ? ipc.unstageSegment : ipc.stageSegment)(segmentRequest);
+        }
+      } else if (discard) {
         if (!("snapshotRevision" in target)) throw { kind: "rejected", message: messages.changes.fileChanged };
-        const discardRequest = { ...request, snapshotRevision: target.snapshotRevision };
-        next = target.hunkId !== undefined
-          ? await ipc.discardHunk({ ...discardRequest, hunkId: target.hunkId })
-          : await ipc.discardFile(discardRequest);
+        next = await ipc.discardHunk({ ...request, snapshotRevision: target.snapshotRevision, hunkId: target.hunkId });
       } else {
-        next = target.hunkId !== undefined
-          ? await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId })
-          : await (unstaging ? ipc.unstageFile : ipc.stageFile)(request);
+        next = await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId });
       }
       // 写结果同样走统一接收门：晚到的 r2 不能覆盖已接受的 r3，A→B→A 也不能串味。
       const written = reviewRead.deliver(next);
@@ -1280,6 +1566,16 @@ export function App() {
       if (operationGateRef.current.acceptSuccess(opToken, next)
         && acceptSnapshot(opToken, written.snapshot)) {
         setAppError(null, opWorktreeId);
+        // 成功结果用右下角通知报告，不再走 diff 页签提示条（返修 C9，F07）。
+        notify({
+          tone: "success",
+          kind: discard ? "discard" : "stage",
+          title: discard
+            ? messages.changes.segmentDiscarded
+            : unstaging
+              ? messages.changes.segmentUnstaged
+              : messages.changes.segmentStaged,
+        });
       } else {
         debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);
       }
@@ -1287,8 +1583,14 @@ export function App() {
       const err = toAppError(caught);
       needsVerification = err.kind === "needsVerification";
       // 原目标的结果不能因切走而丢失；字典按 worktree 隔离，不污染另一目标。
+      // 写入失败也用通知报告（含结果待核对），提示条只留给环境类错误（返修 C9，F07）。
       if (operationGateRef.current.canRecord(opToken)) {
-        setAppError(err, opWorktreeId);
+        notify({
+          tone: err.kind === "needsVerification" ? "warning" : "error",
+          title: err.kind === "needsVerification" ? messages.errors.needsVerification : messages.changes.writeFailedTitle,
+          detail: err.message,
+          persistent: true,
+        });
         if (operationGateRef.current.acceptFailure(opToken)
           && (err.kind === "needsVerification" || err.kind === "rejected")) void refresh();
       }
@@ -1297,7 +1599,13 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
+  }, [acceptSnapshot, notify, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
+
+  const { performBatchWrite, stageFile, unstageFile } = useBatchWrite({
+    worktreeIdRef, writingWorktreesRef, setWritingWorktrees, writeOrchestrator,
+    operationGateRef, reviewOverlayRef, acceptSnapshot, scheduleReviewRecovery,
+    refreshTarget, setAppError, notify, expandToSelection,
+  });
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -1355,6 +1663,33 @@ export function App() {
       writeOrchestrator.end(opWorktreeId, needsVerification);
     }
   }, [refreshTarget, setAppError, writeOrchestrator]);
+
+  /**
+   * 合并写入（Q143）：合并页签的“应用”、接受一侧，以及冲突对话框的接受一侧。
+   * 与恢复同一套全局写门禁、关闭/退出保护和结果通道（Q90、Q91、Q96），见 `runMergeWrite`。
+   * 失败用通知报告（返修 C9），组件关闭后仍保留。
+   */
+  const performMergeWrite = useCallback((request: MergeWriteRequest) => runMergeWrite<OperationContext>({
+    writing: writingWorktreesRef.current,
+    publishWriting: () => setWritingWorktrees(new Set(writingWorktreesRef.current)),
+    begin: (worktreeId) => writeOrchestrator.begin(worktreeId),
+    end: (worktreeId, needsVerification) => writeOrchestrator.end(worktreeId, needsVerification),
+    beginOperation: (worktreeId) => operationGateRef.current.begin(worktreeId),
+    canRecord: (token) => operationGateRef.current.canRecord(token),
+    execute: (write) => write.kind === "apply"
+      ? ipc.mergeApply({ worktreeId: write.worktreeId, path: write.path, result: write.result, fingerprint: write.fingerprint })
+      : ipc.mergeAcceptSide({ worktreeId: write.worktreeId, targets: write.targets, side: write.side }),
+    refreshTarget,
+    reportFailure: (_worktreeId, error) => notify({
+      tone: error.kind === "needsVerification" ? "warning" : "error",
+      title: error.kind === "needsVerification" ? messages.errors.needsVerification : messages.merge.writeFailedTitle,
+      detail: error.message,
+      persistent: true,
+    }),
+    toError: toAppError,
+    busyMessage: messages.merge.busy,
+    guardUnavailable: messages.close.guardUnavailable,
+  }, request), [notify, refreshTarget, writeOrchestrator]);
 
   /**
    * 另存回收内容（任务 05）。
@@ -1458,16 +1793,6 @@ export function App() {
     }
   }, [recordExternalResult, refreshTarget, setAppError, writeOrchestrator]);
 
-  const stageFile = useCallback((entry: ChangeEntry) => {
-    if (!worktreeId || entry.readonlyReason || entry.changes === "staged") return;
-    return performWrite({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
-  }, [performWrite, worktreeId]);
-
-  const unstageFile = useCallback((entry: ChangeEntry) => {
-    if (!worktreeId || entry.readonlyReason || entry.changes !== "staged") return;
-    return performWrite({ worktreeId, path: entry.path, changes: entry.changes, fingerprint: entry.fingerprint });
-  }, [performWrite, worktreeId]);
-
   // ---------------- 提交工作流（M3 F01–F06） ----------------
 
   /**
@@ -1490,25 +1815,26 @@ export function App() {
   // 磁盘保存失败时仍按身份保留本地输入；切换回来先核身份，不能继承同路径旧仓库。
   const localDraftsRef = useRef(new Map<string, { input: ComposerInput; revision: string; identity: string | null }>());
   const [commitDraftNotice, setCommitDraftNotice] = useState<string | null>(null);
-  /**
-   * 提交结果按 **worktree** 保存（F03.3：结果和错误归原 worktree）。
-   *
-   * 切走再切回来时仍能看到那次提交的输出；旧 worktree 的结果不会画到当前目标上。
-   */
-  const [commitResults, setCommitResults] = useState<Record<string, CommitResultView>>({});
-  const [commitResultExpanded, setCommitResultExpanded] = useState(true);
-  const [commitCopied, setCommitCopied] = useState(false);
-  /** 当前 worktree 的提交结果（其他 worktree 的结果不出现在这里）。 */
-  const commitResult = worktreeId ? commitResults[worktreeId] ?? null : null;
-
   const setCommitResultFor = useCallback((view: CommitResultView) => {
     setCommitResults((current) => ({ ...current, [view.worktreeId]: view }));
-  }, []);
+  }, [setCommitResults]);
+  /**
+   * 提交进行中的实时输出（返修 C8，F04.3）：显示在提交区，可展开；
+   * 完成后的结果由通知报告，这里只保留进行中的进度与输出。
+   */
+  const [commitLiveOutput, setCommitLiveOutput] = useState<{ worktreeId: string; output: string[] } | null>(null);
   /**
    * amend 二次确认（F06.2）：凭据绑定**当时的**整组预期 + 信息 + 选项。
    *
    * 任何刷新/切换/编辑都会清掉它，因此不会拿旧确认去改一份新的提交内容。
    */
+  /** 提交时警告（返修 E.3）：发现问题时先弹提示，可以继续或取消。 */
+  const [commitWarningConfirm, setCommitWarningConfirm] = useState<{
+    warnings: CommitWarning[];
+    worktreeId: string;
+    activation: number;
+    confirmation: AmendConfirmation | null;
+  } | null>(null);
   const [amendConfirm, setAmendConfirm] = useState<{
     upstreamName: string;
     confirmation: AmendConfirmation;
@@ -1748,7 +2074,10 @@ export function App() {
    * 同一份 `writingWorktrees` 非排队互斥、同一套按 worktree 保留结果的错误通道。
    * 结果与错误归**原 worktree**，切走后不覆盖当前界面（F03.3）。
    */
-  const performCommit = useCallback(async (confirmation: AmendConfirmation | null = null) => {
+  const performCommit = useCallback(async (
+    confirmation: AmendConfirmation | null = null,
+    options: { skipWarnings?: boolean } = {},
+  ) => {
     const target = worktreeIdRef.current;
     if (!target) {
       setAppError({ kind: "rejected", message: messages.commit.noWorktree }, null);
@@ -1780,6 +2109,24 @@ export function App() {
       return;
     }
     setAmendConfirm(null);
+    // 提交时警告（返修 E.3）：检查由 Rust 完成，发现问题时先弹提示。
+    if (!options.skipWarnings) {
+      let warnings: CommitWarning[] = [];
+      try {
+        warnings = await ipc.commitWarnings(target);
+      } catch {
+        warnings = [];
+      }
+      if (warnings.length > 0) {
+        setCommitWarningConfirm({
+          warnings,
+          worktreeId: target,
+          activation: gateRef.current.token().activation,
+          confirmation,
+        });
+        return;
+      }
+    }
     const submitted: ComposerInput = { ...input };
     const submittedExpectation = context.expectation;
     const contextEpochAtSubmit = commitContextEpochRef.current;
@@ -1836,6 +2183,8 @@ export function App() {
     const clientNonce = newCommitNonce();
     const outputRun = commitOutputs.start(target, clientNonce);
     // 先把结果区打开并清空输出：Git 的 stdout/stderr 会实时追加到这里（F04.1）。
+    // 实时输出也显示在提交区（返修 C8，F04.3）。
+    setCommitLiveOutput({ worktreeId: target, output: [] });
     setCommitResultFor({
       worktreeId: target,
       title: messages.commit.outputTitle(targetTitle),
@@ -1845,9 +2194,8 @@ export function App() {
       needsVerification: false,
       hookChanges: null,
       snapshotRecordId: null,
+      snapshotPaths: [],
     });
-    setCommitResultExpanded(true);
-    setCommitCopied(false);
     try {
       const outcome = await ipc.executeCommit({
         worktreeId: target,
@@ -1876,15 +2224,17 @@ export function App() {
             : messages.commit.resultTitle,
         detail: outcome.draftError
           ? messages.commit.resultDraftError(outcome.draftError)
-          : outcome.verificationNote ?? null,
+          : [
+            submitted.message.split("\n")[0],
+            outcome.verificationNote,
+          ].filter((part): part is string => typeof part === "string" && part.length > 0).join("\n") || null,
         outcome,
         output: commitOutputs.finish(outputRun, outcome.output),
         needsVerification: outcome.needsVerification,
         hookChanges: outcome.hookChanges,
         snapshotRecordId: outcome.snapshotRecordId,
+        snapshotPaths: outcome.snapshotPaths,
       });
-      setCommitResultExpanded(true);
-      setCommitCopied(false);
       if (failed) {
         // 已确认失败：错误按 Git 类归原 worktree，草稿保留。
         if (operationGateRef.current.canRecord(opToken)) {
@@ -1928,8 +2278,8 @@ export function App() {
         needsVerification: err.kind === "needsVerification",
         hookChanges: null,
         snapshotRecordId: null,
+        snapshotPaths: [],
       });
-      setCommitResultExpanded(true);
       // 失败/待核对保留草稿：本地输入不清，也不改写已保存的草稿（F02.5）。
       if (operationGateRef.current.canRecord(opToken)) setAppError(err, target);
       // 任何失败都重新核对原目标：预期/门禁可能已变化（F01.3）。
@@ -1948,6 +2298,8 @@ export function App() {
       }
       releaseFlight();
       commitOutputs.release(outputRun);
+      // 提交结束（成功/失败/待核对）：提交区的实时输出清掉，结果由通知报告（返修 C8/C9）。
+      setCommitLiveOutput((current) => (current && current.worktreeId === target ? null : current));
       writeOrchestrator.end(target, needsVerification);
     }
   }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, refreshTarget, setAppError, writeOrchestrator]);
@@ -1977,20 +2329,6 @@ export function App() {
     void performCommit(pending.confirmation);
   }, [amendConfirm, performCommit, setAppError]);
 
-  /** 复制提交输出（可复制，F04.1）。 */
-  const copyCommitOutput = useCallback(() => {
-    const text = commitResult?.output.join("\n") ?? "";
-    void navigator.clipboard.writeText(text)
-      .then(() => {
-        setCommitCopied(true);
-        window.setTimeout(() => setCommitCopied(false), 1500);
-      })
-      .catch((caught) => {
-        setAppError({ kind: "internal", message: `${messages.commit.copyFailed}：${getErrorMessage(caught)}` },
-          commitResult?.worktreeId ?? null);
-      });
-  }, [commitResult, setAppError]);
-
   /** 实时输出的传输与展示；归属、缓冲和终态判定由同一个 module 持有。 */
   useEffect(() => {
     let disposed = false;
@@ -1999,6 +2337,10 @@ export function App() {
       if (disposed) return;
       const update = commitOutputs.accept(event.payload);
       if (!update) return;
+      // 实时输出进提交区（返修 C8，F04.3）；完成后的结果仍在 commitResults 里。
+      setCommitLiveOutput((current) =>
+        current && current.worktreeId === update.worktreeId ? { ...current, output: update.output } : current,
+      );
       setCommitResults((current) => {
         const existing = current[update.worktreeId];
         if (!existing) return current;
@@ -2209,20 +2551,94 @@ export function App() {
     void performWrite(action);
   }, [performWrite, refresh, setAppError]);
 
-  const requestDiscard = useCallback((target: DiscardTarget, section?: string) => {
-    const current = selectedRef.current;
-    const entry = snapshotRef.current?.entries.find((entry) => entry.path === current?.path && entry.changes === current.changes);
-    if (writingWorktreesRef.current.has(target.worktreeId) || target.changes !== "unstaged" || !entry || entry.readonlyReason
-      || target.worktreeId !== worktreeIdRef.current || target.path !== entry.path || target.changes !== entry.changes
-      || target.fingerprint !== entry.fingerprint || target.snapshotRevision !== entry.snapshotRevision) return;
-    setDiscardConfirmation({ target, section, epoch: selectionEpochRef.current, activation: gateRef.current.token().activation,
-      worktree: snapshotRef.current?.worktreePath ?? "" });
-  }, []);
+  /** 段（块）操作目标：凭证与签发时的忽略空白档位原样传回（Q140、Q142）。 */
+  const segmentTarget = useCallback(
+    (action: SegmentAction): StagingTarget => ({
+      worktreeId: action.worktreeId,
+      path: action.path,
+      changes: action.changes,
+      fingerprint: action.fingerprint,
+      segment: {
+        hunkIndex: action.hunkIndex,
+        segmentIndex: action.segmentIndex,
+        ignoreWhitespace: action.ignoreWhitespace,
+        credential: action.credential,
+      },
+    }),
+    [],
+  );
 
-  const discardFile = useCallback((entry: ChangeEntry) => {
-    if (worktreeId) requestDiscard({ worktreeId, path: entry.path, changes: entry.changes,
-      fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision });
-  }, [requestDiscard, worktreeId]);
+  /** 暂存或取消暂存一段（块）：段与显示同批签发，切换文件后不再解释。 */
+  const changeSegment = useCallback(
+    (action: SegmentAction) => {
+      const current = selectedRef.current;
+      if (
+        !current
+        || current.path !== action.path
+        || current.changes !== action.changes
+        || worktreeIdRef.current !== action.worktreeId
+      ) {
+        setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+        void refresh();
+        return;
+      }
+      void performWrite(segmentTarget(action));
+    },
+    [performWrite, refresh, segmentTarget, setAppError],
+  );
+
+  /** 丢弃一段（块）：先确认，再先存回收区、后写工作区。 */
+  const requestDiscardSegment = useCallback(
+    (action: SegmentAction) => {
+      const current = selectedRef.current;
+      const entry = snapshotRef.current?.entries.find(
+        (candidate) => candidate.path === action.path && candidate.changes === action.changes,
+      );
+      if (!current || !entry || current.path !== action.path || current.changes !== action.changes) {
+        setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+        return;
+      }
+      setDiscardRequest({
+        targets: [{ path: action.path, changes: action.changes, section: messages.changes.discardSegment }],
+        entries: [entry],
+        worktree: snapshotRef.current?.worktreePath ?? "",
+        snapshotRevision: action.snapshotRevision,
+        activation: gateRef.current.token().activation,
+        segment: segmentTarget(action),
+      });
+    },
+    [segmentTarget, setAppError],
+  );
+
+  /** 丢弃一个或多个文件：先弹一次确认，再逐个先存回收区、后写工作区（Q120、F03.6）。 */
+  const requestDiscardEntries = useCallback((entries: ChangeEntry[]) => {
+    const current = snapshotRef.current;
+    const activeWorktree = worktreeIdRef.current;
+    if (!current || !activeWorktree) return;
+    const candidates = entries.filter(
+      (entry) => entry.changes === "unstaged" || entry.changes === "untracked",
+    );
+    const discardable = candidates.filter((entry) => !entry.readonlyReason);
+    if (discardable.length === 0) {
+      notify({
+        tone: "warning",
+        title: messages.changes.nothingToDiscard,
+        detail: candidates
+          .filter((entry) => entry.readonlyReason)
+          .map((entry) => `${entry.path}：${messages.changes.readonlyReasons[entry.readonlyReason!]}`)
+          .join("\n") || undefined,
+        persistent: true,
+      });
+      return;
+    }
+    setDiscardRequest({
+      targets: discardable.map((entry) => ({ path: entry.path, changes: entry.changes })),
+      entries: discardable,
+      worktree: current.worktreePath,
+      snapshotRevision: discardable[0].snapshotRevision,
+      activation: gateRef.current.token().activation,
+    });
+  }, [notify]);
 
   const discardHunk = useCallback((action: HunkAction, section: string) => {
     const current = selectedRef.current;
@@ -2231,17 +2647,39 @@ export function App() {
       setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
       return;
     }
-    requestDiscard(action, section);
-  }, [requestDiscard, setAppError]);
+    setDiscardRequest({
+      targets: [{ path: action.path, changes: action.changes, section }],
+      entries: [entry],
+      worktree: snapshotRef.current?.worktreePath ?? "",
+      snapshotRevision: action.snapshotRevision,
+      activation: gateRef.current.token().activation,
+      hunk: action,
+    });
+  }, [setAppError]);
 
-  const confirmationValid = useCallback((confirmation: DiscardConfirmation) => {
-    const target = confirmation.target;
-    const current = selectedRef.current;
-    const entry = snapshotRef.current?.entries.find((entry) => entry.path === current?.path && entry.changes === current.changes);
-    return !!entry && target.worktreeId === worktreeIdRef.current && target.path === entry.path && target.changes === entry.changes
-      && target.fingerprint === entry.fingerprint && target.snapshotRevision === entry.snapshotRevision
-      && confirmation.epoch === selectionEpochRef.current && confirmation.activation === gateRef.current.token().activation
-      && !writingWorktreesRef.current.has(target.worktreeId);
+  const discardRequestValid = useCallback((request: DiscardRequestState) => {
+    // 丢弃确认只绑定 worktree 激活与文件指纹，不绑定选择代际：文件选择、自动刷新
+    // 都会推进选择代际，但目标文件没变时确认不应失效（返修 B1）。真正的内容变化
+    // 由下面的 fingerprint / snapshotRevision 比对与后端写前复核兜住。
+    if (request.activation !== gateRef.current.token().activation) return false;
+    const current = snapshotRef.current;
+    if (!current || worktreeIdRef.current === null) return false;
+    if (request.hunk || request.segment) {
+      const target = request.hunk ?? request.segment!;
+      return current.entries.some(
+        (entry) => entry.path === target.path && entry.changes === target.changes
+          && entry.fingerprint === target.fingerprint
+          && entry.snapshotRevision === request.snapshotRevision,
+      ) && !writingWorktreesRef.current.has(target.worktreeId);
+    }
+    if (writingWorktreesRef.current.has(worktreeIdRef.current)) return false;
+    return request.entries.every((target) =>
+      current.entries.some(
+        (entry) => entry.path === target.path && entry.changes === target.changes
+          && entry.fingerprint === target.fingerprint
+          && entry.snapshotRevision === request.snapshotRevision,
+      ),
+    );
   }, []);
 
   // 快捷键（Q19、Q93、审查意见 6）：
@@ -2262,7 +2700,9 @@ export function App() {
 
       if (isDiscardFileShortcut(event)) {
         event.preventDefault();
-        if (selectedEntry && !isWriting) discardFile(selectedEntry);
+        if (isWriting) return;
+        const targets = treeSelectedEntries();
+        requestDiscardEntries(targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : []);
         return;
       }
 
@@ -2277,14 +2717,41 @@ export function App() {
 
       if (isStageFileShortcut(event)) {
         event.preventDefault();
-        if (selectedEntry && !isWriting && !selectedEntry.readonlyReason) {
-          if (selectedEntry.changes === "staged") {
-            void unstageFile(selectedEntry);
-          } else {
-            void stageFile(selectedEntry);
+        if (isWriting) return;
+        const targets = treeSelectedEntries();
+        const entries = targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : [];
+        // 不过滤只读条目：批量入口会让后端逐个返回跳过原因（返修 C6，F03.5）。
+        const staged = entries.filter((entry) => entry.changes === "staged");
+        const unstaged = entries.filter((entry) => entry.changes !== "staged");
+        // 选中项混有两组时串行执行：同一 worktree 的写门只放一个，并发发两笔
+        // 第二笔会被静默丢掉（返修 C5）。逐组等待前一组完成再发。
+        const runSequentially = async () => {
+          if (unstaged.length > 0) await performBatchWrite("stage", unstaged);
+          if (staged.length > 0) await performBatchWrite("unstage", staged);
+          if (unstaged.length === 0 && staged.length === 0 && entries.length > 0) {
+            notify({ tone: "warning", title: messages.changes.batchNothing, persistent: true });
           }
-        }
+        };
+        void runSequentially();
         return;
+      }
+
+      // 界面缩放（返修 E.2，Q139）：快捷键照 JetBrains（⌃⌥= / ⌃⌥- / ⌃⌥0）。
+      if (event.altKey && event.ctrlKey && !event.metaKey) {
+        const nextZoom =
+          event.key === "=" || event.key === "+"
+            ? Math.min(150, Math.round(uiZoomRef.current / 10) * 10 + 10)
+            : event.key === "-"
+              ? Math.max(80, Math.round(uiZoomRef.current / 10) * 10 - 10)
+              : event.key === "0"
+                ? 100
+                : null;
+        if (nextZoom !== null) {
+          event.preventDefault();
+          setUiZoom(nextZoom);
+          void ipc.updateSettings({ uiZoom: nextZoom }).catch(() => {});
+          return;
+        }
       }
 
       const primary = isPrimaryModifier(event);
@@ -2300,7 +2767,8 @@ export function App() {
       } else if (primary && event.key === "-") {
         event.preventDefault();
         void changeFontSize(-1);
-      } else if (event.key === "F7") {
+      } else if (event.key === "F7" && !mergeTabPathRef.current) {
+        // 合并页签里的 F7 由合并页签自己处理（上一处、下一处冲突）。
         event.preventDefault();
         jumpToHunk(event.shiftKey ? -1 : 1);
       } else if (event.key === "ArrowDown" && primary) {
@@ -2313,7 +2781,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, discardFile, focusNextFile, isWriting, jumpToHunk, performCommit, refresh, reviewNextFile, selectedEntry, stageFile, unstageFile]);
+  }, [changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, notify, performBatchWrite, performCommit, refresh, requestDiscardEntries, reviewNextFile, selectedEntry, treeSelectedEntries]);
 
   // ---------------- 测量 ----------------
 
@@ -2352,6 +2820,96 @@ export function App() {
       const rafPerSecond = await probeRaf(1);
       const hasCompositor = rafPerSecond > 5;
       const visibility = visibilitySample(rafPerSecond);
+
+      // 并排视图（返修 A1）：行来自 side_lines，旧的行窗口探针不适用，
+      // 这里单独测跳转、滚动覆盖与两栏同步误差（D06 门槛不变）。
+      if (targetView === "split") {
+        const handle = sbsRef.current;
+        const viewportHeight = handle?.getViewportHeight() ?? 0;
+        const contentHeight = handle?.getContentHeight() ?? 0;
+        const segmentCount = handle?.segmentCount() ?? 0;
+        const visibleCovered = () => {
+          const current = sbsRef.current;
+          if (!current) return false;
+          return (["left", "right"] as const).every((side) => {
+            const visible = current.getVisibleRange(side);
+            return current.isCovered(visible.from, visible.to, side);
+          });
+        };
+        const measureJump = async (top: number) => {
+          const started = performance.now();
+          handle?.setScrollTop(top);
+          // 跳转同步提交行窗口：调用返回时已有内容，就在这一帧画出（口径同统一视图）。
+          const withinOneFrame = visibleCovered();
+          const covered = await waitUntil(visibleCovered, 4000);
+          const dataAt = performance.now();
+          await nextPaint();
+          return { appearMs: performance.now() - started, dataAt: dataAt - started, covered, withinOneFrame };
+        };
+        const cold = await measureJump(Math.floor(contentHeight * 0.6));
+        const warm = await measureJump(0);
+        let uncoveredFrames = 0;
+        let uncoveredMax = 0;
+        const frames: number[] = [];
+        let last = performance.now();
+        let syncErrorMax = 0;
+        let syncErrorLast = 0;
+        const column = document.querySelector<HTMLElement>(".sbs-column");
+        for (let step = 0; step < 60; step += 1) {
+          column?.dispatchEvent(new WheelEvent("wheel", { deltaY: 320, bubbles: true, cancelable: true }));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          const now = performance.now();
+          frames.push(now - last);
+          last = now;
+          const current = sbsRef.current;
+          if (!current) continue;
+          let missing = 0;
+          for (const side of ["left", "right"] as const) {
+            const visible = current.getVisibleRange(side);
+            for (let row = visible.from; row < visible.to; row += 1) {
+              if (!current.isCovered(row, row + 1, side)) missing += 1;
+            }
+          }
+          if (missing > 0) uncoveredFrames += 1;
+          uncoveredMax = Math.max(uncoveredMax, missing);
+          const error = current.syncError();
+          syncErrorLast = error;
+          syncErrorMax = Math.max(syncErrorMax, error);
+        }
+        handle?.setScrollTop(0);
+        const splitMeasurement: Measurement = {
+          id: measurements.length + 1,
+          label: `${targetView} / ${entry.path}`,
+          startedAt: nowStamp(),
+          view: targetView,
+          path: entry.path,
+          visibility,
+          firstScreen: firstScreenRef.current,
+          jump: null,
+          scroll: null,
+          jumpDom: null,
+          jumpDomError: "并排视图不使用旧的行窗口探针",
+          highlight: null,
+          split: {
+            syncErrorMax,
+            syncErrorLast,
+            viewportHeight,
+            contentHeight,
+            segments: segmentCount,
+            jumpAppearMs: cold.appearMs,
+            warmJumpAppearMs: warm.appearMs,
+            jumpWithinOneFrame: cold.withinOneFrame,
+            warmJumpWithinOneFrame: warm.withinOneFrame,
+            scrollFrames: frames.length,
+            uncoveredFrames,
+            uncoveredMax,
+            frameP50Ms: percentile(frames, 0.5),
+            frameP95Ms: percentile(frames, 0.95),
+          },
+        };
+        setMeasurements((current) => [splitMeasurement, ...current]);
+        return splitMeasurement;
+      }
 
       // T2：大幅跳转
       let jump: JumpSample | null = null;
@@ -2513,7 +3071,14 @@ export function App() {
       try {
         if (config.repoPath) await ipc.addRepo(config.repoPath);
         const list = await ipc.listRepos();
-        const repo = list[0];
+        // 指定了测量仓库时优先选它，避免共享数据目录里其它仓库排在首位。
+        const repoPath = config.repoPath;
+        const repo = (repoPath
+          ? list.find((entry) => entry.worktrees.some(
+            (worktree) => worktree.path === repoPath
+              || worktree.path.replace("/private", "") === repoPath.replace("/private", ""),
+          ))
+          : undefined) ?? list[0];
         setRepos(list);
         setActiveRepo(repo);
         report.repo = { id: repo.id, name: repo.name, worktrees: repo.worktrees.map((w) => ({ id: w.id, path: w.path, branch: w.branch, main: w.isMain })) };
@@ -2555,7 +3120,7 @@ export function App() {
         for (const entry of snapshot.entries) {
           const expand = !entry.binary;
           const result = await openEntry(entry, { view: "split", worktreeId: worktree.id, expand });
-          const element = document.querySelector<HTMLElement>(".diff-scroll");
+          const element = document.querySelector<HTMLElement>(".diff-scroll, .sbs-column");
           const rows = element ? Math.ceil(element.clientHeight / ROW_HEIGHT) : 0;
           const first = rowStore.getRow(0);
           visited.push({
@@ -2577,61 +3142,161 @@ export function App() {
         if (target) {
           await openEntry(target, { view: "split", worktreeId: worktree.id, expand: true });
           await nextPaint();
-          const handle = diffRef.current;
-          // 先滚到文件中间，锚点才有意义；等目标行数据到位后再取行号。
-          const anchorIndex = Math.floor(target.rowCountSplit * 0.4);
-          handle?.scrollToRow(anchorIndex);
-          await waitUntil(() => rowStore.isCovered(anchorIndex, anchorIndex + 1), 4000);
-          await waitUntil(() => {
-            const visible = diffRef.current?.getVisibleRange();
-            return !!visible && rowStore.isCovered(visible.from, visible.to);
-          }, 4000);
-          const beforeTop = handle?.getScrollTop() ?? 0;
-          const beforeRow = Math.floor(beforeTop / ROW_HEIGHT);
-          const lineOf = (row: typeof beforeAnchor) =>
-            row?.left?.line ?? row?.oldLine ?? row?.newLine ?? row?.right?.line ?? null;
-          const beforeAnchor = rowStore.getRow(beforeRow);
-          const anchorLine = lineOf(beforeAnchor);
+          await waitUntil(() => (sbsRef.current?.getViewportHeight() ?? 0) > 0, 4000);
+          const handle = sbsRef.current;
+          handle?.setScrollTop(handle.getContentHeight() * 0.4);
+          await nextPaint();
+          const beforeAnchor = handle?.getFileAnchor() ?? null;
 
-          const clickView = (label: string) => {
-            selectViewInUi(label === messages.diff.unified ? "unified" : "split");
-          };
-          // 切换后等锚点行真正落到顶部（pendingAnchor 的定位是异步的）。
-          const topLine = () => {
-            const top = diffRef.current?.getScrollTop() ?? 0;
-            const row = rowStore.getRow(Math.floor(top / ROW_HEIGHT));
-            return { top, row, line: row ? lineOf(row) : null };
-          };
-          clickView("统一");
-          await waitUntil(() => rowStore.rowCountValue === target.rowCountUnified, 4000);
-          await waitUntil(() => {
-            const visible = diffRef.current?.getVisibleRange();
-            return !!visible && rowStore.isCovered(visible.from, visible.to);
+          selectViewInUi("unified");
+          const unifiedMatches = await waitUntil(() => {
+            if (viewRef.current !== "unified" || pendingAnchor.current || !beforeAnchor) return false;
+            const range = diffRef.current?.getVisibleRange();
+            if (!range) return false;
+            for (let index = range.from; index < range.to; index += 1) {
+              const row = rowStore.getRow(index);
+              if (!row || row.kind !== "line") continue;
+              return (beforeAnchor.version === "old" ? row.oldLine : row.newLine) === beforeAnchor.line;
+            }
+            return false;
           }, 4000);
-          const unifiedTop = topLine().top;
-          const unifiedAnchor = topLine().row;
+          const unifiedTop = diffRef.current?.getScrollTop() ?? 0;
+          const unifiedAnchor = diffRef.current?.getFileAnchor() ?? null;
 
-          clickView("并排");
-          await waitUntil(() => rowStore.rowCountValue === target.rowCountSplit, 4000);
-          await waitUntil(() => {
-            const visible = diffRef.current?.getVisibleRange();
-            return !!visible && rowStore.isCovered(visible.from, visible.to);
+          selectViewInUi("split");
+          const splitMatches = await waitUntil(() => {
+            if (viewRef.current !== "split" || pendingAnchor.current || !unifiedAnchor) return false;
+            const anchor = sbsRef.current?.getFileAnchor();
+            return anchor?.line === unifiedAnchor.line && anchor.version === unifiedAnchor.version;
           }, 4000);
-          const splitTop = topLine().top;
-          const splitAnchor = topLine().row;
+          const splitTop = sbsRef.current?.getScrollTop() ?? 0;
+          const splitAnchor = sbsRef.current?.getFileAnchor() ?? null;
 
           report.viewSwitch = {
-            anchorLineBefore: anchorLine,
+            anchorLineBefore: beforeAnchor?.line ?? null,
+            anchorVersionBefore: beforeAnchor?.version ?? null,
             unifiedRows: target.rowCountUnified,
             splitRows: target.rowCountSplit,
-            unifiedAnchorLine: lineOf(unifiedAnchor),
-            splitAnchorLine: lineOf(splitAnchor),
+            unifiedAnchorLine: unifiedAnchor?.line ?? null,
+            unifiedAnchorVersion: unifiedAnchor?.version ?? null,
+            splitAnchorLine: splitAnchor?.line ?? null,
+            splitAnchorVersion: splitAnchor?.version ?? null,
             unifiedScrollTop: Math.round(unifiedTop),
             splitScrollTop: Math.round(splitTop),
-            sameLineAfterRoundTrip: anchorLine != null && lineOf(splitAnchor) === anchorLine,
+            sameLineAfterRoundTrip: unifiedMatches && splitMatches,
           };
         }
 
+        // 返修 A1：并排视图有左栏、窄栏、右栏，且窄栏 canvas 有内容。
+        const splitTarget = snapshot.entries.find((entry) => entry.hunkCount > 0 && !entry.binary && !entry.unmerged);
+        if (splitTarget) {
+          debugLog(`冒烟：并排视图检查开始 ${splitTarget.path}`);
+          await openEntry(splitTarget, { view: "split", worktreeId: worktree.id, expand: true });
+          await nextPaint();
+          const columns = document.querySelectorAll(".sbs-column").length;
+          const canvas = document.querySelector<HTMLCanvasElement>(".sbs-bands");
+          let canvasPainted = false;
+          if (canvas) {
+            const context = canvas.getContext("2d");
+            const data = context?.getImageData(0, 0, Math.max(1, canvas.width), Math.max(1, canvas.height)).data;
+            if (data) {
+              for (let index = 3; index < data.length; index += 4) {
+                if (data[index] !== 0) {
+                  canvasPainted = true;
+                  break;
+                }
+              }
+            }
+          }
+          debugLog(`冒烟：并排视图检查完成 columns=${columns} painted=${canvasPainted}`);
+          report.sideBySide = {
+            columns,
+            numbers: document.querySelectorAll(".sbs-numbers").length,
+            canvasPainted,
+            canvasWidth: canvas?.width ?? 0,
+          };
+        }
+
+        // 返修 F10：冲突文件打开合并页签，检查三栏与可编辑的中栏。
+        const conflictEntry = snapshot.entries.find((entry) => entry.unmerged);
+        if (conflictEntry && openMergeTabRef.current) {
+          debugLog(`冒烟：合并页签检查开始 ${conflictEntry.path}`);
+          openMergeTabRef.current(conflictEntry);
+          await nextPaint();
+          await waitUntil(() => !!document.querySelector("[data-merge-view]"), 4000);
+          // 中栏是 CodeMirror：从编辑器状态读全文，不依赖只渲染可见行的 DOM。
+          const resultEditor = document.querySelector<HTMLElement>("[data-merge-pane='result'] .cm-editor");
+          const result = resultEditor ? EditorView.findFromDOM(resultEditor)?.state.doc.toString() ?? null : null;
+          debugLog(`冒烟：合并页签检查完成 view=${!!document.querySelector("[data-merge-view]")}`);
+          report.merge = {
+            view: !!document.querySelector("[data-merge-view]"),
+            resultLines: result === null ? 0 : result.split("\n").length,
+            hasConflictMarkers: result === null ? false : result.includes("<<<<<<<"),
+            conflictCountText: document.querySelector("[data-merge-conflicts]")?.textContent ?? null,
+            conflictGroup: document.querySelectorAll(".section-header").length,
+          };
+        }
+
+        debugLog("冒烟：界面骨架检查开始");
+        // 新界面骨架：页签、改动树、提交区与状态栏都按真实 DOM 检查（M4 F02–F05）。
+        const tabNodes = [...document.querySelectorAll<HTMLElement>("[data-tab-key]")];
+        const firstRow = document.querySelector<HTMLElement>(".change-row");
+        const activeTab = () => document.querySelector<HTMLElement>('[data-tab-key][data-active="true"]');
+        const ui: Record<string, unknown> = {
+          tabs: tabNodes.map((node) => ({
+            key: node.dataset.tabKey ?? null,
+            active: node.dataset.active === "true",
+            preview: node.dataset.preview === "true",
+          })),
+          treeRows: document.querySelectorAll(".change-row").length,
+          groupHeaders: document.querySelectorAll(".section-header").length,
+          sidebarVisible: !!document.querySelector(".changes-tree"),
+          commitArea: !!document.querySelector("[data-commit-composer]"),
+          commitMessage: !!document.querySelector("[data-commit-message]"),
+          activityBadge: document.querySelector(".activity-badge")?.textContent ?? null,
+          statusBar: document.querySelector("footer")?.textContent?.slice(0, 120) ?? null,
+        };
+        if (firstRow) {
+          firstRow.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          await nextPaint();
+          ui.previewAfterClick = activeTab()?.dataset.preview ?? null;
+          firstRow.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+          await nextPaint();
+          ui.pinnedAfterDoubleClick = activeTab()?.dataset.preview ?? null;
+        }
+        // 布局尺寸与四套主题的实际取值（验收时用于对照效果图与 VS Code）。
+        const rect = (selector: string) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          if (!element) return null;
+          const box = element.getBoundingClientRect();
+          return { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.width), h: Math.round(box.height) };
+        };
+        ui.layout = {
+          titlebar: rect(".titlebar"),
+          activityBar: rect(".activity-bar"),
+          sidebar: rect("aside"),
+          tab: rect(".editor-tab"),
+          statusBar: rect("footer"),
+          commitArea: rect("[data-commit-composer]"),
+          treeRow: rect(".change-row"),
+          diff: rect(".diff-scroll"),
+        };
+        const main = document.querySelector<HTMLElement>("main");
+        const previousTheme = document.documentElement.dataset.theme;
+        const previousKind = document.documentElement.dataset.kind;
+        ui.themes = ["one-light", "light-2026", "one-dark-pro", "dark-2026"].map((id) => {
+          document.documentElement.dataset.theme = id;
+          document.documentElement.dataset.kind = id.includes("dark") ? "dark" : "light";
+          return {
+            id,
+            editorBackground: main ? getComputedStyle(main).backgroundColor : null,
+            foreground: getComputedStyle(document.body).color,
+            syntaxKeyword: getComputedStyle(document.documentElement).getPropertyValue("--syn-keyword").trim(),
+          };
+        });
+        if (previousTheme) document.documentElement.dataset.theme = previousTheme;
+        if (previousKind) document.documentElement.dataset.kind = previousKind;
+        report.ui = ui;
         report.ok = true;
       } catch (caught) {
         report.ok = false;
@@ -2771,9 +3436,8 @@ export function App() {
         // 通过工具栏事件调用最新渲染闭包，避免长期任务持有旧的选中项。
         const clickView = async (label: string, rowCount: number) => {
           const target: ViewMode = label === messages.diff.unified ? "unified" : "split";
-          const select = selectViewInUi(target);
-          if (!select) throw new Error(`找不到视图下拉：${label}`);
-          if (!await waitForSoak(() => select.value === target
+          if (!selectViewInUi(target)) throw new Error(`找不到视图切换按钮：${label}`);
+          if (!await waitForSoak(() => viewRef.current === target
             && rowStore.rowCountValue === rowCount && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
             throw new Error(`视图切换未完成：${label}`);
           }
@@ -3203,9 +3867,165 @@ export function App() {
     [runMeasurement],
   );
 
+  // ---------------- 设置、worktree 状态与页签 ----------------
+
+  /** 保存设置（F08）：成功返回 null，失败返回可展示的原因。 */
+  /** diff 工具条与设置共用同一份选项：改一处即写设置，两处同步（Q139）。 */
+  const changeDiffOptions = useCallback((patch: Partial<DiffToolbarOptions>) => {
+    const next = { ...diffOptionsRef.current, ...patch };
+    setDiffOptions({ ...next, ignoreWhitespace: Math.min(3, Math.max(0, next.ignoreWhitespace)) as 0 | 1 | 2 | 3 });
+    void ipc
+      .updateSettings({
+        diffContextLines: next.contextLines,
+        diffFoldUnchanged: next.foldUnchanged,
+        diffSyncScroll: next.syncScroll,
+        diffHighlight: next.highlight,
+        diffShowWhitespace: next.showWhitespace,
+        diffSoftWrap: next.softWrap,
+        diffJumpToNextFile: next.jumpToNextFile,
+        diffIgnoreWhitespace: next.ignoreWhitespace,
+      })
+      .catch(() => {
+        /* 保存失败时仍按界面上的选择显示，下次启动回到上次保存的值 */
+      });
+  }, []);
+
+  const updateSettings = useCallback(async (patch: SettingsPatch): Promise<string | null> => {
+    try {
+      const next = await ipc.updateSettings({
+        themeLight: patch.themeLight,
+        themeDark: patch.themeDark,
+        codeFontFamily: patch.codeFontFamily,
+        diffFontSize: patch.diffFontSize,
+        gitPath: patch.gitPath,
+        mergeTool: patch.mergeTool,
+        sidebarWidth: patch.sidebarWidth,
+        viewMode: patch.viewMode,
+        uiZoom: patch.uiZoom,
+        treeGroupByDirectory: patch.treeGroupByDirectory,
+        diffContextLines: patch.diffContextLines,
+        diffFoldUnchanged: patch.diffFoldUnchanged,
+        diffSyncScroll: patch.diffSyncScroll,
+        diffHighlight: patch.diffHighlight,
+        diffShowWhitespace: patch.diffShowWhitespace,
+        diffSoftWrap: patch.diffSoftWrap,
+        diffJumpToNextFile: patch.diffJumpToNextFile,
+        diffIgnoreWhitespace: patch.diffIgnoreWhitespace,
+        commitSubjectLimit: patch.commitSubjectLimit,
+        commitBlankLineRequired: patch.commitBlankLineRequired,
+        commitBodyLineLimit: patch.commitBodyLineLimit,
+        commitShowRuler: patch.commitShowRuler,
+        commitWarnCrlf: patch.commitWarnCrlf,
+        commitWarnDetached: patch.commitWarnDetached,
+        commitWarnLargeFileBytes: patch.commitWarnLargeFileBytes,
+        commitWarnInvalidFilename: patch.commitWarnInvalidFilename,
+        notify: patch.notify,
+        mergeAutoApply: patch.mergeAutoApply,
+      });
+      setThemeLight(next.themeLight);
+      setThemeDark(next.themeDark);
+      setCodeFontFamily(next.codeFontFamily);
+      setFontSize(next.diffFontSize);
+      setGitPath(next.gitPath);
+      setMergeTool(next.mergeTool);
+      setSidebarWidth(next.sidebarWidth);
+      setView(next.viewMode);
+      setUiZoom(next.uiZoom);
+      setTreeGroupByDirectory(next.treeGroupByDirectory);
+      setDiffOptions({
+        contextLines: next.diffContextLines,
+        foldUnchanged: next.diffFoldUnchanged,
+        syncScroll: next.diffSyncScroll,
+        highlight: next.diffHighlight,
+        showWhitespace: next.diffShowWhitespace,
+        softWrap: next.diffSoftWrap,
+        jumpToNextFile: next.diffJumpToNextFile,
+        ignoreWhitespace: next.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
+      });
+      setCommitChecks({
+        subjectLimit: next.commitSubjectLimit,
+        blankLineRequired: next.commitBlankLineRequired,
+        bodyLineLimit: next.commitBodyLineLimit,
+        showRuler: next.commitShowRuler,
+        warnCrlf: next.commitWarnCrlf,
+        warnDetached: next.commitWarnDetached,
+        warnLargeFileBytes: Number(next.commitWarnLargeFileBytes),
+        warnInvalidFilename: next.commitWarnInvalidFilename,
+      });
+      setNotifyKinds(next.notify);
+      setMergeAutoApply(next.mergeAutoApply);
+      return null;
+    } catch (caught) {
+      return getErrorMessage(caught);
+    }
+  }, []);
+
+  /** 重新加载登录 shell 环境与 Git 程序（F08）。 */
+  const reloadEnvironment = useCallback(async (): Promise<string | null> => {
+    try {
+      await ipc.reloadEnvironment();
+      if (worktreeId) {
+        const session = await ipc.openWorktree(worktreeId);
+        setInfo(session);
+        await refresh();
+      }
+      return null;
+    } catch (caught) {
+      return getErrorMessage(caught);
+    }
+  }, [refresh, worktreeId]);
+
+  const refreshWorktreeStatuses = useCallback(async () => {
+    if (!activeRepo) return;
+    try {
+      setWorktreeStatuses(await ipc.listWorktreeStatus(activeRepo.id));
+    } catch {
+      // 下拉里的状态读取失败不阻塞主流程；单个 worktree 的错误由后端逐项返回。
+    }
+  }, [activeRepo]);
+
+  useEffect(() => {
+    void refreshWorktreeStatuses();
+  }, [refreshWorktreeStatuses, worktreeId, snapshot?.revision]);
+
+  /** 从仓库下拉或欢迎界面打开一个已登记仓库。 */
+  const openRepo = useCallback(async (repo: RepoEntry) => {
+    setBusy(true);
+    try {
+      setActiveRepo(repo);
+      const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
+      if (!worktree) {
+        setAppError({ kind: "rejected", message: messages.firstRun.notARepo });
+        return;
+      }
+      await ipc.selectRepo(repo.id, worktree.id);
+      await openWorktree(worktree.id);
+    } catch (caught) {
+      setAppError(toAppError(caught));
+    } finally {
+      setBusy(false);
+    }
+  }, [openWorktree, setAppError]);
+
+  const pinEntry = useCallback((entry: ChangeEntry) => {
+    // 冲突文件双击 / Enter 直接打开合并页签（返修 F10，Q143）。
+    if (entry.unmerged) {
+      openMergeTab(entry);
+      return;
+    }
+    if (worktreeIdRef.current) {
+      void openEntry(entry, { view: viewRef.current, worktreeId: worktreeIdRef.current, pin: true });
+    }
+  }, [openEntry, openMergeTab]);
+
+  const toggleReviewCurrent = useCallback(() => {
+    if (!selectedEntry) return;
+    void setReviewMark(selectedEntry, !selectedEntry.reviewed);
+  }, [selectedEntry, setReviewMark]);
+
   // ---------------- 渲染 ----------------
 
-  // 诊断：记录当前选中文件会走哪条渲染分支（默认收起 / 渲染 diff）。
+  // 当前选中文件会走哪条渲染分支（默认收起 / 渲染 diff）。
   const diffArea = !selectedEntry
     ? "none"
     : selectedEntry.unmerged
@@ -3214,7 +4034,7 @@ export function App() {
         ? "readonly"
         : selectedEntry.changes === "untracked" && !selectedEntry.metricsLoaded
           ? "loading"
-          : selectedEntry.collapsed && !expanded.has(`${selectedEntry.changes}:${selectedEntry.path}`)
+          : selectedEntry.collapsed && !expanded.has(entryKey(selectedEntry))
             ? "collapsed"
             : selectedEntry.binary
               ? "binary"
@@ -3230,28 +4050,26 @@ export function App() {
   }, [diffArea, selectedEntry]);
 
   if (!bootstrapDone) {
-    return <div className="flex h-full items-center justify-center text-fg-2">载入中…</div>;
+    return <div className="flex h-full items-center justify-center text-descriptionforeground">载入中…</div>;
   }
 
-  if (repos.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8" data-tauri-drag-region>
-        <h1 className="text-[15px] font-semibold">{messages.firstRun.title}</h1>
-        <p className="max-w-md text-center text-fg-2">{messages.firstRun.description}</p>
-        <Button onClick={() => void chooseRepo()} disabled={busy}>
-          {messages.firstRun.addButton}
-        </Button>
-        <p className="text-xs text-fg-2">{messages.firstRun.dragHint}</p>
-        {error ? (
-          <div className="island w-full max-w-lg">
-            <ErrorBanner error={error} onDismiss={dismissError} />
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  const collapsed = diffArea === "collapsed";
+  const activeKey = mergeTabPath ? mergeTabKey(mergeTabPath) : selected ? tabKey(selected.path, selected.changes) : null;
+  const mergeEntry = snapshot?.worktreeId === worktreeId
+    ? activeMergeEntry(mergeTabTargetRef.current, snapshot)
+    : null;
+  const reviewedCount = snapshot?.review.reviewedCount ?? 0;
+  const reviewTotal = snapshot?.review.total ?? 0;
+  const activeStatus = worktreeStatuses.find((status) => status.id === worktreeId);
+  const selectedTreeEntries = treeSelectedEntries();
+  // 工具条上的“第 n / m 个文件”：按改动树顺序（返修 A1/Q138）。
+  const orderedEntries = snapshot ? treeOrder(snapshot) : [];
+  const activeIndex = selected
+    ? orderedEntries.findIndex((entry) => entry.path === selected.path && entry.changes === selected.changes)
+    : -1;
+  const filePosition = { index: activeIndex + 1, total: orderedEntries.length };
+  const discardableSelected = selectedTreeEntries.filter(
+    (entry) => entry.changes === "unstaged" || entry.changes === "untracked",
+  );
   const allReviewed = !!reviewNotice
     && reviewNotice.worktreeId === snapshot?.worktreeId
     && !!snapshot?.review
@@ -3259,275 +4077,637 @@ export function App() {
     && reviewNotice.reviewedCount === snapshot.review.reviewedCount
     && snapshot.review.total > 0
     && snapshot.review.reviewedCount === snapshot.review.total;
+  const discardValid = discardRequest ? discardRequestValid(discardRequest) : false;
 
-  // 布局照 Rebased（Q107）：主工具栏 / 图标条 + “变更”工具窗口 + diff 编辑区 / 状态栏。
-  return (
-    <div className="grid h-full grid-cols-[40px_300px_minmax(0,1fr)] grid-rows-[40px_minmax(0,1fr)_24px] overflow-hidden">
-      <MainToolbar
-        repo={activeRepo}
-        worktrees={activeRepo?.worktrees ?? []}
-        activeWorktreeId={worktreeId}
-        onWorktree={(id) => void switchWorktree(id)}
-        onChooseRepo={() => void chooseRepo()}
-        busy={busy}
-        watchError={watchState.error}
-      />
-      <ToolStripe recoveryOpen={recoveryOpen} onRecovery={() => setRecoveryOpen(true)} />
-      <aside className="island mr-[3px] mb-1 flex flex-col bg-tool">
-        <div className="flex h-[34px] shrink-0 items-center px-3 font-semibold">{messages.changes.toolWindow}</div>
-        <ChangesToolbar
-          selectedEntry={selectedEntry}
-          isWriting={isWriting}
+  const expandActive = () => {
+    if (selectedEntry) setExpanded((current) => new Set(current).add(entryKey(selectedEntry)));
+  };
+
+  const sideBySideOptions: DiffOptions = {
+    ignoreWhitespace: ignoreWhitespaceOf(diffOptions.ignoreWhitespace),
+    highlight: diffOptions.highlight,
+    foldUnchanged: diffOptions.foldUnchanged,
+    syncScroll: diffOptions.syncScroll,
+    showWhitespace: diffOptions.showWhitespace,
+    softWrap: diffOptions.softWrap,
+    contextLines: diffOptions.contextLines,
+  };
+
+  const settingsValues = {
+    themeLight,
+    themeDark,
+    codeFontFamily: codeFontFamily ?? "",
+    fontSize,
+    gitPath: gitPath ?? "",
+    mergeTool: mergeTool ?? "",
+    sidebarWidth,
+    uiZoom,
+    treeGroupByDirectory,
+    diffContextLines: diffOptions.contextLines,
+    diffFoldUnchanged: diffOptions.foldUnchanged,
+    diffSyncScroll: diffOptions.syncScroll,
+    diffHighlight: diffOptions.highlight,
+    diffShowWhitespace: diffOptions.showWhitespace,
+    diffSoftWrap: diffOptions.softWrap,
+    diffJumpToNextFile: diffOptions.jumpToNextFile,
+    diffIgnoreWhitespace: diffOptions.ignoreWhitespace,
+    commitSubjectLimit: commitChecks.subjectLimit,
+    commitBlankLineRequired: commitChecks.blankLineRequired,
+    commitBodyLineLimit: commitChecks.bodyLineLimit,
+    commitShowRuler: commitChecks.showRuler,
+    commitWarnCrlf: commitChecks.warnCrlf,
+    commitWarnDetached: commitChecks.warnDetached,
+    commitWarnLargeFileBytes: commitChecks.warnLargeFileBytes,
+    commitWarnInvalidFilename: commitChecks.warnInvalidFilename,
+    notify: notifyKinds,
+    mergeAutoApply,
+    detectedGitPath: info?.gitPath ?? null,
+  };
+
+  if (!activeRepo) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
+        <WelcomeScreen
+          repos={repos}
           busy={busy}
-          review={snapshot?.review ?? null}
-          onRefresh={() => void refresh()}
-          onStage={(entry) => void stageFile(entry)}
-          onUnstage={(entry) => void unstageFile(entry)}
-          onDiscard={discardFile}
+          onChooseRepo={() => void chooseRepo()}
+          onSelectRepo={(repo) => void openRepo(repo)}
+          error={error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
         />
-        {snapshot ? (
-          <ChangesList
-            snapshot={snapshot}
-            selected={selected}
-            onSelect={(next) => void selectFromList(next)}
-            onStage={(entry) => void stageFile(entry)}
-            onUnstage={(entry) => void unstageFile(entry)}
-            isWriting={isWriting}
-            onToggleReview={(entry, marked) => void setReviewMark(entry, marked)}
-          />
-        ) : (
-          <div className="px-3 py-2 text-fg-2">{messages.changes.loading}</div>
-        )}
-        {worktreeId ? (
-          <CommitComposer
-            context={commitContext}
-            message={commitInput.message}
-            amend={commitInput.amend}
-            skipHooks={commitInput.skipHooks}
-            busy={busy || isWriting}
-            submitting={commitSubmitting}
-            reviewedCount={snapshot?.review.reviewedCount ?? 0}
-            totalFiles={snapshot?.review.total ?? 0}
-            result={commitResult}
-            resultExpanded={commitResultExpanded}
-            copied={commitCopied}
-            onMessage={(value) => updateCommitInput({ ...commitInputRef.current, message: value })}
-            onAmend={toggleAmend}
-            // 跳过 hooks 只对本次命令生效：改它不写草稿（F04.2）。
-            onSkipHooks={(value) => updateCommitInput(
-              { ...commitInputRef.current, skipHooks: value },
-              { persist: false },
-            )}
-            onSubmit={() => void performCommit()}
-            onPickRecent={pickRecentMessage}
-            onToggleResult={() => setCommitResultExpanded((value) => !value)}
-            onCopyResult={copyCommitOutput}
-            onCloseResult={() => setCommitResults((current) => {
-              if (!worktreeId) return current;
-              const next = { ...current };
-              delete next[worktreeId];
-              return next;
-            })}
-            activeWorktreeId={worktreeId}
-            draftNotice={commitContextError ?? commitDraftNotice}
-            templateError={commitContext?.templateError ?? null}
-            amendConfirm={amendConfirm}
-            onAmendConfirm={confirmAmend}
-            onAmendCancel={() => setAmendConfirm(null)}
+        <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
+        {settingsOpen ? (
+          <SettingsDialog
+            open
+            values={settingsValues}
+            onClose={() => setSettingsOpen(false)}
+            onChange={updateSettings}
+            onReloadEnvironment={reloadEnvironment}
           />
         ) : null}
-      </aside>
+        {closeRequest && closeRequest.action !== "proceed" ? (
+          <CloseRequestDialog
+            intent={closeIntentRef.current}
+            writing={closeRequest.writing}
+            pending={"pending" in closeRequest ? closeRequest.pending : []}
+            onWait={() => applyEffect(closeDriver.handleChoice("wait"))}
+            onStay={() => applyEffect(closeDriver.handleChoice("stay"))}
+            onPendingReviewed={() => void confirmPendingReviewed()}
+          />
+        ) : null}
+      </div>
+    );
+  }
 
-      <main className="island mr-1.5 mb-1 ml-[3px] flex min-w-0 flex-col bg-island">
-        {selectedEntry ? (
-          <EditorHeader
+  return (
+    <div className="grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden bg-[var(--editor-background)]">
+      <TitleBar
+        repo={activeRepo}
+        repos={repos}
+        worktrees={activeRepo.worktrees}
+        statuses={worktreeStatuses}
+        activeWorktreeId={worktreeId}
+        busy={busy}
+        onSelectRepo={(repo) => void openRepo(repo)}
+        onChooseRepo={() => void chooseRepo()}
+        onWorktree={(id) => void switchWorktree(id)}
+        onSettings={() => setSettingsOpen(true)}
+        onRefreshWorktrees={() => void refreshWorktreeStatuses()}
+      />
+
+      <div className="flex min-h-0 overflow-hidden">
+        <ActivityBar
+          pressed={sidebarVisible}
+          count={new Set((snapshot?.entries ?? []).map((entry) => entry.path)).size}
+          onToggle={() => setSidebarVisible((value) => !value)}
+        />
+        {sidebarVisible ? (
+          <aside className="changes-sidebar relative flex min-h-0 shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-background)]" style={{ width: sidebarWidth }}>
+            <div
+              className="sidebar-resizer"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={messages.changes.resizeSidebar}
+              onPointerDown={(event) => {
+                const sidebar = event.currentTarget.parentElement;
+                if (!sidebar?.offsetWidth || !sidebar.parentElement) return;
+                const activityWidth = sidebar.previousElementSibling?.getBoundingClientRect().width ?? 0;
+                const scale = sidebar.getBoundingClientRect().width / sidebar.offsetWidth;
+                const editorMinWidth = Number.parseFloat(getComputedStyle(sidebar).getPropertyValue("--editor-min-width"));
+                sidebarDragRef.current = {
+                  pointerId: event.pointerId, clientX: event.clientX, width: sidebar.offsetWidth, scale,
+                  maxWidth: Math.min(720, sidebar.parentElement.clientWidth - activityWidth / scale - editorMinWidth),
+                  latestWidth: sidebar.offsetWidth,
+                };
+                event.currentTarget.setPointerCapture(event.pointerId);
+                event.currentTarget.dataset.dragging = "true";
+                event.preventDefault();
+              }}
+              onPointerMove={(event) => {
+                const drag = sidebarDragRef.current;
+                if (!drag || drag.pointerId !== event.pointerId) return;
+                // clientX 是缩放后的坐标；用拖动起点的实际比例换回布局宽度。
+                drag.latestWidth = Math.round(Math.min(drag.maxWidth, Math.max(220,
+                  drag.width + (event.clientX - drag.clientX) / drag.scale,
+                )));
+                setSidebarWidth(drag.latestWidth);
+              }}
+              onPointerUp={(event) => {
+                const drag = sidebarDragRef.current;
+                if (!drag || drag.pointerId !== event.pointerId) return;
+                sidebarDragRef.current = null;
+                delete event.currentTarget.dataset.dragging;
+                event.currentTarget.releasePointerCapture(event.pointerId);
+                void ipc.updateSettings({ sidebarWidth: drag.latestWidth }).catch(() => {});
+              }}
+              onLostPointerCapture={(event) => {
+                sidebarDragRef.current = null;
+                delete event.currentTarget.dataset.dragging;
+              }}
+            />
+            <div className="flex h-[var(--tab-height)] shrink-0 items-center gap-3 pr-2 pl-3">
+              <button
+                type="button"
+                className="side-tab"
+                aria-selected={sideTab === "commit"}
+                onClick={() => setSideTab("commit")}
+              >
+                {messages.commit.tab}
+              </button>
+              <button
+                type="button"
+                className="side-tab"
+                aria-selected={sideTab === "recovery"}
+                onClick={() => setSideTab("recovery")}
+              >
+                {messages.recovery.title}
+              </button>
+              {sideTab === "commit" ? (
+                <div className="ml-auto flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    className="icon-action size-[22px]"
+                    title={messages.changes.refresh}
+                    aria-label={messages.changes.refresh}
+                    disabled={busy}
+                    onClick={() => void refresh()}
+                  >
+                    <Codicon name="refresh" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-action size-[22px]"
+                    title={messages.changes.discardSelected}
+                    aria-label={messages.changes.discardSelected}
+                    disabled={isWriting || discardableSelected.length === 0}
+                    onClick={() => requestDiscardEntries(discardableSelected)}
+                  >
+                    <Codicon name="discard" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-action size-[22px]"
+                    title={messages.changes.expandAll}
+                    aria-label={messages.changes.expandAll}
+                    onClick={() => setGroupOpen({ conflicts: true, staged: true, unstaged: true, untracked: true })}
+                  >
+                    <Codicon name="expand-all" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-action size-[22px]"
+                    title={messages.changes.collapseAll}
+                    aria-label={messages.changes.collapseAll}
+                    onClick={() => setGroupOpen({ conflicts: false, staged: false, unstaged: false, untracked: false })}
+                  >
+                    <Codicon name="collapse-all" size={15} />
+                  </button>
+                  <SidebarMore
+                    onSelectAll={selectAllEntries}
+                    onRefresh={() => void refresh()}
+                    onCloseAll={closeAllTabs}
+                    groupByDirectory={treeGroupByDirectory}
+                    onToggleGroupByDirectory={() => {
+                      const next = !treeGroupByDirectory;
+                      setTreeGroupByDirectory(next);
+                      void ipc.updateSettings({ treeGroupByDirectory: next }).catch(() => {});
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            {sideTab === "commit" ? (
+              <>
+                {snapshot ? (
+                  <ChangesTree
+                    snapshot={snapshot}
+                    active={selected}
+                    selectedKeys={treeSelection}
+                    open={groupOpen}
+                    groupByDirectory={treeGroupByDirectory}
+                    dirOpen={dirOpen}
+                    isWriting={isWriting}
+                    onActivate={activateTreeEntry}
+                    onPin={pinEntry}
+                    onMove={moveTreeSelection}
+                    onSelectAll={selectAllEntries}
+                    onToggleGroup={toggleGroup}
+                    onResolveConflicts={() => setConflictDialogOpen(true)}
+                    onToggleDir={toggleDir}
+                    onStageEntries={(entries) => void performBatchWrite("stage", entries)}
+                    onUnstageEntries={(entries) => void performBatchWrite("unstage", entries)}
+                    onStageEntry={(entry) => void stageFile(entry)}
+                    onUnstageEntry={(entry) => void unstageFile(entry)}
+                    onDiscardEntry={(entry) => requestDiscardEntries(expandToSelection(entry))}
+                  />
+                ) : (
+                  <div className="px-3 py-2 text-descriptionforeground">{messages.changes.loading}</div>
+                )}
+                {worktreeId ? (
+                  <CommitArea
+                    context={commitContext}
+                    message={commitInput.message}
+                    amend={commitInput.amend}
+                    skipHooks={commitInput.skipHooks}
+                    busy={busy || isWriting}
+                    submitting={commitSubmitting}
+                    reviewedCount={reviewedCount}
+                    totalFiles={reviewTotal}
+                    draftNotice={commitContextError ?? commitDraftNotice}
+                    templateError={commitContext?.templateError ?? null}
+                    amendConfirm={amendConfirm}
+                    liveOutput={
+                      commitLiveOutput && commitLiveOutput.worktreeId === worktreeId
+                        ? commitLiveOutput.output
+                        : null
+                    }
+                    checks={commitChecks}
+                    onMessage={(value) => updateCommitInput({ ...commitInputRef.current, message: value })}
+                    onAmend={toggleAmend}
+                    onSkipHooks={(value) => updateCommitInput(
+                      { ...commitInputRef.current, skipHooks: value },
+                      { persist: false },
+                    )}
+                    onSubmit={() => void performCommit()}
+                    onPickRecent={pickRecentMessage}
+                    onAmendConfirm={confirmAmend}
+                    onAmendCancel={() => setAmendConfirm(null)}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <RecoveryPanel
+                worktreeId={worktreeId}
+                isWriting={isWriting}
+                snapshotRevision={snapshot?.revision ?? 0}
+                activation={gateRef.current.token().activation}
+                isWritingFor={(id) => writingWorktrees.has(id)}
+                onRestore={performRestore}
+                onSaveAs={performSaveAs}
+                onNotify={(notice) => notify({ ...notice, kind: "recovery" })}
+              />
+            )}
+          </aside>
+        ) : null}
+
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+          <EditorTabs
+            tabs={tabs}
+            activeKey={activeKey}
             entry={selectedEntry}
             view={view}
-            onView={(next) => void switchView(next)}
-            canNavigate={diffArea === "diff"}
-            onJump={jumpToHunk}
+            canNavigate={diffArea === "diff" && displayChangeCount > 0}
             isWriting={isWriting}
-            onStage={(entry) => void stageFile(entry)}
-            onUnstage={(entry) => void unstageFile(entry)}
-            onDiscard={discardFile}
+            changeCount={displayChangeCount}
+            fileIndex={filePosition.index}
+            fileTotal={filePosition.total}
+            diffOptions={diffOptions}
+            onDiffOption={changeDiffOptions}
+            onActivate={activateTab}
+            onClose={closeTab}
+            onCloseAll={closeAllTabs}
+            onView={(next) => void switchView(next)}
+            onJump={jumpToHunk}
+            onFilePrev={() => focusNextFile(-1)}
+            onFileNext={() => focusNextFile(1)}
+            onToggleReview={toggleReviewCurrent}
+            onRefresh={() => void refresh()}
           />
-        ) : null}
-        {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
-        {allReviewed ? (
-          <EditorBanner tone="info" icon={CircleCheck}>
-            <span className="font-semibold">{messages.review.allReviewed}</span>
-          </EditorBanner>
-        ) : null}
-        {watchState.error ? (
-          <EditorBanner tone="warn" icon={RefreshCwOff} action={{ label: messages.changes.refresh, run: () => void refresh() }}>
-            <span className="mr-1.5 font-semibold">{messages.changes.watchUnavailable}</span>
-            {messages.changes.watchUnavailableDetail}
-          </EditorBanner>
-        ) : null}
-        {selectedEntry?.unmerged ? (
-          <EditorBanner tone="error" icon={TriangleAlert}>{messages.changes.conflict}</EditorBanner>
-        ) : null}
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-          {!selectedEntry ? (
-            <Hint title={messages.changes.noSelection} />
-          ) : selectedEntry.unmerged ? (
-            <Hint title={messages.changes.conflictTitle} />
-          ) : diffArea === "readonly" && selectedEntry.readonlyReason ? (
-            <Hint title={messages.changes.readonly} detail={messages.changes.readonlyReasons[selectedEntry.readonlyReason]} />
-          ) : diffArea === "loading" ? (
-            <Hint title={messages.changes.loadingFile} />
-          ) : collapsed ? (
-            <Hint
-              title={messages.changes.collapsed}
-              detail={messages.changes.collapsedDetail}
-              action={{ label: messages.changes.expandDiff, run: () => expandEntry(selectedEntry) }}
+          {selectedEntry && !mergeEntry ? (
+            <Breadcrumbs
+              entry={selectedEntry}
+              view={view}
+              changeCount={displayChangeCount}
             />
-          ) : selectedEntry.binary ? (
-            <Hint
-              title={messages.changes.binary}
-              detail={selectedEntry.changes === "unstaged" ? messages.changes.binaryDetail : undefined}
-            />
-          ) : selectedEntry.hunkCount === 0 ? (
-            <Hint title={messages.changes.emptyFile} detail={messages.changes.emptyFileDetail} />
-          ) : (
-            <ErrorBoundary>
-              <DiffView
+          ) : null}
+          {error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+          {allReviewed && !mergeEntry ? (
+            <EditorBanner tone="info" icon="pass-filled">
+              <span className="font-semibold">{messages.review.allReviewed}</span>
+            </EditorBanner>
+          ) : null}
+          {watchState.error ? (
+            <EditorBanner
+              tone="warn"
+              icon="warning"
+              action={{ label: messages.changes.refresh, run: () => void refresh() }}
+            >
+              <span className="mr-1.5 font-semibold">{messages.changes.watchUnavailable}</span>
+              {messages.changes.watchUnavailableDetail}
+            </EditorBanner>
+          ) : null}
+          {diffOptions.ignoreWhitespace === 3 && !mergeEntry ? (
+            <EditorBanner tone="info" icon="info">{messages.diff.ignoreWhitespaceReadonly}</EditorBanner>
+          ) : null}
+          {selectedEntry?.unmerged && !mergeEntry ? (
+            <EditorBanner
+              tone="error"
+              icon="warning"
+              action={{ label: messages.diff.resolveConflict, run: () => selectedEntry && openMergeTab(selectedEntry) }}
+            >
+              {messages.diff.conflictBanner}
+            </EditorBanner>
+          ) : null}
+          {selectedEntry && diffArea === "readonly" && selectedEntry.readonlyReason ? (
+            <EditorBanner tone="info" icon="lock">
+              <span className="mr-1.5 font-semibold">{messages.changes.readonly}</span>
+              {messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
+            </EditorBanner>
+          ) : null}
+          {selectedEntry && diffArea === "collapsed" ? (
+            <EditorBanner
+              tone="info"
+              icon="info"
+              action={{ label: messages.changes.expandDiff, run: expandActive }}
+            >
+              {`${messages.changes.collapsed}：${messages.changes.collapsedDetail}`}
+            </EditorBanner>
+          ) : null}
+
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            {mergeEntry ? (
+              <MergeView
+                key={`${worktreeId}/${mergeEntry.path}`}
                 worktreeId={worktreeId ?? ""}
-                entry={selectedEntry}
-                view={view}
+                path={mergeEntry.path}
                 fontSize={fontSize}
-                rows={rowStore}
-                highlights={highlightStore}
-                handleRef={diffRef}
-                isWriting={isWriting}
-                onHunkAction={changeHunk}
-                onHunkDiscard={discardHunk}
+                fontFamily={codeFontFamily}
+                softWrap={diffOptions.softWrap}
+                onClose={() => closeMergeTab(mergeEntry.path)}
+                onWrite={performMergeWrite}
               />
-            </ErrorBoundary>
-          )}
-        </div>
-        {measurementMode ? (
-          <MeasurePanel
-            open={panelOpen}
-            status={status}
-            onToggle={() => setPanelOpen((value) => !value)}
-            measurements={measurements}
-            onClear={() => setMeasurements([])}
-          />
-        ) : null}
-      </main>
+            ) : !selectedEntry ? (
+              <Hint title={messages.changes.noSelection} detail={messages.changes.noSelectionDetail} />
+            ) : selectedEntry.unmerged ? (
+              // 冲突文件（设计 3.2）：只读对照 HEAD 与工作区，解决冲突在合并页签。
+              <ErrorBoundary>
+                <SideBySideView
+                  worktreeId={worktreeId ?? ""}
+                  entry={selectedEntry}
+                  fontSize={fontSize}
+                  fontFamily={codeFontFamily}
+                  options={sideBySideOptions}
+                  highlights={highlightStore}
+                  isWriting={isWriting}
+                  handleRef={sbsRef}
+                  onLayout={setSideLayout}
+                />
+              </ErrorBoundary>
+            ) : diffArea === "readonly" && selectedEntry.readonlyReason ? (
+              <Hint
+                title={messages.changes.readonly}
+                detail={messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
+              />
+            ) : diffArea === "loading" ? (
+              <Hint title={messages.changes.loadingFile} />
+            ) : diffArea === "collapsed" ? null : selectedEntry.binary ? (
+              <Hint
+                title={messages.changes.binary}
+                detail={selectedEntry.changes === "unstaged" ? messages.changes.binaryDetail : undefined}
+              />
+            ) : selectedEntry.hunkCount === 0 ? (
+              <Hint title={messages.changes.emptyFile} detail={messages.changes.emptyFileDetail} />
+            ) : (
+              <ErrorBoundary>
+                {view === "split" ? (
+                  <SideBySideView
+                    worktreeId={worktreeId ?? ""}
+                    entry={selectedEntry}
+                    fontSize={fontSize}
+                    fontFamily={codeFontFamily}
+                    options={sideBySideOptions}
+                    highlights={highlightStore}
+                    isWriting={isWriting}
+                    handleRef={sbsRef}
+                    onLayout={setSideLayout}
+                    onStageSegment={changeSegment}
+                    onUnstageSegment={changeSegment}
+                    onDiscardSegment={requestDiscardSegment}
+                  />
+                ) : (
+                  <DiffView
+                    worktreeId={worktreeId ?? ""}
+                    entry={selectedEntry}
+                    view={view}
+                    fontSize={fontSize}
+                    fontFamily={codeFontFamily}
+                    rows={rowStore}
+                    highlights={highlightStore}
+                    handleRef={diffRef}
+                    isWriting={isWriting}
+                    onHunkAction={changeHunk}
+                    onHunkDiscard={discardHunk}
+                    segmentActionsEnabled={diffOptions.ignoreWhitespace !== 3}
+                    softWrap={diffOptions.softWrap}
+                    onSegmentAction={changeSegment}
+                    onSegmentDiscard={requestDiscardSegment}
+                  />
+                )}
+              </ErrorBoundary>
+            )}
+          </div>
+
+          {measurementMode ? (
+            <MeasurePanel
+              open={panelOpen}
+              status={status}
+              onToggle={() => setPanelOpen((value) => !value)}
+              measurements={measurements}
+              onClear={() => setMeasurements([])}
+            />
+          ) : null}
+        </main>
+      </div>
 
       <StatusBar
-        repoName={activeRepo?.name ?? messages.app.name}
-        branch={snapshot?.branch ?? null}
-        entry={selectedEntry}
+        branch={activeStatus?.branch ?? snapshot?.branch ?? null}
+        ahead={activeStatus?.ahead ?? 0}
+        behind={activeStatus?.behind ?? 0}
         watchError={watchState.error}
+        reviewed={reviewedCount}
+        total={reviewTotal}
+        onRefresh={() => void refresh()}
       />
-      {discardConfirmation ? (
-        <DiscardDialog path={discardConfirmation.target.path} worktree={discardConfirmation.worktree} section={discardConfirmation.section}
-          valid={confirmationValid(discardConfirmation)} onClose={() => setDiscardConfirmation(null)}
+
+      <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
+
+      {discardRequest ? (
+        <DiscardDialog
+          targets={discardRequest.targets}
+          worktree={discardRequest.worktree}
+          valid={discardValid}
+          onClose={() => setDiscardRequest(null)}
           onConfirm={() => {
-            if (!confirmationValid(discardConfirmation)) return;
-            setDiscardConfirmation(null);
-            void performWrite(discardConfirmation.target, true);
-          }} />
-      ) : null}
-      {recoveryOpen ? (
-        <RecoveryDialog
-          worktreeId={worktreeId}
-          isWriting={isWriting}
-          snapshotRevision={snapshot?.revision ?? 0}
-          activation={gateRef.current.token().activation}
-          isWritingFor={(id) => writingWorktrees.has(id)}
-          onRestore={performRestore}
-          onSaveAs={performSaveAs}
-          onClose={() => setRecoveryOpen(false)}
+            if (!discardRequest || !discardRequestValid(discardRequest)) return;
+            const request = discardRequest;
+            setDiscardRequest(null);
+            if (request.segment) {
+              void performWrite({ ...request.segment, snapshotRevision: request.snapshotRevision }, true);
+            } else if (request.hunk) {
+              void performWrite({ ...request.hunk, snapshotRevision: request.snapshotRevision }, true);
+            } else {
+              void performBatchWrite("discard", request.entries, {
+                snapshotRevision: request.snapshotRevision,
+              });
+            }
+          }}
         />
       ) : null}
+
+      {conflictDialogOpen && worktreeId ? (
+        <ConflictDialog
+          worktreeId={worktreeId}
+          onClose={() => setConflictDialogOpen(false)}
+          onOpenMerge={(path) => {
+            const entry = snapshotRef.current?.entries.find((candidate) => candidate.path === path);
+            setConflictDialogOpen(false);
+            if (entry) openMergeTab(entry);
+          }}
+          onWrite={performMergeWrite}
+        />
+      ) : null}
+
+      {commitWarningConfirm ? (
+        <CommitWarningDialog
+          warnings={commitWarningConfirm.warnings}
+          onCancel={() => setCommitWarningConfirm(null)}
+          onContinue={() => {
+            const pending = commitWarningConfirm;
+            setCommitWarningConfirm(null);
+            void performCommit(pending.confirmation, { skipWarnings: true });
+          }}
+        />
+      ) : null}
+
+      {settingsOpen ? (
+        <SettingsDialog
+          open
+          values={settingsValues}
+          onClose={() => setSettingsOpen(false)}
+          onChange={updateSettings}
+          onReloadEnvironment={reloadEnvironment}
+        />
+      ) : null}
+
       {closeRequest && closeRequest.action !== "proceed" ? (
         <CloseRequestDialog
           intent={closeIntentRef.current}
           writing={closeRequest.writing}
           pending={"pending" in closeRequest ? closeRequest.pending : []}
-          onWait={() => {
-            // 用户明确选择「等待」：交给共享驱动（可能立刻执行，也可能继续等待）。
-            applyEffect(closeDriver.handleChoice("wait"));
-          }}
-          onStay={() => {
-            // 留在应用：驱动清掉请求与授权并推进代际，在途旧投递/核对失效。
-            applyEffect(closeDriver.handleChoice("stay"));
-          }}
-          onPendingReviewed={() => {
-            // 待核对闭环：捕获**请求代际**与每个目标的**待核对代际**，
-            // 只清自己成功核对过的那一代（ST-B03-08-4/5/6）。
-            const coordinator = closeCoordinatorRef.current;
-            const requestGen = coordinator.generation();
-            const targets = coordinator.pendingWorktrees()
-              .map((worktreeId) => ({ worktreeId, generation: coordinator.pendingGeneration(worktreeId) }));
-            void (async () => {
-              let allConfirmed = true;
-              for (const { worktreeId, generation } of targets) {
-                // 用户在核对过程中取消/发起新请求：旧核对不得授权新请求。
-                if (coordinator.generation() !== requestGen) return;
-                if (!worktreeId.startsWith("save-as:")) {
-                  let verified = false;
-                  try {
-                    verified = await refreshTarget(worktreeId);
-                  } catch {
-                    verified = false;
-                  }
-                  if (!verified) {
-                    // 核对失败：保留待核对，不关闭、不重跑。
-                    allConfirmed = false;
-                    continue;
-                  }
-                }
-                if (!coordinator.acknowledgePending(worktreeId, generation)) {
-                  // 该目标出现了新的待核对（代际已变）：不清账。
-                  allConfirmed = false;
-                }
-              }
-              if (coordinator.generation() !== requestGen) return;
-              if (!allConfirmed) {
-                // 失败或出现新 pending：按**当前真实集合**主动重新展示。
-                reconcileClose();
-                return;
-              }
-              applyEffect(closeDriver.handlePendingContinue());
-            })();
-          }}
+          onWait={() => applyEffect(closeDriver.handleChoice("wait"))}
+          onStay={() => applyEffect(closeDriver.handleChoice("stay"))}
+          onPendingReviewed={() => void confirmPendingReviewed()}
         />
       ) : null}
     </div>
   );
+}
 
-  function selectionKey(entry: ChangeEntry): string {
-    return `${entry.changes}:${entry.path}`;
-  }
-
-  function expandEntry(entry: ChangeEntry) {
-    setExpanded((current) => new Set(current).add(selectionKey(entry)));
-  }
-
-  async function selectFromList(next: Selection) {
-    const entry = snapshot?.entries.find((item) => item.path === next.path && item.changes === next.changes);
-    if (entry && worktreeId) await openEntry(entry, { view, worktreeId });
-  }
+/** 工具窗口“更多”菜单：查看选项（按目录分组，A2）、全选、全部关闭页签、刷新。 */
+function SidebarMore({
+  onSelectAll,
+  onRefresh,
+  onCloseAll,
+  groupByDirectory,
+  onToggleGroupByDirectory,
+}: {
+  onSelectAll: () => void;
+  onRefresh: () => void;
+  onCloseAll: () => void;
+  groupByDirectory: boolean;
+  onToggleGroupByDirectory: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Popover
+        open={open}
+        onOpen={() => setOpen(true)}
+        onClose={() => setOpen(false)}
+        align="right"
+        width={200}
+        trigger={
+          <button
+            type="button"
+            className="icon-action size-[22px]"
+            title={messages.changes.more}
+            aria-label={messages.changes.more}
+          >
+            <Codicon name="ellipsis" size={15} />
+          </button>
+        }
+      >
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onToggleGroupByDirectory();
+          }}
+        >
+          {groupByDirectory ? messages.changes.viewFlat : messages.changes.viewByDirectory}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onSelectAll();
+          }}
+        >
+          {messages.changes.selectAll}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onCloseAll();
+          }}
+        >
+          {messages.changes.closeAllTabs}
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem
+          onClick={() => {
+            setOpen(false);
+            onRefresh();
+          }}
+        >
+          {messages.changes.refresh}
+        </MenuItem>
+      </Popover>
+    </div>
+  );
 }
 
 /** 测量与长测通过真实的视图下拉切换视图，走与用户相同的 onChange 路径。 */
-function selectViewInUi(view: ViewMode): HTMLSelectElement | null {
-  const select = document.querySelector<HTMLSelectElement>("select[data-view-select]");
-  if (!select) return null;
-  select.value = view;
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-  return select;
+function selectViewInUi(view: ViewMode): boolean {
+  // 页签工具条上的切换按钮：`data-view-toggle` 是点击后要切到的视图。
+  const button = document.querySelector<HTMLButtonElement>(`[data-view-toggle="${view}"]`);
+  if (!button) return false;
+  button.click();
+  return true;
 }
 
-/** 编辑区中央的一句提示（JetBrains 的空状态写法）：标题、可选说明、可选链接。 */
+/** 编辑区中央的一句提示（VS Code 的空状态写法）：标题、可选说明、可选链接。 */
 function Hint({ title, detail, action }: { title: string; detail?: string; action?: { label: string; run: () => void } }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center text-fg-2">
+    <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center text-descriptionforeground">
       <span className="text-foreground">{title}</span>
       {detail ? <span className="max-w-md">{detail}</span> : null}
       {action ? (
@@ -3539,240 +4719,16 @@ function Hint({ title, detail, action }: { title: string; detail?: string; actio
   );
 }
 
-function IconAction({ icon: Icon, label, disabled, pressed, onClick }: {
-  icon: LucideIcon;
-  label: string;
-  disabled?: boolean;
-  pressed?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button type="button" className="icon-action" title={label} aria-label={label} aria-pressed={pressed}
-      disabled={disabled} onClick={onClick}>
-      <Icon aria-hidden className="size-4" strokeWidth={1.6} />
-    </button>
-  );
-}
-
-/** 主工具栏：仓库与 worktree 组件（Q107），空白处可拖动窗口。 */
-function MainToolbar({
-  repo,
-  worktrees,
-  activeWorktreeId,
-  onWorktree,
-  onChooseRepo,
-  busy,
-  watchError,
-}: {
-  repo: RepoEntry | null;
-  worktrees: WorktreeEntry[];
-  activeWorktreeId: string | null;
-  onWorktree: (worktreeId: string) => void;
-  onChooseRepo: () => void;
-  busy: boolean;
-  watchError: string | null;
-}) {
-  const active = worktrees.find((worktree) => worktree.id === activeWorktreeId);
-  const worktreeLabel = (worktree: WorktreeEntry) =>
-    `${worktree.branch ?? worktree.path}${worktree.isMain ? ` ${messages.changes.worktreeMain}` : ""}`;
-  const name = repo?.name ?? messages.app.name;
-  return (
-    <header data-tauri-drag-region className="col-span-3 flex items-center gap-0.5 pr-2.5" style={{ paddingLeft: MAIN_TOOLBAR_INSET }}>
-      <button type="button" className="toolbar-widget" disabled={busy} onClick={onChooseRepo}
-        title={repo ? `${repo.path}\n${messages.toolbar.chooseRepo}` : messages.toolbar.chooseRepo}>
-        <span aria-hidden className="project-badge">{name.slice(0, 1).toUpperCase()}</span>
-        <span>{name}</span>
-        <ChevronDown aria-hidden className="size-3 text-fg-2" strokeWidth={2} />
-      </button>
-      {active ? (
-        worktrees.length > 1 ? (
-          <label className="toolbar-widget relative has-[select:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]">
-            <GitBranch aria-hidden className="size-4 text-icon" strokeWidth={1.6} />
-            <span>{worktreeLabel(active)}</span>
-            <ChevronDown aria-hidden className="size-3 text-fg-2" strokeWidth={2} />
-            <select
-              aria-label={messages.changes.worktreeLabel}
-              className="absolute inset-0 cursor-default opacity-0"
-              value={activeWorktreeId ?? ""}
-              onChange={(event) => onWorktree(event.target.value)}
-            >
-              {worktrees.map((worktree) => (
-                <option key={worktree.id} value={worktree.id}>{worktreeLabel(worktree)}</option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <span className="toolbar-widget">
-            <GitBranch aria-hidden className="size-4 text-icon" strokeWidth={1.6} />
-            <span>{worktreeLabel(active)}</span>
-          </span>
-        )
-      ) : null}
-      <span className="flex-1 self-stretch" data-tauri-drag-region />
-      {watchError ? (
-        <span className="warn-chip" title={watchError}>
-          <RefreshCwOff aria-hidden className="size-3.5" strokeWidth={1.8} />
-          {messages.changes.watchUnavailable}
-        </span>
-      ) : null}
-    </header>
-  );
-}
-
-/** 左侧工具窗口图标条：只有“变更”和“回收区”（不借此新增功能，Q100）。 */
-function ToolStripe({ recoveryOpen, onRecovery }: { recoveryOpen: boolean; onRecovery: () => void }) {
-  return (
-    <nav aria-label={messages.toolbar.toolWindows} className="flex flex-col items-center gap-1 pt-0.5">
-      <button type="button" className="icon-action size-[30px]" aria-pressed="true" title={messages.changes.toolWindow}
-        aria-label={messages.changes.toolWindow}
-        onClick={() => document.querySelector<HTMLElement>(".change-list")?.focus()}>
-        <GitCommitHorizontal aria-hidden className="size-[18px]" strokeWidth={1.6} />
-      </button>
-      <button type="button" className="icon-action size-[30px]" aria-pressed={recoveryOpen} title={messages.recovery.title}
-        aria-label={messages.recovery.title} onClick={onRecovery}>
-        <Inbox aria-hidden className="size-[18px]" strokeWidth={1.6} />
-      </button>
-    </nav>
-  );
-}
-
-/** “变更”工具窗口的图标工具条：刷新、暂存、取消暂存、丢弃，右侧是审阅进度。 */
-function ChangesToolbar({
-  selectedEntry,
-  isWriting,
-  busy,
-  review,
-  onRefresh,
-  onStage,
-  onUnstage,
-  onDiscard,
-}: {
-  selectedEntry: ChangeEntry | null;
-  isWriting: boolean;
-  busy: boolean;
-  review: ChangesSnapshot["review"] | null;
-  onRefresh: () => void;
-  onStage: (entry: ChangeEntry) => void;
-  onUnstage: (entry: ChangeEntry) => void;
-  onDiscard: (entry: ChangeEntry) => void;
-}) {
-  const writable = selectedEntry && !selectedEntry.readonlyReason && !isWriting ? selectedEntry : null;
-  return (
-    <div className="flex h-[30px] shrink-0 items-center gap-0.5 pr-2.5 pl-1.5">
-      <IconAction icon={RotateCw} label={messages.changes.refresh} disabled={busy} onClick={onRefresh} />
-      <span aria-hidden className="mx-1 h-4 w-px bg-border" />
-      <IconAction icon={Plus} label={messages.changes.shortcuts.stageFile}
-        disabled={!writable || writable.changes === "staged"} onClick={() => writable && onStage(writable)} />
-      <IconAction icon={Minus} label={messages.changes.shortcuts.unstageFile}
-        disabled={!writable || writable.changes !== "staged"} onClick={() => writable && onUnstage(writable)} />
-      <IconAction icon={Undo2} label={messages.changes.shortcuts.discardFile}
-        disabled={!writable || writable.changes !== "unstaged"} onClick={() => writable && onDiscard(writable)} />
-      {review ? (
-        <span className="ml-auto text-xs whitespace-nowrap text-fg-2 tabular-nums">
-          {messages.review.progress(review.reviewedCount, review.total)}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-/** 编辑区顶部：单个文件标签（不做多标签，Q16）和 diff 工具条。 */
-function EditorHeader({
-  entry,
-  view,
-  onView,
-  canNavigate,
-  onJump,
-  isWriting,
-  onStage,
-  onUnstage,
-  onDiscard,
-}: {
-  entry: ChangeEntry;
-  view: ViewMode;
-  onView: (view: ViewMode) => void;
-  canNavigate: boolean;
-  onJump: (direction: 1 | -1) => void;
-  isWriting: boolean;
-  onStage: (entry: ChangeEntry) => void;
-  onUnstage: (entry: ChangeEntry) => void;
-  onDiscard: (entry: ChangeEntry) => void;
-}) {
-  const slash = entry.path.lastIndexOf("/");
-  const name = entry.path.slice(slash + 1);
-  const dir = slash > 0 ? entry.path.slice(0, slash) : messages.changes.repoRoot;
-  const group = entry.changes === "staged"
-    ? messages.changes.staged
-    : entry.changes === "untracked" ? messages.changes.untracked : messages.changes.unstaged;
-  const ViewIcon = view === "unified" ? Rows3 : Columns2;
-  return (
-    <>
-      <div className="flex h-9 shrink-0 px-1.5 shadow-[inset_0_-1px_0_var(--border)]">
-        <div className="editor-tab" title={entry.path}>
-          <FileTypeIcon path={entry.path} symlink={entry.readonlyReason === "symlink"} />
-          <span className="truncate">{name}</span>
-          <span className="truncate text-xs text-fg-2">{`${dir} · ${group}`}</span>
-        </div>
-      </div>
-      <div className="flex h-8 shrink-0 items-center gap-0.5 px-2 shadow-[inset_0_-1px_0_var(--border)]">
-        <IconAction icon={ArrowUp} label={messages.diff.previousHunkShortcut} disabled={!canNavigate} onClick={() => onJump(-1)} />
-        <IconAction icon={ArrowDown} label={messages.diff.nextHunkShortcut} disabled={!canNavigate} onClick={() => onJump(1)} />
-        <span aria-hidden className="mx-1.5 h-4 w-px bg-border" />
-        <span className="relative inline-flex items-center">
-          <ViewIcon aria-hidden className="pointer-events-none absolute left-2 size-4 text-icon" strokeWidth={1.6} />
-          <select
-            data-view-select
-            aria-label={messages.diff.viewLabel}
-            className="widget-select pl-7"
-            value={view}
-            onChange={(event) => onView(event.target.value as ViewMode)}
-          >
-            <option value="split">{messages.diff.viewSplit}</option>
-            <option value="unified">{messages.diff.viewUnified}</option>
-          </select>
-        </span>
-        <span className="flex-1" />
-        {entry.readonlyReason ? (
-          <span className="inline-flex h-[22px] items-center gap-1 rounded px-2 text-xs text-fg-2 ring-1 ring-edge ring-inset"
-            title={messages.changes.readonlyReasons[entry.readonlyReason]}>
-            <Lock aria-hidden className="size-3.5" strokeWidth={1.6} />
-            {messages.changes.readonly}
-          </span>
-        ) : entry.changes === "staged" ? (
-          <Button variant="outline" size="sm" disabled={isWriting} onClick={() => onUnstage(entry)}
-            title={messages.changes.shortcuts.unstageFile}>
-            {isWriting ? <Loader2 aria-hidden className="animate-spin" /> : <Minus aria-hidden />}
-            {isWriting ? messages.changes.writing : messages.changes.unstageFile}
-          </Button>
-        ) : (
-          <Button variant="outline" size="sm" disabled={isWriting} onClick={() => onStage(entry)}
-            title={messages.changes.shortcuts.stageFile}>
-            {isWriting ? <Loader2 aria-hidden className="animate-spin" /> : <Plus aria-hidden />}
-            {isWriting ? messages.changes.writing : messages.changes.stageFile}
-          </Button>
-        )}
-        {entry.changes === "unstaged" && !entry.readonlyReason ? (
-          <Button variant="outline" size="sm" className="ml-1.5" disabled={isWriting} onClick={() => onDiscard(entry)}
-            title={messages.changes.shortcuts.discardFile}>
-            <Undo2 aria-hidden />
-            {messages.changes.discardShort}
-          </Button>
-        ) : null}
-      </div>
-    </>
-  );
-}
-
-/** 编辑区顶部提示条：信息、警告、错误三种（JetBrains 的编辑器通知）。 */
-function EditorBanner({ tone, icon: Icon, action, children }: {
+/** 编辑区顶部提示条：信息、警告、错误三种（F07）。 */
+function EditorBanner({ tone, icon, action, children }: {
   tone: "info" | "warn" | "error";
-  icon: LucideIcon;
+  icon: string;
   action?: { label: string; run: () => void };
   children: React.ReactNode;
 }) {
   return (
     <div role={tone === "error" ? "alert" : "status"} className="editor-banner shrink-0" data-tone={tone}>
-      <Icon aria-hidden className="size-4" strokeWidth={1.8} />
+      <Codicon name={icon} size={16} />
       <div className="min-w-0 flex-1">{children}</div>
       {action ? (
         <button type="button" className="banner-link" onClick={action.run}>
@@ -3780,33 +4736,6 @@ function EditorBanner({ tone, icon: Icon, action, children }: {
         </button>
       ) : null}
     </div>
-  );
-}
-
-/** 底部状态栏：仓库 › 分支 › 当前文件路径；自动刷新不可用时常驻提示（Q95）。 */
-function StatusBar({ repoName, branch, entry, watchError }: {
-  repoName: string;
-  branch: string | null;
-  entry: ChangeEntry | null;
-  watchError: string | null;
-}) {
-  const crumbs = [repoName, branch ?? messages.changes.detachedHead, ...(entry ? entry.path.split("/") : [])];
-  return (
-    <footer className="col-span-3 flex items-center gap-1.5 overflow-hidden pr-3 pl-3.5 text-xs whitespace-nowrap text-fg-2">
-      {crumbs.map((crumb, index) => (
-        <Fragment key={index}>
-          {index ? <span aria-hidden className="text-fg-3">›</span> : null}
-          <span className="truncate">{crumb}</span>
-        </Fragment>
-      ))}
-      <span className="flex-1" />
-      {watchError ? (
-        <span className="status-warn inline-flex items-center gap-1.5 text-foreground" title={watchError}>
-          <RefreshCwOff aria-hidden className="size-3.5" strokeWidth={1.8} />
-          {messages.changes.watchUnavailable}
-        </span>
-      ) : null}
-    </footer>
   );
 }
 
@@ -3823,8 +4752,11 @@ function ErrorBanner({ error, onDismiss }: { error: AppErrorPayload; onDismiss: 
             : messages.errors.internal;
   const warn = error.kind === "needsVerification" || error.kind === "environment";
   return (
-    <EditorBanner tone={warn ? "warn" : "error"} icon={warn ? TriangleAlert : CircleX}
-      action={{ label: messages.errors.dismiss, run: onDismiss }}>
+    <EditorBanner
+      tone={warn ? "warn" : "error"}
+      icon={warn ? "warning" : "error"}
+      action={{ label: messages.errors.dismiss, run: onDismiss }}
+    >
       <strong className="mr-1.5 font-semibold">{title}</strong>
       <span className={error.kind === "git" ? "font-mono text-xs whitespace-pre-wrap" : "whitespace-pre-wrap"}>{error.message}</span>
     </EditorBanner>
@@ -3846,15 +4778,16 @@ function MeasurePanel({
   onClear: () => void;
 }) {
   const latest = measurements[0];
+  const smallButton = "rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50";
   return (
-    <section className="border-t">
+    <section className="border-t border-panel-border">
       <header className="flex items-center gap-3 px-3 py-1.5 text-xs">
-        <Button variant="ghost" size="sm" onClick={onToggle}>
+        <button type="button" className={smallButton} onClick={onToggle}>
           {open ? "▾" : "▸"} {messages.measure.title}（{measurements.length}）
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
+        </button>
+        <button
+          type="button"
+          className={smallButton}
           disabled={measurements.length === 0}
           onClick={() => {
             const blob = new Blob([JSON.stringify(measurements, null, 2)], { type: "application/json" });
@@ -3867,10 +4800,10 @@ function MeasurePanel({
           }}
         >
           {messages.measure.export}
-        </Button>
-        <Button variant="ghost" size="sm" disabled={measurements.length === 0} onClick={onClear}>
+        </button>
+        <button type="button" className={smallButton} disabled={measurements.length === 0} onClick={onClear}>
           {messages.measure.clear}
-        </Button>
+        </button>
         <span className="ml-auto text-muted-foreground">
           {status ? `${status} · ` : ""}
           {latest ? `${latest.label} · ${latest.startedAt}` : ""}
@@ -3907,15 +4840,6 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ---------------- 工具 ----------------
-
-/** 界面展示顺序：未暂存 -> 未跟踪 -> 已暂存（审查意见 5）。 */
-/**
- * 构造 amend 的二次确认凭据（F06.2）。
- *
- * 绑定当时看到的整组提交预期指纹、提交信息原文与选项：刷新出新 index、
- * 修改输入或切换选项都会让这份凭据失效，后端写前逐项比对。
- */
 function AmendConfirmationOf(context: CommitContext, input: ComposerInput): AmendConfirmation {
   return {
     upstreamVersion: context.upstreamVersion,
@@ -3924,6 +4848,14 @@ function AmendConfirmationOf(context: CommitContext, input: ComposerInput): Amen
     amend: input.amend,
     skipHooks: input.skipHooks,
   };
+}
+
+/** 设置里的忽略空白档位（0–3）→ Rust 侧的枚举取值（Q140）。 */
+function ignoreWhitespaceOf(level: number): IgnoreWhitespace {
+  if (level === 1) return "eol";
+  if (level === 2) return "all";
+  if (level === 3) return "allAndBlankLines";
+  return "off";
 }
 
 function getDisplayOrderEntries(snapshot: ChangesSnapshot): ChangeEntry[] {

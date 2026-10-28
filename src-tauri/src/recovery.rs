@@ -153,7 +153,13 @@ pub fn capture_files(root: &Path, paths: &[String]) -> Result<Vec<SavedFile>> {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
-pub enum RecoverySource { DiscardFile, DiscardHunk, CommitSnapshot }
+pub enum RecoverySource {
+    DiscardFile,
+    DiscardHunk,
+    CommitSnapshot,
+    /// 内置三方合并“应用”前保存的工作区内容（Q143）。
+    MergeApply,
+}
 
 impl RecoverySource {
     pub fn is_commit_snapshot(self) -> bool {
@@ -165,6 +171,7 @@ impl RecoverySource {
             RecoverySource::DiscardFile => "discardFile",
             RecoverySource::DiscardHunk => "discardHunk",
             RecoverySource::CommitSnapshot => "commitSnapshot",
+            RecoverySource::MergeApply => "mergeApply",
         }
     }
 }

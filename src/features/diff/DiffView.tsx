@@ -15,18 +15,24 @@ import { flushSync } from "react-dom";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import type { HunkAction } from "@/types/bindings/HunkAction";
+import type { SegmentAction } from "@/types/bindings/SegmentAction";
 import type { RenderRow } from "@/types/bindings/RenderRow";
 import type { RowCell } from "@/types/bindings/RowCell";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import { ipc } from "@/lib/ipc";
 import { messages } from "@/lib/i18n/zh-CN";
+import { codeFontStack } from "@/lib/theme";
+import { Codicon } from "@/components/ui/codicon";
 import { logToBackend } from "./log";
 import type { HighlightStore } from "./highlightStore";
 import type { RowWindowStore } from "./rowWindowStore";
 import { visibleHighlightLines } from "./visibleHighlightLines";
-import { matchesHunkAction } from "./hunkAction";
+import { matchesHunkAction, segmentActionDisabled } from "./hunkAction";
+import { RowHeights } from "./rowHeights";
+import { useFontRevision } from "./useFontRevision";
+import { unifiedFileAnchor, type FileAnchor } from "./fileAnchor";
 
-export const ROW_HEIGHT = 18;
+export const ROW_HEIGHT = 19;
 /** 滚动停止多久之后才请求新高亮（毫秒）。 */
 const SCROLL_IDLE_MS = 150;
 /** 大幅跳转后恢复全量预渲染与语法颜色的目标帧数（约 2 帧，33ms）。 */
@@ -44,6 +50,7 @@ const SCROLLBAR_MIN_THUMB = 24;
 const ARROW_STEP_ROWS = 2;
 
 export interface DiffViewHandle {
+  getFileAnchor(): FileAnchor | null;
   scrollToRow(index: number): void;
   scrollToLine(line: number, version: FileVersion): Promise<void>;
   getScrollTop(): number;
@@ -60,18 +67,27 @@ interface DiffViewProps {
   entry: ChangeEntry;
   view: ViewMode;
   fontSize: number;
+  fontFamily?: string | null;
   rows: RowWindowStore;
   highlights: HighlightStore;
   isWriting?: boolean;
+  /** 段（块）操作是否可用（Q140：同时忽略空行一档只用于查看）。 */
+  segmentActionsEnabled?: boolean;
+  /** 软换行（Q139）：长行折行显示，行高随内容。 */
+  softWrap?: boolean;
   onHunkAction?: (action: HunkAction) => void;
   onHunkDiscard?: (action: HunkAction, section: string) => void;
+  onSegmentAction?: (action: SegmentAction) => void;
+  onSegmentDiscard?: (action: SegmentAction) => void;
   handleRef?: React.Ref<DiffViewHandle>;
   /** 每帧采样：用于测量「可见区域里还没有数据的行数」。 */
   onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
 }
 
 export function DiffView(props: DiffViewProps) {
-  const { worktreeId, entry, view, fontSize, rows, highlights, handleRef, onSample, isWriting, onHunkAction, onHunkDiscard } = props;
+  const { worktreeId, entry, view, fontSize, fontFamily, rows, highlights, handleRef, onSample, isWriting, onHunkAction, onHunkDiscard } = props;
+  const segmentActionsEnabled = props.segmentActionsEnabled ?? true;
+  const softWrap = props.softWrap ?? false;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +96,9 @@ export function DiffView(props: DiffViewProps) {
   const scrollTopRef = useRef(0);
   // 只记录顶部是第几行：同一行内的像素级滚动不触发重新渲染。
   const [firstRow, setFirstRow] = useState(0);
+  // 软换行时一个逻辑行可能高过视口：顶部行不变、底部已进入下一行时也要重新渲染。
+  // 只在换行时更新，不换行的固定行高路径（D06）不受影响。
+  const [, setBottomRow] = useState(0);
   // 最近一次滚动的方向（1 向下，-1 向上），决定预渲染往哪边多放。
   const scrollDirection = useRef(1);
   const [scrollIdle, setScrollIdle] = useState(true);
@@ -89,14 +108,36 @@ export function DiffView(props: DiffViewProps) {
   const jumpRestoreRaf = useRef<number | null>(null);
   const jumpRestoreTimer = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  // 软换行时量过的行高变了：重新排位置。
+  const [, setLayoutVersion] = useState(0);
   const rowSnapshot = useSyncExternalStore(rows.subscribe, rows.getSnapshot);
   const version = rowSnapshot.version;
   const highlightSnapshot = useSyncExternalStore(highlights.subscribe, highlights.getSnapshot);
 
   const rowCount = rows.rowCountValue;
-  const contentHeight = rowCount * ROW_HEIGHT;
+  // 软换行时宽度、字号或内容一变，量过的行高就作废（不换行时与宽度无关）。
+  const wrapWidth = softWrap ? viewportWidth : 0;
+  const fontRevision = useFontRevision(softWrap);
+  const wrapFont = softWrap ? `${fontSize}/${fontFamily ?? ""}/${fontRevision}` : "";
+  const epoch = rows.epochValue;
+  const heights = useMemo(
+    () => {
+      void [wrapWidth, wrapFont, epoch, entry.path, entry.changes, view];
+      return new RowHeights(rowCount, ROW_HEIGHT, softWrap);
+    },
+    [rowCount, softWrap, wrapWidth, wrapFont, epoch, entry.path, entry.changes, view],
+  );
+  const heightsRef = useRef(heights);
+  const previousHeights = useRef(heights);
+  heightsRef.current = heights;
+  const contentHeight = heights.total();
   const geometry = useRef({ viewportHeight: 0, contentHeight: 0 });
   geometry.current = { viewportHeight, contentHeight };
+  const changedHeights = previousHeights.current !== heights;
+  const renderTop = changedHeights
+    ? heights.yAt(previousHeights.current.rowAtFraction(scrollTopRef.current))
+    : scrollTopRef.current;
 
   const cancelJumpRestore = useCallback(() => {
     if (jumpRestoreRaf.current != null) {
@@ -160,9 +201,13 @@ export function DiffView(props: DiffViewProps) {
   useLayoutEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setViewportHeight(element.clientHeight));
+    const measure = () => {
+      setViewportHeight(element.clientHeight);
+      setViewportWidth(element.clientWidth);
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
-    setViewportHeight(element.clientHeight);
+    measure();
     return () => observer.disconnect();
   }, []);
 
@@ -196,7 +241,8 @@ export function DiffView(props: DiffViewProps) {
       paintScrollPosition();
       const bigJump = Math.abs(delta) > height * 2;
       const update = () => {
-        setFirstRow(Math.floor(top / ROW_HEIGHT));
+        setFirstRow(heightsRef.current.rowAt(top));
+        if (heightsRef.current.wrap) setBottomRow(heightsRef.current.rowAt(top + height));
         setScrollIdle(false);
         if (bigJump) setCompact(true);
       };
@@ -216,15 +262,29 @@ export function DiffView(props: DiffViewProps) {
     [paintScrollPosition, rows],
   );
 
-  // 视口或内容高度变化（窗口缩放、切换视图、行数校正）时，把滚动位置收回有效范围并重画。
+  // 先按原逻辑位置渲染并量高，再夹紧；避免新宽度下的估算总高提前弄丢底部锚点。
   useLayoutEffect(() => {
-    const maxTop = Math.max(0, contentHeight - viewportHeight);
-    if (scrollTopRef.current > maxTop) {
-      scrollTopRef.current = maxTop;
-      setFirstRow(Math.floor(maxTop / ROW_HEIGHT));
+    const previous = previousHeights.current;
+    const anchor = previous.rowAtFraction(scrollTopRef.current);
+    const reset = previous !== heights;
+    previousHeights.current = heights;
+    let changed = false;
+    if (heights.wrap && contentRef.current) {
+      for (const child of contentRef.current.children) {
+        const element = child as HTMLElement;
+        const row = element.dataset.row;
+        if (row !== undefined && heights.measure(Number(row), element.offsetHeight)) changed = true;
+      }
     }
+    const total = heights.total();
+    geometry.current = { viewportHeight, contentHeight: total };
+    const top = reset || changed ? heights.yAt(anchor) : scrollTopRef.current;
+    scrollTopRef.current = Math.min(Math.max(0, total - viewportHeight), Math.max(0, top));
+    setFirstRow(heights.rowAt(scrollTopRef.current));
+    if (heights.wrap) setBottomRow(heights.rowAt(scrollTopRef.current + viewportHeight));
     paintScrollPosition();
-  }, [contentHeight, viewportHeight, paintScrollPosition]);
+    if (changed) setLayoutVersion((value) => value + 1);
+  });
 
   // 滚轮与触控板（含 macOS 惯性滚动）。必须是非被动监听，才能阻止浏览器自己滚动。
   useEffect(() => {
@@ -321,10 +381,12 @@ export function DiffView(props: DiffViewProps) {
   const viewportRows = Math.max(1, Math.ceil(Math.max(viewportHeight, ROW_HEIGHT) / ROW_HEIGHT));
   const ahead = compact ? 0 : viewportRows * OVERSCAN_AHEAD_SCREENS;
   const behind = compact ? 0 : viewportRows * OVERSCAN_BEHIND_SCREENS;
-  const visibleFrom = Math.max(0, firstRow);
+  const visibleFrom = changedHeights ? heights.rowAt(renderTop) : Math.max(0, firstRow);
   // 视口底部可能没有对齐整行，必须额外多备 1 行防抖，
   // 保证 compact 期间即使停在半行也不会露出底部的“加载中的行”（Issue 09 审查意见 2）。
-  const visibleTo = Math.min(rowCount, visibleFrom + viewportRows + 1);
+  const visibleTo = Math.min(rowCount, softWrap
+    ? heights.rowAt(renderTop + viewportHeight) + 1
+    : visibleFrom + viewportRows + 1);
   const scrollingUp = scrollDirection.current < 0;
   const renderFrom = Math.max(0, visibleFrom - (scrollingUp ? ahead : behind));
   const renderTo = Math.min(rowCount, visibleTo + (scrollingUp ? behind : ahead));
@@ -354,8 +416,11 @@ export function DiffView(props: DiffViewProps) {
   useImperativeHandle(
     handleRef,
     () => ({
+      getFileAnchor() {
+        return unifiedFileAnchor((index) => rows.getRow(index), visibleFrom, visibleTo);
+      },
       scrollToRow(index: number) {
-        applyScroll(Math.max(0, index) * ROW_HEIGHT);
+        applyScroll(heightsRef.current.top(Math.max(0, index)));
       },
       async scrollToLine(line: number, targetVersion: FileVersion) {
         const index = await ipc.rowIndexForLine({
@@ -366,7 +431,7 @@ export function DiffView(props: DiffViewProps) {
           line,
           version: targetVersion,
         });
-        applyScroll(Math.max(0, index) * ROW_HEIGHT);
+        applyScroll(heightsRef.current.top(Math.max(0, index)));
       },
       getScrollTop() {
         return scrollTopRef.current;
@@ -402,8 +467,8 @@ export function DiffView(props: DiffViewProps) {
   return (
     <div
       ref={viewportRef}
-      className="diff-scroll relative h-full overflow-hidden bg-[var(--diff-bg)] font-mono outline-none"
-      style={{ fontSize, lineHeight: `${ROW_HEIGHT}px` }}
+      className={`diff-scroll relative h-full overflow-hidden bg-[var(--diff-bg)] font-mono outline-none${softWrap ? " diff-wrap" : ""}`}
+      style={{ fontSize, fontFamily: codeFontStack(fontFamily ?? null), lineHeight: `${ROW_HEIGHT}px` }}
       onKeyDown={onKeyDown}
       onScroll={onNativeScroll}
       tabIndex={0}
@@ -415,17 +480,24 @@ export function DiffView(props: DiffViewProps) {
           return row ? (
             <RowView
               key={index}
+              index={index}
               row={row}
-              top={index * ROW_HEIGHT}
+              top={heights.top(index)}
+              wrap={heights.wrap}
               view={view}
               highlights={highlights}
               highlightVersion={compact ? 0 : highlightSnapshot.version}
               plainTextOnly={compact}
               onHunkAction={onHunkAction}
               onHunkDiscard={onHunkDiscard}
+              onSegmentAction={props.onSegmentAction}
+              onSegmentDiscard={props.onSegmentDiscard}
+              segmentActionsEnabled={segmentActionsEnabled}
               onHunkFocus={revealHunk}
               hunkDisabled={isWriting || !!rowSnapshot.error || !row.hunkAction
                 || !matchesHunkAction(row.hunkAction, worktreeId, entry)}
+              segmentDisabled={segmentActionDisabled(row.segmentAction, worktreeId, entry,
+                !!isWriting || !!rowSnapshot.error || !segmentActionsEnabled)}
             />
           ) : null;
         })}
@@ -455,18 +527,27 @@ function thumbGeometry(
 }
 
 const RowView = memo(function RowView({
+  index,
   row,
   top,
+  wrap,
   view,
   highlights,
   plainTextOnly,
   onHunkAction,
   onHunkDiscard,
+  onSegmentAction,
+  onSegmentDiscard,
+  segmentActionsEnabled,
   onHunkFocus,
   hunkDisabled,
+  segmentDisabled,
 }: {
+  index: number;
   row: RenderRow;
   top: number;
+  /** 软换行：行高随内容，交给视图量（不能用 size containment）。 */
+  wrap: boolean;
   view: ViewMode;
   highlights: HighlightStore;
   /** 缓存对象保持不变时，让 memo 行在 token 到达后仍能补绘。 */
@@ -474,10 +555,14 @@ const RowView = memo(function RowView({
   plainTextOnly: boolean;
   onHunkAction?: (action: HunkAction) => void;
   onHunkDiscard?: (action: HunkAction, section: string) => void;
+  onSegmentAction?: (action: SegmentAction) => void;
+  onSegmentDiscard?: (action: SegmentAction) => void;
+  segmentActionsEnabled: boolean;
   onHunkFocus: (top: number) => void;
   hunkDisabled: boolean;
+  segmentDisabled: boolean;
 }) {
-  const style: React.CSSProperties = { top, contain: "strict" };
+  const style: React.CSSProperties = { top, contain: wrap ? "layout paint style" : "strict" };
 
   const getTokens = (version: FileVersion, line?: number | null) =>
     !plainTextOnly && line != null ? highlights.get(version, line) : undefined;
@@ -485,8 +570,17 @@ const RowView = memo(function RowView({
   if (row.kind === "hunk") {
     const action = row.hunkAction;
     const label = action?.changes === "staged" ? messages.changes.unstageHunk : messages.changes.stageHunk;
+    // 按段操作时 hunk 标题行只显示 @@ 信息（设计第 2 节）；
+    // “同时忽略空行”一档下段按钮不可用，标题行保留灰掉的整块入口并说明原因（Q140）。
+    if (segmentActionsEnabled) {
+      return (
+        <div className="row row-hunk" style={style} data-row={index} title={row.section ?? ""}>
+          <span className="hunk-section">{row.section ?? ""}</span>
+        </div>
+      );
+    }
     return (
-      <div className="row row-hunk" style={style} title={row.section ?? ""}>
+      <div className="row row-hunk" style={style} data-row={index} title={row.section ?? ""}>
         <span className="hunk-section">{row.section ?? ""}</span>
         {action && onHunkAction ? (
           <button
@@ -494,9 +588,11 @@ const RowView = memo(function RowView({
             className="hunk-action"
             disabled={hunkDisabled}
             aria-label={`${label}：${row.section ?? ""}`}
+            title={messages.diff.ignoreWhitespaceReadonly}
             onFocus={() => onHunkFocus(top)}
             onClick={() => onHunkAction(action)}
           >
+            <Codicon name={action.changes === "staged" ? "remove" : "add"} size={13} />
             {label}
           </button>
         ) : null}
@@ -504,6 +600,7 @@ const RowView = memo(function RowView({
           <button type="button" className="hunk-action" disabled={hunkDisabled}
             aria-label={`${messages.changes.discardHunk}：${row.section ?? ""}`}
             onFocus={() => onHunkFocus(top)} onClick={() => onHunkDiscard(action, row.section ?? "")}>
+            <Codicon name="discard" size={13} />
             {messages.changes.discardHunk}
           </button>
         ) : null}
@@ -514,11 +611,44 @@ const RowView = memo(function RowView({
   if (view === "unified") {
     const version: FileVersion = row.lineKind === "addition" ? "new" : "old";
     const line = row.lineKind === "addition" ? row.newLine : row.oldLine;
-    const tone = toneOf(row.lineKind, row.modified);
+    const tone = toneOf(row.lineKind);
+    const segmentAction = row.segmentAction;
+    const segmentLabel =
+      segmentAction?.changes === "staged" ? messages.changes.unstageSegment : messages.changes.stageSegment;
     return (
-      <div className="row row-unified" style={style}>
-        <span className={gutterClass(tone)}>{row.oldLine ?? ""}</span>
-        <span className={gutterClass(tone)}>{row.newLine ?? ""}</span>
+      <div className="row row-unified" style={style} data-row={index}>
+        <span className={gutterClass(tone)}>
+          {segmentAction && onSegmentAction ? (
+            <button
+              type="button"
+              className="segment-action"
+              title={segmentLabel}
+              aria-label={messages.changes.segmentAt(segmentLabel, row.oldLine ?? row.newLine ?? 0)}
+              disabled={segmentDisabled}
+              onFocus={() => onHunkFocus(top)}
+              onClick={() => onSegmentAction(segmentAction)}
+            >
+              <Codicon name={segmentAction.changes === "staged" ? "chevron-right" : "chevron-left"} size={11} />
+            </button>
+          ) : null}
+          {row.oldLine ?? ""}
+        </span>
+        <span className={gutterClass(tone)}>
+          {segmentAction && onSegmentDiscard && segmentAction.changes === "unstaged" ? (
+            <button
+              type="button"
+              className="segment-action"
+              title={messages.changes.discardSegment}
+              aria-label={messages.changes.segmentAt(messages.changes.discardSegment, row.oldLine ?? row.newLine ?? 0)}
+              disabled={segmentDisabled}
+              onFocus={() => onHunkFocus(top)}
+              onClick={() => onSegmentDiscard(segmentAction)}
+            >
+              <Codicon name="discard" size={11} />
+            </button>
+          ) : null}
+          {row.newLine ?? ""}
+        </span>
         <Cell
           text={row.text ?? ""}
           tone={tone}
@@ -531,10 +661,10 @@ const RowView = memo(function RowView({
     );
   }
 
-  const leftTone = toneOf(row.left?.kind, row.modified);
-  const rightTone = toneOf(row.right?.kind, row.modified);
+  const leftTone = toneOf(row.left?.kind);
+  const rightTone = toneOf(row.right?.kind);
   return (
-    <div className="row row-split" style={style}>
+    <div className="row row-split" style={style} data-row={index}>
       <span className={row.left ? gutterClass(leftTone) : "gutter gutter-none"}>{row.left?.line ?? ""}</span>
       <SplitCell
         cell={row.left}
@@ -542,7 +672,7 @@ const RowView = memo(function RowView({
         highlights={highlights}
         tokens={getTokens("old", row.left?.line)}
       />
-      <span className={`mid${leftTone || rightTone ? ` mid-${row.modified ? "mod" : (rightTone ?? leftTone)}` : ""}`} />
+      <span className={`mid${rightTone ? ` mid-${rightTone}` : leftTone ? ` mid-${leftTone}` : ""}`} />
       <span className={row.right ? gutterClass(rightTone) : "gutter gutter-none"}>{row.right?.line ?? ""}</span>
       <SplitCell
         cell={row.right}
@@ -557,9 +687,10 @@ const RowView = memo(function RowView({
 /** 行的着色：修改块蓝、纯新增绿、纯删除灰（JetBrains diff 配色，Q107）。 */
 type LineTone = "mod" | "ins" | "del" | null;
 
-function toneOf(kind: RenderRow["lineKind"] | RowCell["kind"] | undefined, modified: boolean): LineTone {
-  if (kind === "addition") return modified ? "mod" : "ins";
-  if (kind === "deletion") return modified ? "mod" : "del";
+function toneOf(kind: RenderRow["lineKind"] | RowCell["kind"] | undefined): LineTone {
+  // VS Code 的 diff 只有“新增 / 删除”两种底色：修改行在并排视图里也是左删右增。
+  if (kind === "addition") return "ins";
+  if (kind === "deletion") return "del";
   return null;
 }
 

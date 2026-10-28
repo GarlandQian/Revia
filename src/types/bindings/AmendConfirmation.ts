@@ -7,23 +7,23 @@
  * 期间刷新出新 index、切换 worktree、修改输入或选项，任何一项变化都让旧凭据失效，
  * 后端在写前逐项比对，不会拿旧确认去改一份新的提交内容。
  */
-export type AmendConfirmation = {
+export type AmendConfirmation = { 
 /**
  * 上游读数版本（HEAD + 分支 + 上游名 + 上游对象名）。
  */
-upstreamVersion: string,
+upstreamVersion: string, 
 /**
  * 用户确认时看到的提交预期指纹。
  */
-expectationFingerprint: string,
+expectationFingerprint: string, 
 /**
  * 用户确认时的提交信息原文（逐字比较，不用哈希以免前端另算一份）。
  */
-message: string,
+message: string, 
 /**
  * 确认时的 amend 选项。
  */
-amend: boolean,
+amend: boolean, 
 /**
  * 确认时的跳过 hooks 选项。
  */

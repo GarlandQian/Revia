@@ -3,11 +3,10 @@ import { App } from "./App";
 import { ErrorBoundary } from "./components/app/ErrorBoundary";
 import { reportCritical } from "./features/diff/log";
 import { getErrorMessage } from "./lib/error";
-// Inter 与 JetBrains Mono 随应用打包（Q107）：只带拉丁子集，中文回退到系统字体。
-import "@fontsource/inter/latin-400.css";
-import "@fontsource/inter/latin-500.css";
-import "@fontsource/inter/latin-600.css";
+// 界面字体用系统字体（Q131）；代码字体默认随应用打包的 JetBrains Mono（Q133）。
 import "@fontsource/jetbrains-mono/latin-400.css";
+// 界面图标用 Codicons（Q130）：字体与图标类由 npm 包提供。
+import "@vscode/codicons/dist/codicon.css";
 import "./index.css";
 
 // 渲染异常与未处理的 Promise 都记进后端日志（只在测量会话里真正写入）。

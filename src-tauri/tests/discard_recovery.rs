@@ -2665,6 +2665,7 @@ fn prepare_task05_desktop_fixture() {
                 RecoverySource::DiscardFile => "discardFile",
                 RecoverySource::DiscardHunk => "discardHunk",
                 RecoverySource::CommitSnapshot => "commitSnapshot",
+                RecoverySource::MergeApply => "mergeApply",
             },
             "createdAtMs": record.created_at_ms,
             "paths": summary.paths,

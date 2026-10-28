@@ -16,6 +16,7 @@ import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { RenderRow } from "@/types/bindings/RenderRow";
 import type { ViewMode } from "@/types/bindings/ViewMode";
+import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 
 export const CHUNK_ROWS = 500;
 
@@ -40,6 +41,8 @@ export interface RowWindowTarget {
   path: string;
   changes: ChangesKind;
   view: ViewMode;
+  /** 忽略空白档位（Q140）；统一视图也按同一档位取行。 */
+  ignoreWhitespace?: IgnoreWhitespace;
   fingerprint: string;
   snapshotRevision: string;
 }
@@ -57,11 +60,12 @@ export interface RowWindowSnapshot {
 type FetchRows = (request: RowWindowTarget & {
   from: number;
   to: number;
-}) => Promise<{ rows: RenderRow[]; rowCount: number; revision: number; entry: ChangeEntry }>;
+}) => Promise<{ rows: RenderRow[]; rowCount: number; navigationRows: number[]; revision: number; entry: ChangeEntry }>;
 
 export class RowWindowStore {
   private target: RowWindowTarget | null = null;
   private rowCount = 0;
+  private navigationRows: readonly number[] | null = null;
   private chunks = new Map<number, RenderRow[]>();
   private pending = new Map<number, number>();
   /** 整块到达前单独取到的可见行（行下标 → 行）。 */
@@ -100,13 +104,18 @@ export class RowWindowStore {
 
   getSnapshot = (): RowWindowSnapshot => this.snapshot;
 
+  /** null 表示尚未取得当前目标的导航元数据；空数组表示确知没有可见改动。 */
+  getNavigationRows = (): readonly number[] | null => this.navigationRows;
+
   /** 切换文件 / 视图；行数与元数据随第一次取块的结果校正。 */
   setTarget(target: RowWindowTarget, rowCount: number, entry: ChangeEntry | null): void {
     const same = this.isCurrent(target);
-    if (same && (this.stale || this.rowCount === rowCount)) return;
+    // 已取行时以后端过滤后行数为准，重复绑定原始列表不能重置已校正的排版。
+    if (same && (this.stale || this.navigationRows !== null || this.rowCount === rowCount)) return;
     this.epoch += 1;
     this.target = { ...target };
     this.rowCount = rowCount;
+    this.navigationRows = null;
     this.chunks.clear();
     this.pending.clear();
     this.looseRows.clear();
@@ -126,6 +135,7 @@ export class RowWindowStore {
       this.target.path === target.path &&
       this.target.changes === target.changes &&
       this.target.view === target.view &&
+      (this.target.ignoreWhitespace ?? "off") === (target.ignoreWhitespace ?? "off") &&
       this.target.fingerprint === target.fingerprint &&
       this.target.snapshotRevision === target.snapshotRevision
     );
@@ -133,6 +143,11 @@ export class RowWindowStore {
 
   get rowCountValue(): number {
     return this.rowCount;
+  }
+
+  /** 目标代际：换文件、视图、档位或快照时递增（软换行据此丢掉量过的行高）。 */
+  get epochValue(): number {
+    return this.epoch;
   }
 
   getRow(index: number): RenderRow | null {
@@ -251,6 +266,7 @@ export class RowWindowStore {
         if (!this.chunks.has(Math.floor(index / CHUNK_ROWS))) this.looseRows.set(index, row);
       });
       if (slice.rowCount !== this.rowCount) this.rowCount = slice.rowCount;
+      this.navigationRows ??= slice.navigationRows;
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
@@ -290,6 +306,8 @@ export class RowWindowStore {
       if (slice.rowCount !== this.rowCount) {
         this.rowCount = slice.rowCount;
       }
+      // 同一目标的分页共享完整导航；保留首次引用，避免仅加载新行就重绘顶层。
+      this.navigationRows ??= slice.navigationRows;
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
@@ -322,6 +340,7 @@ export class RowWindowStore {
     this.looseRows.clear();
     this.sliceInFlight = false;
     this.entry = null;
+    this.navigationRows = null;
     this.publish(messages.changes.fileChanged);
   }
 

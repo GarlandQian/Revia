@@ -10,6 +10,9 @@ import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { AmendConfirmation } from "@/types/bindings/AmendConfirmation";
+import type { BatchOutcome } from "@/types/bindings/BatchOutcome";
+import type { BatchTarget } from "@/types/bindings/BatchTarget";
+import type { WorktreeStatusEntry } from "@/types/bindings/WorktreeStatusEntry";
 import type { CommitContext } from "@/types/bindings/CommitContext";
 import type { CommitDraft } from "@/types/bindings/CommitDraft";
 import type { CommitOutcome } from "@/types/bindings/CommitOutcome";
@@ -24,6 +27,9 @@ import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
 import type { RowSlice } from "@/types/bindings/RowSlice";
+import type { SideBySideLayout } from "@/types/bindings/SideBySideLayout";
+import type { SideLine } from "@/types/bindings/SideLine";
+import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
 
@@ -69,6 +75,14 @@ export interface WatchSnapshotPayload {
   eventSequence: number;
 }
 
+/** 成功通知按类别开关（E.6）；失败与结果待核对始终弹出。 */
+export interface NotifyKinds {
+  stage: boolean;
+  discard: boolean;
+  commit: boolean;
+  recovery: boolean;
+}
+
 /** 与 Rust 侧 `Settings` 对应。 */
 /** 长测诊断只重复的一类操作（M2 任务 01 内存定位）。 */
 export type SoakFocus = "idle" | "ipc" | "highlight" | "channel" | "open" | "remount" | "switch" | "scroll" | "jump"
@@ -78,6 +92,66 @@ export interface SettingsPayload {
   repos: string[];
   lastWorktreeId: string | null;
   diffFontSize: number;
+  themeLight: string;
+  themeDark: string;
+  codeFontFamily: string | null;
+  gitPath: string | null;
+  mergeTool: string | null;
+  sidebarWidth: number;
+  viewMode: "split" | "unified";
+  uiZoom: number;
+  treeGroupByDirectory: boolean;
+  diffContextLines: number;
+  diffFoldUnchanged: boolean;
+  diffSyncScroll: boolean;
+  diffHighlight: "word" | "line" | "char" | "none";
+  diffShowWhitespace: boolean;
+  diffSoftWrap: boolean;
+  diffJumpToNextFile: boolean;
+  diffIgnoreWhitespace: number;
+  commitSubjectLimit: number;
+  commitBlankLineRequired: boolean;
+  commitBodyLineLimit: number;
+  commitShowRuler: boolean;
+  commitWarnCrlf: boolean;
+  commitWarnDetached: boolean;
+  commitWarnLargeFileBytes: number;
+  commitWarnInvalidFilename: boolean;
+  /** 各类成功结果是否弹出通知（E.6）。 */
+  notify: NotifyKinds;
+  mergeAutoApply: boolean;
+}
+
+/** 与 Rust 侧 `SettingsPatch` 对应：只传要改的字段。 */
+export interface SettingsPatchPayload {
+  themeLight?: string;
+  themeDark?: string;
+  codeFontFamily?: string;
+  diffFontSize?: number;
+  gitPath?: string;
+  mergeTool?: string;
+  sidebarWidth?: number;
+  viewMode?: "split" | "unified";
+  uiZoom?: number;
+  treeGroupByDirectory?: boolean;
+  diffContextLines?: number;
+  diffFoldUnchanged?: boolean;
+  diffSyncScroll?: boolean;
+  diffHighlight?: "word" | "line" | "char" | "none";
+  diffShowWhitespace?: boolean;
+  diffSoftWrap?: boolean;
+  diffJumpToNextFile?: boolean;
+  diffIgnoreWhitespace?: number;
+  commitSubjectLimit?: number;
+  commitBlankLineRequired?: boolean;
+  commitBodyLineLimit?: number;
+  commitShowRuler?: boolean;
+  commitWarnCrlf?: boolean;
+  commitWarnDetached?: boolean;
+  commitWarnLargeFileBytes?: number;
+  commitWarnInvalidFilename?: boolean;
+  notify?: NotifyKinds;
+  mergeAutoApply?: boolean;
 }
 
 export interface CommandRecordPayload {
@@ -127,6 +201,10 @@ export const ipc = {
       request: { repoId, worktreeId: worktreeId ?? null },
     }),
   setDiffFontSize: (size: number) => invoke<SettingsPayload>("set_diff_font_size", { size }),
+  updateSettings: (request: SettingsPatchPayload) => invoke<SettingsPayload>("update_settings", { request }),
+  reloadEnvironment: () => invoke<void>("reload_environment"),
+  listWorktreeStatus: (repoId: string) =>
+    invoke<WorktreeStatusEntry[]>("list_worktree_status", { request: { repoId } }),
   openWorktree: (worktreeId: string) =>
     invoke<WorktreeSessionInfo>("open_worktree", { request: { worktreeId } }),
   watchWorktree: (worktreeId: string, activation: number) =>
@@ -149,9 +227,61 @@ export const ipc = {
     path: string;
     changes: ChangesKind;
     view: ViewMode;
+    /** 忽略空白档位（Q140）。 */
+    ignoreWhitespace?: IgnoreWhitespace;
     from: number;
     to: number;
   }) => invoke<RowSlice>("get_rows", { request }),
+  /** 左右对照布局（返修 A1/Q138）：段、折叠区、两侧行数与段操作目标。 */
+  sideBySideLayout: (request: {
+    worktreeId: string;
+    path: string;
+    changes: ChangesKind;
+    ignoreWhitespace: IgnoreWhitespace;
+    contextLines: number;
+    highlight: "word" | "line" | "char" | "none";
+  }) => invoke<SideBySideLayout>("side_by_side_layout", { request }),
+  /** 左右对照取行（返修 A1/Q138）。 */
+  sideLines: (request: {
+    worktreeId: string;
+    path: string;
+    changes: ChangesKind;
+    ignoreWhitespace: IgnoreWhitespace;
+    contextLines: number;
+    highlight: "word" | "line" | "char" | "none";
+    version: FileVersion;
+    from: number;
+    to: number;
+  }) => invoke<SideLine[]>("side_lines", { request }),
+  /** 按段（块）暂存、取消暂存、丢弃（返修 A1/Q142）。 */
+  stageSegment: (request: {
+    worktreeId: string;
+    path: string;
+    /** `SegmentAction.credential` 原样传回。 */
+    credential: string;
+    hunkIndex: number;
+    segmentIndex: number;
+    ignoreWhitespace: IgnoreWhitespace;
+  }) => invoke<ChangesSnapshot>("stage_segment", { request }),
+  unstageSegment: (request: {
+    worktreeId: string;
+    path: string;
+    /** `SegmentAction.credential` 原样传回。 */
+    credential: string;
+    hunkIndex: number;
+    segmentIndex: number;
+    ignoreWhitespace: IgnoreWhitespace;
+  }) => invoke<ChangesSnapshot>("unstage_segment", { request }),
+  discardSegment: (request: {
+    worktreeId: string;
+    path: string;
+    /** `SegmentAction.credential` 原样传回。 */
+    credential: string;
+    snapshotRevision: string;
+    hunkIndex: number;
+    segmentIndex: number;
+    ignoreWhitespace: IgnoreWhitespace;
+  }) => invoke<ChangesSnapshot>("discard_segment", { request }),
   highlightRange: (request: {
     worktreeId: string;
     path: string;
@@ -167,6 +297,9 @@ export const ipc = {
     view: ViewMode;
     line: number;
     version: FileVersion;
+    ignoreWhitespace?: IgnoreWhitespace;
+    expectedFingerprint?: string;
+    expectedSnapshotRevision?: string;
   }) => invoke<number>("row_index_for_line", { request }),
   syntaxCategories: () => invoke<string[]>("syntax_categories"),
   commandLog: () => invoke<CommandRecordPayload[]>("command_log_snapshot"),
@@ -217,6 +350,12 @@ export const ipc = {
     invoke<ChangesSnapshot>("discard_file", { request }),
   discardHunk: (request: { worktreeId: string; path: string; fingerprint: string; snapshotRevision: string; hunkId: string }) =>
     invoke<ChangesSnapshot>("discard_hunk", { request }),
+  stageFiles: (request: { worktreeId: string; targets: BatchTarget[] }) =>
+    invoke<BatchOutcome>("stage_files", { request }),
+  unstageFiles: (request: { worktreeId: string; targets: BatchTarget[] }) =>
+    invoke<BatchOutcome>("unstage_files", { request }),
+  discardFiles: (request: { worktreeId: string; targets: BatchTarget[]; snapshotRevision: string }) =>
+    invoke<BatchOutcome>("discard_files", { request }),
   listRecovery: (worktreeId: string | null) => invoke<RecoverySummary[]>("list_recovery", { worktreeId }),
   inspectRecovery: (worktreeId: string, recordId: string) =>
     invoke<RecoveryInspection>("inspect_recovery", { request: { worktreeId, recordId } }),
@@ -258,6 +397,38 @@ export const ipc = {
   /** 清除该 worktree 的持久草稿（用户明确丢弃输入时）。 */
   clearCommitDraft: (worktreeId: string) =>
     invoke<void>("clear_commit_draft", { request: { worktreeId } }),
+  /** 未解决冲突的文件与两侧状态（冲突对话框）。 */
+  listConflicts: (worktreeId: string) =>
+    invoke<import("@/types/bindings/ConflictFile").ConflictFile[]>("list_conflicts", {
+      request: { worktreeId },
+    }),
+  /** 合并页签的数据（Q143）：三个版本、按块分好的改动与初始结果。 */
+  mergeOpen: (request: { worktreeId: string; path: string; autoApply?: boolean | null }) =>
+    invoke<import("@/types/bindings/MergeLayout").MergeLayout>("merge_open", { request }),
+  /** “应用”：写前校验、存回收区、写工作区、git add、写后核对。 */
+  mergeApply: (request: { worktreeId: string; path: string; result: string; fingerprint: string }) =>
+    invoke<import("@/types/bindings/MergeOutcome").MergeOutcome>("merge_apply", { request }),
+  /** 整文件接受一侧（可多选）：每个文件带冲突列表或合并页签签发的指纹。 */
+  mergeAcceptSide: (request: {
+    worktreeId: string;
+    targets: Array<{ path: string; fingerprint: string }>;
+    side: "ours" | "theirs";
+  }) => invoke<import("@/types/bindings/MergeOutcome").MergeOutcome[]>("merge_accept_side", { request }),
+  /** 合并页签按内容取高亮（0 基、左闭右开的行范围）。 */
+  highlightText: (request: {
+    worktreeId: string;
+    documentId: string;
+    generation: number;
+    language: string;
+    fromLine: number;
+    toLine: number;
+    content?: string;
+  }) => invoke<HighlightRangeResult>("highlight_text", { request }),
+  /** 提交时警告（返修 E.3，Q139）：检查由 Rust 层完成。 */
+  commitWarnings: (worktreeId: string) =>
+    invoke<import("@/types/bindings/CommitWarning").CommitWarning[]>("commit_warnings", {
+      request: { worktreeId },
+    }),
   /**
    * 执行提交。只传登记 worktree ID、信息、amend/skip 与用户所见预期；
    * 不传任何 Git 参数。实时输出走 `revia://commit-output` 事件。

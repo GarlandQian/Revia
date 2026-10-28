@@ -1,9 +1,17 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="one-light" data-kind="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Revia</title>
+    <!-- 首帧前按系统深浅色选默认主题，避免闪一下另一套外观；设置加载后由应用覆盖。 -->
+    <script>
+      (() => {
+        const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "one-dark-pro" : "one-light";
+        document.documentElement.dataset.kind = dark ? "dark" : "light";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

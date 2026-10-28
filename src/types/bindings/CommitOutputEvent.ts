@@ -3,15 +3,15 @@
 /**
  * 提交执行期间的实时输出事件负载（事件名 `revia://commit-output`）。
  */
-export type CommitOutputEvent = {
+export type CommitOutputEvent = { 
 /**
  * 本次提交操作 ID。
  */
-operationId: string,
+operationId: string, 
 /**
  * 前端发起时提供的 nonce：只有当前这次请求能认领这些事件。
  */
-clientNonce: string, worktreeId: string, line: string,
+clientNonce: string, worktreeId: string, line: string, 
 /**
  * 该行来自 stderr（前端可据此着色，不改变顺序）。
  */

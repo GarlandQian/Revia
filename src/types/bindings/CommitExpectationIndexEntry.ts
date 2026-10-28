@@ -10,32 +10,32 @@
  * - intent-to-add（`git add -N`）：index 里只有占位条目，不会被写进提交，
  *   因此不算「有暂存内容」。
  */
-export type CommitExpectationIndexEntry = { path: string, originalPath: string | null,
+export type CommitExpectationIndexEntry = { path: string, originalPath: string | null, 
 /**
  * 六位八进制模式，例如 `100644`、`100755`、`120000`、`160000`；
  * 暂存删除为 `000000`（表示 index 中缺席，不是真实条目）。
  */
-mode: string,
+mode: string, 
 /**
  * 暂存区对象 ID；unmerged（stage ≠ 0）与暂存删除为 None。
  */
-oid: string | null,
+oid: string | null, 
 /**
  * porcelain v2 的状态字母（A/M/D/R/T/U…）；本次提交不改变该条目时为 `F`。
  */
-status: string,
+status: string, 
 /**
  * 未解决冲突（unmerged）条目。
  */
-unmerged: boolean,
+unmerged: boolean, 
 /**
  * 暂存删除（index 中已无该路径）。
  */
-deleted: boolean,
+deleted: boolean, 
 /**
  * intent-to-add 占位条目：不会被写进提交，也不算已暂存内容。
  */
-intentToAdd: boolean,
+intentToAdd: boolean, 
 /**
  * 暂存删除时被删除的 HEAD 对象（仅参与指纹，不代表 index 内容）。
  */

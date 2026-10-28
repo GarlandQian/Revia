@@ -19,8 +19,112 @@ pub struct Settings {
     pub repos: Vec<String>,
     /// 上次打开的 worktree ID。
     pub last_worktree_id: Option<String>,
-    /// diff 字号（⌘+ / ⌘-，Q39）。
+    /// diff / 代码字号（⌘+ / ⌘-，Q39、Q133）。
     pub diff_font_size: u32,
+    /// 浅色颜色主题（Q132）。
+    pub theme_light: String,
+    /// 深色颜色主题（Q132）。
+    pub theme_dark: String,
+    /// 代码字体名称；None 表示使用随应用打包的 JetBrains Mono（Q133）。
+    pub code_font_family: Option<String>,
+    /// 手动指定的 Git 程序路径；None 表示使用登录 shell `PATH` 中的 git（Q27）。
+    pub git_path: Option<String>,
+    /// 外部合并工具命令（M6 使用；现在只保存，不改用户的 Git 配置，Q28）。
+    pub merge_tool: Option<String>,
+    /// 提交工具窗口宽度（像素，Q139：可拖动分隔条）。
+    pub sidebar_width: u32,
+    /// 并排 / 统一视图（Q17：选择会被记住；返修 C12：不再用 localStorage）。
+    pub view_mode: ViewModeSetting,
+    /// 界面缩放百分比（Q139，80–150，100 表示不缩放）。
+    pub ui_zoom: u32,
+    /// 改动树是否按目录分组（Q139；false 是平铺）。
+    pub tree_group_by_directory: bool,
+    /// diff 上下文行数（Q139，Git `-U<n>`）。
+    pub diff_context_lines: u32,
+    /// 是否折叠未改动部分（Q139）。
+    pub diff_fold_unchanged: bool,
+    /// 同步滚动（Q139）。
+    pub diff_sync_scroll: bool,
+    /// 差异高亮方式（Q139，默认按词）。
+    pub diff_highlight: DiffHighlightSetting,
+    /// 显示空白字符（Q139）。
+    pub diff_show_whitespace: bool,
+    /// 软换行（Q139）。
+    pub diff_soft_wrap: bool,
+    /// 最后一处改动后跳到下一个文件（Q139）。
+    pub diff_jump_to_next_file: bool,
+    /// 忽略空白档位（Q140：0 关闭，1 行尾，2 全部，3 全部加空行；空行档位只读）。
+    pub diff_ignore_whitespace: u32,
+    /// 提交信息检查：首行长度上限（0 表示不检查）。
+    pub commit_subject_limit: u32,
+    /// 提交信息检查：首行与正文之间要求空行。
+    pub commit_blank_line_required: bool,
+    /// 提交信息检查：正文每行长度上限（0 表示不检查）。
+    pub commit_body_line_limit: u32,
+    /// 提交信息检查：显示右边界线。
+    pub commit_show_ruler: bool,
+    /// 提交时警告：CRLF 换行。
+    pub commit_warn_crlf: bool,
+    /// 提交时警告：游离 HEAD 或 rebase 进行中。
+    pub commit_warn_detached: bool,
+    /// 提交时警告：大文件阈值（字节，0 表示不警告）。
+    pub commit_warn_large_file_bytes: u64,
+    /// 提交时警告：在其他系统上不合法的文件名。
+    pub commit_warn_invalid_filename: bool,
+    /// 各类成功通知是否弹出（E.6；失败与结果待核对始终弹出）。
+    pub notify: NotifyKinds,
+    /// 合并时自动应用无冲突改动（Q143；关闭后初始结果用共同祖先）。
+    pub merge_auto_apply: bool,
+}
+
+/// 各类成功结果是否弹出通知（E.6）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct NotifyKinds {
+    /// 暂存、取消暂存。
+    pub stage: bool,
+    /// 丢弃。
+    pub discard: bool,
+    /// 提交。
+    pub commit: bool,
+    /// 回收区：恢复、另存、清理。
+    pub recovery: bool,
+}
+
+impl Default for NotifyKinds {
+    fn default() -> Self {
+        Self { stage: true, discard: true, commit: true, recovery: true }
+    }
+}
+
+/// 并排 / 统一视图（Q17）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ViewModeSetting {
+    Split,
+    Unified,
+}
+
+impl Default for ViewModeSetting {
+    fn default() -> Self {
+        Self::Split
+    }
+}
+
+/// 差异高亮方式（Q139）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DiffHighlightSetting {
+    Word,
+    Line,
+    Char,
+    None,
+}
+
+impl Default for DiffHighlightSetting {
+    fn default() -> Self {
+        Self::Word
+    }
 }
 
 impl Default for Settings {
@@ -29,8 +133,75 @@ impl Default for Settings {
             repos: Vec::new(),
             last_worktree_id: None,
             diff_font_size: 12,
+            theme_light: DEFAULT_LIGHT_THEME.into(),
+            theme_dark: DEFAULT_DARK_THEME.into(),
+            code_font_family: None,
+            git_path: None,
+            merge_tool: None,
+            sidebar_width: 330,
+            view_mode: ViewModeSetting::Split,
+            ui_zoom: 100,
+            tree_group_by_directory: false,
+            diff_context_lines: 3,
+            diff_fold_unchanged: false,
+            diff_sync_scroll: true,
+            diff_highlight: DiffHighlightSetting::Word,
+            diff_show_whitespace: false,
+            diff_soft_wrap: false,
+            diff_jump_to_next_file: true,
+            diff_ignore_whitespace: 0,
+            commit_subject_limit: 72,
+            commit_blank_line_required: false,
+            commit_body_line_limit: 0,
+            commit_show_ruler: false,
+            commit_warn_crlf: true,
+            commit_warn_detached: true,
+            commit_warn_large_file_bytes: 50 * 1024 * 1024,
+            commit_warn_invalid_filename: true,
+            notify: NotifyKinds::default(),
+            merge_auto_apply: true,
         }
     }
+}
+
+/// 随应用打包的四套颜色主题（Q132）。
+pub const LIGHT_THEMES: &[&str] = &["light-2026", "one-light"];
+pub const DARK_THEMES: &[&str] = &["dark-2026", "one-dark-pro"];
+pub const DEFAULT_LIGHT_THEME: &str = "one-light";
+pub const DEFAULT_DARK_THEME: &str = "one-dark-pro";
+
+/// 设置修改请求：只传要改的字段，其余保持不变。
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SettingsPatch {
+    pub theme_light: Option<String>,
+    pub theme_dark: Option<String>,
+    pub code_font_family: Option<String>,
+    pub diff_font_size: Option<u32>,
+    pub git_path: Option<String>,
+    pub merge_tool: Option<String>,
+    pub sidebar_width: Option<u32>,
+    pub view_mode: Option<ViewModeSetting>,
+    pub ui_zoom: Option<u32>,
+    pub tree_group_by_directory: Option<bool>,
+    pub diff_context_lines: Option<u32>,
+    pub diff_fold_unchanged: Option<bool>,
+    pub diff_sync_scroll: Option<bool>,
+    pub diff_highlight: Option<DiffHighlightSetting>,
+    pub diff_show_whitespace: Option<bool>,
+    pub diff_soft_wrap: Option<bool>,
+    pub diff_jump_to_next_file: Option<bool>,
+    pub diff_ignore_whitespace: Option<u32>,
+    pub commit_subject_limit: Option<u32>,
+    pub commit_blank_line_required: Option<bool>,
+    pub commit_body_line_limit: Option<u32>,
+    pub commit_show_ruler: Option<bool>,
+    pub commit_warn_crlf: Option<bool>,
+    pub commit_warn_detached: Option<bool>,
+    pub commit_warn_large_file_bytes: Option<u64>,
+    pub commit_warn_invalid_filename: Option<bool>,
+    pub notify: Option<NotifyKinds>,
+    pub merge_auto_apply: Option<bool>,
 }
 
 pub struct Registry {
@@ -168,6 +339,115 @@ impl Registry {
         Ok(self.settings.clone())
     }
 
+    /// 应用一次设置修改；取值不合法时拒绝并保留原设置。
+    pub fn update_settings(&mut self, patch: &SettingsPatch) -> Result<Settings> {
+        let mut next = self.settings.clone();
+        if let Some(theme) = &patch.theme_light {
+            if !LIGHT_THEMES.contains(&theme.as_str()) {
+                return Err(AppError::rejected(format!("未知的浅色颜色主题：{theme}")));
+            }
+            next.theme_light = theme.clone();
+        }
+        if let Some(theme) = &patch.theme_dark {
+            if !DARK_THEMES.contains(&theme.as_str()) {
+                return Err(AppError::rejected(format!("未知的深色颜色主题：{theme}")));
+            }
+            next.theme_dark = theme.clone();
+        }
+        if let Some(font) = &patch.code_font_family {
+            let trimmed = font.trim();
+            next.code_font_family = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+        }
+        if let Some(size) = patch.diff_font_size {
+            next.diff_font_size = size.clamp(9, 24);
+        }
+        if let Some(path) = &patch.git_path {
+            let trimmed = path.trim();
+            if trimmed.is_empty() {
+                next.git_path = None;
+            } else {
+                let candidate = Path::new(trimmed);
+                if !candidate.is_file() {
+                    return Err(AppError::rejected(format!("Git 程序路径不是可执行文件：{trimmed}")));
+                }
+                next.git_path = Some(trimmed.to_string());
+            }
+        }
+        if let Some(tool) = &patch.merge_tool {
+            let trimmed = tool.trim();
+            next.merge_tool = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+        }
+        if let Some(width) = patch.sidebar_width {
+            next.sidebar_width = width.clamp(220, 720);
+        }
+        if let Some(mode) = patch.view_mode {
+            next.view_mode = mode;
+        }
+        if let Some(zoom) = patch.ui_zoom {
+            next.ui_zoom = zoom.clamp(80, 150);
+        }
+        if let Some(value) = patch.tree_group_by_directory {
+            next.tree_group_by_directory = value;
+        }
+        if let Some(value) = patch.diff_context_lines {
+            next.diff_context_lines = value.clamp(0, 64);
+        }
+        if let Some(value) = patch.diff_fold_unchanged {
+            next.diff_fold_unchanged = value;
+        }
+        if let Some(value) = patch.diff_sync_scroll {
+            next.diff_sync_scroll = value;
+        }
+        if let Some(value) = patch.diff_highlight {
+            next.diff_highlight = value;
+        }
+        if let Some(value) = patch.diff_show_whitespace {
+            next.diff_show_whitespace = value;
+        }
+        if let Some(value) = patch.diff_soft_wrap {
+            next.diff_soft_wrap = value;
+        }
+        if let Some(value) = patch.diff_jump_to_next_file {
+            next.diff_jump_to_next_file = value;
+        }
+        if let Some(value) = patch.diff_ignore_whitespace {
+            next.diff_ignore_whitespace = value.clamp(0, 3);
+        }
+        if let Some(value) = patch.commit_subject_limit {
+            next.commit_subject_limit = value.clamp(0, 200);
+        }
+        if let Some(value) = patch.commit_blank_line_required {
+            next.commit_blank_line_required = value;
+        }
+        if let Some(value) = patch.commit_body_line_limit {
+            next.commit_body_line_limit = value.clamp(0, 200);
+        }
+        if let Some(value) = patch.commit_show_ruler {
+            next.commit_show_ruler = value;
+        }
+        if let Some(value) = patch.commit_warn_crlf {
+            next.commit_warn_crlf = value;
+        }
+        if let Some(value) = patch.commit_warn_detached {
+            next.commit_warn_detached = value;
+        }
+        if let Some(value) = patch.commit_warn_large_file_bytes {
+            next.commit_warn_large_file_bytes = value;
+        }
+        if let Some(value) = patch.commit_warn_invalid_filename {
+            next.commit_warn_invalid_filename = value;
+        }
+        if let Some(value) = patch.notify {
+            next.notify = value;
+        }
+        if let Some(value) = patch.merge_auto_apply {
+            next.merge_auto_apply = value;
+        }
+        self.settings = next;
+        self.persist()?;
+        Ok(self.settings.clone())
+    }
+
     fn persist(&self) -> Result<()> {
         write_settings(&self.directory, &self.settings)
     }
@@ -202,12 +482,68 @@ mod tests {
             repos: vec!["/tmp/example".into()],
             last_worktree_id: Some("abc".into()),
             diff_font_size: 13,
+            theme_light: "light-2026".into(),
+            theme_dark: "dark-2026".into(),
+            code_font_family: Some("Fira Code".into()),
+            git_path: None,
+            merge_tool: Some("code".into()),
+            sidebar_width: 420,
+            tree_group_by_directory: true,
+            diff_context_lines: 5,
+            diff_ignore_whitespace: 2,
+            commit_subject_limit: 60,
+            commit_warn_large_file_bytes: 1024,
+            notify: NotifyKinds { discard: false, ..NotifyKinds::default() },
+            ..Settings::default()
         };
         write_settings(dir.path(), &settings).unwrap();
         let read = read_settings(dir.path()).unwrap();
         assert_eq!(read.repos, settings.repos);
         assert_eq!(read.last_worktree_id.as_deref(), Some("abc"));
         assert_eq!(read.diff_font_size, 13);
+        assert_eq!(read.theme_light, "light-2026");
+        assert_eq!(read.theme_dark, "dark-2026");
+        assert_eq!(read.code_font_family.as_deref(), Some("Fira Code"));
+        assert_eq!(read.merge_tool.as_deref(), Some("code"));
+        assert_eq!(read.sidebar_width, 420);
+        assert!(read.tree_group_by_directory);
+        assert_eq!(read.diff_context_lines, 5);
+        assert_eq!(read.diff_ignore_whitespace, 2);
+        assert_eq!(read.commit_subject_limit, 60);
+        assert_eq!(read.commit_warn_large_file_bytes, 1024);
+        assert!(!read.notify.discard && read.notify.stage);
+    }
+
+    #[test]
+    fn old_settings_files_get_theme_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(settings_path(dir.path()), r#"{"repos":[],"diffFontSize":11}"#).unwrap();
+        let read = read_settings(dir.path()).unwrap();
+        assert_eq!(read.diff_font_size, 11);
+        assert_eq!(read.theme_light, DEFAULT_LIGHT_THEME);
+        assert_eq!(read.theme_dark, DEFAULT_DARK_THEME);
+    }
+
+    #[test]
+    fn update_settings_validates_theme_and_clamps_font() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut registry = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        let updated = registry
+            .update_settings(&SettingsPatch {
+                theme_light: Some("light-2026".into()),
+                theme_dark: Some("one-dark-pro".into()),
+                diff_font_size: Some(100),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert_eq!(updated.theme_light, "light-2026");
+        assert_eq!(updated.diff_font_size, 24);
+        let rejected = registry.update_settings(&SettingsPatch {
+            theme_light: Some("one-dark-pro".into()),
+            ..SettingsPatch::default()
+        });
+        assert!(rejected.is_err());
+        assert_eq!(registry.settings().theme_light, "light-2026");
     }
 
     #[test]

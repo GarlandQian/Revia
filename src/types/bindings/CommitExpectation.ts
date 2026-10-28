@@ -5,23 +5,23 @@ import type { OperationState } from "./OperationState";
 /**
  * 提交预期：执行提交前必须与真实状态逐项一致的一组读数。
  */
-export type CommitExpectation = {
+export type CommitExpectation = { 
 /**
  * 当前 HEAD 提交对象；unborn（无任何提交）为 None。
  */
-head: string | null,
+head: string | null, 
 /**
  * HEAD 所在分支；detached 为 None。
  */
-branch: string | null,
+branch: string | null, 
 /**
  * 暂存区条目（按路径排序）：路径、模式、对象、状态、删除/占位标记。
  */
-index: Array<CommitExpectationIndexEntry>,
+index: Array<CommitExpectationIndexEntry>, 
 /**
  * 进行中操作（None = 无），含真实元数据版本。
  */
-operation: OperationState | null,
+operation: OperationState | null, 
 /**
  * 整组预期的指纹：前端原样带回，Rust 执行前重新计算并比较。
  */

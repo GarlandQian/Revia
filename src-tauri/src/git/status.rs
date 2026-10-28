@@ -113,6 +113,8 @@ pub struct StatusEntry {
 pub fn read(git: &Git) -> Result<WorktreeStatus> {
     let output = git.run_ok(
         &[
+            // 只读列表不更新可选锁文件（untracked cache 等），避免与用户终端里的 Git 争抢 index.lock（返修 C2）。
+            "--no-optional-locks",
             "-c",
             "core.quotePath=false",
             "status",

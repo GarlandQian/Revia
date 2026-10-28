@@ -4,11 +4,11 @@ import type { UpstreamStatus } from "./UpstreamStatus";
 /**
  * 一次上游读数：状态 + 上游名 + 读数版本。
  */
-export type UpstreamRead = { status: UpstreamStatus,
+export type UpstreamRead = { status: UpstreamStatus, 
 /**
  * 本地上游跟踪分支名；未配置为 None。
  */
-upstream: string | null,
+upstream: string | null, 
 /**
  * 读数版本：HEAD + 分支 + 上游名 + 上游对象名。
  * 任何一项变化都使旧的 amend 二次确认失效（规格 F06.2）。

@@ -4,4 +4,4 @@
  * 记录来源。`commitSnapshot` 是提交前对部分暂存文件的完整工作区快照（M3 F05），
  * 与丢弃来源区分；回收区 UI 不得把它描述成「已丢弃」。
  */
-export type RecoverySource = "discardFile" | "discardHunk" | "commitSnapshot";
+export type RecoverySource = "discardFile" | "discardHunk" | "commitSnapshot" | "mergeApply";

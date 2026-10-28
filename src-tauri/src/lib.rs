@@ -3,9 +3,12 @@
 //! 边界：所有 Git 调用都在 Rust 层完成（ADR-0002）；前端只调用固定、带类型的命令。
 
 pub mod acceptance;
+pub mod batch;
 pub mod commit;
 pub mod commit_flow;
 pub mod commit_snapshot;
+pub mod commit_warnings;
+pub mod merge;
 pub mod commands;
 pub mod error;
 pub mod git;
@@ -17,6 +20,7 @@ pub mod session;
 pub mod settings;
 pub mod shell;
 pub mod watch;
+pub mod worktree_status;
 
 use commands::AppState;
 
@@ -104,6 +108,9 @@ pub fn run() {
             commands::add_repo,
             commands::select_repo,
             commands::set_diff_font_size,
+            commands::update_settings,
+            commands::reload_environment,
+            commands::list_worktree_status,
             commands::open_worktree,
             commands::watch_worktree,
             commands::stop_watch,
@@ -111,12 +118,21 @@ pub fn run() {
             commands::list_changes,
             commands::set_review_mark,
             commands::get_rows,
+            commands::side_by_side_layout,
+            commands::side_lines,
+            commands::stage_segment,
+            commands::unstage_segment,
+            commands::discard_segment,
             commands::highlight_range,
+            commands::highlight_text,
             commands::row_index_for_line,
             commands::syntax_categories,
             commands::command_log_snapshot,
             commands::stage_file,
             commands::unstage_file,
+            commands::stage_files,
+            commands::unstage_files,
+            commands::discard_files,
             commands::stage_hunk,
             commands::unstage_hunk,
             commands::discard_file,
@@ -141,6 +157,11 @@ pub fn run() {
             commands::save_commit_draft,
             commands::clear_commit_draft,
             commands::execute_commit,
+            commands::commit_warnings,
+            commands::list_conflicts,
+            commands::merge_open,
+            commands::merge_apply,
+            commands::merge_accept_side,
         ])
         .build(tauri::generate_context!())
         .expect("Revia 启动失败");

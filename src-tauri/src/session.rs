@@ -16,9 +16,11 @@ use ts_rs::TS;
 use crate::error::{AppError, Result};
 use crate::git::highlight::{HighlightRequest, HighlightResult, Highlighter};
 use crate::git::rows::{self, HunkAction, HunkAnchor, RenderRow, RowKind, ViewMode};
+use crate::git::segments::{self, IgnoreWhitespace};
 use crate::git::status::{self, ChangesKind, FileStatus, ReadonlyReason, StatusEntry};
 use crate::git::{self, Git};
 use crate::shell::{self, ShellEnv};
+use crate::merge;
 use crate::recovery::{self, DiscardOutcome, DiscardPhase, RecoverySource, RecoveryStore, WorktreeIdentity};
 use crate::review::{self, ReviewMarks, ReviewStore, ReviewVersions};
 
@@ -126,6 +128,37 @@ pub struct ChangesSnapshot {
     pub review: review::ReviewMarks,
 }
 
+/// 左右对照布局（返修 A1，Q138）：一次取全两侧行数、段、折叠区与段操作目标。
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SideBySideLayout {
+    pub worktree_id: String,
+    pub path: String,
+    pub changes: ChangesKind,
+    /// 有未解决冲突：左侧 HEAD、右侧工作区（含冲突标记），只读（设计 3.2）。
+    pub conflict: bool,
+    pub left_line_count: u32,
+    pub right_line_count: u32,
+    /// 改动段（文件全文行号，0 基左闭右开），按位置排序。
+    pub segments: Vec<segments::ChangeSegment>,
+    /// 每段的操作目标（与显示同批签发；前端原样传回）。
+    pub segment_actions: Vec<SegmentAction>,
+    /// 折叠区（Q139）。
+    pub folds: Vec<segments::FoldRange>,
+    /// 忽略空白档位（Q140）：同时忽略空行时块按钮变灰。
+    pub ignore_whitespace: segments::IgnoreWhitespace,
+    /// 段按钮是否可用（二进制、冲突、收起等不可用时为 false）。
+    pub segment_actions_available: bool,
+    pub fingerprint: String,
+    pub snapshot_revision: String,
+    /// 二进制文件不进入左右对照。
+    pub binary: bool,
+}
+
+/// 段的操作目标（Q142）：与显示同批签发；前端原样传回，不自己拼补丁。
+pub use segments::SegmentAction;
+
 /// 一段显示行。
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -137,6 +170,8 @@ pub struct RowSlice {
     pub view: ViewMode,
     pub from: u32,
     pub row_count: u32,
+    /// 当前过滤后统一视图的全部段首行（0 基）；分页不截断，并排视图为空。
+    pub navigation_rows: Vec<u32>,
     pub rows: Vec<RenderRow>,
     pub fingerprint: String,
     /// 生成这段行的快照版本；前端据此拒绝晚到的旧行（Q88、T05）。
@@ -179,11 +214,28 @@ pub struct WorktreeSessionInfo {
     pub checks: Vec<EnvironmentCheck>,
 }
 
+/// 按段丢弃的段目标（返修 A1）：补丁与写前复核都用它从当前缓存切开。
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SegmentOverride {
+    pub hunk_index: u32,
+    pub segment_index: u32,
+    /// 显示时所用的忽略空白档位（Q140）：段编号与那个档位的 diff 对齐。
+    pub ignore_whitespace: IgnoreWhitespace,
+}
+
 /// 单个文件的解析结果缓存。
 struct FileModelCache {
     model: git::diff::FileChange,
     unfiled: bool,
     hunk_actions: Vec<HunkAction>,
+}
+
+/// 左右对照的全文与段缓存（返修 A1/Q138）：两侧全文只读一次，段与折叠区按档位算一次。
+struct SideLayoutCache {
+    left_text: String,
+    right_text: String,
+    segments: Vec<segments::ChangeSegment>,
+    folds: Vec<segments::FoldRange>,
 }
 
 struct Snapshot {
@@ -202,6 +254,10 @@ struct Snapshot {
     /// 显示行排版缓存：key 为 `<changes>/<path>/<view>`。
     /// 只缓存源行位置，`get_rows` 按请求范围生成文本与 hunk 操作目标。
     layouts: HashMap<String, rows::RowLayout>,
+    /// 忽略空白档位下的模型缓存（Q140）：key 为 `<ignore>/<changes>/<path>`。
+    ignore_models: HashMap<String, FileModelCache>,
+    /// 左右对照的全文与段缓存（A1/Q138）：key 为 `<changes>/<path>/<ignore>/<context>`。
+    side_layouts: HashMap<String, SideLayoutCache>,
     generation: u64,
 }
 
@@ -220,7 +276,8 @@ pub struct WorktreeSession {
     generation_counter: Mutex<u64>,
     instance_id: u64,
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
-    writing: Mutex<bool>,
+    /// 命令层判断“能否重新加载环境”时也要读它（返修 C3）。
+    pub(crate) writing: Mutex<bool>,
     /// 审阅标记存储（None 表示未配置，此时界面不显示勾选框）。
     review_store: Option<Arc<ReviewStore>>,
     /// 审阅标记的**真实提交序号**：每次成功写入在会话内单调递增。
@@ -266,7 +323,19 @@ impl WorktreeSession {
         command_log: Arc<git::CommandLog>,
         review_store: Option<Arc<ReviewStore>>,
     ) -> Result<Arc<Self>> {
-        let git = Git::new(path, &shell_env, command_log)?;
+        Self::open_with_options(id, path, shell_env, command_log, review_store, None)
+    }
+
+    /// 带审阅存储与手动指定 Git 程序的会话（Q27、M4 F08）。
+    pub fn open_with_options(
+        id: &str,
+        path: &Path,
+        shell_env: ShellEnv,
+        command_log: Arc<git::CommandLog>,
+        review_store: Option<Arc<ReviewStore>>,
+        git_program: Option<&Path>,
+    ) -> Result<Arc<Self>> {
+        let git = Git::with_program(path, &shell_env, command_log, git_program)?;
         let git_version = git.version()?;
         let (major, minor) = git::parse_version(&git_version).unwrap_or((0, 0));
         let mut checks = Vec::new();
@@ -371,8 +440,9 @@ impl WorktreeSession {
             let cached = models.get(&key(entry.changes, &entry.path));
             let model = cached.map(|cached| &cached.model);
             let language = language_for_path(&entry.path);
-            let row_count_unified = model.map(|file| rows::row_count(file, ViewMode::Unified) as u32).unwrap_or(0);
-            let row_count_split = model.map(|file| rows::row_count(file, ViewMode::Split) as u32).unwrap_or(0);
+            let layout_summary = model.map(rows::layout_summary).unwrap_or_default();
+            let row_count_unified = layout_summary.unified_count as u32;
+            let row_count_split = layout_summary.split_count as u32;
 
             let mut readonly_reason = entry.readonly_reason;
             let full_path = self.path.join(&entry.path);
@@ -420,7 +490,7 @@ impl WorktreeSession {
                 unmerged: entry.unmerged,
                 // 未跟踪文件要读了内容才知道行数，打开时补全。
                 metrics_loaded: entry.changes != ChangesKind::Untracked,
-                hunks: model.map(rows::hunk_anchors).unwrap_or_default(),
+                hunks: layout_summary.anchors,
                 readonly_reason,
                 fingerprint,
                 snapshot_revision: String::new(),
@@ -480,17 +550,35 @@ impl WorktreeSession {
             unconfirmed,
             models,
             layouts: HashMap::new(),
+            ignore_models: HashMap::new(),
+            side_layouts: HashMap::new(),
             generation,
         });
         Ok(snapshot)
     }
 
-    /// 取一段显示行。
+    /// 取一段显示行（普通档位，忽略空白关闭）。
     pub fn rows(
         &self,
         path: &str,
         changes: ChangesKind,
         view: ViewMode,
+        from: u32,
+        to: u32,
+    ) -> Result<RowSlice> {
+        self.rows_with_ignore(path, changes, view, IgnoreWhitespace::Off, from, to)
+    }
+
+    /// 取一段显示行。
+    ///
+    /// `ignore`（返修 A1/Q140）：忽略空白档位下用对应 Git 参数的 diff 排版，
+    /// 块按钮与段的编号与那份 diff 一致；普通档位用刷新时的缓存。
+    pub fn rows_with_ignore(
+        &self,
+        path: &str,
+        changes: ChangesKind,
+        view: ViewMode,
+        ignore: IgnoreWhitespace,
         from: u32,
         to: u32,
     ) -> Result<RowSlice> {
@@ -528,11 +616,14 @@ impl WorktreeSession {
             }
         }
 
-        let cached = snapshot
-            .models
-            .get(&key(changes, path))
-            .ok_or_else(|| AppError::rejected(format!("没有该文件的改动内容：{path}")))?;
-        let layout_key = format!("{changes:?}/{path}/{view:?}");
+        // 忽略空白档位：按需读一份带参数的 diff 并缓存（Q140）。
+        let ignore_key = self.ensure_ignore_model(snapshot, path, changes, ignore)?;
+        let cached = match &ignore_key {
+            None => snapshot.models.get(&key(changes, path)),
+            Some(ignore_key) => snapshot.ignore_models.get(ignore_key),
+        }
+        .ok_or_else(|| AppError::rejected(format!("没有该文件的改动内容：{path}")))?;
+        let layout_key = format!("{changes:?}/{path}/{view:?}/{ignore:?}");
         if !snapshot.layouts.contains_key(&layout_key) {
             // 简单上限：缓存最多 8 份排版（镜像来回切换的常见用法）。
             if snapshot.layouts.len() >= 8 {
@@ -545,20 +636,43 @@ impl WorktreeSession {
             .get(&layout_key)
             .ok_or_else(|| AppError::internal("排版缓存丢失"))?;
         let row_count = layout.len() as u32;
+        let navigation_rows = layout.navigation_rows().to_vec();
         let from = from.min(row_count);
         let to = to.min(row_count).max(from);
         let mut rows = layout.render_range(&cached.model, from as usize..to as usize);
-        for row in &mut rows {
-            if row.kind == RowKind::Hunk {
-                row.hunk_action = cached.hunk_actions.get(row.hunk_index as usize).cloned();
-            }
-        }
+        let hunk_actions = cached.hunk_actions.clone();
         let entry = snapshot
             .entries
             .iter()
             .find(|entry| entry.path == path && entry.changes == changes)
             .cloned()
             .ok_or_else(|| AppError::internal("列表元数据丢失"))?;
+        let revision = snapshot.generation;
+        // 块（段）操作目标（返修 A1/Q142）：与显示同批签发，前端原样传回。
+        let segment_actions_available = ignore.allows_segment_actions()
+            && entry.readonly_reason.is_none()
+            && !entry.unmerged
+            && !entry.binary
+            && entry.original_path.is_none()
+            && matches!(entry.status, FileStatus::Modified | FileStatus::Added | FileStatus::Deleted);
+        for row in &mut rows {
+            if row.kind == RowKind::Hunk {
+                row.hunk_action = hunk_actions.get(row.hunk_index as usize).cloned();
+            }
+            if let (Some(segment_index), true) = (row.segment_index, segment_actions_available) {
+                row.segment_action = Some(segments::SegmentAction {
+                    worktree_id: self.id.clone(),
+                    path: path.to_string(),
+                    changes,
+                    hunk_index: row.hunk_index,
+                    segment_index,
+                    fingerprint: entry.fingerprint.clone(),
+                    ignore_whitespace: ignore,
+                    credential: segments::segment_credential(&entry.fingerprint, ignore),
+                    snapshot_revision: revision.to_string(),
+                });
+            }
+        }
 
         Ok(RowSlice {
             worktree_id: self.id.clone(),
@@ -567,9 +681,10 @@ impl WorktreeSession {
             view,
             from,
             row_count,
+            navigation_rows,
             rows,
             fingerprint: snapshot.fingerprint.clone(),
-            revision: snapshot.generation,
+            revision,
             entry,
             // 与 `entry` 同一次加锁读取：快照的审阅状态就是这个序号对应的真值。
             review_seq: snapshot.review.seq,
@@ -585,18 +700,321 @@ impl WorktreeSession {
         line: u32,
         version: FileVersion,
     ) -> Result<u32> {
-        let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
-        let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
-        let cached = snapshot
-            .models
-            .get(&key(changes, path))
+        self.row_index_for_line_with_ignore(
+            path, changes, view, line, version, IgnoreWhitespace::Off, None, None,
+        )
+    }
+
+    /// 视图切换使用与取行相同的过滤模型；版本校验和模型选择处于同一次快照锁内。
+    pub fn row_index_for_line_with_ignore(
+        &self,
+        path: &str,
+        changes: ChangesKind,
+        view: ViewMode,
+        line: u32,
+        version: FileVersion,
+        ignore: IgnoreWhitespace,
+        expected_fingerprint: Option<&str>,
+        expected_snapshot_revision: Option<&str>,
+    ) -> Result<u32> {
+        let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        let snapshot = guard.as_mut().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+        let entry = snapshot.entries.iter()
+            .find(|entry| entry.path == path && entry.changes == changes)
             .ok_or_else(|| AppError::rejected(format!("没有该文件的改动内容：{path}")))?;
+        if expected_fingerprint.is_some_and(|expected| entry.fingerprint != expected)
+            || expected_snapshot_revision.is_some_and(|expected| entry.snapshot_revision != expected)
+        {
+            return Err(AppError::rejected("文件已变化，请刷新后重试"));
+        }
+        let ignore_key = self.ensure_ignore_model(snapshot, path, changes, ignore)?;
+        let cached = match &ignore_key {
+            None => snapshot.models.get(&key(changes, path)),
+            Some(ignore_key) => snapshot.ignore_models.get(ignore_key),
+        }
+        .ok_or_else(|| AppError::rejected(format!("没有该文件的改动内容：{path}")))?;
         Ok(rows::row_index_for_line(
             &cached.model,
             view,
             line,
             version == FileVersion::Old,
         ))
+    }
+
+    /// 左右对照布局（返修 A1/Q138）：两侧全文、段、折叠区与段操作目标同批签发。
+    ///
+    /// 段仍来自同一次 `git diff` 的解析结果（ADR-0004）；忽略空白档位下
+    /// 重新读一份带对应参数的 diff（Q140），指纹仍按普通 diff 计算。
+    pub fn side_layout(
+        &self,
+        path: &str,
+        changes: ChangesKind,
+        ignore: IgnoreWhitespace,
+        context_lines: u32,
+    ) -> Result<SideBySideLayout> {
+        let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        let snapshot = guard.as_mut().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+        let entry = snapshot
+            .entries
+            .iter()
+            .find(|entry| entry.path == path && entry.changes == changes)
+            .cloned()
+            .ok_or_else(|| AppError::rejected(format!("文件不在当前改动列表中：{path}（请刷新后重试）")))?;
+        let worktree_id = self.id.clone();
+        let revision = snapshot.generation.to_string();
+        if entry.binary {
+            return Ok(SideBySideLayout {
+                worktree_id,
+                path: path.to_string(),
+                changes,
+                conflict: entry.unmerged,
+                left_line_count: 0,
+                right_line_count: 0,
+                segments: Vec::new(),
+                segment_actions: Vec::new(),
+                folds: Vec::new(),
+                ignore_whitespace: ignore,
+                segment_actions_available: false,
+                fingerprint: entry.fingerprint.clone(),
+                snapshot_revision: revision,
+                binary: true,
+            });
+        }
+
+        let cache_key = self.ensure_side_cache(snapshot, path, changes, ignore, context_lines)?;
+        let cached = snapshot
+            .side_layouts
+            .get(&cache_key)
+            .ok_or_else(|| AppError::internal("左右对照缓存丢失"))?;
+        let segments = cached.segments.clone();
+        let actions_available = ignore.allows_segment_actions()
+            && entry.readonly_reason.is_none()
+            && !entry.unmerged
+            && !entry.binary
+            && entry.original_path.is_none()
+            && !segments.is_empty()
+            && matches!(entry.status, FileStatus::Modified | FileStatus::Added | FileStatus::Deleted);
+        let segment_actions = if actions_available {
+            let credential = segments::segment_credential(&entry.fingerprint, ignore);
+            segments
+                .iter()
+                .map(|segment| SegmentAction {
+                    worktree_id: worktree_id.clone(),
+                    path: path.to_string(),
+                    changes,
+                    hunk_index: segment.hunk_index,
+                    segment_index: segment.segment_index,
+                    fingerprint: entry.fingerprint.clone(),
+                    ignore_whitespace: ignore,
+                    credential: credential.clone(),
+                    snapshot_revision: revision.clone(),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Ok(SideBySideLayout {
+            worktree_id,
+            path: path.to_string(),
+            changes,
+            conflict: entry.unmerged,
+            left_line_count: segments::text_line_count(&cached.left_text),
+            right_line_count: segments::text_line_count(&cached.right_text),
+            segments,
+            segment_actions,
+            folds: cached.folds.clone(),
+            ignore_whitespace: ignore,
+            segment_actions_available: actions_available,
+            fingerprint: entry.fingerprint.clone(),
+            snapshot_revision: revision,
+            binary: false,
+        })
+    }
+
+    /// 按需取左右对照一侧的行（虚拟滚动用），带改动标记与词级区间。
+    ///
+    /// 行号是**文件全文**的 1 基行号，`from`/`to` 两端包含。
+    pub fn side_lines(
+        &self,
+        path: &str,
+        changes: ChangesKind,
+        ignore: IgnoreWhitespace,
+        context_lines: u32,
+        version: FileVersion,
+        from: u32,
+        to: u32,
+        granularity: segments::WordGranularity,
+    ) -> Result<Vec<segments::SideLine>> {
+        let mut guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        let snapshot = guard.as_mut().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+        if !snapshot.entries.iter().any(|entry| entry.path == path && entry.changes == changes) {
+            return Err(AppError::rejected(format!("文件不在当前改动列表中：{path}（请刷新后重试）")));
+        }
+        let cache_key = self.ensure_side_cache(snapshot, path, changes, ignore, context_lines)?;
+        let cached = snapshot
+            .side_layouts
+            .get(&cache_key)
+            .ok_or_else(|| AppError::internal("左右对照缓存丢失"))?;
+        let left_lines: Vec<&str> = segments::display_lines(&cached.left_text).collect();
+        let right_lines: Vec<&str> = segments::display_lines(&cached.right_text).collect();
+        let lines = match version {
+            FileVersion::Old => &left_lines,
+            FileVersion::New => &right_lines,
+        };
+        let from = from.max(1);
+        let to = to.max(from);
+
+        let mut changed_lines: std::collections::HashSet<u32> = std::collections::HashSet::new();
+        let mut word_ranges: std::collections::HashMap<u32, Vec<(u32, u32)>> = std::collections::HashMap::new();
+        for segment in &cached.segments {
+            let (start, end) = match version {
+                FileVersion::Old => (segment.left_start, segment.left_end),
+                FileVersion::New => (segment.right_start, segment.right_end),
+            };
+            // 请求外的行既不返回，也不需要重复分配改动标记。
+            if end < from || start >= to {
+                continue;
+            }
+            for line in (start + 1).max(from)..=end.min(to) {
+                changed_lines.insert(line);
+            }
+            // 段的行区间始终按左右各自的全文行号算，与请求的是哪一侧无关。
+            let (left_map, right_map) =
+                segments::segment_word_ranges(&left_lines, &right_lines, segment, granularity);
+            word_ranges.extend(match version {
+                FileVersion::Old => left_map,
+                FileVersion::New => right_map,
+            });
+        }
+        Ok(segments::side_lines_from_text(lines, from, to, &changed_lines, &word_ranges))
+    }
+
+    /// 忽略空白档位下按需读一份带对应参数的 diff 并缓存（Q140），返回缓存键；
+    /// 不忽略时返回 `None`，调用方用刷新时的普通模型。
+    fn ensure_ignore_model(
+        &self,
+        snapshot: &mut Snapshot,
+        path: &str,
+        changes: ChangesKind,
+        ignore: IgnoreWhitespace,
+    ) -> Result<Option<String>> {
+        if matches!(ignore, IgnoreWhitespace::Off) {
+            return Ok(None);
+        }
+        let ignore_key = format!("{ignore:?}/{changes:?}/{path}");
+        if !snapshot.ignore_models.contains_key(&ignore_key) {
+            let original_path = snapshot
+                .entries
+                .iter()
+                .find(|entry| entry.path == path && entry.changes == changes)
+                .and_then(|entry| entry.original_path.clone());
+            let file = self.read_ignore_model(path, changes, original_path.as_deref(), ignore)?;
+            snapshot.ignore_models.insert(
+                ignore_key.clone(),
+                FileModelCache { model: file, unfiled: false, hunk_actions: Vec::new() },
+            );
+        }
+        Ok(Some(ignore_key))
+    }
+
+    /// 读取并解析某一档忽略空白下的 diff（不经缓存）。
+    fn read_ignore_model(
+        &self,
+        path: &str,
+        changes: ChangesKind,
+        original_path: Option<&str>,
+        ignore: IgnoreWhitespace,
+    ) -> Result<git::diff::FileChange> {
+        let patch = match changes {
+            ChangesKind::Unstaged => self.git.diff_worktree_with_ignore(Some(path), ignore)?,
+            ChangesKind::Staged => self.git.diff_index_with_ignore(path, original_path, ignore)?,
+            ChangesKind::Untracked => self.git.diff_untracked(path)?,
+        };
+        let mut parsed = git::diff::parse_bytes(&patch);
+        Ok(parsed.files.pop().unwrap_or_else(|| empty_file(path, FileStatus::Added)))
+    }
+
+    /// 确保左右对照的全文与段已缓存，返回缓存键。
+    fn ensure_side_cache(
+        &self,
+        snapshot: &mut Snapshot,
+        path: &str,
+        changes: ChangesKind,
+        ignore: IgnoreWhitespace,
+        context_lines: u32,
+    ) -> Result<String> {
+        let cache_key = format!("{changes:?}/{path}/{ignore:?}/{context_lines}");
+        if snapshot.side_layouts.contains_key(&cache_key) {
+            return Ok(cache_key);
+        }
+        let unmerged = snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.path == path && entry.changes == changes && entry.unmerged);
+        let cached = if unmerged {
+            // 冲突文件（设计 3.2）：HEAD 对工作区（含冲突标记），段来自 `git diff HEAD`，只读。
+            let left_text = self.git.file_at("HEAD", path).unwrap_or_default();
+            let right_text = self.git.working_file(path).unwrap_or_default();
+            let model = git::diff::parse_bytes(&self.git.diff_head(path)?).files.pop();
+            Self::build_side_layout(left_text, right_text, model.as_ref(), context_lines)?
+        } else {
+            let (left_text, right_text) = match changes {
+                ChangesKind::Unstaged => (
+                    self.git.file_at("", path).unwrap_or_default(),
+                    self.git.working_file(path).unwrap_or_default(),
+                ),
+                ChangesKind::Staged => (
+                    self.git.file_at("HEAD", path).unwrap_or_default(),
+                    self.git.file_at("", path).unwrap_or_default(),
+                ),
+                ChangesKind::Untracked => (String::new(), self.git.working_file(path).unwrap_or_default()),
+            };
+            let model = match self.ensure_ignore_model(snapshot, path, changes, ignore)? {
+                None => snapshot.models.get(&key(changes, path)),
+                Some(ignore_key) => snapshot.ignore_models.get(&ignore_key),
+            }
+            .map(|cached| &cached.model);
+            Self::build_side_layout(left_text, right_text, model, context_lines)?
+        };
+        // 派生完成后再改缓存，不必复制快照里的整个 diff 模型。
+        // 有界缓存：文件与档位来回切换时不无限累积。
+        if snapshot.side_layouts.len() >= 16 {
+            snapshot.side_layouts.clear();
+        }
+        snapshot.side_layouts.insert(cache_key.clone(), cached);
+        Ok(cache_key)
+    }
+
+    /// 核对两侧全文与 diff 一致后，派生供快照缓存的段与折叠区。
+    fn build_side_layout(
+        left_text: String,
+        right_text: String,
+        model: Option<&git::diff::FileChange>,
+        context_lines: u32,
+    ) -> Result<SideLayoutCache> {
+        // 全文与 diff 不是同一次读取：对不上说明期间文件被改过，不缓存，等刷新后重取。
+        if let Some(model) = model {
+            if !segments::texts_match_diff(model, &left_text, &right_text) {
+                return Err(AppError::rejected("文件已变化，请刷新后重试"));
+            }
+        }
+        let (segments, folds) = match model {
+            Some(model) => {
+                let mut segments: Vec<segments::ChangeSegment> = Vec::new();
+                for (index, hunk) in model.hunks.iter().enumerate() {
+                    segments.extend(segments::segments_of_hunk(hunk, index as u32));
+                }
+                let folds = segments::compute_folds_from_segments(
+                    &segments,
+                    segments::text_line_count(&left_text),
+                    segments::text_line_count(&right_text),
+                    context_lines,
+                );
+                (segments, folds)
+            }
+            None => (Vec::new(), Vec::new()),
+        };
+        Ok(SideLayoutCache { left_text, right_text, segments, folds })
     }
 
     /// 按行范围取高亮结果；内容由 Rust 自己读取，前端不接触文件内容。
@@ -762,6 +1180,12 @@ impl WorktreeSession {
     }
 
     /// 当前高亮线程保留的文档数（验证缓存有界；测试与诊断用）。
+    /// 合并页签按内容取高亮（Q143）：三个版本与可编辑的结果都不是某个 diff 的一侧，
+    /// 由界面带上内容与版本号，解析状态仍放在同一个高亮线程里。
+    pub fn highlight_text(&self, request: HighlightRequest) -> Result<HighlightResult> {
+        self.highlighter.highlight(request)
+    }
+
     pub fn highlight_document_count(&self) -> usize {
         self.highlighter.document_count()
     }
@@ -789,6 +1213,19 @@ impl WorktreeSession {
                     .and_then(|snapshot| snapshot.models.get(&key(changes, path)).map(|cached| cached.model.binary))
             })
             .unwrap_or(false)
+    }
+
+    /// 当前快照里的条目（批量操作按用户确认的原快照逐项核对）。
+    pub(crate) fn snapshot_entries(&self) -> Option<Vec<ChangeEntry>> {
+        self.snapshot
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|snapshot| snapshot.entries.clone()))
+    }
+
+    /// 本会话使用的 Git 上下文（批量操作读取真实状态用）。
+    pub(crate) fn git(&self) -> &Git {
+        &self.git
     }
 
     /// 获取当前 worktree 的独占写操作锁（不排队，发现被占用立即拒绝并发写，Q90/T06）。
@@ -822,6 +1259,122 @@ impl WorktreeSession {
         self.execute_staging_op(path, fingerprint, false, Some(hunk_id))
     }
 
+    /// 按段写（返修 A1/Q142）：暂存、取消暂存一段；补丁由同一个 Git hunk
+    /// 按段切开得到（同 git add -p），不用前端传补丁（ADR-0004）。
+    ///
+    /// `credential` 是显示时与段同批签发的凭证（文件指纹 + 忽略空白档位，Q140）；
+    /// 档位与请求不符就拒绝。
+    pub fn execute_segment_op(
+        &self,
+        path: &str,
+        credential: &str,
+        hunk_index: u32,
+        segment_index: u32,
+        is_stage: bool,
+        ignore_whitespace: IgnoreWhitespace,
+    ) -> Result<ChangesSnapshot> {
+        let expected_fp = segment_fingerprint(credential, ignore_whitespace)?;
+        let _guard = self.acquire_write_lock()?;
+        self.execute_segment_op_locked(path, expected_fp, hunk_index, segment_index, is_stage, ignore_whitespace)
+    }
+
+    pub(crate) fn execute_segment_op_locked(
+        &self,
+        path: &str,
+        expected_fp: &str,
+        hunk_index: u32,
+        segment_index: u32,
+        is_stage: bool,
+        ignore_whitespace: IgnoreWhitespace,
+    ) -> Result<ChangesSnapshot> {
+        let mut last_lock_err: Option<String> = None;
+        const LOCK_RETRIES: usize = 3;
+        const LOCK_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
+
+        for attempt in 0..=LOCK_RETRIES {
+            // 每次尝试（含重试）前重新读取真实状态并核对指纹（审查意见 2）。
+            let status = status::read(&self.git)?;
+            let changes = if is_stage { ChangesKind::Unstaged } else { ChangesKind::Staged };
+            let entry = status
+                .entries
+                .iter()
+                .find(|entry| entry.path == path && entry.changes == changes)
+                .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+            if let Some(reason) = &entry.readonly_reason {
+                return Err(AppError::rejected(reason.description()));
+            }
+            // Q81：Git 识别的改名只做整文件操作。
+            if entry.original_path.is_some() {
+                return Err(AppError::rejected("改名的文件只能整个文件操作"));
+            }
+            let diff_bytes = if is_stage {
+                self.git.diff_worktree(Some(path))?
+            } else {
+                self.git.diff_index_with_orig(path, entry.original_path.as_deref())?
+            };
+            let current_fp = compute_file_fingerprint_from_patch(entry, &diff_bytes, &self.path)?;
+            if current_fp != expected_fp {
+                return Err(AppError::rejected("文件已变化，请重新确认"));
+            }
+
+            // 段号是显示时按同一档位的 diff 签发的：普通档位直接用指纹核对过的这份 diff，
+            // 忽略空白档位重新读同一档位的 diff（内容未变，结果与显示时相同）。
+            let model = if matches!(ignore_whitespace, IgnoreWhitespace::Off) {
+                git::diff::parse_bytes(&diff_bytes).files.into_iter().next()
+            } else {
+                Some(self.read_ignore_model(path, changes, None, ignore_whitespace)?)
+            }
+            .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+            let patch = segments::rewrite_hunk_for_segment(&model, hunk_index as usize, segment_index, is_stage)
+                .ok_or_else(|| AppError::rejected("当前块无法生成补丁，请刷新后重新确认"))?;
+            let expected_remaining = segments::signatures_without(&model, hunk_index as usize, segment_index)
+                .ok_or_else(|| AppError::rejected("当前块无法生成补丁，请刷新后重新确认"))?;
+
+            let output = self.git.apply_index_patch(patch, !is_stage, !matches!(ignore_whitespace, IgnoreWhitespace::Off))?;
+            if output.timed_out || output.exit_code < 0 {
+                return Err(AppError::needs_verification(
+                    "Git 命令执行超时或中断，写入结果待核对；请重新核对真实状态后再继续",
+                ));
+            }
+            if git::is_lock_error(&output) {
+                let err_text = output.stderr.trim().to_string();
+                if attempt < LOCK_RETRIES {
+                    last_lock_err = Some(err_text);
+                    std::thread::sleep(LOCK_RETRY_DELAY * (attempt as u32 + 1));
+                    continue;
+                }
+                let detail = last_lock_err.unwrap_or(err_text);
+                return Err(AppError::rejected(format!(
+                    "Git 索引被其他进程占用（index.lock），已重试 {LOCK_RETRIES} 次：{detail}"
+                )));
+            }
+            if output.exit_code != 0 {
+                return Err(AppError::git(format!(
+                    "{}失败（退出码 {}）：{}",
+                    if is_stage { "暂存此块" } else { "取消暂存此块" },
+                    output.exit_code,
+                    output.stderr.trim()
+                )));
+            }
+            // 写后核对（设计 3.2）：按同一档位重新读来源一侧的 diff，目标段应已移走、
+            // 其余段不变；对不上标“结果待核对”（Q91）。
+            let verified = self
+                .read_ignore_model(path, changes, None, ignore_whitespace)
+                .map(|after| segments::segment_signatures(&after) == expected_remaining);
+            let refreshed = self.refresh();
+            return match (verified, refreshed) {
+                (Ok(true), Ok(snapshot)) => Ok(snapshot),
+                (Ok(false), _) => Err(AppError::needs_verification(
+                    "写入已执行，但重新读取的改动与预期不符，结果待核对；请检查这个文件的暂存内容",
+                )),
+                (Err(error), _) | (_, Err(error)) => Err(AppError::needs_verification(format!(
+                    "写入已执行，重新读取状态失败：{error}"
+                ))),
+            };
+        }
+        unreachable!("锁重试循环总会返回")
+    }
+
     pub fn discard_file(&self, path: &str, fingerprint: &str, revision: &str, store: &RecoveryStore) -> Result<ChangesSnapshot> {
         self.discard_with_hook(path, fingerprint, revision, None, store, |_| Ok(()))
     }
@@ -830,12 +1383,15 @@ impl WorktreeSession {
         self.discard_with_hook(path, fingerprint, revision, Some(hunk_id), store, |_| Ok(()))
     }
 
-    fn check_discard_target(&self, path: &str, fingerprint: &str, revision: &str) -> Result<StatusEntry> {
+    fn check_discard_target(&self, path: &str, fingerprint: &str, revision: Option<&str>) -> Result<StatusEntry> {
         {
             let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
             let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+            // 批量丢弃时，用户确认的原快照版本已在整批开始时逐项核对；
+            // 批次内每次刷新都会推进版本，因此单文件复检只看真实指纹（ADR-0009）。
             if !snapshot.entries.iter().any(|entry| entry.path == path && entry.changes == ChangesKind::Unstaged
-                && entry.fingerprint == fingerprint && entry.snapshot_revision == revision) {
+                && entry.fingerprint == fingerprint
+                && revision.is_none_or(|revision| entry.snapshot_revision == revision)) {
                 return Err(AppError::rejected("文件已变化，请重新确认"));
             }
         }
@@ -860,9 +1416,38 @@ impl WorktreeSession {
     /// Test seams surround real storage and real Git; normal operations pass a no-op.
     pub fn discard_with_hook(
         &self, path: &str, fingerprint: &str, revision: &str, hunk_id: Option<&str>,
-        store: &RecoveryStore, mut hook: impl FnMut(DiscardPhase) -> Result<()>,
+        store: &RecoveryStore, hook: impl FnMut(DiscardPhase) -> Result<()>,
     ) -> Result<ChangesSnapshot> {
         let _write = self.acquire_write_lock()?;
+        self.discard_with_hook_locked(path, fingerprint, Some(revision), hunk_id, None, store, hook)
+    }
+
+    /// 丢弃一段（返修 A1/Q142）：补丁由缓存的同一个 Git hunk 按段切开（反向），
+    /// 其余流程（回收区、写前校验、写后核对）与单块丢弃一致。
+    pub fn discard_segment(
+        &self, path: &str, credential: &str, revision: &str,
+        hunk_index: u32, segment_index: u32, ignore_whitespace: IgnoreWhitespace,
+        store: &RecoveryStore,
+    ) -> Result<ChangesSnapshot> {
+        let fingerprint = segment_fingerprint(credential, ignore_whitespace)?;
+        let _write = self.acquire_write_lock()?;
+        self.discard_with_hook_locked(
+            path, fingerprint, Some(revision), None,
+            Some(SegmentOverride { hunk_index, segment_index, ignore_whitespace }),
+            store, |_| Ok(()),
+        )
+    }
+
+    /// 已持有同 worktree 写锁时的丢弃实现（批量操作用）。
+    ///
+    /// `revision` 为 None 时不比对快照版本，但仍会重新读取真实状态并核对指纹。
+    /// `segment_override`（返修 A1）：按段丢弃时的段目标；补丁与写前复核都
+    /// 从**当前缓存**的同一个 hunk 按段切开，段变了（上下文偏移）即拒绝。
+    pub(crate) fn discard_with_hook_locked(
+        &self, path: &str, fingerprint: &str, revision: Option<&str>, hunk_id: Option<&str>,
+        segment_override: Option<SegmentOverride>,
+        store: &RecoveryStore, mut hook: impl FnMut(DiscardPhase) -> Result<()>,
+    ) -> Result<ChangesSnapshot> {
         let entry = self.check_discard_target(path, fingerprint, revision)?;
         let identity = WorktreeIdentity::capture(&self.git)?;
         store.ensure_outside(&identity)?;
@@ -871,9 +1456,12 @@ impl WorktreeSession {
         paths.sort();
         paths.dedup();
         let before = recovery::capture_files(&self.path, &paths)?;
-        let patch = match hunk_id {
-            Some(id) => self.hunk_patch(path, fingerprint, id, true)?,
-            None => self.git.discard_patch(path)?,
+        let patch = match &segment_override {
+            Some(segment) => self.segment_patch(path, segment, false)?,
+            None => match hunk_id {
+                Some(id) => self.hunk_patch(path, fingerprint, id, true)?,
+                None => self.git.discard_patch(path)?,
+            },
         };
         if patch.is_empty() { return Err(AppError::rejected("文件已变化，请重新确认")); }
         // 预览与保存必须使用同一套「字节如何转换」的上下文（属性 + 相关配置）。
@@ -882,7 +1470,7 @@ impl WorktreeSession {
         hook(DiscardPhase::BeforeSave)?;
         // A complete, durably published record is the prerequisite for any worktree write.
         // 占用标记覆盖「保存 → 写入 → 结果记录」全程：期间清理不能删掉这条唯一备份（Q91）。
-        let (record, _record_in_use) = store.save(identity.clone(), if hunk_id.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone(), context.clone())?;
+        let (record, _record_in_use) = store.save(identity.clone(), if hunk_id.is_some() || segment_override.is_some() { RecoverySource::DiscardHunk } else { RecoverySource::DiscardFile }, path, before.clone(), context.clone())?;
         hook(DiscardPhase::AfterSave).map_err(discard_pending)?;
         hook(DiscardPhase::BeforeWrite).map_err(discard_pending)?;
         {
@@ -893,9 +1481,13 @@ impl WorktreeSession {
                 if WorktreeIdentity::capture(&self.git)? != identity || !recovery::unchanged(&before, &recovery::capture_files(&self.path, &paths)?) {
                     return Err(AppError::rejected("文件已变化，请重新确认"));
                 }
-                let current_patch = match hunk_id {
-                    Some(id) => self.hunk_patch(path, fingerprint, id, true)?,
-                    None => self.git.discard_patch(path)?,
+                let current_patch = match &segment_override {
+                    // 按段丢弃：重新从当前缓存切开同一段比对；段变了（上下文偏移）即拒绝。
+                    Some(segment) => self.segment_patch(path, segment, false).unwrap_or_default(),
+                    None => match hunk_id {
+                        Some(id) => self.hunk_patch(path, fingerprint, id, true)?,
+                        None => self.git.discard_patch(path)?,
+                    },
                 };
                 if current_patch != patch { return Err(AppError::rejected("文件已变化，请重新确认")); }
                 // 属性/转换上下文变化时，同一份补丁会写出不同的字节（例如未选中的行也被改了换行）。
@@ -926,6 +1518,227 @@ impl WorktreeSession {
         self.refresh().map_err(|error| AppError::needs_verification(format!("丢弃已执行并保存，最新状态读取失败：{error}")))
     }
 
+
+    /// 丢弃一个未跟踪文件：先保存完整内容到回收区，再删除文件（M4 F03.4）。
+    ///
+    /// 未跟踪文件没有 Git 基线，丢弃等于删除；安全边界要求先存回收区，
+    /// 因此这里保存 `before` 内容、把 `after` 记为路径不存在，再删除。
+    pub(crate) fn discard_untracked_locked(
+        &self,
+        path: &str,
+        fingerprint: &str,
+        store: &RecoveryStore,
+    ) -> Result<ChangesSnapshot> {
+        let status = status::read(&self.git)?;
+        let entry = status
+            .entries
+            .into_iter()
+            .find(|entry| entry.path == path && entry.changes == ChangesKind::Untracked)
+            .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        if let Some(reason) = &entry.readonly_reason {
+            return Err(AppError::rejected(reason.description()));
+        }
+        // 未跟踪条目的指纹按「空 diff + 工作区字节」计算（刷新时尚未读取内容，见 refresh）；
+        // 这里必须用同一份输入，否则会把同一文件误判为已变化。
+        if compute_file_fingerprint_from_patch(&entry, &[], &self.path)? != fingerprint {
+            return Err(AppError::rejected("文件已变化，请重新确认"));
+        }
+        let identity = WorktreeIdentity::capture(&self.git)?;
+        store.ensure_outside(&identity)?;
+        let paths = vec![entry.path.clone()];
+        let before = recovery::capture_files(&self.path, &paths)?;
+        let context = recovery::context_fingerprint(&self.git, &paths)?;
+        let (record, _record_in_use) = store.save(
+            identity,
+            RecoverySource::DiscardFile,
+            path,
+            before.clone(),
+            context,
+        )?;
+        let full = recovery::checked_path(&self.path, path)?;
+        // 保存回收记录之后、删除之前复核内容：期间被外部写入的内容不能被删掉而不在回收记录里（返修 C1）。
+        // NotFound 视为未被外部改动：回收记录已包含「路径不存在」的原状态。
+        let current = recovery::capture_files(&self.path, &paths)?;
+        if !recovery::unchanged(&before, &current) {
+            store
+                .finish(&record, &DiscardOutcome::NotApplied)
+                .map_err(discard_pending)?;
+            return Err(AppError::rejected("文件已变化，请重新确认"));
+        }
+        match std::fs::remove_file(&full) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                store
+                    .finish(&record, &DiscardOutcome::NotApplied)
+                    .map_err(discard_pending)?;
+                return Err(AppError::rejected(format!("删除未跟踪文件失败：{error}")));
+            }
+        }
+        let after = vec![recovery::SavedFile {
+            path: entry.path.clone(),
+            content: None,
+            executable: false,
+        }];
+        store
+            .finish(&record, &DiscardOutcome::Completed { after })
+            .map_err(discard_pending)?;
+        self.refresh().map_err(|error| {
+            AppError::needs_verification(format!("文件已删除并保存，最新状态读取失败：{error}"))
+        })
+    }
+
+    // ---------- 内置三方合并（Q143，设计见 merge-design.md） ----------
+
+    /// 未解决冲突的文件、两侧状态与指纹（冲突对话框用）。
+    pub fn list_conflicts(&self) -> Result<Vec<merge::ConflictFile>> {
+        merge::list_conflicts(&self.git)
+    }
+
+    /// 合并页签的数据：三个版本、按块分好的改动与初始结果。
+    pub fn merge_layout(&self, data_dir: &Path, path: &str, auto_apply: bool) -> Result<merge::MergeLayout> {
+        merge::build_layout(&self.git, data_dir, &self.id, path, auto_apply, language_for_path(path))
+    }
+
+    /// “应用”合并结果：写前校验 → 存回收区 → 再核对 → 写工作区 → `git add` → 写后核对。
+    pub fn merge_apply(
+        &self,
+        path: &str,
+        result: &str,
+        expected_fingerprint: &str,
+        store: &RecoveryStore,
+    ) -> Result<merge::MergeOutcome> {
+        let _write = self.acquire_write_lock()?;
+        let stages = merge::read_stages(&self.git, Some(path))?
+            .remove(path)
+            .ok_or_else(|| AppError::rejected("这个文件已经没有未解决的冲突，请刷新后重试"))?;
+        if merge::fingerprint(&self.git, path)? != expected_fingerprint {
+            return Err(AppError::rejected("文件已变化，请重新打开合并页签"));
+        }
+        let ours = stages
+            .ours
+            .as_ref()
+            .ok_or_else(|| AppError::rejected("你的版本里已删除这个文件，只能接受一侧"))?;
+        let full = recovery::checked_path(&self.path, path)?;
+        if std::fs::symlink_metadata(&full).is_ok_and(|meta| !meta.is_file()) {
+            return Err(AppError::rejected("工作区里这个路径不是普通文件，只能接受一侧"));
+        }
+        // 换行风格保持与你的版本一致（设计第 4 节）。
+        let ours_bytes = self.git.run_ok(&["cat-file", "blob", &ours.oid], "读取你的版本")?.stdout;
+        let bytes = merge::result_bytes(result, ours_bytes.windows(2).any(|pair| pair == b"\r\n"));
+
+        let identity = WorktreeIdentity::capture(&self.git)?;
+        store.ensure_outside(&identity)?;
+        let paths = vec![path.to_string()];
+        let before = recovery::capture_files(&self.path, &paths)?;
+        let context = recovery::context_fingerprint(&self.git, &paths)?;
+        let (record, _record_in_use) =
+            store.save(identity, RecoverySource::MergeApply, path, before.clone(), context)?;
+        // 保存之后、写入之前再核对：期间被外部改动的内容不能被覆盖（同返修 C1）。
+        let still_same = merge::fingerprint(&self.git, path).is_ok_and(|current| current == expected_fingerprint)
+            && recovery::capture_files(&self.path, &paths).is_ok_and(|now| recovery::unchanged(&before, &now));
+        if !still_same {
+            store.finish(&record, &DiscardOutcome::NotApplied).map_err(discard_pending)?;
+            return Err(AppError::rejected("文件已变化，请重新打开合并页签"));
+        }
+        // 写已有文件时截断重写，可执行位不变；文件不在时按你的版本的模式创建。
+        let existed = full.exists();
+        std::fs::write(&full, &bytes).map_err(merge_pending)?;
+        if !existed && ours.mode == "100755" {
+            set_executable(&full).map_err(merge_pending)?;
+        }
+        // 用户明确点了“应用”：`git add` 标记为已解决（Q82）。
+        let output = self.git.run(&["--literal-pathspecs", "add", "--", path]).map_err(merge_pending)?;
+        if output.timed_out || output.exit_code != 0 {
+            return Err(merge_pending(format!("标记为已解决失败（退出码 {}）：{}", output.exit_code, output.stderr.trim())));
+        }
+        // 写后核对：不再是未解决冲突；工作区就是写入的结果；暂存区对象等于按属性计算的工作区对象。
+        let resolved = merge::read_stages(&self.git, Some(path)).is_ok_and(|stages| stages.is_empty());
+        let written = std::fs::read(&full).is_ok_and(|now| now == bytes);
+        let staged = merge::worktree_blob_id(&self.git, path)
+            .is_ok_and(|blob| merge::index_blob_id(&self.git, path) == Some(blob));
+        if !(resolved && written && staged) {
+            return Err(merge_pending("写后核对没有通过"));
+        }
+        let after = recovery::capture_files(&self.path, &paths).map_err(merge_pending)?;
+        store
+            .finish(&record, &DiscardOutcome::Completed { after })
+            .map_err(merge_pending)?;
+        self.refresh()
+            .map_err(|error| AppError::needs_verification(format!("合并结果已写入并保存，最新状态读取失败：{error}")))?;
+        Ok(merge::MergeOutcome { path: path.to_string(), recovery_record_id: Some(record.id.clone()) })
+    }
+
+    /// 整文件接受一侧（可多选）：`git checkout --ours|--theirs` 后 `git add`；
+    /// 那一侧删除了文件时用 `git rm`。每个文件都写前校验、先存回收区、写后核对。
+    pub fn merge_accept_side(
+        &self,
+        targets: &[(String, String)],
+        side: merge::MergeSide,
+        store: &RecoveryStore,
+    ) -> Result<Vec<merge::MergeOutcome>> {
+        let _write = self.acquire_write_lock()?;
+        // 整批先核对：任何一个文件变了就一个都不写。
+        for (path, fingerprint) in targets {
+            if merge::fingerprint(&self.git, path)? != *fingerprint {
+                return Err(AppError::rejected(format!("{path} 已变化，请重新确认")));
+            }
+        }
+        let mut outcomes = Vec::new();
+        for (path, fingerprint) in targets {
+            let done = |outcomes: &Vec<merge::MergeOutcome>| {
+                outcomes.iter().map(|outcome| outcome.path.as_str()).collect::<Vec<_>>().join("、")
+            };
+            let stages = merge::read_stages(&self.git, Some(path))?
+                .remove(path.as_str())
+                .ok_or_else(|| AppError::rejected(format!("{path} 已经没有未解决的冲突")))?;
+            let expected_blob = merge::side_blob_id(&stages, side);
+            let identity = WorktreeIdentity::capture(&self.git)?;
+            store.ensure_outside(&identity)?;
+            let paths = vec![path.clone()];
+            let before = recovery::capture_files(&self.path, &paths)?;
+            let context = recovery::context_fingerprint(&self.git, &paths)?;
+            let (record, _record_in_use) =
+                store.save(identity, RecoverySource::MergeApply, path, before.clone(), context)?;
+            let still_same = merge::fingerprint(&self.git, path).is_ok_and(|current| current == *fingerprint)
+                && recovery::capture_files(&self.path, &paths).is_ok_and(|now| recovery::unchanged(&before, &now));
+            if !still_same {
+                store.finish(&record, &DiscardOutcome::NotApplied).map_err(discard_pending)?;
+                return Err(AppError::rejected(format!(
+                    "{path} 已变化，没有写入；已完成：{}",
+                    if outcomes.is_empty() { "无".to_string() } else { done(&outcomes) }
+                )));
+            }
+            let output = if expected_blob.is_some() {
+                let checkout = self
+                    .git
+                    .run(&["--literal-pathspecs", "checkout", merge::checkout_flag(side), "--", path])
+                    .map_err(merge_pending)?;
+                if checkout.timed_out || checkout.exit_code != 0 {
+                    return Err(merge_pending(format!("取出这一侧失败（退出码 {}）：{}", checkout.exit_code, checkout.stderr.trim())));
+                }
+                self.git.run(&["--literal-pathspecs", "add", "--", path]).map_err(merge_pending)?
+            } else {
+                self.git.run(&["--literal-pathspecs", "rm", "--quiet", "--", path]).map_err(merge_pending)?
+            };
+            if output.timed_out || output.exit_code != 0 {
+                return Err(merge_pending(format!("标记为已解决失败（退出码 {}）：{}", output.exit_code, output.stderr.trim())));
+            }
+            // 写后核对：不再冲突；暂存区就是那一侧的对象，或那一侧删除后路径已不在。
+            let resolved = merge::read_stages(&self.git, Some(path)).is_ok_and(|stages| stages.is_empty());
+            let index_ok = merge::index_blob_id(&self.git, path) == expected_blob;
+            let worktree_ok = expected_blob.is_some() || std::fs::symlink_metadata(self.path.join(path)).is_err();
+            if !(resolved && index_ok && worktree_ok) {
+                return Err(merge_pending(format!("{path} 写后核对没有通过")));
+            }
+            let after = recovery::capture_files(&self.path, &paths).map_err(merge_pending)?;
+            store.finish(&record, &DiscardOutcome::Completed { after }).map_err(merge_pending)?;
+            outcomes.push(merge::MergeOutcome { path: path.clone(), recovery_record_id: Some(record.id.clone()) });
+        }
+        self.refresh()
+            .map_err(|error| AppError::needs_verification(format!("已接受一侧并保存，最新状态读取失败：{error}")))?;
+        Ok(outcomes)
+    }
 
     /// 从回收记录恢复完整工作区状态（Q29、Q85、ADR-0010）。
     ///
@@ -1292,6 +2105,42 @@ impl WorktreeSession {
             .ok_or_else(|| AppError::rejected("当前 hunk 无法生成补丁，请刷新后重新确认"))
     }
 
+    /// 从当前缓存的 hunk 按段切开补丁（返修 A1/Q142）。
+    ///
+    /// `forward`：暂存（true，保留 +/-）；丢弃与取消暂存用反向（false）。
+    /// 段来自显示时同批签发的 hunk_index/segment_index；模型缓存被刷新后
+    /// hunk 可能偏移，切不出补丁或与显示不一致时由调用方拒绝。
+    fn segment_patch(&self, path: &str, segment: &SegmentOverride, forward: bool) -> Result<Vec<u8>> {
+        let guard = self.snapshot.lock().map_err(|_| AppError::internal("状态锁失败"))?;
+        let snapshot = guard.as_ref().ok_or_else(|| AppError::rejected("请先读取仓库状态"))?;
+        let entry = snapshot
+            .entries
+            .iter()
+            .find(|entry| entry.path == path && entry.changes == ChangesKind::Unstaged)
+            .ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        // 忽略空白档位下：段编号来自带档位的 diff，补丁必须从同一档位的 hunk 切出
+        // （Q140）。普通档位直接用刷新时的缓存模型。
+        if entry.original_path.is_some() {
+            return Err(AppError::rejected("改名的文件只能整个文件操作"));
+        }
+        let model = if matches!(segment.ignore_whitespace, IgnoreWhitespace::Off) {
+            snapshot
+                .models
+                .get(&key(ChangesKind::Unstaged, path))
+                .map(|cached| cached.model.clone())
+        } else {
+            Some(self.read_ignore_model(path, ChangesKind::Unstaged, None, segment.ignore_whitespace)?)
+        };
+        let model = model.ok_or_else(|| AppError::rejected("文件已变化，请重新确认"))?;
+        segments::rewrite_hunk_for_segment(
+            &model,
+            segment.hunk_index as usize,
+            segment.segment_index,
+            forward,
+        )
+        .ok_or_else(|| AppError::rejected("当前块无法生成补丁，请刷新后重新确认"))
+    }
+
     /// 统一的写操作执行入口：锁重试在操作层进行，每次重试前重新读取状态并核对指纹（审查意见 1、2、7）。
     fn execute_staging_op(
         &self,
@@ -1301,6 +2150,17 @@ impl WorktreeSession {
         hunk_id: Option<&str>,
     ) -> Result<ChangesSnapshot> {
         let _guard = self.acquire_write_lock()?;
+        self.execute_staging_op_locked(path, expected_fp, is_stage, hunk_id)
+    }
+
+    /// 已持有同 worktree 写锁时的暂存 / 取消暂存实现（批量操作用）。
+    pub(crate) fn execute_staging_op_locked(
+        &self,
+        path: &str,
+        expected_fp: &str,
+        is_stage: bool,
+        hunk_id: Option<&str>,
+    ) -> Result<ChangesSnapshot> {
         let mut last_lock_err: Option<String> = None;
         const LOCK_RETRIES: usize = 3;
         const LOCK_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
@@ -1355,7 +2215,7 @@ impl WorktreeSession {
             let output = if let Some(hunk_id) = hunk_id {
                 // 状态读取期间可能刷新过快照；在真正应用前才解析仍有效的原始目标。
                 let patch = self.hunk_patch(path, expected_fp, hunk_id, is_stage)?;
-                self.git.apply_index_patch(patch, !is_stage)?
+                self.git.apply_index_patch(patch, !is_stage, false)?
             } else if is_stage {
                 // 暂存只取工作区这一侧；`original_path` 只用于「取消暂存已识别的改名」。
                 // 对 RM 的未暂存条目，原路径已不在工作区或暂存区里，一并传入会让
@@ -1415,6 +2275,33 @@ impl WorktreeSession {
     }
 }
 
+/// 核对段凭证（Q140）：档位只能是可按块写的两档以内，且与签发时一致；返回文件指纹。
+fn segment_fingerprint(credential: &str, ignore: IgnoreWhitespace) -> Result<&str> {
+    if !ignore.allows_segment_actions() {
+        return Err(AppError::rejected("同时忽略空行的档位只用于查看；关闭忽略空白后才能按块操作"));
+    }
+    segments::credential_fingerprint(credential, ignore)
+        .ok_or_else(|| AppError::rejected("忽略空白的设置已变化，请重新确认这个块"))
+}
+
+/// 合并写入在回收区保存之后失败：结果待核对，不自动继续（Q91）。
+fn merge_pending(error: impl std::fmt::Display) -> AppError {
+    AppError::needs_verification(format!("原内容已保存到回收区，合并结果待核对：{error}"))
+}
+
+#[cfg(unix)]
+fn set_executable(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut permissions = std::fs::metadata(path)?.permissions();
+    permissions.set_mode(permissions.mode() | 0o111);
+    std::fs::set_permissions(path, permissions)
+}
+
+#[cfg(not(unix))]
+fn set_executable(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 fn discard_pending(error: impl std::fmt::Display) -> AppError {
     AppError::needs_verification(format!("内容已保存到回收区，丢弃结果待核对；不会自动继续：{error}"))
 }
@@ -1447,10 +2334,11 @@ fn fill_entry(entry: &mut ChangeEntry, model: Option<&git::diff::FileChange>) {
             entry.added = file.added;
             entry.deleted = file.deleted;
             entry.hunk_count = file.hunks.len() as u32;
-            entry.row_count_unified = rows::row_count(file, ViewMode::Unified) as u32;
-            entry.row_count_split = rows::row_count(file, ViewMode::Split) as u32;
+            let layout_summary = rows::layout_summary(file);
+            entry.row_count_unified = layout_summary.unified_count as u32;
+            entry.row_count_split = layout_summary.split_count as u32;
             entry.collapsed = is_collapsed(&entry.path, file);
-            entry.hunks = rows::hunk_anchors(file);
+            entry.hunks = layout_summary.anchors;
         }
         None => {
             entry.collapsed = looks_like_lock(&entry.path);

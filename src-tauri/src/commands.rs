@@ -11,6 +11,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::acceptance::{deliver, Acceptance};
+use crate::batch::{BatchOutcome, BatchTarget};
 use crate::error::{AppError, Result};
 use crate::git::highlight::HighlightResult;
 use crate::git::rows::ViewMode;
@@ -18,6 +19,7 @@ use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
 use crate::settings::{Registry, Settings};
+use crate::worktree_status::WorktreeStatusEntry;
 use crate::recovery::{self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
 use crate::commit::{CommitDraft, DraftStore};
 use crate::commit_flow::{self, CommitOptions, CommitOutcome, CommitOutputEvent};
@@ -151,15 +153,48 @@ impl AppState {
         };
         let home = crate::shell::home_dir()?;
         let shell_env = crate::shell::resolve(&home, &path);
-        let session = WorktreeSession::open_with_review(
+        // 设置里手动指定的 Git 程序（Q27）；未指定时使用登录 shell PATH 中的 git。
+        let git_program = {
+            let registry = self
+                .registry
+                .lock()
+                .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+            registry
+                .settings()
+                .git_path
+                .clone()
+                .map(std::path::PathBuf::from)
+        };
+        let session = WorktreeSession::open_with_options(
             worktree_id,
             &path,
             shell_env,
             self.command_log.clone(),
             Some(self.review.clone()),
+            git_program.as_deref(),
         )?;
         sessions.insert(worktree_id.to_string(), session.clone());
         Ok(session)
+    }
+
+    /// 清空全部会话缓存：重新解析登录 shell 环境与 Git 程序（设置里的“重新加载环境”）。
+    ///
+    /// 有任何会话正在写操作时拒绝：清缓存会让下一次打开换一个新会话，
+    /// 绕过它的写锁，同一 worktree 可能并发写（返修 C3，Q90）。
+    pub fn reload_sessions(&self) -> Result<()> {
+        let sessions = self.sessions.lock().map_err(|_| AppError::internal("会话锁失败"))?;
+        for session in sessions.values() {
+            if *session.writing.lock().map_err(|_| AppError::internal("写操作锁失败"))? {
+                return Err(AppError::rejected(
+                    "有正在进行的写操作，完成后再重新加载环境",
+                ));
+            }
+        }
+        drop(sessions);
+        if let Ok(mut sessions) = self.sessions.lock() {
+            sessions.clear();
+        }
+        Ok(())
     }
 
     /// 取得某个已登记 worktree 的会话（命令层与生产入口测试共用同一条路径）。
@@ -210,8 +245,75 @@ pub struct RowsRequest {
     pub path: String,
     pub changes: ChangesKind,
     pub view: ViewMode,
+    /// 忽略空白档位（Q140）；缺省为关闭。
+    #[serde(default)]
+    pub ignore_whitespace: crate::git::segments::IgnoreWhitespace,
     pub from: u32,
     pub to: u32,
+}
+
+/// 左右对照布局请求（返修 A1/Q138）。
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SideLayoutRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub changes: ChangesKind,
+    #[serde(default)]
+    pub ignore_whitespace: crate::git::segments::IgnoreWhitespace,
+    #[serde(default = "default_context_lines")]
+    pub context_lines: u32,
+    /// 差异高亮粒度（按词、按字符、按行/不高亮）。
+    #[serde(default)]
+    pub highlight: String,
+}
+
+/// 左右对照取行请求（返修 A1/Q138）。
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SideLinesRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub changes: ChangesKind,
+    #[serde(default)]
+    pub ignore_whitespace: crate::git::segments::IgnoreWhitespace,
+    #[serde(default = "default_context_lines")]
+    pub context_lines: u32,
+    #[serde(default)]
+    pub highlight: String,
+    pub version: FileVersion,
+    pub from: u32,
+    pub to: u32,
+}
+
+fn default_context_lines() -> u32 {
+    3
+}
+
+/// 按段（块）操作请求（返修 A1/Q142）。
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SegmentRequest {
+    pub worktree_id: String,
+    pub path: String,
+    /// 段的写入凭证（`SegmentAction.credential`，含签发时的忽略空白档位）。
+    pub credential: String,
+    pub hunk_index: u32,
+    pub segment_index: u32,
+    pub ignore_whitespace: crate::git::segments::IgnoreWhitespace,
+}
+
+/// 丢弃一段（块）的请求：比暂存多一个用户确认时的快照版本。
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscardSegmentRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub credential: String,
+    pub snapshot_revision: String,
+    pub hunk_index: u32,
+    pub segment_index: u32,
+    pub ignore_whitespace: crate::git::segments::IgnoreWhitespace,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -234,6 +336,10 @@ pub struct RowIndexRequest {
     pub view: ViewMode,
     pub line: u32,
     pub version: FileVersion,
+    #[serde(default)]
+    pub ignore_whitespace: crate::git::segments::IgnoreWhitespace,
+    pub expected_fingerprint: Option<String>,
+    pub expected_snapshot_revision: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -263,12 +369,164 @@ pub struct HunkRequest {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BatchRequest {
+    pub worktree_id: String,
+    pub targets: Vec<BatchTarget>,
+    /// 丢弃时用户确认的原快照版本；暂存不需要。
+    #[serde(default)]
+    pub snapshot_revision: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListWorktreeStatusRequest {
+    pub repo_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiscardRequest {
     pub worktree_id: String,
     pub path: String,
     pub fingerprint: String,
     pub snapshot_revision: String,
     pub hunk_id: Option<String>,
+}
+
+/// 提交时警告（返修 E.3，Q139）：CRLF、游离 HEAD 或 rebase、大文件、非法文件名。
+// ---------- 内置三方合并（返修 F10，Q143） ----------
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeOpenRequest {
+    pub worktree_id: String,
+    pub path: String,
+    /// 覆盖“合并时自动应用无冲突改动”设置（“应用所有不冲突的改动”按钮用）。
+    #[serde(default)]
+    pub auto_apply: Option<bool>,
+}
+
+/// 未解决冲突的文件与两侧状态（冲突对话框）。
+#[tauri::command]
+pub async fn list_conflicts(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<Vec<crate::merge::ConflictFile>> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || session.list_conflicts())
+        .await
+        .map_err(|error| AppError::internal(format!("读取冲突列表失败：{error}")))?
+}
+
+/// 合并页签的数据（Q143）。
+#[tauri::command]
+pub async fn merge_open(
+    state: State<'_, AppState>,
+    request: MergeOpenRequest,
+) -> Result<crate::merge::MergeLayout> {
+    let session = state.session(&request.worktree_id)?;
+    let auto_apply = match request.auto_apply {
+        Some(value) => value,
+        None => {
+            let registry = state
+                .registry
+                .lock()
+                .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+            registry.settings().merge_auto_apply
+        }
+    };
+    let data_dir = state.data_dir.clone();
+    let path = request.path.clone();
+    let worktree_id = request.worktree_id.clone();
+    tauri::async_runtime::spawn_blocking(move || session.merge_layout(&data_dir, &path, auto_apply))
+        .await
+        .map_err(|error| AppError::internal(format!("读取合并页签失败：{error}")))?
+        .map(|mut layout| {
+            layout.worktree_id = worktree_id;
+            layout
+        })
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeApplyRequest {
+    pub worktree_id: String,
+    pub path: String,
+    pub result: String,
+    pub fingerprint: String,
+}
+
+/// “应用”：写前校验、存回收区、写工作区、`git add`、写后核对。
+#[tauri::command]
+pub async fn merge_apply(
+    state: State<'_, AppState>,
+    request: MergeApplyRequest,
+) -> Result<crate::merge::MergeOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        session.merge_apply(&request.path, &request.result, &request.fingerprint, &store)
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("应用合并结果时中断，结果待核对：{error}")))?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeAcceptRequest {
+    pub worktree_id: String,
+    /// 每个文件带它的指纹（冲突列表或合并页签签发），写前逐个核对。
+    pub targets: Vec<MergeAcceptTarget>,
+    pub side: crate::merge::MergeSide,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeAcceptTarget {
+    pub path: String,
+    pub fingerprint: String,
+}
+
+/// 整文件接受一侧（可多选）。
+#[tauri::command]
+pub async fn merge_accept_side(
+    state: State<'_, AppState>,
+    request: MergeAcceptRequest,
+) -> Result<Vec<crate::merge::MergeOutcome>> {
+    let session = state.session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let targets: Vec<(String, String)> =
+            request.targets.into_iter().map(|target| (target.path, target.fingerprint)).collect();
+        session.merge_accept_side(&targets, request.side, &store)
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("接受一侧时中断，结果待核对：{error}")))?
+}
+
+#[tauri::command]
+pub async fn commit_warnings(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<Vec<crate::commit_warnings::CommitWarning>> {
+    let session = state.session(&request.worktree_id)?;
+    let settings = {
+        let registry = state
+            .registry
+            .lock()
+            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        registry.settings().clone()
+    };
+    let options = crate::commit_warnings::WarningOptions {
+        crlf: settings.commit_warn_crlf,
+        detached: settings.commit_warn_detached,
+        large_file_bytes: settings.commit_warn_large_file_bytes,
+        invalid_filename: settings.commit_warn_invalid_filename,
+    };
+    let git = session.git().clone();
+    tauri::async_runtime::spawn_blocking(move || crate::commit_warnings::collect(&git, &options))
+        .await
+        .map_err(|error| AppError::internal(format!("提交前检查失败：{error}")))?
 }
 
 #[tauri::command]
@@ -318,6 +576,83 @@ pub async fn set_diff_font_size(state: State<'_, AppState>, size: u32) -> Result
         .lock()
         .map_err(|_| AppError::internal("仓库列表锁失败"))?;
     registry.update_font_size(size)
+}
+
+/// 修改设置（颜色主题、代码字体与字号、Git 程序路径、合并工具）。
+#[tauri::command]
+pub async fn update_settings(
+    state: State<'_, AppState>,
+    request: crate::settings::SettingsPatch,
+) -> Result<Settings> {
+    let mut registry = state
+        .registry
+        .lock()
+        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    registry.update_settings(&request)
+}
+
+/// 重新解析登录 shell 环境与 Git 程序：丢弃会话缓存，下一次打开会重新探测。
+/// 有写操作进行中时拒绝，避免绕过写锁并发写（返修 C3，Q90）。
+#[tauri::command]
+pub async fn reload_environment(state: State<'_, AppState>) -> Result<()> {
+    state.reload_sessions()
+}
+
+/// worktree 下拉的只读状态（M4 F09.2）。
+#[tauri::command]
+pub async fn list_worktree_status(
+    state: State<'_, AppState>,
+    request: ListWorktreeStatusRequest,
+) -> Result<Vec<WorktreeStatusEntry>> {
+    let repo = {
+        let registry = state
+            .registry
+            .lock()
+            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        registry
+            .find(&request.repo_id)
+            .ok_or_else(|| AppError::rejected("仓库未登记，请先添加"))?
+    };
+    // 优先使用该仓库已有会话的 Git 上下文（同一套登录 shell 环境），
+    // 否则按仓库路径解析一次；不在命令里重复为每个 worktree 启动登录 shell。
+    let git = {
+        let sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| AppError::internal("会话锁失败"))?;
+        repo.worktrees
+            .iter()
+            .find_map(|worktree| sessions.get(&worktree.id).cloned())
+    };
+    let git = match git {
+        Some(session) => session.git().clone(),
+        None => {
+            let home = crate::shell::home_dir()?;
+            let path = std::path::PathBuf::from(&repo.path);
+            let shell_env = crate::shell::resolve(&home, &path);
+            let program = {
+                let registry = state
+                    .registry
+                    .lock()
+                    .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+                registry
+                    .settings()
+                    .git_path
+                    .clone()
+                    .map(std::path::PathBuf::from)
+            };
+            crate::git::Git::with_program(&path, &shell_env, state.command_log.clone(), program.as_deref())?
+        }
+    };
+    let entries = repo.worktrees;
+    tauri::async_runtime::spawn_blocking(move || {
+        entries
+            .iter()
+            .map(|entry| crate::worktree_status::read(&git, entry))
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取 worktree 状态失败：{error}")))
 }
 
 #[tauri::command]
@@ -527,6 +862,56 @@ async fn execute_discard(state: State<'_, AppState>, request: DiscardRequest, hu
         }
     }).await.map_err(|error| AppError::needs_verification(format!("丢弃任务中断，结果待核对：{error}")))?;
     deliver(state.acceptance.as_ref(), if hunk { "discard_hunk" } else { "discard_file" }, &context.worktree_id, Some(&context.path), result).await
+}
+
+#[tauri::command]
+pub async fn stage_files(
+    state: State<'_, AppState>,
+    request: BatchRequest,
+) -> Result<BatchOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.stage_files(&request.targets, true)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("批量暂存失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "stage_files", &context.worktree_id, None, Ok(result)).await
+}
+
+#[tauri::command]
+pub async fn unstage_files(
+    state: State<'_, AppState>,
+    request: BatchRequest,
+) -> Result<BatchOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.stage_files(&request.targets, false)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("批量取消暂存失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "unstage_files", &context.worktree_id, None, Ok(result)).await
+}
+
+#[tauri::command]
+pub async fn discard_files(
+    state: State<'_, AppState>,
+    request: BatchRequest,
+) -> Result<BatchOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    let revision = request
+        .snapshot_revision
+        .clone()
+        .ok_or_else(|| AppError::rejected("批量丢弃缺少确认时的快照版本"))?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.discard_files(&request.targets, &revision, &store)
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("批量丢弃任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "discard_files", &context.worktree_id, None, Ok(result)).await
 }
 
 #[tauri::command]
@@ -831,11 +1216,152 @@ pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Resul
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.rows(&request.path, request.changes, request.view, request.from, request.to)
+        session.rows_with_ignore(
+            &request.path,
+            request.changes,
+            request.view,
+            request.ignore_whitespace,
+            request.from,
+            request.to,
+        )
     })
     .await
     .map_err(|error| AppError::internal(format!("取显示行失败：{error}")))?;
     deliver(state.acceptance.as_ref(), "get_rows", &context.worktree_id, Some(&context.path), result).await
+}
+
+/// 左右对照布局（返修 A1/Q138）：两侧行数、段、折叠区与段操作目标。
+#[tauri::command]
+pub async fn side_by_side_layout(
+    state: State<'_, AppState>,
+    request: SideLayoutRequest,
+) -> Result<crate::session::SideBySideLayout> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.side_layout(
+            &request.path,
+            request.changes,
+            request.ignore_whitespace,
+            request.context_lines,
+        )
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取左右对照布局失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "side_by_side_layout", &context.worktree_id, Some(&context.path), result).await
+}
+
+/// 左右对照取行（返修 A1/Q138）：按需取一侧的行、改动标记与词级区间。
+#[tauri::command]
+pub async fn side_lines(
+    state: State<'_, AppState>,
+    request: SideLinesRequest,
+) -> Result<Vec<crate::git::segments::SideLine>> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.side_lines(
+            &request.path,
+            request.changes,
+            request.ignore_whitespace,
+            request.context_lines,
+            request.version,
+            request.from,
+            request.to,
+            crate::git::segments::WordGranularity::from_setting(&request.highlight),
+        )
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("取左右对照的行失败：{error}")))?;
+    deliver(state.acceptance.as_ref(), "side_lines", &context.worktree_id, Some(&context.path), result).await
+}
+
+/// 暂存一段（块）（返修 A1/Q142）：补丁由 Rust 从同一个 Git hunk 按段切开。
+#[tauri::command]
+pub async fn stage_segment(
+    state: State<'_, AppState>,
+    request: SegmentRequest,
+) -> Result<ChangesSnapshot> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.execute_segment_op(
+            &request.path,
+            &request.credential,
+            request.hunk_index,
+            request.segment_index,
+            true,
+            request.ignore_whitespace,
+        )
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("暂存块任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "stage_segment", &context.worktree_id, Some(&context.path), result).await
+}
+
+/// 取消暂存一段（块）（返修 A1/Q142）。
+#[tauri::command]
+pub async fn unstage_segment(
+    state: State<'_, AppState>,
+    request: SegmentRequest,
+) -> Result<ChangesSnapshot> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.execute_segment_op(
+            &request.path,
+            &request.credential,
+            request.hunk_index,
+            request.segment_index,
+            false,
+            request.ignore_whitespace,
+        )
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("取消暂存块任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "unstage_segment", &context.worktree_id, Some(&context.path), result).await
+}
+
+/// 丢弃一段（块）（返修 A1/Q142）：先存回收区，再反向应用补丁。
+#[tauri::command]
+pub async fn discard_segment(
+    state: State<'_, AppState>,
+    request: DiscardSegmentRequest,
+) -> Result<ChangesSnapshot> {
+    let session = state.session(&request.worktree_id)?;
+    let context = request.clone();
+    let store = state.recovery.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        session.discard_segment(
+            &request.path,
+            &request.credential,
+            &request.snapshot_revision,
+            request.hunk_index,
+            request.segment_index,
+            request.ignore_whitespace,
+            &store,
+        )
+    })
+    .await
+    .map_err(|error| AppError::needs_verification(format!("丢弃块任务中断，结果待核对：{error}")))?;
+    deliver(state.acceptance.as_ref(), "discard_segment", &context.worktree_id, Some(&context.path), result).await
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HighlightTextRequest {
+    pub worktree_id: String,
+    #[serde(flatten)]
+    pub request: crate::git::highlight::HighlightRequest,
+}
+
+/// 合并页签按内容取高亮（Q143）。
+#[tauri::command]
+pub async fn highlight_text(state: State<'_, AppState>, request: HighlightTextRequest) -> Result<HighlightResult> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || session.highlight_text(request.request))
+        .await
+        .map_err(|error| AppError::internal(format!("高亮失败：{error}")))?
 }
 
 #[tauri::command]
@@ -865,12 +1391,15 @@ pub async fn row_index_for_line(state: State<'_, AppState>, request: RowIndexReq
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.row_index_for_line(
+        session.row_index_for_line_with_ignore(
             &request.path,
             request.changes,
             request.view,
             request.line,
             request.version,
+            request.ignore_whitespace,
+            request.expected_fingerprint.as_deref(),
+            request.expected_snapshot_revision.as_deref(),
         )
     })
     .await

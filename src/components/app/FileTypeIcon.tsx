@@ -1,49 +1,59 @@
 /**
- * 文件类型图标：照 JetBrains 新版界面的彩色圆角方块加字母（Q107）。
- * 只是辨认文件类型的视觉提示；Git 状态仍只由行右侧的状态字母表示（Q31）。
+ * 文件类型图标：VS Code 的 Material Icon Theme（M4 F01.3、Q130）。
+ *
+ * 图标与映射来自 VS Code 扩展 pkief.material-icon-theme 5.39.0（MIT），
+ * 由 `tools/sync-material-icons.mjs` 复制到 `src/assets/material-icons/`；
+ * 许可见同目录的 `LICENSE.txt`。查找顺序与 VS Code 一致：
+ * 完整文件名 → 从长到短的扩展名 → 默认文件图标。
  */
 
-import { Link2 } from "lucide-react";
+import manifest from "@/assets/material-icons/manifest.json";
+import { Codicon } from "@/components/ui/codicon";
 
-const TYPES: Record<string, [color: string, label: string]> = {
-  ts: ["var(--file-typescript)", "TS"],
-  tsx: ["var(--file-typescript)", "TX"],
-  js: ["var(--file-javascript)", "JS"],
-  jsx: ["var(--file-javascript)", "JX"],
-  mjs: ["var(--file-javascript)", "JS"],
-  rs: ["var(--file-rust)", "RS"],
-  json: ["var(--file-json)", "{}"],
-  yaml: ["var(--file-yaml)", "Y"],
-  yml: ["var(--file-yaml)", "Y"],
-  toml: ["var(--file-toml)", "T"],
-  md: ["var(--file-markdown)", "M"],
-  css: ["var(--file-css)", "#"],
-  html: ["var(--file-html)", "<>"],
-  sql: ["var(--file-sql)", "SQ"],
-  sh: ["var(--file-shell)", "$"],
-  py: ["var(--file-python)", "PY"],
-  png: ["var(--file-image)", "P"],
-  jpg: ["var(--file-image)", "P"],
-  jpeg: ["var(--file-image)", "P"],
-  gif: ["var(--file-image)", "P"],
-  svg: ["var(--file-image)", "P"],
-};
-const FALLBACK: [string, string] = ["var(--file-default)", ""];
+const iconModules = import.meta.glob<string>("../../assets/material-icons/icons/*.svg", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
 
-export function FileTypeIcon({ path, symlink }: { path: string; symlink?: boolean }) {
-  if (symlink) return <Link2 aria-hidden className="size-4 shrink-0 text-icon" strokeWidth={1.6} />;
+const iconUrls = new Map<string, string>();
+for (const [path, url] of Object.entries(iconModules)) {
+  const name = path.slice(path.lastIndexOf("/") + 1, -".svg".length);
+  iconUrls.set(name, url);
+}
+
+const fileExtensions = manifest.fileExtensions as Record<string, string>;
+const fileNames = manifest.fileNames as Record<string, string>;
+const defaultIcon = manifest.default as string;
+
+/** 解析一个路径应使用的 Material Icon 名称。 */
+export function materialIconName(path: string): string {
   const name = path.slice(path.lastIndexOf("/") + 1);
-  const dot = name.lastIndexOf(".");
-  const [color, label] = dot > 0 ? (TYPES[name.slice(dot + 1).toLowerCase()] ?? FALLBACK) : FALLBACK;
+  const exact = fileNames[name] ?? fileNames[name.toLowerCase()];
+  if (exact) return exact;
+  const parts = name.toLowerCase().split(".");
+  for (let index = 1; index < parts.length; index += 1) {
+    const extension = parts.slice(index).join(".");
+    const icon = fileExtensions[extension];
+    if (icon) return icon;
+  }
+  return defaultIcon;
+}
+
+export function FileTypeIcon({ path, symlink, className }: { path: string; symlink?: boolean; className?: string }) {
+  if (symlink) {
+    return <Codicon name="link" size={16} className={`shrink-0 ${className ?? ""}`} />;
+  }
+  const name = materialIconName(path);
+  const url = iconUrls.get(name) ?? iconUrls.get(defaultIcon);
+  if (!url) return null;
   return (
-    <svg aria-hidden viewBox="0 0 16 16" className="size-4 shrink-0">
-      <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill={color} />
-      {label ? (
-        <text x="8" y="10.6" textAnchor="middle" fontSize={label.length > 1 ? 6.4 : 7.6} fontWeight={700}
-          fontFamily="Inter, sans-serif" fill="var(--file-icon-label)">
-          {label}
-        </text>
-      ) : null}
-    </svg>
+    <img
+      src={url}
+      alt=""
+      aria-hidden
+      draggable={false}
+      className={`size-4 shrink-0 select-none ${className ?? ""}`}
+    />
   );
 }

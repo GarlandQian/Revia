@@ -3,20 +3,30 @@ import type { HunkAction } from "./HunkAction";
 import type { LineKind } from "./LineKind";
 import type { RowCell } from "./RowCell";
 import type { RowKind } from "./RowKind";
+import type { SegmentAction } from "./SegmentAction";
 
 /**
  * 界面上的一个显示行。统一视图用 `lineKind`/`text`，并排视图用 `left`/`right`。
  */
-export type RenderRow = { kind: RowKind, hunkIndex: number, hunkAction: HunkAction | null,
+export type RenderRow = { kind: RowKind, hunkIndex: number, hunkAction: HunkAction | null, 
 /**
  * hunk 头显示的内容。
  */
-section: string | null,
+section: string | null, 
 /**
  * 统一视图：旧行号 / 新行号；并排视图：配对两侧的行号。
  */
-oldLine: number | null, newLine: number | null, lineKind: LineKind | null, text: string | null, left: RowCell | null, right: RowCell | null,
+oldLine: number | null, newLine: number | null, lineKind: LineKind | null, text: string | null, left: RowCell | null, right: RowCell | null, 
 /**
  * 该行属于“先删后增”的修改块：同一块里既有删除行又有新增行。界面据此把修改与纯新增、纯删除分开着色。
  */
-modified: boolean, };
+modified: boolean, 
+/**
+ * 统一视图里这一行是某一段（块）的首行时，给段在 hunk 内的序号（Q142）。
+ * 只有首行带按钮，其余行是 None。
+ */
+segmentIndex: number | null, 
+/**
+ * 段操作目标；与显示同批签发（由会话层填充）。
+ */
+segmentAction: SegmentAction | null, };

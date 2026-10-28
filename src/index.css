@@ -1,395 +1,368 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-
-@custom-variant dark (&:is(.dark *));
+@import "./themes/themes.css";
 
 /*
- * 外观照 Rebased（JetBrains 新版界面）的岛屿面板与配色（Q107）：
- * 窗口底色（frame）上放两块岛屿面板——“变更”工具窗口（tool）和 diff 编辑区（island）。
- * shadcn 的语义色名保留，组件自动跟随；JetBrains 专有的颜色另起名字。
+ * 外观照 VS Code 与所选颜色主题（Q131、Q132）：所有颜色都取自
+ * `src/themes/themes.css` 里的 VS Code 键，保留 shadcn 基础组件需要的语义映射。
+ * 布局与交互照 Rebased（Q119），尺寸按效果图：主工具栏 38、页签 35、状态栏 22、
+ * 列表行 22。
  */
+@custom-variant dark (&:is([data-kind="dark"] *));
+
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
-    --font-mono: "JetBrains Mono", "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
-    --color-frame: var(--frame);
-    --color-island: var(--island);
-    --color-tool: var(--tool);
-    --color-edge: var(--edge);
-    --color-fg-2: var(--fg-2);
-    --color-fg-3: var(--fg-3);
-    --color-icon: var(--icon);
-    --color-hover: var(--hover);
-    --color-row-hover: var(--row-hover);
-    --color-sel: var(--sel);
-    --color-sel-inactive: var(--sel-inactive);
-    --color-link: var(--link);
-    --color-btn-edge: var(--btn-edge);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+  --font-heading: var(--font-sans);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Helvetica Neue", sans-serif;
+  --font-mono: var(--code-font-family, "JetBrains Mono", "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace);
+  --color-titlebar-activebackground: var(--titlebar-activebackground);
+  --color-editor-background: var(--editor-background);
+  --color-sidebar-background: var(--sidebar-background);
+  --color-panel-border: var(--panel-border);
+  --color-descriptionforeground: var(--descriptionforeground);
+  --color-icon-foreground: var(--icon-foreground);
+  --color-toolbar-hoverbackground: var(--toolbar-hoverbackground);
+  --color-list-hoverbackground: var(--list-hoverbackground);
+  --color-list-activeselectionbackground: var(--list-activeselectionbackground);
+  --color-list-inactiveselectionbackground: var(--list-inactiveselectionbackground);
+  --color-textlink-foreground: var(--textlink-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 5px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+  --radius-4xl: 14px;
 }
 
-/* Islands Light */
+/* shadcn 组件语义色：全部来自当前颜色主题。 */
 :root {
-    --frame: #ebecf0;
-    --island: #ffffff;
-    --tool: #f7f8fa;
-    --edge: #dfe1e5;
-    --fg-2: #6c707e;
-    --fg-3: #a8adbd;
-    --icon: #6c707e;
-    --hover: #dfe1e5;
-    --row-hover: #edeef2;
-    --sel: #d4e2ff;
-    --sel-inactive: #dfe1e5;
-    --link: #2e6ae1;
-    --btn-edge: #c9ccd6;
-    --badge: #e8794a;
-    --banner-info: #edf3ff;
-    --banner-info-edge: #c2d6fc;
-    --banner-info-icon: #3574f0;
-    --banner-warn: #fff6de;
-    --banner-warn-edge: #fed277;
-    --banner-warn-icon: #e5a213;
-    --banner-error: #fff7f7;
-    --banner-error-edge: #fad4d8;
-    --banner-error-icon: #db3b4b;
+  --background: var(--editor-background);
+  --foreground: var(--ui-foreground);
+  --card: var(--editorwidget-background);
+  --card-foreground: var(--foreground);
+  --popover: var(--editorwidget-background);
+  --popover-foreground: var(--foreground);
+  --primary: var(--button-background);
+  --primary-foreground: var(--button-foreground);
+  --secondary: var(--button-secondarybackground);
+  --secondary-foreground: var(--button-secondaryforeground);
+  --muted: var(--sidebarsectionheader-background);
+  --muted-foreground: var(--descriptionforeground);
+  --accent: var(--list-hoverbackground);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--gitdecoration-conflictingresourceforeground);
+  --border: var(--panel-border);
+  --input: var(--input-border);
+  --ring: var(--focusborder);
+  --chart-1: var(--descriptionforeground);
+  --chart-2: var(--icon-foreground);
+  --chart-3: var(--foreground);
+  --chart-4: var(--textlink-foreground);
+  --chart-5: var(--button-background);
+  --radius: 4px;
+  --sidebar: var(--sidebar-background);
+  --sidebar-foreground: var(--descriptionforeground);
+  --sidebar-primary: var(--button-background);
+  --sidebar-primary-foreground: var(--button-foreground);
+  --sidebar-accent: var(--list-hoverbackground);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--panel-border);
+  --sidebar-ring: var(--focusborder);
+  --overlay: rgb(0 0 0 / 30%);
 
-    --background: #ffffff;
-    --foreground: #1e1f22;
-    --card: #ffffff;
-    --card-foreground: #1e1f22;
-    --popover: #ffffff;
-    --popover-foreground: #1e1f22;
-    --primary: #3574f0;
-    --primary-foreground: #ffffff;
-    --secondary: #f7f8fa;
-    --secondary-foreground: #1e1f22;
-    --muted: #f2f3f5;
-    --muted-foreground: #6c707e;
-    --accent: #dfe1e5;
-    --accent-foreground: #1e1f22;
-    --destructive: #db3b4b;
-    --border: #ebecf0;
-    --input: #c9ccd6;
-    --ring: #3574f0;
-    --chart-1: #c9ccd6;
-    --chart-2: #a8adbd;
-    --chart-3: #6c707e;
-    --chart-4: #494b57;
-    --chart-5: #1e1f22;
-    --radius: 0.375rem;
-    --sidebar: #f7f8fa;
-    --sidebar-foreground: #1e1f22;
-    --sidebar-primary: #3574f0;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #dfe1e5;
-    --sidebar-accent-foreground: #1e1f22;
-    --sidebar-border: #ebecf0;
-    --sidebar-ring: #3574f0;
-    /* 模态遮罩：跟随主题，不写死颜色（Q50、technical-direction）。 */
-    --overlay: rgb(0 0 0 / 16%);
+  /* 尺寸（效果图与 VS Code 一致）。 */
+  --titlebar-height: 38px;
+  --tab-height: 35px;
+  --statusbar-height: 22px;
+  --row-height: 22px;
+  --activitybar-width: 44px;
+  --editor-min-width: 240px;
+  --sidebar-width: 330px;
+
+  /* 代码字体与字号：设置里可改（Q133），默认随应用打包的 JetBrains Mono。 */
+  --code-font-size: 12px;
+
+  /* 语法颜色（tokenColors）。 */
+  --syntax-plain: var(--syn-default);
+  --syntax-comment: var(--syn-comment);
+  --syntax-string: var(--syn-string);
+  --syntax-number: var(--syn-number);
+  --syntax-constant: var(--syn-constant);
+  --syntax-keyword: var(--syn-keyword);
+  --syntax-function: var(--syn-func);
+  --syntax-type: var(--syn-type);
+  --syntax-variable: var(--syn-variable);
+  --syntax-parameter: var(--syn-param);
+  --syntax-tag: var(--syn-tag);
+  --syntax-attribute: var(--syn-attr);
+  --syntax-punctuation: var(--syn-punct);
+  --syntax-operator: var(--syn-operator);
+  --syntax-invalid: var(--gitdecoration-conflictingresourceforeground);
 }
-
-/* Islands Dark：跟随系统深浅色（Q50）；也保留 .dark 类以便以后加手动覆盖。 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --frame: #141519;
-    --island: #1e1f22;
-    --tool: #1e1f22;
-    --edge: #2b2d30;
-    --fg-2: #868a91;
-    --fg-3: #5a5d63;
-    --icon: #a9acb3;
-    --hover: #2b2d30;
-    --row-hover: #26282b;
-    --sel: #2e436e;
-    --sel-inactive: #393b40;
-    --link: #548af7;
-    --btn-edge: #4e5157;
-    --badge: #c76a3f;
-    --banner-info: #25324d;
-    --banner-info-edge: #35538f;
-    --banner-info-icon: #548af7;
-    --banner-warn: #3d3223;
-    --banner-warn-edge: #5e4d33;
-    --banner-warn-icon: #f2c55c;
-    --banner-error: #402929;
-    --banner-error-edge: #5e3838;
-    --banner-error-icon: #f75464;
-
-    --background: #1e1f22;
-    --foreground: #dfe1e5;
-    --card: #2b2d30;
-    --card-foreground: #dfe1e5;
-    --popover: #2b2d30;
-    --popover-foreground: #dfe1e5;
-    --primary: #3574f0;
-    --primary-foreground: #ffffff;
-    --secondary: #2b2d30;
-    --secondary-foreground: #dfe1e5;
-    --muted: #2b2d30;
-    --muted-foreground: #868a91;
-    --accent: #2b2d30;
-    --accent-foreground: #dfe1e5;
-    --destructive: #f75464;
-    --border: #2b2d30;
-    --input: #4e5157;
-    --ring: #548af7;
-    --chart-1: #4e5157;
-    --chart-2: #5a5d63;
-    --chart-3: #868a91;
-    --chart-4: #a9acb3;
-    --chart-5: #dfe1e5;
-    --sidebar: #1e1f22;
-    --sidebar-foreground: #dfe1e5;
-    --sidebar-primary: #3574f0;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #2b2d30;
-    --sidebar-accent-foreground: #dfe1e5;
-    --sidebar-border: #2b2d30;
-    --sidebar-ring: #548af7;
-    /* 深色下遮罩更重，保证对比。 */
-    --overlay: rgb(0 0 0 / 45%);
-  }
-}
-
-.dark {
-    --frame: #141519;
-    --island: #1e1f22;
-    --tool: #1e1f22;
-    --edge: #2b2d30;
-    --fg-2: #868a91;
-    --fg-3: #5a5d63;
-    --icon: #a9acb3;
-    --hover: #2b2d30;
-    --row-hover: #26282b;
-    --sel: #2e436e;
-    --sel-inactive: #393b40;
-    --link: #548af7;
-    --btn-edge: #4e5157;
-    --badge: #c76a3f;
-    --banner-info: #25324d;
-    --banner-info-edge: #35538f;
-    --banner-info-icon: #548af7;
-    --banner-warn: #3d3223;
-    --banner-warn-edge: #5e4d33;
-    --banner-warn-icon: #f2c55c;
-    --banner-error: #402929;
-    --banner-error-edge: #5e3838;
-    --banner-error-icon: #f75464;
-    --background: #1e1f22;
-    --foreground: #dfe1e5;
-    --card: #2b2d30;
-    --card-foreground: #dfe1e5;
-    --popover: #2b2d30;
-    --popover-foreground: #dfe1e5;
-    --primary: #3574f0;
-    --primary-foreground: #ffffff;
-    --secondary: #2b2d30;
-    --secondary-foreground: #dfe1e5;
-    --muted: #2b2d30;
-    --muted-foreground: #868a91;
-    --accent: #2b2d30;
-    --accent-foreground: #dfe1e5;
-    --destructive: #f75464;
-    --border: #2b2d30;
-    --input: #4e5157;
-    --ring: #548af7;
-    --sidebar: #1e1f22;
-    --sidebar-foreground: #dfe1e5;
-    --sidebar-primary: #3574f0;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #2b2d30;
-    --sidebar-accent-foreground: #dfe1e5;
-    --sidebar-border: #2b2d30;
-    --sidebar-ring: #548af7;
-    --overlay: rgb(0 0 0 / 45%);
-}
-
 
 @layer base {
   html,
   body,
   #root {
     height: 100%;
-    }
+  }
 
   body {
     overflow: hidden;
-    }
+  }
 
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-frame text-foreground;
-    font-size: 13px;
-    -webkit-font-smoothing: antialiased;
-    }
-  html {
-    @apply font-sans;
-    }
-}
-
-:root {
-  --file-typescript: #3178c6;
-  --file-javascript: #d6a514;
-  --file-rust: #c46a2f;
-  --file-json: #7a8291;
-  --file-yaml: #c9634f;
-  --file-toml: #9a6b3f;
-  --file-markdown: #5b8bd0;
-  --file-css: #8250df;
-  --file-html: #d4643a;
-  --file-sql: #d98e2b;
-  --file-shell: #4f9a5b;
-  --file-python: #3d7ab8;
-  --file-image: #9c6ade;
-  --file-default: #8c90a0;
-  --file-icon-label: #ffffff;
-}
-
-/* ---------- 窗口框架：主工具栏、工具窗口图标条、岛屿面板、状态栏（Q107） ---------- */
-/* 放在 components 层，让 Tailwind 工具类（如 pl-7、size-[30px]）能覆盖。 */
-@layer components {
-  .project-badge {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 5px;
-    background: var(--badge);
-    color: #ffffff;
-    font-size: 11px;
-    font-weight: 600;
   }
 
-  /* 工具栏里的组件、图标按钮：无边框，悬停时出底色。 */
+  body {
+    @apply bg-titlebar-activebackground text-foreground;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html {
+    @apply font-sans;
+    /* 界面缩放（返修 E.2）：设置里可改 80%–150%，默认 100%。 */
+    zoom: var(--ui-zoom, 1);
+  }
+
+  ::selection {
+    background: var(--list-activeselectionbackground);
+    color: var(--list-activeselectionforeground);
+  }
+}
+
+/* ---------- 窗口框架：主工具栏、图标条、工具窗口、编辑器页签、状态栏（Q119） ---------- */
+@layer components {
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: var(--titlebar-height);
+    padding-right: 8px;
+    background: var(--titlebar-activebackground);
+    color: var(--titlebar-activeforeground);
+    border-bottom: 1px solid var(--titlebar-border);
+  }
+
   .toolbar-widget,
   .icon-action {
     display: inline-flex;
     align-items: center;
     border-radius: 5px;
-    color: var(--foreground);
+    color: inherit;
     white-space: nowrap;
     outline: none;
+    /* 返修 B11：与 VS Code 相当的短过渡（悬停、按下）。 */
+    transition: background-color 120ms ease, color 120ms ease;
   }
 
   .toolbar-widget {
-    height: 28px;
+    height: 26px;
     gap: 6px;
     padding: 0 8px;
-    font-weight: 500;
+    font-weight: 400;
   }
 
   .icon-action {
     justify-content: center;
     width: 26px;
     height: 26px;
-    color: var(--icon);
+    color: var(--icon-foreground);
   }
 
-  .toolbar-widget:hover,
+  .toolbar-widget:hover:not(:disabled),
   .icon-action:hover:not(:disabled) {
-    background: var(--hover);
+    background: var(--toolbar-hoverbackground);
   }
 
   .toolbar-widget:focus-visible,
   .icon-action:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--ring);
+    outline: 1px solid var(--focusborder);
+    outline-offset: -1px;
   }
 
   .icon-action:disabled {
-    color: var(--fg-3);
+    color: color-mix(in srgb, var(--descriptionforeground) 55%, var(--editor-background));
     cursor: default;
   }
 
   .icon-action[aria-pressed="true"] {
-    background: var(--hover);
+    background: var(--toolbar-hoverbackground);
     color: var(--foreground);
   }
 
-  /* 视图下拉、worktree 下拉：用原生 select 弹出菜单，外观收成组件样式。 */
-  .widget-select {
-    appearance: none;
-    height: 26px;
-    padding: 0 22px 0 8px;
-    border-radius: 5px;
-    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5' fill='none' stroke='%236c707e' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 4px center / 12px;
-    color: var(--foreground);
-    font: inherit;
-    cursor: default;
+  /* 左侧工具窗口图标条：选中项左侧 2px 强调条（效果图）。 */
+  .activity-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: var(--activitybar-width);
+    background: var(--activitybar-background);
+    border-right: 1px solid var(--activitybar-border);
+    padding-top: 4px;
+  }
+
+  .activity-item {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--activitybar-width);
+    height: 44px;
+    color: var(--activitybar-inactiveforeground);
     outline: none;
   }
 
-  .widget-select:hover {
-    background-color: var(--hover);
+  .activity-item:hover {
+    color: var(--activitybar-foreground);
   }
 
-  .widget-select:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--ring);
+  .activity-item[aria-pressed="true"] {
+    color: var(--activitybar-foreground);
   }
 
-  .island {
-    min-height: 0;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 0 0 1px var(--edge);
+  .activity-item[aria-pressed="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--activitybar-activeborder);
   }
 
-  /* 文件列表：键盘焦点在列表里时用强调色选中，否则用灰色（JetBrains 的列表选中态）。 */
+  .activity-item .codicon {
+    font-size: 22px;
+  }
+
+  .activity-badge {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    /* VS Code 的活动栏徽标是圆形底色（返修 B6）：对比色底 + 圆角。 */
+    border-radius: 9px;
+    background: var(--activitybadge-background, var(--activitybarbadge-background, var(--badge-background)));
+    color: var(--activitybadge-foreground, var(--activitybarbadge-foreground, var(--badge-foreground)));
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 15px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--activitybar-background);
+  }
+
+  .side-tab {
+    display: flex;
+    align-items: center;
+    height: var(--tab-height);
+    padding: 0 2px;
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--sidebartitle-foreground);
+    opacity: 0.75;
+    /* 返修 B9：当前页签用下划线标出，与 Rebased 的工具窗口页签一致。 */
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    outline: none;
+    transition: opacity 120ms ease, border-color 120ms ease;
+  }
+
+  .side-tab[aria-selected="true"] {
+    opacity: 1;
+    font-weight: 600;
+    color: var(--sidebartitle-foreground);
+    border-bottom-color: var(--focusborder);
+  }
+
+  .side-tab:hover {
+    opacity: 1;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: var(--row-height);
+    padding: 0 8px 0 4px;
+    font-weight: 600;
+    font-size: 11.5px;
+    color: var(--sidebarsectionheader-foreground);
+    background: var(--sidebarsectionheader-background);
+    outline: none;
+  }
+
+  .count-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--badge-background);
+    color: var(--badge-foreground);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  /* 文件行：选中态照 VS Code 列表（有焦点用强调色，无焦点用灰色）。 */
   .change-row {
     background: transparent;
+    /* 返修 B11：悬停与选中的背景切换加短过渡。 */
+    transition: background-color 100ms ease;
   }
 
   .change-row:hover {
-    background: var(--row-hover);
+    background: var(--list-hoverbackground);
   }
 
   .change-row[data-selected="true"] {
-    background: var(--sel-inactive);
+    background: var(--list-inactiveselectionbackground);
+    color: var(--list-activeselectionforeground);
   }
 
-  .change-list:focus-within .change-row[data-selected="true"] {
-    background: var(--sel);
+  .changes-tree:focus-within .change-row[data-selected="true"] {
+    background: var(--list-activeselectionbackground);
+  }
+
+  .changes-tree:focus-within .change-row[data-active="true"] {
+    outline: 1px solid var(--list-focusoutline);
+    outline-offset: -1px;
   }
 
   .review-check {
@@ -399,15 +372,15 @@
     height: 14px;
     flex: none;
     border-radius: 3px;
-    box-shadow: inset 0 0 0 1px var(--btn-edge);
-    background: var(--island);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--icon-foreground) 28%, transparent);
+    background: var(--editor-background);
     color: transparent;
   }
 
   .review-check[aria-checked="true"] {
-    background: var(--primary);
+    background: var(--button-background);
     box-shadow: none;
-    color: var(--primary-foreground);
+    color: var(--button-foreground);
   }
 
   .review-check:disabled {
@@ -416,59 +389,124 @@
   }
 
   .review-check:focus-visible {
-    outline: 2px solid var(--ring);
+    outline: 2px solid var(--focusborder);
     outline-offset: 1px;
   }
 
-  /* 编辑区的单个文件标签：底部强调色下划线（不做多标签，Q16）。 */
-  .editor-tab {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    box-shadow: inset 0 -2px 0 var(--primary);
-    white-space: nowrap;
-    min-width: 0;
+  .editor-tabs {
+    container: editor-tabs / inline-size;
+    min-height: var(--tab-height);
   }
 
-  /* 编辑区顶部提示条：信息、警告、错误三种底色（JetBrains 的编辑器通知）。 */
+  .editor-tab-list {
+    flex: 1 1 0%;
+    height: calc(var(--tab-height) - 1px);
+  }
+
+  /* 按编辑区宽度换行，缩放或侧栏加宽都不能挤掉页签。 */
+  @container editor-tabs (max-width: 700px) {
+    .editor-tab-list {
+      flex-basis: 100%;
+    }
+
+    .editor-tabs-toolbar {
+      width: 100%;
+      min-height: var(--tab-height);
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding-block: 4px;
+      border-top: 1px solid var(--editorgroupheader-tabsborder);
+    }
+  }
+
+  @container editor-tabs (max-width: 480px) {
+    .editor-toolbar-count,
+    .editor-review-label {
+      display: none;
+    }
+  }
+
+  /* 编辑器页签：选中页签用编辑器底色 + 顶部细线（VS Code）。 */
+  .editor-tab {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    height: var(--tab-height);
+    padding: 0 10px 0 12px;
+    border-right: 1px solid var(--tab-border);
+    background: var(--tab-inactivebackground);
+    color: var(--tab-inactiveforeground);
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 260px;
+    outline: none;
+  }
+
+  .editor-tab[data-active="true"] {
+    background: var(--tab-activebackground);
+    color: var(--tab-activeforeground);
+  }
+
+  .editor-tab[data-active="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 1px;
+    background: var(--tab-activebordertop);
+  }
+
+  .editor-tab:hover {
+    background: var(--tab-activebackground);
+  }
+
+  .editor-tab[data-preview="true"] .tab-title {
+    font-style: italic;
+  }
+
+  /* 提示条：编辑器顶部（写前校验失败、冲突、只读、默认收起）。 */
   .editor-banner {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 7px 12px;
+    margin: 2px 10px 6px;
+    padding: 7px 10px;
+    border-radius: 5px;
     font-size: 12.5px;
     line-height: 18px;
     background: var(--banner-bg);
-    box-shadow: inset 0 -1px 0 var(--banner-edge);
+    border: 1px solid var(--banner-edge);
   }
 
   .editor-banner[data-tone="info"] {
-    --banner-bg: var(--banner-info);
-    --banner-edge: var(--banner-info-edge);
-    --banner-icon: var(--banner-info-icon);
+    --banner-bg: var(--editorwidget-background);
+    --banner-edge: var(--widget-border);
+    --banner-icon: var(--editorinfo-foreground);
   }
 
   .editor-banner[data-tone="warn"] {
-    --banner-bg: var(--banner-warn);
-    --banner-edge: var(--banner-warn-edge);
-    --banner-icon: var(--banner-warn-icon);
+    --banner-bg: color-mix(in srgb, var(--editorwarning-foreground) 10%, var(--editor-background));
+    --banner-edge: color-mix(in srgb, var(--editorwarning-foreground) 32%, transparent);
+    --banner-icon: var(--editorwarning-foreground);
   }
 
   .editor-banner[data-tone="error"] {
-    --banner-bg: var(--banner-error);
-    --banner-edge: var(--banner-error-edge);
-    --banner-icon: var(--banner-error-icon);
+    --banner-bg: color-mix(in srgb, var(--gitdecoration-conflictingresourceforeground) 10%, var(--editor-background));
+    --banner-edge: color-mix(in srgb, var(--gitdecoration-conflictingresourceforeground) 32%, transparent);
+    --banner-icon: var(--gitdecoration-conflictingresourceforeground);
   }
 
-  .editor-banner > svg {
+  .editor-banner > .codicon {
     flex: none;
     margin-top: 1px;
     color: var(--banner-icon);
   }
 
   .banner-link {
-    color: var(--link);
+    color: var(--textlink-foreground);
     white-space: nowrap;
     cursor: pointer;
   }
@@ -486,170 +524,139 @@
     border-radius: 5px;
     font-size: 12px;
     white-space: nowrap;
-    background: var(--banner-warn);
-    box-shadow: inset 0 0 0 1px var(--banner-warn-edge);
+    background: color-mix(in srgb, var(--editorwarning-foreground) 10%, var(--editor-background));
+    border: 1px solid color-mix(in srgb, var(--editorwarning-foreground) 32%, transparent);
   }
 
-  .warn-chip > svg,
-  .status-warn > svg {
-    color: var(--banner-warn-icon);
+  .warn-chip > .codicon {
+    color: var(--editorwarning-foreground);
   }
 
-  /* 提交信息框（M3 F02.2）：JetBrains Mono、岛屿底色、无网站式圆角卡片。 */
+  .commit-composer {
+    min-height: 0;
+    /* 留出标题与四行改动树；提示、确认和 hooks 输出仍可滚动查看。 */
+    max-height: calc(100% - var(--tab-height) - 4 * var(--row-height));
+    overflow: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  /* 提交信息框：VS Code 输入框样式（Q131）。 */
   .commit-message {
     display: block;
     width: 100%;
     min-height: 72px;
-    max-height: 40vh;
+    max-height: 32vh;
     padding: 6px 8px;
-    border-radius: 5px;
-    background: var(--island);
-    box-shadow: inset 0 0 0 1px var(--btn-edge);
-    color: var(--foreground);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 18px;
+    /* 返修 B12：VS Code 输入框 — 1px 边框、2px 圆角、聚焦时焦点色描边。 */
+    border-radius: 2px;
+    background: var(--input-background);
+    border: 1px solid var(--input-border);
+    color: var(--input-foreground);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 19px;
     resize: vertical;
     outline: none;
+    transition: border-color 100ms ease, outline-color 100ms ease;
   }
 
   .commit-message::placeholder {
-    color: var(--fg-3);
-  }
-
-  .commit-message:hover:not(:disabled) {
-    box-shadow: inset 0 0 0 1px var(--edge);
+    color: var(--input-placeholderforeground);
   }
 
   .commit-message:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--ring);
+    outline: 1px solid var(--focusborder);
+    outline-offset: -1px;
   }
 
   .commit-message:disabled {
-    color: var(--fg-2);
+    color: var(--descriptionforeground);
     cursor: default;
   }
-}
 
-/* ---------- diff 视图与语法配色（浅色 / 深色两套，Q50；配色照 JetBrains，Q107） ---------- */
+  /* 通知气泡（右下角，F07）：成功约 10 秒后自动消失，失败与待核对保留。 */
+  .notification {
+    width: min(420px, calc(100vw - 32px));
+    border-radius: 6px;
+    background: var(--notifications-background);
+    border: 1px solid var(--notifications-border);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 28%);
+    color: var(--foreground);
+  }
 
-:root {
-  --diff-bg: var(--island);
-  --diff-row-height: 18px;
-  /* 行号栏宽度；并排视图两半之间另有一条分隔栏。 */
-  --diff-gutter: 52px;
-  --diff-mid: 12px;
-  --diff-gutter-fg: #a8adbd;
-  --diff-gutter-border: #ebecf0;
-  --diff-mid-bg: #f7f8fa;
-  --diff-ins-bg: #e4f5e6;
-  --diff-ins-gutter: #c9ebcf;
-  --diff-del-bg: #eeeff2;
-  --diff-del-gutter: #dcdee3;
-  --diff-mod-bg: #e5eefe;
-  --diff-mod-gutter: #cadcfd;
-  --diff-hunk-bg: #f2f3f5;
-  --diff-hunk-fg: #8c90a0;
-  /* 并排视图里一侧没有对应行。 */
-  --diff-empty-bg: #f9fafb;
-  /* 数据还没到的行：要和白底明显区分，快速滚动时不能看起来像“空白”（Q46）。 */
-  --diff-placeholder-bg: #eef0f3;
-  --diff-placeholder-gutter: #e4e6eb;
-  --diff-placeholder-line: #dde0e5;
-  --diff-scrollbar-thumb: rgb(0 0 0 / 0.24);
-  --diff-scrollbar-thumb-hover: rgb(0 0 0 / 0.4);
-  --diff-selection: color-mix(in oklab, var(--primary) 18%, transparent);
+  /* 设置项控件（F08）：VS Code 输入框与下拉。 */
+  .settings-input,
+  .settings-select {
+    display: block;
+    height: 26px;
+    padding: 0 6px;
+    border-radius: 3px;
+    background: var(--input-background);
+    border: 1px solid var(--input-border);
+    color: var(--input-foreground);
+    font: inherit;
+    outline: none;
+  }
 
-  /* IntelliJ Light */
-  --syntax-plain: #080808;
-  --syntax-comment: #8c8c8c;
-  --syntax-string: #067d17;
-  --syntax-number: #1750eb;
-  --syntax-constant: #871094;
-  --syntax-keyword: #0033b3;
-  --syntax-function: #00627a;
-  --syntax-type: #000000;
-  --syntax-variable: #871094;
-  --syntax-parameter: #080808;
-  --syntax-tag: #0033b3;
-  --syntax-attribute: #174ad4;
-  --syntax-punctuation: #080808;
-  --syntax-operator: #080808;
-  --syntax-invalid: #f50000;
-}
+  .settings-select {
+    width: 260px;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --diff-gutter-fg: #4b5059;
-    --diff-gutter-border: #2b2d30;
-    --diff-mid-bg: #1b1c1f;
-    --diff-ins-bg: #253a2b;
-    --diff-ins-gutter: #2f4a35;
-    --diff-del-bg: #34363a;
-    --diff-del-gutter: #404247;
-    --diff-mod-bg: #24344d;
-    --diff-mod-gutter: #2e4466;
-    --diff-hunk-bg: #25272b;
-    --diff-hunk-fg: #6f737a;
-    --diff-empty-bg: #212226;
-    --diff-placeholder-bg: #24262a;
-    --diff-placeholder-gutter: #2a2c30;
-    --diff-placeholder-line: #303237;
-    --diff-scrollbar-thumb: rgb(255 255 255 / 0.26);
-    --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.45);
+  .settings-input {
+    width: 100%;
+  }
 
-    /* New UI Dark */
-    --syntax-plain: #bcbec4;
-    --syntax-comment: #7a7e85;
-    --syntax-string: #6aab73;
-    --syntax-number: #2aacb8;
-    --syntax-constant: #c77dbb;
-    --syntax-keyword: #cf8e6d;
-    --syntax-function: #56a8f5;
-    --syntax-type: #bcbec4;
-    --syntax-variable: #c77dbb;
-    --syntax-parameter: #bcbec4;
-    --syntax-tag: #d5b778;
-    --syntax-attribute: #bababa;
-    --syntax-punctuation: #bcbec4;
-    --syntax-operator: #bcbec4;
-    --syntax-invalid: #f75464;
+  .settings-input:focus-visible,
+  .settings-select:focus-visible {
+    outline: 1px solid var(--focusborder);
+    outline-offset: -1px;
+  }
+
+  /* 设置、丢弃确认等对话框。 */
+  .app-dialog {
+    margin: auto;
+    border-radius: 8px;
+    background: var(--editorwidget-background);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 36%);
+    color: var(--foreground);
+  }
+
+  .app-dialog::backdrop {
+    background: var(--overlay);
   }
 }
 
-.dark {
-  --diff-gutter-fg: #4b5059;
-  --diff-gutter-border: #2b2d30;
-  --diff-mid-bg: #1b1c1f;
-  --diff-ins-bg: #253a2b;
-  --diff-ins-gutter: #2f4a35;
-  --diff-del-bg: #34363a;
-  --diff-del-gutter: #404247;
-  --diff-mod-bg: #24344d;
-  --diff-mod-gutter: #2e4466;
-  --diff-hunk-bg: #25272b;
-  --diff-hunk-fg: #6f737a;
-  --diff-empty-bg: #212226;
-  --diff-placeholder-bg: #24262a;
-  --diff-placeholder-gutter: #2a2c30;
-  --diff-placeholder-line: #303237;
-  --diff-scrollbar-thumb: rgb(255 255 255 / 0.26);
-  --diff-scrollbar-thumb-hover: rgb(255 255 255 / 0.45);
-  --syntax-plain: #bcbec4;
-  --syntax-comment: #7a7e85;
-  --syntax-string: #6aab73;
-  --syntax-number: #2aacb8;
-  --syntax-constant: #c77dbb;
-  --syntax-keyword: #cf8e6d;
-  --syntax-function: #56a8f5;
-  --syntax-type: #bcbec4;
-  --syntax-variable: #c77dbb;
-  --syntax-parameter: #bcbec4;
-  --syntax-tag: #d5b778;
-  --syntax-attribute: #bababa;
-  --syntax-punctuation: #bcbec4;
-  --syntax-operator: #bcbec4;
-  --syntax-invalid: #f75464;
+/* ---------- diff 视图（配色全部来自颜色主题） ---------- */
+
+:root {
+  --diff-bg: var(--editor-background);
+  --diff-row-height: 19px;
+  --diff-gutter: 52px;
+  --diff-mid: 12px;
+  --diff-gutter-fg: var(--editorlinenumber-foreground);
+  --diff-gutter-border: var(--panel-border);
+  --diff-mid-bg: var(--editorgutter-background);
+  --diff-ins-bg: var(--diffeditor-insertedlinebackground);
+  --diff-ins-gutter: var(--diffeditorgutter-insertedlinebackground);
+  --diff-del-bg: var(--diffeditor-removedlinebackground);
+  --diff-del-gutter: var(--diffeditorgutter-removedlinebackground);
+  --diff-mod-bg: color-mix(in srgb, var(--diffeditor-insertedlinebackground) 60%, var(--diffeditor-removedlinebackground));
+  --diff-ins-word: var(--diffeditor-insertedtextbackground);
+  --diff-del-word: var(--diffeditor-removedtextbackground);
+  --sbs-band-ins: var(--diffeditor-insertedtextbackground);
+  --sbs-band-del: var(--diffeditor-removedtextbackground);
+  --sbs-band-ins-edge: color-mix(in srgb, var(--diffeditor-insertedtextbackground) 70%, var(--foreground));
+  --sbs-band-del-edge: color-mix(in srgb, var(--diffeditor-removedtextbackground) 70%, var(--foreground));
+  --diff-mod-gutter: color-mix(in srgb, var(--diffeditorgutter-insertedlinebackground) 60%, var(--diffeditorgutter-removedlinebackground));
+  --diff-hunk-bg: var(--editorgroupheader-tabsbackground);
+  --diff-hunk-fg: var(--descriptionforeground);
+  --diff-empty-bg: var(--editor-background);
+  --diff-placeholder-bg: color-mix(in srgb, var(--editor-background) 94%, var(--foreground));
+  --diff-placeholder-gutter: color-mix(in srgb, var(--editorgutter-background) 90%, var(--foreground));
+  --diff-placeholder-line: var(--panel-border);
+  --diff-scrollbar-thumb: var(--scrollbarslider-background);
+  --diff-scrollbar-thumb-hover: color-mix(in srgb, var(--scrollbarslider-background) 70%, var(--foreground));
 }
 
 .diff-scroll {
@@ -657,15 +664,9 @@
   contain: layout paint style;
 }
 
-/*
- * 行区域底图：还没渲染进 DOM 的位置画成“加载中的行”（行号栏 + 每行一条分隔线）。
- * 触控板快速滑动时，系统会先滚动画面，行组件稍后才补上；这段时间露出的是行的轮廓，
- * 而不是白底（Q46）。真实的行自带不透明背景，会盖住底图。
- */
 .diff-canvas {
   position: relative;
   background-color: var(--diff-placeholder-bg);
-  /* 两层渐变都只画一行高，再纵向平铺：渐变按整个内容高度（十几万像素）绘制会让每帧重绘变得极慢。 */
   background-image:
     linear-gradient(
       to bottom,
@@ -677,7 +678,6 @@
   background-repeat: repeat-y;
 }
 
-/* 自绘滚动条（ADR-0008）：覆盖在内容右侧。 */
 .diff-scrollbar {
   position: absolute;
   top: 0;
@@ -701,7 +701,6 @@
   background: var(--diff-scrollbar-thumb-hover);
 }
 
-/* 底图的行号栏与真实行的列宽一致：统一视图两栏，并排视图左右各一栏、中间一条分隔栏。 */
 .diff-canvas-unified {
   --diff-canvas-gutters: linear-gradient(
     to right,
@@ -730,8 +729,22 @@
   align-items: center;
   white-space: pre;
   overflow: hidden;
-  /* 不透明，盖住 .diff-canvas 的“加载中”底图。 */
   background-color: var(--diff-bg);
+}
+
+/* 软换行（Q139）：行高随内容，视图按渲染后量出的高度排位置；块标题行仍是一行。 */
+.diff-wrap .row {
+  height: auto;
+  min-height: var(--diff-row-height);
+  align-items: stretch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-wrap .row-hunk {
+  height: var(--diff-row-height);
+  align-items: center;
+  white-space: pre;
 }
 
 .row-unified {
@@ -746,11 +759,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-left: 12px;
-  padding-right: 16px;
+  padding-left: 10px;
+  padding-right: 12px;
   color: var(--diff-hunk-fg);
-  font-size: 0.95em;
-  /* 深色模式下 hunk 底色叠在行的不透明底色上，不能直接透出底图。 */
+  font-family: var(--font-sans);
+  font-size: 11.5px;
   background-image: linear-gradient(var(--diff-hunk-bg), var(--diff-hunk-bg));
 }
 
@@ -761,49 +774,35 @@
   text-overflow: ellipsis;
 }
 
-/* hunk 操作照 JetBrains 写成链接样式；仍是可聚焦的按钮（Q93）。 */
+/* 块操作按钮：编辑器里的行内小按钮（Q93、Q135）。 */
 .hunk-action {
   flex: none;
-  height: 16px;
-  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background: none;
-  color: var(--link);
-  font: 12px/16px var(--font-sans);
+  color: var(--foreground);
+  font: 11.5px/20px var(--font-sans);
   cursor: pointer;
-}
-
-.hunk-action + .hunk-action::before {
-  content: "·";
-  margin-right: 8px;
-  color: var(--fg-3);
+  white-space: nowrap;
 }
 
 .hunk-action:hover:not(:disabled) {
-  text-decoration: underline;
+  background: var(--toolbar-hoverbackground);
 }
 
 .hunk-action:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 0;
+  outline: 1px solid var(--focusborder);
+  outline-offset: -1px;
 }
 
 .hunk-action:disabled {
-  color: var(--fg-3);
+  color: color-mix(in srgb, var(--descriptionforeground) 55%, var(--editor-background));
   cursor: default;
-}
-
-.recovery-dialog {
-  /* Tailwind 的 preflight 把所有元素的 margin 清零，模态对话框要靠 margin: auto 才会居中。 */
-  margin: auto;
-  width: min(640px, calc(100vw - 40px));
-  max-height: calc(100vh - 40px);
-  overflow: auto;
-}
-
-.recovery-dialog::backdrop {
-  background: var(--overlay);
 }
 
 .gutter {
@@ -825,7 +824,6 @@
   overflow: hidden;
 }
 
-/* 修改块蓝、纯新增绿、纯删除灰（JetBrains diff 配色）；修改块由 Rust 按并排视图的配对规则判断。 */
 .cell-ins { background: var(--diff-ins-bg); }
 .cell-del { background: var(--diff-del-bg); }
 .cell-mod { background: var(--diff-mod-bg); }
@@ -833,10 +831,9 @@
 .gutter-ins, .mid-ins { background: var(--diff-ins-gutter); }
 .gutter-del, .mid-del { background: var(--diff-del-gutter); }
 .gutter-mod, .mid-mod { background: var(--diff-mod-gutter); }
-.gutter-ins, .gutter-del, .gutter-mod { color: var(--fg-2); }
+.gutter-ins, .gutter-del, .gutter-mod { color: var(--descriptionforeground); }
 .gutter-none { background: var(--diff-empty-bg); }
 
-/* 不显示 +/- 标记列：增删由底色表示（JetBrains 的做法）。标记仍留在 DOM 里，读屏可读。 */
 .marker {
   position: absolute;
   width: 1px;
@@ -846,7 +843,7 @@
 }
 
 .tok-plain { color: var(--syntax-plain); }
-.tok-comment { color: var(--syntax-comment); font-style: italic; }
+.tok-comment { color: var(--syntax-comment); font-style: var(--syn-comment-style, normal); }
 .tok-string { color: var(--syntax-string); }
 .tok-number { color: var(--syntax-number); }
 .tok-constant { color: var(--syntax-constant); }
@@ -861,31 +858,517 @@
 .tok-operator { color: var(--syntax-operator); }
 .tok-invalid { color: var(--syntax-invalid); }
 
-/* Git 状态色（Q31：只有状态字母上色，文件名保持正常颜色；颜色照 JetBrains 文件状态色，Q107） */
-.status-modified { color: var(--status-modified); }
-.status-added { color: var(--status-added); }
-.status-deleted { color: var(--status-deleted); }
-.status-renamed { color: var(--status-renamed); }
-.status-conflict { color: var(--status-conflict); }
-.status-typeChanged { color: var(--status-modified); }
-.status-untracked { color: var(--status-untracked); }
+/* Git 状态色（Q128：文件名按状态上色，不显示状态字母）。 */
+.status-modified { color: var(--gitdecoration-modifiedresourceforeground); }
+.status-added { color: var(--gitdecoration-addedresourceforeground); }
+.status-deleted { color: var(--gitdecoration-deletedresourceforeground); }
+.status-renamed { color: var(--gitdecoration-renamedresourceforeground); }
+.status-conflict { color: var(--gitdecoration-conflictingresourceforeground); }
+.status-typeChanged { color: var(--gitdecoration-modifiedresourceforeground); }
+.status-untracked { color: var(--gitdecoration-untrackedresourceforeground); }
 
-:root {
-  --status-modified: #2f65ca;
-  --status-added: #3e8a42;
-  --status-deleted: #7f838e;
-  --status-renamed: #2f65ca;
-  --status-conflict: #d02e2e;
-  --status-untracked: #b4462b;
+/* Codicons 默认跟随文字颜色，尺寸由组件按效果图指定。 */
+.codicon {
+  color: inherit;
+  flex: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --status-modified: #548af7;
-    --status-added: #73bd79;
-    --status-deleted: #868a91;
-    --status-renamed: #548af7;
-    --status-conflict: #f75464;
-    --status-untracked: #d1675a;
+/* ---------- 返修（Q113）：可拖动分隔条、控件形状统一、过渡（B4/B11/B12） ---------- */
+@layer components {
+  /* 提交工具窗口与编辑区之间的分隔条：可拖动调宽（返修 B4）。 */
+  .changes-sidebar {
+    /* 保留编辑区，已保存的宽侧栏在缩窗或放大后也不能挤走所有工具。 */
+    max-width: calc(100% - var(--activitybar-width) - var(--editor-min-width));
   }
+
+  .sidebar-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -3px;
+    width: 6px;
+    z-index: 10;
+    cursor: col-resize;
+  }
+
+  .sidebar-resizer:hover,
+  .sidebar-resizer[data-dragging="true"] {
+    background: var(--focusborder);
+    opacity: 0.5;
+  }
+
+  /* 勾选框不用系统原生控件（返修 B12）：照效果图 .box — 小方框、选中时强调色填充。 */
+  input[type="checkbox"] {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    margin: 0;
+    border-radius: 2px;
+    border: 1px solid var(--checkbox-border);
+    background: var(--checkbox-background);
+    color: transparent;
+    display: inline-grid;
+    place-items: center;
+    outline: none;
+    cursor: pointer;
+    transition: background-color 100ms ease, border-color 100ms ease;
+  }
+
+  input[type="checkbox"]:hover {
+    border-color: var(--focusborder);
+  }
+
+  input[type="checkbox"]:checked {
+    background: var(--checkbox-background);
+    border-color: var(--checkbox-border);
+  }
+
+  input[type="checkbox"]:checked::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: var(--checkbox-foreground, var(--editor-foreground));
+    clip-path: polygon(14% 44%, 0 62%, 40% 100%, 100% 16%, 84% 3%, 38% 68%);
+  }
+
+  input[type="checkbox"]:focus-visible {
+    outline: 1px solid var(--focusborder);
+    outline-offset: 1px;
+  }
+
+  input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* 弹层、对话框与通知的出现过渡（返修 B11）：约 120ms，与 VS Code 相当。 */
+  .app-dialog,
+  .notification {
+    animation: revia-pop-in 120ms ease;
+  }
+
+  @keyframes revia-pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* 完整视口定位父层让 Floating UI 识别 CSS zoom，不把 client 坐标再次放大。 */
+.revia-popover-host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* 弹层内容挂在顶层（返修 B3、Comments 3）：由 Base UI 的 portal 定位。 */
+.revia-popper {
+  max-height: min(70vh, var(--available-height));
+  max-width: var(--available-width);
+  z-index: 60;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--editorwidget-background);
+  color: var(--foreground);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 28%);
+  animation: revia-pop-in 120ms ease;
+}
+
+/* ---------- 左右对照（返修 A1/Q138） ---------- */
+
+.sbs-header {
+  height: 22px;
+  border-bottom: 1px solid var(--diff-gutter-border);
+  background: var(--diff-hunk-bg);
+}
+
+.sbs-column {
+  background: var(--diff-bg);
+}
+
+.sbs-canvas {
+  position: relative;
+  will-change: transform;
+}
+
+.sbs-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  display: flex;
+  align-items: center;
+  white-space: pre;
+  overflow: hidden;
+  padding-left: 6px;
+  background: var(--diff-bg);
+}
+
+.sbs-row.sbs-ins { background: var(--diff-ins-bg); }
+.sbs-row.sbs-del { background: var(--diff-del-bg); }
+
+.sbs-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.sbs-wrap .sbs-row {
+  height: auto;
+  min-height: var(--diff-row-height);
+  align-items: flex-start;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sbs-wrap .sbs-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sbs-word {
+  background: var(--diff-ins-word);
+  border-radius: 2px;
+}
+
+.sbs-row.sbs-del .sbs-word {
+  background: var(--diff-del-word);
+}
+
+/* 悬停在块按钮上：这一块两边一起加亮（设计第 2 节）。 */
+.sbs-row.sbs-del.sbs-hover { background: var(--sbs-band-del); }
+.sbs-row.sbs-ins.sbs-hover { background: var(--sbs-band-ins); }
+
+.sbs-fold {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--diff-hunk-bg);
+}
+
+.sbs-fold-button {
+  border: 0;
+  background: none;
+  color: var(--diff-hunk-fg);
+  font: 11px/16px var(--font-sans);
+  cursor: pointer;
+}
+
+.sbs-fold-button:hover {
+  color: var(--foreground);
+}
+
+.sbs-gutter {
+  background: var(--editorgutter-background);
+  border-left: 1px solid var(--diff-gutter-border);
+  border-right: 1px solid var(--diff-gutter-border);
+}
+
+.sbs-bands {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sbs-numbers {
+  color: var(--diff-gutter-fg);
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  user-select: none;
+  padding-top: 0;
+}
+
+.sbs-number {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  line-height: var(--diff-row-height);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  will-change: transform;
+}
+
+.sbs-numbers.text-right .sbs-number {
+  justify-content: flex-end;
+  padding-right: 2px;
+}
+
+.sbs-numbers.text-left .sbs-number {
+  justify-content: flex-start;
+  padding-left: 2px;
+}
+
+.sbs-number-text {
+  font-size: 10.5px;
+}
+
+.sbs-gutter-action {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--foreground);
+  font: 12px/15px var(--font-sans);
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.sbs-gutter-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sbs-gutter-action:hover:not(:disabled) {
+  background: var(--toolbar-hoverbackground);
+  opacity: 1;
+}
+
+.sbs-gutter-action:focus-visible {
+  outline: 1px solid var(--focusborder);
+  outline-offset: -1px;
+}
+
+/* 统一视图里每段首行的段操作按钮（返修 A1/Q142）。 */
+.segment-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-right: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--foreground);
+  vertical-align: middle;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.segment-action:hover:not(:disabled) {
+  background: var(--toolbar-hoverbackground);
+  opacity: 1;
+}
+
+.segment-action:focus-visible {
+  outline: 1px solid var(--focusborder);
+  outline-offset: -1px;
+}
+
+.segment-action:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ---------- 合并页签（Q143，照 Rebased 的合并窗口） ---------- */
+
+.merge-view {
+  --merge-gutter-width: 60px;
+  --merge-conflict: var(--gitdecoration-conflictingresourceforeground);
+  --merge-line-conflict: color-mix(in srgb, var(--merge-conflict) 16%, var(--diff-bg));
+  --merge-line-change: var(--diff-ins-bg);
+  --merge-line-applied: color-mix(in srgb, var(--diff-ins-bg) 40%, var(--diff-bg));
+  --merge-band-conflict: color-mix(in srgb, var(--merge-conflict) 38%, transparent);
+  --merge-band-change: var(--diffeditor-insertedtextbackground);
+  --merge-band-done: color-mix(in srgb, var(--diffeditor-insertedtextbackground) 35%, transparent);
+  --merge-selection: color-mix(in srgb, var(--focusborder) 32%, transparent);
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--diff-bg);
+}
+
+.merge-toolbar,
+.merge-footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  background: var(--editor-background);
+}
+
+.merge-toolbar {
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.merge-footer {
+  padding-block: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.merge-toolbar-separator {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--panel-border);
+}
+
+.merge-button {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--icon-foreground) 28%, transparent);
+  border-radius: 2px;
+  font-size: 12px;
+  transition: background-color 100ms ease;
+}
+
+.merge-button:hover:not(:disabled) {
+  background: var(--toolbar-hoverbackground);
+}
+
+.merge-button:disabled {
+  opacity: 0.5;
+}
+
+.merge-button-primary {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.merge-button-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 88%, var(--foreground));
+}
+
+.merge-count {
+  color: var(--descriptionforeground);
+}
+
+.merge-count-open {
+  color: var(--merge-conflict);
+}
+
+.merge-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--merge-gutter-width) minmax(0, 1fr) var(--merge-gutter-width) minmax(0, 1fr);
+}
+
+.merge-headers {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.merge-header {
+  overflow: hidden;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--descriptionforeground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge-panes {
+  min-height: 0;
+  flex: 1;
+}
+
+.merge-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.merge-pane-result {
+  box-shadow: inset 1px 0 0 var(--panel-border), inset -1px 0 0 var(--panel-border);
+}
+
+.merge-line-conflict { background: var(--merge-line-conflict); }
+.merge-line-change { background: var(--merge-line-change); }
+.merge-line-applied { background: var(--merge-line-applied); }
+.merge-line-ignored { opacity: 0.55; }
+.merge-line-edited { box-shadow: inset 2px 0 0 var(--focusborder); }
+
+/* 空块（纯删除、尚未放进内容）：在所在行顶上画一条线。 */
+.merge-line-gap { background: none; }
+.merge-line-gap.merge-line-conflict { box-shadow: inset 0 2px 0 var(--merge-conflict); }
+.merge-line-gap.merge-line-change,
+.merge-line-gap.merge-line-applied { box-shadow: inset 0 2px 0 var(--merge-band-change); }
+
+.merge-gutter {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--diff-bg);
+}
+
+.merge-gutter-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.merge-gutter-actions {
+  position: absolute;
+  display: flex;
+  gap: 1px;
+  height: var(--diff-row-height);
+  align-items: center;
+}
+
+.merge-gutter-ours .merge-gutter-actions { left: 2px; }
+.merge-gutter-theirs .merge-gutter-actions { right: 2px; }
+
+.merge-gutter-button {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--diff-bg) 70%, transparent);
+  transition: background-color 100ms ease;
+}
+
+.merge-gutter-ignore {
+  font-size: 10px;
+  color: var(--descriptionforeground);
+}
+
+.merge-gutter-conflict {
+  color: var(--merge-conflict);
+}
+
+.merge-gutter-button:hover:not(:disabled) {
+  background: var(--toolbar-hoverbackground);
+}
+
+.merge-gutter-button:focus-visible {
+  outline: 1px solid var(--focusborder);
+}
+
+.merge-gutter-button:disabled {
+  opacity: 0.4;
+}
+
+.merge-message {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 32px;
+  font-size: 12.5px;
 }

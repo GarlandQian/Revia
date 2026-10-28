@@ -15,12 +15,25 @@ export const isMac =
  */
 export const MAIN_TOOLBAR_INSET = isMac ? 84 : 10;
 
+/** 平台修饰键符号（返修 C11）：macOS 用 ⌘ / ⌥ / ⇧，其他平台用 Ctrl / Alt / Shift。 */
+export const MOD_SYMBOLS = isMac
+  ? { primary: "⌘", alt: "⌥", shift: "⇧", control: "⌃" }
+  : { primary: "Ctrl+", alt: "Alt+", shift: "Shift+", control: "Ctrl+" };
+
 /**
  * 判断主修饰键（macOS 为 Command/Meta，Windows/Linux 为 Control）。
  *
  * 严格互斥：在 macOS 上 Ctrl 键绝不冒充 ⌘（Command），避免在 Mac 上按 Ctrl 触发 ⌘ 快捷键（审查意见 6）。
  */
 export function isPrimaryModifier(event: KeyboardEvent | React.KeyboardEvent): boolean {
+  if (isMac) {
+    return event.metaKey && !event.ctrlKey;
+  }
+  return event.ctrlKey && !event.metaKey;
+}
+
+/** 判断鼠标点击是否带主修饰键（返修 C11：判断逻辑与键盘一致，集中在这里）。 */
+export function isPrimaryClick(event: { metaKey: boolean; ctrlKey: boolean }): boolean {
   if (isMac) {
     return event.metaKey && !event.ctrlKey;
   }

@@ -22,7 +22,7 @@ const imports = registerHooks({
   },
 });
 const { RowWindowStore } = await import("../src/features/diff/rowWindowStore.ts");
-const { matchesHunkAction } = await import("../src/features/diff/hunkAction.ts");
+const { matchesHunkAction, segmentActionDisabled } = await import("../src/features/diff/hunkAction.ts");
 const { messages } = await import("../src/lib/i18n/zh-CN.ts");
 const { isLoggingEnabled } = await import("../src/features/diff/log.ts");
 imports.deregister();
@@ -98,7 +98,7 @@ function responseFor(call, entry, marker = "current") {
       text: index === 0 ? null : `${marker} line ${index}`, left: null, right: null,
     };
   });
-  return { rows, rowCount: ROW_COUNT, entry };
+  return { rows, rowCount: ROW_COUNT, navigationRows: [1], entry };
 }
 
 async function resolveAll(calls, entry, marker = "current") {
@@ -116,6 +116,87 @@ test("matching rows preserve the hunk credentials issued with the response", asy
   assert.equal(f.store.getSnapshot().stale, false);
   assert.equal(f.store.getSnapshot().error, null);
   assert.equal(f.store.getSnapshot().pendingChunks, 0);
+});
+
+test("navigation metadata is complete for a partial window and stable across page publications", async () => {
+  const f = fixture();
+  assert.equal(f.store.getNavigationRows(), null);
+  const requested = requestWindow(f);
+  const positions = [2, 24, 57];
+  requested.slice.resolve({ ...responseFor(requested.slice, f.entry), navigationRows: positions });
+  await nextTurn();
+  const accepted = f.store.getNavigationRows();
+  assert.deepEqual(accepted, positions, "Navigation must include positions outside loaded rows");
+  assert.equal(f.store.getRow(57), null);
+  requested.chunk.resolve({ ...responseFor(requested.chunk, f.entry), navigationRows: [...positions] });
+  await nextTurn();
+  assert.equal(f.store.getNavigationRows(), accepted, "Equivalent pagination cannot rerender navigation subscribers");
+  assert.equal(f.store.latestEntry, f.entry);
+  assert.deepEqual(f.store.getRow(0).hunkAction, actionFor(f.target, f.entry));
+});
+
+for (const filteredCount of [0, 12]) {
+  test(`rebinding original row counts preserves the authoritative ${filteredCount}-row filtered layout`, async () => {
+    const f = fixture(target({ ignoreWhitespace: "all" }));
+    const requested = requestWindow(f);
+    const navigationRows = filteredCount === 0 ? [] : [4];
+    for (const call of requested.calls) {
+      const response = responseFor(call, f.entry);
+      call.resolve({ ...response, rows: response.rows.slice(0, filteredCount), rowCount: filteredCount, navigationRows });
+    }
+    await nextTurn();
+    const accepted = f.store.getNavigationRows();
+    const epoch = f.store.epochValue;
+    assert.deepEqual(accepted, navigationRows);
+    assert.notEqual(accepted, null, "An empty filtered layout is known, not loading");
+    f.store.setTarget({ ...f.target }, ROW_COUNT, f.entry);
+    assert.equal(f.store.rowCountValue, filteredCount);
+    assert.equal(f.store.epochValue, epoch);
+    assert.equal(f.store.getNavigationRows(), accepted);
+    assert.equal(f.store.isCovered(0, filteredCount), true);
+  });
+}
+
+for (const [field, value] of Object.entries({
+  worktreeId: "worktree-b", path: "src/other.ts", changes: "staged", view: "split",
+  ignoreWhitespace: "all", fingerprint: "file-version-2", snapshotRevision: "snapshot-2",
+})) {
+  test(`changing ${field} clears navigation and rejects late metadata from the old target`, async () => {
+    const f = fixture();
+    const old = requestWindow(f);
+    old.slice.resolve({ ...responseFor(old.slice, f.entry), navigationRows: [2, 24, 57] });
+    await nextTurn();
+    assert.deepEqual(f.store.getNavigationRows(), [2, 24, 57]);
+    const nextTarget = target({ [field]: value });
+    const nextEntry = entryFor(nextTarget);
+    f.store.setTarget(nextTarget, ROW_COUNT, nextEntry);
+    assert.equal(f.store.getNavigationRows(), null);
+    const current = requestWindow(f);
+    for (const call of current.calls) {
+      call.resolve({ ...responseFor(call, nextEntry), navigationRows: [7] });
+    }
+    await nextTurn();
+    const accepted = f.store.getNavigationRows();
+    assert.deepEqual(accepted, [7]);
+    old.chunk.resolve({ ...responseFor(old.chunk, f.entry), navigationRows: [2, 24, 57] });
+    await nextTurn();
+    assert.equal(f.store.getNavigationRows(), accepted);
+  });
+}
+
+test("a stale response clears navigation before any mismatched metadata can be read", async () => {
+  const f = fixture();
+  const requested = requestWindow(f);
+  requested.slice.resolve({ ...responseFor(requested.slice, f.entry), navigationRows: [2, 24, 57] });
+  await nextTurn();
+  const wrong = responseFor(requested.chunk, entryFor(f.target, { fingerprint: "other-file-version" }));
+  let metadataReads = 0;
+  Object.defineProperty(wrong, "navigationRows", { get() { metadataReads += 1; return [9]; } });
+  requested.chunk.resolve(wrong);
+  await nextTurn();
+  assert.equal(metadataReads, 0, "Credentials must be checked before publishing navigation");
+  assert.equal(f.store.getNavigationRows(), null);
+  assert.equal(f.store.getSnapshot().stale, true);
 });
 
 const mismatchedFields = {
@@ -279,5 +360,55 @@ test("hunk action rejects readonly, binary, conflicted and untracked entries eve
     const entry = entryFor(current, change);
     const action = actionFor(current, entry);
     assert.equal(matchesHunkAction(action, current.worktreeId, entry), false, JSON.stringify(change));
+  }
+});
+
+
+function segmentFor(current, entry, overrides = {}) {
+  return {
+    worktreeId: current.worktreeId, path: entry.path, changes: entry.changes,
+    fingerprint: entry.fingerprint, snapshotRevision: entry.snapshotRevision,
+    hunkIndex: 0, segmentIndex: 1, ignoreWhitespace: "off", credential: "issued-segment",
+    ...overrides,
+  };
+}
+
+for (const changes of ["unstaged", "staged"]) {
+  test(`unified ${changes} segment buttons use their own credential without a header hunk action`, () => {
+    const current = target({ changes });
+    const entry = Object.freeze(entryFor(current));
+    for (const ignoreWhitespace of ["off", "eol", "all"]) {
+      const action = Object.freeze(segmentFor(current, entry, { ignoreWhitespace }));
+      const row = Object.freeze({ hunkAction: null, segmentAction: action });
+      const original = { ...action };
+      assert.equal(segmentActionDisabled(row.segmentAction, current.worktreeId, entry, false), false);
+      assert.deepEqual(action, original, "issued credentials are passed through unchanged");
+    }
+  });
+}
+
+test("unified segment buttons retain write, row-error, disabled-mode and missing-credential gates", () => {
+  const current = target();
+  const entry = entryFor(current);
+  const action = segmentFor(current, entry);
+  assert.equal(segmentActionDisabled(action, current.worktreeId, entry, true), true);
+  assert.equal(segmentActionDisabled(null, current.worktreeId, entry, false), true);
+  assert.equal(segmentActionDisabled({ ...action, ignoreWhitespace: "allAndBlankLines" }, current.worktreeId, entry, false), true);
+});
+
+for (const [field, value] of Object.entries({ worktreeId: "worktree-b", ...mismatchedFields })) {
+  test(`unified segment buttons reject a mismatched ${field} credential`, () => {
+    const current = target();
+    const entry = entryFor(current);
+    const action = segmentFor(current, entry, { [field]: value });
+    assert.equal(segmentActionDisabled(action, current.worktreeId, entry, false), true);
+  });
+}
+
+test("unified segment buttons reject readonly, binary, conflicted and untracked entries", () => {
+  for (const change of [{ readonlyReason: "symlink" }, { binary: true }, { unmerged: true }, { changes: "untracked" }]) {
+    const current = target();
+    const entry = entryFor(current, change);
+    assert.equal(segmentActionDisabled(segmentFor(current, entry), current.worktreeId, entry, false), true);
   }
 });

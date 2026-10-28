@@ -102,6 +102,24 @@ export interface Measurement {
   jumpDom: JumpDomDiagnostics | null;
   jumpDomError: string | null;
   highlight: { roundTrips: number; lastRoundTripMs: number | null; loadedLines: number } | null;
+  /** 并排视图（返修 A1）的实测：两栏滚动同步误差与首屏数据。 */
+  split?: {
+    syncErrorMax: number;
+    syncErrorLast: number;
+    viewportHeight: number;
+    contentHeight: number;
+    segments: number;
+    jumpAppearMs: number;
+    warmJumpAppearMs: number;
+    /** 跳转调用返回时两栏可见行是否已有内容（同步检查，口径同统一视图的 1 帧判定）。 */
+    jumpWithinOneFrame: boolean;
+    warmJumpWithinOneFrame: boolean;
+    scrollFrames: number;
+    uncoveredFrames: number;
+    uncoveredMax: number;
+    frameP50Ms: number;
+    frameP95Ms: number;
+  };
 }
 
 export function percentile(values: number[], fraction: number): number {

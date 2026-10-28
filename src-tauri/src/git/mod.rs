@@ -11,6 +11,7 @@
 pub mod diff;
 pub mod highlight;
 pub mod rows;
+pub mod segments;
 pub mod status;
 
 use std::collections::VecDeque;
@@ -22,6 +23,8 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
+
+use crate::git::segments::IgnoreWhitespace;
 use sha2::{Digest, Sha256};
 use wait_timeout::ChildExt;
 
@@ -139,9 +142,22 @@ pub struct Git {
 
 impl Git {
     pub fn new(directory: &Path, shell_env: &ShellEnv, log: Arc<CommandLog>) -> Result<Self> {
-        let program = shell_env
-            .which("git")
-            .ok_or_else(|| AppError::environment("登录 shell 的 PATH 中找不到 git"))?;
+        Self::with_program(directory, shell_env, log, None)
+    }
+
+    /// 用设置中手动指定的 Git 程序（Q27），未指定时使用登录 shell `PATH` 中的 git。
+    pub fn with_program(
+        directory: &Path,
+        shell_env: &ShellEnv,
+        log: Arc<CommandLog>,
+        program: Option<&Path>,
+    ) -> Result<Self> {
+        let program = match program {
+            Some(program) => program.to_path_buf(),
+            None => shell_env
+                .which("git")
+                .ok_or_else(|| AppError::environment("登录 shell 的 PATH 中找不到 git"))?,
+        };
         Ok(Self {
             program,
             directory: directory.to_path_buf(),
@@ -395,8 +411,12 @@ impl Git {
 
     /// 某个版本中的文件内容：`HEAD:<path>`、`:0:<path>`（暂存区 stage 0，审查意见 3）。
     pub fn file_at(&self, scope: &str, path: &str) -> Option<String> {
+        // 空范围 / "index" / ":" 是暂存区 stage 0；纯数字（"0"/"1"/"2"/"3"）是
+        // 合并场景的 stage N（返修 A1/Q143 用）；其余按引用处理（HEAD、分支名）。
         let spec = if scope.is_empty() || scope == "index" || scope == ":" {
             format!(":0:{path}")
+        } else if scope.chars().all(|ch| ch.is_ascii_digit()) && !scope.is_empty() {
+            format!(":{scope}:{path}")
         } else {
             format!("{scope}:{path}")
         };
@@ -443,9 +463,64 @@ impl Git {
         (!value.is_empty()).then(|| value.to_string())
     }
 
+    /// 工作区相对 HEAD 的 diff（冲突文件的只读对照，设计 3.2）。
+    pub fn diff_head(&self, path: &str) -> Result<Vec<u8>> {
+        self.diff(Some("HEAD"), Some(path))
+    }
+
     /// 工作区相对暂存区的 diff（未暂存改动）。
     pub fn diff_worktree(&self, path: Option<&str>) -> Result<Vec<u8>> {
         self.diff(None, path)
+    }
+
+    /// 带忽略空白档位的未暂存 diff（返修 Q140）：结果只用于显示与段计算，
+    /// 指纹仍由普通 diff 计算，两者分开。
+    pub fn diff_worktree_with_ignore(&self, path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
+        self.diff_with_extra(None, path, ignore.diff_args(), ignore.ignore_blank_lines())
+    }
+
+    /// 带忽略空白档位的已暂存 diff（返修 Q140）。
+    pub fn diff_index_with_ignore(&self, path: &str, orig_path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
+        let mut args: Vec<&str> = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.extend_from_slice(ignore.diff_args());
+        if ignore.ignore_blank_lines() {
+            args.push("--ignore-blank-lines");
+        }
+        args.push("--staged");
+        args.push("--");
+        if let Some(orig) = orig_path {
+            args.push(orig);
+        }
+        args.push(path);
+        Ok(self.run_ok(&args, "读取已暂存 diff")?.stdout)
+    }
+
+    fn diff_with_extra(
+        &self,
+        extra: Option<&str>,
+        path: Option<&str>,
+        ignore_args: &[&str],
+        ignore_blank_lines: bool,
+    ) -> Result<Vec<u8>> {
+        let mut args: Vec<&str> = Vec::new();
+        if path.is_some() {
+            args.push("--literal-pathspecs");
+        }
+        args.extend_from_slice(&["-c", "core.quotePath=false", "diff"]);
+        args.extend_from_slice(DIFF_FLAGS);
+        args.extend_from_slice(ignore_args);
+        if ignore_blank_lines {
+            args.push("--ignore-blank-lines");
+        }
+        if let Some(extra) = extra {
+            args.push(extra);
+        }
+        args.push("--");
+        if let Some(path) = path {
+            args.push(path);
+        }
+        Ok(self.run_ok(&args, "读取 diff")?.stdout)
     }
 
     /// 暂存区相对 HEAD 的 diff（已暂存改动）。
@@ -487,10 +562,14 @@ impl Git {
     }
 
     /// 单次应用已校验的原始 hunk，只写暂存区；锁重试由会话层重新校验后决定。
-    pub fn apply_index_patch(&self, patch: Vec<u8>, reverse: bool) -> Result<GitOutput> {
+    /// `ignore_whitespace`：忽略空白档位下按段写时补丁来自 -w diff，应用加 --ignore-whitespace（返修 Q140）。
+    pub fn apply_index_patch(&self, patch: Vec<u8>, reverse: bool, ignore_whitespace: bool) -> Result<GitOutput> {
         let mut args = vec![
             "-c", "apply.ignoreWhitespace=no", "apply", "--cached", "--whitespace=nowarn",
         ];
+        if ignore_whitespace {
+            args.push("--ignore-whitespace");
+        }
         if reverse {
             args.push("--reverse");
         }

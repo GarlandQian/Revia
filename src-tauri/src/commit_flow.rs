@@ -112,6 +112,8 @@ pub struct CommitOutcome {
     pub hook_changes: Option<CommitHookChanges>,
     /// 本次提交前保存的快照记录 ID（有部分暂存文件时）。
     pub snapshot_record_id: Option<String>,
+    /// 快照记录保存的文件路径（没有快照时为空）。
+    pub snapshot_paths: Vec<String>,
     /// 草稿是否已清除（成功且仍是本次输入时清除）。
     pub draft_cleared: bool,
     /// 草稿收尾失败的原因（持久化失败必须可见，F02.5）。
@@ -432,6 +434,10 @@ impl WorktreeSession {
                 )?)
             };
         let snapshot_record_id = snapshot.as_ref().map(|(record, _, _)| record.id.clone());
+        let snapshot_paths = snapshot
+            .as_ref()
+            .map(|(record, _, _)| record.before.iter().map(|file| file.path.clone()).collect())
+            .unwrap_or_default();
 
         // 已保存快照后的所有启动前错误，统一记为「未执行」，不伪装成 Git 已启动。
         let preflight = (|| -> Result<(HookBaseline, Option<PathBuf>)> {
@@ -588,6 +594,7 @@ impl WorktreeSession {
                 output,
                 hook_changes,
                 snapshot_record_id,
+                snapshot_paths,
                 draft_cleared,
                 draft_error,
                 needs_verification,
@@ -634,6 +641,7 @@ impl WorktreeSession {
             output,
             hook_changes,
             snapshot_record_id,
+            snapshot_paths,
             draft_cleared: false,
             draft_error: None,
             needs_verification,

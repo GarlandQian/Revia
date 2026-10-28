@@ -7,7 +7,11 @@ import type { ViewMode } from "./ViewMode";
 /**
  * 一段显示行。
  */
-export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number, rows: Array<RenderRow>, fingerprint: string,
+export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number,
+/**
+ * 当前过滤后统一视图的全部段首行（0 基）；分页不截断，并排视图为空。
+ */
+navigationRows: Array<number>, rows: Array<RenderRow>, fingerprint: string,
 /**
  * 生成这段行的快照版本；前端据此拒绝晚到的旧行（Q88、T05）。
  */

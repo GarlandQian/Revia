@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # M0 测试 fixture 生成脚本。
 #
-# 生成 4 个仓库（生成物不进版本库，脚本进版本库）：
+# 生成 5 个仓库（生成物不进版本库，脚本进版本库）：
 #   node-versioned  带 .node-version（v24.11.1）+ husky pre-commit hook
 #   node-default    没有 .node-version，hook 应拿到 fnm 默认版本 v26.5.0
 #   mergetool       配置 merge.tool=vscode，供 git mergetool 验证
 #   diffs           TypeScript / Vue / Swift 改动 + 大文件 + lock 文件 + 二进制文件
+#   conflicts       未解决冲突（内容冲突 + 一边删除一边修改），供内置三方合并验证
 #
 # 用法：fixtures/setup.sh [输出目录]   默认 $TMPDIR/revia-m0-fixtures
 set -euo pipefail
@@ -154,9 +155,70 @@ commit_all diffs "fixture: 初始化 diffs"
 $PYTHON "$(dirname "$0")/gen_diff_repo.py" "$OUT/diffs" --modify
 $GIT -C "$OUT/diffs" add -- src/staged.ts
 
+# ---------------------------------------------------------------- 冲突仓库（返修 F10）
+
+# conflicts：main 与 feature 改同一行，merge 后留一处未解决冲突，
+# 另有“一边删除一边修改”的文件，用来验证冲突组、冲突对话框与合并页签。
+init_repo conflicts
+mkdir -p "$OUT/conflicts/src"
+cat > "$OUT/conflicts/src/app.ts" <<'TS'
+export function label() {
+  return "base";
+}
+
+export const keep = true;
+TS
+cat > "$OUT/conflicts/src/gone.ts" <<'TS'
+export const gone = "base";
+TS
+cat > "$OUT/conflicts/src/clean.ts" <<'TS'
+export function total(items: number[]) {
+  return items.reduce((sum, item) => sum + item, 0);
+}
+TS
+commit_all conflicts "fixture: 初始化 conflicts"
+
+$GIT -C "$OUT/conflicts" checkout --quiet -b feature
+cat > "$OUT/conflicts/src/app.ts" <<'TS'
+export function label() {
+  return "feature";
+}
+
+export const keep = true;
+TS
+cat > "$OUT/conflicts/src/gone.ts" <<'TS'
+export const gone = "feature changed";
+TS
+commit_all conflicts "fixture: feature 改动"
+
+$GIT -C "$OUT/conflicts" checkout --quiet main
+cat > "$OUT/conflicts/src/app.ts" <<'TS'
+export function label() {
+  return "main";
+}
+
+export const keep = true;
+TS
+$GIT -C "$OUT/conflicts" rm --quiet -- src/gone.ts
+commit_all conflicts "fixture: main 改动"
+
+# 另加一个普通未暂存改动，冒烟检查用它验证并排视图（左右对照、窄栏色带）。
+cat > "$OUT/conflicts/src/clean.ts" <<'TS'
+export function total(items: number[]) {
+  return items.reduce((sum, item) => sum + item, 0);
+}
+
+export const extra = true;
+TS
+
+# merge 会因冲突失败；保留未解决状态供冒烟检查打开冲突组与合并页签。
+set +e
+$GIT -C "$OUT/conflicts" merge --no-edit feature >/dev/null 2>&1
+set -e
+
 echo
 printf '=== fixture 概览 ===\n'
-for name in node-versioned node-default mergetool diffs; do
+for name in node-versioned node-default mergetool diffs conflicts; do
   printf '%-16s %s\n' "$name" "$OUT/$name"
 done
 printf 'diffs 仓库改动行数：%s\n' \

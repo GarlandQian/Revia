@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::git::diff::{FileChange, LineKind};
+use crate::git::diff::{FileChange, Hunk, LineKind};
 use crate::git::status::ChangesKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -74,6 +74,11 @@ pub struct RenderRow {
     pub right: Option<RowCell>,
     /// 该行属于“先删后增”的修改块：同一块里既有删除行又有新增行。界面据此把修改与纯新增、纯删除分开着色。
     pub modified: bool,
+    /// 统一视图里这一行是某一段（块）的首行时，给段在 hunk 内的序号（Q142）。
+    /// 只有首行带按钮，其余行是 None。
+    pub segment_index: Option<u32>,
+    /// 段操作目标；与显示同批签发（由会话层填充）。
+    pub segment_action: Option<crate::git::segments::SegmentAction>,
 }
 
 /// hunk 在某个视图里的位置，供 F7 / ⇧F7 跳转使用。
@@ -94,7 +99,7 @@ pub struct HunkAnchor {
 #[derive(Clone, Copy)]
 enum LayoutRow {
     Hunk { hunk_index: usize },
-    Line { hunk_index: usize, line: usize, modified: bool },
+    Line { hunk_index: usize, line: usize, modified: bool, segment: Option<u32> },
     Pair { hunk_index: usize, left: Option<usize>, right: Option<usize>, modified: bool },
 }
 
@@ -133,6 +138,8 @@ impl LayoutRow {
             left: None,
             right: None,
             modified: false,
+            segment_index: None,
+            segment_action: None,
         };
         match self {
             Self::Hunk { .. } => {
@@ -141,7 +148,7 @@ impl LayoutRow {
                 row.old_line = Some(hunk.old_start);
                 row.new_line = Some(hunk.new_start);
             }
-            Self::Line { line, modified, .. } => {
+            Self::Line { line, modified, segment, .. } => {
                 let line = &hunk.lines[line];
                 row.kind = RowKind::Line;
                 row.old_line = line.old_line;
@@ -149,6 +156,7 @@ impl LayoutRow {
                 row.line_kind = Some(line.kind);
                 row.text = Some(line.text.clone());
                 row.modified = modified;
+                row.segment_index = segment;
             }
             Self::Pair { left, right, modified, .. } => {
                 let cell = |index: Option<usize>, old: bool| {
@@ -168,16 +176,50 @@ impl LayoutRow {
     }
 }
 
-/// 只遍历 Git hunk 的配对关系；计数、定位和索引构造共用，不复制文本。
+/// 返回连续删除段之后的新增起点及结束位置；NoEol 与上下文一样终止配对。
+fn change_block_end(hunk: &Hunk, mut cursor: usize) -> (usize, usize) {
+    while cursor < hunk.lines.len() && hunk.lines[cursor].kind == LineKind::Deletion {
+        cursor += 1;
+    }
+    let additions_start = cursor;
+    while cursor < hunk.lines.len() && hunk.lines[cursor].kind == LineKind::Addition {
+        cursor += 1;
+    }
+    (additions_start, cursor)
+}
+
+fn split_hunk_row_count(hunk: &Hunk) -> usize {
+    let mut count = 1; // hunk 头
+    let mut cursor = 0;
+    while cursor < hunk.lines.len() {
+        if matches!(hunk.lines[cursor].kind, LineKind::Deletion | LineKind::Addition) {
+            let (additions_start, end) = change_block_end(hunk, cursor);
+            count += (additions_start - cursor).max(end - additions_start);
+            cursor = end;
+        } else {
+            count += 1;
+            cursor += 1;
+        }
+    }
+    count
+}
+
+/// 只遍历 Git hunk 的配对关系；定位和索引构造共用，不复制文本。
 fn visit_layout(file: &FileChange, view: ViewMode, mut visit: impl FnMut(LayoutRow)) {
     for (hunk_index, hunk) in file.hunks.iter().enumerate() {
         visit(LayoutRow::Hunk { hunk_index });
         let mut cursor = 0;
+        // 段（块）编号与左右对照、按段切补丁共用一张表（Q142）；每段首行带按钮。
+        let owners = (view == ViewMode::Unified).then(|| crate::git::segments::line_owners(hunk));
+        let first_of_segment = |line: usize| {
+            let owners = owners.as_ref()?;
+            owners[line].filter(|_| line == 0 || owners[line - 1] != owners[line])
+        };
         while cursor < hunk.lines.len() {
             let line = &hunk.lines[cursor];
             if !matches!(line.kind, LineKind::Deletion | LineKind::Addition) {
                 visit(match view {
-                    ViewMode::Unified => LayoutRow::Line { hunk_index, line: cursor, modified: false },
+                    ViewMode::Unified => LayoutRow::Line { hunk_index, line: cursor, modified: false, segment: None },
                     ViewMode::Split => LayoutRow::Pair {
                         hunk_index,
                         left: line.old_line.map(|_| cursor),
@@ -190,20 +232,20 @@ fn visit_layout(file: &FileChange, view: ViewMode, mut visit: impl FnMut(LayoutR
             }
 
             let start = cursor;
-            while cursor < hunk.lines.len() && hunk.lines[cursor].kind == LineKind::Deletion {
-                cursor += 1;
-            }
-            let additions_start = cursor;
-            while cursor < hunk.lines.len() && hunk.lines[cursor].kind == LineKind::Addition {
-                cursor += 1;
-            }
+            let (additions_start, end) = change_block_end(hunk, cursor);
+            cursor = end;
             let deleted = additions_start - start;
             let added = cursor - additions_start;
             let modified = deleted > 0 && added > 0;
             match view {
                 ViewMode::Unified => {
                     for line in start..cursor {
-                        visit(LayoutRow::Line { hunk_index, line, modified });
+                        visit(LayoutRow::Line {
+                            hunk_index,
+                            line,
+                            modified,
+                            segment: first_of_segment(line),
+                        });
                     }
                 }
                 ViewMode::Split => {
@@ -224,17 +266,29 @@ fn visit_layout(file: &FileChange, view: ViewMode, mut visit: impl FnMut(LayoutR
 /// 仅供所属 FileChange 快照使用的排版索引，不拥有整份 RenderRow/文本副本。
 pub(crate) struct RowLayout {
     rows: Vec<LayoutRow>,
+    navigation_rows: Vec<u32>,
 }
 
 impl RowLayout {
     pub(crate) fn new(file: &FileChange, view: ViewMode) -> Self {
         let mut rows = Vec::with_capacity(row_count(file, view));
-        visit_layout(file, view, |row| rows.push(row));
-        Self { rows }
+        let mut navigation_rows = Vec::new();
+        visit_layout(file, view, |row| {
+            if matches!(row, LayoutRow::Line { segment: Some(_), .. }) {
+                navigation_rows.push(rows.len() as u32);
+            }
+            rows.push(row);
+        });
+        Self { rows, navigation_rows }
     }
 
     pub(crate) fn len(&self) -> usize {
         self.rows.len()
+    }
+
+    /// 统一视图各段首行；与正文共用排版，分页时不重新扫描全文。
+    pub(crate) fn navigation_rows(&self) -> &[u32] {
+        &self.navigation_rows
     }
 
     pub(crate) fn render_range(&self, file: &FileChange, range: std::ops::Range<usize>) -> Vec<RenderRow> {
@@ -249,42 +303,53 @@ pub fn layout(file: &FileChange, view: ViewMode) -> Vec<RenderRow> {
 }
 
 pub fn row_count(file: &FileChange, view: ViewMode) -> usize {
-    let mut count = 0;
-    visit_layout(file, view, |_| count += 1);
-    count
+    file.hunks.iter().map(|hunk| match view {
+        ViewMode::Unified => hunk.lines.len() + 1,
+        ViewMode::Split => split_hunk_row_count(hunk),
+    }).sum()
+}
+
+#[derive(Default)]
+pub(crate) struct LayoutSummary {
+    pub unified_count: usize,
+    pub split_count: usize,
+    pub anchors: Vec<HunkAnchor>,
+}
+
+/// 列表只需要行数和跳转锚点：一次扫描汇总，不构造逐行索引或段归属表。
+pub(crate) fn layout_summary(file: &FileChange) -> LayoutSummary {
+    let mut summary = LayoutSummary {
+        anchors: Vec::with_capacity(file.hunks.len()),
+        ..LayoutSummary::default()
+    };
+    for (index, hunk) in file.hunks.iter().enumerate() {
+        summary.anchors.push(HunkAnchor {
+            index: index as u32,
+            header: hunk.header.clone(),
+            section: hunk.section.clone(),
+            row_unified: summary.unified_count as u32,
+            row_split: summary.split_count as u32,
+        });
+        summary.unified_count += hunk.lines.len() + 1;
+        summary.split_count += split_hunk_row_count(hunk);
+    }
+    summary
 }
 
 /// 每个 hunk 在两种视图里的行下标。
 pub fn hunk_anchors(file: &FileChange) -> Vec<HunkAnchor> {
-    let mut anchors: Vec<HunkAnchor> = file.hunks.iter().enumerate().map(|(index, hunk)| HunkAnchor {
-        index: index as u32,
-        header: hunk.header.clone(),
-        section: hunk.section.clone(),
-        row_unified: 0,
-        row_split: 0,
-    }).collect();
-    for view in [ViewMode::Unified, ViewMode::Split] {
-        let mut index = 0;
-        visit_layout(file, view, |row| {
-            if let LayoutRow::Hunk { hunk_index } = row {
-                match view {
-                    ViewMode::Unified => anchors[hunk_index].row_unified = index,
-                    ViewMode::Split => anchors[hunk_index].row_split = index,
-                }
-            }
-            index += 1;
-        });
-    }
-    anchors
+    layout_summary(file).anchors
 }
 
-/// 行号所属的显示行下标。先精确匹配，再找第一条 >= 目标的行；均不构造文本行。
+/// 行号所属的显示行下标。先精确匹配，再找后继行；越过末尾时取该版本最后可见行。
 pub fn row_index_for_line(file: &FileChange, view: ViewMode, line: u32, old: bool) -> u32 {
     let mut index = 0;
     let mut exact = None;
     let mut nearest = None;
+    let mut last = None;
     visit_layout(file, view, |row| {
         if let Some(candidate) = row.line_number(file, old) {
+            last = Some(index);
             if candidate == line && exact.is_none() {
                 exact = Some(index);
             }
@@ -294,7 +359,7 @@ pub fn row_index_for_line(file: &FileChange, view: ViewMode, line: u32, old: boo
         }
         index += 1;
     });
-    exact.or(nearest).unwrap_or(0)
+    exact.or(nearest).or(last).unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -416,6 +481,73 @@ diff --git a/x.ts b/x.ts
     }
 
     #[test]
+    fn summary_matches_layout_for_insert_delete_and_no_eol_hunks() {
+        let inserted = "diff --git a/x.txt b/x.txt
+--- a/x.txt
++++ b/x.txt
+@@ -0,0 +1,2 @@
++a
++b
+";
+        let deleted = "diff --git a/x.txt b/x.txt
+--- a/x.txt
++++ b/x.txt
+@@ -1,2 +0,0 @@
+-a
+-b
+";
+        let no_eol = "diff --git a/x.txt b/x.txt
+--- a/x.txt
++++ b/x.txt
+@@ -1,2 +1,3 @@ section
+-a
+-b
++A
++B
++C
+@@ -10 +11 @@
+-z
+\\ No newline at end of file
++Z
+\\ No newline at end of file
+";
+        for (patch, unified, split, positions) in [
+            (PATCH, 10, 8, vec![(0, 0), (6, 5)]),
+            (inserted, 3, 3, vec![(0, 0)]),
+            (deleted, 3, 3, vec![(0, 0)]),
+            (no_eol, 11, 9, vec![(0, 0), (6, 4)]),
+        ] {
+            let file = diff::parse(patch).files.into_iter().next().unwrap();
+            let summary = layout_summary(&file);
+            assert_eq!((summary.unified_count, summary.split_count), (unified, split));
+            assert_eq!(summary.anchors.iter().map(|anchor| (anchor.row_unified, anchor.row_split)).collect::<Vec<_>>(), positions);
+            for (view, count) in [(ViewMode::Unified, unified), (ViewMode::Split, split)] {
+                let index = RowLayout::new(&file, view);
+                assert_eq!(index.len(), count);
+                assert_eq!(row_count(&file, view), count);
+                for anchor in &summary.anchors {
+                    let hunk = &file.hunks[anchor.index as usize];
+                    let position = match view {
+                        ViewMode::Unified => anchor.row_unified,
+                        ViewMode::Split => anchor.row_split,
+                    } as usize;
+                    let row = &index.render_range(&file, position..position + 1)[0];
+                    assert_eq!(row.kind, RowKind::Hunk);
+                    assert_eq!(row.hunk_index, anchor.index);
+                    assert_eq!(anchor.header, hunk.header);
+                    assert_eq!(anchor.section, hunk.section);
+                    assert_eq!(row.section.as_deref(), Some(if hunk.section.is_empty() { hunk.header.as_str() } else { hunk.section.as_str() }));
+                }
+            }
+        }
+        let mut empty = file();
+        empty.hunks.clear();
+        let summary = layout_summary(&empty);
+        assert_eq!((summary.unified_count, summary.split_count), (0, 0));
+        assert!(summary.anchors.is_empty());
+    }
+
+    #[test]
     fn row_index_for_line_finds_the_row() {
         let file = file();
         let rows = layout(&file, ViewMode::Unified);
@@ -425,14 +557,16 @@ diff --git a/x.ts b/x.ts
         // 旧行号 3 是空上下文行
         let context = row_index_for_line(&file, ViewMode::Unified, 3, true);
         assert_eq!(rows[context as usize].line_kind, Some(LineKind::Context));
-        for (view, second_content) in [(ViewMode::Unified, 7), (ViewMode::Split, 6)] {
+        for (view, second_content, last_old, last_new) in [
+            (ViewMode::Unified, 7, 8, 9), (ViewMode::Split, 6, 7, 7),
+        ] {
             // 两个 hunk 之间的行号退化到下一条内容行，不选 hunk 头。
             assert_eq!(row_index_for_line(&file, view, 4, true), second_content);
             assert_eq!(row_index_for_line(&file, view, 5, false), second_content);
             assert_eq!(row_index_for_line(&file, view, 10, true), second_content);
             assert_eq!(row_index_for_line(&file, view, 11, false), second_content);
-            assert_eq!(row_index_for_line(&file, view, 100, true), 0);
-            assert_eq!(row_index_for_line(&file, view, 100, false), 0);
+            assert_eq!(row_index_for_line(&file, view, 100, true), last_old);
+            assert_eq!(row_index_for_line(&file, view, 100, false), last_new);
         }
     }
 
@@ -512,6 +646,8 @@ diff --git a/x.txt b/x.txt
             }
             assert_eq!(row_index_for_line(&file, view, 1, true), 1);
             assert_eq!(row_index_for_line(&file, view, 1, false), 3);
+            assert_eq!(row_index_for_line(&file, view, 100, true), 1, "旧版本末尾不落到新行或 NoEol 标记");
+            assert_eq!(row_index_for_line(&file, view, 100, false), 3, "新版本末尾跳过 NoEol 标记");
         }
     }
 
@@ -527,6 +663,8 @@ diff --git a/x.txt b/x.txt
             assert!(index.render_range(&file, 0..0).is_empty());
             assert_eq!(row_index_for_line(&file, view, 1, true), 0);
             assert_eq!(row_index_for_line(&file, view, 1, false), 0);
+            assert_eq!(row_index_for_line(&file, view, u32::MAX, true), 0);
+            assert_eq!(row_index_for_line(&file, view, u32::MAX, false), 0);
         }
     }
 }

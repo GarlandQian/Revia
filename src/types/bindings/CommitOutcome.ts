@@ -9,63 +9,67 @@ import type { CommitHookChanges } from "./CommitHookChanges";
  * **已确认的 Git 非零退出也走这里**（`success = false` + `error`），
  * 前端据此既能显示 Git 类错误，又能保留输出、hooks 改动与快照信息（F04.3/F05.3）。
  */
-export type CommitOutcome = {
+export type CommitOutcome = { 
 /**
  * git 是否成功退出（退出码 0 且信息确认写入）。
  */
-success: boolean,
+success: boolean, 
 /**
  * 真实退出码；结果不确定为 None。
  */
-exitCode: number | null,
+exitCode: number | null, 
 /**
  * 提交创建（或 amend 改写）后的新 HEAD；成功时必有。
  */
-newHead: string | null,
+newHead: string | null, 
 /**
  * 提交前的 HEAD。
  */
-previousHead: string | null,
+previousHead: string | null, 
 /**
  * 合并输出尾部（实时事件已另行交付，这里是聚合副本）。
  */
-output: string,
+output: string, 
 /**
  * hooks 修改过的文件（提交成功或已确认失败后重新读取对照；不确定时为 None）。
  */
-hookChanges: CommitHookChanges | null,
+hookChanges: CommitHookChanges | null, 
 /**
  * 本次提交前保存的快照记录 ID（有部分暂存文件时）。
  */
-snapshotRecordId: string | null,
+snapshotRecordId: string | null, 
+/**
+ * 快照记录保存的文件路径（没有快照时为空）。
+ */
+snapshotPaths: Array<string>, 
 /**
  * 草稿是否已清除（成功且仍是本次输入时清除）。
  */
-draftCleared: boolean,
+draftCleared: boolean, 
 /**
  * 草稿收尾失败的原因（持久化失败必须可见，F02.5）。
  */
-draftError: string | null,
+draftError: string | null, 
 /**
  * 结果是否需要用户核对真实状态（F03.5）。
  */
-needsVerification: boolean,
+needsVerification: boolean, 
 /**
  * 操作结束后重新读到的提交预期（前端据此刷新列表与审阅进度）。
  */
-expectationAfter: CommitExpectation | null,
+expectationAfter: CommitExpectation | null, 
 /**
  * 已确认失败时的错误（Git 类）；成功或结果不确定时为 None。
  */
-error: AppErrorPayload | null,
+error: AppErrorPayload | null, 
 /**
  * 结果已确定但收尾需要核对（例如快照收尾落盘失败）时的说明。
  */
-verificationNote: string | null,
+verificationNote: string | null, 
 /**
  * 本次操作 ID（与实时输出事件里的 operationId 对应）。
  */
-operationId: string,
+operationId: string, 
 /**
  * 前端发起时提供的 nonce（原样带回，供前端确认事件归属）。
  */
