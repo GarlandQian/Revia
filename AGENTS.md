@@ -15,7 +15,7 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 
 M6“冲突与历史”的范围见 [产品方向](docs/product-direction.md#实施顺序) 的里程碑表：stash；继续、中止、跳过；在日志中 cherry-pick、revert、reset、改提交信息、交互式 rebase；文件历史与 blame；外部合并工具保留为可选（Q126、Q143、Q149）。从下面工作流程的第 1 步开始，先与用户追问未定细节，再写 `docs/milestones/m6/spec.md`；实施仍由 Codex 派 Paseo 的 Pi 完成（Q155）。
 
-M6 细节见 [产品方向：M6](docs/product-direction.md#m6冲突与历史追问中)（Q156–Q163）：stash 的独立回收存储、自动保存与冲突保留已确认；不做 Shelf、不加清理方式设置。简体中文 / English 与 x18n 文案维护已从 M7 提前到 M6，实施前读取该节及 UI 方向的“界面语言”。
+M6 细节见 [产品方向：M6](docs/product-direction.md#m6冲突与历史追问中)（Q156–Q168）：stash 独立回收、自动保存与冲突保留、edit 停点提交已确认；不做 Shelf、不加清理方式设置，import 自动解决仅入未排期 backlog。双语与 x18n 提前到 M6，首次按系统语言选择；Rust 用户报错也须结构化后由前端翻译。Pi 实施前读取该节、UI 方向的“界面语言”及已安装的 x18n skills，并核对其 MCP 实际加载状态。
 
 M4、M5 带已知未达标项合入 main（Q154）：Q98 长测、统一视图首次跳转与未做完的桌面验收在 `docs/milestones/backlog/` 04–06，不属于 M6 范围，除非用户在第 1 步中纳入。用户已要求把 [backlog 07](docs/milestones/backlog/07-log-date-column-wrap.md)（日志日期列折行）并入 M6 一起修复。
 
@@ -74,7 +74,7 @@ M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界�
 - **不写死 macOS 假设**：从 M2 起，平台相关的代码（登录 shell 环境解析、窗口外观、快捷键修饰键等）集中放在少数模块中，其他代码保持平台无关（Q55）。
 - **Git 调用只放在 Rust 层**：前端只调用固定、带类型的操作，不拼接 Git 参数或 shell 命令。
 - **推送和 PR**：除非用户明确要求，不推送，不开 PR。M2 的唯一例外是 Q97：为编译验收按需正常推送 `m2` 到现有 `origin` 并运行仅编译的 CI；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包。
-- **语言**：文档和界面文案使用简体中文。
+- **语言**：文档使用简体中文；界面文案按简体中文 / English 设置显示（Q164），回复仍默认简体中文。
 
 ## 文档维护
 
