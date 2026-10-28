@@ -32,16 +32,16 @@ M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界�
 | 1 | 规划方与用户 | 用 grill-with-docs 追问这个里程碑还没定的细节（包括测试接缝），更新决策、术语表和 ADR |
 | 2 | 规划方 | 用 to-spec 写 `spec.md` |
 | 3 | 规划方 | 用 to-tickets 拆成 `issues/`，标好依赖 |
-| 4 | 实施方 | 在里程碑分支 `m<N>` 上实现（有并行会话时放在独立 worktree）：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型按 GLM-5.3-Flash → GLM-5.3 → deepseek-v4.1-flash → gemini-3.8-flash 的顺序，当前模型请求出错就换下一个，四个都失败由规划方接手（[Q137](docs/README.md)）；返修最多一次（Q113）；保留已有改动和失败原件 |
+| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型按 GLM-5.3-Flash → GLM-5.3 → deepseek-v4.1-flash → gemini-3.8-flash 的顺序，当前模型请求出错就换下一个，四个都失败由规划方接手（[Q137](docs/README.md)）；返修最多一次（Q113）；保留已有改动和失败原件 |
 | 5 | 规划方 | 用 code-review 审查 `m<N>` 相对 main 的改动，对照 `spec.md`；意见写进对应任务文件的 `## Comments` |
 | 6 | 实施方 | 按 `## Comments` 修改，回到第 5 步 |
 | 7 | 实施方 | 写 `report.md`：实测数据、验收结论、遗留问题 |
 | 8 | 规划方 | 在真实桌面上验收：截图检查、在窗口可见时测量；`ready-for-human` 的任务由规划方用电脑操控完成（Q77） |
-| 9 | 规划方 | 验收通过后，把 `m<N>` 压成一个提交合并进 main，删除 worktree（如有），告诉用户结果 |
+| 9 | 规划方 | 验收通过后，把 `m<N>` 压成一个提交合并进 main，删除 worktree，告诉用户结果 |
 
 - 规格和任务单只整理第 1 步确认过的内容，不需要用户另行确认；遇到第 1 步没覆盖的取舍，回到第 1 步补问用户（Q76）。
 - 任务单与已确认的决策冲突时，停下来询问用户。
-- 有并行会话时，实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m6 -b m6 main`），不要在主目录里切换分支；只有一个会话工作，或规划方与 Pi 轮流工作（一方工作时另一方不改文件）时，直接在主目录的 `m<N>` 分支上进行（Q154、Q155）。
+- 实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m2 -b m2 main`），不要在主目录里切换分支。
 - 交接文件只记录工作过程，不产生新的决策；新的决策仍以 [docs/README.md](docs/README.md) 为准。
 - **合并方式**：里程碑分支合并进 main 时压成一个提交，提交说明写成“M<N>：<内容>”（例如“M1：只读界面与 diff 流式取数”），中间过程的提交只留在里程碑分支上；设计决策每轮一个提交。实施方只提交到里程碑分支，合并由规划方在验收通过后进行；用户可以随时要求撤回。
 - M0、M1 当时用的是“实施方写计划 + 规划方写评审意见”的方式，它们的 `plan.md`、`review.md` 保留作记录。
