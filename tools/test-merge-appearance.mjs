@@ -5,7 +5,8 @@ import { Compartment, EditorState, StateEffect, StateField, Transaction } from "
 import { EditorView } from "@codemirror/view";
 import { history, invertedEffects, redo, undo, undoDepth } from "@codemirror/commands";
 
-// Node loads these source modules without Vite's alias resolution.
+// 与 test-sync-scroll.mjs 相同的接线：Node 直接加载 `src/` 下的 TS 模块，
+// 需要把 `@/` 别名解析到 `src/`，并给相对导入补上 `.ts` 扩展名。
 const sourceRoot = new URL("../src/", import.meta.url);
 const imports = registerHooks({
   resolve(specifier, context, nextResolve) {

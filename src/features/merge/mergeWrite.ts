@@ -9,10 +9,10 @@
  * - 收尾只做一次；结果待核对时登记到关闭协调器，退出前先展示待核对。
  *
  * 不依赖组件生命周期：合并页签或冲突对话框在写入期间被关闭，收尾与失败通知照常完成。
- * 纯模块，App 与 Node 回归使用同一份实现。
+ * 编排本体在 `src/lib/guardedWrite.ts`，合并、分支、远端操作共用同一份实现。
  */
 
-import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { runGuardedWrite, type GuardedWriteDeps } from "@/lib/guardedWrite";
 
 export type MergeWriteRequest =
   | { kind: "apply"; worktreeId: string; path: string; result: string; fingerprint: string }
@@ -23,70 +23,20 @@ export type MergeWriteRequest =
       side: "ours" | "theirs";
     };
 
-export interface MergeWriteDeps<Token> {
-  /** 全局写门禁（App 的 `writingWorktreesRef.current`）。 */
-  writing: Set<string>;
-  /** 门禁变化后同步到界面状态。 */
-  publishWriting: () => void;
-  /** 共享异步编排（`WriteGuardOrchestrator`）。 */
-  begin: (worktreeId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
-  end: (worktreeId: string, needsVerification: boolean) => void;
-  /** 操作结果通道（`OperationResultGate`）：较新的操作会让旧结果失去记录资格。 */
-  beginOperation: (worktreeId: string) => Token;
-  canRecord: (token: Token) => boolean;
-  /** 真正的写命令（IPC）。 */
+export type MergeWriteDeps<Token> = Omit<GuardedWriteDeps<Token>, "execute"> & {
+  /** 写命令：合并写入的 IPC 参数随请求变化。 */
   execute: (request: MergeWriteRequest) => Promise<unknown>;
-  /** 对指定 worktree 真实重读一次（界面是否接收由它自己判断）。 */
-  refreshTarget: (worktreeId: string) => Promise<unknown>;
-  /** 失败按原目标报告（不随组件卸载消失）。 */
-  reportFailure: (worktreeId: string, error: AppErrorPayload) => void;
-  toError: (caught: unknown) => AppErrorPayload;
-  busyMessage: string;
-  guardUnavailable: (reason: string) => string;
-}
+};
 
 /** 执行一次受保护的合并写入；失败时抛出规范化后的错误。 */
-export async function runMergeWrite<Token>(deps: MergeWriteDeps<Token>, request: MergeWriteRequest): Promise<void> {
-  const worktreeId = request.worktreeId;
-  if (deps.writing.has(worktreeId)) {
-    const busy: AppErrorPayload = { kind: "rejected", message: deps.busyMessage };
-    throw busy;
-  }
-  deps.writing.add(worktreeId);
-  deps.publishWriting();
-  let started: { ok: true } | { ok: false; reason: string };
-  try {
-    started = await deps.begin(worktreeId);
-  } catch (caught) {
-    deps.writing.delete(worktreeId);
-    deps.publishWriting();
-    throw deps.toError(caught);
-  }
-  if (!started.ok) {
-    deps.writing.delete(worktreeId);
-    deps.publishWriting();
-    const unavailable: AppErrorPayload = { kind: "internal", message: deps.guardUnavailable(started.reason) };
-    throw unavailable;
-  }
-
-  const token = deps.beginOperation(worktreeId);
-  let failure: AppErrorPayload | null = null;
-  try {
-    try {
-      await deps.execute(request);
-    } catch (caught) {
-      failure = deps.toError(caught);
-      if (deps.canRecord(token)) deps.reportFailure(worktreeId, failure);
-    }
-    try {
-      await deps.refreshTarget(worktreeId);
-    } catch {
-      // 重读失败由 refreshTarget 自己报告，不覆盖写入结果。
-    }
-  } finally {
-    deps.writing.delete(worktreeId);
-    deps.publishWriting();
-    deps.end(worktreeId, failure?.kind === "needsVerification");
-  }
-  if (failure) throw failure;
+export async function runMergeWrite<Token>(
+  deps: MergeWriteDeps<Token>,
+  request: MergeWriteRequest,
+): Promise<void> {
+  // 合并写入的 IPC 参数随请求变化，统一封装成 `{ worktreeId }` 交给编排。
+  const guarded: GuardedWriteDeps<Token> = {
+    ...deps,
+    execute: () => deps.execute(request),
+  };
+  return runGuardedWrite(guarded, { worktreeId: request.worktreeId });
 }

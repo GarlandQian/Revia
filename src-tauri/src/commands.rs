@@ -15,6 +15,11 @@ use crate::batch::{BatchOutcome, BatchTarget};
 use crate::error::{AppError, Result};
 use crate::git::highlight::HighlightResult;
 use crate::git::rows::ViewMode;
+use crate::git::segments::IgnoreWhitespace;
+use crate::history::{
+    HistoryCommitDetail, HistoryCommitFiles, HistoryFileTarget, HistoryPage, HistoryRowSlice,
+    HistorySideLayout, HistoryStart, HistoryStore, HistoryTargetInfo,
+};
 use crate::git::status::ChangesKind;
 use crate::git::{CommandLog, CommandRecord};
 use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
@@ -76,6 +81,8 @@ pub struct AppState {
     pub registry: Mutex<Registry>,
     pub sessions: Mutex<HashMap<String, Arc<WorktreeSession>>>,
     pub command_log: Arc<CommandLog>,
+    /// 只读提交历史目标（M5 任务 01）：与工作区会话分开，关闭后请求与游标立即失效。
+    pub history: Arc<HistoryStore>,
     /// 只监视当前 worktree 的控制器（Q88）。
     pub watch: Arc<WatchController>,
     /// 合并事件的单调进度及激活归属。
@@ -107,6 +114,7 @@ impl AppState {
             registry: Mutex::new(Registry::load(data_dir.clone(), command_log.clone())),
             sessions: Mutex::new(HashMap::new()),
             command_log,
+            history: Arc::new(HistoryStore::new()),
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
             acceptance: None,
@@ -190,10 +198,21 @@ impl AppState {
                 ));
             }
         }
+        // 清空缓存之前先让旧会话实例失效：`history_open` 可能在读 Git 期间被
+        // 这里抢先完成，只清目标表拦不住它随后把旧会话登记成新目标。
+        let instances: Vec<(String, u64)> = sessions
+            .iter()
+            .map(|(worktree_id, session)| (worktree_id.clone(), session.instance_id()))
+            .collect();
         drop(sessions);
+        for (worktree_id, instance_id) in instances {
+            self.history.invalidate_session(&worktree_id, instance_id);
+        }
         if let Ok(mut sessions) = self.sessions.lock() {
             sessions.clear();
         }
+        // 环境重载后旧的历史目标（含其 Git 程序与 shell 环境）不再有效。
+        self.history.clear();
         Ok(())
     }
 
@@ -204,9 +223,18 @@ impl AppState {
 
     /// 释放某个 worktree 的会话（切换离开时用）：停止其高亮线程引用与缓存。
     pub fn release_session(&self, worktree_id: &str) {
-        if let Ok(mut sessions) = self.sessions.lock() {
-            sessions.remove(worktree_id);
+        // 先标记实例失效，再关目标：正在读 Git 的 `history_open` 随后登记时必须被拒绝，
+        // 不能把已释放的旧会话认成新目标。
+        let released = self
+            .sessions
+            .lock()
+            .ok()
+            .and_then(|mut sessions| sessions.remove(worktree_id));
+        if let Some(session) = released {
+            self.history.invalidate_session(worktree_id, session.instance_id());
         }
+        // 历史目标绑定这个 worktree 的会话实例，一起释放：旧 target_id 之后一律拒绝。
+        self.history.close_worktree(worktree_id);
     }
 }
 
@@ -1407,6 +1435,194 @@ pub async fn row_index_for_line(state: State<'_, AppState>, request: RowIndexReq
     deliver(state.acceptance.as_ref(), "row_index_for_line", &context.worktree_id, Some(&context.path), result).await
 }
 
+// ---------- 分支与远端（M5 任务 03，规格 B01–B06） ----------
+//
+// 全部命令只接收已登记的 worktree ID 与结构化参数（分支名、远端名、选项）；
+// Git 参数由 Rust 组合，前端不拼任何参数。写操作在 Rust 侧仍占同 worktree 写锁。
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeRequestPayload {
+    pub worktree_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckoutRequestPayload {
+    pub worktree_id: String,
+    pub target: crate::remote_ops::CheckoutTarget,
+    pub strategy: crate::remote_ops::CheckoutStrategy,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateBranchPayload {
+    pub worktree_id: String,
+    pub request: crate::remote_ops::CreateBranchRequest,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PushBranchPayload {
+    pub worktree_id: String,
+    pub request: crate::remote_ops::PushRequest,
+}
+
+/// 读一份设置快照（命令参数与网络选项都从这里取，前端不传设置值）。
+fn settings_snapshot(state: &State<'_, AppState>) -> Result<Settings> {
+    let registry = state
+        .registry
+        .lock()
+        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    Ok(registry.settings().clone())
+}
+
+/// 当前 HEAD 树里的文件路径（日志的路径筛选候选用，只读）。
+#[tauri::command]
+pub async fn repo_files(
+    state: State<'_, AppState>,
+    request: WorktreeRequestPayload,
+) -> Result<Vec<String>> {
+    let session = state.worktree_session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || crate::git::history::head_files(&session.git))
+        .await
+        .map_err(|error| AppError::internal(format!("读取文件树失败：{error}")))?
+}
+
+/// 分支组件的只读状态：本地 / 远端分支、领先落后、当前分支与提交身份。
+#[tauri::command]
+pub async fn branches_overview(
+    state: State<'_, AppState>,
+    request: WorktreeRequestPayload,
+) -> Result<crate::git::branch::BranchOverview> {
+    let session = state.worktree_session(&request.worktree_id)?;
+    let worktree_id = request.worktree_id.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::git::branch::read_overview(&session.git, &worktree_id)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取分支失败：{error}")))?
+}
+
+/// 检出本地 / 远端分支（B02）。会被覆盖时返回需要确认的文件列表。
+#[tauri::command]
+pub async fn checkout_branch(
+    state: State<'_, AppState>,
+    request: CheckoutRequestPayload,
+) -> Result<crate::remote_ops::CheckoutResult> {
+    let session = state.worktree_session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::checkout(&session, &store, &request.target, request.strategy)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("检出分支失败：{error}")))?
+}
+
+/// 新建分支（可选同时检出）。
+#[tauri::command]
+pub async fn create_branch(
+    state: State<'_, AppState>,
+    request: CreateBranchPayload,
+) -> Result<crate::remote_ops::CreateBranchOutcome> {
+    let session = state.worktree_session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::create_branch(&session, &request.request)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("新建分支失败：{error}")))?
+}
+
+/// 对当前仓库的所有远端执行 fetch（标签方式来自设置）。
+#[tauri::command]
+pub async fn fetch_remotes(
+    state: State<'_, AppState>,
+    request: WorktreeRequestPayload,
+) -> Result<crate::remote_ops::FetchOutcome> {
+    let settings = settings_snapshot(&state)?;
+    let session = state.worktree_session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::fetch(
+            &session,
+            settings.fetch_tag_mode,
+            crate::remote_ops::default_network_timeout(),
+        )
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("fetch 失败：{error}")))?
+}
+
+/// 更新项目（⌘T）：先 fetch 上游，再按设置的更新方式并入。
+#[tauri::command]
+pub async fn update_project(
+    state: State<'_, AppState>,
+    request: WorktreeRequestPayload,
+) -> Result<crate::remote_ops::UpdateOutcome> {
+    let settings = settings_snapshot(&state)?;
+    let session = state.worktree_session(&request.worktree_id)?;
+    let store = state.recovery.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::update(
+            &session,
+            &store,
+            settings.update_mode,
+            settings.fetch_tag_mode,
+            crate::remote_ops::default_network_timeout(),
+        )
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("更新失败：{error}")))?
+}
+
+/// 推送对话框的预览：目标远端 / 分支、将要推送的提交与受保护分支判断。
+#[tauri::command]
+pub async fn push_preview(
+    state: State<'_, AppState>,
+    request: WorktreeRequestPayload,
+) -> Result<crate::remote_ops::PushPreview> {
+    let settings = settings_snapshot(&state)?;
+    let session = state.worktree_session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::push_preview(&session, &settings.protected_branches)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取推送预览失败：{error}")))?
+}
+
+/// 推送（B05）：被拒时返回 Rejected，由前端决定是否「更新后再推送」。
+#[tauri::command]
+pub async fn push_branch(
+    state: State<'_, AppState>,
+    request: PushBranchPayload,
+) -> Result<crate::remote_ops::PushResult> {
+    let settings = settings_snapshot(&state)?;
+    let session = state.worktree_session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::push(
+            &session,
+            &request.request,
+            &settings.protected_branches,
+            crate::remote_ops::default_network_timeout(),
+        )
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("推送失败：{error}")))?
+}
+
+/// 检查远端是否有新提交（只比较引用，不取回对象）。
+#[tauri::command]
+pub async fn check_remote(
+    state: State<'_, AppState>,
+    request: WorktreeRequestPayload,
+) -> Result<crate::remote_ops::RemoteCheck> {
+    let session = state.worktree_session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::remote_ops::check_remote(&session, crate::remote_ops::default_network_timeout())
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("检查远端失败：{error}")))?
+}
+
 /// 语法类别名（按索引顺序），前端用它建立 index → CSS 变量的映射（Q50）。
 #[tauri::command]
 pub async fn syntax_categories() -> Result<Vec<String>> {
@@ -1420,6 +1636,301 @@ pub async fn syntax_categories() -> Result<Vec<String>> {
 #[tauri::command]
 pub async fn command_log_snapshot(state: State<'_, AppState>) -> Result<Vec<CommandRecord>> {
     Ok(state.command_log.snapshot())
+}
+
+// ---------- 只读提交历史（M5 任务 01，规格 H01–H04） ----------
+//
+// 全部命令只接收已登记 worktree 打开的历史目标 ID；历史内容和对象 ID 一律来自 Git，
+// 前端不传仓库目录、不拼 Git 参数，也不传工作区路径。
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryOpenRequest {
+    pub worktree_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryTargetRequest {
+    pub target_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryPageRequest {
+    pub target_id: String,
+    /// 首次查询必须给起点；继续分页时用游标，不再重解析起点。
+    #[serde(default)]
+    pub start: Option<HistoryStart>,
+    pub first_parent: bool,
+    pub limit: u32,
+    #[serde(default)]
+    pub cursor: Option<String>,
+    /// 结构化筛选条件（M5 第二批 L04）；省略等同不筛选。
+    #[serde(default)]
+    pub filter: Option<crate::history::HistoryFilter>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryMergeFilesRequest {
+    pub target_id: String,
+    pub commit: String,
+    pub mode: crate::history::HistoryMergeMode,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryMergeViewRequest {
+    pub target_id: String,
+    pub commit: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryCommitRequest {
+    pub target_id: String,
+    pub commit: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryFilesRequest {
+    pub target_id: String,
+    pub commit: String,
+    /// 显式指定的真实父提交；根提交为 null（明确用空 tree）。
+    #[serde(default)]
+    pub parent: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryRowsRequest {
+    pub target_id: String,
+    pub file: HistoryFileTarget,
+    pub view: ViewMode,
+    #[serde(default)]
+    pub ignore_whitespace: Option<IgnoreWhitespace>,
+    pub from: u32,
+    pub to: u32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistorySideLayoutRequest {
+    pub target_id: String,
+    pub file: HistoryFileTarget,
+    #[serde(default)]
+    pub ignore_whitespace: Option<IgnoreWhitespace>,
+    #[serde(default = "default_context_lines")]
+    pub context_lines: u32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistorySideLinesRequest {
+    pub target_id: String,
+    pub file: HistoryFileTarget,
+    #[serde(default)]
+    pub ignore_whitespace: Option<IgnoreWhitespace>,
+    #[serde(default = "default_context_lines")]
+    pub context_lines: u32,
+    pub version: FileVersion,
+    #[serde(default)]
+    pub highlight: String,
+    pub from: u32,
+    pub to: u32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryHighlightRequest {
+    pub target_id: String,
+    pub file: HistoryFileTarget,
+    #[serde(default)]
+    pub ignore_whitespace: Option<IgnoreWhitespace>,
+    pub version: FileVersion,
+    pub from_line: u32,
+    pub to_line: u32,
+}
+
+/// 打开只读历史目标：返回 HEAD、本地引用与工程限额。
+#[tauri::command]
+pub async fn history_open(
+    state: State<'_, AppState>,
+    request: HistoryOpenRequest,
+) -> Result<HistoryTargetInfo> {
+    let session = state.worktree_session(&request.worktree_id)?;
+    let store = state.history.clone();
+    tauri::async_runtime::spawn_blocking(move || store.open(&session))
+        .await
+        .map_err(|error| AppError::internal(format!("打开提交历史失败：{error}")))?
+}
+
+/// 关闭历史目标（幂等）。关闭后该目标的请求与分页游标一律失效。
+#[tauri::command]
+pub async fn history_close(state: State<'_, AppState>, request: HistoryTargetRequest) -> Result<bool> {
+    // 关闭要等目标自身的锁（它可能正在跑 Git），放到阻塞线程里做，
+    // 不占用异步运行时线程。
+    let store = state.history.clone();
+    tauri::async_runtime::spawn_blocking(move || Ok(store.close(&request.target_id)))
+        .await
+        .map_err(|error| AppError::internal(format!("关闭提交历史失败：{error}")))?
+}
+
+/// 重新读取本地引用。
+#[tauri::command]
+pub async fn history_refs(
+    state: State<'_, AppState>,
+    request: HistoryTargetRequest,
+) -> Result<Vec<crate::history::HistoryRef>> {
+    let target = state.history.target(&request.target_id)?;
+    tauri::async_runtime::spawn_blocking(move || target.refs())
+        .await
+        .map_err(|error| AppError::internal(format!("读取引用失败：{error}")))?
+}
+
+/// 读取一页提交：起点固定为查询开始时的完整提交对象。
+#[tauri::command]
+pub async fn history_log_page(
+    state: State<'_, AppState>,
+    request: HistoryPageRequest,
+) -> Result<HistoryPage> {
+    let target = state.history.target(&request.target_id)?;
+    let start = request.start;
+    let cursor = request.cursor;
+    let first_parent = request.first_parent;
+    let limit = request.limit;
+    let filter = request.filter.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        target.log_page_filtered(start, first_parent, limit, cursor, &filter)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取提交历史失败：{error}")))?
+}
+
+/// merge 提交的改动文件（默认合并视图 / 按父提交分组）。
+#[tauri::command]
+pub async fn history_merge_files(
+    state: State<'_, AppState>,
+    request: HistoryMergeFilesRequest,
+) -> Result<crate::history::HistoryMergeFiles> {
+    let target = state.history.target(&request.target_id)?;
+    let commit = request.commit;
+    let mode = request.mode;
+    tauri::async_runtime::spawn_blocking(move || target.merge_files(&commit, mode))
+        .await
+        .map_err(|error| AppError::internal(format!("读取合并提交的改动文件失败：{error}")))?
+}
+
+/// merge 提交的三栏只读内容（父提交 1 | 合并结果 | 父提交 2）。
+#[tauri::command]
+pub async fn history_merge_view(
+    state: State<'_, AppState>,
+    request: HistoryMergeViewRequest,
+) -> Result<crate::history::HistoryMergeView> {
+    let target = state.history.target(&request.target_id)?;
+    let commit = request.commit;
+    let path = request.path;
+    tauri::async_runtime::spawn_blocking(move || target.merge_view(&commit, &path))
+        .await
+        .map_err(|error| AppError::internal(format!("读取合并提交的三栏内容失败：{error}")))?
+}
+
+/// 按固定提交对象读取完整提交信息与父提交列表。
+#[tauri::command]
+pub async fn history_commit(
+    state: State<'_, AppState>,
+    request: HistoryCommitRequest,
+) -> Result<HistoryCommitDetail> {
+    let target = state.history.target(&request.target_id)?;
+    let commit = request.commit;
+    tauri::async_runtime::spawn_blocking(move || target.commit_detail(&commit))
+        .await
+        .map_err(|error| AppError::internal(format!("读取提交详情失败：{error}")))?
+}
+
+/// 读取提交相对显式父提交的改动文件（根提交用空 tree）。
+#[tauri::command]
+pub async fn history_commit_files(
+    state: State<'_, AppState>,
+    request: HistoryFilesRequest,
+) -> Result<HistoryCommitFiles> {
+    let target = state.history.target(&request.target_id)?;
+    let commit = request.commit;
+    let parent = request.parent;
+    tauri::async_runtime::spawn_blocking(move || target.commit_files(&commit, parent.as_deref()))
+        .await
+        .map_err(|error| AppError::internal(format!("读取改动文件失败：{error}")))?
+}
+
+/// 提交 diff 的统一 / 左右布局显示行（只读，不签发任何写操作目标）。
+#[tauri::command]
+pub async fn history_file_rows(
+    state: State<'_, AppState>,
+    request: HistoryRowsRequest,
+) -> Result<HistoryRowSlice> {
+    let target = state.history.target(&request.target_id)?;
+    let ignore = request.ignore_whitespace.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        target.file_rows(&request.file, request.view, ignore, request.from, request.to)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取提交显示行失败：{error}")))?
+}
+
+/// 提交 diff 的左右对照布局：两侧行数、段与折叠区（没有段操作目标）。
+#[tauri::command]
+pub async fn history_file_side_layout(
+    state: State<'_, AppState>,
+    request: HistorySideLayoutRequest,
+) -> Result<HistorySideLayout> {
+    let target = state.history.target(&request.target_id)?;
+    let ignore = request.ignore_whitespace.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        target.file_side_layout(&request.file, ignore, request.context_lines)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取提交左右对照失败：{error}")))?
+}
+
+/// 按需取提交左右对照一侧的行。
+#[tauri::command]
+pub async fn history_file_side_lines(
+    state: State<'_, AppState>,
+    request: HistorySideLinesRequest,
+) -> Result<Vec<crate::git::segments::SideLine>> {
+    let target = state.history.target(&request.target_id)?;
+    let ignore = request.ignore_whitespace.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        target.file_side_lines(
+            &request.file,
+            ignore,
+            request.context_lines,
+            request.version,
+            request.from,
+            request.to,
+            crate::git::segments::WordGranularity::from_setting(&request.highlight),
+        )
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("读取提交左右行失败：{error}")))?
+}
+
+/// 提交文件的语法高亮（内容由 Rust 按对象 ID 读取，前端不传文件内容或路径）。
+#[tauri::command]
+pub async fn history_file_highlight(
+    state: State<'_, AppState>,
+    request: HistoryHighlightRequest,
+) -> Result<HighlightResult> {
+    let target = state.history.target(&request.target_id)?;
+    let ignore = request.ignore_whitespace.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        target.file_highlight(&request.file, ignore, request.version, request.from_line, request.to_line)
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("提交高亮失败：{error}")))?
 }
 
 // ---------- 测量用命令（M1 验收需要；不上界面，只在这个里程碑使用） ----------

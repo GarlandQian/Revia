@@ -7,7 +7,8 @@
  * Popover.Trigger 用 render 接管调用方的按钮，保留原有样式与受控逻辑。
  */
 
-import { type ReactNode, type ReactElement } from "react";
+import { useState, type ReactNode, type ReactElement } from "react";
+
 import { Popover as PopoverParts } from "@base-ui/react/popover";
 
 export function Popover({
@@ -29,7 +30,15 @@ export function Popover({
   width?: number;
 }) {
   return (
-    <PopoverParts.Root open={open} onOpenChange={(next) => { if (next) onOpen(); else onClose(); }}>
+    <PopoverParts.Root
+      open={open}
+      onOpenChange={(next) => {
+        // 打开与关闭都同步给调用方：触发器自己会切换内部状态，
+        // 受控状态跟随它即可，不需要给触发按钮再加 onClick（会互相抵消）。
+        if (next) onOpen();
+        else onClose();
+      }}
+    >
       <PopoverParts.Trigger render={trigger} nativeButton />
       <PopoverParts.Portal className="revia-popover-host">
         <PopoverParts.Positioner className="pointer-events-auto" align={align === "right" ? "end" : "start"} side="bottom" sideOffset={4}>
@@ -43,6 +52,39 @@ export function Popover({
         </PopoverParts.Positioner>
       </PopoverParts.Portal>
     </PopoverParts.Root>
+  );
+}
+
+/**
+ * 自带开关状态的弹出层：触发按钮的点击由这里接管（内部受控）。
+ *
+ * 用在筛选菜单这类“点开、选完再关”的场景，调用方不必自己维护 open 状态。
+ */
+export function Dropdown({
+  trigger,
+  children,
+  align = "left",
+  width,
+}: {
+  trigger: ReactElement;
+  children: ReactNode;
+  align?: "left" | "right";
+  width?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  // 打开 / 关闭都交给 Base UI 的触发点击（`onOpen` / `onClose`），
+  // 不再给按钮加 onClick：那会和触发器的原生切换互相抵消。
+  return (
+    <Popover
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      trigger={trigger}
+      align={align}
+      width={width}
+    >
+      {children}
+    </Popover>
   );
 }
 

@@ -1,7 +1,7 @@
 /**
  * 只读 diff 视图：自绘、窗口化、只渲染可见区域（Q32）。
  *
- * 数据来自 `RowWindowStore`（按可见范围分块取行）与 `HighlightStore`（按行范围取类别）。
+ * 数据来自 `RowWindowStore`（按可见范围分块取行）与 `DiffHighlights`（按行范围取类别）。
  * 视图本身不做差异计算，也不持有整份 diff（ADR-0004）。
  *
  * 滚动由本组件接管，不用浏览器原生滚动（ADR-0008）：原生滚动交给系统单独处理，
@@ -24,8 +24,8 @@ import { messages } from "@/lib/i18n/zh-CN";
 import { codeFontStack } from "@/lib/theme";
 import { Codicon } from "@/components/ui/codicon";
 import { logToBackend } from "./log";
-import type { HighlightStore } from "./highlightStore";
-import type { RowWindowStore } from "./rowWindowStore";
+import type { DiffHighlights } from "./highlightStore";
+import type { DiffRows } from "./rowWindowStore";
 import { visibleHighlightLines } from "./visibleHighlightLines";
 import { matchesHunkAction, segmentActionDisabled } from "./hunkAction";
 import { RowHeights } from "./rowHeights";
@@ -62,30 +62,47 @@ export interface DiffViewHandle {
   isCompact(): boolean;
 }
 
-interface DiffViewProps {
-  worktreeId: string;
-  entry: ChangeEntry;
+interface DiffViewBaseProps {
   view: ViewMode;
   fontSize: number;
   fontFamily?: string | null;
-  rows: RowWindowStore;
-  highlights: HighlightStore;
+  rows: DiffRows;
+  highlights: DiffHighlights;
+  /** 软换行（Q139）：长行折行显示，行高随内容。 */
+  softWrap?: boolean;
+  /** 每帧采样：用于测量「可见区域里还没有数据的行数」。 */
+  onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
+}
+
+type DiffViewProps = DiffViewBaseProps & ({
+  history?: never;
+  worktreeId: string;
+  entry: ChangeEntry;
   isWriting?: boolean;
   /** 段（块）操作是否可用（Q140：同时忽略空行一档只用于查看）。 */
   segmentActionsEnabled?: boolean;
-  /** 软换行（Q139）：长行折行显示，行高随内容。 */
-  softWrap?: boolean;
   onHunkAction?: (action: HunkAction) => void;
   onHunkDiscard?: (action: HunkAction, section: string) => void;
   onSegmentAction?: (action: SegmentAction) => void;
   onSegmentDiscard?: (action: SegmentAction) => void;
   handleRef?: React.Ref<DiffViewHandle>;
-  /** 每帧采样：用于测量「可见区域里还没有数据的行数」。 */
-  onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
-}
+} | {
+  history: { key: string; path: string };
+  worktreeId?: never;
+  entry?: never;
+  isWriting?: never;
+  segmentActionsEnabled?: never;
+  onHunkAction?: never;
+  onHunkDiscard?: never;
+  onSegmentAction?: never;
+  onSegmentDiscard?: never;
+  handleRef?: never;
+});
 
 export function DiffView(props: DiffViewProps) {
   const { worktreeId, entry, view, fontSize, fontFamily, rows, highlights, handleRef, onSample, isWriting, onHunkAction, onHunkDiscard } = props;
+  const displayPath = props.history ? props.history.path : props.entry.path;
+  const sourceKey = props.history ? props.history.key : `${props.entry.changes}/${props.entry.path}`;
   const segmentActionsEnabled = props.segmentActionsEnabled ?? true;
   const softWrap = props.softWrap ?? false;
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -105,6 +122,11 @@ export function DiffView(props: DiffViewProps) {
   const idleTimer = useRef<number | null>(null);
   // 大幅跳转的那一帧只渲染可见行纯文本，保证 1 帧内画出文字（Q52）；语法颜色与预渲染余量在约 2 帧内恢复。
   const [compact, setCompact] = useState(false);
+  // 跳转那一帧只插入目标可见行：旧窗口的上百行着色节点先留在原位（视口之外），
+  // 等颜色恢复的那次渲染再卸载，不在跳转的同步提交里删除。
+  const [retained, setRetained] = useState<{ from: number; to: number } | null>(null);
+  // 最近一次完整（非 compact）渲染的行范围。
+  const renderedRange = useRef<{ from: number; to: number } | null>(null);
   const jumpRestoreRaf = useRef<number | null>(null);
   const jumpRestoreTimer = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -123,10 +145,10 @@ export function DiffView(props: DiffViewProps) {
   const epoch = rows.epochValue;
   const heights = useMemo(
     () => {
-      void [wrapWidth, wrapFont, epoch, entry.path, entry.changes, view];
+      void [wrapWidth, wrapFont, epoch, sourceKey, view];
       return new RowHeights(rowCount, ROW_HEIGHT, softWrap);
     },
-    [rowCount, softWrap, wrapWidth, wrapFont, epoch, entry.path, entry.changes, view],
+    [rowCount, softWrap, wrapWidth, wrapFont, epoch, sourceKey, view],
   );
   const heightsRef = useRef(heights);
   const previousHeights = useRef(heights);
@@ -162,6 +184,7 @@ export function DiffView(props: DiffViewProps) {
           jumpRestoreTimer.current = null;
         }
         setCompact(false);
+        setRetained(null);
       } else {
         jumpRestoreRaf.current = requestAnimationFrame(onFrame);
       }
@@ -170,6 +193,7 @@ export function DiffView(props: DiffViewProps) {
     jumpRestoreTimer.current = window.setTimeout(() => {
       cancelJumpRestore();
       setCompact(false);
+      setRetained(null);
     }, JUMP_RESTORE_FALLBACK_MS);
   }, [cancelJumpRestore]);
 
@@ -181,22 +205,23 @@ export function DiffView(props: DiffViewProps) {
       idleTimer.current = null;
     }
     setCompact(false);
+    setRetained(null);
     setScrollIdle(true);
-  }, [cancelJumpRestore, entry.changes, entry.path, view]);
+  }, [cancelJumpRestore, sourceKey, view]);
 
   // 组件卸载时清理所有定时器与 rAF
   useEffect(() => {
     const element = viewportRef.current;
-    logToBackend(`DiffView 已挂载：${entry.path}/${view} clientHeight=${element?.clientHeight}`);
+    logToBackend(`DiffView 已挂载：${displayPath}/${view} clientHeight=${element?.clientHeight}`);
     return () => {
-      logToBackend(`DiffView 卸载：${entry.path}/${view}`);
+      logToBackend(`DiffView 卸载：${displayPath}/${view}`);
       cancelJumpRestore();
       if (idleTimer.current != null) {
         window.clearTimeout(idleTimer.current);
         idleTimer.current = null;
       }
     };
-  }, [cancelJumpRestore, entry.path, view]);
+  }, [cancelJumpRestore, displayPath, view]);
 
   useLayoutEffect(() => {
     const element = viewportRef.current;
@@ -244,7 +269,10 @@ export function DiffView(props: DiffViewProps) {
         setFirstRow(heightsRef.current.rowAt(top));
         if (heightsRef.current.wrap) setBottomRow(heightsRef.current.rowAt(top + height));
         setScrollIdle(false);
-        if (bigJump) setCompact(true);
+        if (bigJump) {
+          setCompact(true);
+          setRetained(renderedRange.current);
+        }
       };
       // 同步提交新的行窗口：这一帧画出来的位置上已经有行，不会先露白再补。
       if (options.sync) flushSync(update);
@@ -391,14 +419,16 @@ export function DiffView(props: DiffViewProps) {
   const renderFrom = Math.max(0, visibleFrom - (scrollingUp ? ahead : behind));
   const renderTo = Math.min(rowCount, visibleTo + (scrollingUp ? behind : ahead));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // 先量出真实视口，避免 0 高度小请求占住首屏 slice，随后又为完整视口补一次。
+    if (viewportHeight <= 0) return;
     void version;
     rows.ensure(visibleFrom, visibleTo, PREFETCH_SCREENS);
     if (version === 0) {
       rows.logWindow?.();
     }
     onSample?.({ from: visibleFrom, to: visibleTo, uncovered: rows.uncovered(visibleFrom, visibleTo) });
-  }, [onSample, rows, scrollIdle, version, visibleFrom, visibleTo]);
+  }, [onSample, rows, scrollIdle, version, visibleFrom, visibleTo, viewportHeight]);
 
   useEffect(() => {
     if (!scrollIdle || !highlightSnapshot.supported || highlightSnapshot.pending > 0
@@ -423,6 +453,7 @@ export function DiffView(props: DiffViewProps) {
         applyScroll(heightsRef.current.top(Math.max(0, index)));
       },
       async scrollToLine(line: number, targetVersion: FileVersion) {
+        if (!entry || !worktreeId) return;
         const index = await ipc.rowIndexForLine({
           worktreeId,
           path: entry.path,
@@ -455,14 +486,21 @@ export function DiffView(props: DiffViewProps) {
         return compact;
       },
     }),
-    [applyScroll, compact, entry.changes, entry.path, rows, view, visibleFrom, visibleTo, worktreeId],
+    [applyScroll, compact, entry, rows, view, visibleFrom, visibleTo, worktreeId],
   );
 
+  useLayoutEffect(() => {
+    if (!compact) renderedRange.current = { from: renderFrom, to: renderTo };
+  });
+
+  const kept = compact ? retained : null;
   const indices = useMemo(() => {
     const list: number[] = [];
+    if (kept) for (let index = kept.from; index < Math.min(kept.to, renderFrom); index += 1) list.push(index);
     for (let index = renderFrom; index < renderTo; index += 1) list.push(index);
+    if (kept) for (let index = Math.max(kept.from, renderTo); index < kept.to; index += 1) list.push(index);
     return list;
-  }, [renderFrom, renderTo]);
+  }, [kept, renderFrom, renderTo]);
 
   return (
     <div
@@ -476,6 +514,7 @@ export function DiffView(props: DiffViewProps) {
       <div ref={contentRef} className={`diff-canvas diff-canvas-${view}`} style={{ height: contentHeight }}>
         {indices.map((index) => {
           const row = rows.getRow(index);
+          const plain = compact && index >= renderFrom && index < renderTo;
           // 数据没到的行不渲染节点，直接露出底图里“加载中的行”。
           return row ? (
             <RowView
@@ -486,17 +525,17 @@ export function DiffView(props: DiffViewProps) {
               wrap={heights.wrap}
               view={view}
               highlights={highlights}
-              highlightVersion={compact ? 0 : highlightSnapshot.version}
-              plainTextOnly={compact}
+              highlightVersion={plain ? 0 : highlightSnapshot.version}
+              plainTextOnly={plain}
               onHunkAction={onHunkAction}
               onHunkDiscard={onHunkDiscard}
               onSegmentAction={props.onSegmentAction}
               onSegmentDiscard={props.onSegmentDiscard}
               segmentActionsEnabled={segmentActionsEnabled}
               onHunkFocus={revealHunk}
-              hunkDisabled={isWriting || !!rowSnapshot.error || !row.hunkAction
+              hunkDisabled={!entry || !worktreeId || isWriting || !!rowSnapshot.error || !row.hunkAction
                 || !matchesHunkAction(row.hunkAction, worktreeId, entry)}
-              segmentDisabled={segmentActionDisabled(row.segmentAction, worktreeId, entry,
+              segmentDisabled={!entry || !worktreeId || segmentActionDisabled(row.segmentAction, worktreeId, entry,
                 !!isWriting || !!rowSnapshot.error || !segmentActionsEnabled)}
             />
           ) : null;
@@ -549,7 +588,7 @@ const RowView = memo(function RowView({
   /** 软换行：行高随内容，交给视图量（不能用 size containment）。 */
   wrap: boolean;
   view: ViewMode;
-  highlights: HighlightStore;
+  highlights: DiffHighlights;
   /** 缓存对象保持不变时，让 memo 行在 token 到达后仍能补绘。 */
   highlightVersion: number;
   plainTextOnly: boolean;
@@ -709,7 +748,7 @@ function markerFor(kind?: RenderRow["lineKind"] | RowCell["kind"]): string {
  * 高亮来自另一个版本时（例如未刷新前外部等长改写），宁可显示纯文本，
  * 也不能让渲染出的文字与 Git hunk / 写指纹不一致（Q88、T05）。
  */
-function tokensMatchText(tokens: ReturnType<HighlightStore["get"]>, text: string): boolean {
+function tokensMatchText(tokens: ReturnType<DiffHighlights["get"]>, text: string): boolean {
   if (!tokens) return false;
   let joined = "";
   for (const token of tokens) joined += token.text;
@@ -728,8 +767,8 @@ function Cell({
   tone: LineTone;
   kind: RowCell["kind"];
   marker: string;
-  tokens: ReturnType<HighlightStore["get"]>;
-  highlights: HighlightStore;
+  tokens: ReturnType<DiffHighlights["get"]>;
+  highlights: DiffHighlights;
 }) {
   return (
     <span className={`cell cell-${kind}${tone ? ` cell-${tone}` : ""}`}>
@@ -753,8 +792,8 @@ function SplitCell({
 }: {
   cell: RowCell | null;
   tone: LineTone;
-  highlights: HighlightStore;
-  tokens: ReturnType<HighlightStore["get"]>;
+  highlights: DiffHighlights;
+  tokens: ReturnType<DiffHighlights["get"]>;
 }) {
   if (!cell) return <span className="cell empty" />;
   return (

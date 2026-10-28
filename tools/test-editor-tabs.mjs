@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import test from "node:test";
 
@@ -37,6 +38,23 @@ function entry(path, patch = {}) {
     fingerprint: "original", snapshotRevision: "revision-1", ...patch,
   });
 }
+
+test("默认日志与刷新只重绑工作区数据，显式打开文件/合并页签才激活 diff", () => {
+  const app = readFileSync(new URL("App.tsx", sourceRoot), "utf8");
+  assert.doesNotMatch(app, /if \(selected \|\| mergeTabPath\) setMainView\("diff"\)/);
+  const entryOpen = app.slice(app.indexOf("const openEntry ="), app.indexOf("entryNavigationRef.current ="));
+  assert.match(entryOpen, /if \(target\.activate !== false\) setMainView\("diff"\)/);
+  assert.match(entryOpen, /target\.activate === false && mainViewRef\.current !== "diff"/);
+  const refresh = app.slice(app.indexOf("const applyRefreshedSnapshot ="), app.indexOf("const openWorktree ="));
+  assert.match(refresh, /openEntry\(entry, \{[^}]*activate: false/);
+  assert.doesNotMatch(refresh, /setMainView/);
+  const opening = app.slice(app.indexOf("const openWorktree ="), app.indexOf("const acceptSnapshot ="));
+  assert.match(opening, /activate: options\.activateDiff === true/);
+  const merge = app.slice(app.indexOf("const selectMergeEntry ="), app.indexOf("openMergeTabRef.current ="));
+  assert.match(merge, /setMainView\("diff"\)/);
+  const measurement = app.slice(app.indexOf("const runMeasurement ="), app.indexOf("const runMeasurement =") + 1000);
+  assert.match(measurement, /activateDiff: true/, "测量模式显式打开 diff，不用普通模式默认日志替代首屏");
+});
 
 test("关闭当前 diff 后按相邻页签的 merge 类型激活，不把它当普通 diff", () => {
   const current = diff("src/a.ts");

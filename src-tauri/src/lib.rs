@@ -12,9 +12,11 @@ pub mod merge;
 pub mod commands;
 pub mod error;
 pub mod git;
+pub mod history;
 pub mod operation;
 pub mod platform;
 pub mod recovery;
+pub mod remote_ops;
 pub mod review;
 pub mod session;
 pub mod settings;
@@ -162,6 +164,27 @@ pub fn run() {
             commands::merge_open,
             commands::merge_apply,
             commands::merge_accept_side,
+            commands::history_open,
+            commands::history_close,
+            commands::history_refs,
+            commands::history_log_page,
+            commands::history_commit,
+            commands::history_commit_files,
+            commands::history_file_rows,
+            commands::history_file_side_layout,
+            commands::history_file_side_lines,
+            commands::history_file_highlight,
+            commands::history_merge_files,
+            commands::history_merge_view,
+            commands::branches_overview,
+            commands::repo_files,
+            commands::checkout_branch,
+            commands::create_branch,
+            commands::fetch_remotes,
+            commands::update_project,
+            commands::push_preview,
+            commands::push_branch,
+            commands::check_remote,
         ])
         .build(tauri::generate_context!())
         .expect("Revia 启动失败");

@@ -1,6 +1,74 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { startIpcDiagnostics } from "../src/lib/ipcDiagnostics.ts";
+import { soakScroller } from "../src/lib/soakScroller.ts";
+
+test("长测并排就绪必须检查两侧真实可见行，不访问统一缓存", () => {
+  const calls = [];
+  let covered = false;
+  let pending = true;
+  const split = {
+    getViewportHeight: () => 500,
+    getFileAnchor: () => ({ line: 1, version: "new" }),
+    getVisibleRange: (side) => side === "left" ? { from: 0, to: 0 } : { from: 0, to: 2 },
+    isCovered(from, to, side) { calls.push([from, to, side]); return side === "left" || covered; },
+    isSettled: () => !pending,
+    getScrollTop: () => 0,
+    restoreFileAnchor(anchor) { calls.push(anchor); return true; },
+  };
+  const staleUnified = new Proxy({}, { get() { throw new Error("不得访问统一缓存"); } });
+  const current = soakScroller("split", staleUnified, split);
+  assert.equal(current.ready(), false);
+  covered = true;
+  assert.equal(current.ready(), true, "纯新增的空左侧不应阻止右侧就绪");
+  assert.equal(current.settled(), false);
+  pending = false;
+  assert.equal(current.settled(), true);
+  current.scrollToRow(40);
+  assert.deepEqual(calls.at(-1), { line: 41, version: "new" });
+  assert.equal(current.atTop(), true);
+  assert.ok(calls.some((call) => Array.isArray(call) && call[2] === "right"));
+});
+
+test("长测并排拒绝未挂载、隐藏、旧布局和空可见范围", () => {
+  assert.equal(soakScroller("split", null, null), null);
+  const split = {
+    getViewportHeight: () => 0,
+    getFileAnchor: () => ({ line: 1, version: "old" }),
+    getVisibleRange: () => ({ from: 0, to: 0 }),
+    isCovered: () => true,
+    restoreFileAnchor: () => false,
+  };
+  const current = soakScroller("split", null, split);
+  assert.equal(current.ready(), false);
+  split.getViewportHeight = () => 500;
+  split.getFileAnchor = () => null;
+  assert.equal(current.ready(), false);
+  split.getFileAnchor = () => ({ line: 1, version: "old" });
+  assert.equal(current.ready(), false);
+  assert.throws(() => current.scrollToRow(40), /尚未就绪/);
+});
+
+test("长测统一仍使用自身可见行与滚动入口", () => {
+  let covered = false;
+  let top = 20;
+  const unified = {
+    getViewportHeight: () => 500,
+    getVisibleRange: () => ({ from: 10, to: 40 }),
+    isCovered: (from, to) => from === 10 && to === 40 && covered,
+    scrollToRow: (row) => { top = row; },
+    getScrollTop: () => top,
+  };
+  const staleSplit = new Proxy({}, { get() { throw new Error("不得访问并排缓存"); } });
+  const current = soakScroller("unified", unified, staleSplit);
+  assert.equal(current.ready(), false);
+  covered = true;
+  assert.equal(current.ready(), true);
+  assert.equal(current.atTop(), false);
+  current.scrollToRow(0);
+  assert.equal(current.atTop(), true);
+  assert.equal(soakScroller("unified", null, staleSplit), null);
+});
 
 function deferred() {
   let resolve;

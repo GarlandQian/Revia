@@ -46,6 +46,10 @@ export class SideLineWindow {
     this.key = key;
   }
 
+  get pendingRequests(): number {
+    return this.pending.size;
+  }
+
   ensure(side: Side, window: WindowRequest, loader: Loader): void {
     if (!loader.isCurrent()) return;
     this.windows[side] = window;

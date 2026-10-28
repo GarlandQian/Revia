@@ -150,7 +150,7 @@ pub fn capture_files(root: &Path, paths: &[String]) -> Result<Vec<SavedFile>> {
 
 /// 记录来源。`commitSnapshot` 是提交前对部分暂存文件的完整工作区快照（M3 F05），
 /// 与丢弃来源区分；回收区 UI 不得把它描述成「已丢弃」。
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum RecoverySource {
@@ -159,6 +159,12 @@ pub enum RecoverySource {
     CommitSnapshot,
     /// 内置三方合并“应用”前保存的工作区内容（Q143）。
     MergeApply,
+    /// 智能检出（Q150）：stash 之前保存会被覆盖的本地内容。
+    CheckoutSmart,
+    /// 强制检出（Q150）：丢弃全部已跟踪文件的本地改动之前保存。
+    CheckoutForce,
+    /// 更新项目（Q148）：带 autostash 之前保存已跟踪文件的本地改动。
+    UpdateAutostash,
 }
 
 impl RecoverySource {
@@ -172,6 +178,9 @@ impl RecoverySource {
             RecoverySource::DiscardHunk => "discardHunk",
             RecoverySource::CommitSnapshot => "commitSnapshot",
             RecoverySource::MergeApply => "mergeApply",
+            RecoverySource::CheckoutSmart => "checkoutSmart",
+            RecoverySource::CheckoutForce => "checkoutForce",
+            RecoverySource::UpdateAutostash => "updateAutostash",
         }
     }
 }

@@ -93,6 +93,7 @@ export function CommitArea({
   onAmend,
   onSkipHooks,
   onSubmit,
+  onSubmitAndPush,
   onPickRecent,
   onAmendConfirm,
   onAmendCancel,
@@ -116,6 +117,8 @@ export function CommitArea({
   onAmend: (value: boolean) => void;
   onSkipHooks: (value: boolean) => void;
   onSubmit: () => void;
+  /** 提交并推送（B06、⌥⌘K）：先走同一个提交流程，成功后再推送。 */
+  onSubmitAndPush: () => void;
   onPickRecent: (value: string) => void;
   onAmendConfirm: () => void;
   onAmendCancel: () => void;
@@ -281,6 +284,16 @@ export function CommitArea({
           {submitting ? <Codicon name="loading" size={14} spin /> : <Codicon name="check" size={14} />}
           {submitting ? messages.commit.submitting : messages.commit.submit}
           {!submitting ? <span className="text-[11px] opacity-70">{COMMIT_SHORTCUT_LABEL}</span> : null}
+        </button>
+        <button
+          type="button"
+          className="icon-action size-7"
+          disabled={disabled}
+          title={messages.branches.commitAndPush}
+          aria-label={messages.branches.commitAndPush}
+          onClick={onSubmitAndPush}
+        >
+          <Codicon name="cloud-upload" size={15} />
         </button>
         <div className="relative">
           <Popover

@@ -32,6 +32,12 @@ function sourceLabel(source: RecoverySource): string {
       return messages.recovery.sourceFile;
     case "mergeApply":
       return messages.recovery.sourceMerge;
+    case "checkoutSmart":
+      return messages.recovery.sourceCheckoutSmart;
+    case "checkoutForce":
+      return messages.recovery.sourceCheckoutForce;
+    case "updateAutostash":
+      return messages.recovery.sourceUpdateAutostash;
   }
 }
 

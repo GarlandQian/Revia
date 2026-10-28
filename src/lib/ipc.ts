@@ -18,6 +18,31 @@ import type { CommitDraft } from "@/types/bindings/CommitDraft";
 import type { CommitOutcome } from "@/types/bindings/CommitOutcome";
 import type { CommitOutputEvent } from "@/types/bindings/CommitOutputEvent";
 import type { FileVersion } from "@/types/bindings/FileVersion";
+import type { HistoryCommitDetail } from "@/types/bindings/HistoryCommitDetail";
+import type { HistoryCommitFiles } from "@/types/bindings/HistoryCommitFiles";
+import type { HistoryFileTarget } from "@/types/bindings/HistoryFileTarget";
+import type { HistoryPage } from "@/types/bindings/HistoryPage";
+import type { HistoryRef } from "@/types/bindings/HistoryRef";
+import type { HistoryRowSlice } from "@/types/bindings/HistoryRowSlice";
+import type { HistorySideLayout } from "@/types/bindings/HistorySideLayout";
+import type { HistoryStart } from "@/types/bindings/HistoryStart";
+import type { HistoryFilter } from "@/types/bindings/HistoryFilter";
+import type { HistoryMergeFiles } from "@/types/bindings/HistoryMergeFiles";
+import type { HistoryMergeMode } from "@/types/bindings/HistoryMergeMode";
+import type { HistoryMergeView } from "@/types/bindings/HistoryMergeView";
+import type { BranchOverview } from "@/types/bindings/BranchOverview";
+import type { CheckoutTarget } from "@/types/bindings/CheckoutTarget";
+import type { CheckoutStrategy } from "@/types/bindings/CheckoutStrategy";
+import type { CheckoutResult } from "@/types/bindings/CheckoutResult";
+import type { CreateBranchRequest } from "@/types/bindings/CreateBranchRequest";
+import type { CreateBranchOutcome } from "@/types/bindings/CreateBranchOutcome";
+import type { FetchOutcome } from "@/types/bindings/FetchOutcome";
+import type { UpdateOutcome } from "@/types/bindings/UpdateOutcome";
+import type { PushPreview } from "@/types/bindings/PushPreview";
+import type { PushRequest } from "@/types/bindings/PushRequest";
+import type { PushResult } from "@/types/bindings/PushResult";
+import type { RemoteCheck } from "@/types/bindings/RemoteCheck";
+import type { HistoryTargetInfo } from "@/types/bindings/HistoryTargetInfo";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { RecoveryInspection } from "@/types/bindings/RecoveryInspection";
 import type { RecoveryMaintenance } from "@/types/bindings/RecoveryMaintenance";
@@ -120,7 +145,32 @@ export interface SettingsPayload {
   /** 各类成功结果是否弹出通知（E.6）。 */
   notify: NotifyKinds;
   mergeAutoApply: boolean;
+  /** 日志设置（F06、L06）。 */
+  logColumns: LogColumns;
+  logLongEdges: boolean;
+  logFirstParent: boolean;
+  logPreviewPosition: LogPreviewPosition;
+  /** 更新与推送设置（F05、B08）。 */
+  updateMode: UpdateMode;
+  fetchTagMode: FetchTagMode;
+  fetchAutomatically: boolean;
+  checkRemote: boolean;
+  autoUpdateOnPushRejection: boolean;
+  pushDialogOnCommit: boolean;
+  pushDialogProtectedOnly: boolean;
+  protectedBranches: string[];
 }
+
+/** 日志表格显示列（F06）。 */
+export interface LogColumns {
+  author: boolean;
+  date: boolean;
+  hash: boolean;
+}
+
+export type LogPreviewPosition = "right" | "bottom";
+export type UpdateMode = "merge" | "rebase" | "branchDefault";
+export type FetchTagMode = "auto" | "sync" | "always" | "never";
 
 /** 与 Rust 侧 `SettingsPatch` 对应：只传要改的字段。 */
 export interface SettingsPatchPayload {
@@ -152,10 +202,25 @@ export interface SettingsPatchPayload {
   commitWarnInvalidFilename?: boolean;
   notify?: NotifyKinds;
   mergeAutoApply?: boolean;
+  logColumns?: LogColumns;
+  logLongEdges?: boolean;
+  logFirstParent?: boolean;
+  logPreviewPosition?: LogPreviewPosition;
+  updateMode?: UpdateMode;
+  fetchTagMode?: FetchTagMode;
+  fetchAutomatically?: boolean;
+  checkRemote?: boolean;
+  autoUpdateOnPushRejection?: boolean;
+  pushDialogOnCommit?: boolean;
+  pushDialogProtectedOnly?: boolean;
+  protectedBranches?: string[];
 }
 
+/** 与 Rust 侧 `CommandRecord` 对应（B07：时间、worktree、参数、退出码、耗时、输出）。 */
 export interface CommandRecordPayload {
   sequence: number;
+  worktreeId: string | null;
+  startedAtMs: number;
   program: string;
   args: string[];
   directory: string;
@@ -164,6 +229,9 @@ export interface CommandRecordPayload {
   timedOut: boolean;
   stdoutBytes: number;
   stderrExcerpt: string;
+  /** 合并后的标准输出与错误输出（已打码，最多 64 KB）。 */
+  output: string;
+  outputTruncated: boolean;
 }
 
 /** 与 Rust 侧 `CommitOptions` 对应（固定类型，前端不能扩展成任意 Git 参数）。 */
@@ -435,4 +503,119 @@ export const ipc = {
    */
   executeCommit: (request: { worktreeId: string; options: CommitExecuteOptions }) =>
     invoke<CommitOutcome>("execute_commit", { request }),
+
+  // ---------- 只读提交历史（M5 任务 01） ----------
+  //
+  // 历史内容与对象 ID 都由 Rust 从 Git 读取；前端只传已登记 worktree 打开的历史目标 ID、
+  // 后端签发的文件身份与分页游标，不传仓库目录、工作区路径或 Git 参数。
+  // 这组接口没有任何写操作目标（没有 HunkAction / SegmentAction）。
+  /** 打开只读历史目标：返回 HEAD、本地引用与工程限额。 */
+  historyOpen: (worktreeId: string) =>
+    invoke<HistoryTargetInfo>("history_open", { request: { worktreeId } }),
+  /** 关闭历史目标（幂等）：关闭后该目标的请求与游标立即失效。 */
+  historyClose: (targetId: string) =>
+    invoke<boolean>("history_close", { request: { targetId } }),
+  /** 重新读取本地引用。 */
+  historyRefs: (targetId: string) =>
+    invoke<HistoryRef[]>("history_refs", { request: { targetId } }),
+  /**
+   * 读取一页提交。首次查询给 `start`，之后只带上一页的 `cursor`；
+   * 落地后引用移动也不改变这条查询的历史。
+   */
+  historyLogPage: (request: {
+    targetId: string;
+    /** 首次查询的起点；带游标时省略。 */
+    start?: HistoryStart;
+    /** 是否只走第一父提交（不影响返回的真实父提交列表）。 */
+    firstParent: boolean;
+    /** 1..=200，超过由后端拒绝。 */
+    limit: number;
+    cursor?: string;
+    /** 结构化筛选条件（L04）；省略等同不筛选。 */
+    filter?: HistoryFilter;
+  }) => invoke<HistoryPage>("history_log_page", { request }),
+  /** 按固定提交对象读取完整提交信息与父提交列表。 */
+  historyCommit: (targetId: string, commit: string) =>
+    invoke<HistoryCommitDetail>("history_commit", { request: { targetId, commit } }),
+  /**
+   * 读取提交相对显式父提交的改动文件。
+   * 根提交传 `parent: null`（后端明确用空 tree）；merge 不提供默认父提交。
+   */
+  historyCommitFiles: (request: { targetId: string; commit: string; parent: string | null }) =>
+    invoke<HistoryCommitFiles>("history_commit_files", { request }),
+  /** 提交 diff 的统一 / 左右布局显示行（只读）。 */
+  historyFileRows: (request: {
+    targetId: string;
+    /** 改动文件列表里的 `diffId` 与身份字段，原样传回。 */
+    file: HistoryFileTarget;
+    view: ViewMode;
+    ignoreWhitespace?: IgnoreWhitespace;
+    from: number;
+    to: number;
+  }) => invoke<HistoryRowSlice>("history_file_rows", { request }),
+  /** 提交 diff 的左右对照布局：两侧行数、段与折叠区，没有段操作目标。 */
+  historyFileSideLayout: (request: {
+    targetId: string;
+    file: HistoryFileTarget;
+    ignoreWhitespace?: IgnoreWhitespace;
+    contextLines?: number;
+  }) => invoke<HistorySideLayout>("history_file_side_layout", { request }),
+  /** 按需取提交左右对照一侧的行。 */
+  historyFileSideLines: (request: {
+    targetId: string;
+    file: HistoryFileTarget;
+    ignoreWhitespace?: IgnoreWhitespace;
+    contextLines?: number;
+    version: FileVersion;
+    highlight: "word" | "line" | "char" | "none";
+    from: number;
+    to: number;
+  }) => invoke<SideLine[]>("history_file_side_lines", { request }),
+  /** merge 提交的改动文件（默认合并视图 / 按父提交分组，Q147）。 */
+  historyMergeFiles: (request: { targetId: string; commit: string; mode: HistoryMergeMode }) =>
+    invoke<HistoryMergeFiles>("history_merge_files", { request }),
+  /** merge 提交的三栏只读内容（父提交 1 | 合并结果 | 父提交 2）。 */
+  historyMergeView: (request: { targetId: string; commit: string; path: string }) =>
+    invoke<HistoryMergeView>("history_merge_view", { request }),
+
+  // ---------- 分支与远端（M5 任务 03） ----------
+  //
+  // 前端只传已登记 worktree ID 与结构化参数（分支 / 远端名字、选项）；
+  // Git 参数由 Rust 组合。写操作在 Rust 侧占同 worktree 写锁。
+  /** 当前 HEAD 树里的文件路径（日志的路径筛选候选，只读）。 */
+  repoFiles: (worktreeId: string) => invoke<string[]>("repo_files", { request: { worktreeId } }),
+  /** 分支组件的只读状态：本地 / 远端分支、领先落后、当前分支与提交身份。 */
+  branchesOverview: (worktreeId: string) =>
+    invoke<BranchOverview>("branches_overview", { request: { worktreeId } }),
+  /** 检出分支：会被覆盖时返回需要确认的文件列表（Q150）。 */
+  checkoutBranch: (request: { worktreeId: string; target: CheckoutTarget; strategy: CheckoutStrategy }) =>
+    invoke<CheckoutResult>("checkout_branch", { request }),
+  /** 新建分支（可选同时检出）。 */
+  createBranch: (request: { worktreeId: string; request: CreateBranchRequest }) =>
+    invoke<CreateBranchOutcome>("create_branch", { request }),
+  /** 对当前仓库所有远端执行 fetch（标签方式来自设置）。 */
+  fetchRemotes: (worktreeId: string) =>
+    invoke<FetchOutcome>("fetch_remotes", { request: { worktreeId } }),
+  /** 更新项目（⌘T）：先 fetch 上游，再按设置的更新方式并入。 */
+  updateProject: (worktreeId: string) =>
+    invoke<UpdateOutcome>("update_project", { request: { worktreeId } }),
+  /** 推送预览：目标远端 / 分支、待推送提交与受保护分支判断。 */
+  pushPreview: (worktreeId: string) =>
+    invoke<PushPreview>("push_preview", { request: { worktreeId } }),
+  /** 推送；被远端拒绝时返回 rejected，由前端决定是否「更新后再推送」。 */
+  pushBranch: (request: { worktreeId: string; request: PushRequest }) =>
+    invoke<PushResult>("push_branch", { request }),
+  /** 检查远端是否有新提交（只比较引用，不取回对象）。 */
+  checkRemote: (worktreeId: string) =>
+    invoke<RemoteCheck>("check_remote", { request: { worktreeId } }),
+
+  /** 提交文件的语法高亮（内容由 Rust 按对象 ID 读取）。 */
+  historyFileHighlight: (request: {
+    targetId: string;
+    file: HistoryFileTarget;
+    ignoreWhitespace?: IgnoreWhitespace;
+    version: FileVersion;
+    fromLine: number;
+    toLine: number;
+  }) => invoke<HighlightRangeResult>("history_file_highlight", { request }),
 };

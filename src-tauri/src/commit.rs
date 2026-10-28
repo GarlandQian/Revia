@@ -1233,17 +1233,28 @@ pub fn execute_commit(
     }
 
     let exit_code = status.code().unwrap_or(-1);
+    let masked_output = crate::git::cap_output_text(
+        &crate::git::mask_credentials(&tail.text()),
+        tail.byte_count() > crate::git::LOG_OUTPUT_LIMIT,
+    );
     // 命令日志：直接 spawn 的提交也要留证（git/mod.rs 的「每条命令都记入」）。
     git.log.record(CommandRecord {
         sequence: 0,
+        worktree_id: git.worktree_id.clone(),
+        started_at_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_millis() as u64)
+            .unwrap_or_default(),
         program: git.program.display().to_string(),
-        args,
+        args: args.iter().map(|arg| crate::git::mask_credentials(arg)).collect(),
         directory: git.directory.display().to_string(),
         exit_code,
         elapsed_ms: elapsed.as_millis() as u64,
         timed_out: false,
         stdout_bytes: tail.byte_count(),
-        stderr_excerpt: tail.stderr_text().chars().take(400).collect(),
+        stderr_excerpt: crate::git::mask_credentials(&tail.stderr_text().chars().take(400).collect::<String>()),
+        output: masked_output.0,
+        output_truncated: masked_output.1,
     });
 
     if let Some(error) = wait_error.or(output_error) {

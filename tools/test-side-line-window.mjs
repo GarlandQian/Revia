@@ -35,6 +35,7 @@ test("两侧可见小片先到齐，随后仍补完整400行块", async () => {
   const f = fixture();
   f.store.ensure("left", f.window, f.loader);
   f.store.ensure("right", f.window, f.loader);
+  assert.equal(f.store.pendingRequests, 2);
   assert.deepEqual(f.calls.map(({ side, from, to }) => [side, from, to]), [["left", 1, 32], ["right", 1, 32]]);
   await complete(f.calls[0]);
   f.store.ensure("left", f.window, f.loader);
@@ -46,6 +47,7 @@ test("两侧可见小片先到齐，随后仍补完整400行块", async () => {
   assert.equal(f.calls.length, 4, "小片和整块分别去重，重复render不重复请求");
   await complete(f.calls[2]);
   await complete(f.calls[3]);
+  assert.equal(f.store.pendingRequests, 0);
   f.store.ensure("left", f.window, f.loader);
   assert.equal(f.calls.length, 4);
   assert.equal(f.store.old.size, 400);

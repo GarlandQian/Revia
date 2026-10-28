@@ -335,7 +335,8 @@ impl WorktreeSession {
         review_store: Option<Arc<ReviewStore>>,
         git_program: Option<&Path>,
     ) -> Result<Arc<Self>> {
-        let git = Git::with_program(path, &shell_env, command_log, git_program)?;
+        let git = Git::with_program(path, &shell_env, command_log, git_program)?
+            .with_worktree_id(id);
         let git_version = git.version()?;
         let (major, minor) = git::parse_version(&git_version).unwrap_or((0, 0));
         let mut checks = Vec::new();
@@ -386,6 +387,11 @@ impl WorktreeSession {
             review_seq: Mutex::new(0),
             identity: identity.clone(),
         }))
+    }
+
+    /// 会话实例代号：进程内唯一，历史目标据此拒绝旧实例的目标。
+    pub fn instance_id(&self) -> u64 {
+        self.instance_id
     }
 
     /// 重新读取状态并解析 diff（`list_changes`）。

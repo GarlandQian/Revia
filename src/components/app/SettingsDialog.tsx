@@ -7,7 +7,13 @@
  * 按键都写设置。所有设置都存在 Rust 的 settings.rs 里，前端不用 localStorage。
  */
 
-import type { NotifyKinds } from "@/lib/ipc";
+import type {
+  FetchTagMode,
+  LogColumns,
+  LogPreviewPosition,
+  NotifyKinds,
+  UpdateMode,
+} from "@/lib/ipc";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { messages } from "@/lib/i18n/zh-CN";
 import { themesOfKind } from "@/lib/theme";
@@ -41,6 +47,19 @@ export interface SettingsValues {
   commitWarnInvalidFilename: boolean;
   notify: NotifyKinds;
   mergeAutoApply: boolean;
+  logColumns: LogColumns;
+  logLongEdges: boolean;
+  logFirstParent: boolean;
+  logPreviewPosition: LogPreviewPosition;
+  updateMode: UpdateMode;
+  fetchTagMode: FetchTagMode;
+  fetchAutomatically: boolean;
+  checkRemote: boolean;
+  autoUpdateOnPushRejection: boolean;
+  pushDialogOnCommit: boolean;
+  pushDialogProtectedOnly: boolean;
+  /** 受保护分支（每行一个）。 */
+  protectedBranches: string;
   /** 当前会话实际使用的 Git 程序（只读展示）。 */
   detectedGitPath: string | null;
 }
@@ -74,17 +93,31 @@ export interface SettingsPatch {
   commitWarnInvalidFilename?: boolean;
   notify?: NotifyKinds;
   mergeAutoApply?: boolean;
+  logColumns?: LogColumns;
+  logLongEdges?: boolean;
+  logFirstParent?: boolean;
+  logPreviewPosition?: LogPreviewPosition;
+  updateMode?: UpdateMode;
+  fetchTagMode?: FetchTagMode;
+  fetchAutomatically?: boolean;
+  checkRemote?: boolean;
+  autoUpdateOnPushRejection?: boolean;
+  pushDialogOnCommit?: boolean;
+  pushDialogProtectedOnly?: boolean;
+  protectedBranches?: string[];
 }
 
-type Category = "appearance" | "commit" | "diff" | "notifications" | "git" | "about";
+type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "about";
 type Page =
   | "theme"
   | "font"
   | "commitMessage"
   | "commitWarnings"
   | "diffDisplay"
+  | "logSettings"
   | "notifications"
   | "gitTools"
+  | "updatePush"
   | "about";
 
 interface PageDef {
@@ -137,6 +170,13 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
+    id: "log",
+    title: messages.log.title,
+    pages: [
+      { id: "logSettings", title: messages.settings.pages.log, keywords: messages.settings.keywords.log },
+    ],
+  },
+  {
     id: "notifications",
     title: messages.settings.notifications,
     pages: [
@@ -151,6 +191,11 @@ const CATEGORIES: CategoryDef[] = [
         id: "gitTools",
         title: messages.settings.pages.gitTools,
         keywords: messages.settings.keywords.gitTools,
+      },
+      {
+        id: "updatePush",
+        title: messages.settings.pages.updatePush,
+        keywords: messages.settings.keywords.updatePush,
       },
     ],
   },
@@ -167,8 +212,10 @@ const CATEGORY_OF_PAGE: Record<Page, Category> = {
   commitMessage: "commit",
   commitWarnings: "commit",
   diffDisplay: "diff",
+  logSettings: "log",
   notifications: "notifications",
   gitTools: "git",
+  updatePush: "git",
   about: "about",
 };
 
@@ -196,6 +243,7 @@ export function SettingsDialog({
   const [subjectLimit, setSubjectLimit] = useState(String(values.commitSubjectLimit));
   const [bodyLimit, setBodyLimit] = useState(String(values.commitBodyLineLimit));
   const [largeFileMb, setLargeFileMb] = useState(String(Math.round(values.commitWarnLargeFileBytes / (1024 * 1024))));
+  const [protectedBranches, setProtectedBranches] = useState(values.protectedBranches);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -208,6 +256,7 @@ export function SettingsDialog({
     setSubjectLimit(String(values.commitSubjectLimit));
     setBodyLimit(String(values.commitBodyLineLimit));
     setLargeFileMb(String(Math.round(values.commitWarnLargeFileBytes / (1024 * 1024))));
+    setProtectedBranches(values.protectedBranches);
     setError(null);
     setNotice(null);
     setQuery("");
@@ -220,6 +269,7 @@ export function SettingsDialog({
     values.commitSubjectLimit,
     values.commitBodyLineLimit,
     values.commitWarnLargeFileBytes,
+    values.protectedBranches,
   ]);
 
   useEffect(() => {
@@ -636,6 +686,156 @@ export function SettingsDialog({
                     <option value={2}>{messages.diff.ignoreWhitespaceLevels.all}</option>
                     <option value={3}>{messages.diff.ignoreWhitespaceLevels.allBlank}</option>
                   </select>
+                </Field>
+              </div>
+            ) : null}
+
+            {page === "logSettings" ? (
+              <div className="space-y-5">
+                <Field label={messages.settings.logColumns} hint={messages.settings.logColumnsHint}>
+                  <div className="space-y-1.5">
+                    {([
+                      ["author", messages.settings.logColumnAuthor],
+                      ["date", messages.settings.logColumnDate],
+                      ["hash", messages.settings.logColumnHash],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="flex items-center gap-2 text-[12.5px]">
+                        <input
+                          type="checkbox"
+                          checked={values.logColumns[key]}
+                          onChange={(event) =>
+                            void commit({ logColumns: { ...values.logColumns, [key]: event.target.checked } })
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+                <Field label={messages.settings.logLongEdges} hint={messages.settings.logLongEdgesHint}>
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input
+                      type="checkbox"
+                      checked={values.logLongEdges}
+                      onChange={(event) => void commit({ logLongEdges: event.target.checked })}
+                    />
+                    {messages.settings.logLongEdges}
+                  </label>
+                </Field>
+                <Field label={messages.settings.logFirstParent} hint={messages.settings.logFirstParentHint}>
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input
+                      type="checkbox"
+                      checked={values.logFirstParent}
+                      onChange={(event) => void commit({ logFirstParent: event.target.checked })}
+                    />
+                    {messages.settings.logFirstParent}
+                  </label>
+                </Field>
+                <Field label={messages.settings.logPreviewPosition}>
+                  <select
+                    className="settings-select"
+                    value={values.logPreviewPosition}
+                    onChange={(event) => void commit({ logPreviewPosition: event.target.value as LogPreviewPosition })}
+                  >
+                    <option value="right">{messages.settings.logPreviewRight}</option>
+                    <option value="bottom">{messages.settings.logPreviewBottom}</option>
+                  </select>
+                </Field>
+                <p className="text-[11.5px] text-descriptionforeground">{messages.settings.logHint}</p>
+              </div>
+            ) : null}
+
+            {page === "updatePush" ? (
+              <div className="space-y-5">
+                <Field label={messages.settings.updateMode} hint={messages.settings.updateModeHint}>
+                  <select
+                    className="settings-select"
+                    value={values.updateMode}
+                    onChange={(event) => void commit({ updateMode: event.target.value as UpdateMode })}
+                  >
+                    <option value="merge">{messages.settings.updateModeMerge}</option>
+                    <option value="rebase">{messages.settings.updateModeRebase}</option>
+                    <option value="branchDefault">{messages.settings.updateModeBranchDefault}</option>
+                  </select>
+                </Field>
+                <Field label={messages.settings.fetchTagMode}>
+                  <select
+                    className="settings-select"
+                    value={values.fetchTagMode}
+                    onChange={(event) => void commit({ fetchTagMode: event.target.value as FetchTagMode })}
+                  >
+                    <option value="auto">{messages.settings.fetchTagModeAuto}</option>
+                    <option value="sync">{messages.settings.fetchTagModeSync}</option>
+                    <option value="always">{messages.settings.fetchTagModeAlways}</option>
+                    <option value="never">{messages.settings.fetchTagModeNever}</option>
+                  </select>
+                </Field>
+                <Field label={messages.settings.fetchAutomatically} hint={messages.settings.fetchAutomaticallyHint}>
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input
+                      type="checkbox"
+                      checked={values.fetchAutomatically}
+                      onChange={(event) => void commit({ fetchAutomatically: event.target.checked })}
+                    />
+                    {messages.settings.fetchAutomatically}
+                  </label>
+                </Field>
+                <Field label={messages.settings.checkRemote} hint={messages.settings.checkRemoteHint}>
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input
+                      type="checkbox"
+                      checked={values.checkRemote}
+                      onChange={(event) => void commit({ checkRemote: event.target.checked })}
+                    />
+                    {messages.settings.checkRemote}
+                  </label>
+                </Field>
+                <Field label={messages.settings.autoUpdateOnPushRejection} hint={messages.settings.autoUpdateOnPushRejectionHint}>
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input
+                      type="checkbox"
+                      checked={values.autoUpdateOnPushRejection}
+                      onChange={(event) => void commit({ autoUpdateOnPushRejection: event.target.checked })}
+                    />
+                    {messages.settings.autoUpdateOnPushRejection}
+                  </label>
+                </Field>
+                <Field label={messages.settings.pushDialogOnCommit}>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-2 text-[12.5px]">
+                      <input
+                        type="checkbox"
+                        checked={values.pushDialogOnCommit}
+                        onChange={(event) => void commit({ pushDialogOnCommit: event.target.checked })}
+                      />
+                      {messages.settings.pushDialogOnCommit}
+                    </label>
+                    <label className="flex items-center gap-2 text-[12.5px]">
+                      <input
+                        type="checkbox"
+                        checked={values.pushDialogProtectedOnly}
+                        onChange={(event) => void commit({ pushDialogProtectedOnly: event.target.checked })}
+                      />
+                      {messages.settings.pushDialogProtectedOnly}
+                    </label>
+                  </div>
+                </Field>
+                <Field label={messages.settings.protectedBranches} hint={messages.settings.protectedBranchesHint}>
+                  <textarea
+                    className="settings-input min-h-[72px] w-full font-mono"
+                    value={protectedBranches}
+                    spellCheck={false}
+                    onChange={(event) => setProtectedBranches(event.target.value)}
+                    onBlur={() =>
+                      void commit({
+                        protectedBranches: protectedBranches
+                          .split(/\r?\n/)
+                          .map((line) => line.trim())
+                          .filter((line) => line.length > 0),
+                      })
+                    }
+                  />
                 </Field>
               </div>
             ) : null}

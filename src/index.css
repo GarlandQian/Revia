@@ -1372,3 +1372,291 @@
   padding: 24px 32px;
   font-size: 12.5px;
 }
+
+/* ---------- 提交日志（M5 任务 02） ---------- */
+
+.log-input,
+.log-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--icon-foreground) 18%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--editorgroupheader-tabsbackground) 92%, transparent);
+  color: var(--foreground);
+  font: 11.5px/20px var(--font-sans);
+  white-space: nowrap;
+}
+
+.log-input {
+  display: block;
+  height: 22px;
+  padding: 0 6px;
+  font-family: var(--font-sans);
+  outline: none;
+}
+
+.log-filter-button:hover:not(:disabled) {
+  background: var(--toolbar-hoverbackground);
+}
+
+.log-filter-button.active {
+  border-color: var(--focusborder);
+  color: var(--foreground);
+}
+
+.log-filter-button:focus-visible,
+.log-input:focus-visible {
+  outline: 1px solid var(--focusborder);
+  outline-offset: -1px;
+}
+
+.log-view {
+  container: revia-log / inline-size;
+}
+
+/* Keep the log readable beside a preview without changing its chosen position. */
+@container revia-log (max-width: 1150px) {
+  .log-main-with-preview {
+    flex-direction: column;
+  }
+
+  .log-main-with-preview > .log-details {
+    width: 100%;
+    flex: 0 1 45%;
+    min-height: 140px;
+    border-left: 0;
+    border-top: 1px solid var(--panel-border);
+  }
+}
+
+.log-table-head {
+  font-family: var(--font-sans);
+}
+
+.log-row {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: default;
+  border-left: 2px solid transparent;
+  contain: layout paint style;
+}
+
+.log-row:hover {
+  background: var(--list-hoverbackground, var(--toolbar-hoverbackground));
+}
+
+.log-row.selected {
+  background: var(--list-activeSelectionbackground, var(--toolbar-hoverbackground));
+  border-left-color: var(--focusborder);
+}
+
+.log-graph-col {
+  position: relative;
+  height: 100%;
+  display: inline-block;
+  padding: 0;
+}
+
+.log-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+}
+
+.log-rail.collapsed {
+  border-left: 1px dashed color-mix(in srgb, var(--descriptionforeground) 70%, transparent);
+}
+
+.log-arm {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+}
+
+.log-node {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  margin-left: -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--editor-background);
+}
+
+.log-long-edge {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  margin-left: -6px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--editor-background);
+  color: var(--descriptionforeground);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.log-long-edge:hover {
+  color: var(--foreground);
+  background: var(--toolbar-hoverbackground);
+}
+
+.log-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  max-width: 180px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--gitdecoration-headsresourceforeground, var(--badge-background)) 22%, transparent);
+  color: var(--foreground);
+  font-size: 10.5px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-ref-chip.remote {
+  background: color-mix(in srgb, var(--descriptionforeground) 18%, transparent);
+}
+
+.log-ref-chip.tag {
+  background: color-mix(in srgb, var(--editorwarning-foreground) 24%, transparent);
+}
+
+.log-ref-chip.current {
+  background: var(--focusborder);
+  color: var(--editor-background);
+  font-weight: 600;
+}
+
+.log-file-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 2px 8px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: default;
+}
+
+.log-file-row:hover {
+  background: var(--toolbar-hoverbackground);
+}
+
+.log-status {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--gitdecoration-modifiedresourceforeground);
+}
+
+.log-status-added { color: var(--gitdecoration-addedresourceforeground, #4caf50); }
+.log-status-deleted { color: var(--gitdecoration-deletedresourceforeground, #e05252); }
+.log-status-renamed { color: var(--gitdecoration-renamedresourceforeground, #4f9cd6); }
+
+.log-parent-link {
+  border-radius: 3px;
+  padding: 0 3px;
+  font-family: var(--font-mono, monospace);
+  color: var(--textlink-foreground, var(--focusborder));
+}
+
+.log-parent-link:hover {
+  background: var(--toolbar-hoverbackground);
+}
+
+.history-row {
+  contain: layout paint style;
+}
+
+.history-rows .row {
+  position: static;
+}
+
+.history-merge-row {
+  height: 19px;
+}
+
+.history-merge-line {
+  width: 46px;
+  padding-right: 8px;
+  text-align: right;
+  color: var(--diff-gutter-fg);
+  font-size: 0.92em;
+  user-select: none;
+  vertical-align: top;
+}
+
+.history-merge-cell {
+  padding-left: 6px;
+  white-space: pre;
+}
+
+/* Git 命令日志（M5 B07）。 */
+.command-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 1px 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  text-align: left;
+  border-left: 2px solid transparent;
+}
+
+.command-row:hover {
+  background: var(--toolbar-hoverbackground);
+}
+
+.command-row.selected {
+  background: var(--list-activeSelectionbackground, var(--toolbar-hoverbackground));
+  border-left-color: var(--focusborder);
+}
+
+/* 对话框按钮（分支 / 源端对话框）。 */
+.dialog-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--icon-foreground) 24%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--foreground);
+  font: 12px/22px var(--font-sans);
+}
+
+.dialog-button:hover:not(:disabled) {
+  background: var(--toolbar-hoverbackground);
+}
+
+.dialog-button.primary {
+  border-color: var(--focusborder);
+  background: var(--focusborder);
+  color: var(--editor-background);
+  font-weight: 600;
+}
+
+.dialog-button:disabled {
+  opacity: 0.5;
+}

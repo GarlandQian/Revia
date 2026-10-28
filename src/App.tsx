@@ -29,7 +29,7 @@ import { ChangesTree, entryKey, treeOrder } from "@/components/app/ChangesTree";
 import { Breadcrumbs, EditorTabs, mergeTabKey, tabKey, type DiffToolbarOptions } from "@/components/app/EditorTabs";
 import { MergeView } from "@/features/diff/MergeView";
 import { ConflictDialog } from "@/components/app/ConflictDialog";
-import { CloseRequestDialog, CommitWarningDialog, DiscardDialog, type DiscardDialogTarget } from "@/components/app/Dialogs";
+import { CloseRequestDialog, CommitWarningDialog, DiscardDialog, Modal, type DiscardDialogTarget } from "@/components/app/Dialogs";
 import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { NotificationStack } from "@/components/app/Notifications";
 import { RecoveryPanel } from "@/components/app/RecoveryPanel";
@@ -49,8 +49,39 @@ import { HighlightStore } from "@/features/diff/highlightStore";
 import { RowWindowStore } from "@/features/diff/rowWindowStore";
 import { matchesHunkAction } from "@/features/diff/hunkAction";
 import { runMergeWrite, type MergeWriteRequest } from "@/features/merge/mergeWrite";
+import type { LogColumns, LogPreviewPosition, UpdateMode, FetchTagMode } from "@/lib/ipc";
+import type { HistoryFileTarget } from "@/types/bindings/HistoryFileTarget";
+import type { HistoryRef } from "@/types/bindings/HistoryRef";
+import type { BranchStart } from "@/types/bindings/BranchStart";
+import type { CheckoutTarget } from "@/types/bindings/CheckoutTarget";
+import type { CheckoutResult } from "@/types/bindings/CheckoutResult";
+import type { CheckoutStrategy } from "@/types/bindings/CheckoutStrategy";
+import type { PushRequest } from "@/types/bindings/PushRequest";
+import type { RemoteWriteIntent, RemoteWriteLease } from "@/features/branches/remoteWrite";
+import {
+  branchFailureDetail,
+  pushNotice,
+  runRemoteWrite,
+  updateNotice,
+} from "@/features/branches/remoteWrite";
+import {
+  captureRemoteTarget, commitPushNeedsDialog, confirmRemoteAction, finishCommitAndContinue,
+  preparePush, remoteShortcutAction, remoteTargetIsCurrent, runPushSequence,
+  type BoundPushPreview, type RemoteTarget,
+} from "@/features/branches/remoteContinuation";
+import { BranchWidget } from "@/features/branches/BranchWidget";
+import { CheckoutConflictDialog, NewBranchDialog, PushDialog } from "@/features/branches/BranchDialogs";
+import { useBranches } from "@/features/branches/useBranches";
+import type { IncomingToken } from "@/features/branches/incomingState";
+import { useLogWorkspace } from "@/features/log/useLogWorkspace";
+import { useCommitTabs } from "@/features/log/logTabs";
+import { LogView } from "@/features/log/LogView";
+import { CommitDiffView } from "@/features/log/CommitDiffView";
+import { CommitMergeView } from "@/features/log/CommitMergeView";
+import { CommandLogPanel } from "@/features/commands/CommandLogPanel";
 import { EditorView } from "@codemirror/view";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
+import { soakScroller } from "@/lib/soakScroller";
 import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
@@ -224,6 +255,70 @@ export function App() {
   /** 合并时自动应用无冲突改动（Q143）。 */
   const [mergeAutoApply, setMergeAutoApply] = useState(true);
 
+  // ---------- M5 第二批：日志、分支与远端状态 ----------
+  /** 日志设置（F06，随现有设置持久化）。 */
+  const [logSettings, setLogSettings] = useState<{
+    columns: LogColumns;
+    longEdges: boolean;
+    firstParent: boolean;
+    previewPosition: LogPreviewPosition;
+  }>({ columns: { author: true, date: true, hash: false }, longEdges: false, firstParent: false, previewPosition: "right" });
+  /** 更新与推送设置（F05）。 */
+  const [pushSettings, setPushSettings] = useState<{
+    updateMode: UpdateMode;
+    fetchTagMode: FetchTagMode;
+    fetchAutomatically: boolean;
+    checkRemote: boolean;
+    autoUpdateOnPushRejection: boolean;
+    pushDialogOnCommit: boolean;
+    pushDialogProtectedOnly: boolean;
+    protectedBranches: string[];
+  }>({
+    updateMode: "merge",
+    fetchTagMode: "auto",
+    fetchAutomatically: false,
+    checkRemote: false,
+    autoUpdateOnPushRejection: false,
+    pushDialogOnCommit: true,
+    pushDialogProtectedOnly: false,
+    protectedBranches: ["master", "main"],
+  });
+  /** 日志的只读历史目标（随 worktree 打开 / 关闭）。 */
+  const [historySession, setHistorySession] = useState<{
+    worktreeId: string; epoch: number; targetId: string; refs: HistoryRef[];
+  } | null>(null);
+  /** 环境重载后代际递增：旧会话的历史目标已失效，必须重新打开。 */
+  const [historyEpoch, setHistoryEpoch] = useState(0);
+  const currentHistorySession = historySession?.worktreeId === worktreeId
+    && historySession.epoch === historyEpoch ? historySession : null;
+  const historyTargetId = currentHistorySession?.targetId ?? null;
+  const historyRefs = currentHistorySession?.refs;
+  /** 主区域当前显示：日志、改动 diff 或提交 diff。 */
+  const [mainView, setMainView] = useState<"log" | "diff" | "commit">("log");
+  const mainViewRef = useRef(mainView);
+  mainViewRef.current = mainView;
+  /** diff 预览开关（L05，默认关；不持久化）。 */
+  const [logPreviewOpen, setLogPreviewOpen] = useState(false);
+  /** Git 命令日志面板（B07，默认隐藏；入口在状态栏，菜单入口随原生菜单一起做）。 */
+  const [commandLogOpen, setCommandLogOpen] = useState(false);
+  /** 新建分支 / 检出确认 / 推送对话框的界面状态。 */
+  const [newBranchStart, setNewBranchStart] = useState<{ origin: RemoteTarget; start: BranchStart } | null>(null);
+  const newBranchDialogRef = useRef(newBranchStart);
+  newBranchDialogRef.current = newBranchStart;
+  const [newBranchError, setNewBranchError] = useState<string | null>(null);
+  const [checkoutBlocked, setCheckoutBlocked] = useState<{
+    origin: RemoteTarget; target: CheckoutTarget; label: string; files: string[];
+  } | null>(null);
+  const [pushDialog, setPushDialog] = useState<BoundPushPreview | null>(null);
+  const [pushDialogError, setPushDialogError] = useState<string | null>(null);
+  /** 推送被拒绝且没有开启自动更新时的提示（B05：提供“更新后再推送”）。 */
+  const [pushRejected, setPushRejected] = useState<{ origin: RemoteTarget; request: PushRequest } | null>(null);
+  /** 提交成功后进入“提交并推送”的转发（performCommit 早于推送编排定义）。 */
+  const commitAndPushRef = useRef<((origin: RemoteTarget, lease: RemoteWriteLease) => Promise<void>) | null>(null);
+  const logWorkspace = useLogWorkspace(worktreeId);
+  const commitTabs = useCommitTabs();
+  const dropCommitTarget = commitTabs.dropTarget;
+
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
 
@@ -368,6 +463,9 @@ export function App() {
     devicePixelRatio: null,
   });
   const pendingAnchor = useRef<(FileAnchor & AnchorTarget & { view: ViewMode }) | null>(null);
+  useEffect(() => {
+    if (mainView !== "diff") pendingAnchor.current = null;
+  }, [mainView]);
 
   const clearEditorSelection = useCallback(() => {
     selectionEpochRef.current += 1;
@@ -382,6 +480,7 @@ export function App() {
     // 激活合并页签也使仍在途的 diff 选择失效，避免旧回包夺回当前页。
     selectionEpochRef.current += 1;
     selectionGateRef.current.clear();
+    setMainView("diff");
     setSelected({ path: entry.path, changes: entry.changes });
   }, []);
   const {
@@ -462,11 +561,12 @@ export function App() {
   const openEntry = useCallback(
     async (
       requested: ChangeEntry,
-      target: { view: ViewMode; worktreeId: string; expand?: boolean; pin?: boolean; select?: boolean },
+      target: { view: ViewMode; worktreeId: string; expand?: boolean; pin?: boolean; select?: boolean; activate?: boolean },
     ) => {
       // 本次选择独占一个上下文：期间又选了别的文件或切走，本次结果一律作废（Q88）。
       selectionEpochRef.current += 1;
       enterDiff();
+      if (target.activate !== false) setMainView("diff");
       const gateToken = gateRef.current.token();
       const selectionContext = selectionGateRef.current.begin(
         target.worktreeId, requested.path, requested.changes, gateToken.activation,
@@ -540,6 +640,10 @@ export function App() {
       setSelected(selection);
       recordDiffTab(entry, target.pin === true);
       followActiveEntry(entry, target.select === true);
+      // 默认日志与后台刷新只重绑工作区数据，不等待未挂载的 diff 首屏。
+      if (target.activate === false && mainViewRef.current !== "diff") {
+        return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
+      }
       const covered = await waitUntil(
         () => {
           // 并排视图的行来自 side_lines（返修 A1），不用 RowWindowStore。
@@ -596,7 +700,7 @@ export function App() {
       : pickFirstEntry(next);
     applySnapshot(next);
     if (entry) {
-      void openEntry(entry, { view: viewRef.current, worktreeId: next.worktreeId })
+      void openEntry(entry, { view: viewRef.current, worktreeId: next.worktreeId, activate: false })
         .catch((caught) => setAppError(toAppError(caught), next.worktreeId));
     } else {
       enterDiff();
@@ -605,13 +709,18 @@ export function App() {
   }, [applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
 
   const openWorktree = useCallback(
-    async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean } = {}) => {
+    async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean; activateDiff?: boolean } = {}) => {
       const targetView = options.view ?? view;
       setBusy(true);
       const openStart = performance.now();
       if (id !== worktreeIdRef.current) resetMergeTabs();
       // 切换请求发起时立即改激活目标：此后旧 worktree 的响应一律丢弃（含 A→B→A）。
       gateRef.current.activate(id);
+      setCheckoutBlocked(null);
+      setPushDialog(null);
+      setPushDialogError(null);
+      setPushRejected(null);
+      setNewBranchStart(null);
       const myToken = gateRef.current.token();
       try {
         const sessionInfo = await ipc.openWorktree(id);
@@ -665,6 +774,7 @@ export function App() {
           worktreeId: id,
           expand: options.expand,
           select: true,
+          activate: options.activateDiff === true,
         });
         debugLog(`首屏取行完成：covered=${opened.covered}`);
         const firstScreenMs = performance.now() - startedAt;
@@ -708,6 +818,8 @@ export function App() {
         return false;
       }
       applyRefreshedSnapshot(snap);
+      // 监视、手动刷新、写后重读与恢复均在门禁接受后通知引用消费者。
+      setWatchRevision((value) => value + 1);
       setStatus(snap.entries.length > 0 ? `${snap.entries.length} 个文件` : messages.changes.empty);
       return true;
     },
@@ -893,7 +1005,9 @@ export function App() {
         const expectedTarget = infoRef.current?.worktreePath ?? null;
         if (expectedTarget && snapshot.status.target !== expectedTarget) return;
         setWatchState({ active: snapshot.status.active, error: snapshot.status.error });
-        if (notifications.consume(token.activation, snapshot)) refreshCoordinator.request();
+        if (notifications.consume(token.activation, snapshot)) {
+          refreshCoordinator.request();
+        }
       } catch {
         // 状态查询失败不改变监视结论，等下一轮。
       }
@@ -1089,6 +1203,22 @@ export function App() {
         });
         setNotifyKinds(settings.notify);
         setMergeAutoApply(settings.mergeAutoApply);
+        setLogSettings({
+          columns: settings.logColumns,
+          longEdges: settings.logLongEdges,
+          firstParent: settings.logFirstParent,
+          previewPosition: settings.logPreviewPosition,
+        });
+        setPushSettings({
+          updateMode: settings.updateMode,
+          fetchTagMode: settings.fetchTagMode,
+          fetchAutomatically: settings.fetchAutomatically,
+          checkRemote: settings.checkRemote,
+          autoUpdateOnPushRejection: settings.autoUpdateOnPushRejection,
+          pushDialogOnCommit: settings.pushDialogOnCommit,
+          pushDialogProtectedOnly: settings.pushDialogProtectedOnly,
+          protectedBranches: settings.protectedBranches,
+        });
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
@@ -1133,17 +1263,20 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 拖入文件夹即可添加仓库（Q35）
+  // 拖入文件夹即可添加仓库（Q35）。监听只装一次：addRepo 随视图切换重建，
+  // 跟着重装会让每次切换都多出 4 次监听 / 取消的 IPC 与注入脚本。
+  const addRepoRef = useRef(addRepo);
+  addRepoRef.current = addRepo;
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type !== "drop") return;
       const paths = event.payload.paths;
-      if (paths.length > 0) void addRepo(paths[0]);
+      if (paths.length > 0) void addRepoRef.current(paths[0]);
     });
     return () => {
       void unlisten.then((dispose) => dispose());
     };
-  }, [addRepo]);
+  }, []);
 
   /** 切换当前 worktree：记录选择并重开，监视随之切换（Q88）。 */
   const switchWorktree = useCallback(
@@ -1170,7 +1303,7 @@ export function App() {
   const switchView = useCallback(
     async (next: ViewMode) => {
       if (next === view) return;
-      if (!selectedEntry || !worktreeId) {
+      if (!selectedEntry || !worktreeId || mainViewRef.current !== "diff") {
         pendingAnchor.current = null;
         setView(next);
         return;
@@ -1203,7 +1336,7 @@ export function App() {
       const entry = snapshotRef.current?.entries.find((item) => item.path === anchor.entry.path
         && item.changes === anchor.entry.changes);
       return !!entry && !cancelled && pendingAnchor.current === anchor && viewRef.current === anchor.view
-        && !mergeTabPathRef.current
+        && mainViewRef.current === "diff" && !mergeTabPathRef.current
         && selectedRef.current?.path === anchor.entry.path
         && selectedRef.current?.changes === anchor.entry.changes
         && sameAnchorTarget(anchor, {
@@ -1243,7 +1376,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [rowStore, selectedEntry, view, worktreeId, diffOptions, mergeTabPathRef]);
+  }, [rowStore, selectedEntry, view, worktreeId, diffOptions, mergeTabPathRef, mainView]);
 
   /** focusNextFile 定义在后面；F7 走到最后一处时经这里切到下一个文件。 */
   const focusNextFileRef = useRef<(direction: 1 | -1) => void>(() => {});
@@ -1834,6 +1967,7 @@ export function App() {
     worktreeId: string;
     activation: number;
     confirmation: AmendConfirmation | null;
+    pushAfter: boolean;
   } | null>(null);
   const [amendConfirm, setAmendConfirm] = useState<{
     upstreamName: string;
@@ -1842,6 +1976,7 @@ export function App() {
     activation: number;
     contextEpoch: number;
     generation: number;
+    pushAfter: boolean;
   } | null>(null);
   const commitOutputsRef = useRef<CommitOutputStore | null>(null);
   if (commitOutputsRef.current === null) commitOutputsRef.current = new CommitOutputStore();
@@ -1981,6 +2116,7 @@ export function App() {
     setCommitContextError(null);
     setCommitDraftNotice(null);
     setAmendConfirm(null);
+    setCommitWarningConfirm(null);
   }, [draftPersistence]);
 
   /**
@@ -2076,13 +2212,14 @@ export function App() {
    */
   const performCommit = useCallback(async (
     confirmation: AmendConfirmation | null = null,
-    options: { skipWarnings?: boolean } = {},
+    options: { skipWarnings?: boolean; pushAfter?: boolean } = {},
   ) => {
-    const target = worktreeIdRef.current;
-    if (!target) {
+    const origin = captureRemoteTarget(gateRef.current.token(), worktreeIdRef.current);
+    if (!origin) {
       setAppError({ kind: "rejected", message: messages.commit.noWorktree }, null);
       return;
     }
+    const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
     const context = commitContextRef.current;
     if (!context || context.worktreeId !== target) {
@@ -2105,6 +2242,7 @@ export function App() {
         activation: gateRef.current.token().activation,
         contextEpoch: commitContextEpochRef.current,
         generation: commitStateRef.current.current().generation,
+        pushAfter: options.pushAfter === true,
       });
       return;
     }
@@ -2117,16 +2255,19 @@ export function App() {
       } catch {
         warnings = [];
       }
+      if (!remoteTargetIsCurrent(origin, gateRef.current.token())) return;
       if (warnings.length > 0) {
         setCommitWarningConfirm({
           warnings,
           worktreeId: target,
-          activation: gateRef.current.token().activation,
+          activation: origin.activation,
           confirmation,
+          pushAfter: options.pushAfter === true,
         });
         return;
       }
     }
+    if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target)) return;
     const submitted: ComposerInput = { ...input };
     const submittedExpectation = context.expectation;
     const contextEpochAtSubmit = commitContextEpochRef.current;
@@ -2149,6 +2290,7 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
     };
     let needsVerification = false;
+    let pushAfterCommit = false;
     let gateHeld = false;
     try {
       // 先登记生命周期再等待草稿，关闭不能越过这段异步准备去销毁窗口。
@@ -2260,6 +2402,8 @@ export function App() {
           }
         }
         if (operationGateRef.current.canRecord(opToken)) setAppError(null, target);
+        // 提交并推送（B06）：只有提交成功且结果确定时才推送；失败/待核对不推送。
+        pushAfterCommit = options.pushAfter === true;
       }
       // 不论成功、已确认失败还是待核对，都刷新**原 worktree** 的真实状态：
       // 提交可能已经改变了 HEAD/index，界面必须与真实状态一致（F04.3/F06.4）。
@@ -2267,6 +2411,7 @@ export function App() {
       await loadCommitContext(target);
     } catch (caught) {
       const err = toAppError(caught);
+      pushAfterCommit = false;
       needsVerification ||= err.kind === "needsVerification";
       const lines = commitOutputs.snapshot(outputRun);
       setCommitResultFor({
@@ -2296,11 +2441,13 @@ export function App() {
           setCommitInput(local.input);
         }
       }
-      releaseFlight();
-      commitOutputs.release(outputRun);
-      // 提交结束（成功/失败/待核对）：提交区的实时输出清掉，结果由通知报告（返修 C8/C9）。
-      setCommitLiveOutput((current) => (current && current.worktreeId === target ? null : current));
-      writeOrchestrator.end(target, needsVerification);
+      await finishCommitAndContinue(origin, pushAfterCommit, (pushNeedsVerification) => {
+        releaseFlight();
+        commitOutputs.release(outputRun);
+        // 提交结束（成功/失败/待核对）：实时输出清掉，结果由通知报告。
+        setCommitLiveOutput((current) => (current && current.worktreeId === target ? null : current));
+        writeOrchestrator.end(target, needsVerification || pushNeedsVerification);
+      }, (original, lease) => commitAndPushRef.current?.(original, lease) ?? Promise.resolve());
     }
   }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, refreshTarget, setAppError, writeOrchestrator]);
 
@@ -2326,7 +2473,7 @@ export function App() {
       return;
     }
     setAmendConfirm(null);
-    void performCommit(pending.confirmation);
+    void performCommit(pending.confirmation, { pushAfter: pending.pushAfter });
   }, [amendConfirm, performCommit, setAppError]);
 
   /** 实时输出的传输与展示；归属、缓冲和终态判定由同一个 module 持有。 */
@@ -2798,6 +2945,7 @@ export function App() {
         targetPath: targetPath ?? configPath,
         view: targetView,
         expand: true,
+        activateDiff: true,
       });
       if (!opened) return null;
       const entry = opened.entry;
@@ -3433,12 +3581,17 @@ export function App() {
         const yieldStep = async (ms = 30) => {
           await sleep(ms);
         };
+        const scroller = () => viewRef.current === currentView
+          ? soakScroller(currentView, diffRef.current, sbsRef.current) : null;
+        const rowsReady = () => scroller()?.ready() === true;
+        const rowsSettled = () => rowsReady() && scroller()?.settled() === true && highlightStore.getSnapshot().pending === 0
+          && (currentView === "split" || rowStore.getSnapshot().pendingChunks === 0);
         // 通过工具栏事件调用最新渲染闭包，避免长期任务持有旧的选中项。
-        const clickView = async (label: string, rowCount: number) => {
+        const clickView = async (label: string) => {
           const target: ViewMode = label === messages.diff.unified ? "unified" : "split";
           if (!selectViewInUi(target)) throw new Error(`找不到视图切换按钮：${label}`);
-          if (!await waitForSoak(() => viewRef.current === target
-            && rowStore.rowCountValue === rowCount && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
+          currentView = target;
+          if (!await waitForSoak(rowsReady, 2000)) {
             throw new Error(`视图切换未完成：${label}`);
           }
         };
@@ -3473,10 +3626,8 @@ export function App() {
         const holdCheckpoint = async (entry: ChangeEntry, pressure: boolean) => {
           const pauseStarted = performance.now();
           await sleep(500);
-          const settled = await waitForSoak(() => rowStore.getSnapshot().pendingChunks === 0
-            && highlightStore.getSnapshot().pending === 0, 1000);
-          if (!settled || !diffRef.current || diffRef.current.getScrollTop() !== 0
-            || !rowStore.isCovered(0, entry.rowCountSplit)) throw new Error("同阶段内存采样准备失败");
+          const settled = await waitForSoak(rowsSettled, 1000);
+          if (!settled || !scroller()?.atTop()) throw new Error("同阶段内存采样准备失败");
           const checkpoint = { cycle, file: entry.path, view: currentView, pressure, startedAt: new Date().toISOString(),
             endedAt: "", hiddenDuringHold: false,
             ...(diagnostics ? { ipcBefore: diagnostics.snapshot(), ipcAfter: undefined as IpcDiagnosticSample | undefined } : {}) };
@@ -3520,8 +3671,7 @@ export function App() {
             await openEntry(entry, { view: "split", worktreeId: worktree.id, expand });
             currentView = "split";
             fileSwitches += 1;
-            if (expand && entry.rowCountSplit > 0 && !await waitForSoak(() => !rowStore.getSnapshot().error
-              && rowStore.rowCountValue > 0 && rowStore.getSnapshot().loadedChunks > 0, 2000)) {
+            if (expand && entry.rowCountSplit > 0 && !await waitForSoak(rowsReady, 2000)) {
               throw new Error(`等待行数据超时：${entry.path}`);
             }
             await yieldStep();
@@ -3531,7 +3681,7 @@ export function App() {
           // 区分“卸载后的 DOM 仍被持有”与“DOM 已回收但原生内存累积”。
           const mountedRoots: WeakRef<Element>[] = [];
           const trackRoot = () => {
-            const element = document.querySelector(".diff-scroll");
+            const element = document.querySelector(".sbs, .diff-scroll");
             if (element && mountedRoots.at(-1)?.deref() !== element) mountedRoots.push(new WeakRef(element));
           };
           const rootSamples: Array<{ cycle: number; tracked: number; alive: number }> = [];
@@ -3541,7 +3691,7 @@ export function App() {
             cycle += 1;
             if (document.hidden) await resumeWhenVisible("操作前窗口不可见");
             try {
-              const handle = diffRef.current;
+              const handle = scroller();
               if (focusEntry === large && focus !== "open" && !handle) throw new Error("diff 未挂载");
               if (focus === "idle") {
                 await sleep(1000);
@@ -3584,10 +3734,9 @@ export function App() {
                 await yieldStep();
               } else if (focus === "jump") {
                 const target = Math.floor(large.rowCountSplit * [0.25, 0.5, 0.75][step % 3]);
-                rowStore.prioritize(target, target + 40);
                 handle!.scrollToRow(target);
                 jumps += 1;
-                if (!await waitForSoak(() => rowStore.isCovered(target, target + 40), 2000)) {
+                if (!await waitForSoak(rowsReady, 2000)) {
                   throw new Error(`跳转数据超时：${large.path}`);
                 }
                 await yieldStep();
@@ -3595,11 +3744,11 @@ export function App() {
                 jumps += 1;
                 await yieldStep();
               } else {
-                await clickView("统一", large.rowCountUnified);
+                await clickView("统一");
                 currentView = "unified";
                 viewSwitches += 1;
                 await yieldStep();
-                await clickView("并排", large.rowCountSplit);
+                await clickView("并排");
                 currentView = "split";
                 viewSwitches += 1;
                 await yieldStep();
@@ -3609,7 +3758,7 @@ export function App() {
               if (performance.now() - lastCheckpoint >= 90_000
                 && startedAt + soakSeconds * 1000 + pausedMs() - performance.now() > 5000) {
                 if (focusEntry !== fixed) await openSplit(fixed);
-                diffRef.current?.scrollToRow(0);
+                scroller()?.scrollToRow(0);
                 await holdCheckpoint(fixed, true);
                 if (mountedRoots.length > 0) {
                   const sample = { cycle, tracked: mountedRoots.length,
@@ -3641,18 +3790,16 @@ export function App() {
             await yieldStep();
             debugLog(`[SOAK] 已打开 ${entry.path}`);
 
-            let handle = diffRef.current;
+            let handle = scroller();
             // 只有可展开且有行数的文件才等待行数据；二进制或 0 行文件无需等行，直接推进
             if (expand && entry.rowCountSplit > 0) {
-              const coveredOk = await waitForSoak(() => !rowStore.getSnapshot().error && rowStore.rowCountValue > 0
-                ? rowStore.isCovered(0, 1) || rowStore.getSnapshot().loadedChunks > 0
-                : false, 2000);
+              const coveredOk = await waitForSoak(rowsReady, 2000);
               if (!coveredOk) {
                 throw new Error(`等待行数据超时：${entry.path} ${currentView}`);
               }
             }
 
-            handle = diffRef.current;
+            handle = scroller();
             if (expand && entry.rowCountSplit > 0 && !handle) throw new Error(`diff 未挂载：${entry.path}`);
             const totalRows = currentView === "split" ? entry.rowCountSplit : entry.rowCountUnified;
             if (expand && totalRows > 0 && handle && !isTimeUp()) {
@@ -3668,11 +3815,10 @@ export function App() {
 
               if (totalRows > 100 && !isTimeUp()) {
                 const target = Math.floor(totalRows * 0.5);
-                rowStore.prioritize(target, target + 40);
                 handle.scrollToRow(target);
                 jumps += 1;
                 debugLog(`[SOAK] jump to ${target}`);
-                const jumped = await waitForSoak(() => rowStore.isCovered(target, target + 40), 2000);
+                const jumped = await waitForSoak(rowsReady, 2000);
                 if (!jumped) throw new Error(`跳转数据超时：${entry.path}`);
                 await yieldStep();
 
@@ -3683,7 +3829,7 @@ export function App() {
               }
 
               if (!isTimeUp()) {
-                await clickView("统一", entry.rowCountUnified);
+                await clickView("统一");
                 viewSwitches += 1;
                 currentView = "unified";
                 debugLog(`[SOAK] 已切换到统一视图 ${entry.path}`);
@@ -3692,7 +3838,7 @@ export function App() {
                 const unifiedRows = entry.rowCountUnified;
                 for (let r = 0; r < Math.min(unifiedRows, 120); r += step) {
                   if (isTimeUp()) break;
-                  const live = diffRef.current;
+                  const live = scroller();
                   if (!live) break;
                   live.scrollToRow(r);
                   scrolls += 1;
@@ -3701,7 +3847,7 @@ export function App() {
               }
 
               if (!isTimeUp()) {
-                await clickView("并排", entry.rowCountSplit);
+                await clickView("并排");
                 viewSwitches += 1;
                 currentView = "split";
                 debugLog(`[SOAK] 已切回并排视图 ${entry.path}`);
@@ -3756,11 +3902,9 @@ export function App() {
           const fixedEntry = entries.find((entry) => entry.path === "src/staged.ts" && entry.changes === "staged");
           if (!fixedEntry) throw new Error("诊断静置缺少固定 staged 文件");
           await openEntry(fixedEntry, { view: "split", worktreeId: worktree.id, expand: true });
-          diffRef.current?.scrollToRow(0);
-          if (!await waitForSoak(() => rowStore.getSnapshot().pendingChunks === 0
-            && highlightStore.getSnapshot().pending === 0, 2000)
-            || !diffRef.current || diffRef.current.getScrollTop() !== 0
-            || !rowStore.isCovered(0, fixedEntry.rowCountSplit)) throw new Error("诊断静置准备失败");
+          currentView = "split";
+          scroller()?.scrollToRow(0);
+          if (!await waitForSoak(rowsSettled, 2000) || !scroller()?.atTop()) throw new Error("诊断静置准备失败");
           setStatus("诊断静置中，请保持窗口可见");
           const idleStarted = performance.now();
           const idle = { file: fixedEntry.path, view: "split", preparationSeconds: (idleStarted - prepareStarted) / 1000,
@@ -3921,6 +4065,18 @@ export function App() {
         commitWarnInvalidFilename: patch.commitWarnInvalidFilename,
         notify: patch.notify,
         mergeAutoApply: patch.mergeAutoApply,
+        logColumns: patch.logColumns,
+        logLongEdges: patch.logLongEdges,
+        logFirstParent: patch.logFirstParent,
+        logPreviewPosition: patch.logPreviewPosition,
+        updateMode: patch.updateMode,
+        fetchTagMode: patch.fetchTagMode,
+        fetchAutomatically: patch.fetchAutomatically,
+        checkRemote: patch.checkRemote,
+        autoUpdateOnPushRejection: patch.autoUpdateOnPushRejection,
+        pushDialogOnCommit: patch.pushDialogOnCommit,
+        pushDialogProtectedOnly: patch.pushDialogProtectedOnly,
+        protectedBranches: patch.protectedBranches,
       });
       setThemeLight(next.themeLight);
       setThemeDark(next.themeDark);
@@ -3954,6 +4110,22 @@ export function App() {
       });
       setNotifyKinds(next.notify);
       setMergeAutoApply(next.mergeAutoApply);
+      setLogSettings({
+        columns: next.logColumns,
+        longEdges: next.logLongEdges,
+        firstParent: next.logFirstParent,
+        previewPosition: next.logPreviewPosition,
+      });
+      setPushSettings({
+        updateMode: next.updateMode,
+        fetchTagMode: next.fetchTagMode,
+        fetchAutomatically: next.fetchAutomatically,
+        checkRemote: next.checkRemote,
+        autoUpdateOnPushRejection: next.autoUpdateOnPushRejection,
+        pushDialogOnCommit: next.pushDialogOnCommit,
+        pushDialogProtectedOnly: next.pushDialogProtectedOnly,
+        protectedBranches: next.protectedBranches,
+      });
       return null;
     } catch (caught) {
       return getErrorMessage(caught);
@@ -3967,6 +4139,8 @@ export function App() {
       if (worktreeId) {
         const session = await ipc.openWorktree(worktreeId);
         setInfo(session);
+        // 旧会话的历史目标随环境重载失效：重新打开（任务 01 的失效规则）。
+        setHistoryEpoch((value) => value + 1);
         await refresh();
       }
       return null;
@@ -4022,6 +4196,420 @@ export function App() {
     if (!selectedEntry) return;
     void setReviewMark(selectedEntry, !selectedEntry.reviewed);
   }, [selectedEntry, setReviewMark]);
+
+  // ---------------- M5 第二批：日志、分支与远端 ----------------
+
+  /** 引用版本：内部写操作（提交、检出、fetch、更新、推送）后递增，日志据此重新查询。 */
+  const [refsRevision, setRefsRevision] = useState(0);
+  /**
+   * 可信重读代号：监视事件、手动刷新与回到前台都核对一次引用。
+   * 日志不自己定期轮询 `history_refs`，监视失败时仍能手动刷新。
+   */
+  const [watchRevision, setWatchRevision] = useState(0);
+  const bumpRefsRevision = useCallback(() => setRefsRevision((value) => value + 1), []);
+  const pushSettingsRef = useRef(pushSettings);
+  pushSettingsRef.current = pushSettings;
+  /** fetch / 更新成功后清除“远端有新提交”标记（branches 在写编排之后创建）。 */
+  const branchesIncomingRef = useRef<{
+    captureIncoming: (worktreeId: string) => IncomingToken | null;
+    clearIncoming: (token: IncomingToken | null) => void;
+  }>({ captureIncoming: () => null, clearIncoming: () => {} });
+
+  /**
+   * 打开只读历史目标（随 worktree 生命周期，任务 01 的失效规则）。
+   * 切换 worktree 时关闭旧目标：它的页签随之失效，旧请求与新目标不能串味。
+   */
+  useEffect(() => {
+    if (!worktreeId) {
+      setHistorySession(null);
+      return;
+    }
+    let cancelled = false;
+    let openedId: string | null = null;
+    setHistorySession(null);
+    void ipc
+      .historyOpen(worktreeId)
+      .then((info) => {
+        if (cancelled) {
+          void ipc.historyClose(info.targetId).catch(() => undefined);
+          return;
+        }
+        openedId = info.targetId;
+        setHistorySession({ worktreeId, epoch: historyEpoch, targetId: info.targetId, refs: info.refs });
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setAppError(toAppError(caught), worktreeId);
+      });
+    return () => {
+      cancelled = true;
+      setHistorySession(null);
+      if (openedId) {
+        dropCommitTarget(openedId);
+        void ipc.historyClose(openedId).catch(() => undefined);
+      }
+    };
+    // 只依赖稳定方法；commitTabs 容器每次渲染都会变化，不能作为目标生命周期依赖。
+  }, [dropCommitTarget, historyEpoch, setAppError, worktreeId]);
+
+  // 打开仓库 / 切换 worktree 时默认显示日志（L01）。
+  useEffect(() => {
+    setMainView("log");
+  }, [worktreeId]);
+
+  // 提交页签全部关闭后回到日志（不抢工作区 diff 的激活状态）。
+  useEffect(() => {
+    if (mainView === "commit" && !commitTabs.active) setMainView("log");
+  }, [commitTabs.active, mainView]);
+
+  /** 执行一次分支 / 远端写操作的真实 IPC（参数全部结构化）。 */
+  const executeRemoteIntent = useCallback((intent: RemoteWriteIntent): Promise<unknown> => {
+    switch (intent.kind) {
+      case "checkout":
+        return ipc.checkoutBranch({
+          worktreeId: intent.worktreeId,
+          target: intent.target,
+          strategy: intent.strategy,
+        });
+      case "createBranch":
+        return ipc.createBranch({ worktreeId: intent.worktreeId, request: intent.request });
+      case "fetch":
+        return ipc.fetchRemotes(intent.worktreeId);
+      case "update":
+        return ipc.updateProject(intent.worktreeId);
+      case "push":
+        return ipc.pushBranch({ worktreeId: intent.worktreeId, request: intent.request });
+      default:
+        return Promise.reject({ kind: "internal", message: "未知的远端操作" });
+    }
+  }, []);
+
+  /**
+   * 受保护的分支 / 远端写入（B01）：写门禁、结果归属、真实重读、待核对阻止退出。
+   * `silent` 用于自动 fetch：失败只记在状态栏，不弹通知（Q152）。
+   */
+  const performRemoteWrite = useCallback(
+    async (
+      intent: RemoteWriteIntent,
+      options: {
+        silent?: boolean;
+        lease?: RemoteWriteLease;
+        execute?: (intent: RemoteWriteIntent) => Promise<unknown>;
+      } = {},
+    ): Promise<{ ok: true; result: unknown } | { ok: false; error: AppErrorPayload }> => {
+      const outcome = await runRemoteWrite<OperationContext>(
+        {
+          writing: writingWorktreesRef.current,
+          publishWriting: () => setWritingWorktrees(new Set(writingWorktreesRef.current)),
+          begin: (id) => writeOrchestrator.begin(id),
+          end: (id, needsVerification) => writeOrchestrator.end(id, needsVerification),
+          beginOperation: (id) => operationGateRef.current.begin(id),
+          canRecord: (token) => operationGateRef.current.canRecord(token),
+          executeIntent: options.execute ?? executeRemoteIntent,
+          refreshTarget,
+          reportFailure: (_id, error) => {
+            if (options.silent) {
+              setAutoFetchError(error.message);
+              return;
+            }
+            notify({
+              tone: error.kind === "needsVerification" ? "warning" : "error",
+              title:
+                error.kind === "needsVerification"
+                  ? messages.errors.needsVerification
+                  : error.kind === "rejected"
+                    ? messages.remote.rejectedTitle
+                    : error.kind === "environment"
+                      ? messages.remote.environmentTitle
+                      : messages.remote.gitFailedTitle,
+              detail: error.message,
+              persistent: true,
+            });
+          },
+          toError: toAppError,
+          busyMessage: messages.branches.busy,
+          guardUnavailable: messages.close.guardUnavailable,
+          onSuccess: () => undefined,
+        },
+        intent,
+        options.lease,
+      );
+      if (outcome.ok) {
+        // 引用可能已经变化（检出、fetch、更新、推送）：日志与分支都要重新读取。
+        bumpRefsRevision();
+      }
+      return outcome;
+    },
+    [bumpRefsRevision, executeRemoteIntent, notify, refreshTarget, setAppError, writeOrchestrator],
+  );
+
+  /** 检出（Plain 先试；会被覆盖时弹出智能 / 强制检出）。 */
+  const runCheckout = useCallback(
+    async (
+      target: CheckoutTarget,
+      strategy: CheckoutStrategy,
+      origin = captureRemoteTarget(gateRef.current.token(), worktreeIdRef.current),
+    ) => {
+      if (!origin || !remoteTargetIsCurrent(origin, gateRef.current.token())) return;
+      const outcome = await performRemoteWrite({ kind: "checkout", worktreeId: origin.worktreeId, target, strategy });
+      if (!outcome.ok) return;
+      const result = outcome.result as CheckoutResult;
+      if (result.kind === "needsConfirmation") {
+        if (remoteTargetIsCurrent(origin, gateRef.current.token())) {
+          setCheckoutBlocked({ origin, target, label: result.target, files: result.files });
+        }
+        return;
+      }
+      setCheckoutBlocked((current) => current?.origin === origin ? null : current);
+      notify({
+        tone: "success",
+        title: messages.remote.checkoutDone(result.branch),
+        detail: [result.stashKept ? messages.remote.checkoutStashKept : null, ...result.notes]
+          .filter((part): part is string => Boolean(part))
+          .join("\n") || undefined,
+      });
+    },
+    [notify, performRemoteWrite],
+  );
+
+  /** 新建分支（B02）。 */
+  const openNewBranch = useCallback((start: BranchStart) => {
+    const origin = captureRemoteTarget(gateRef.current.token(), worktreeIdRef.current);
+    if (!origin) return;
+    setNewBranchError(null);
+    setNewBranchStart({ origin, start });
+  }, []);
+  const runCreateBranch = useCallback(
+    async (name: string, checkout: boolean) => {
+      const pending = newBranchStart;
+      if (!pending || !remoteTargetIsCurrent(pending.origin, gateRef.current.token())) return;
+      setNewBranchError(null);
+      const outcome = await performRemoteWrite({
+        kind: "createBranch",
+        worktreeId: pending.origin.worktreeId,
+        request: { name, start: pending.start, checkout },
+      });
+      if (!outcome.ok) {
+        // 对话框直接显示后端（Git）给出的原因，例如名字不合法。
+        if (newBranchDialogRef.current === pending && remoteTargetIsCurrent(pending.origin, gateRef.current.token())) {
+          setNewBranchError(branchFailureDetail(outcome.error));
+        }
+        return;
+      }
+      const result = outcome.result as { name: string; checkedOut: boolean };
+      setNewBranchStart((current) => current === pending ? null : current);
+      notify({
+        tone: "success",
+        title: result.checkedOut
+          ? messages.remote.branchCreatedCheckedOut(result.name)
+          : messages.remote.branchCreated(result.name),
+      });
+    },
+    [newBranchStart, notify, performRemoteWrite],
+  );
+
+  /** fetch（B03）。 */
+  const runFetch = useCallback(
+    async (targetWorktreeId: string, reason: "user" | "auto") => {
+      const incomingToken = branchesIncomingRef.current.captureIncoming(targetWorktreeId);
+      const outcome = await performRemoteWrite(
+        { kind: "fetch", worktreeId: targetWorktreeId },
+        { silent: reason === "auto" },
+      );
+      const result = outcome.ok ? (outcome.result as { remotes: string[] }) : null;
+      if (result) {
+        setAutoFetchError(null);
+        // fetch 成功：远端对象已取回，“远端有新提交”标记不再需要（不额外联网核对）。
+        branchesIncomingRef.current.clearIncoming(incomingToken);
+        if (reason === "user") {
+          notify({ tone: "success", title: messages.remote.fetchDone(result.remotes.join("、")) });
+        }
+      }
+    },
+    [notify, performRemoteWrite],
+  );
+
+  /** 更新项目（⌘T，B04）。 */
+  const runUpdate = useCallback(
+    async (targetWorktreeId: string): Promise<boolean> => {
+      const incomingToken = branchesIncomingRef.current.captureIncoming(targetWorktreeId);
+      const outcome = await performRemoteWrite({ kind: "update", worktreeId: targetWorktreeId });
+      if (!outcome.ok) return false;
+      const result = outcome.result as import("@/types/bindings/UpdateOutcome").UpdateOutcome;
+      branchesIncomingRef.current.clearIncoming(incomingToken);
+      notify(updateNotice(result));
+      return result.status === "updated" || result.status === "upToDate";
+    },
+    [notify, performRemoteWrite],
+  );
+
+  /** 执行推送；被拒时按设置决定是否自动“更新后再推送”（只一次）。 */
+  const performPush = useCallback(
+    async (
+      origin: RemoteTarget,
+      request: PushRequest,
+      options: { alreadyAttempted?: boolean; updateFirst?: boolean; lease?: RemoteWriteLease } = {},
+    ): Promise<void> => {
+      const outcome = await performRemoteWrite({ kind: "push", worktreeId: origin.worktreeId, request }, {
+        lease: options.lease,
+        execute: async () => {
+          const update = async (targetWorktreeId: string) => {
+            const incoming = branchesIncomingRef.current.captureIncoming(targetWorktreeId);
+            const result = await ipc.updateProject(targetWorktreeId);
+            branchesIncomingRef.current.clearIncoming(incoming);
+            notify(updateNotice(result));
+            return result.status === "updated" || result.status === "upToDate";
+          };
+          if (options.updateFirst && !await update(origin.worktreeId)) return "update-failed";
+          return runPushSequence(origin, request, options.alreadyAttempted === true, {
+            push: (worktreeId, targetRequest) => ipc.pushBranch({ worktreeId, request: targetRequest }),
+            update,
+            autoUpdate: () => pushSettingsRef.current.autoUpdateOnPushRejection,
+            onResult: (result) => notify(pushNotice(result)),
+          });
+        },
+      });
+      if (!outcome.ok) return;
+      const next = outcome.result;
+      if (next === "offer-update" && remoteTargetIsCurrent(origin, gateRef.current.token())) {
+        // 没有开启自动更新：给用户一个明确的“更新后再推送”入口，不自动重试。
+        setPushRejected({ origin, request });
+      }
+      if (next === "update-failed") {
+        notify({ tone: "warning", title: messages.remote.autoUpdateFailed });
+      }
+    },
+    [notify, performRemoteWrite],
+  );
+
+  /** 推送预览、确认和提交后的续步都绑定原目标（B01、B05、B06）。 */
+  const prepareBoundPush = useCallback(
+    async (origin: RemoteTarget, afterCommit: boolean, lease?: RemoteWriteLease) => {
+      setPushDialogError(null);
+      try {
+        const next = await preparePush(origin, {
+          preview: ipc.pushPreview,
+          current: () => gateRef.current.token(),
+          showDialog: (preview) => !afterCommit || commitPushNeedsDialog(preview, pushSettingsRef.current),
+          onConfirmationRequired: () => {
+            if (afterCommit && closeCoordinatorRef.current.pendingIntent() !== null) {
+              applyEffect(closeDriver.handleChoice("stay"));
+              notify({
+                tone: "warning", title: messages.remote.pushConfirmationPending,
+                detail: messages.remote.pushConfirmationPendingDetail, persistent: true,
+              });
+            }
+          },
+        });
+        if (next.kind === "dialog") {
+          setPushDialog({ origin: next.origin, preview: next.preview });
+        } else if (next.kind === "push") {
+          await performPush(next.origin, next.request, { lease });
+        } else if (afterCommit) {
+          setAppError({ kind: "rejected", message: messages.remote.pushConfirmationOtherWorktree }, origin.worktreeId);
+        }
+      } catch (caught) {
+        setAppError(toAppError(caught), origin.worktreeId);
+        notify({ tone: "error", title: messages.remote.pushRejected, detail: getErrorMessage(caught), persistent: true });
+      }
+    },
+    [applyEffect, closeDriver, notify, performPush, setAppError],
+  );
+  const openPushDialog = useCallback(() => {
+    const origin = captureRemoteTarget(gateRef.current.token(), worktreeIdRef.current);
+    if (origin) void prepareBoundPush(origin, false);
+  }, [prepareBoundPush]);
+  commitAndPushRef.current = (origin, lease) => {
+    return prepareBoundPush(origin, true, lease);
+  };
+
+  /** 自动 fetch 失败的状态栏提示（不弹通知，Q152）。 */
+  const [autoFetchError, setAutoFetchError] = useState<string | null>(null);
+  const branches = useBranches({
+    worktreeId,
+    refreshKey: refsRevision + watchRevision,
+    autoFetch: pushSettings.fetchAutomatically,
+    checkRemote: pushSettings.checkRemote,
+    writing: isWriting,
+    runFetch: (targetWorktreeId, reason) => void runFetch(targetWorktreeId, reason),
+    runCheck: async (targetWorktreeId) => {
+      const result = await ipc.checkRemote(targetWorktreeId);
+      return result.hasNewCommits;
+    },
+  });
+  branchesIncomingRef.current = branches;
+
+  /** 复制到剪贴板（提交哈希等）：失败不打断操作。 */
+  const copyText = useCallback((text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+  }, []);
+
+  /** 打开提交 diff 页签（同一提交同一文件复用已有页签）。 */
+  const openCommitFileTab = useCallback(
+    (request: { target: HistoryFileTarget; title: string }) => {
+      if (!historyTargetId || !worktreeId) return;
+      commitTabs.open({
+        kind: "diff",
+        worktreeId,
+        targetId: historyTargetId,
+        commit: request.target.commit,
+        path: request.target.path,
+        parent: request.target.parent ?? null,
+        title: request.title,
+        file: request.target,
+      });
+      setMainView("commit");
+    },
+    [commitTabs, historyTargetId, worktreeId],
+  );
+
+  /** 打开 merge 提交的三栏只读视图（Q147）。 */
+  const openMergeCommitTab = useCallback(
+    (request: { commit: string; path: string; title: string }) => {
+      if (!historyTargetId || !worktreeId) return;
+      commitTabs.open({
+        kind: "merge",
+        worktreeId,
+        targetId: historyTargetId,
+        commit: request.commit,
+        path: request.path,
+        parent: null,
+        title: request.title,
+      });
+      setMainView("commit");
+    },
+    [commitTabs, historyTargetId, worktreeId],
+  );
+
+  // 分支与远端快捷键（B04、B05、B06）：⌘T 更新、⌘⇧K 推送、⌥⌘K 提交并推送。
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!isPrimaryModifier(event)) return;
+      const action = remoteShortcutAction(event, {
+        textOrDialog: isTextInputOrDialog(event.target),
+        button: isButtonTarget(event.target),
+        commitMessage: isCommitMessageTarget(event.target),
+        dialogOpen: document.querySelector("[role='dialog'], dialog[open]") !== null,
+      });
+      if (action === "push") {
+        event.preventDefault();
+        if (isWriting) return;
+        openPushDialog();
+        return;
+      }
+      if (action === "commitAndPush") {
+        event.preventDefault();
+        if (isWriting) return;
+        void performCommit(null, { pushAfter: true });
+        return;
+      }
+      if (action === "update") {
+        event.preventDefault();
+        if (worktreeIdRef.current) void runUpdate(worktreeIdRef.current);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isWriting, openPushDialog, performCommit, runUpdate]);
 
   // ---------------- 渲染 ----------------
 
@@ -4121,6 +4709,18 @@ export function App() {
     commitWarnInvalidFilename: commitChecks.warnInvalidFilename,
     notify: notifyKinds,
     mergeAutoApply,
+    logColumns: logSettings.columns,
+    logLongEdges: logSettings.longEdges,
+    logFirstParent: logSettings.firstParent,
+    logPreviewPosition: logSettings.previewPosition,
+    updateMode: pushSettings.updateMode,
+    fetchTagMode: pushSettings.fetchTagMode,
+    fetchAutomatically: pushSettings.fetchAutomatically,
+    checkRemote: pushSettings.checkRemote,
+    autoUpdateOnPushRejection: pushSettings.autoUpdateOnPushRejection,
+    pushDialogOnCommit: pushSettings.pushDialogOnCommit,
+    pushDialogProtectedOnly: pushSettings.pushDialogProtectedOnly,
+    protectedBranches: pushSettings.protectedBranches.join("\n"),
     detectedGitPath: info?.gitPath ?? null,
   };
 
@@ -4172,6 +4772,21 @@ export function App() {
         onWorktree={(id) => void switchWorktree(id)}
         onSettings={() => setSettingsOpen(true)}
         onRefreshWorktrees={() => void refreshWorktreeStatuses()}
+        extra={worktreeId ? (
+          <BranchWidget
+            overview={branches.overview}
+            loading={branches.loading}
+            error={branches.error}
+            incoming={branches.incoming}
+            busy={isWriting}
+            onRefresh={branches.reload}
+            onCheckout={(target) => void runCheckout(target, "plain")}
+            onNewBranch={openNewBranch}
+            onFetch={() => void runFetch(worktreeId, "user")}
+            onUpdate={() => void runUpdate(worktreeId)}
+            onPush={() => void openPushDialog()}
+          />
+        ) : null}
       />
 
       <div className="flex min-h-0 overflow-hidden">
@@ -4349,6 +4964,7 @@ export function App() {
                       { persist: false },
                     )}
                     onSubmit={() => void performCommit()}
+                    onSubmitAndPush={() => void performCommit(null, { pushAfter: true })}
                     onPickRecent={pickRecentMessage}
                     onAmendConfirm={confirmAmend}
                     onAmendCancel={() => setAmendConfirm(null)}
@@ -4373,7 +4989,7 @@ export function App() {
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
           <EditorTabs
             tabs={tabs}
-            activeKey={activeKey}
+            activeKey={mainView === "diff" ? activeKey : null}
             entry={selectedEntry}
             view={view}
             canNavigate={diffArea === "diff" && displayChangeCount > 0}
@@ -4383,7 +4999,7 @@ export function App() {
             fileTotal={filePosition.total}
             diffOptions={diffOptions}
             onDiffOption={changeDiffOptions}
-            onActivate={activateTab}
+            onActivate={(tab) => { setMainView("diff"); activateTab(tab); }}
             onClose={closeTab}
             onCloseAll={closeAllTabs}
             onView={(next) => void switchView(next)}
@@ -4392,21 +5008,30 @@ export function App() {
             onFileNext={() => focusNextFile(1)}
             onToggleReview={toggleReviewCurrent}
             onRefresh={() => void refresh()}
+            logActive={mainView === "log"}
+            onActivateLog={() => setMainView("log")}
+            commitTabs={commitTabs.tabs}
+            activeCommitKey={mainView === "commit" ? commitTabs.activeKey : null}
+            onActivateCommit={(tab) => {
+              commitTabs.activate(tab.key);
+              setMainView("commit");
+            }}
+            onCloseCommit={(tab) => commitTabs.close(tab.key)}
           />
-          {selectedEntry && !mergeEntry ? (
+          {mainView === "diff" && selectedEntry && !mergeEntry ? (
             <Breadcrumbs
               entry={selectedEntry}
               view={view}
               changeCount={displayChangeCount}
             />
           ) : null}
-          {error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
-          {allReviewed && !mergeEntry ? (
+          {mainView === "diff" && error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+          {mainView === "diff" && allReviewed && !mergeEntry ? (
             <EditorBanner tone="info" icon="pass-filled">
               <span className="font-semibold">{messages.review.allReviewed}</span>
             </EditorBanner>
           ) : null}
-          {watchState.error ? (
+          {mainView === "diff" && watchState.error ? (
             <EditorBanner
               tone="warn"
               icon="warning"
@@ -4416,10 +5041,10 @@ export function App() {
               {messages.changes.watchUnavailableDetail}
             </EditorBanner>
           ) : null}
-          {diffOptions.ignoreWhitespace === 3 && !mergeEntry ? (
+          {mainView === "diff" && diffOptions.ignoreWhitespace === 3 && !mergeEntry ? (
             <EditorBanner tone="info" icon="info">{messages.diff.ignoreWhitespaceReadonly}</EditorBanner>
           ) : null}
-          {selectedEntry?.unmerged && !mergeEntry ? (
+          {mainView === "diff" && selectedEntry?.unmerged && !mergeEntry ? (
             <EditorBanner
               tone="error"
               icon="warning"
@@ -4428,13 +5053,13 @@ export function App() {
               {messages.diff.conflictBanner}
             </EditorBanner>
           ) : null}
-          {selectedEntry && diffArea === "readonly" && selectedEntry.readonlyReason ? (
+          {mainView === "diff" && selectedEntry && diffArea === "readonly" && selectedEntry.readonlyReason ? (
             <EditorBanner tone="info" icon="lock">
               <span className="mr-1.5 font-semibold">{messages.changes.readonly}</span>
               {messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
             </EditorBanner>
           ) : null}
-          {selectedEntry && diffArea === "collapsed" ? (
+          {mainView === "diff" && selectedEntry && diffArea === "collapsed" ? (
             <EditorBanner
               tone="info"
               icon="info"
@@ -4445,7 +5070,7 @@ export function App() {
           ) : null}
 
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {mergeEntry ? (
+            {mainView === "diff" ? (mergeEntry ? (
               <MergeView
                 key={`${worktreeId}/${mergeEntry.path}`}
                 worktreeId={worktreeId ?? ""}
@@ -4524,8 +5149,83 @@ export function App() {
                   />
                 )}
               </ErrorBoundary>
-            )}
+            )) : null}
+            {/* 日志始终挂载（隐藏时保留筛选、选中与滚动位置，L01）。 */}
+            <div className={mainView === "log" ? "h-full min-h-0" : "hidden"}>
+              <LogView
+                key={worktreeId ?? ""}
+                worktreeId={worktreeId ?? ""}
+                targetId={historyTargetId}
+                initialRefs={historyRefs}
+                active={mainView === "log"}
+                state={logWorkspace.state}
+                onState={logWorkspace.update}
+                settings={logSettings}
+                onSettings={(patch) => {
+                  const next = { ...logSettings, ...patch };
+                  setLogSettings(next);
+                  void ipc
+                    .updateSettings({
+                      logColumns: next.columns,
+                      logLongEdges: next.longEdges,
+                      logFirstParent: next.firstParent,
+                      logPreviewPosition: next.previewPosition,
+                    })
+                    .catch(() => undefined);
+                }}
+                previewOpen={logPreviewOpen}
+                onPreviewOpen={setLogPreviewOpen}
+                diffPresentation={{ view, options: sideBySideOptions, fontSize, fontFamily: codeFontFamily }}
+                groupByDirectory={treeGroupByDirectory}
+                currentBranch={snapshot?.branch ?? branches.overview?.currentBranch ?? null}
+                headCommit={branches.overview?.headCommit ?? null}
+                me={branches.overview?.user ?? null}
+                refreshKey={refsRevision}
+                refsWatchRevision={watchRevision}
+                onOpenCommitFile={openCommitFileTab}
+                onOpenMergeCommitFile={openMergeCommitTab}
+                onCreateBranchAt={(commit) => {
+                  setNewBranchError(null);
+                  openNewBranch({ kind: "commit", oid: commit });
+                }}
+                onCopy={copyText}
+                onNotify={(notice) => notify(notice)}
+              />
+            </div>
+            {mainView === "commit" && commitTabs.active && historyTargetId ? (
+              commitTabs.active.kind === "merge" ? (
+                <CommitMergeView
+                  key={commitTabs.active.key}
+                  targetId={historyTargetId}
+                  commit={commitTabs.active.commit}
+                  path={commitTabs.active.path}
+                  title={commitTabs.active.title}
+                  fontSize={fontSize}
+                  fontFamily={codeFontFamily}
+                  onClose={() => commitTabs.close(commitTabs.active?.key ?? "")}
+                />
+              ) : (
+                <CommitDiffView
+                  key={commitTabs.active.key}
+                  targetId={historyTargetId}
+                  file={commitTabs.active.file as HistoryFileTarget}
+                  title={commitTabs.active.title}
+                  view={view}
+                  options={{ ...diffOptions, ignoreWhitespace: ignoreWhitespaceOf(diffOptions.ignoreWhitespace) }}
+                  ignoreWhitespace={ignoreWhitespaceOf(diffOptions.ignoreWhitespace)}
+                  softWrap={diffOptions.softWrap}
+                  fontSize={fontSize}
+                  fontFamily={codeFontFamily}
+                  onClose={() => commitTabs.close(commitTabs.active?.key ?? "")}
+                />
+              )
+            ) : null}
           </div>
+
+          {/* Git 命令日志（B07）：底部面板，默认隐藏。 */}
+          {commandLogOpen ? (
+            <CommandLogPanel open={commandLogOpen} onClose={() => setCommandLogOpen(false)} />
+          ) : null}
 
           {measurementMode ? (
             <MeasurePanel
@@ -4547,6 +5247,8 @@ export function App() {
         reviewed={reviewedCount}
         total={reviewTotal}
         onRefresh={() => void refresh()}
+        onOpenCommandLog={() => setCommandLogOpen((value) => !value)}
+        autoFetchError={autoFetchError}
       />
 
       <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
@@ -4594,9 +5296,94 @@ export function App() {
           onContinue={() => {
             const pending = commitWarningConfirm;
             setCommitWarningConfirm(null);
-            void performCommit(pending.confirmation, { skipWarnings: true });
+            void confirmRemoteAction(pending, gateRef.current.token(), () =>
+              performCommit(pending.confirmation, { skipWarnings: true, pushAfter: pending.pushAfter }));
           }}
         />
+      ) : null}
+
+      {/* 新建分支（B02）：起点由入口决定（当前 HEAD / 分支 / 日志所选提交）。 */}
+      {newBranchStart ? (
+        <NewBranchDialog
+          overview={branches.overview}
+          start={newBranchStart.start}
+          busy={isWriting}
+          error={newBranchError}
+          onCancel={() => {
+            setNewBranchStart(null);
+            setNewBranchError(null);
+          }}
+          onConfirm={(request) => void runCreateBranch(request.name, request.checkout)}
+        />
+      ) : null}
+
+      {/* 检出被拒：智能检出 / 强制检出（Q150）。 */}
+      {checkoutBlocked ? (
+        <CheckoutConflictDialog
+          target={checkoutBlocked.label}
+          files={checkoutBlocked.files}
+          busy={isWriting}
+          onCancel={() => setCheckoutBlocked(null)}
+          onSmart={() => {
+            const pending = checkoutBlocked;
+            setCheckoutBlocked(null);
+            void confirmRemoteAction(pending.origin, gateRef.current.token(), (origin) =>
+              runCheckout(pending.target, "smart", origin));
+          }}
+          onForce={() => {
+            const pending = checkoutBlocked;
+            setCheckoutBlocked(null);
+            void confirmRemoteAction(pending.origin, gateRef.current.token(), (origin) =>
+              runCheckout(pending.target, "force", origin));
+          }}
+        />
+      ) : null}
+
+      {/* 推送对话框（B05）。 */}
+      {pushDialog ? (
+        <PushDialog
+          preview={pushDialog.preview}
+          busy={isWriting}
+          error={pushDialogError}
+          onCancel={() => {
+            setPushDialog(null);
+            setPushDialogError(null);
+          }}
+          onPush={(request) => {
+            const pending = pushDialog;
+            setPushDialog(null);
+            void confirmRemoteAction(pending.origin, gateRef.current.token(), (origin) =>
+              performPush(origin, request));
+          }}
+        />
+      ) : null}
+
+      {pushRejected ? (
+        <Modal title={messages.remote.pushRejectedTitle} onClose={() => setPushRejected(null)} width={460}>
+          <div className="space-y-3">
+            <p className="text-[12.5px]">
+              {messages.remote.pushRejectedDetail}
+              {`（${pushRejected.request.remote}/${pushRejected.request.branch}）`}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="dialog-button" onClick={() => setPushRejected(null)}>
+                {messages.remote.close}
+              </button>
+              <button
+                type="button"
+                className="dialog-button primary"
+                onClick={() => {
+                  const pending = pushRejected;
+                  setPushRejected(null);
+                  void confirmRemoteAction(pending.origin, gateRef.current.token(), (origin) =>
+                    performPush(origin, { ...pending.request, force: "none" }, { alreadyAttempted: true, updateFirst: true }));
+                }}
+              >
+                {messages.remote.updateThenPushConfirm}
+              </button>
+            </div>
+          </div>
+        </Modal>
       ) : null}
 
       {settingsOpen ? (

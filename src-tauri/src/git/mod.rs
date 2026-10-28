@@ -8,8 +8,10 @@
 //! - 遇到 `index.lock` 被占用只重试和上报，绝不删除锁文件（Q26）；
 //! - 每条命令都记入 Git 命令日志（Q36），M1 只记录，面板在 M4。
 
+pub mod branch;
 pub mod diff;
 pub mod highlight;
+pub mod history;
 pub mod rows;
 pub mod segments;
 pub mod status;
@@ -45,16 +47,29 @@ pub const DIFF_FLAGS: &[&str] = &[
 
 /// 单个 Git 命令的超时。读取操作远小于这个值；写成上限是为了不挂死界面。
 const GIT_TIMEOUT: Duration = Duration::from_secs(120);
+/// 网络操作（fetch / pull / push / 检查远端）单独的上限（Q96、规格 B01）。
+pub const NETWORK_TIMEOUT: Duration = Duration::from_secs(600);
 const LOCK_RETRIES: u32 = 3;
 const LOCK_RETRY_DELAY: Duration = Duration::from_millis(120);
-const LOG_CAPACITY: usize = 500;
+/// 命令日志只保留最近 1000 条（规格 B07）；只在内存里，不写磁盘。
+const LOG_CAPACITY: usize = 1000;
+/// 单条命令保留的输出上限（64 KB，规格 B07），超出时标明截断。
+pub const LOG_OUTPUT_LIMIT: usize = 64 * 1024;
 
-/// 一条 Git 命令日志（只保存在本机，Q36、Q42）。
+/// 一条 Git 命令日志（只保存在本机，Q36、Q42、B07）。
+///
+/// 记录时间、所属 worktree、命令与参数、退出码、耗时与输出；参数与输出都做过
+/// 凭据打码（URL 里的用户名 / 密码 / 令牌、携带认证信息的参数值）。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandRecord {
     pub sequence: u64,
+    /// 发起这条命令的 worktree（不属于任何 worktree 的探测命令为 null）。
+    pub worktree_id: Option<String>,
+    /// 命令开始时的 Unix 毫秒时间。
+    pub started_at_ms: u64,
     pub program: String,
+    /// 打码后的参数。
     pub args: Vec<String>,
     pub directory: String,
     pub exit_code: i32,
@@ -62,6 +77,10 @@ pub struct CommandRecord {
     pub timed_out: bool,
     pub stdout_bytes: usize,
     pub stderr_excerpt: String,
+    /// 合并后的标准输出与错误输出（打码、最多 64 KB）。
+    pub output: String,
+    /// 输出是否因为超过上限被截断。
+    pub output_truncated: bool,
 }
 
 #[derive(Debug, Default)]
@@ -138,6 +157,8 @@ pub struct Git {
     pub directory: PathBuf,
     pub env: Arc<Vec<(String, String)>>,
     pub log: Arc<CommandLog>,
+    /// 发起调用的 worktree（命令日志归属，规格 B07）；不属于 worktree 的探测为 None。
+    pub worktree_id: Option<String>,
 }
 
 impl Git {
@@ -169,7 +190,15 @@ impl Git {
                     .collect(),
             ),
             log,
+            worktree_id: None,
         })
+    }
+
+    /// 标注命令日志的 worktree 归属（会话打开时一次）。
+    pub fn with_worktree_id(&self, worktree_id: &str) -> Self {
+        let mut next = self.clone();
+        next.worktree_id = Some(worktree_id.to_string());
+        next
     }
 
     /// 用同一套环境在别的目录执行（例如对文件直接做 `--no-index` 比较）。
@@ -179,6 +208,35 @@ impl Git {
             directory: directory.to_path_buf(),
             env: self.env.clone(),
             log: self.log.clone(),
+            worktree_id: self.worktree_id.clone(),
+        }
+    }
+
+    /// 返回一个带额外环境变量的副本；同名变量以新值为准，不重复追加。
+    ///
+    /// 用于只读历史读取的两个 Git 行为开关（不改工作区读取）：
+    /// - `GIT_NO_LAZY_FETCH=1`（Git 2.44+）：部分克隆里缺失对象不再自动向远端补取；
+    /// - `GIT_ATTR_SOURCE=<treeish>`（Git 2.40+）：`.gitattributes` 取自指定提交的树，
+    ///   而不是当前工作区。
+    ///
+    /// 低版本 Git 会忽略不认识的 `GIT_*` 变量，行为退回旧版默认（见报告已知限制）。
+    pub fn with_env_vars(&self, vars: &[(&str, &str)]) -> Self {
+        let mut env: Vec<(String, String)> = self.env.as_ref().clone();
+        for (key, value) in vars {
+            match env
+                .iter_mut()
+                .find(|(name, _)| name.eq_ignore_ascii_case(key))
+            {
+                Some(slot) => slot.1 = (*value).to_string(),
+                None => env.push(((*key).to_string(), (*value).to_string())),
+            }
+        }
+        Self {
+            program: self.program.clone(),
+            directory: self.directory.clone(),
+            env: Arc::new(env),
+            log: self.log.clone(),
+            worktree_id: self.worktree_id.clone(),
         }
     }
 
@@ -231,6 +289,7 @@ impl Git {
             directory: directory.to_path_buf(),
             env: Arc::new(env),
             log: self.log.clone(),
+            worktree_id: self.worktree_id.clone(),
         }
     }
 
@@ -241,9 +300,16 @@ impl Git {
 
     /// 执行一次 Git 调用，遇到 `index.lock` 时短暂重试。
     pub fn run(&self, args: &[&str]) -> Result<GitOutput> {
+        self.run_with_timeout(args, GIT_TIMEOUT)
+    }
+
+    /// 带显式超时的一次调用（网络操作用 10 分钟上限，规格 B01）。
+    ///
+    /// 超时不是普通失败：调用者必须按「结果待核对」处理（Q96），并重新读取引用与状态。
+    pub fn run_with_timeout(&self, args: &[&str], timeout: Duration) -> Result<GitOutput> {
         let mut last: Option<GitOutput> = None;
         for attempt in 0..=LOCK_RETRIES {
-            let output = self.run_once(args)?;
+            let output = self.run_once_with_timeout(args, None, timeout)?;
             if !is_lock_error(&output) {
                 return Ok(output);
             }
@@ -258,8 +324,27 @@ impl Git {
         )))
     }
 
+    /// 网络命令（fetch / pull / push / 检查远端）：10 分钟上限，且不等待任何输入。
+    ///
+    /// 凭据打码与「不进入交互」在这里统一处理（Q153、规格 B01）：
+    /// - 关闭 Git 自己的终端提示（`GIT_TERMINAL_PROMPT=0`），标准输入为空；
+    /// - `SSH_ASKPASS_REQUIRE=never` 防止 SSH 弹出图形化询问；
+    /// - **不**覆盖用户在环境或配置里的 ssh 命令与 askpass 程序，也不改 Git 配置。
+    pub fn run_network(&self, args: &[&str], timeout: Duration) -> Result<GitOutput> {
+        self.with_env_vars(&[
+            ("GIT_TERMINAL_PROMPT", "0"),
+            ("SSH_ASKPASS_REQUIRE", "never"),
+        ])
+        .run_with_timeout(args, timeout)
+    }
+
     pub fn run_ok(&self, args: &[&str], what: &str) -> Result<GitOutput> {
         self.run(args)?.into_success(what)
+    }
+
+    /// 带 stdin 的一次调用（只用于只读计算，例如按仓库哈希算法求空 tree）。
+    pub fn run_with_input(&self, args: &[&str], input: Vec<u8>) -> Result<GitOutput> {
+        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT)
     }
 
     /// 允许非零退出码（例如 `git diff --no-index` 在有差异时返回 1）。
@@ -287,11 +372,20 @@ impl Git {
     }
 
     fn run_once(&self, args: &[&str]) -> Result<GitOutput> {
-        self.run_once_with_input(args, None)
+        self.run_once_with_timeout(args, None, GIT_TIMEOUT)
     }
 
-    fn run_once_with_input(&self, args: &[&str], input: Option<Vec<u8>>) -> Result<GitOutput> {
+    fn run_once_with_timeout(
+        &self,
+        args: &[&str],
+        input: Option<Vec<u8>>,
+        timeout: Duration,
+    ) -> Result<GitOutput> {
         let started = Instant::now();
+        let started_at_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_millis() as u64)
+            .unwrap_or_default();
         let has_input = input.is_some();
         let mut command = Command::new(&self.program);
         command
@@ -327,7 +421,7 @@ impl Git {
             })
         });
 
-        let waited = child.wait_timeout(GIT_TIMEOUT.saturating_sub(started.elapsed()));
+        let waited = child.wait_timeout(timeout.saturating_sub(started.elapsed()));
         let timed_out = matches!(&waited, Ok(None));
         if timed_out || waited.is_err() {
             let _ = child.kill();
@@ -344,17 +438,22 @@ impl Git {
         let elapsed = started.elapsed();
         let stderr = String::from_utf8_lossy(&stderr_bytes).into_owned();
         let exit_code = status.as_ref().ok().and_then(|value| value.code()).unwrap_or(-1);
+        let (output, output_truncated) = command_output(&stdout, &stderr_bytes);
 
         self.log.record(CommandRecord {
             sequence,
+            worktree_id: self.worktree_id.clone(),
+            started_at_ms,
             program: self.program.display().to_string(),
-            args: args.iter().map(|arg| arg.to_string()).collect(),
+            args: args.iter().map(|arg| mask_credentials(arg)).collect(),
             directory: self.directory.display().to_string(),
             exit_code,
             elapsed_ms: elapsed.as_millis() as u64,
             timed_out,
             stdout_bytes: stdout.len(),
-            stderr_excerpt: truncate(stderr.trim(), 2000),
+            stderr_excerpt: truncate(&mask_credentials(stderr.trim()), 2000),
+            output,
+            output_truncated,
         });
 
         if let Some(error) = waited.err().or_else(|| status.err()) {
@@ -574,7 +673,7 @@ impl Git {
             args.push("--reverse");
         }
         args.push("-");
-        self.run_once_with_input(&args, Some(patch))
+        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT)
     }
 
     pub fn discard_patch(&self, path: &str) -> Result<Vec<u8>> {
@@ -586,7 +685,7 @@ impl Git {
 
     /// No --index/--cached/--3way: discarding must not change the index.
     pub fn apply_worktree_patch(&self, patch: Vec<u8>) -> Result<GitOutput> {
-        self.run_once_with_input(&["-c", "apply.ignoreWhitespace=no", "apply", "--reverse", "--whitespace=nowarn", "-"], Some(patch))
+        self.run_once_with_timeout(&["-c", "apply.ignoreWhitespace=no", "apply", "--reverse", "--whitespace=nowarn", "-"], Some(patch), GIT_TIMEOUT)
     }
 
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {
@@ -692,6 +791,121 @@ pub fn is_lock_error(output: &GitOutput) -> bool {
     output.exit_code != 0 && output.stderr.contains("index.lock")
 }
 
+/// 凭据打码（规格 B07、Q153）：URL 中的用户名、密码与令牌，以及携带认证信息的参数值。
+///
+/// 只处理可识别的形状，不改动其他文字（对象 ID、普通路径、分支名不动），
+/// 否则命令日志就失去诊断价值。
+pub fn mask_credentials(text: &str) -> String {
+    // 按行处理：一行里的 `key=value` 只影响这一行，不会把后面的输出当成值吞掉。
+    let mut out = String::with_capacity(text.len());
+    for (index, line) in text.split('\n').enumerate() {
+        if index > 0 {
+            out.push('\n');
+        }
+        let masked = mask_url_userinfo(line);
+        match masked.find('=') {
+            Some(position) => {
+                let (key, value) = masked.split_at(position);
+                if is_sensitive_key(key) && !value.is_empty() {
+                    out.push_str(key);
+                    out.push_str("=***");
+                } else {
+                    out.push_str(&masked);
+                }
+            }
+            None => out.push_str(&masked),
+        }
+    }
+    out
+}
+
+/// 参数 / 配置键是否携带认证信息（`http.extraheader`、`--password` 等）。
+fn is_sensitive_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    const NEEDLES: &[&str] = &[
+        "password",
+        "passwd",
+        "token",
+        "secret",
+        "authorization",
+        "extraheader",
+        "credential",
+        "oauth",
+        "apikey",
+        "api-key",
+        "private-key",
+    ];
+    NEEDLES.iter().any(|needle| lower.contains(needle))
+}
+
+/// 把 URL 里的 userinfo（用户名、密码、令牌）换成 `***`，主机与路径保留。
+fn mask_url_userinfo(text: &str) -> String {
+    if !text.contains("://") {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find("://") {
+        let (before, after_scheme) = rest.split_at(start);
+        out.push_str(before);
+        out.push_str("://");
+        let authority = &after_scheme[3..];
+        let end = authority
+            .find(['/', ' ', '\n', '\t', '"', '\''])
+            .unwrap_or(authority.len());
+        let segment = &authority[..end];
+        match segment.rfind('@') {
+            Some(at) => {
+                out.push_str("***");
+                out.push_str(&segment[at..]);
+            }
+            None => out.push_str(segment),
+        }
+        rest = &authority[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// 合并标准输出与错误输出，打码后最多保留 64 KB，并标明是否截断。
+fn command_output(stdout: &[u8], stderr: &[u8]) -> (String, bool) {
+    // 先限定原始读取量，再打码，最后按字符边界截断：先截断会把 URL 截半，
+    // 留下半个令牌看起来像普通文字。
+    const RAW_LIMIT: usize = 512 * 1024;
+    let stdout_text = String::from_utf8_lossy(&stdout[..stdout.len().min(RAW_LIMIT)]);
+    let stderr_text = String::from_utf8_lossy(&stderr[..stderr.len().min(RAW_LIMIT)]);
+    let mut text = String::new();
+    if !stdout_text.is_empty() {
+        text.push_str(&mask_credentials(&stdout_text));
+    }
+    if !stderr_text.is_empty() {
+        if !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        text.push_str(&mask_credentials(&stderr_text));
+    }
+    let dropped_raw = stdout.len() > RAW_LIMIT || stderr.len() > RAW_LIMIT;
+    cap_output_text(&text, dropped_raw)
+}
+
+/// 把一段输出截到单条命令的上限；`force_truncated` 用于原始读取本身已被截断的情况。
+pub fn cap_output_text(text: &str, force_truncated: bool) -> (String, bool) {
+    if text.len() > LOG_OUTPUT_LIMIT || force_truncated {
+        let mut end = text.len().min(LOG_OUTPUT_LIMIT);
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        let mut capped = text[..end].to_string();
+        capped.push_str(&format!(
+            "\n…（输出已截断：单条最多保留 {} KB）",
+            LOG_OUTPUT_LIMIT / 1024
+        ));
+        (capped, true)
+    } else {
+        (text.to_string(), false)
+    }
+}
+
 /// diff 指纹（ADR-0005）：对原始 diff 输出取 SHA-256。
 pub fn fingerprint(parts: &[&[u8]]) -> String {
     let mut hasher = Sha256::new();
@@ -748,6 +962,73 @@ mod tests {
 
     fn assert_len(text: &str, expected: usize) {
         assert_eq!(text.len(), expected);
+    }
+
+    #[test]
+    fn mask_credentials_hides_url_userinfo_and_secret_values() {
+        assert_eq!(
+            mask_credentials("https://alice:s3cret@gitea.example/repo.git"),
+            "https://***@gitea.example/repo.git"
+        );
+        assert_eq!(
+            mask_credentials("git@github.com:owner/repo.git"),
+            "git@github.com:owner/repo.git",
+            "SSH 的 user@host 不是 URL userinfo，不当成凭据"
+        );
+        assert_eq!(
+            mask_credentials("--password=hunter2"),
+            "--password=***"
+        );
+        assert_eq!(
+            mask_credentials("-c http.extraHeader=Authorization: Bearer abc"),
+            "-c http.extraHeader=***"
+        );
+        // 对象 ID 与普通路径保持原样，命令日志才有诊断价值。
+        assert_eq!(
+            mask_credentials("0123456789abcdef0123456789abcdef01234567"),
+            "0123456789abcdef0123456789abcdef01234567"
+        );
+        assert_eq!(mask_credentials("fetch origin main"), "fetch origin main");
+        // 多行输出按行打码：后面的行不会被当成前一行的值。
+        assert_eq!(
+            mask_credentials("Password=abc\nfatal: could not read"),
+            "Password=***\nfatal: could not read"
+        );
+    }
+
+    #[test]
+    fn command_log_keeps_recent_records_and_caps_output() {
+        let log = CommandLog::default();
+        for index in 0..(LOG_CAPACITY + 5) {
+            log.record(CommandRecord {
+                sequence: 0,
+                worktree_id: Some("w".into()),
+                started_at_ms: index as u64,
+                program: "git".into(),
+                args: vec!["status".into()],
+                directory: "/repo".into(),
+                exit_code: 0,
+                elapsed_ms: 1,
+                timed_out: false,
+                stdout_bytes: 0,
+                stderr_excerpt: String::new(),
+                output: String::new(),
+                output_truncated: false,
+            });
+        }
+        let snapshot = log.snapshot();
+        assert_eq!(snapshot.len(), LOG_CAPACITY);
+        assert_eq!(snapshot.last().map(|record| record.sequence), Some(LOG_CAPACITY as u64 + 5));
+        assert_eq!(snapshot.first().map(|record| record.sequence), Some(6));
+
+        let big = "x".repeat(LOG_OUTPUT_LIMIT + 100);
+        let (capped, truncated) = cap_output_text(&big, false);
+        assert!(truncated);
+        assert!(capped.len() < big.len());
+        assert!(capped.contains("输出已截断"));
+        let (small, truncated) = cap_output_text("ok", false);
+        assert!(!truncated);
+        assert_eq!(small, "ok");
     }
 
     #[test]

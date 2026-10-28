@@ -1,10 +1,11 @@
 //! 集成测试：在 fixture 仓库上跑通「登记 → 打开会话 → 读取状态 → 取行 → 高亮」。
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use revia_lib::git::highlight::HighlightRequest;
 use revia_lib::git::rows::ViewMode;
+use revia_lib::git::segments::{IgnoreWhitespace, WordGranularity};
 use revia_lib::git::status::ChangesKind;
 use revia_lib::git::CommandLog;
 use revia_lib::session::{FileVersion, WorktreeSession};
@@ -97,8 +98,39 @@ fn rows_cold_and_warm_cost() {
     let Some(path) = fixture() else { return };
     let home = revia_lib::shell::home_dir().unwrap();
     let env = revia_lib::shell::resolve(&home, &path);
-    let session = WorktreeSession::open("test", &path, env, Arc::new(CommandLog::default())).unwrap();
+    let log = Arc::new(CommandLog::default());
+    let session = WorktreeSession::open("test", &path, env, log.clone()).unwrap();
+    let refresh_sequence = log.snapshot().last().map_or(0, |record| record.sequence);
+    let started = std::time::Instant::now();
     session.refresh().unwrap();
+    println!("读取状态：{:.3} ms", started.elapsed().as_secs_f64() * 1000.0);
+
+    let started = std::time::Instant::now();
+    let layout = session
+        .side_layout("src/generated.ts", ChangesKind::Unstaged, IgnoreWhitespace::Off, 3)
+        .expect("读取左右对照布局失败");
+    println!(
+        "左右对照冷布局：{:.3} ms（{} 段，{} 个操作目标）",
+        started.elapsed().as_secs_f64() * 1000.0,
+        layout.segments.len(), layout.segment_actions.len()
+    );
+    for (label, from, to) in [("可见小片", 1, 50), ("首块", 1, 400), ("后续块", 4001, 4400)] {
+        for version in [FileVersion::Old, FileVersion::New] {
+            let started = std::time::Instant::now();
+            let lines = session.side_lines(
+                "src/generated.ts", ChangesKind::Unstaged, IgnoreWhitespace::Off, 3,
+                version, from, to, WordGranularity::Word,
+            ).expect("左右对照取行失败");
+            println!(
+                "左右对照 {version:?} {label} {from}..={to}：{:.3} ms（{} 行）",
+                started.elapsed().as_secs_f64() * 1000.0, lines.len()
+            );
+            assert!(!lines.is_empty());
+        }
+    }
+    for record in log.snapshot().into_iter().filter(|record| record.sequence > refresh_sequence) {
+        println!("Git {:?}：{} ms，退出 {}", record.args, record.elapsed_ms, record.exit_code);
+    }
 
     for (label, view) in [("并排", ViewMode::Split), ("统一", ViewMode::Unified)] {
         let started = std::time::Instant::now();

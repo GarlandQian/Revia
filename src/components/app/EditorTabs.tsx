@@ -16,6 +16,15 @@ import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
 import { FileTypeIcon } from "./FileTypeIcon";
 
+/** 主区域固定的日志页签内容（M5 L01）：不可关闭，打开仓库后默认显示。 */
+export interface CommitDiffTabInfo {
+  key: string;
+  kind: "diff" | "merge";
+  title: string;
+  path: string;
+  commit: string;
+}
+
 export interface EditorTab {
   key: string;
   path: string;
@@ -34,6 +43,9 @@ export function mergeTabKey(path: string): string {
 function tabKey(path: string, changes: ChangesKind): string {
   return `${changes}:${path}`;
 }
+
+/** 日志页签的固定 key（不可关闭，也不进 diff 页签列表）。 */
+export const LOG_TAB_KEY = "log";
 
 export { tabKey };
 
@@ -70,6 +82,12 @@ export function EditorTabs({
   onFileNext,
   onToggleReview,
   onRefresh,
+  logActive,
+  onActivateLog,
+  commitTabs,
+  activeCommitKey,
+  onActivateCommit,
+  onCloseCommit,
 }: {
   tabs: EditorTab[];
   activeKey: string | null;
@@ -92,6 +110,14 @@ export function EditorTabs({
   onFileNext: () => void;
   onToggleReview: () => void;
   onRefresh: () => void;
+  /** 日志页签（固定在最左，不可关闭）。 */
+  logActive: boolean;
+  onActivateLog: () => void;
+  /** 提交 diff 页签（与改动 diff 页签分型）。 */
+  commitTabs: CommitDiffTabInfo[];
+  activeCommitKey: string | null;
+  onActivateCommit: (tab: CommitDiffTabInfo) => void;
+  onCloseCommit: (tab: CommitDiffTabInfo) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -116,11 +142,77 @@ export function EditorTabs({
     observer.observe(list);
     observer.observe(tab);
     return () => observer.disconnect();
-  }, [activeKey, tabs]);
+  }, [activeKey, activeCommitKey, logActive, tabs, commitTabs]);
   const reviewed = entry?.reviewed ?? false;
   return (
     <div className="editor-tabs flex shrink-0 flex-wrap items-stretch border-b border-[var(--editorgroupheader-tabsborder)] bg-[var(--editorgroupheader-tabsbackground)]">
       <div ref={tabListRef} className="editor-tab-list relative flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* 固定的“日志”页签（L01）：不可关闭，打开仓库后默认显示。 */}
+        <div
+          key={LOG_TAB_KEY}
+          ref={logActive ? activeTabRef : null}
+          className="editor-tab group"
+          data-active={logActive}
+          data-tab-key={LOG_TAB_KEY}
+          role="tab"
+          aria-selected={logActive}
+          tabIndex={logActive ? 0 : -1}
+          title={messages.log.title}
+          onClick={onActivateLog}
+          onDoubleClick={onActivateLog}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onActivateLog();
+            }
+          }}
+        >
+          <Codicon name="list-unordered" size={13} />
+          <span className="tab-title min-w-0 truncate">{messages.log.title}</span>
+        </div>
+        {/* 提交 diff 页签：标题是“文件名（短哈希）”，与改动 diff 分型。 */}
+        {commitTabs.map((tab) => {
+          const active = tab.key === activeCommitKey;
+          return (
+            <div
+              key={`commit-${tab.key}`}
+              ref={active ? activeTabRef : null}
+              className="editor-tab group"
+              data-active={active}
+              data-tab-key={`commit-${tab.key}`}
+              role="tab"
+              aria-selected={active}
+              tabIndex={active ? 0 : -1}
+              title={tab.path}
+              onClick={() => onActivateCommit(tab)}
+              onDoubleClick={() => onActivateCommit(tab)}
+              onAuxClick={(event) => {
+                if (event.button === 1) onCloseCommit(tab);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onActivateCommit(tab);
+                }
+              }}
+            >
+              <FileTypeIcon path={tab.path} />
+              <span className="tab-title min-w-0 truncate">{tab.title}</span>
+              <button
+                type="button"
+                className={`icon-action ml-0.5 size-5 shrink-0 ${active ? "" : "opacity-0 group-hover:opacity-100"}`}
+                aria-label={messages.changes.closeTab}
+                title={messages.changes.closeTab}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCloseCommit(tab);
+                }}
+              >
+                <Codicon name="close" size={14} />
+              </button>
+            </div>
+          );
+        })}
         {tabs.map((tab) => {
           const slash = tab.path.lastIndexOf("/");
           const name = tab.path.slice(slash + 1);
@@ -177,7 +269,12 @@ export function EditorTabs({
           );
         })}
       </div>
-      <div className="editor-tabs-toolbar flex shrink-0 items-center gap-0.5 px-2">
+      {logActive || activeCommitKey ? (
+        <div className="flex shrink-0 items-center gap-0.5 px-2 text-[11.5px] text-descriptionforeground">
+          {logActive ? messages.log.title : messages.history.readonly}
+        </div>
+      ) : null}
+      <div className={`editor-tabs-toolbar ${logActive || activeCommitKey ? "hidden" : "flex"} shrink-0 items-center gap-0.5 px-2`}>
         <button
           type="button"
           className="icon-action"

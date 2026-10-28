@@ -9,19 +9,22 @@
  * `mapLine` 把跟随栏映射到对应位置。
  */
 
-import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { bandVisible, drawBand, horizontalGradient, prepareCanvas, type BandEnds } from "./bands";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangeSegment } from "@/types/bindings/ChangeSegment";
 import type { SideBySideLayout } from "@/types/bindings/SideBySideLayout";
+import type { HistorySideLayout } from "@/types/bindings/HistorySideLayout";
 import type { SegmentAction } from "@/types/bindings/SegmentAction";
 import type { FoldRange } from "@/types/bindings/FoldRange";
 import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import { ipc } from "@/lib/ipc";
+import { getErrorMessage } from "@/lib/error";
 import { messages } from "@/lib/i18n/zh-CN";
 import { codeFontStack } from "@/lib/theme";
-import type { HighlightStore } from "./highlightStore";
+import type { DiffHighlights } from "./highlightStore";
+import type { HistorySideSource } from "@/features/log/historySideSource";
 import { clampLine } from "./syncScroll";
 import { buildRows, type RowIndex, type Side } from "./rowIndex";
 import { RowHeights } from "./rowHeights";
@@ -67,31 +70,49 @@ export interface SideBySideHandle {
   getContentHeight(): number;
   getVisibleRange(side?: Side): { from: number; to: number };
   isCovered(from: number, to: number, side?: Side): boolean;
+  isSettled(): boolean;
   isCompact(): boolean;
   /** 两栏中线的对应误差（行）：测量同步滚动用。 */
   syncError(): number;
 }
 
-interface SideBySideViewProps {
-  worktreeId: string;
-  entry: ChangeEntry;
+interface SideBySideCommonProps {
   fontSize: number;
   fontFamily?: string | null;
   options: DiffOptions;
-  highlights: HighlightStore;
+  highlights: DiffHighlights;
+  onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
+  handleRef?: React.Ref<SideBySideHandle>;
+}
+
+interface WorktreeSideProps {
+  worktreeId: string;
+  entry: ChangeEntry;
+  history?: never;
   isWriting?: boolean;
   onStageSegment?: (action: SegmentAction) => void;
   onUnstageSegment?: (action: SegmentAction) => void;
   onDiscardSegment?: (action: SegmentAction) => void;
   onLayout?: (layout: SideBySideLayout | null) => void;
-  onSample?: (sample: { from: number; to: number; uncovered: number }) => void;
-  handleRef?: React.Ref<SideBySideHandle>;
 }
 
+interface HistorySideProps {
+  history: HistorySideSource;
+  worktreeId?: never;
+  entry?: never;
+  isWriting?: never;
+  onStageSegment?: never;
+  onUnstageSegment?: never;
+  onDiscardSegment?: never;
+  onLayout?: never;
+}
+
+type SideBySideViewProps = SideBySideCommonProps & (WorktreeSideProps | HistorySideProps);
+
 export function SideBySideView(props: SideBySideViewProps) {
-  const { worktreeId, entry, fontSize, fontFamily, options, highlights, isWriting, onLayout, onSample, handleRef } = props;
+  const { worktreeId, entry, history, fontSize, fontFamily, options, highlights, isWriting, onLayout, onSample, handleRef } = props;
   const { ignoreWhitespace, highlight, foldUnchanged, syncScroll, showWhitespace, softWrap } = options;
-  const [layout, setLayout] = useState<SideBySideLayout | null>(null);
+  const [loadedLayout, setLayout] = useState<SideBySideLayout | HistorySideLayout | null>(null);
   const [layoutKey, setLayoutKey] = useState<string | null>(null);
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [cacheVersion, setCacheVersion] = useState(0);
@@ -113,30 +134,36 @@ export function SideBySideView(props: SideBySideViewProps) {
   const lineTarget = useRef<FileAnchor | null>(null);
   const gutterWidth = GUTTER_NUMBERS * 2 + GUTTER_BAND;
 
-  const cacheKey = `${worktreeId}/${entry.changes}/${entry.path}/${ignoreWhitespace}/${options.contextLines}/${highlight}/${entry.snapshotRevision}/${entry.fingerprint}`;
-  const currentLayout = layoutKey === cacheKey && layout?.worktreeId === worktreeId
-    && layout.path === entry.path && layout.changes === entry.changes
-    && layout.fingerprint === entry.fingerprint && layout.snapshotRevision === entry.snapshotRevision
-    && layout.ignoreWhitespace === ignoreWhitespace;
+  const cacheKey = history?.key ?? `${worktreeId}/${entry!.changes}/${entry!.path}/${ignoreWhitespace}/${options.contextLines}/${highlight}/${entry!.snapshotRevision}/${entry!.fingerprint}`;
+  const currentLayout = layoutKey === cacheKey && !!loadedLayout && (history
+    ? "targetId" in loadedLayout && history.matches(loadedLayout)
+    : "worktreeId" in loadedLayout && loadedLayout.worktreeId === worktreeId
+      && loadedLayout.path === entry!.path && loadedLayout.changes === entry!.changes
+      && loadedLayout.fingerprint === entry!.fingerprint && loadedLayout.snapshotRevision === entry!.snapshotRevision
+      && loadedLayout.ignoreWhitespace === ignoreWhitespace);
+  const layout = history ? (currentLayout ? loadedLayout : null)
+    : loadedLayout && "worktreeId" in loadedLayout ? loadedLayout : null;
+  const workspaceLayout = !history && layout && "worktreeId" in layout ? layout : null;
+  const path = history?.path ?? entry!.path;
 
-  // 布局：段、折叠区、两侧行数与段操作目标都来自 Rust。
-  useEffect(() => {
+  // 尽早发起异步布局读取，不先画一帧空布局再请求；数据仍全部来自 Rust。
+  useLayoutEffect(() => {
     let cancelled = false;
     setLayoutError(null);
-    void ipc
-      .sideBySideLayout({
-        worktreeId,
-        path: entry.path,
-        changes: entry.changes,
+    const readLayout = history ? history.layout() : ipc.sideBySideLayout({
+        worktreeId: worktreeId!,
+        path: entry!.path,
+        changes: entry!.changes,
         ignoreWhitespace,
         contextLines: options.contextLines,
         highlight,
-      })
+      });
+    void readLayout
       .then((next) => {
         if (cancelled) return;
         setLayout(next);
         setLayoutKey(cacheKey);
-        onLayout?.(next);
+        if ("worktreeId" in next) onLayout?.(next);
         setExpandedFolds(new Set());
       })
       .catch((error: unknown) => {
@@ -144,12 +171,12 @@ export function SideBySideView(props: SideBySideViewProps) {
         setLayout(null);
         setLayoutKey(null);
         onLayout?.(null);
-        setLayoutError(error instanceof Error ? error.message : String(error));
+        setLayoutError(getErrorMessage(error));
       });
     return () => {
       cancelled = true;
     };
-  }, [worktreeId, entry.path, entry.changes, entry.snapshotRevision, ignoreWhitespace, options.contextLines, highlight, onLayout, cacheKey]);
+  }, [worktreeId, entry?.path, entry?.changes, entry?.snapshotRevision, history, ignoreWhitespace, options.contextLines, highlight, onLayout, cacheKey]);
 
   // 换文件、换档位或快照前进时清空行缓存。
   useEffect(() => {
@@ -159,6 +186,8 @@ export function SideBySideView(props: SideBySideViewProps) {
     cache.current = new SideLineWindow(cacheKey);
     setCacheVersion((value) => value + 1);
   }, [cacheKey]);
+
+  useEffect(() => () => { cache.current = new SideLineWindow(""); }, []);
 
   const segments = layout?.segments ?? EMPTY_SEGMENTS;
   const folds = layout?.folds ?? EMPTY_FOLDS;
@@ -193,10 +222,10 @@ export function SideBySideView(props: SideBySideViewProps) {
       const current = cache.current;
       if (current.key !== cacheKey) return;
       current.ensure(side, { visible, buffered, lineCount }, {
-        load: (targetSide, from, to) => ipc.sideLines({
-          worktreeId,
-          path: entry.path,
-          changes: entry.changes,
+        load: (targetSide, from, to) => history ? history.lines(targetSide, from, to) : ipc.sideLines({
+          worktreeId: worktreeId!,
+          path: entry!.path,
+          changes: entry!.changes,
           ignoreWhitespace,
           contextLines: options.contextLines,
           highlight,
@@ -208,7 +237,7 @@ export function SideBySideView(props: SideBySideViewProps) {
         publish: () => setCacheVersion((value) => value + 1),
       });
     },
-    [cacheKey, worktreeId, entry.path, entry.changes, ignoreWhitespace, options.contextLines, highlight],
+    [cacheKey, worktreeId, entry?.path, entry?.changes, history, ignoreWhitespace, options.contextLines, highlight],
   );
 
   /** 按两栏当前的滚动位置画色带（跟随栏移动之后再画，避免慢一帧）。 */
@@ -364,6 +393,9 @@ export function SideBySideView(props: SideBySideViewProps) {
         }
         return true;
       },
+      isSettled() {
+        return !!currentLayout && cache.current.key === cacheKey && cache.current.pendingRequests === 0;
+      },
       isCompact() {
         return false;
       },
@@ -406,27 +438,36 @@ export function SideBySideView(props: SideBySideViewProps) {
   if (layout.binary) {
     return <div className="p-3 text-[12px] text-descriptionforeground">{messages.diff.binaryNotCompared}</div>;
   }
-  const labels = messages.diff.sideLabels(layout.changes, layout.conflict);
+  if (history && "targetId" in layout && layout.modeOnly) {
+    return <div className="p-3 text-[12px] text-descriptionforeground">{messages.history.modeOnly}</div>;
+  }
+  if (history && "targetId" in layout && layout.emptyReason === "emptyFile") {
+    return <div className="p-3 text-[12px] text-descriptionforeground">{messages.history.emptyFile}</div>;
+  }
+  const labels = history
+    ? { left: history.file.parent ? messages.history.parent(history.file.parent) : messages.log.rootCommit,
+      right: messages.history.commit(history.file.commit) }
+    : messages.diff.sideLabels(workspaceLayout!.changes, workspaceLayout!.conflict);
   // 冲突文件只读：不显示块按钮（设计 3.2）。
-  const leftActions = layout.conflict ? "none" : layout.changes === "unstaged" ? "discard" : layout.changes === "staged" ? "unstage" : "none";
-  const rightActions = layout.conflict ? "none" : layout.changes === "unstaged" ? "stage" : "none";
+  const leftActions = !workspaceLayout || workspaceLayout.conflict ? "none" : workspaceLayout.changes === "unstaged" ? "discard" : workspaceLayout.changes === "staged" ? "unstage" : "none";
+  const rightActions = !workspaceLayout || workspaceLayout.conflict ? "none" : workspaceLayout.changes === "unstaged" ? "stage" : "none";
 
   // 段按钮是否可用：Q140“同时忽略空行”一档下按钮变灰并说明原因。
-  const actionsEnabled = layout.segmentActionsAvailable && !isWriting;
+  const actionsEnabled = !!workspaceLayout?.segmentActionsAvailable && !isWriting;
   const actionsDisabled = !actionsEnabled;
-  const actionFor = (index: number): SegmentAction | null => layout.segmentActions[index] ?? null;
+  const actionFor = (index: number): SegmentAction | null => workspaceLayout?.segmentActions[index] ?? null;
 
   return (
     <div className="sbs flex h-full min-h-0 flex-col" style={{ "--font-mono": codeFontStack(fontFamily ?? null) } as React.CSSProperties}>
       <div className="sbs-header flex shrink-0 items-center text-[11.5px] text-descriptionforeground">
         <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
           <span className="shrink-0 font-semibold">{labels.left}</span>
-          <span className="truncate">{entry.path}</span>
+          <span className="truncate">{path}</span>
         </div>
         <div className="shrink-0" style={{ width: gutterWidth }} />
         <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
           <span className="shrink-0 font-semibold">{labels.right}</span>
-          <span className="truncate">{entry.path}</span>
+          <span className="truncate">{path}</span>
         </div>
       </div>
       <div className="relative flex min-h-0 flex-1">
@@ -439,6 +480,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           }}
           onWindow={(top) => leftGutterRef.current?.setWindow(top)}
           lineCount={layout.leftLineCount}
+          emptyText={history && "targetId" in layout && layout.leftMissing ? messages.history.missingSide : undefined}
           rows={leftRows}
           heights={leftHeights}
           folds={folds}
@@ -468,7 +510,7 @@ export function SideBySideView(props: SideBySideViewProps) {
             onSegmentAction={(index) => {
               const action = actionFor(index);
               if (!action) return;
-              if (layout.changes === "staged") props.onUnstageSegment?.(action);
+              if (workspaceLayout?.changes === "staged") props.onUnstageSegment?.(action);
               else props.onDiscardSegment?.(action);
             }}
             handleRef={leftGutterRef}
@@ -505,6 +547,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           }}
           onWindow={(top) => rightGutterRef.current?.setWindow(top)}
           lineCount={layout.rightLineCount}
+          emptyText={history && "targetId" in layout && layout.rightMissing ? messages.history.missingSide : undefined}
           rows={rightRows}
           heights={rightHeights}
           folds={folds}
@@ -541,13 +584,14 @@ interface SideColumnProps {
   handleRef: React.Ref<SideColumnHandle>;
   side: Side;
   lineCount: number;
+  emptyText?: string;
   rows: RowIndex;
   heights: RowHeights;
   folds: FoldRange[];
   segments: ChangeSegment[];
   cache: SideLineWindow;
   cacheVersion: number;
-  highlights: HighlightStore;
+  highlights: DiffHighlights;
   highlight: DiffHighlight;
   showWhitespace: boolean;
   fontSize: number;
@@ -565,6 +609,11 @@ interface SideColumnProps {
 
 function SideColumn(props: SideColumnProps) {
   const { handleRef, side, lineCount, rows, heights, folds, cache, cacheVersion, highlights, highlight, showWhitespace, fontSize, onWidth, onHeightsChanged, ensureLines, onScroll, onWindow } = props;
+  const highlightSnapshot = useSyncExternalStore(highlights.subscribe, highlights.getSnapshot);
+  const categoryClass = useCallback((index: number) => {
+    void highlightSnapshot.version;
+    return highlights.categoryClass(index);
+  }, [highlights, highlightSnapshot.version]);
   const onPaintRef = useRef(props.onPaint);
   onPaintRef.current = props.onPaint;
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -756,10 +805,23 @@ function SideColumn(props: SideColumnProps) {
 
   const visibleFrom = heights.rowAt(renderTop);
   const visibleTo = Math.min(rows.rows.length, Math.ceil(heights.rowAtFraction(renderTop + viewportHeight)));
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (viewportHeight <= 0) return;
     ensureLines(side, lineRangesForRows(rows.rows, visibleFrom, visibleTo), lineRangesForRows(rows.rows, from, to), lineCount);
   }, [ensureLines, side, from, to, visibleFrom, visibleTo, viewportHeight, rows, lineCount, cacheVersion]);
+
+  useEffect(() => {
+    if (viewportHeight <= 0) return;
+    const loaded = side === "left" ? cache.old : cache.new;
+    for (const range of lineRangesForRows(rows.rows, visibleFrom, visibleTo)) {
+      let covered = true;
+      for (let line = range.from; line <= range.to; line += 1) {
+        if (!loaded.has(line)) { covered = false; break; }
+      }
+      if (!covered) continue;
+      highlights.ensure(side === "left" ? "old" : "new", range.from, range.to);
+    }
+  }, [highlights, highlightSnapshot.version, side, rows, visibleFrom, visibleTo, viewportHeight, cache, cacheVersion]);
 
   const map = side === "left" ? cache.old : cache.new;
   const hoveredRange = useMemo(() => {
@@ -814,11 +876,13 @@ function SideColumn(props: SideColumnProps) {
               highlight={highlight}
               showWhitespace={showWhitespace}
               tokens={highlights.get(side === "left" ? "old" : "new", item.line)}
+              categoryClass={categoryClass}
               hovered={hoveredRange !== null && item.line >= hoveredRange[0] && item.line <= hoveredRange[1]}
             />
           );
         })}
       </div>
+      {props.emptyText ? <div className="absolute inset-x-0 top-0 p-3 text-[12px] text-descriptionforeground">{props.emptyText}</div> : null}
       <div ref={trackRef} className="diff-scrollbar" onPointerDown={onTrackPointerDown}>
         <div ref={thumbRef} className="diff-scrollbar-thumb" />
       </div>
@@ -844,6 +908,7 @@ const LineRow = memo(function LineRow({
   highlight,
   showWhitespace,
   tokens,
+  categoryClass,
   hovered,
 }: {
   rowIndex: number;
@@ -855,7 +920,8 @@ const LineRow = memo(function LineRow({
   side: Side;
   highlight: DiffHighlight;
   showWhitespace: boolean;
-  tokens: ReturnType<HighlightStore["get"]>;
+  tokens: ReturnType<DiffHighlights["get"]>;
+  categoryClass: (index: number) => string;
   hovered: boolean;
 }) {
   const tone = !changed ? "" : side === "left" ? " sbs-del" : " sbs-ins";
@@ -863,7 +929,7 @@ const LineRow = memo(function LineRow({
   return (
     <div className={`sbs-row${tone}${hovered ? " sbs-hover" : ""}`} style={{ top }} data-row={rowIndex} data-line={lineNumber}>
       <span className="sbs-text">
-        {renderLine(text, useWords ? words : [], tokens, showWhitespace)}
+        {renderLine(text, useWords ? words : [], tokens, showWhitespace, categoryClass)}
       </span>
     </div>
   );
@@ -873,8 +939,9 @@ const LineRow = memo(function LineRow({
 function renderLine(
   text: string,
   words: Array<[number, number]>,
-  tokens: ReturnType<HighlightStore["get"]>,
+  tokens: ReturnType<DiffHighlights["get"]>,
   showWhitespace: boolean,
+  categoryClass: (index: number) => string,
 ) {
   if (showWhitespace) {
     return highlightWords(visibleWhitespace(text), words, "sbs-word");
@@ -884,7 +951,7 @@ function renderLine(
   }
   if (words.length === 0) {
     return tokens.map((token, index) => (
-      <span key={index} className={`tok-${token.category}`}>{token.text}</span>
+      <span key={index} className={categoryClass(token.category)}>{token.text}</span>
     ));
   }
   // 把 token 按改动区间切开，同一段文字既是语法颜色又是改动字词。
@@ -901,13 +968,13 @@ function renderLine(
       const from = Math.max(cursor, wordStart);
       const to = Math.min(end, wordEnd);
       if (from > cursor) {
-        parts.push(<span key={`${index}-${piece++}`} className={`tok-${token.category}`}>{token.text.slice(cursor - start, from - start)}</span>);
+        parts.push(<span key={`${index}-${piece++}`} className={categoryClass(token.category)}>{token.text.slice(cursor - start, from - start)}</span>);
       }
-      parts.push(<span key={`${index}-${piece++}`} className={`tok-${token.category} sbs-word`}>{token.text.slice(from - start, to - start)}</span>);
+      parts.push(<span key={`${index}-${piece++}`} className={`${categoryClass(token.category)} sbs-word`}>{token.text.slice(from - start, to - start)}</span>);
       cursor = to;
     }
     if (cursor < end) {
-      parts.push(<span key={`${index}-${piece++}`} className={`tok-${token.category}`}>{token.text.slice(cursor - start)}</span>);
+      parts.push(<span key={`${index}-${piece++}`} className={categoryClass(token.category)}>{token.text.slice(cursor - start)}</span>);
     }
   }
   return parts;

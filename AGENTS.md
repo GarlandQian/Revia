@@ -2,7 +2,7 @@
 
 Revia 是一个照 Rebased 的布局和功能、配上 VS Code 外观的轻量桌面 Git 客户端（[ADR-0011](docs/adr/0011-rebuild-like-rebased-not-fork.md)），核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M8（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
-M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见各自报告）。
+M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2、M3 已于 2026-10-26 合入 main，M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154），部分验收未完成（见各自报告）。
 
 ## 开始前必读
 
@@ -11,9 +11,13 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M4 界面重做准备中
+## 当前阶段：M6 第 1 步
 
-用户于 2026-10-26 确认功能和界面都照 Rebased（Q117–Q127）。M4 把现有功能按本机安装的 Rebased 1.1.22 的布局与交互、VS Code 的外观和颜色主题重做（Q131–Q133），范围见 [产品方向](docs/product-direction.md#实施顺序)。M4 全部代码由 Pi 按 [整包交接](docs/milestones/m4/paseo-batch.md) 一次实现，做完后统一审查与验收，中间不逐项派发（Q136）；用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，出错时按 Q137 的顺序换模型。旧界面决定冲突时，布局与交互照 Rebased，外观照 VS Code，不必再问用户；安全边界和 Revia 独有功能保持原决定（Q129、Q131）。
+M6“冲突与历史”的范围见 [产品方向](docs/product-direction.md#实施顺序) 的里程碑表：stash；继续、中止、跳过；在日志中 cherry-pick、revert、reset、改提交信息、交互式 rebase；文件历史与 blame；外部合并工具保留为可选（Q126、Q143、Q149）。从下面工作流程的第 1 步开始，先与用户追问未定细节，再写 `docs/milestones/m6/spec.md`。
+
+M4、M5 带已知未达标项合入 main（Q154）：Q98 长测、统一视图首次跳转与未做完的桌面验收在 `docs/milestones/backlog/` 04–06，不属于 M6 范围，除非用户在第 1 步中纳入。
+
+布局与交互照本机 Rebased 1.1.22，外观沿用 VS Code 颜色主题（Q117、Q131–Q133）。旧决定冲突时按 Q129、Q131 处理，安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
 
 M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
@@ -28,16 +32,16 @@ M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界�
 | 1 | 规划方与用户 | 用 grill-with-docs 追问这个里程碑还没定的细节（包括测试接缝），更新决策、术语表和 ADR |
 | 2 | 规划方 | 用 to-spec 写 `spec.md` |
 | 3 | 规划方 | 用 to-tickets 拆成 `issues/`，标好依赖 |
-| 4 | 实施方 | 在里程碑 worktree（分支 `m<N>`）中实现：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型按 GLM-5.3-Flash → GLM-5.3 → deepseek-v4.1-flash → gemini-3.8-flash 的顺序，当前模型请求出错就换下一个，四个都失败由规划方接手（[Q137](docs/README.md)）；返修最多一次（Q113）；保留已有改动和失败原件 |
+| 4 | 实施方 | 在里程碑分支 `m<N>` 上实现（有并行会话时放在独立 worktree）：整份规格用 implement-spec，集成分支就是 `m<N>`；单个任务用 implement。规划方用 `paseo send <会话> --prompt-file <任务说明>` 把任务发给 Paseo 中 Revia 工作区的 Pi 会话，再用 `paseo wait` 等它完成。模型按 GLM-5.3-Flash → GLM-5.3 → deepseek-v4.1-flash → gemini-3.8-flash 的顺序，当前模型请求出错就换下一个，四个都失败由规划方接手（[Q137](docs/README.md)）；返修最多一次（Q113）；保留已有改动和失败原件 |
 | 5 | 规划方 | 用 code-review 审查 `m<N>` 相对 main 的改动，对照 `spec.md`；意见写进对应任务文件的 `## Comments` |
 | 6 | 实施方 | 按 `## Comments` 修改，回到第 5 步 |
 | 7 | 实施方 | 写 `report.md`：实测数据、验收结论、遗留问题 |
 | 8 | 规划方 | 在真实桌面上验收：截图检查、在窗口可见时测量；`ready-for-human` 的任务由规划方用电脑操控完成（Q77） |
-| 9 | 规划方 | 验收通过后，把 `m<N>` 压成一个提交合并进 main，删除 worktree，告诉用户结果 |
+| 9 | 规划方 | 验收通过后，把 `m<N>` 压成一个提交合并进 main，删除 worktree（如有），告诉用户结果 |
 
 - 规格和任务单只整理第 1 步确认过的内容，不需要用户另行确认；遇到第 1 步没覆盖的取舍，回到第 1 步补问用户（Q76）。
 - 任务单与已确认的决策冲突时，停下来询问用户。
-- 实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m2 -b m2 main`），不要在主目录里切换分支。
+- 有并行会话时，实施方在独立的 git worktree 中工作（例如 `git worktree add ../Revia-m6 -b m6 main`），不要在主目录里切换分支；只有一个会话顺序工作时，直接在主目录建 `m<N>` 分支即可（Q154）。
 - 交接文件只记录工作过程，不产生新的决策；新的决策仍以 [docs/README.md](docs/README.md) 为准。
 - **合并方式**：里程碑分支合并进 main 时压成一个提交，提交说明写成“M<N>：<内容>”（例如“M1：只读界面与 diff 流式取数”），中间过程的提交只留在里程碑分支上；设计决策每轮一个提交。实施方只提交到里程碑分支，合并由规划方在验收通过后进行；用户可以随时要求撤回。
 - M0、M1 当时用的是“实施方写计划 + 规划方写评审意见”的方式，它们的 `plan.md`、`review.md` 保留作记录。
@@ -54,7 +58,7 @@ M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界�
 
 ## 规则
 
-- **本地验证**：本地回归、Pi交接或平台风险提示出现时，先读 [本地验证与平台提示处理](docs/agents/local-validation.md)，明确业务目的、隔离范围、原始证据和验收分工。
+- **本地验证**：写回归或复现测试、给 Pi 或子代理写任务说明、遇到平台风险提示时，先读 [本地验证与平台提示处理](docs/agents/local-validation.md)，明确业务目的、隔离范围、原始证据和验收分工。
 - **不擅自修改已确认的决策**：已确认的决策和 ADR 不得自行修改。发现行不通时，在报告中写明证据和建议，由用户决定。
 - **不扩大首版范围**：[产品方向](docs/product-direction.md#首版范围) 中“首版不提供”一列的内容不做。
 - **不突破安全边界**，具体包括：

@@ -26,6 +26,7 @@ export function TitleBar({
   onWorktree,
   onSettings,
   onRefreshWorktrees,
+  extra,
 }: {
   repo: RepoEntry | null;
   repos: RepoEntry[];
@@ -38,6 +39,8 @@ export function TitleBar({
   onWorktree: (worktreeId: string) => void;
   onSettings: () => void;
   onRefreshWorktrees: () => void;
+  /** 分支组件与“更新 / 推送”按钮（M5 B02）。 */
+  extra?: React.ReactNode;
 }) {
   const [repoOpen, setRepoOpen] = useState(false);
   const [worktreeOpen, setWorktreeOpen] = useState(false);
@@ -181,6 +184,7 @@ export function TitleBar({
         </div>
       ) : null}
 
+      {extra}
       <span className="flex-1 self-stretch" data-tauri-drag-region />
       <button type="button" className="icon-action" title={messages.settings.open} aria-label={messages.settings.open} onClick={onSettings}>
         <Codicon name="settings-gear" size={16} />
@@ -223,6 +227,8 @@ export function StatusBar({
   reviewed,
   total,
   onRefresh,
+  onOpenCommandLog,
+  autoFetchError,
 }: {
   branch: string | null;
   ahead: number;
@@ -231,6 +237,10 @@ export function StatusBar({
   reviewed: number;
   total: number;
   onRefresh: () => void;
+  /** 打开 Git 命令日志面板（B07）。 */
+  onOpenCommandLog: () => void;
+  /** 自动 fetch 失败的提示（只在状态栏，不弹通知）。 */
+  autoFetchError: string | null;
 }) {
   return (
     <footer className="flex h-[var(--statusbar-height)] shrink-0 items-center gap-0.5 overflow-hidden bg-[var(--statusbar-background)] px-1.5 text-[12px] whitespace-nowrap text-[var(--statusbar-foreground)]">
@@ -254,6 +264,26 @@ export function StatusBar({
         >
           <Codicon name="refresh" size={13} />
           {messages.changes.watchUnavailable}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5"
+        title={messages.commandLog.open}
+        onClick={onOpenCommandLog}
+      >
+        <Codicon name="terminal" size={13} />
+        {messages.commandLog.title}
+      </button>
+      {autoFetchError ? (
+        <button
+          type="button"
+          className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5 text-[var(--editorwarning-foreground)]"
+          title={autoFetchError}
+          onClick={onOpenCommandLog}
+        >
+          <Codicon name="cloud-offline" size={13} />
+          {messages.remote.autoFetchFailed}
         </button>
       ) : null}
       <span className="flex-1" />

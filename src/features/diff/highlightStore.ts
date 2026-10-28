@@ -36,6 +36,9 @@ export interface HighlightSnapshot {
   lastRoundTripMs: number | null;
 }
 
+/** Rendering only: a history source cannot inherit a worktree write identity. */
+export type DiffHighlights = Pick<HighlightStore, "subscribe" | "getSnapshot" | "get" | "ensure" | "categoryClass">;
+
 export class HighlightStore {
   private target: HighlightTarget | null = null;
   private epoch = 0;

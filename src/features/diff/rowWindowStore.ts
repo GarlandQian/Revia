@@ -57,6 +57,11 @@ export interface RowWindowSnapshot {
   stale: boolean;
 }
 
+/** Minimal read-only rendering contract, also implemented by history sources. */
+export type DiffRows = Pick<RowWindowStore,
+  "subscribe" | "getSnapshot" | "rowCountValue" | "epochValue" | "getRow" | "uncovered"
+  | "isCovered" | "noteDirection" | "ensure"> & { logWindow?: () => void };
+
 type FetchRows = (request: RowWindowTarget & {
   from: number;
   to: number;

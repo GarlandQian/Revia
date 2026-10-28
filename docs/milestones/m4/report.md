@@ -369,7 +369,7 @@ REVIA_MEASURE_LOG=/tmp/smoke-conflicts.json src-tauri/target/release/revia
 | --- | --- |
 | `pnpm exec tsc -b` | 通过 |
 | `pnpm lint` | 通过，7 条原有 `test-refresh-gate.mjs` unused-vars 警告 |
-| 逐个 `node --test tools/test-*.mjs` | 13 个脚本中 12 个通过；`test-merge-appearance.mjs` 导入失败 |
+| 逐个 `node --test tools/test-*.mjs` | 12 个脚本中 11 个通过；`test-merge-appearance.mjs` 导入失败 |
 | `/opt/homebrew/bin/cargo test --manifest-path src-tauri/Cargo.toml` | 389 通过，0 失败，1 忽略 |
 | 前端 build / `.app` 重打包 | 未运行 |
 | 桌面 / D06 / 冒烟 / Windows 编译 | 未运行，未验收 |
@@ -802,3 +802,9 @@ diff check、lint、前端 build；独立证据核对确认构建和 normal-07 �
 长测通过。本轮没有新跑 smoke，不沿用旧包性能成绩；色带悬停、横向页签手势、四主题、
 完整 Rebased 对照、稳定首屏门槛与颜色探针仍按前文未完成项处理。M4 整体验收尚未完成，
 没有合入 main，没有推送。
+
+# 合入 main（2026-10-28）
+
+用户认为 M5 可以了，M4 随 M5 带已知未做项合入 main（[Q154](../../README.md#已确认)）。
+上面“已实现但未做桌面验收”的各项与合并写入三个入口的桌面验收转入 [backlog 06](../backlog/06-m4-m5-desktop-acceptance.md)；
+D06 与长测的最新结果见 [M5 报告](../m5/report.md) 22.19 与第 23 节。

@@ -75,6 +75,135 @@ pub struct Settings {
     pub notify: NotifyKinds,
     /// 合并时自动应用无冲突改动（Q143；关闭后初始结果用共同祖先）。
     pub merge_auto_apply: bool,
+    /// 日志表格显示哪些列（F06）：作者、日期、哈希（默认隐藏）。
+    pub log_columns: LogColumns,
+    /// 合并线拉直（Rebased 的 Long Edges，默认关）：关闭时跨越很多行的边折成短箭头。
+    pub log_long_edges: bool,
+    /// 只看第一父提交（默认关）。
+    pub log_first_parent: bool,
+    /// diff 预览位置（默认右侧）。
+    pub log_preview_position: LogPreviewPosition,
+    /// 更新方式（默认 merge；Q149）。
+    pub update_mode: UpdateMode,
+    /// fetch 的标签方式（默认自动，跟随 Git 配置）。
+    pub fetch_tag_mode: FetchTagMode,
+    /// 自动 fetch（默认关，Q152）。
+    pub fetch_automatically: bool,
+    /// 检查远端是否有新提交（默认关，只比较引用）。
+    pub check_remote: bool,
+    /// 推送被拒时自动更新（默认关）。
+    pub auto_update_on_push_rejection: bool,
+    /// 提交并推送时显示推送对话框（默认开）。
+    pub push_dialog_on_commit: bool,
+    /// 推送对话框只在受保护分支显示（默认关）。
+    pub push_dialog_protected_only: bool,
+    /// 受保护分支（每行一个，支持 `*` 通配；默认 master、main）。
+    pub protected_branches: Vec<String>,
+}
+
+/// 日志表格的显示列（F06）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LogColumns {
+    pub author: bool,
+    pub date: bool,
+    /// 哈希列默认隐藏（L02）。
+    pub hash: bool,
+}
+
+impl Default for LogColumns {
+    fn default() -> Self {
+        Self { author: true, date: true, hash: false }
+    }
+}
+
+/// diff 预览位置（F06）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LogPreviewPosition {
+    Right,
+    Bottom,
+}
+
+impl Default for LogPreviewPosition {
+    fn default() -> Self {
+        Self::Right
+    }
+}
+
+/// 更新方式（B04）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateMode {
+    Merge,
+    Rebase,
+    /// 按分支默认：只读读取该分支与仓库的 rebase 相关配置决定（不改配置）。
+    BranchDefault,
+}
+
+impl Default for UpdateMode {
+    fn default() -> Self {
+        Self::Merge
+    }
+}
+
+/// fetch 的标签方式（B03）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FetchTagMode {
+    /// 跟随 Git 配置，不加参数。
+    Auto,
+    /// 同步删除远端已删除的标签和分支。
+    Sync,
+    /// 取回全部标签。
+    Always,
+    /// 不取标签。
+    Never,
+}
+
+impl Default for FetchTagMode {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+/// 默认受保护分支（B05、B08）。
+pub const DEFAULT_PROTECTED_BRANCHES: &[&str] = &["master", "main"];
+
+/// 分支名是否匹配受保护分支的某个模式（`*` 通配，`?` 单字符）。
+pub fn matches_protected(name: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| glob_matches(pattern.trim(), name))
+}
+
+/// 极简 glob：只支持 `*` 与 `?`，其余字符按字面比较（分支名里没有转义需求）。
+fn glob_matches(pattern: &str, text: &str) -> bool {
+    if pattern.is_empty() {
+        return false;
+    }
+    let pattern: Vec<char> = pattern.chars().collect();
+    let text: Vec<char> = text.chars().collect();
+    let (mut p, mut t) = (0usize, 0usize);
+    let (mut star, mut resume) = (None::<usize>, 0usize);
+    while t < text.len() {
+        if p < pattern.len() && (pattern[p] == '?' || pattern[p] == text[t]) {
+            p += 1;
+            t += 1;
+        } else if p < pattern.len() && pattern[p] == '*' {
+            star = Some(p);
+            resume = t;
+            p += 1;
+        } else if let Some(position) = star {
+            p = position + 1;
+            resume += 1;
+            t = resume;
+        } else {
+            return false;
+        }
+    }
+    while p < pattern.len() && pattern[p] == '*' {
+        p += 1;
+    }
+    p == pattern.len()
 }
 
 /// 各类成功结果是否弹出通知（E.6）。
@@ -160,6 +289,18 @@ impl Default for Settings {
             commit_warn_invalid_filename: true,
             notify: NotifyKinds::default(),
             merge_auto_apply: true,
+            log_columns: LogColumns::default(),
+            log_long_edges: false,
+            log_first_parent: false,
+            log_preview_position: LogPreviewPosition::default(),
+            update_mode: UpdateMode::default(),
+            fetch_tag_mode: FetchTagMode::default(),
+            fetch_automatically: false,
+            check_remote: false,
+            auto_update_on_push_rejection: false,
+            push_dialog_on_commit: true,
+            push_dialog_protected_only: false,
+            protected_branches: DEFAULT_PROTECTED_BRANCHES.iter().map(|name| name.to_string()).collect(),
         }
     }
 }
@@ -202,6 +343,18 @@ pub struct SettingsPatch {
     pub commit_warn_invalid_filename: Option<bool>,
     pub notify: Option<NotifyKinds>,
     pub merge_auto_apply: Option<bool>,
+    pub log_columns: Option<LogColumns>,
+    pub log_long_edges: Option<bool>,
+    pub log_first_parent: Option<bool>,
+    pub log_preview_position: Option<LogPreviewPosition>,
+    pub update_mode: Option<UpdateMode>,
+    pub fetch_tag_mode: Option<FetchTagMode>,
+    pub fetch_automatically: Option<bool>,
+    pub check_remote: Option<bool>,
+    pub auto_update_on_push_rejection: Option<bool>,
+    pub push_dialog_on_commit: Option<bool>,
+    pub push_dialog_protected_only: Option<bool>,
+    pub protected_branches: Option<Vec<String>>,
 }
 
 pub struct Registry {
@@ -443,6 +596,42 @@ impl Registry {
         if let Some(value) = patch.merge_auto_apply {
             next.merge_auto_apply = value;
         }
+        if let Some(value) = patch.log_columns {
+            next.log_columns = value;
+        }
+        if let Some(value) = patch.log_long_edges {
+            next.log_long_edges = value;
+        }
+        if let Some(value) = patch.log_first_parent {
+            next.log_first_parent = value;
+        }
+        if let Some(value) = patch.log_preview_position {
+            next.log_preview_position = value;
+        }
+        if let Some(value) = patch.update_mode {
+            next.update_mode = value;
+        }
+        if let Some(value) = patch.fetch_tag_mode {
+            next.fetch_tag_mode = value;
+        }
+        if let Some(value) = patch.fetch_automatically {
+            next.fetch_automatically = value;
+        }
+        if let Some(value) = patch.check_remote {
+            next.check_remote = value;
+        }
+        if let Some(value) = patch.auto_update_on_push_rejection {
+            next.auto_update_on_push_rejection = value;
+        }
+        if let Some(value) = patch.push_dialog_on_commit {
+            next.push_dialog_on_commit = value;
+        }
+        if let Some(value) = patch.push_dialog_protected_only {
+            next.push_dialog_protected_only = value;
+        }
+        if let Some(value) = &patch.protected_branches {
+            next.protected_branches = normalize_patterns(value)?;
+        }
         self.settings = next;
         self.persist()?;
         Ok(self.settings.clone())
@@ -451,6 +640,24 @@ impl Registry {
     fn persist(&self) -> Result<()> {
         write_settings(&self.directory, &self.settings)
     }
+}
+
+/// 受保护分支模式：去空白、去空行、拒绝含空白的模式（分支名里没有空格）。
+fn normalize_patterns(values: &[String]) -> Result<Vec<String>> {
+    let mut next = Vec::new();
+    for value in values {
+        let pattern = value.trim();
+        if pattern.is_empty() {
+            continue;
+        }
+        if pattern.chars().any(char::is_whitespace) {
+            return Err(AppError::rejected(format!("受保护分支模式不能包含空白：{pattern}")));
+        }
+        if !next.iter().any(|existing: &String| existing == pattern) {
+            next.push(pattern.to_string());
+        }
+    }
+    Ok(next)
 }
 
 pub fn settings_path(directory: &Path) -> PathBuf {
