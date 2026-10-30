@@ -26,7 +26,7 @@ Status: ready-for-agent
 
 到期令牌在client_for发出业务请求前刷新；访问/刷新令牌与到期时间以同一凭据条目原子轮换，兼容迁移旧独立条目，登出与刷新串行且清理失败明确报错。普通账号配置不含令牌；OAuth刷新禁止重定向，不自动重放业务写请求。设备授权scope沿GitHub App权限模型处理。官方契约与独占测试细节见任务06新增Comments。
 
-`github-auth-cargo-05`顶层1项集成测试通过，包含四个独立子进程的成功轮换/拒绝/刷新令牌过期/重定向场景，各自验证重启与存储、登出失败/恢复和旧版迁移；嵌套harness计数不相加。`github-unit-cargo-01`32项通过（含类型导出），`command-log-unit-cargo-01`通过。前端构建`codex-frontend-build-03`与`codex-x18n-02`exit0，翻译检查0error/69warning。全部原始证据逐轮保留，测试只使用假令牌和独占文件存储/loopback服务，不操作真实用户钥匙串。真实GitHub/系统钥匙串桌面验收仍未进行；M7整体仍未完成。
+`github-auth-cargo-05`顶层1项集成测试通过，包含四个独立子进程的成功轮换/拒绝/刷新令牌过期/重定向场景，成功场景另验证重建GithubState读取及并发复用，各场景验证存储、登出失败/恢复和旧版迁移；嵌套harness计数不相加。`github-unit-cargo-01`32项通过（含类型导出），`command-log-unit-cargo-01`通过。前端构建`codex-frontend-build-03`与`codex-x18n-02`exit0，翻译检查0error/69warning。全部原始证据逐轮保留，测试只使用假令牌和独占文件存储/loopback服务，不操作真实用户钥匙串。真实GitHub/系统钥匙串桌面验收仍未进行；M7整体仍未完成。
 
 ## 版本历史
 
