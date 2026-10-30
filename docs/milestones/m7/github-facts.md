@@ -6,7 +6,7 @@
 
 GitHub 支持 device flow：应用取得验证码，用户在浏览器打开 GitHub 授权页输入验证码，应用取得用户访问令牌。这一流程要求先注册应用获得 `client_id`，并在应用设置中启用 device flow；其令牌交换不需要 `client_secret`。普通 OAuth 网页授权码交换仍列 `client_secret` 为必填，不能因为支持 PKCE 就假定可以省略。来源：[GitHub OAuth 授权文档](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)。
 
-据此，浏览器验证码授权可作为不把 client secret 放进安装包的桌面登录方案。第三轮 Q184 已确认采用 device flow，并提供手动 Token 备用入口；GitHub API 登录与 Q153 的 Git 传输凭据规则分别处理。后续核对了两种 App 的刷新接口，见下节；OAuth App 与 GitHub App 的产品取舍尚未确定。
+据此，浏览器验证码授权可作为不把 client secret 放进安装包的桌面登录方案。第三轮 Q184 已确认采用 device flow，并提供手动 Token 备用入口；GitHub API 登录与 Q153 的 Git 传输凭据规则分别处理。后续核对了两种 App 的刷新接口，见下节；Q193 已选择 GitHub App，device flow 与 Token 备用入口继续按 Q184。
 
 ## 应用类型、权限与续期
 
@@ -14,7 +14,7 @@ GitHub App 可细分权限并选择安装覆盖的仓库；OAuth App 采用 scop
 
 两种 App 的文档均允许 device flow 初次换取令牌时不携带 `client_secret`，刷新接口也明确给出相同例外。GitHub App 默认用户令牌 8 小时、刷新令牌 6 个月；刷新后需保存轮换后的两种令牌，到期后重新授权。当前 OAuth App 文档也包含到期令牌刷新接口，不能用“只有 GitHub App 支持短期令牌”作为选型理由。来源：[GitHub App 刷新](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens#refreshing-a-user-access-token-with-a-refresh-token)、[OAuth App 刷新](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#refreshing-an-access-token-with-a-refresh-token)。
 
-据这些接口要求，device flow 的续期不强制 Revia 携带应用密钥或自建认证中转；这是文档推论，未做真实授权验证。App 类型仍待用户选择：较宽授权、较低安装门槛的 OAuth App，或精细权限、需要安装覆盖的 GitHub App。
+据这些接口要求，device flow 的续期不强制 Revia 携带应用密钥或自建认证中转；这是文档推论，未做真实授权验证。Q193 已选择精细权限、需要安装覆盖的 GitHub App；仍需真实注册与授权验证。
 
 ## PR 操作事实与待定范围
 

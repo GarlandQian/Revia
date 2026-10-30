@@ -1,6 +1,6 @@
 # 技术方向
 
-更新日期：2026-10-30。状态：M6 已合入 main；M7 第 1 步访谈中，已核对 GitHub 登录、Actions 打包与 Liquid Glass 材质候选；尚未实施这些功能。
+更新日期：2026-10-30。状态：M6 已合入 main；M7 访谈已确认，进入实施准备，已核对 GitHub 登录、Actions 打包与 Liquid Glass 材质候选；尚未实施这些功能。
 
 ## 已确认的选择
 
@@ -39,7 +39,7 @@ Git 执行：Rust 层调用系统 Git CLI
 
 Q189、Q190 确认新的外观方向与代码清晰度要求。材质变量与编辑器颜色分别管理：玻璃背景只影响装饰层，不能把文字、行号、选区或 diff 标记一起送入滤镜；代码区保留稳定的底色。Base UI 继续负责既有弹层定位、焦点与键盘行为。
 
-React Bits 的 GlassSurface 是按需引入的候选。当前源码有 SVG、WebGL2 和磨砂降级路径；WebGL 的 backdrop 只接受图片、视频或 canvas，不能自动折射任意 DOM。实际 WKWebView 与 Windows WebView2 的效果、滚动性能和降级状态分别验证，不以 Chromium 预览或标题栏 Overlay 作为证明。接入点、源码散列与许可说明见 [M7 Liquid Glass 核对](./milestones/m7/liquid-glass.md)；本轮未添加产品依赖。
+Q199 确认优先复用 React Bits 的 Glass Surface、Specular Button 与 Glass Icons；第四版已实际接入这三种组件，产品实现沿该外观。当前源码有 SVG、WebGL2 和磨砂降级路径；WebGL 的 backdrop 只接受图片、视频或 canvas，不能自动折射任意 DOM。实际 WKWebView 与 Windows WebView2 的效果、滚动性能和降级状态分别验证，不以 Chromium 预览或标题栏 Overlay 作为证明。接入点、源码散列与许可说明见 [M7 Liquid Glass 核对](./milestones/m7/liquid-glass.md)；本轮未添加产品依赖。
 
 Q191 在设计阶段就要求考虑 Windows。共享语义颜色、信息密度与业务组件；窗口按钮、菜单、字体、修饰键、系统缩放和材质能力由平台适配层处理。当前 Windows 使用原生标题栏，不能为了玻璃外观直接移除它而丢失系统拖动、最大化或贴靠行为。Mica / Acrylic 是 Windows 原生材质的参照，不把 CSS 预览称为这些原生效果已接入；透明关闭与高对比度下的稳定底色也须验证。
 
