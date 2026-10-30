@@ -1,6 +1,6 @@
 # M7 分发与更新：官方事实核对
 
-核对日期：2026-10-30。产品决定见 Q62、Q63、Q65、Q181、Q182；本文件记录技术事实，不另行决定发布方式。
+核对日期：2026-10-30。产品决定见 Q62、Q63、Q65、Q181、Q182、Q188；本文件记录技术事实，不另行决定发布方式。
 
 ## 没有 Apple 证书时的路径
 
@@ -12,7 +12,7 @@ Apple 的应用代码签名、公证是独立流程。缺少这套身份验证�
 
 Tauri 官方提供通过 `tauri-action` 在 GitHub Actions 构建、上传产物及创建 GitHub Release 的流程，支持版本标签触发，也提供 Release 草稿配置。官方多平台示例不改变 Revia 的平台范围；本轮不锁定示例中 action 的版本，也未执行发布。[官方 GitHub Actions 指南](https://v2.tauri.app/distribute/pipelines/github/)
 
-Revia 沿 Q62 在 main 推送时只检查，在版本标签时生成分发包。M7 只发布 macOS Apple Silicon，Windows 发布在 M8；Release 是否自动公开尚未确认。已有 `.github/workflows/compile-check.yml` 仅编译检查，没有安装包上传或发布步骤。
+Revia 沿 Q62 在 main 推送时只检查，在版本标签时生成分发包。M7 只发布 macOS Apple Silicon，Windows 发布在 M8。第二轮 Q188 已确认先生成带安装包的 Release 草稿，确认后公开，公开后客户端才收到更新。已有 `.github/workflows/compile-check.yml` 仅编译检查，没有安装包上传或发布步骤。
 
 更新产物与用户下载的 `.dmg` 不同：官方 updater 为 macOS 生成 `.app.tar.gz` 与相应 `.sig`。Revia 的具体更新产物命名在实现时确定，安装包仍沿 Q65 命名。下载与安装可以分开调用，支持 Q181 由用户确认下载、处理当前工作后再安装的交互。[Tauri updater 官方文档](https://v2.tauri.app/plugin/updater/)
 

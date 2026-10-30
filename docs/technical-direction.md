@@ -131,7 +131,7 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 - 应用标识（Tauri `identifier`）为 `io.github.garlandqian.revia`，数据目录随之为 `~/Library/Application Support/io.github.garlandqian.revia/`（Q49）。签名、公证和自动更新都使用这个标识，更改需要迁移用户数据。
 - 目标平台：macOS Apple Silicon（arm64）与 Windows x64；不做 Intel Mac、ARM 版 Windows 和 Linux，见 [ADR-0007](./adr/0007-target-platforms.md)。首版只发布 macOS，Windows 在 M8（Q55、Q126）。
 - **构建**：GitHub Actions 分别在 macOS（Apple Silicon）与 Windows 机器上构建，不在 Mac 上交叉编译 Windows 版。推送到 main 时只做编译检查（从 M2 起包括 Windows）；打版本标签才生成安装包和便携包（Q62）。本机开发仍可用 Homebrew 安装的 Rust 构建 macOS 版。
-- **M7 打包**：Q182 重申使用 GitHub Actions；M7 的发布产物只覆盖 macOS Apple Silicon，Windows 发布仍在 M8，现有 Windows 编译检查保留。当前只有 [compile-check.yml](../.github/workflows/compile-check.yml)，没有分发包上传或应用更新发布链路。是否先生成 Release 草稿仍待访谈，本轮只记录设计。
+- **M7 打包**：Q182 重申使用 GitHub Actions；M7 的发布产物只覆盖 macOS Apple Silicon，Windows 发布仍在 M8，现有 Windows 编译检查保留。版本标签触发打包后先生成带安装包的 Release 草稿，确认后公开；只有公开版本进入客户端的相应更新渠道（Q188）。当前只有 [compile-check.yml](../.github/workflows/compile-check.yml)，没有分发包上传或应用更新发布链路，本轮只记录设计。
 - **M2 验收授权**：允许给 `m2` 增加仅编译、不发布的 CI 入口，并在 M2 验收期间按需将 `m2` 正常推送到现有 `origin`，取得真实 Windows x64 编译结果；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包（Q97）。工作流文件存在不等于已经编译通过。
 - **Windows 安装版**：NSIS 生成的 `.exe` 安装程序，默认只为当前用户安装、不需要管理员权限；不做 MSI（Q57）。
 - **Windows 便携版**：同时提供单个 exe 和 zip，zip 内是一个 `Revia` 文件夹（Q66）；解压即用；设置、回收区、审阅标记等数据放在 exe 旁边的 `data` 文件夹，不写用户目录和注册表；目录不可写时提示用户把程序移到可写的位置；依赖系统自带的 WebView2；不自动更新，只提示新版本（Q58）。
@@ -149,7 +149,12 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 - **Apple 代码签名与公证**：用户没有 Apple 证书，沿 Q63 暂不做 Apple 开发者代码签名和公证，不以购买证书作为 M7 打包前提（Q182）。这种试用分发仍可能触发 macOS 首次打开的安全提示；保留首次打开说明与真实下载后的启动验收。Windows 暂不签名的原决定也不变，正式签名在首版完成后再评估。
 - **应用更新**：试用阶段使用 Tauri updater，从 GitHub Releases 获取新版本，启动时检查。默认稳定版，预发布版由用户主动开启；确认后下载与安装，安装前处理未保存编辑、Git 写入和终端会话，再确认重启（Q41、Q181）。不静默更新。
 - **更新包签名**：Tauri updater 要求校验签名，不能关闭；用 Tauri CLI 自行生成公私钥，公钥随应用分发，私钥供打包端签署更新包。它不需要 Apple 证书，也不代替 Apple 代码签名和公证（Q182）。CI 中使用 GitHub Actions 的 secret 注入更新签名密钥，私钥不进源码、安装包或日志；具体接线在 M7 实施。官方核对与来源见 [M7 分发事实](./milestones/m7/distribution-facts.md)。
-- **诊断导出**：不收集遥测，不联网上报。用户通过“帮助 → 导出诊断信息”手动导出，默认只含当前仓库相关日志与环境信息；路径、远端地址、作者邮箱等默认脱敏，导出前预览，始终排除文件正文和 diff（Q42、Q180）。现有 Git 命令日志的 stdout/stderr 可能含文件内容或 diff，不能仅凭既有凭据打码就原样导出；日志持久化与保留期限仍待访谈。
+- **诊断导出**：不收集遥测，不联网上报。用户通过“帮助 → 导出诊断信息”手动导出，默认只含当前仓库相关日志与环境信息；路径、远端地址、作者邮箱等默认脱敏，导出前预览（Q42、Q180）。跨重启记录仅保存脱敏的操作摘要与错误信息，保留 7 天，可手动清空；排除文件正文、diff、终端输入输出（Q187）。现有 Git 命令日志的 stdout/stderr 可能含文件内容或 diff，不能仅凭既有凭据打码就原样持久化或导出；错误信息的提取同样遵守这些排除规则。
+
+## M7 已确认的数据边界
+
+- 未保存编辑自动保存为本机编辑草稿，重启或崩溃后供恢复；草稿持久化不等于写回工作区。磁盘文件已变化时保留两版供对比，不自动覆盖；显式保存仍须执行 Q122 的写前校验（Q186）。
+- GitHub 保护同步只读取得现有分支的保护状态，与用户本地保护列表取并集；失败保留上次成功结果并标记可能过期，不把错误或不完整响应当作空集合，不修改远端规则（Q185）。账号和 API 认证方案仍待 Q183、Q184 确认。
 
 ## 尚未确认的配套
 
