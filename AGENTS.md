@@ -17,7 +17,7 @@ M6“冲突与历史、双语界面”已于 2026-10-30 压成一个提交合入
 
 审查按 Q174：首轮全范围两轴审查之后只审增量，真实桌面验收不必等审查零发现；P3 与构造场景的边界问题记 backlog。M4、M5 遗留（Q98 长测、统一视图首次跳转、未做完的桌面验收）在 `docs/milestones/backlog/` 04–06，M6 验收转出的观察在 09–14，都不属于 M7 范围，除非用户在第 1 步中纳入。
 
-布局与交互照本机 Rebased 1.1.22，M7 外观改为 Liquid Glass，代码与 diff 清晰度优先（Q189、Q190）。修改材质、颜色主题或代码显示时，读 [UI 方向](docs/ui-direction.md#视觉风格)；VS Code 颜色主题、代码字体与图标体系继续沿用。安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
+布局与交互照本机 Rebased 1.1.22，M7 外观改为 Liquid Glass，代码与 diff 清晰度优先（Q189、Q190）。修改材质、颜色主题或代码显示时，读 [UI 方向](docs/ui-direction.md#视觉风格)，同时考虑 macOS 与 Windows 外壳（Q191）；VS Code 颜色主题、代码字体与图标体系继续沿用。安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
 
 M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
