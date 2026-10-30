@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-platform="windows">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revia · Liquid Glass 最终候选 · macOS / Windows</title>
+  <link rel="stylesheet" href="../../m4/mockups/codicon.css">
+  <style>
+    @font-face { font-family: "JetBrains Mono"; src: url("./fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+    * { box-sizing: border-box; }
+    :root {
+      color-scheme: dark;
+      --desktop: #192128; --desk-ink: #d9e0e6; --desk-muted: #b0bdc8;
+      --shell: #282f37d9; --shell-solid: #2b3139; --shell-tint: #4e5a6260;
+      --side: #272e3780; --rail: #232a3270; --surface: #3039437d;
+      --ink: #e0e5eb; --muted: #b2bcc8; --line: #abbcc52b; --edge: #d2e1e958;
+      --shine: #f2faff56; --hover: #b6c5d217; --selected: #729fc52b; --accent: #a1c9ee;
+      --code-bg: #282c34; --code: #dce0e8; --code-muted: #abb4c3;
+      --kw: #d0a4e6; --str: #afd89d; --fn: #91c8f2; --type: #edc696;
+      --green: #abd6b5; --red: #efafb7; --green-bg: #2c3d34; --red-bg: #422e36;
+      --input: #202730a8; --button: #d5e6f3; --button-ink: #172b3d;
+      --popover: #323a44e8; --shadow: #02080d64; --scroll: #a0b1c559;
+      --ui-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", sans-serif;
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --desktop: #d4dde1; --desk-ink: #283944; --desk-muted: #50636f;
+      --shell: #edf3f4d4; --shell-solid: #edf1f4; --shell-tint: #ffffff83;
+      --side: #edf1f480; --rail: #e3e9ee52; --surface: #ffffff61;
+      --ink: #293542; --muted: #556474; --line: #354d6426; --edge: #ffffffe6;
+      --shine: #ffffffed; --hover: #748ba519; --selected: #8cb5d82d; --accent: #245c8e;
+      --code-bg: #f8f9fb; --code: #273749; --code-muted: #526175;
+      --kw: #803e9b; --str: #3d6636; --fn: #1a6292; --type: #7b581d;
+      --green: #346d44; --red: #a23d52; --green-bg: #e7f1e9; --red-bg: #f9e7eb;
+      --input: #ffffffba; --button: #355e7e; --button-ink: #ffffff;
+      --popover: #f5f8fbef; --shadow: #35434e36; --scroll: #5f718854;
+    }
+    html[data-platform="windows"] { --ui-font: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", -apple-system, sans-serif; }
+    body { margin: 0; min-width: 620px; min-height: 620px; padding: 0 32px; height: 100vh; overflow: hidden; background: var(--desktop); color: var(--ink); font: 13px/1.45 var(--ui-font); }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    button { border: 0; background: transparent; }
+    .codicon { font-size: 16px; flex-shrink: 0; }
+    .spacer { flex: 1; min-width: 0; }
+    .muted { color: var(--muted); }
+    .desktop-art { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 5% 12%,#a2c8cb32,transparent 60%),radial-gradient(ellipse at 95% 78%,#adb9cc29,transparent 55%); }
+    .desktop-art::before { content: ""; position: absolute; width: 78vw; height: 135vh; left: -25vw; top: -50vh; border: 1px solid #eefaff25; border-radius: 50%; transform: rotate(-37deg); background: linear-gradient(143deg,transparent 35%,#c1d7dc19 48%,#d6e4e92a 50%,transparent 54%); box-shadow: 12px 1px 32px #0000000a; }
+    .desktop-art::after { content: ""; position: absolute; width: 110vw; height: 110vh; right: -55vw; bottom: -68vh; border: 1px solid #d9e9ff21; border-radius: 50%; transform: rotate(-26deg); background: linear-gradient(130deg,transparent,#c4d7e522 58%,transparent 60%); }
+    .preview-bar { position: relative; display: flex; align-items: center; gap: 14px; height: 70px; max-width: 1560px; margin: auto; color: var(--desk-ink); }
+    .brand { font-size: 18px; font-weight: 650; letter-spacing: -.6px; }
+    .study { font-size: 11px; color: var(--desk-muted); }
+    .preview-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+    .switcher { display: flex; gap: 1px; padding: 3px; background: #73889b17; border: 1px solid #91a9ba30; border-radius: 7px; }
+    .switcher button { border-radius: 4px; padding: 4px 9px; min-height: 26px; color: var(--desk-muted); font-size: 11px; }
+    .switcher button[aria-pressed="true"] { color: var(--desk-ink); background: #c6d5dd30; box-shadow: inset 0 1px #fffffff0,0 1px 2px #00000010; }
+    html[data-theme="dark"] .switcher button[aria-pressed="true"] { box-shadow: inset 0 1px #ffffff24,0 1px 2px #00000018; }
+    .preview-controls label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--desk-muted); white-space: nowrap; }
+    .preview-controls select { border: 1px solid #91a9ba40; border-radius: 4px; padding: 3px 4px; background: var(--desktop); font-size: 11px; }
+    .preview-controls input { accent-color: var(--accent); }
+    .app-window { --scale: 1; container-type: inline-size; position: relative; display: flex; flex-direction: column; height: calc((100vh - 113px) / var(--scale)); width: 100%; max-width: calc(1560px / var(--scale)); margin: auto; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; background: var(--shell); box-shadow: 0 24px 65px var(--shadow), 0 1px 4px #00000019, inset 0 1px 0 var(--shine); backdrop-filter: blur(34px) saturate(1.05); -webkit-backdrop-filter: blur(34px) saturate(1.05); zoom: var(--scale); }
+    .app-window::after { content: ""; position: absolute; z-index: 15; inset: 0; pointer-events: none; border-radius: inherit; box-shadow: inset 1px 0 0 #ffffff1a,inset -1px 0 0 #ffffff14,inset 0 1px 0 var(--shine); }
+    html[data-platform="windows"] .app-window { border-radius: 8px; }
+    .windows-caption { display: none; height: 32px; flex-shrink: 0; align-items: center; padding-left: 13px; background: var(--shell-tint); }
+    html[data-platform="windows"] .windows-caption { display: flex; }
+    .app-mark { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 4px; background: var(--accent); color: var(--shell-solid); font-size: 11px; font-weight: 600; }
+    .caption-title { font-size: 12px; margin-left: 9px; }
+    .window-buttons { height: 100%; display: flex; margin-left: auto; }
+    .window-buttons span { display: grid; place-items: center; width: 46px; height: 100%; }
+    .window-buttons .codicon { font-size: 10px; }
+    .windows-menu { display: none; flex-shrink: 0; gap: 0; align-items: center; height: 26px; padding: 0 9px; background: var(--shell-tint); }
+    html[data-platform="windows"] .windows-menu { display: flex; }
+    .windows-menu span { padding: 2px 8px; font-size: 12px; }
+    .main-toolbar { display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 13px; flex-shrink: 0; background: linear-gradient(180deg,var(--shell-tint),transparent); border-bottom: 1px solid var(--line); }
+    html[data-platform="windows"] .main-toolbar { height: 44px; }
+    .traffic-lights { display: flex; gap: 8px; width: 59px; margin-right: 4px; flex-shrink: 0; }
+    html[data-platform="windows"] .traffic-lights { display: none; }
+    .traffic-lights i { width: 11px; height: 11px; background: #ff6058; border-radius: 50%; box-shadow: inset 0 0 0 1px #0000000b; }
+    .traffic-lights i:nth-child(2) { background: #ffbd2f; } .traffic-lights i:nth-child(3) { background: #29c840; }
+    .toolbar-item { display: inline-flex; gap: 8px; align-items: center; min-width: 0; height: 29px; padding: 0 7px; border-radius: 5px; white-space: nowrap; }
+    .toolbar-item span { overflow: hidden; text-overflow: ellipsis; }
+    .toolbar-item strong { font-weight: 600; }
+    .toolbar-item.branch { background: var(--surface); border: 1px solid var(--line); max-width: 290px; }
+    .toolbar-item.branch .codicon { color: var(--muted); }
+    .toolbar-item .codicon-chevron-down { font-size: 11px; color: var(--muted); }
+    .toolbar-item.action { color: var(--muted); font-size: 12px; }
+    .toolbar-separator { height: 15px; width: 1px; background: var(--line); margin: 0 4px; }
+    .icon-button { display: inline-grid; place-items: center; border-radius: 4px; width: 28px; height: 28px; color: var(--muted); flex-shrink: 0; }
+    button.icon-button:hover, button.toolbar-item:hover { background: var(--hover); }
+    .workspace { display: grid; flex: 1; min-height: 0; grid-template-columns: 43px 254px minmax(0,1fr); }
+    .tool-rail { display: flex; flex-direction: column; align-items: center; padding: 7px 0 6px; background: var(--rail); border-right: 1px solid var(--line); }
+    .tool-rail .rail-icon { position: relative; display: grid; place-items: center; width: 33px; height: 35px; margin-bottom: 8px; border-radius: 5px; color: var(--muted); }
+    .tool-rail .codicon { font-size: 19px; }
+    .tool-rail .active { color: var(--ink); background: var(--selected); box-shadow: inset 0 1px #ffffff1f; }
+    .tool-rail .active::before { content: ""; position: absolute; left: -5px; top: 9px; height: 17px; width: 2px; background: var(--accent); border-radius: 2px; }
+    .side-panel { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--side); }
+    .side-heading { height: 40px; flex-shrink: 0; display: flex; align-items: stretch; padding: 0 9px; gap: 13px; border-bottom: 1px solid var(--line); }
+    .side-tab { display: flex; align-items: center; color: var(--muted); position: relative; font-size: 12px; }
+    .side-tab.active { color: var(--ink); font-weight: 550; }
+    .side-tab.active::after { content: ""; position: absolute; height: 2px; bottom: -1px; left: 0; right: 0; background: var(--accent); }
+    .side-heading .icon-button { margin: auto -4px auto 0; }
+    .change-list { flex: 1; min-height: 90px; overflow: auto; padding: 6px 6px 10px; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+    .file-group { display: flex; align-items: center; gap: 5px; height: 29px; padding: 0 4px; color: var(--muted); font-size: 11px; }
+    .file-group .codicon { font-size: 13px; }
+    .count { font-size: 11px; min-width: 16px; margin-left: auto; text-align: center; }
+    .file { position: relative; display: flex; align-items: center; width: 100%; gap: 7px; height: 29px; border-radius: 4px; padding: 0 7px 0 18px; white-space: nowrap; }
+    .file img { width: 15px; height: 15px; flex-shrink: 0; }
+    .file .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+    .file .dir { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+    .file .codicon { color: var(--muted); font-size: 13px; margin-left: auto; }
+    .file.selected { background: var(--selected); box-shadow: inset 0 0 0 1px var(--line); }
+    .file.modified .name { color: var(--accent); }
+    .file.added .name { color: var(--green); }
+    .commit-panel { position: relative; flex-shrink: 0; max-height: calc(100% - 156px); overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); padding: 10px 11px 11px; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+    .commit-header { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; min-height: 24px; }
+    .amend { display: flex; gap: 7px; align-items: center; color: var(--muted); font-size: 11px; min-width: 0; }
+    .amend span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .amend input { margin: 0; accent-color: var(--accent); flex-shrink: 0; }
+    .recent-button { width: 24px; height: 24px; margin-left: auto; }
+    .commit-message { width: 100%; min-height: 92px; height: 100px; max-height: 180px; padding: 8px; resize: vertical; display: block; border: 1px solid var(--line); border-radius: 4px; background: var(--input); font-size: 12px; line-height: 19px; }
+    .commit-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; color: var(--muted); font-size: 10px; min-height: 16px; font-variant-numeric: tabular-nums; }
+    .commit-meta span:last-child { margin-left: auto; }
+    .commit-actions { margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+    .commit-button { display: inline-flex; flex: 1; min-width: 0; align-items: center; justify-content: center; gap: 6px; height: 29px; padding: 0 8px; border: 1px solid #ffffff1b; border-radius: 5px; background: var(--button); color: var(--button-ink); box-shadow: inset 0 1px #ffffff40,0 1px 2px #00000015; font-size: 12px; white-space: nowrap; }
+    .commit-button:hover { box-shadow: inset 0 1px #ffffff55,0 2px 4px #00000020; }
+    .commit-button kbd { font: 10px var(--ui-font); opacity: .85; }
+    .commit-button .codicon { font-size: 13px; }
+    .review-progress { margin: 8px 1px 0; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 11px; }
+    .review-progress .codicon { font-size: 13px; }
+    .commit-popup { position: absolute; z-index: 20; width: 280px; max-width: calc(100% - 16px); padding: 6px; border: 1px solid var(--edge); border-radius: 7px; background: var(--popover); color: var(--ink); box-shadow: 0 12px 28px var(--shadow),inset 0 1px var(--shine); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px); }
+    .commit-popup[hidden] { display: none; }
+    .recent-item { display: block; width: 100%; padding: 7px 8px; text-align: left; border-radius: 4px; font-size: 12px; }
+    .recent-item:hover { background: var(--hover); }
+    .commit-option { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; font-size: 12px; }
+    .commit-option input { margin: 3px 0 0; accent-color: var(--accent); }
+    .commit-option small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .editor { display: flex; min-width: 0; min-height: 0; flex-direction: column; background: var(--code-bg); }
+    .editor-tabs { height: 40px; display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: color-mix(in srgb,var(--code-bg) 68%,var(--shell-solid)); flex-shrink: 0; }
+    .editor-tab { display: flex; align-items: center; gap: 7px; padding: 0 14px; color: var(--muted); font-size: 12px; border-right: 1px solid var(--line); }
+    .editor-tab img { height: 15px; width: 15px; }
+    .editor-tab .codicon { font-size: 13px; }
+    .editor-tab.active { position: relative; background: var(--code-bg); color: var(--ink); }
+    .editor-tab.active::before { content: ""; position: absolute; left: 13px; right: 13px; bottom: -1px; height: 2px; background: var(--accent); }
+    .editor-tabs > .icon-button { margin: auto 5px auto auto; }
+    .diff-toolbar { display: flex; gap: 8px; align-items: center; padding: 0 12px; height: 35px; flex-shrink: 0; background: color-mix(in srgb,var(--code-bg) 90%,var(--shell-solid)); border-bottom: 1px solid var(--line); }
+    .breadcrumb { display: flex; gap: 7px; min-width: 0; align-items: center; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
+    .breadcrumb span { overflow: hidden; text-overflow: ellipsis; }
+    .breadcrumb .codicon { font-size: 11px; }
+    .diff-mode { color: var(--muted); font-size: 11px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .diff-mode .codicon { font-size: 13px; }
+    .review-button { flex-shrink: 0; display: flex; align-items: center; gap: 5px; border-radius: 4px; height: 25px; padding: 0 7px; border: 1px solid var(--line); background: var(--hover); font-size: 11px; white-space: nowrap; }
+    .review-button .codicon { font-size: 13px; }
+    .version-labels { flex-shrink: 0; height: 29px; display: grid; grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr); align-items: center; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+    .version-labels > span { padding: 0 15px; }
+    .version-labels .stats { text-align: center; padding: 0; font-size: 10px; }
+    .added-count { color: var(--green); } .removed-count { color: var(--red); }
+    .diff-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; background: var(--code-bg); }
+    .diff { display: grid; grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr); grid-template-rows: max-content; min-height: 100%; }
+    .code-pane { overflow-x: auto; padding: 13px 0 24px; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+    .code-row { height: 23px; min-width: max-content; padding: 0 16px; white-space: pre; font: 400 13px/23px "JetBrains Mono",Consolas,monospace; color: var(--code); }
+    .code-row.add { background: var(--green-bg); box-shadow: inset 2px 0 var(--green); }
+    .code-row.remove { background: var(--red-bg); box-shadow: inset -2px 0 var(--red); }
+    .kw { color: var(--kw); } .str { color: var(--str); } .fn { color: var(--fn); } .type { color: var(--type); } .comment { color: var(--code-muted); }
+    .gutter { position: relative; padding: 13px 4px 24px; display: flex; justify-content: space-between; border-left: 1px solid var(--line); border-right: 1px solid var(--line); overflow: hidden; background: var(--code-bg); }
+    .line-numbers { position: relative; z-index: 1; }
+    .line-numbers span { display: block; width: 22px; height: 23px; font: 400 10px/23px "JetBrains Mono",monospace; color: var(--code-muted); text-align: center; }
+    .connections { position: absolute; left: 0; right: 0; top: 13px; width: 100%; height: 760px; pointer-events: none; }
+    .gutter-action { position: absolute; z-index: 2; left: 50%; margin-left: -9px; width: 18px; height: 20px; padding: 0; font-size: 13px; color: var(--green); background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; text-align: center; }
+    .editor-status { height: 25px; flex-shrink: 0; display: flex; align-items: center; gap: 13px; padding: 0 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+    .window-status { display: flex; align-items: center; gap: 12px; height: 25px; flex-shrink: 0; padding: 0 12px; background: var(--side); border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+    .window-status .codicon { font-size: 12px; margin-right: 4px; vertical-align: -2px; }
+    .window-status .ready { color: var(--green); }
+    .popover { position: absolute; top: 52px; right: 9px; z-index: 10; width: 257px; padding: 6px; border: 1px solid var(--edge); border-radius: 9px; background: var(--popover); box-shadow: 0 12px 28px var(--shadow),inset 0 1px var(--shine); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px); }
+    html[data-platform="windows"] .popover { top: 104px; border-radius: 7px; }
+    .popover[hidden] { display: none; }
+    .popover-title { padding: 6px 8px 9px; color: var(--muted); font-size: 11px; }
+    .popover-row { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 4px; font-size: 12px; }
+    .popover-row.chosen { background: var(--hover); }
+    .popover-row .codicon { font-size: 14px; color: var(--muted); }
+    .popover-row small { margin-left: auto; color: var(--muted); font-size: 10px; }
+    .popover-rule { height: 1px; background: var(--line); margin: 6px 2px; }
+    .preview-footer { position: relative; max-width: 1560px; margin: 12px auto 0; display: flex; gap: 12px; color: var(--desk-muted); font-size: 10px; }
+    .preview-footer span:last-child { margin-left: auto; }
+    html[data-transparency="reduced"] .app-window { background: var(--shell-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    html[data-transparency="reduced"] .popover,html[data-transparency="reduced"] .commit-popup { background: var(--shell-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    @media(prefers-reduced-transparency: reduce) { .app-window,.popover,.commit-popup { background: var(--shell-solid); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+    @media(prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none!important; transition: none!important; } }
+    @media(forced-colors: active) {
+      .desktop-art { display: none; }
+      .app-window,.editor,.diff-scroll,.gutter,.popover,.commit-popup { forced-color-adjust: auto; background: Canvas; color: CanvasText; backdrop-filter: none; box-shadow: none; }
+      .code-row,.line-numbers span,.kw,.str,.fn,.type,.comment { color: CanvasText; }
+      .code-row.add { border-left: 3px solid LinkText; box-shadow: none; }
+      .code-row.remove { border-right: 3px dashed LinkText; box-shadow: none; }
+      .file.selected,.tool-rail .active { border: 1px solid Highlight; }
+      .commit-button,.review-button { border: 1px solid ButtonText; }
+      .connections { display: none; }
+    }
+    @media(max-width:1120px) { body { padding: 0 16px; } .study { display: none; } .preview-controls { gap: 8px; } }
+    @media(max-width:800px) { body { padding: 0 9px; } .preview-controls { gap: 5px; } .preview-controls .transparency-label { display: none; } }
+    @container(max-width:1120px) { .workspace { grid-template-columns: 41px 218px minmax(0,1fr); } .file .dir { display: none; } .toolbar-item.action .action-label { display: none; } .editor-tab.secondary { display: none; } }
+    @container(max-width:800px) { .commit-button kbd { display: none; } .workspace { grid-template-columns: 38px 184px minmax(0,1fr); } .diff-mode { display: none; } .main-toolbar { gap: 3px; padding: 0 7px; } .version-labels,.diff { grid-template-columns: minmax(0,1fr) 60px minmax(0,1fr); } .file { padding-left: 8px; } }
+  </style>
+</head>
+<body>
+  <div class="desktop-art" aria-hidden="true"></div>
+  <header class="preview-bar"><span class="brand">Revia</span><span class="study">Glass study 03 · 最终候选</span><div class="preview-controls">
+    <div class="switcher" aria-label="预览平台"><button data-platform="macos" aria-pressed="false">macOS</button><button data-platform="windows" aria-pressed="true">Windows</button></div>
+    <div class="switcher" aria-label="预览明暗"><button data-theme="light" aria-pressed="false">浅色</button><button data-theme="dark" aria-pressed="true">深色</button></div>
+    <label>缩放 <select id="scale"><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select></label>
+    <label class="transparency-label"><input type="checkbox" id="reduce-transparency">降低透明度</label>
+  </div></header>
+  <section class="app-window" aria-label="Revia 连贯玻璃设计提案">
+    <header class="windows-caption"><span class="app-mark">R</span><span class="caption-title">Revia</span><div class="window-buttons" aria-label="Windows 窗口按钮示意"><span title="最小化"><i class="codicon codicon-chrome-minimize"></i></span><span title="最大化"><i class="codicon codicon-chrome-maximize"></i></span><span title="关闭"><i class="codicon codicon-chrome-close"></i></span></div></header>
+    <nav class="windows-menu" aria-label="Windows 原生菜单位置示意"><span>文件</span><span>编辑</span><span>仓库</span><span>提交</span><span>视图</span><span>窗口</span><span>帮助</span></nav>
+    <header class="main-toolbar">
+      <div class="traffic-lights" aria-label="macOS 窗口按钮示意"><i></i><i></i><i></i></div>
+      <span class="toolbar-item"><span class="app-mark">R</span><strong>Revia</strong><i class="codicon codicon-chevron-down"></i></span>
+      <span class="toolbar-item branch" title="feature/keep-selection"><i class="codicon codicon-git-branch"></i><span>feature/keep-selection</span><i class="codicon codicon-chevron-down"></i></span>
+      <span class="spacer"></span>
+      <span class="toolbar-item action" title="更新"><i class="codicon codicon-arrow-down"></i><span class="action-label">更新</span></span><span class="toolbar-item action" title="推送"><i class="codicon codicon-arrow-up"></i><span class="action-label">推送</span></span>
+      <span class="toolbar-separator"></span><span class="icon-button" title="搜索"><i class="codicon codicon-search"></i></span><button class="icon-button" id="settings" title="显示外观浮层" aria-label="显示外观浮层" aria-expanded="false" aria-controls="appearance"><i class="codicon codicon-settings-gear"></i></button>
+    </header>
+    <div class="workspace">
+      <nav class="tool-rail" aria-label="工具窗口示意"><span class="rail-icon active" title="提交"><i class="codicon codicon-source-control"></i></span><span class="rail-icon" title="日志"><i class="codicon codicon-history"></i></span><span class="rail-icon" title="GitHub PR"><i class="codicon codicon-git-pull-request"></i></span><span class="spacer"></span><span class="rail-icon" title="终端"><i class="codicon codicon-terminal"></i></span></nav>
+      <aside class="side-panel">
+        <header class="side-heading"><span class="side-tab active">提交</span><span class="side-tab">回收区</span><span class="spacer"></span><span class="icon-button" title="刷新"><i class="codicon codicon-refresh"></i></span><span class="icon-button" title="查看选项"><i class="codicon codicon-ellipsis"></i></span></header>
+        <div class="change-list">
+          <div class="file-group"><i class="codicon codicon-chevron-down"></i>已暂存<span class="count">2</span></div>
+          <div class="file added"><img src="../../m4/mockups/icons/typescript.svg" alt=""><span class="name">selection.ts</span><span class="dir">src/lib</span><i class="codicon codicon-pass"></i></div>
+          <div class="file modified"><img src="../../m4/mockups/icons/typescript.svg" alt=""><span class="name">snapshot.ts</span><i class="codicon codicon-pass"></i></div>
+          <div class="file-group"><i class="codicon codicon-chevron-down"></i>未暂存<span class="count">4</span></div>
+          <div class="file modified selected"><img src="../../m4/mockups/icons/typescript.svg" alt=""><span class="name">selection.ts</span><span class="spacer"></span><i class="codicon codicon-add"></i></div>
+          <div class="file modified"><img src="../../m4/mockups/icons/react_ts.svg" alt=""><span class="name">ChangeList.tsx</span><i class="codicon codicon-pass"></i></div>
+          <div class="file modified"><img src="../../m4/mockups/icons/react_ts.svg" alt=""><span class="name">App.tsx</span><span class="dir">src</span></div>
+          <div class="file modified"><img src="../../m4/mockups/icons/markdown.svg" alt=""><span class="name">README.md</span></div>
+          <div class="file-group"><i class="codicon codicon-chevron-right"></i>未跟踪<span class="count">1</span></div>
+        </div>
+        <section class="commit-panel" aria-label="提交区">
+          <div class="commit-header"><label class="amend"><input id="amend" type="checkbox"><span>修改上一次提交</span></label><button type="button" class="icon-button recent-button" id="recent-messages" title="最近提交信息" aria-label="最近提交信息" aria-expanded="false" aria-controls="recent-menu"><i class="codicon codicon-history"></i></button></div>
+          <textarea class="commit-message" id="commit-message" aria-label="示例提交信息" spellcheck="false">保留刷新后的文件选择</textarea>
+          <div class="commit-meta"><span id="commit-count">11 / 50</span><span id="commit-mode"></span></div>
+          <div class="commit-actions">
+            <button type="button" class="commit-button" id="commit-submit" title="提交 (Ctrl+K)"><i class="codicon codicon-check"></i><span>提交</span><kbd data-shortcut="commit">Ctrl+K</kbd></button>
+            <button type="button" class="icon-button" id="commit-push" title="提交并推送 (Ctrl+Alt+K)" aria-label="提交并推送"><i class="codicon codicon-cloud-upload"></i></button>
+            <button type="button" class="icon-button" id="commit-options" title="提交选项" aria-label="提交选项" aria-expanded="false" aria-controls="commit-options-menu"><i class="codicon codicon-settings-gear"></i></button>
+          </div>
+          <div class="review-progress"><i class="codicon codicon-pass"></i><span id="review-progress">已审阅 3 / 6</span></div>
+        </section>
+      </aside>
+      <main class="editor">
+        <header class="editor-tabs"><span class="editor-tab secondary"><i class="codicon codicon-git-commit"></i>提交日志</span><span class="editor-tab active"><img src="../../m4/mockups/icons/typescript.svg" alt="">selection.ts<i class="codicon codicon-close"></i></span><span class="icon-button" title="编辑器布局"><i class="codicon codicon-split-horizontal"></i></span></header>
+        <div class="diff-toolbar"><span class="breadcrumb" title="src / lib / selection.ts"><span>src</span><i class="codicon codicon-chevron-right"></i><span>lib</span><i class="codicon codicon-chevron-right"></i><span>selection.ts</span></span><span class="spacer"></span><span class="diff-mode"><i class="codicon codicon-split-horizontal"></i>并排<i class="codicon codicon-chevron-down"></i></span><button class="review-button" id="review" aria-pressed="false"><i class="codicon codicon-eye"></i><span>标记为已审阅</span></button></div>
+        <div class="version-labels"><span>暂存区</span><span class="stats"><span class="added-count">+5</span> <span class="removed-count">−2</span></span><span>工作区</span></div>
+        <div class="diff-scroll" tabindex="0" aria-label="示例差异，可滚动"><div class="diff"><div class="code-pane" id="before-code"></div><div class="gutter"><svg class="connections" viewBox="0 0 72 760" preserveAspectRatio="none" aria-hidden="true"><path d="M0 138 C36 138 36 138 72 138 L72 230 C36 230 36 161 0 161 Z" fill="var(--green-bg)"/><path d="M0 322 C36 322 36 391 72 391 L72 414 C36 414 36 345 0 345 Z" fill="var(--green-bg)"/></svg><div class="line-numbers" id="before-lines"></div><span class="gutter-action" style="top:171px" title="暂存此块（示意）">»</span><span class="gutter-action" style="top:371px" title="暂存此块（示意）">»</span><div class="line-numbers" id="after-lines"></div></div><div class="code-pane" id="after-code"></div></div></div>
+        <footer class="editor-status"><span class="muted">2 处差异</span><span class="spacer"></span><span>UTF-8</span><span>LF</span><span>TypeScript</span></footer>
+      </main>
+    </div>
+    <footer class="window-status"><span><i class="codicon codicon-git-branch"></i>feature/keep-selection</span><span>↑ 2　↓ 0</span><span class="spacer"></span><span id="worktree-path">C:\work\Revia</span><span class="ready"><i class="codicon codicon-check"></i>已刷新</span></footer>
+    <aside class="popover" id="appearance" hidden aria-label="外观浮层示意"><div class="popover-title">外观</div><div class="popover-row chosen"><i class="codicon codicon-symbol-color"></i><span id="theme-name">One Dark Pro</span><small>✓</small></div><div class="popover-row"><i class="codicon codicon-text-size"></i>代码字体<small>JetBrains Mono · 13</small></div><div class="popover-rule"></div><div class="popover-row"><i class="codicon codicon-settings-gear"></i>打开设置<small data-shortcut="settings">Ctrl+,</small></div></aside>
+    <aside class="commit-popup" id="recent-menu" hidden aria-label="最近提交信息"><div class="popover-title">最近提交信息</div><button type="button" class="recent-item">保留刷新后的文件选择</button><button type="button" class="recent-item">调整 diff 页签的键盘导航</button><button type="button" class="recent-item">补充暂存区状态提示</button></aside>
+    <aside class="commit-popup" id="commit-options-menu" hidden aria-label="提交选项"><label class="commit-option"><input type="checkbox" id="skip-hooks"><span>跳过 hooks<small>仅本次提交。跳过提交前与提交信息检查。</small></span></label></aside>
+  </section>
+  <footer class="preview-footer"><span id="platform-caption">Windows · 设计提案</span><span id="preview-note" role="status">连续材质 · 清晰代码 · 示例数据</span><span>03 / 待确认</span></footer>
+  <script>
+    const before = [
+      'import type { FileChange } from "./types";', '',
+      'export function keepSelection(', '  files: FileChange[],', '  selectedPath: string | null,', ') {',
+      '  const selected = files.find(', '    file => file.path === selectedPath,', '  );', '',
+      '  if (selected) {', '    return selected.path;', '  }', '',
+      '  return files[0]?.path ?? null;', '}', '',
+      'export function nextUnreviewed(', '  files: FileChange[],', '  currentPath: string,', ') {',
+      '  const index = files.findIndex(', '    file => file.path === currentPath,', '  );', '',
+      '  return files.slice(index + 1)', '    .find(file => !file.reviewed);', '}', '',
+      '// Keep the current file in view.'
+    ];
+    const after = [
+      'import type { FileChange } from "./types";', '',
+      'export function keepSelection(', '  files: FileChange[],', '  selectedPath: string | null,', ') {',
+      '  const visible = files.filter(', '    file => file.status !== "unchanged",', '  );',
+      '  const selected = visible.find(', '    file => file.path === selectedPath,', '  );', '',
+      '  if (selected) {', '    return selected.path;', '  }', '',
+      '  return visible[0]?.path ?? null;', '}', '',
+      'export function nextUnreviewed(', '  files: FileChange[],', '  currentPath: string,', ') {',
+      '  const index = files.findIndex(', '    file => file.path === currentPath,', '  );', '',
+      '  return files.slice(index + 1)', '    .find(file => !file.reviewed);', '}', '',
+      '// Keep the current file in view.'
+    ];
+    function escapeText(value) { return value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    function highlight(line) {
+      if (line.trimStart().startsWith('//')) return '<span class="comment">' + escapeText(line) + '</span>';
+      return line.split(/("[^"]*"|\b(?:import|type|from|export|function|const|return|if|null|string|FileChange|keepSelection|nextUnreviewed)\b)/g).map(part => {
+        const text = escapeText(part);
+        if(part.startsWith('"')) return '<span class="str">'+text+'</span>';
+        if(/^(import|type|from|export|function|const|return|if|null)$/.test(part)) return '<span class="kw">'+text+'</span>';
+        if(/^(FileChange|string)$/.test(part)) return '<span class="type">'+text+'</span>';
+        if(/^(keepSelection|nextUnreviewed)$/.test(part)) return '<span class="fn">'+text+'</span>';
+        return text;
+      }).join('');
+    }
+    function renderCode(side, lines, changed, kind) {
+      document.getElementById(side+'-code').innerHTML = lines.map((line,index)=>'<div class="code-row '+(changed.includes(index)?kind:'')+'">'+highlight(line)+'</div>').join('');
+      document.getElementById(side+'-lines').innerHTML = lines.map((_,index)=>'<span>'+(index+1)+'</span>').join('');
+    }
+    renderCode('before',before,[6,14],'remove');
+    renderCode('after',after,[6,7,8,9,17],'add');
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      document.querySelectorAll('button[data-theme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.theme===theme)));
+      document.getElementById('theme-name').textContent = theme==='dark'?'深色材质预览':'浅色材质预览';
+    }
+    function setPlatform(platform) {
+      const mac = platform==='macos'; document.documentElement.dataset.platform = platform;
+      document.querySelectorAll('button[data-platform]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.platform===platform)));
+      document.querySelector('[data-shortcut="commit"]').textContent = mac?'⌘K':'Ctrl+K';
+      document.getElementById('commit-submit').title = '提交 ('+(mac?'⌘K':'Ctrl+K')+')';
+      document.getElementById('commit-push').title = '提交并推送 ('+(mac?'⌥⌘K':'Ctrl+Alt+K')+')';
+      closeCommitPopups();
+      document.querySelector('[data-shortcut="settings"]').textContent = mac?'⌘,':'Ctrl+,';
+      document.getElementById('worktree-path').textContent = mac?'/work/Revia':'C:\\work\\Revia';
+      document.getElementById('platform-caption').textContent = (mac?'macOS':'Windows')+' · 设计提案';
+    }
+    function setScale(value) { closeCommitPopups();document.querySelector('.app-window').style.setProperty('--scale',String(value));document.getElementById('scale').value=String(value); }
+    document.querySelectorAll('button[data-theme]').forEach(button=>button.addEventListener('click',()=>setTheme(button.dataset.theme)));
+    document.querySelectorAll('button[data-platform]').forEach(button=>button.addEventListener('click',()=>setPlatform(button.dataset.platform)));
+    document.getElementById('scale').addEventListener('change',event=>setScale(event.target.value));
+    document.getElementById('reduce-transparency').addEventListener('change',event=>{document.documentElement.dataset.transparency=event.target.checked?'reduced':'normal';});
+    function setPopover(open) { if(open)closeCommitPopups();document.getElementById('appearance').hidden=!open;document.getElementById('settings').setAttribute('aria-expanded',String(open)); }
+    document.getElementById('settings').addEventListener('click',()=>setPopover(document.getElementById('appearance').hidden));
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'){setPopover(false);closeCommitPopups(true);}});
+    const commitPopupPairs=[['recent-messages','recent-menu'],['commit-options','commit-options-menu']];
+    function closeCommitPopups(restoreFocus=false) {
+      for(const [triggerId,popupId] of commitPopupPairs){
+        const popup=document.getElementById(popupId),trigger=document.getElementById(triggerId);
+        if(!popup.hidden&&restoreFocus)trigger.focus();
+        popup.hidden=true;trigger.setAttribute('aria-expanded','false');
+      }
+    }
+    function toggleCommitPopup(triggerId,popupId) {
+      const popup=document.getElementById(popupId),trigger=document.getElementById(triggerId),opening=popup.hidden;
+      closeCommitPopups();setPopover(false);if(!opening)return;
+      popup.hidden=false;trigger.setAttribute('aria-expanded','true');
+      const win=document.querySelector('.app-window'),w=win.getBoundingClientRect(),t=trigger.getBoundingClientRect(),scale=w.width/win.offsetWidth;
+      const side=document.querySelector('.side-panel').getBoundingClientRect();
+      popup.style.left=Math.max(8,Math.min((side.left-w.left)/scale+6,win.clientWidth-popup.offsetWidth-8))+'px';
+      popup.style.top=Math.max(8,(t.top-w.top)/scale-popup.offsetHeight-6)+'px';
+      popup.querySelector('button,input')?.focus();
+    }
+    for(const [trigger,popup] of commitPopupPairs)document.getElementById(trigger).addEventListener('click',()=>toggleCommitPopup(trigger,popup));
+    document.addEventListener('pointerdown',event=>{if(!event.target.closest('.commit-popup,#recent-messages,#commit-options'))closeCommitPopups();});
+    window.addEventListener('resize',()=>closeCommitPopups());
+    const commitMessage=document.getElementById('commit-message');
+    function updateCommitCount(){document.getElementById('commit-count').textContent=commitMessage.value.split('\n')[0].length+' / 50';}
+    commitMessage.addEventListener('input',updateCommitCount);updateCommitCount();
+    document.querySelectorAll('.recent-item').forEach(button=>button.addEventListener('click',()=>{commitMessage.value=button.textContent;updateCommitCount();closeCommitPopups();commitMessage.focus();}));
+    document.getElementById('skip-hooks').addEventListener('change',event=>{document.getElementById('commit-mode').textContent=event.target.checked?'本次跳过 hooks':'';});
+    for(const id of ['commit-submit','commit-push'])document.getElementById(id).addEventListener('click',()=>{document.getElementById('preview-note').textContent='按钮外观预览 · 未执行 Git 操作';});
+    document.getElementById('review').addEventListener('click',event=>{const button=event.currentTarget;const checked=button.getAttribute('aria-pressed')!=='true';button.setAttribute('aria-pressed',String(checked));button.querySelector('span').textContent=checked?'已审阅':'标记为已审阅';document.getElementById('review-progress').textContent=checked?'已审阅 4 / 6':'已审阅 3 / 6';});
+    const params=new URLSearchParams(location.search);
+    setTheme(params.get('theme')==='light'?'light':'dark');
+    setPlatform(params.get('platform')==='macos'?'macos':'windows');
+    setScale(['1','1.25','1.5'].includes(params.get('scale'))?params.get('scale'):'1');
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # 产品方向
 
-更新日期：2026-10-30。状态：布局和功能照 Rebased，M7 外观改为 Liquid Glass、代码清晰度优先，并同步设计 macOS / Windows 外壳；M6 已合入 main，M7 第 1 步访谈中，已确认 Q176–Q191；既有遗留项仍在 backlog。
+更新日期：2026-10-30。状态：布局和功能照 Rebased，M7 外观改为 Liquid Glass、代码清晰度优先，并同步设计 macOS / Windows 外壳；M6 已合入 main，M7 第 1 步访谈中，已确认 Q176–Q192；既有遗留项仍在 backlog。
 
 ## 定位
 
@@ -213,7 +213,7 @@ Rebased 安装资源与 x18n 官方工作流的事实、来源和未确认边界
 | 诊断导出 | 默认当前仓库；路径、远端地址、作者邮箱等默认脱敏；导出前预览（Q180）。脱敏操作摘要和错误信息跨重启保留 7 天，可手动清空；排除文件正文、diff、终端输入输出（Q187） |
 | 应用更新 | 稳定版为默认，预发布版主动开启；确认后下载与安装，处理未保存编辑、Git 写入和终端会话后再确认重启（Q181） |
 | 打包分发 | 用 GitHub Actions 打包，版本标签触发；先生成带安装包的 Release 草稿，确认后公开，公开后客户端才收到更新（Q188）。首版只发布 macOS Apple Silicon，暂不做 Apple 开发者代码签名和公证，更新包使用独立生成的签名密钥（Q182；沿 Q62、Q63） |
-| 外观 | 改为 Liquid Glass，可以按需使用 React Bits；偏强透明、折射和悬浮感，代码与 diff 的清晰度优先（Q189、Q190）。设计时同时考虑 macOS 与 Windows，第一版预览未被采用，新稿待确认（Q191）。见 [UI 方向](./ui-direction.md#视觉风格) 与 [预览](./milestones/m7/mockups/) |
+| 外观 | 改为 Liquid Glass，可以按需使用 React Bits；偏强透明、折射和悬浮感，代码与 diff 的清晰度优先（Q189、Q190）。设计时同时考虑 macOS 与 Windows；第二版整体可用，第四版接入实际组件并修正按钮配色，待最终确认（Q191、Q192）。见 [UI 方向](./ui-direction.md#视觉风格) 与 [预览](./milestones/m7/mockups/) |
 
 GitHub API 登录用于 PR 与保护状态等协作功能，本地查看改动、提交和历史不要求该登录（Q184）。Git 传输认证分别处理：克隆、fetch、pull、push 仍沿用已配置的 credential helper / ssh-agent，不修改用户 Git 配置；需要交互输入时按 Q153 提示到终端配置。
 

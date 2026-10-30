@@ -1,0 +1,46 @@
+/* Layout, palette and accessibility adaptations for the independent Revia preview. */
+:root { --rb-button-edge: #afc6d037; --rb-button-hover: #b9cedb36; --rb-button-press: #b9cedb22; }
+html[data-theme="light"] { --rb-button-edge: #5d788b50; --rb-button-hover: #405b712b; --rb-button-press: #405b7138; }
+.app-window { isolation: isolate; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.rb-surface-mount { position: absolute; z-index: 0; inset: 0; pointer-events: none; border-radius: inherit; }
+.rb-window-surface { background: var(--shell); }
+.rb-popup-surface { background: var(--popover); }
+.rb-surface-mount .glass-surface__content { padding: 0; }
+.app-window > .windows-caption,.app-window > .windows-menu,.app-window > .main-toolbar,
+.app-window > .workspace,.app-window > .window-status { position: relative; z-index: 1; }
+.popover,.commit-popup { isolation: isolate; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.popover > :not(.rb-surface-mount),.commit-popup > :not(.rb-surface-mount) { position: relative; z-index: 1; }
+.rb-button-mount,.rb-label { display: contents; }
+.specular-button { border: 1px solid var(--line); box-shadow: inset 0 1px #ffffff0d,0 1px 2px #00000012; }
+.specular-button.icon-button { width: 28px; height: 28px; padding: 0; font-size: 12px; }
+.specular-button.recent-button { width: 24px; height: 24px; margin-left: auto; }
+.specular-button.commit-button { flex: 1; height: 29px; min-width: 0; gap: 6px; padding: 0 8px; font-size: 12px; font-weight: 550; border-color: var(--rb-button-edge); }
+.specular-button.review-button { padding: 0 7px; height: 25px; gap: 5px; font-size: 11px; }
+.specular-button:hover { background: var(--rb-button-hover); box-shadow: inset 0 1px #ffffff14,0 2px 4px #00000015; }
+.specular-button:active { background: var(--rb-button-press); }
+.specular-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.specular-button__label { justify-content: center; min-width: 0; }
+.commit-button kbd { opacity: 1; color: inherit; }
+.tool-rail { padding-top: 10px; padding-bottom: 10px; }
+.rb-rail-mount { width: 28px; }
+.glass-icon-glyph { width: 18px; height: 18px; filter: none; }
+.glass-icon-glyph .codicon { font-size: 18px; }
+.glass-icon.is-selected::before { content: ""; position: absolute; left: -6px; top: 6px; height: 16px; width: 2px; border-radius: 2px; background: var(--accent); }
+.glass-icon:focus-visible .glass-icon-face { outline: 2px solid var(--accent); outline-offset: 2px; }
+html[data-transparency="reduced"] .rb-surface-mount .glass-surface { background: var(--shell-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-transparency="reduced"] .specular-button,html[data-transparency="reduced"] .glass-icon-glass { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: var(--shell-solid); }
+html[data-transparency="reduced"] .specular-button__light,html[data-transparency="reduced"] .glass-icons-canvas,
+html[data-transparency="reduced"] .glass-surface__sheen,html[data-transparency="reduced"] .glass-surface__rim,
+html[data-transparency="reduced"] .glass-icon-shine,html[data-transparency="reduced"] .glass-icon-shade { display: none; }
+@media(prefers-reduced-transparency: reduce) {
+  .rb-surface-mount .glass-surface,.specular-button,.glass-icon-glass { background: var(--shell-solid); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .specular-button__light,.glass-icons-canvas,.glass-surface__sheen,.glass-surface__rim,.glass-icon-shine,.glass-icon-shade { display: none; }
+}
+@media(forced-colors: active) {
+  .rb-surface-mount .glass-surface { background: Canvas; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+  .specular-button,.specular-button:hover,.specular-button:active { color: ButtonText; background: ButtonFace; border: 1px solid ButtonText; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .glass-icon-glass { background: ButtonFace; border: 1px solid ButtonText; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .glass-icon-glyph { color: ButtonText; }
+  .specular-button__light,.glass-icons-canvas,.glass-surface__sheen,.glass-surface__rim,.glass-icon-shine,.glass-icon-shade { display: none; }
+  .specular-button:focus-visible,.glass-icon:focus-visible .glass-icon-face { outline-color: Highlight; }
+}

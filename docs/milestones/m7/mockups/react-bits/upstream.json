@@ -1,0 +1,56 @@
+{
+  "repository": "https://github.com/DavidHDev/react-bits",
+  "commit": "e12c22192ac7b4b452c5e2feb9b586d74765d696",
+  "fetchedAt": "2026-10-30T09:51:10.154602+00:00",
+  "files": [
+    {
+      "path": "LICENSE.md",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/LICENSE.md",
+      "httpStatus": 200,
+      "bytes": 2060,
+      "sha256": "4bdd1fa59a6b7d5954bc3b213dbc34e455c635a94bbcecf9293553797d0fad02"
+    },
+    {
+      "path": "src/ts-default/Components/GlassSurface/GlassSurface.tsx",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/src/ts-default/Components/GlassSurface/GlassSurface.tsx",
+      "httpStatus": 200,
+      "bytes": 31497,
+      "sha256": "3cfd551b02c48aab38418a1de724ebba35c276c27bd11dcf032197f5c6d56888"
+    },
+    {
+      "path": "src/ts-default/Components/GlassSurface/GlassSurface.css",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/src/ts-default/Components/GlassSurface/GlassSurface.css",
+      "httpStatus": 200,
+      "bytes": 5251,
+      "sha256": "90cfc3ad54ad7aa92bb2b700696e2d9f2d8704162ba1b94ebf0b6f8dcecc4e61"
+    },
+    {
+      "path": "src/ts-default/Components/GlassIcons/GlassIcons.tsx",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/src/ts-default/Components/GlassIcons/GlassIcons.tsx",
+      "httpStatus": 200,
+      "bytes": 38650,
+      "sha256": "a762319f5f78c4dc9348aaea6ba8bf957faf97a65ff5dda5466aa6e2a6b89176"
+    },
+    {
+      "path": "src/ts-default/Components/GlassIcons/GlassIcons.css",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/src/ts-default/Components/GlassIcons/GlassIcons.css",
+      "httpStatus": 200,
+      "bytes": 3688,
+      "sha256": "c85801f8d4e5cefbccf564c40603ccf1ddb4f6109f65b5ca96e51f85663f16bb"
+    },
+    {
+      "path": "src/ts-default/Components/SpecularButton/SpecularButton.tsx",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/src/ts-default/Components/SpecularButton/SpecularButton.tsx",
+      "httpStatus": 200,
+      "bytes": 16855,
+      "sha256": "9ec0e4ee0ec0d69abca5fb568a73a4987a1d4159fdfb9cc407cd598120897559"
+    },
+    {
+      "path": "src/ts-default/Components/SpecularButton/SpecularButton.css",
+      "url": "https://raw.githubusercontent.com/DavidHDev/react-bits/e12c22192ac7b4b452c5e2feb9b586d74765d696/src/ts-default/Components/SpecularButton/SpecularButton.css",
+      "httpStatus": 200,
+      "bytes": 1661,
+      "sha256": "af7cad9998bd6102a21fd05da11890ca05c061f9d5e6c96f540fb744684442a9"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)）；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见 [M3 报告](./milestones/m3/report.md)）。M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154，遗留项见 [backlog](./milestones/backlog/)）；M6 已于 2026-10-30 合入 main（见 [M6 报告](./milestones/m6/report.md)）。当前是 M7 第 1 步访谈，已确认 Q176–Q191，尚未写实施规格。更新日期：2026-10-30。
+状态：M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)）；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见 [M3 报告](./milestones/m3/report.md)）。M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154，遗留项见 [backlog](./milestones/backlog/)）；M6 已于 2026-10-30 合入 main（见 [M6 报告](./milestones/m6/report.md)）。当前是 M7 第 1 步访谈，已确认 Q176–Q192，最终外观候选与访谈汇总待用户核对，尚未写实施规格。更新日期：2026-10-30。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -15,7 +15,8 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 - [M4 规格（草稿）](./milestones/m4/spec.md)与 [Rebased 参照](./milestones/m4/rebased-reference.md)：界面照 Rebased 重做的范围，以及从 Rebased 提取的配色与尺寸。
 - [M5 规格](./milestones/m5/spec.md)、[任务单](./milestones/m5/issues/)与[实施交接](./milestones/m5/paseo-batch.md)：日常工作流的已确认范围、可先实施的只读历史基础及待补齐的行为。
 - [M7 访谈记录](./milestones/m7/planning.md)：已确认的扩展功能细节、待定分支及事实核对；尚非实施规格。
-- [M7 Liquid Glass 方向与预览](./milestones/m7/liquid-glass.md)：代码清晰度、React Bits 源码核对与 macOS / Windows 提案；第一版因不协调未被采用，第二版待确认。
+- [M7 Liquid Glass 方向与预览](./milestones/m7/liquid-glass.md)：代码清晰度、React Bits 源码核对与 macOS / Windows 外观；第二版整体获认可，第四版接入实际组件并修正按钮颜色，待确认。
+- [M7 开始前确认清单](./milestones/m7/confirmation.md)：前面已确认的访谈结论、仍未收口事项与最终候选。
 - [术语表](../GLOSSARY.md)：已确认的领域术语和应避免的说法。
 - [里程碑](./milestones/)：每个里程碑的计划、评审意见与报告（`m<N>/`）。
 - [Agent 配置](./agents/)：任务记录与领域文档的约定，供工程类技能读取。
@@ -224,6 +225,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 | Q189 | M7 外观改为 Liquid Glass，可以按需使用 React Bits；取代 Q131 中控件外观照 VS Code 的部分。布局、功能和交互继续照 Rebased，颜色主题、系统界面字体、可配置代码字体和图标体系沿既有决定 | 用户于 2026-10-30 提供 DavidHDev/react-bits 仓库并要求“我想把界面换成liquid glass的，组件库可以用这个” |
 | Q190 | Liquid Glass 偏强透明、折射与悬浮感；代码与 diff 可读性优先，材质效果不能影响正文、行号和增删标记的辨识 | 用户选择“更强的透明、折射和悬浮感”，随后强调“代码还是要能看清，别搞得代码都看不清” |
 | Q191 | Liquid Glass 的设计阶段同时考虑 macOS 与 Windows，延续共享设计与平台外壳（Q55、Q60、Q61）；不能只设计 macOS 再把它原样移到 Windows。Windows 发布仍按 Q126 在 M8。第一版预览被指出不协调，具体视觉稿继续修订，不视为已获认可 | 用户于 2026-10-30 对预览反馈“很不协调”，并补充“还有要考虑到windows的，因为也会出win” |
+| Q192 | 第二版 Liquid Glass 整体方向可用，先修正提交区并给出最终稿供用户查看，确认无问题后再启动实施。实施仍交 Paseo / Pi，Codex 负责审查与验证；前面访谈记录一起汇总给用户核对 | 用户于 2026-10-30 回复“大体可以，提交那边不对，然后给出最终的，我看下没问题可以开始，还有还是用paseo实现，你来验证”，随后要求“前面的访谈记录也给我确认下” |
 
 各项的完整说明见对应的方向文档。
 
@@ -290,7 +292,7 @@ Revia
 |   |-- 首轮全范围审查后只审增量，桌面验收不等审查零发现 [Q174]
 |   |-- Reset 不默认 Hard、多选只留 cherry-pick / revert、归档按仓库分组 [Q175]
 |   `-- 自动解决 import 冲突转未排期 backlog，不进 M7 [Q167]
-|-- M7 扩展细化 [第 1 步访谈中，Q176-Q191 已确认]
+|-- M7 扩展细化 [第 1 步访谈中，Q176-Q192 已确认]
 |   |-- GitHub PR 日常完整流程 [Q176]
 |   |   |-- github.com 多账号，按仓库记住；验证码授权与 Token 备用 [Q183/Q184]
 |   |   |-- 现有保护分支与本地取并集，失败保留上次结果 [Q185]
@@ -310,7 +312,7 @@ Revia
 |   |-- 颜色主题导入与自定义快捷键 [Q132/Q139 已排 M7，细节待确认]
 |   |-- Liquid Glass，允许按需使用 React Bits [Q189]
 |   |   |-- 强玻璃外框；代码与 diff 清晰度优先 [Q190]
-|   |   `-- 同步考虑 macOS / Windows；第一版预览未采用，修订稿待确认 [Q191]
+|   |   `-- 同步考虑 macOS / Windows；第二版整体可用，修正提交区后再确认 [Q191/Q192]
 |   `-- 日志索引 [Q151：大仓库筛选确实慢才做，当前无触发证据]
 |-- 技术栈：Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS [T1/Q1/Q6/Q7 已确认]
 |   |-- Git 执行：Rust 层受控调用 Git CLI [Q7 已确认]

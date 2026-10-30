@@ -1,8 +1,45 @@
 # Liquid Glass 外观预览
 
-这是 M7 第 1 步的独立设计稿，依据 Q189–Q191：Liquid Glass 外观、代码清晰度优先，设计阶段同时考虑 macOS 与 Windows。第一版被用户指出“很不协调”；第二版是修订提案，尚待用户反馈。产品源码尚未改动，也未接入 React Bits。
+这是 M7 第 1 步的独立设计稿，依据 Q189–Q192：Liquid Glass 外观、代码清晰度优先，两平台同步设计。用户认为第二版整体“大体可以”，要求修正提交区并先看最终稿，后又指出按钮颜色并询问全面使用 React Bits。当前第四版实际接入该库组件，仍待确认；产品源码尚未改动。
 
-## 第二版：连续窗口材质与两平台外壳
+## 第四版：实际 React Bits 组件，待确认
+
+[打开当前候选](./liquid-glass-v4.html) · [前面访谈的确认清单](../confirmation.md) · [组件来源与检查](./react-bits/)
+
+| 平台 | 浅色 | 深色 |
+| --- | --- | --- |
+| Windows | [浅色图](./liquid-glass-v4-windows-light.png) | [深色图](./liquid-glass-v4-windows-dark.png) |
+| macOS | [浅色图](./liquid-glass-v4-macos-light.png) | [深色图](./liquid-glass-v4-macos-dark.png) |
+
+延续第三版提交区入口与连续布局，使用实际 Specular Button 替换提交等 6 个按钮，Glass Icons 呈现侧栏 4 个入口，Glass Surface 提供窗口及 3 个浮层。提交按钮改为随主题变化的低饱和透明填充，文字和图标保持清晰。Glass Icons 中的符号仍由既有 Codicons 提供；代码和文件类型图标保持原来的辨识方式。
+
+末轮独立 Chromium 预览 16 组通过，新增核对实际组件挂载、按钮各状态文字对比度与键盘焦点；截图复制自 `/private/tmp/revia-m7-reactbits-cljxi6_0/check-t8wkYO`。首次组件适配覆盖了最近信息右对齐，人工复核后修正并重跑；原件保留。产品构建、真实桌面与双平台 WebView 尚未验证，完整证据范围见 [组件说明](./react-bits/)。
+
+## 第三版：提交区补齐，保留颜色反馈前原稿
+
+[打开第三版](./liquid-glass-v3.html) · [前面访谈的确认清单](../confirmation.md)
+
+| 平台 | 浅色 | 深色 |
+| --- | --- | --- |
+| Windows | [浅色图](./liquid-glass-v3-windows-light.png) | [深色图](./liquid-glass-v3-windows-dark.png) |
+| macOS | [浅色图](./liquid-glass-v3-macos-light.png) | [深色图](./liquid-glass-v3-macos-dark.png) |
+
+保留第二版整体，只修正提交区与相应交互示意：
+
+- 提交按钮中的图标、文字和快捷键居中，不再分别挤到两端。
+- 恢复“修改上一次提交”右侧的最近提交信息入口、信息框下方的首行字数提示，以及提交按钮旁的“提交并推送”和提交选项入口。
+- 最近提交信息和提交选项浮层可查看，按 Escape 关闭并返回触发按钮；选取最近信息会填入示例输入框，切换平台和主题保留内容。
+- 普通提交和提交并推送仅展示按钮位置，点击后在预览页脚说明未执行 Git 操作。
+
+对照现有 `src/components/app/CommitComposer.tsx`、M4 F04 和 M5 B06；未改产品行为，也未用这一页替代更改列表模式等未定细节。实现仍由 Paseo / Pi 完成，Codex 负责审查和验证，等用户看过最终稿后再开始（Q192）。
+
+### 第三版检查
+
+2026-10-30 沿用已有独立 Chromium 预览检查，末轮 16 组通过：两平台浅深色与宽 / 窄窗，Windows 125% / 150% CSS 缩放及降低透明度 / 强制颜色模拟。除原有资源、对比度、清晰代码、滚动和窗口边界检查外，核对提交按钮内容居中且不裁切、三个动作入口可见、两个新增浮层不越界、最近信息选取、实际平台与主题切换后保留输入，以及选项和 Escape 焦点返回。
+
+原始材料保存在 `/private/tmp/revia-m7-final-xsc6wokm/`，末轮目录 `check-U8kZOC`；本目录第三版图片与该轮一致。人工复核了两平台浅深色、窄窗、缩放后的提交区和浮层。完整交付只包含文档及独立预览，没有运行产品构建 / 测试；真实 macOS WKWebView、Windows WebView2、原生窗口、DPI 和强折射效果仍须在实施阶段验证。
+
+## 第二版：已获整体方向认可，保留原稿
 
 [打开第二版交互预览](./liquid-glass-v2.html)。可直接在浏览器打开，切换 macOS / Windows、浅深色、100% / 125% / 150% CSS 缩放与降低透明度；设置按钮展开浮层，Escape 关闭，审阅按钮改变示例状态。
 

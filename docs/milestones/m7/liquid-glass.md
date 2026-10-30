@@ -9,7 +9,7 @@
 - 在设计阶段同时考虑 macOS 和 Windows，不把 macOS 外观原样移到 Windows；用户认为第一版“很不协调”，该稿未被采用（Q191）。
 - Rebased 的布局和功能基准、现有颜色主题、字体、图标与 Git 安全边界继续沿用；详见 [UI 方向](../../ui-direction.md#视觉风格)。
 
-第一版将玻璃分别放在顶栏、侧栏和浮层，又根据全界面玻璃的提问增加了低透明代码底层对比；这两版都未被认可，保留为历史稿。第二版提案将材质连成一个窗口，以细分隔线、统一尺寸与同色系代码背景表达层次，临时浮层单独悬起；同时显示 macOS 和 Windows 外壳。新稿仍待用户反馈，不将“很不协调”的反馈当作新方案已获确认。
+第一版将玻璃分别放在顶栏、侧栏和浮层，又根据全界面玻璃的提问增加了低透明代码底层对比；这两版都未被认可，保留为历史稿。第二版提案将材质连成一个窗口，以细分隔线、统一尺寸与同色系代码背景表达层次，临时浮层单独悬起；同时显示 macOS 和 Windows 外壳。随后用户回复“大体可以”，要求修正提交区并先查看最终稿。第三版补齐提交区后，用户指出按钮颜色不协调并询问能否全部使用 React Bits。第四版接入实际组件并修正配色；最终候选及组件使用范围待用户确认（Q192）。
 
 ## 实现边界
 
@@ -35,7 +35,7 @@
 
 官方 [Glass Surface](https://reactbits.dev/components/glass-surface) 提供 liquid glass 材质。[安装说明](https://reactbits.dev/get-started/installation) 按组件交付源码，可选择 JS / TS 与 CSS / Tailwind 形式，手动复制或通过 shadcn CLI 引入。无需因此替换现有 Base UI 功能控件。
 
-当前 [许可](https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md) 是 **MIT + Commons Clause**，包含作为应用或网站一部分使用和分发的条款，同时限制单独销售、转售或重新分发组件本身；引入时保留原版权和完整许可声明，不标为普通 MIT。本轮预览未复制 React Bits 组件源码。
+当前 [许可](https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md) 是 **MIT + Commons Clause**，包含作为应用或网站一部分使用和分发的条款，同时限制单独销售、转售或重新分发组件本身；引入时保留原版权和完整许可声明，不标为普通 MIT。前三版预览未复制 React Bits 组件源码；第四版实际接入组件，完整许可随预览保留。
 
 对 2026-10-30 取得的 `main` 源码核对如下；这些是已保存字节的事实，不代表已固定上游 commit：
 
@@ -44,7 +44,7 @@
 - 每个 WebGL 实例独立创建上下文和动画循环，实施时应控制材质实例数量，不在每个文件行或 diff 行创建一个。
 - 默认尺寸、padding、居中和裁剪不能直接套在 Revia Shell 上；应适配装饰层，保留已有布局和弹层行为。
 
-原件在 `/private/tmp/revia-m7-glass-source.8JI4U0/`，manifest 记录 URL、取得时间与 SHA256：
+早期原件在 `/private/tmp/revia-m7-glass-source.8JI4U0/`，manifest 记录 URL、取得时间与 SHA256：
 
 | 原件 | SHA256 |
 | --- | --- |
@@ -53,6 +53,8 @@
 | `ts-tailwind.tsx` | `5475561bc5a62ce9476e7e7b8f4fd4c5b741b6dd1bc17f6f6fe76f021ba2428e` |
 
 根代理先读取了用户提供的仓库 URL，官网、安装与许可页面的工具原件保存在 `/private/tmp/revia-m7-round3-n3ww6iju/m7_react_bits_*.json`。根代理没有 GrokSearch 入口，使用可用网页读取工具；独立源码核对保留了三个版本的原始字节。
+
+第四版追加核对并固定 `e12c22192ac7b4b452c5e2feb9b586d74765d696`，实际使用 Specular Button、Glass Icons、Glass Surface 的 TS + CSS 源码；当前 GlassSurface 字节与上表一致。组件目录、图标传入契约、适配与许可见 [第四版来源说明](./mockups/react-bits/)。这回答了用户对按钮、图标也采用玻璃组件的提议；尚未确认整个业务控件栈都替换成 React Bits。
 
 ## Revia 的实际起点
 
@@ -64,6 +66,6 @@
 
 ## 预览与检查
 
-[打开预览说明](./mockups/)；第二版 HTML 可切 macOS / Windows、浅深色、缩放及降低透明度，并查看浮层。它使用自绘 CSS 材质及示例代码，复用已有 M4 图标资源和工程已有 JetBrains Mono 字体，保留许可；没有连接 Git、账号或产品 IPC。代码示例用于呈现颜色和密度，不是 M7 实现片段。第一版文件保持原样，作为未采用稿。
+[打开预览说明](./mockups/)；第四版最终候选 HTML 可切 macOS / Windows、浅深色、缩放及降低透明度，并查看浮层。它实际使用 React Bits 组件及示例代码，复用已有 M4 图标资源和工程已有 JetBrains Mono 字体，保留各方许可；没有连接 Git、账号或产品 IPC。代码示例用于呈现颜色和密度，不是 M7 实现片段。前三版文件保持原样，保留此前反馈对应的稿件。最终候选与访谈汇总见 [开始前确认清单](./confirmation.md)。
 
 预览检查与截图记录在说明中；它们只证明独立设计稿的显示与控制，不代替真实 Revia 的布局、性能、折射或桌面验收。
