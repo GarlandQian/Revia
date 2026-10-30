@@ -133,6 +133,15 @@ impl RepoBindings {
     }
 }
 
+/// 访问/刷新令牌及到期时间作为同一个钥匙串条目轮换，普通账号索引不保存凭据。
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TokenCredentials {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_at_ms: Option<u64>,
+    pub refresh_expires_at_ms: Option<u64>,
+}
+
 /// 令牌存储：系统钥匙串；验收实例可显式改用独立文件（仅 `REVIA_ACCEPTANCE=1`）。
 pub struct TokenStore {
     acceptance_file: Option<PathBuf>,
@@ -183,7 +192,7 @@ impl TokenStore {
             })
     }
 
-    pub fn load(&self, login: &str) -> Result<String> {
+    fn load_raw(&self, login: &str) -> Result<String> {
         if let Some(directory) = &self.acceptance_file {
             let path = directory.join(format!("{}.txt", super::safe_slug(login)));
             return std::fs::read_to_string(&path).map_err(|_| not_logged_in(login));
@@ -193,42 +202,55 @@ impl TokenStore {
             .map_err(|_| not_logged_in(login))
     }
 
-    /// F16：刷新令牌与访问令牌分服务存储，不混用同一个 keyring 条目。
+    pub fn credentials(&self, login: &str) -> Result<TokenCredentials> {
+        let raw = self.load_raw(login)?;
+        let credentials = if raw.starts_with('{') {
+            serde_json::from_str(&raw).map_err(|_| not_logged_in(login))?
+        } else {
+            // 兼容旧版独立条目；没有到期时间的旧设备令牌在有刷新令牌时先轮换。
+            TokenCredentials {
+                access_token: raw,
+                refresh_token: self.legacy_refresh(login),
+                expires_at_ms: None,
+                refresh_expires_at_ms: None,
+            }
+        };
+        if credentials.access_token.is_empty()
+            || credentials.access_token.chars().any(char::is_whitespace)
+        {
+            return Err(not_logged_in(login));
+        }
+        Ok(credentials)
+    }
+
+    pub fn load(&self, login: &str) -> Result<String> {
+        Ok(self.credentials(login)?.access_token)
+    }
+
+    pub fn save_credentials(&self, login: &str, credentials: &TokenCredentials) -> Result<()> {
+        // 单次原子文件写/钥匙串set，避免新access与旧refresh组合。
+        self.save(login, &serde_json::to_string(credentials)?)?;
+        self.delete_refresh(login)?;
+        Ok(())
+    }
+
+    /// 旧版刷新令牌服务，仅用于迁移读取与清理。
     fn refresh_service() -> &'static str {
         "Revia GitHub Refresh"
     }
 
     pub fn save_refresh(&self, login: &str, refresh_token: &str) -> Result<()> {
-        if refresh_token.is_empty() {
-            return Ok(());
-        }
-        if let Some(directory) = &self.acceptance_file {
-            std::fs::create_dir_all(directory)?;
-            let path = directory.join(format!("{}.refresh.txt", super::safe_slug(login)));
-            super::atomic_write(&path, refresh_token.as_bytes())?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-            }
-            return Ok(());
-        }
-        keyring::Entry::new(Self::refresh_service(), login)
-            .and_then(|entry| entry.set_password(refresh_token))
-            .map_err(|error| {
-                AppError::coded(
-                    ErrorKind::Environment,
-                    "errors.m7.githubKeychainFailed",
-                    "无法把 GitHub 凭据写入系统钥匙串：{error}",
-                    &[("error", error.to_string())],
-                )
-            })
+        let mut credentials = self.credentials(login)?;
+        credentials.refresh_token = (!refresh_token.is_empty()).then(|| refresh_token.to_string());
+        self.save_credentials(login, &credentials)
     }
 
-    pub fn load_refresh(&self, login: &str) -> Option<String> {
+    fn legacy_refresh(&self, login: &str) -> Option<String> {
         if let Some(directory) = &self.acceptance_file {
             let path = directory.join(format!("{}.refresh.txt", super::safe_slug(login)));
-            return std::fs::read_to_string(&path).ok().filter(|t| !t.is_empty());
+            return std::fs::read_to_string(&path)
+                .ok()
+                .filter(|t| !t.is_empty());
         }
         keyring::Entry::new(Self::refresh_service(), login)
             .and_then(|entry| entry.get_password())
@@ -236,14 +258,33 @@ impl TokenStore {
             .filter(|t| !t.is_empty())
     }
 
-    pub fn delete_refresh(&self, login: &str) {
+    pub fn load_refresh(&self, login: &str) -> Option<String> {
+        self.credentials(login)
+            .ok()
+            .and_then(|credentials| credentials.refresh_token)
+    }
+
+    pub fn delete_refresh(&self, login: &str) -> Result<()> {
         if let Some(directory) = &self.acceptance_file {
             let path = directory.join(format!("{}.refresh.txt", super::safe_slug(login)));
-            let _ = std::fs::remove_file(path);
-            return;
+            return match std::fs::remove_file(path) {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(error.into()),
+            };
         }
-        if let Ok(entry) = keyring::Entry::new(Self::refresh_service(), login) {
-            let _ = entry.delete_credential();
+        Self::delete_keyring_entry(Self::refresh_service(), login)
+    }
+
+    fn delete_keyring_entry(service: &str, login: &str) -> Result<()> {
+        match keyring::Entry::new(service, login).and_then(|entry| entry.delete_credential()) {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.m7.githubCredentialDeleteFailed",
+                "无法删除 GitHub 凭据：{error}",
+                &[("error", error.to_string())],
+            )),
         }
     }
 
@@ -256,10 +297,7 @@ impl TokenStore {
                 Err(error) => return Err(error.into()),
             }
         }
-        if let Ok(entry) = keyring::Entry::new(Self::service(), login) {
-            let _ = entry.delete_credential();
-        }
-        Ok(())
+        Self::delete_keyring_entry(Self::service(), login)
     }
 }
 
@@ -288,6 +326,7 @@ pub struct GithubState {
     receipts: store::ReceiptStore,
     pub tokens: TokenStore,
     pub flows: Mutex<BTreeMap<String, DeviceFlow>>,
+    credential_lock: Mutex<()>,
 }
 
 impl GithubState {
@@ -303,6 +342,7 @@ impl GithubState {
             receipts: store::ReceiptStore::new(data_dir),
             tokens: TokenStore::new(data_dir),
             flows: Mutex::new(BTreeMap::new()),
+            credential_lock: Mutex::new(()),
         }
     }
 
@@ -327,19 +367,24 @@ impl GithubState {
     }
 
     pub fn remove_account(&self, login: &str) -> Result<()> {
+        let _guard = self
+            .credential_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.tokens.delete(login)?;
+        self.tokens.delete_refresh(login)?;
         let mut accounts = self.accounts.load();
         accounts.retain(|account| account.login != login);
         self.accounts.save(&accounts)?;
         let mut bindings = self.bindings.load();
         bindings.retain(|_, bound| bound != login);
         self.bindings.save(&bindings)?;
-        // F16：登出同时清掉刷新令牌，避免残留可换新令牌的凭据。
-        self.tokens.delete_refresh(login);
-        self.tokens.delete(login)
+        Ok(())
     }
 
     pub fn repo_key(repo_path: &Path) -> String {
-        let canonical = std::fs::canonicalize(repo_path).unwrap_or_else(|_| repo_path.to_path_buf());
+        let canonical =
+            std::fs::canonicalize(repo_path).unwrap_or_else(|_| repo_path.to_path_buf());
         super::sha256_hex(canonical.to_string_lossy().as_bytes())
     }
 
@@ -357,11 +402,20 @@ impl GithubState {
         bindings
             .get(&Self::repo_key(repo_path))
             .cloned()
-            .filter(|login| self.accounts().iter().any(|account| &account.login == login))
+            .filter(|login| {
+                self.accounts()
+                    .iter()
+                    .any(|account| &account.login == login)
+            })
     }
 
     /// 取出当前仓库要用的账号与客户端；未绑定时用唯一账号。
     pub fn client_for(&self, repo_path: &Path) -> Result<(String, GithubClient)> {
+        // 刷新会使旧refresh失效；同一状态内串行选择与轮换，不自动重放任何业务写请求。
+        let _guard = self
+            .credential_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let accounts = self.accounts();
         if accounts.is_empty() {
             return Err(AppError::coded(
@@ -380,10 +434,14 @@ impl GithubState {
                     "errors.m7.githubRepoUnbound",
                     "当前仓库有多个 GitHub 账号，请先为它选择账号",
                     &[],
-                ))
+                ));
             }
         };
-        let token = self.tokens.load(&login)?;
+        let account = accounts
+            .iter()
+            .find(|account| account.login == login)
+            .ok_or_else(|| not_logged_in(&login))?;
+        let token = auth::access_token_for(self, &login, account.auth_method)?;
         Ok((login, GithubClient::new(api_base(), token)?))
     }
 }
@@ -460,7 +518,12 @@ impl GithubClient {
     }
 
     pub fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<(T, ApiMeta)> {
-        let (bytes, meta) = self.send(reqwest::Method::GET, path, None, "application/vnd.github+json")?;
+        let (bytes, meta) = self.send(
+            reqwest::Method::GET,
+            path,
+            None,
+            "application/vnd.github+json",
+        )?;
         let value = serde_json::from_slice(&bytes).map_err(|error| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -588,7 +651,10 @@ fn meta_of(headers: &reqwest::header::HeaderMap) -> ApiMeta {
                 let part = part.trim();
                 if part.contains("rel=\"next\"") {
                     part.split(';').next().map(|url| {
-                        url.trim().trim_start_matches('<').trim_end_matches('>').to_string()
+                        url.trim()
+                            .trim_start_matches('<')
+                            .trim_end_matches('>')
+                            .to_string()
                     })
                 } else {
                     None
@@ -704,9 +770,11 @@ mod tests {
         };
         let error = api_error(403, b"{}", &limited);
         assert_eq!(error.code, Some("errors.m7.githubRateLimited"));
-        assert!(error
-            .params
-            .iter()
-            .any(|(key, value)| *key == "retryAtMs" && value == "1700000000000"));
+        assert!(
+            error
+                .params
+                .iter()
+                .any(|(key, value)| *key == "retryAtMs" && value == "1700000000000")
+        );
     }
 }

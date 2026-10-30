@@ -20,7 +20,13 @@ Status: ready-for-agent
 
 失败原件全部保留：`diagnostics-clone-cargo-01`真实exit101复现日志锁死；`updater-metadata-cargo-01`独占PATH漏Node、`-02`fixture漏插件配置均exit101，补齐fixture后`-03`通过；绑定格式化`diagnostics-bindings-whitespace-01`子进程未启动（launcher exit1，不能记作node退出码）。工具造成的99个无关绑定空白变化已逐项比对并回退，回退前字节另存`impl/binding-whitespace-before-revert`，三个诊断绑定语义变化保留。
 
-编辑/草稿、终端生命周期、PR身份/保护/检出、令牌到期刷新、更新包保留及渠道/安装协调等明确问题仍在处理。全量最终检查、全新独立增量两轴和Release尚未完成；任务13/14真实桌面门槛未满足。formalRepairUsed保持true，不再次派Pi。
+编辑/草稿、终端生命周期、PR身份/保护/检出、更新包保留及渠道/安装协调等明确问题仍在处理。全量最终检查、全新独立增量两轴和Release尚未完成；任务13/14真实桌面门槛未满足。formalRepairUsed保持true，不再次派Pi。
+
+## Codex F16 直接修复检查点（待最终增量审查）
+
+到期令牌在client_for发出业务请求前刷新；访问/刷新令牌与到期时间以同一凭据条目原子轮换，兼容迁移旧独立条目，登出与刷新串行且清理失败明确报错。普通账号配置不含令牌；OAuth刷新禁止重定向，不自动重放业务写请求。设备授权scope沿GitHub App权限模型处理。官方契约与独占测试细节见任务06新增Comments。
+
+`github-auth-cargo-05`顶层1项集成测试通过，包含四个独立子进程的成功轮换/拒绝/刷新令牌过期/重定向场景，各自验证重启与存储、登出失败/恢复和旧版迁移；嵌套harness计数不相加。`github-unit-cargo-01`32项通过（含类型导出），`command-log-unit-cargo-01`通过。前端构建`codex-frontend-build-03`与`codex-x18n-02`exit0，翻译检查0error/69warning。全部原始证据逐轮保留，测试只使用假令牌和独占文件存储/loopback服务，不操作真实用户钥匙串。真实GitHub/系统钥匙串桌面验收仍未进行；M7整体仍未完成。
 
 ## 版本历史
 

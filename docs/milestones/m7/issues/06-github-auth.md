@@ -53,3 +53,11 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 S105“按服务器节流和刷新轮换结果持久保存”。auth:69–75新接expires_in等字段，285–291只把refresh_token传入，402–407保存；`GithubState::client_for:386–387`仍直接load access_token。load_refresh在mod:228只是定义，生产全树没有调用；grant_type只有device_code，无refresh_token请求，也不保存到期时间或换新access/refresh。触发GitHub App用户令牌到期：仍只能重新登录，本地取消可用不等于刷新已实现。`consumers.stdout`保存搜索证据；未触碰钥匙串或登录。设备码取消中的在途成功仍可能返回authorized，未额外以竞态扩大本项。
 
 </details>
+
+### Codex 直接修复 F16 检查点（2026-10-31，待最终增量审查）
+
+依据[GitHub官方刷新文档](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens)，device flow生成的用户令牌刷新无需client_secret。已记录访问/刷新到期时间；client_for在发出业务请求前按到期时间刷新，不因业务API失败重放写请求。新访问令牌、刷新令牌及到期信息以同一钥匙串条目原子保存；兼容旧独立条目并迁移清理。刷新与登出串行，清理失败向上传递，普通账号配置不含凭据；刷新HTTP禁止跟随重定向。
+
+独占回归`src-tauri/tests/m7_github_auth.rs`从真实start_device_flow/poll_device_flow/client_for/logout入口运行。`github-auth-cargo-05`顶层1项集成测试，包含rotate/denied/expired/redirect四个独立子进程场景，每个场景同时覆盖文件模式、登出清理失败及旧凭据迁移；不能把嵌套harness计数相加。全部仅用假令牌、独占HOME/appdata/凭据文件和loopback HTTP，不访问系统钥匙串或真实GitHub账号。`github-unit-cargo-01`32项通过（包含类型导出），`command-log-unit-cargo-01`通过；前端构建`codex-frontend-build-03`与`codex-x18n-02`exit0，后者0错误/69警告。
+
+原件均在`/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`；源码hash/精确argv/真实exit/原stdout/stderr逐轮保存。`impl/github-refresh-finalize-failure-observed.json`保留补丁匹配失败与实际执行停点，未覆盖已执行改动。本组未做系统钥匙串/真实桌面验收，任务状态不据此改为完成。formalRepairUsed仍为true，不再派Pi。

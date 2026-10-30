@@ -1303,7 +1303,8 @@
       "updateReasonNoPubkey": "没有配置更新签名公钥，无法验证安装包",
       "updateReasonNoEndpoints": "没有配置更新检查地址",
       "diagnosticsStoreFailed": "诊断摘要读写失败；请清空摘要后重试",
-      "diagnosticsSnapshotExpired": "诊断预览已失效，请刷新后再导出"
+      "diagnosticsSnapshotExpired": "诊断预览已失效，请刷新后再导出",
+      "githubCredentialDeleteFailed": "无法删除 GitHub 凭据：{error}"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",

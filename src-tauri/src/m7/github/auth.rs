@@ -8,7 +8,10 @@ use ts_rs::TS;
 
 use crate::error::{AppError, ErrorKind, Result};
 
-use super::{client_id, web_base, DeviceFlow, GithubAccount, GithubAuthMethod, GithubClient, GithubState};
+use super::{
+    DeviceFlow, GithubAccount, GithubAuthMethod, GithubClient, GithubState, TokenCredentials,
+    client_id, web_base,
+};
 
 /// 设备码授权开始后给用户的信息。
 #[derive(Debug, Clone, Serialize, TS)]
@@ -113,6 +116,7 @@ fn encode_component(value: &str) -> String {
 
 fn http_client() -> Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(30))
         .user_agent("Revia")
         .build()
@@ -152,7 +156,7 @@ pub fn start_device_flow(state: &GithubState) -> Result<DeviceStart> {
         .post(format!("{}/login/device/code", web_base()))
         .header("Accept", "application/json")
         .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(urlencode(&[("client_id", &client_id), ("scope", "repo read:user")]))
+        .body(urlencode(&[("client_id", &client_id)]))
         .send()
         .map_err(network_error)?;
     if !response.status().is_success() {
@@ -165,10 +169,14 @@ pub fn start_device_flow(state: &GithubState) -> Result<DeviceStart> {
     }
     let body: DeviceCodeResponse = response.json().map_err(network_error)?;
     let now = super::super::now_ms();
-    let flow_id = super::super::sha256_hex(format!("{}\0{now}", body.device_code).as_bytes())[..16].to_string();
+    let flow_id = super::super::sha256_hex(format!("{}\0{now}", body.device_code).as_bytes())[..16]
+        .to_string();
     let interval_ms = body.interval.max(1) * 1000;
     let expires_at_ms = now + body.expires_in * 1000;
-    let mut flows = state.flows.lock().unwrap_or_else(|error| error.into_inner());
+    let mut flows = state
+        .flows
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
     // 只保留一个进行中的流程：新流程会替换旧流程，避免同时轮询多个设备码。
     flows.clear();
     flows.insert(
@@ -219,7 +227,10 @@ pub fn poll_device_flow(state: &GithubState, flow_id: &str) -> Result<DevicePoll
     let client_id = client_id().ok_or_else(missing_client_id)?;
     let now = super::super::now_ms();
     let flow = {
-        let flows = state.flows.lock().unwrap_or_else(|error| error.into_inner());
+        let flows = state
+            .flows
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let flow = flows.get(flow_id).ok_or_else(|| {
             AppError::coded(
                 ErrorKind::Rejected,
@@ -262,7 +273,10 @@ pub fn poll_device_flow(state: &GithubState, flow_id: &str) -> Result<DevicePoll
         .send()
         .map_err(network_error)?;
     let body: TokenResponse = response.json().map_err(network_error)?;
-    let mut flows = state.flows.lock().unwrap_or_else(|error| error.into_inner());
+    let mut flows = state
+        .flows
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
     let Some(slot) = flows.get_mut(flow_id) else {
         return Err(AppError::coded(
             ErrorKind::Rejected,
@@ -283,12 +297,14 @@ pub fn poll_device_flow(state: &GithubState, flow_id: &str) -> Result<DevicePoll
             })?;
             drop(flows);
             // F16：设备码流程的 refresh_token 一并传给登录持久化。
-            let account = login_with_token_full(
+            let account = login_with_expiry(
                 state,
                 &token,
                 body.scope.as_deref(),
                 GithubAuthMethod::DeviceFlow,
                 body.refresh_token.as_deref(),
+                body.expires_in,
+                body.refresh_token_expires_in,
             )?;
             state
                 .flows
@@ -361,6 +377,18 @@ pub fn login_with_token_full(
     method: GithubAuthMethod,
     refresh: Option<&str>,
 ) -> Result<GithubAccount> {
+    login_with_expiry(state, token, scopes_hint, method, refresh, None, None)
+}
+
+fn login_with_expiry(
+    state: &GithubState,
+    token: &str,
+    scopes_hint: Option<&str>,
+    method: GithubAuthMethod,
+    refresh: Option<&str>,
+    expires_in: Option<u64>,
+    refresh_expires_in: Option<u64>,
+) -> Result<GithubAccount> {
     let token = token.trim();
     if token.is_empty() {
         return Err(AppError::coded(
@@ -401,11 +429,101 @@ pub fn login_with_token_full(
         scopes,
         added_at_ms: super::super::now_ms(),
     };
-    state.tokens.save(&account.login, token)?;
-    // F16：刷新令牌（如有）一并持久化，过期轮换时使用。
-    state.tokens.save_refresh(&account.login, refresh.unwrap_or(""))?;
+    let _guard = state
+        .credential_lock
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let now = super::super::now_ms();
+    state.tokens.save_credentials(
+        &account.login,
+        &TokenCredentials {
+            access_token: token.to_string(),
+            refresh_token: refresh
+                .filter(|value| !value.is_empty())
+                .map(str::to_string),
+            expires_at_ms: expires_in
+                .map(|seconds| now.saturating_add(seconds.saturating_mul(1000))),
+            refresh_expires_at_ms: refresh_expires_in
+                .map(|seconds| now.saturating_add(seconds.saturating_mul(1000))),
+        },
+    )?;
     state.upsert_account(account.clone())?;
     Ok(account)
+}
+
+/// client_for持有凭据锁时调用；只在请求发起前刷新，绝不因业务API失败重放写请求。
+/// GitHub device flow产生的用户令牌刷新不需要client_secret（官方refresh文档）。
+pub(super) fn access_token_for(
+    state: &GithubState,
+    login: &str,
+    method: GithubAuthMethod,
+) -> Result<String> {
+    let credentials = state.tokens.credentials(login)?;
+    let now = super::super::now_ms();
+    let needs_refresh = match credentials.expires_at_ms {
+        Some(expires) => expires <= now.saturating_add(60_000),
+        None => method == GithubAuthMethod::DeviceFlow && credentials.refresh_token.is_some(),
+    };
+    if !needs_refresh {
+        return Ok(credentials.access_token);
+    }
+    if method != GithubAuthMethod::DeviceFlow
+        || credentials
+            .refresh_expires_at_ms
+            .is_some_and(|expiry| expiry <= now)
+    {
+        return Err(super::not_logged_in(login));
+    }
+    let refresh = credentials
+        .refresh_token
+        .as_deref()
+        .filter(|token| !token.is_empty())
+        .ok_or_else(|| super::not_logged_in(login))?;
+    let client_id = client_id().ok_or_else(missing_client_id)?;
+    let response = http_client()?
+        .post(format!("{}/login/oauth/access_token", web_base()))
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(urlencode(&[
+            ("client_id", &client_id),
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh),
+        ]))
+        .send()
+        .map_err(network_error)?;
+    if !response.status().is_success() {
+        return Err(super::not_logged_in(login));
+    }
+    let body: TokenResponse = response.json().map_err(network_error)?;
+    if body.error.is_some() {
+        return Err(super::not_logged_in(login));
+    }
+    let valid = |value: Option<String>| {
+        value.filter(|token| !token.is_empty() && !token.chars().any(char::is_whitespace))
+    };
+    let access_token = valid(body.access_token).ok_or_else(|| super::not_logged_in(login))?;
+    let refresh_token = valid(body.refresh_token).ok_or_else(|| super::not_logged_in(login))?;
+    let expires_in = body
+        .expires_in
+        .filter(|seconds| *seconds > 0)
+        .ok_or_else(|| super::not_logged_in(login))?;
+    let refresh_expires_in = body
+        .refresh_token_expires_in
+        .filter(|seconds| *seconds > 0)
+        .ok_or_else(|| super::not_logged_in(login))?;
+    let now = super::super::now_ms();
+    state.tokens.save_credentials(
+        login,
+        &TokenCredentials {
+            access_token: access_token.clone(),
+            refresh_token: Some(refresh_token),
+            expires_at_ms: Some(now.saturating_add(expires_in.saturating_mul(1000))),
+            refresh_expires_at_ms: Some(
+                now.saturating_add(refresh_expires_in.saturating_mul(1000)),
+            ),
+        },
+    )?;
+    Ok(access_token)
 }
 
 /// 退出账号：删钥匙串条目、账号记录与仓库绑定。

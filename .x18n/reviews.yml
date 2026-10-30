@@ -231,6 +231,8 @@ sources:
     en: 18e95746b992db
   errors.m7.githubCommentTooLong:
     en: 18c8076d0a44b8
+  errors.m7.githubCredentialDeleteFailed:
+    en: 923a42f5af6ef
   errors.m7.githubDeviceFlowFailed:
     en: ea11923435be0
   errors.m7.githubDeviceFlowUnconfigured:

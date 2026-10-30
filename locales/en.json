@@ -911,7 +911,8 @@
       "updateReasonNoEndpoints": "No update check URL is configured",
       "writeTargetDirectory": "The write target is missing a directory",
       "diagnosticsStoreFailed": "Could not read or write diagnostic summaries. Clear the summaries and try again.",
-      "diagnosticsSnapshotExpired": "The diagnostic preview has expired. Refresh it before exporting."
+      "diagnosticsSnapshotExpired": "The diagnostic preview has expired. Refresh it before exporting.",
+      "githubCredentialDeleteFailed": "Could not delete GitHub credentials: {error}"
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
