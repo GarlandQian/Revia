@@ -1,6 +1,6 @@
 # 04：运行归属 worktree 的内置终端
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -60,3 +60,9 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 `TerminalPanel.tsx:263–276,340` 点击页签×直接terminalClose；Rust `terminal.rs:386–395` 立即kill。App关闭保护 `App.tsx:1638–1655,1747–1759` 不注册终端运行状态。触发：终端中执行长任务后点×或退出。结果：没有确认/取消机会，进程直接终止。尚未实际启动任务；源码无确认分支。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F05**：重挂载先 `terminalList` 认领本 worktree 仍在运行的会话（不新建不可达进程）；切 worktree 清空 tabs 并销毁前端视图（后端进程保留待认领）；`resolve_cwd` 接受 worktree 内的绝对 cwd（持久化恢复），外部/逃逸路径仍拒绝（新增回归测试 `terminal::cwd_tests`）。
+- **F06/H9**：关闭运行中页签先内联确认（终止并关闭 / 取消），确认才调用 terminalClose。
+- **busy 提示**：面板会话运行态经 `onRunningChange` 同步给 App（terminalRunningRef），参与更新安装门禁与关闭协调；Git 写锁仍然互斥。

@@ -1,6 +1,6 @@
 # 05：克隆并打开仓库
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -37,3 +37,7 @@ clone.rs:259–263 直接 shell_env.which("git")/Command::new；CloneManager 无
 触发：设置指定自装 Git（或默认 PATH Git 不可用）、然后克隆。后果推断：克隆执行不同 Git；成功/失败/耗时不进入 Git 命令日志与诊断。建议让共享执行层提供受控流式 clone，而非另建无日志进程路径。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **H8**：CloneManager 携带设置中的 Git 程序（Q27）与统一 CommandLog；clone 完成写入真实命令日志（参数、耗时、退出码、尾部摘要），程序选择与统一执行器同源。

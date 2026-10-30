@@ -1,6 +1,6 @@
 # 03：编辑工作区 diff 并恢复草稿
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -90,3 +90,11 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 `App.tsx:5794–5801,5854–5864` 仅以非binary/unmerged显示编辑，不判断changes或view；`EditableWorkspace.tsx:126–129,367–430` 两侧分别为磁盘打开时全文/textarea，而非Git原diff。触发：统一视图或暂存组点编辑。结果：直接进入独立二栏整文件编辑，view仍是unified、没有切到同文件split；暂存侧入口也可写磁盘。缺少已确认的diff工作区侧集成，不是未请求的通用编辑器需求。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F03/H1**：EditableWorkspace 卸载时立即落草稿（不只取消 timer）；打开时草稿不再要求基线一致——基线已变时显示磁盘内容、保留草稿存储并进入冲突流程（保留两版）。
+- **F04/H3**：暂存 / 取消暂存 / 丢弃 / 提交入口在编辑器当前文件脏时拒绝（errors.workspace.editUnsavedBlock，双语）；局部关闭对话框“放弃”改为清草稿恢复磁盘，“保存”成功后真正关闭。
+- **H2**：保存继续走生产写入口（m7_save_editable 内部持会话写锁）；更新安装门禁（beforeUpdateInstall）阻止脏编辑，参见任务 11。
+- **H7**：edit.rs 写失败/回读失败保留结构化 cause（AppError::cause），不再把中文诊断句塞进参数。
+- **F20**：编辑入口只在 split 视图 + unstaged 侧出现；统一视图点击先切到同文件 split 再开编辑；历史/暂存侧不出现入口。

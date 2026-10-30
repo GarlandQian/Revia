@@ -1,6 +1,6 @@
 # 11：确认下载并安装应用更新
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: 03, 04
 
 ## What to build
@@ -44,3 +44,9 @@ Blocked by: 03, 04
 `src-tauri/src/settings.rs:123–139` 只有Manual/Notify/Automatic；`settings.tsx:379–432` 同样无预发布开关；`update.rs:207,247`始终构建固定配置endpoint，`tools/check-release-version.mjs:53–58` 预发布端点还固定为当前tag，后续beta无法发现。Automatic文案说自动下载但303–328只检查。触发：稳定版用户想主动订阅预发布或选自动下载。结果：没有所需渠道，新增方式无对应行为，偏离已确认取舍。无部署前提能补齐本地缺失字段/分派。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F13**：更新拆为 检查 → 确认下载（update.download，只下载不安装）→ 已下载待安装 → 确认安装（download_and_install 校验 downloaded_version 匹配，未下载拒绝）→ 重启按钮独立可达（receipt 存在即显示，不再嵌 available 分支）。安装前门禁 beforeUpdateInstall 走完整协调：编辑草稿落盘 + 在途 Git 写/待核对（CloseCoordinator）+ 终端运行中（terminalRunningRef）+ 脏编辑，任一存在则双语错误阻止安装。
+- **F22**：AppUpdateMode 移除未实现的 automatic；新增 allow_prerelease 设置（复选框 + settings patch），check 按 semver 预发布段过滤并动态切换 latest-prerelease.json endpoint（updater_builder().endpoints）。
+- **F14/F15**（任务 12 范围，这里联动的 endpoint 生成）：见任务 12。

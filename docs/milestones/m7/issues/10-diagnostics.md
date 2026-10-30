@@ -1,6 +1,6 @@
 # 10：预览并导出脱敏诊断
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -61,3 +61,9 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 `diagnostics.rs:113,129,145–146` 预览、导出各自重新render当前内存日志与当前时间；无摘要存储/到期/clear API；`src-tauri/src/git/mod.rs:55–57,88–115`全局CommandLog只在内存；`DiagnosticsDialog.tsx:101–109`也无清空入口。触发：重启后查看近7天错误，或预览后发生新命令再导出。结果：历史全失、无法清空，导出内容不等于用户已预览的快照。静态事实，未读用户历史。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F12**：render 按 request.worktree_id 过滤命令日志（其它仓库不进入导出）；字段白名单——program 只留文件名、args 脱敏、失败命令不再拷贝 output/stderr_excerpt，改为 error_class + 单行摘要（多行/diff 形态/超长行排除）；redact 增加 email 脱敏；scope 字段写入清单。
+- **F21**：DiagnosticsSummaryStore（diagnostics-summary.json）持久化脱敏摘要 7 天（500 条上限）；预览/导出共用同一份 command_log 快照并在调用时并入摘要；新增 m7_diagnostics_summary / m7_diagnostics_clear 命令与界面“清空摘要”按钮。
+- 新增单元测试：邮箱/URL/Token 脱敏、diff 形态摘要排除、按仓库过滤渲染、摘要 store 范围与清除。

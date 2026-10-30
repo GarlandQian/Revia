@@ -1,6 +1,6 @@
 # 12：标签打包至 Release 草稿
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -58,3 +58,10 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 `tools/write-updater-config.mjs:27–40` 只接受含 `untrusted comment:` 的原始minisign公钥全文，并原样写pubkey；`docs/release.md:48–51`也指导填全文。锁定 `tauri-plugin-updater 2.14.1` 本地源码 `updater.rs:1901–1902,1970` 先STANDARD base64解码再PublicKey::decode。触发：按文档正确配置公钥，客户端下载合法签名更新。结果：原始带空格/冒号公钥不是base64输入，验签前必失败。以锁定crate源码核对，未下载或安装更新。插件来源hash及原件摘录在supporting-source.txt。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F14**：新增 tools/generate-latest-json.mjs（Static Format 清单：version/notes/pub_date/platforms["darwin-aarch64"]/{url,signature}；signature 为 .sig 全文的 STANDARD base64，与锁定插件 verify_signature 的解码一致）；release.yml 新增“Generate updater manifests”步骤，生成 latest.json 与 latest-prerelease.json（本地 fixture 实测生成与 JSON 校验通过，原件 repair/latest-json-test.out）。
+- **F15**：write-updater-config.mjs 接受 minisign 全文或纯 base64，统一转为插件要求的 base64 编码（真实格式 fixture 实测：全文 0、base64 0、坏输入 exit 1，原件 repair/f15-*.log）。
+- **H10**（P3 顺带，自然消除）：产物重命名为 Revia-<版本>-macos-arm64.dmg 并生成 macos-SHA256SUMS.txt（shasum -a 256 --tag）。
+- 真实 CI 运行仍属最终验收，未执行。

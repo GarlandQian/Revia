@@ -1,6 +1,6 @@
 # 01：采用第四版玻璃外观
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -72,3 +72,8 @@ Blocked by: None
 补充静态覆盖缺口：`src/index.css:995–1003` 的非layer `.revia-popper` 不透明背景优先于1841处layer内透明背景；通用 `src/components/ui/button.tsx:10–16` 沿旧实色。此处仅记录源码，不冒充像素判断。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F01**：`GlassLayer` 显式传 `width/height="100%"`，并加 `.glass-layer.glass-surface { width/height: 100% !important }`（vendor 默认 200×80 行内样式被清除）；`.revia-popper` 圆角/边框改玻璃语义。隔离冒烟 `logs/smoke-repair.json` titlebar y=0、activityBar h=740、windowLayer=true。强折射真机证据仍留任务 14。
+- **F02**：主仓库分支补挂 CloneDialog / DiagnosticsDialog / UpdatePanel，Settings 传 worktreeId/updateStatus/onUpdateStatus/onThemesChanged；欢迎分支重复的第二个 CloneDialog 已删（standards smell 自然消除）。

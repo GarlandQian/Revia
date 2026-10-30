@@ -1,6 +1,6 @@
 # 06：登录并管理多个 GitHub 账号
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -36,3 +36,7 @@ Blocked by: None
 `github/auth.rs:60–69` TokenResponse只接access_token/scope/error/interval；257只保存access token，client_for始终直接载入，整个模块无refresh_token/expires_in/刷新请求；`commands.rs:338–351`/api.ts无cancel命令，GithubPanel451–459授权中只有复制码。触发：用户取消授权或GitHub App返回会过期的用户token/refresh token。结果：无真正取消入口；刷新字段被丢弃，过期后只能重新登录。不是client_id未配置这一外部前提导致。静态事实，未碰真实钥匙串。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F16**：TokenResponse 接收 refresh_token / expires_in / refresh_token_expires_in；TokenStore 新增 save_refresh/load_refresh/delete_refresh（独立 keyring 服务 "Revia GitHub Refresh"，验收模式同文件 0600）；设备码与 Token 登录都持久化刷新令牌，登出同时清除；新增 `m7_github_device_cancel` 命令与面板“取消授权”按钮（本地取消，不访问网络）。

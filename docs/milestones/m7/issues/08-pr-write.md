@@ -1,6 +1,6 @@
 # 08：创建 PR、提交审阅与确认合并
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: 07
 
 ## What to build
@@ -51,3 +51,10 @@ Blocked by: 07
 `GithubPanel.tsx:377–384,740–767` 创建表单仅base/title/body/draft，head强制currentBranch，单一remote来自列表；`github/pr.rs:744–745,1054–1065` 对head使用分支名校验并拒绝冒号。触发：本地origin=自己的fork、upstream=目标项目，为origin feature向upstream main建PR。结果：不能表达 `owner:feature`，也不能独立选来源/目标，不支持已确认fork路径。未远端创建PR。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F07**：ReviewSubmitRequest / MergeRequest 增加 remote 字段，命令层用所选 remote 构造 PrContext；缺 remote 拒绝（github.remoteRequired），不再回退 origin。前端审阅/合并都带列表/详情所选 remote。
+- **F09**：ReviewDraft 增加 head_sha（ts-rs 绑定重新生成）；草稿列表按后端 repoKey（新增 m7_github_repo_key 命令）+ head 过滤，保存绑定 head；前端不再伪造 repoKey（原 `${login}/${headRef}` 键永不匹配的缺陷消除）；reviewBody/commentBody 切 PR 清空。
+- **H7**：PrMergeOutcome 增加 `error: Option<AppErrorPayload>`；API 错误不再把中文 message 塞进 outcome，前端按结构化载荷走生产 formatAppError。
+- **F18**：创建 PR 支持 `owner:branch` head（validate_pr_head 新增测试）；创建表单可选来源远端（fork 场景 owner 前缀自动拼接）。

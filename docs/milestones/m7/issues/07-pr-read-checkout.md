@@ -1,6 +1,6 @@
 # 07：查看 PR 并检出来源分支
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: 06
 
 ## What to build
@@ -77,3 +77,9 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 `github/pr.rs:548–552,577–584` 仅取各列表第一页per_page=100，无Link消费/页码；`GithubPanel.tsx:70–72,610–620` 把patch裁成400行，无截断提示或完整diff入口，虽api.ts177封装prDiff但未调用。触发：>100文件/讨论的常见大PR或单文件patch>400行。结果：后续改动和讨论不可见，可能误当完整审阅。固定源码明确边界，未远端读取。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F11/H4**：PR checkout 先 `acquire_write_lock` + `require_identity`，再 fetch/写引用（H5 写门过晚修复）；已有同名分支时先 `merge-base --is-ancestor` 判定快进——非快进必须 `overwrite_confirmed`，前端分叉时弹确认对话框（覆盖本地分支 / 取消）；不再无条件 `branch -f`。
+- **F08**：列表与详情请求带代际 + 目标身份核对，迟到响应静默丢弃；切 worktree/remote 清空选中与详情。
+- **F19**：files/comments 按 Link header 翻完整页（ApiMeta.next_page）；patch 不再裁 400 行；新增“查看完整 diff”入口（GitHub diff 媒体类型，prDiff 已接线）。

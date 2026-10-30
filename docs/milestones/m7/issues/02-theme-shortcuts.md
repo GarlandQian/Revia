@@ -1,6 +1,6 @@
 # 02：导入颜色主题并自定义快捷键
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: None
 
 ## What to build
@@ -49,3 +49,8 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 `src/features/m7/settings.tsx:199–203` 遇冲突只报错return，没有确认替换；`src/lib/shortcuts.ts:110–120`不判断scope/平台等价。`src/components/app/CommitComposer.tsx:247–251,296` 仍用isCommitShortcut/COMMIT_SHORTCUT_LABEL，而App2970排除提交框后才自定义分派。触发：把commit从mod+k改mod+j，在提交框按J/K。结果：J不提交，K仍提交且提示旧K；真实纯函数输出见ui-probes.stdout，App对target的静态分派确认这一结果。没有真实键盘桌面验收。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F17**：冲突不再直接拒绝——记录待确认替换，UI 提供“替换 / 取消”；替换时冲突动作回落默认。提交框（CommitComposer）改用 `matchesAccelerator(event, acceleratorOf("commit"))`，快捷键提示同步 `formatAccelerator(acceleratorOf("commit"))`，跟随用户绑定。
+- **H11**：`shortcuts.actions.nextHunk/prevHunk` 中文改“下一个块/上一个块”（经 x18n apply，不直接改 JSON）。

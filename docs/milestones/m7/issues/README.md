@@ -1,6 +1,6 @@
 # M7 任务图
 
-Status: ready-for-agent
+Status: ready-for-review
 
 全部交给同一个 Paseo / Pi 实施会话，按依赖推进；整包固定源码后由 Codex 审查。任务 13 的事实门槛未满足，任务 14 整包验收保持阻塞。
 

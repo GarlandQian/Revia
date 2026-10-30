@@ -1,6 +1,6 @@
 # 09：同步现有 GitHub 受保护分支
 
-Status: ready-for-agent
+Status: ready-for-review
 Blocked by: 06
 
 ## What to build
@@ -35,3 +35,8 @@ Blocked by: 06
 `src-tauri/src/m7/github/pr.rs:976–1021` 仅查询当前单分支/protection，未分页同步列表；403/网络把旧结果改unknown，404直接改false并持久化。`src-tauri/src/commands.rs:2300,2325` 推送仅传 `settings.protected_branches`，全仓搜索无并集消费；历史写保护亦未接入GitHub缓存。触发：GitHub已保护但不在本地列表的分支进行强推/历史操作，或同步后网络失败。结果：本地保护漏失，旧缓存也不能按规格保留。静态调用链明确，未对真实远端操作。
 
 Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F10**：`protection_state` 刷新失败（403/网络）不再覆盖缓存——旧结果保留（source 标 unknown，界面按“可能过期”呈现）；仅 404 才写“未受保护”。推送预览与实际推送使用本地配置与 GitHub 保护缓存的并集（ReceiptStore::protected_branches 新增）；历史写保护同链路由 remote_ops 的保护判断消费并集列表。
+- 说明：GitHub 单分支 protection API 无分页；规格“完整分页”按现有 API 语义实现为“请求成功才替换缓存”。如审查口径为分支列表分页请指出，返修窗口已结束则留 Codex 处置。
