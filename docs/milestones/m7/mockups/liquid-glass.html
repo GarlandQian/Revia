@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revia · Liquid Glass 外观预览</title>
+  <link rel="stylesheet" href="../../m4/mockups/codicon.css">
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      color-scheme: dark;
+      --page: #101623; --ink: #e9eef7; --muted: #acb8cd; --line: #a7c8ff24;
+      --glass: #1823375e; --edge: #d1e6ff6b; --glow: #eff9ffb3; --hover: #d5e6ff19;
+      --editor: #202631; --code: #d6deeb; --code-muted: #9cabc0;
+      --green: #92d4a8; --green-bg: #253c33; --red: #ec9aa8; --red-bg: #402c36;
+      --accent: #a1c4ff; --selected: #a4c9ff26; --input: #111d2b9e;
+      --blue-orb: #347ee2; --pink-orb: #9362cc; --aqua-orb: #287e97;
+      --shadow: #00000038; --keyword: #c6a0f6; --string: #a6da95; --func: #8aadf4;
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --page: #e3eaf2; --ink: #243248; --muted: #52627b; --line: #4a668329;
+      --glass: #eef7ff66; --edge: #ffffffde; --glow: #ffffff; --hover: #ffffff82;
+      --editor: #fafbfd; --code: #26374b; --code-muted: #536476;
+      --green: #21663e; --green-bg: #e1f0e6; --red: #9e3550; --red-bg: #f9e6eb;
+      --accent: #1c57a9; --selected: #b8d7ff87; --input: #ffffffb3;
+      --blue-orb: #82b7ec; --pink-orb: #c9a8df; --aqua-orb: #8bcbd1;
+      --shadow: #48658724; --keyword: #8047b7; --string: #35692e; --func: #245fab;
+    }
+    body { margin: 0; min-width: 880px; min-height: 680px; height: 100vh; padding: 22px 28px 18px; overflow: hidden;
+      background: var(--page); color: var(--ink); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .codicon { font-size: 16px; }
+    .stage { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(4px); opacity: .8; }
+    .orb.a { width: 690px; height: 640px; left: -160px; top: 40px; background: radial-gradient(ellipse at 70% 30%,var(--blue-orb),transparent 68%); }
+    .orb.b { width: 740px; height: 600px; right: -170px; top: -160px; background: radial-gradient(ellipse,var(--pink-orb),transparent 70%); }
+    .orb.c { width: 680px; height: 480px; left: 160px; bottom: -270px; background: radial-gradient(ellipse,var(--aqua-orb),transparent 70%); }
+    .ribbon { position: absolute; width: 600px; height: 980px; left: -260px; top: -190px; border: 56px solid #dcecff18; border-radius: 48%; transform: rotate(-37deg); box-shadow: inset -12px 0 22px #fff1, 12px 0 32px #d2efff12; }
+    .preview-head { position: relative; max-width: 1450px; height: 44px; margin: 0 auto 15px; display: flex; align-items: center; gap: 12px; }
+    .wordmark { font-size: 20px; font-weight: 650; letter-spacing: -.7px; }
+    .caption { font-size: 11px; color: var(--muted); letter-spacing: .02em; }
+    .preview-head .controls { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+    .control { border: 1px solid var(--line); background: var(--hover); padding: 6px 11px; border-radius: 18px; font-size: 12px; }
+    .control[aria-pressed="true"] { background: var(--ink); color: var(--page); border-color: transparent; }
+    .window { position: relative; height: calc(100vh - 120px); min-height: 560px; max-width: 1450px; margin: auto;
+      display: grid; grid-template-rows: 56px minmax(0,1fr) 25px; gap: 10px; }
+    .glass { position: relative; isolation: isolate; border: 1px solid var(--edge); border-radius: 18px;
+      background: var(--glass); box-shadow: 0 12px 36px var(--shadow), inset 0 1px 0 var(--glow), inset 0 -1px 1px #ffffff20; }
+    .glass::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none;
+      background: linear-gradient(145deg,#ffffff22,transparent 31%,transparent 73%,#effaff16);
+      -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6); }
+    @supports (backdrop-filter: url(#revia-refraction)) {
+      .glass::before { backdrop-filter: url(#revia-refraction) blur(12px) saturate(1.5); }
+    }
+    .titlebar { display: flex; align-items: center; gap: 10px; padding: 0 16px; z-index: 5; }
+    .lights { display: flex; gap: 7px; margin-right: 16px; }
+    .lights i { width: 11px; height: 11px; border-radius: 50%; background: #ff625b; box-shadow: inset 0 1px 1px #fff7; }
+    .lights i:nth-child(2) { background: #fdbd30; } .lights i:nth-child(3) { background: #30c94c; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line); background: #ffffff0b; }
+    .pill.raised { border-color: var(--edge); background: var(--hover); box-shadow: inset 0 1px #fff3, 0 3px 9px #0000000e; }
+    .repo-mark { width: 20px; height: 20px; border-radius: 7px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg,#b4d8ff,#568bd1); font-size: 11px; font-weight: 700; }
+    .branch { color: var(--accent); }
+    .spacer { flex: 1; }
+    .icon-button { display: inline-grid; place-items: center; width: 29px; height: 29px; border: 0; border-radius: 9px; background: transparent; }
+    .icon-button:hover { background: var(--hover); }
+    .main-grid { display: grid; grid-template-columns: 48px 270px minmax(0,1fr); gap: 10px; min-height: 0; }
+    .rail { display: flex; flex-direction: column; align-items: center; padding: 7px 4px; border-radius: 17px; }
+    .rail .icon-button { width: 36px; height: 39px; margin-bottom: 5px; }
+    .rail .codicon { font-size: 19px; }
+    .rail .active { background: var(--hover); box-shadow: inset 0 1px #fff5,0 2px 6px #0001; color: var(--accent); border: 1px solid var(--edge); }
+    .sidebar { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .panel-title { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; }
+    .panel-title strong { font-size: 13px; font-weight: 600; }
+    .small { font-size: 11px; color: var(--muted); }
+    .count { display: inline-block; padding: 1px 6px; min-width: 18px; border-radius: 8px; text-align: center; font-size: 10px; background: var(--hover); color: var(--muted); }
+    .changes { flex: 1; padding: 0 8px; overflow: hidden; }
+    .group { display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 6px; color: var(--muted); font-size: 11px; font-weight: 600; }
+    .file { width: 100%; display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px 0 16px; border: 1px solid transparent; border-radius: 8px; white-space: nowrap; background: transparent; text-align: left; }
+    .file img { width: 15px; height: 15px; }
+    .file span { overflow: hidden; text-overflow: ellipsis; }
+    .file .path { color: var(--muted); font-size: 10px; margin-left: auto; }
+    .file.selected { background: var(--selected); border-color: var(--edge); box-shadow: inset 0 1px #fff2, 0 4px 9px #0000000d; }
+    .modified { color: var(--accent); } .added { color: var(--green); }
+    .commit { margin: 9px; padding: 12px; border: 1px solid var(--edge); border-radius: 12px; background: var(--input); box-shadow: inset 0 1px #fff2; }
+    .commit p { margin: 0 0 24px; font-size: 12px; }
+    .commit-foot { display: flex; justify-content: space-between; align-items: center; }
+    .commit-button { border: 1px solid #d2e9ff85; padding: 5px 14px; border-radius: 16px; color: #163759; background: linear-gradient(160deg,#edf7ff,#b8d8ff); box-shadow: inset 0 1px #fff,0 3px 10px #4b79ac30; font-weight: 600; }
+    .sidebar-footer { display: flex; gap: 6px; align-items: center; margin: 0 16px 13px; font-size: 11px; color: var(--muted); }
+    .editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--edge); border-radius: 18px; overflow: hidden; background: var(--editor); box-shadow: 0 15px 35px var(--shadow); }
+    .editor-chrome { position: relative; background: color-mix(in srgb, var(--editor) 79%, var(--blue-orb)); border-bottom: 1px solid var(--line); }
+    .tabs { height: 43px; display: flex; gap: 5px; align-items: center; padding: 0 9px; }
+    .tab { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 16px; color: var(--muted); font-size: 12px; }
+    .tab.active { color: var(--ink); background: var(--editor); border: 1px solid var(--line); box-shadow: 0 2px 5px #00000012; }
+    .tab img { width: 15px; height: 15px; }
+    .editor-tools { height: 38px; display: flex; align-items: center; gap: 5px; padding: 0 14px; font-size: 11px; }
+    .editor-tools .file-path { color: var(--muted); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .review-button { font-size: 11px; height: 24px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--line); padding: 0 9px; background: var(--hover); }
+    .versions { display: grid; grid-template-columns: 1fr 70px 1fr; height: 31px; align-items: center; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+    .versions span:first-child { padding-left: 18px; } .versions span:last-child { padding-left: 14px; }
+    .versions small { text-align: center; color: var(--green); font-size: 10px; }
+    /* The code surface is opaque. Refraction only affects decorative chrome. */
+    .diff { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) 70px minmax(0,1fr); grid-template-rows: max-content; background: var(--editor); color: var(--code); overflow-y: auto; }
+    .code-pane { overflow-x: auto; overflow-y: hidden; padding: 12px 0 24px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+    .code-row { min-width: max-content; height: 24px; line-height: 24px; padding: 0 16px; white-space: pre; font: 13px/24px "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+    .code-row.add { background: var(--green-bg); border-left: 2px solid var(--green); padding-left: 14px; }
+    .code-row.remove { background: var(--red-bg); border-right: 2px solid var(--red); }
+    .code-row .kw { color: var(--keyword); } .code-row .str { color: var(--string); } .code-row .fn { color: var(--func); }
+    .code-row .comment { color: var(--code-muted); }
+    .gutter { position: relative; display: flex; justify-content: space-between; border-left: 1px solid var(--line); border-right: 1px solid var(--line); padding: 12px 6px 0; overflow: hidden; background: var(--editor); }
+    .numbers { position: relative; width: 24px; z-index: 1; }
+    .numbers span { display: block; height: 24px; font: 11px/24px "SFMono-Regular", Consolas, monospace; color: var(--code-muted); text-align: center; }
+    .gutter svg { position: absolute; top: 12px; left: 0; width: 100%; height: 620px; }
+    /* Optional whole-interface proposal: tint the backdrop, never filter the text. */
+    html[data-code-glass="true"] .editor { background: color-mix(in srgb,var(--editor) 94%,transparent); -webkit-backdrop-filter: blur(24px) saturate(1.1); backdrop-filter: blur(24px) saturate(1.1); border-color: var(--edge); box-shadow: 0 15px 35px var(--shadow), inset 0 1px 0 var(--glow); }
+    html[data-code-glass="true"] .diff { background: transparent; }
+    html[data-code-glass="true"] .gutter { background: color-mix(in srgb,var(--editor) 30%,transparent); }
+    html[data-code-glass="true"] .editor-chrome { background: color-mix(in srgb,var(--editor) 80%,transparent); }
+    html[data-code-glass="true"] .editor-footer { background: color-mix(in srgb,var(--editor) 40%,transparent); }
+    .editor-footer { padding: 6px 13px; display: flex; gap: 10px; justify-content: flex-end; font-size: 10px; color: var(--muted); border-top: 1px solid var(--line); }
+    .status { display: flex; gap: 13px; align-items: center; font-size: 10px; color: var(--muted); padding: 0 9px; }
+    .status .codicon { font-size: 12px; vertical-align: -2px; }
+    .status .state { width: 5px; height: 5px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 5px; }
+    .floating-menu { position: absolute; right: 1px; top: 63px; width: 230px; z-index: 10; padding: 9px; background: color-mix(in srgb,var(--glass) 75%,var(--page)); }
+    .floating-menu[hidden] { display: none; }
+    .menu-head { padding: 4px 9px 10px; font-size: 11px; color: var(--muted); }
+    .menu-item { display: flex; gap: 9px; align-items: center; padding: 9px; border-radius: 10px; }
+    .menu-item.chosen { background: var(--selected); }
+    .menu-item span:last-child { margin-left: auto; color: var(--muted); }
+    .preview-note { position: relative; text-align: center; color: var(--muted); font-size: 10px; margin: 9px 0 0; letter-spacing: .03em; }
+    @media(max-width:1100px) { body { padding-left: 16px; padding-right: 16px; } .main-grid { grid-template-columns: 44px 224px minmax(0,1fr); gap: 8px; } .file { padding-left: 8px; } .file .path,.tab.secondary,.toolbar-optional { display: none; } .titlebar { gap: 5px; } .diff,.versions { grid-template-columns: minmax(0,1fr) 58px minmax(0,1fr); } .code-row { padding-left: 10px; } }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation: none!important; transition: none!important; } }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs><filter id="revia-refraction" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".006 .018" numOctaves="1" seed="9" result="bend"/><feGaussianBlur in="bend" stdDeviation="2" result="smooth"/><feDisplacementMap in="SourceGraphic" in2="smooth" scale="32" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg>
+  <div class="stage" aria-hidden="true"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div><div class="ribbon"></div></div>
+  <header class="preview-head"><span class="wordmark">Revia</span><span class="caption">LIQUID GLASS · M7 外观预览</span><div class="controls"><button class="control" data-mode="light" aria-pressed="false">浅色</button><button class="control" data-mode="dark" aria-pressed="true">深色</button><button class="control" id="glass-toggle" aria-pressed="false">全界面玻璃对比</button><button class="control" id="menu-toggle" aria-pressed="false">显示浮层</button></div></header>
+  <section class="window" aria-label="Revia 强玻璃外观示意">
+    <header class="titlebar glass"><div class="lights" aria-hidden="true"><i></i><i></i><i></i></div><span class="pill"><span class="repo-mark">R</span><strong>Revia</strong><i class="codicon codicon-chevron-down"></i></span><span class="pill raised branch"><i class="codicon codicon-git-branch"></i>feature/glass-ui<i class="codicon codicon-chevron-down"></i></span><span class="spacer"></span><span class="pill toolbar-optional"><i class="codicon codicon-arrow-down"></i>更新</span><span class="pill toolbar-optional"><i class="codicon codicon-arrow-up"></i>推送</span><button class="icon-button" id="settings-toggle" title="外观浮层" aria-label="显示外观浮层"><i class="codicon codicon-settings-gear"></i></button></header>
+    <div class="main-grid">
+      <nav class="rail glass" aria-label="工具窗口"><span class="icon-button active" title="提交"><i class="codicon codicon-source-control"></i></span><span class="icon-button" title="日志"><i class="codicon codicon-history"></i></span><span class="icon-button" title="PR"><i class="codicon codicon-git-pull-request"></i></span><span class="spacer"></span><span class="icon-button" title="终端"><i class="codicon codicon-terminal"></i></span></nav>
+      <aside class="sidebar glass"><div class="panel-title"><strong>提交</strong><span class="count">7</span><span class="spacer"></span><i class="codicon codicon-refresh"></i><i class="codicon codicon-ellipsis"></i></div><div class="changes"><div class="group"><i class="codicon codicon-chevron-down"></i>已暂存<span class="spacer"></span><span class="count">2</span></div><div class="file"><img src="../../m4/mockups/icons/typescript.svg" alt=""><span class="added">glassTheme.ts</span><span class="path">src/lib</span></div><div class="file"><img src="../../m4/mockups/icons/react_ts.svg" alt=""><span class="modified">GlassSurface.tsx</span></div><div class="group"><i class="codicon codicon-chevron-down"></i>未暂存<span class="spacer"></span><span class="count">5</span></div><div class="file selected"><img src="../../m4/mockups/icons/react_ts.svg" alt=""><span class="modified">TitleBar.tsx</span><span class="spacer"></span><i class="codicon codicon-add"></i></div><div class="file"><img src="../../m4/mockups/icons/react_ts.svg" alt=""><span class="modified">Sidebar.tsx</span></div><div class="file"><img src="../../m4/mockups/icons/typescript.svg" alt=""><span class="modified">theme.ts</span><span class="path">src/lib</span></div><div class="file"><img src="../../m4/mockups/icons/json.svg" alt=""><span class="modified">zh-CN.json</span></div><div class="file"><img src="../../m4/mockups/icons/markdown.svg" alt=""><span class="modified">README.md</span></div><div class="group"><i class="codicon codicon-chevron-right"></i>未跟踪<span class="spacer"></span><span class="count">1</span></div></div><div class="commit"><p>为窗口框架加入玻璃材质</p><div class="commit-foot"><span class="small">⌘K</span><span class="commit-button">提交</span></div></div><div class="sidebar-footer"><i class="codicon codicon-pass"></i>已审阅 4 / 8<span class="spacer"></span><i class="codicon codicon-shield"></i></div></aside>
+      <main class="editor"><div class="editor-chrome"><div class="tabs"><div class="tab secondary"><i class="codicon codicon-git-commit"></i>提交日志</div><div class="tab active"><img src="../../m4/mockups/icons/react_ts.svg" alt="">TitleBar.tsx<i class="codicon codicon-close"></i></div><span class="spacer"></span><i class="codicon codicon-split-horizontal"></i></div><div class="editor-tools"><span class="file-path" title="src / components / TitleBar.tsx">src / components / TitleBar.tsx</span><span class="spacer"></span><button class="review-button" id="review-toggle" aria-pressed="false">标记为已审阅</button></div></div><div class="versions"><span>暂存区</span><small>+4 −2</small><span>工作区</span></div><div class="diff"><div class="code-pane" id="before-code"></div><div class="gutter"><svg viewBox="0 0 70 620" preserveAspectRatio="none" aria-hidden="true"><path d="M0 96 C35 96 35 96 70 96 L70 168 C35 168 35 144 0 144 Z" fill="var(--green-bg)"/><path d="M0 336 C35 336 35 360 70 360 L70 384 C35 384 35 336 0 336 Z" fill="var(--green-bg)"/></svg><div class="numbers" id="before-lines"></div><div class="numbers" id="after-lines"></div></div><div class="code-pane" id="after-code"></div></div><footer class="editor-footer"><span>UTF-8</span><span>LF</span><span>TypeScript React</span></footer></main>
+    </div>
+    <footer class="status"><span><i class="codicon codicon-git-branch"></i> feature/glass-ui</span><span>↑ 2　↓ 0</span><span class="spacer"></span><span><i class="state"></i>已刷新</span><span>Revia</span></footer>
+    <div class="floating-menu glass" id="appearance-menu" hidden><div class="menu-head">外观</div><div class="menu-item chosen"><i class="codicon codicon-sparkle"></i>Liquid Glass<span>✓</span></div><div class="menu-item"><i class="codicon codicon-symbol-color"></i>跟随系统<span>⌘ ,</span></div><div class="menu-item"><i class="codicon codicon-text-size"></i>代码字体<span>13 px</span></div></div>
+  </section>
+  <p class="preview-note" id="preview-note">强玻璃框架 · 清晰代码表面 · 示例数据</p>
+  <script>
+    const before = [
+      'import { TitleBar } from "./TitleBar";', '',
+      'export function Workspace() {', '  const repo = useRepository();',
+      '  const surface = "solid";', '  const border = "subtle";', '',
+      '  return (', '    <WorkspaceLayout>', '      <TitleBar', '        repository={repo}', '        branch={repo.branch}',
+      '        surface={surface}', '        border={border}', '      />', '',
+      '      <DiffView', '        snapshot={repo.snapshot}', '        onStage={stageSelection}', '      />',
+      '    </WorkspaceLayout>', '  );', '}', '', '// 审阅代码，确认每一处改动。'
+    ];
+    const after = [
+      'import { TitleBar } from "./TitleBar";', '',
+      'export function Workspace() {', '  const repo = useRepository();',
+      '  const surface = "liquid-glass";', '  const border = "luminous";', '  const content = "opaque";', '',
+      '  return (', '    <WorkspaceLayout>', '      <TitleBar', '        repository={repo}', '        branch={repo.branch}',
+      '        surface={surface}', '        border={border}', '        floating', '      />', '',
+      '      <DiffView', '        snapshot={repo.snapshot}', '        onStage={stageSelection}', '      />',
+      '    </WorkspaceLayout>', '  );', '}', '', '// 审阅代码，确认每一处改动。'
+    ];
+    function escapeText(value) { return value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    function highlight(value) {
+      if (value.trimStart().startsWith('//')) return '<span class="comment">' + escapeText(value) + '</span>';
+      return value.split(/("[^"]*"|\b(?:import|from|export|function|const|return)\b)/g).map(part => {
+        const text = escapeText(part);
+        if (part.startsWith('"')) return '<span class="str">' + text + '</span>';
+        if (/^(import|from|export|function|const|return)$/.test(part)) return '<span class="kw">' + text + '</span>';
+        return text;
+      }).join('');
+    }
+    function renderCode(id, lines, changed, type) {
+      document.getElementById(id + '-code').innerHTML = lines.map((line,index) => '<div class="code-row ' + (changed.includes(index) ? type : '') + '">' + highlight(line) + '</div>').join('');
+      document.getElementById(id + '-lines').innerHTML = lines.map((_,index) => '<span>' + (index+1) + '</span>').join('');
+    }
+    renderCode('before', before, [4,5], 'remove');
+    renderCode('after', after, [4,5,6,15], 'add');
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      document.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === theme)));
+    }
+    document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setTheme(button.dataset.mode)));
+    function setCodeGlass(enabled) {
+      document.documentElement.dataset.codeGlass = String(enabled);
+      document.getElementById('glass-toggle').setAttribute('aria-pressed', String(enabled));
+      document.getElementById('preview-note').textContent = enabled
+        ? '全界面玻璃提案 · 代码区使用低透明底层 · 示例数据'
+        : '强玻璃框架 · 清晰代码表面 · 示例数据';
+    }
+    document.getElementById('glass-toggle').addEventListener('click', () => setCodeGlass(document.documentElement.dataset.codeGlass !== 'true'));
+    function toggleMenu() {
+      const menu = document.getElementById('appearance-menu'); menu.hidden = !menu.hidden;
+      document.getElementById('menu-toggle').setAttribute('aria-pressed', String(!menu.hidden));
+    }
+    document.getElementById('menu-toggle').addEventListener('click', toggleMenu);
+    document.getElementById('settings-toggle').addEventListener('click', toggleMenu);
+    document.getElementById('review-toggle').addEventListener('click', event => {
+      const button = event.currentTarget; const checked = button.getAttribute('aria-pressed') !== 'true';
+      button.setAttribute('aria-pressed', String(checked)); button.textContent = checked ? '✓ 已审阅' : '标记为已审阅';
+    });
+    setTheme(new URLSearchParams(location.search).get('theme') === 'light' ? 'light' : 'dark');
+    setCodeGlass(new URLSearchParams(location.search).get('glass') === 'all');
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !document.getElementById('appearance-menu').hidden) toggleMenu(); });
+  </script>
+</body>
+</html>

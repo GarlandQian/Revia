@@ -1,6 +1,6 @@
 # Revia 协作指南
 
-Revia 是一个照 Rebased 的布局和功能、配上 VS Code 外观的轻量桌面 Git 客户端（[ADR-0011](docs/adr/0011-rebuild-like-rebased-not-fork.md)），核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M8（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
+Revia 是一个照 Rebased 的布局和功能、采用 Liquid Glass 外观的轻量桌面 Git 客户端（[ADR-0011](docs/adr/0011-rebuild-like-rebased-not-fork.md)），核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M8（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，Git 操作由 Rust 层调用系统 Git 命令行完成，stash 删除/清空的窄范围例外见 ADR-0014。
 
 M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2、M3 已于 2026-10-26 合入 main，M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154），部分验收未完成（见各自报告）；M6 已于 2026-10-30 合入 main（[M6 报告](docs/milestones/m6/report.md)）。
 
@@ -17,7 +17,7 @@ M6“冲突与历史、双语界面”已于 2026-10-30 压成一个提交合入
 
 审查按 Q174：首轮全范围两轴审查之后只审增量，真实桌面验收不必等审查零发现；P3 与构造场景的边界问题记 backlog。M4、M5 遗留（Q98 长测、统一视图首次跳转、未做完的桌面验收）在 `docs/milestones/backlog/` 04–06，M6 验收转出的观察在 09–14，都不属于 M7 范围，除非用户在第 1 步中纳入。
 
-布局与交互照本机 Rebased 1.1.22，外观沿用 VS Code 颜色主题（Q117、Q131–Q133）。旧决定冲突时按 Q129、Q131 处理，安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
+布局与交互照本机 Rebased 1.1.22，M7 外观改为 Liquid Glass，代码与 diff 清晰度优先（Q189、Q190）。修改材质、颜色主题或代码显示时，读 [UI 方向](docs/ui-direction.md#视觉风格)；VS Code 颜色主题、代码字体与图标体系继续沿用。安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
 
 M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
 
