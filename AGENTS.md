@@ -2,7 +2,7 @@
 
 Revia 是一个照 Rebased 的布局和功能、配上 VS Code 外观的轻量桌面 Git 客户端（[ADR-0011](docs/adr/0011-rebuild-like-rebased-not-fork.md)），核心工作流是“审阅 diff → 选择变更 → 提交”。目标平台是 macOS Apple Silicon 与 Windows x64（安装版、便携版）；首版只做 macOS，Windows 在 M8（[ADR-0007](docs/adr/0007-target-platforms.md)）。技术栈为 Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS，所有 Git 操作都由 Rust 层调用系统 Git 命令行完成。
 
-M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2、M3 已于 2026-10-26 合入 main，M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154），部分验收未完成（见各自报告）。
+M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M1 报告](docs/milestones/m1/report.md)）已完成；M2、M3 已于 2026-10-26 合入 main，M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154），部分验收未完成（见各自报告）；M6 已于 2026-10-30 合入 main（[M6 报告](docs/milestones/m6/report.md)）。
 
 ## 开始前必读
 
@@ -11,13 +11,11 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M6 整包实施准备
+## 当前阶段：M7 第 1 步
 
-M6 范围与整包验收见 [规格](docs/milestones/m6/spec.md)、[单一整包任务](docs/milestones/m6/issues/01-complete-m6.md) 与 [Pi 交接](docs/milestones/m6/paseo-batch.md)。按 Q172 一次交给同一个 Pi 会话完成全部功能后统一审查验收，不按功能拆派或启动多个实施代理；Pi 仍在独立 `m6` worktree 实施，主目录保留 main（Q155）。
+M6“冲突与历史、双语界面”已于 2026-10-30 压成一个提交合入 main，真实桌面全组验收通过；收尾几处小改动的真机复查见 [backlog 14](docs/milestones/backlog/14-m6-final-desktop-recheck.md)。下一步 M7“扩展”，范围见 [产品方向](docs/product-direction.md#实施顺序) 的里程碑表（更改列表模式、diff 工作区一侧可编辑、内置终端、克隆、GitHub PR、导出诊断信息、自动更新）。从下面工作流程的第 1 步开始，先与用户追问未定细节，再写 `docs/milestones/m7/spec.md`。
 
-M6 细节见 [产品方向：M6](docs/product-direction.md#m6冲突与历史)（Q156–Q172）。双语与 x18n 提前到 M6，首次按系统语言选择，Rust 用户报错结构化；实施前读 [文案规则](docs/milestones/m6/i18n-proposal.md) 及 x18n skills，核对 MCP 实际加载与目标目录。函数文案占位符化、动态查表用完整字面量键；check 与 extract --list 分别验翻译和写死中文。
-
-M4、M5 带已知未达标项合入 main（Q154）：Q98 长测、统一视图首次跳转与未做完的桌面验收在 `docs/milestones/backlog/` 04–06，不属于 M6 范围，除非用户在第 1 步中纳入。用户已要求把 [backlog 07](docs/milestones/backlog/07-log-date-column-wrap.md)（日志日期列折行）并入 M6 一起修复。
+审查按 Q174：首轮全范围两轴审查之后只审增量，真实桌面验收不必等审查零发现；P3 与构造场景的边界问题记 backlog。M4、M5 遗留（Q98 长测、统一视图首次跳转、未做完的桌面验收）在 `docs/milestones/backlog/` 04–06，M6 验收转出的观察在 09–14，都不属于 M7 范围，除非用户在第 1 步中纳入。
 
 布局与交互照本机 Rebased 1.1.22，外观沿用 VS Code 颜色主题（Q117、Q131–Q133）。旧决定冲突时按 Q129、Q131 处理，安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
 

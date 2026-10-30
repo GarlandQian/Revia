@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)）；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见 [M3 报告](./milestones/m3/report.md)）。M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154，遗留项见 [backlog](./milestones/backlog/)）；下一步 M6。更新日期：2026-10-28。
+状态：M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)）；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见 [M3 报告](./milestones/m3/report.md)）。M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154，遗留项见 [backlog](./milestones/backlog/)）；M6 已于 2026-10-30 合入 main（见 [M6 报告](./milestones/m6/report.md)），下一步 M7。更新日期：2026-10-30。
 
 Revia 照 Rebased（JetBrains 的独立 Git 客户端）的布局和功能，配上 VS Code 的外观，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q131）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
