@@ -1,6 +1,6 @@
 # 01：采用第四版玻璃外观
 
-Status: done
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -56,3 +56,19 @@ Blocked by: None
 修复过程中的一次真实缺陷与验证：
 1. 材质层占位破坏 grid 布局（冒烟 layout 全部偏移、并排色带画不出）→ 原件 `logs/smoke-glass4..7.json` 保留，定位为 vendor `.glass-surface{position:relative}`（非 layered）覆盖 layered 规则。
 2. 修正后全量复测：`cargo test` 669 通过（m6_flows 1 例 15s 超时属负载抖动，单独重跑通过，`logs/m6-retest.exit=0`）、`pnpm exec tsc -b` 0 错、`pnpm lint` 0 错、`x18n check` 0 错 65 预存警告、`pnpm build` 成功、隔离冒烟 `logs/smoke-final2.json` ok=true。
+
+### Codex / review01 Spec — 2026-10-31T03:14:30.306434+08:00
+
+固定候选 `46574071b591b138a31d51be4403c29ba578a0d1`，本轴正式意见与证据摘录按原文转录。来源：/private/tmp/revia-m7-batch-g5scyw0r/review-01-oim6d9nj/spec.md；完整证据附录保存在本轮证据目录。
+
+| F01 P1 | “覆盖窗口”：玻璃层仅200×80，SSR确认 | src/features/m7/glass/GlassLayer.tsx:28；src/components/m7/glass/GlassSurface.tsx:355 |
+
+## F01 [P1] 玻璃装饰层只有 200×80
+
+规格 S64：“Glass Surface 用于窗口和浮层”；任务01原文“覆盖窗口、按钮、工具入口、浮层与平台外壳”；用户纠正要求“整窗外壳、侧栏、工具条、页签/状态栏、设置、业务对话框、菜单/通知与操作按钮采用第四版同一套连贯玻璃材质”。
+
+源码 `src/features/m7/glass/GlassLayer.tsx:28–44` 不传 width/height；`src/components/m7/glass/GlassSurface.tsx:355–356,809–824` 默认200/80并输出行内样式；`src/index.css:1782–1789` 只覆盖 position/inset，未清除width/height。触发：正常打开主窗口或超过200×80的任意对话框。结果：唯一材质层固定200×80，无法覆盖整窗/浮层。`ui-probes.stdout` 三种variant均真实输出 `style="width:200px;height:80px;..."`，并保存SSR原件。这不是仅缺桌面证据，而是确定的尺寸接线错误；其余强折射及视觉一致性仍未验。
+
+补充静态覆盖缺口：`src/index.css:995–1003` 的非layer `.revia-popper` 不透明背景优先于1841处layer内透明背景；通用 `src/components/ui/button.tsx:10–16` 沿旧实色。此处仅记录源码，不冒充像素判断。
+
+Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。

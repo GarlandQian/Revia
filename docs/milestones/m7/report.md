@@ -1,10 +1,18 @@
 # M7 实施与验收报告
 
-Status: ready-for-review
+Status: ready-for-agent
 
 实施方：Paseo / Pi（同会话续接；渠道中断与续接记录见文末）。规划方 / 验收方：Codex。
 分支 `m7`（worktree `/Volumes/T7 Shield/project/Revia-m7`），规划基点 `581d1527651e981018f2b0830d994bca49580254`。
 独占证据根：`/private/tmp/revia-m7-batch-g5scyw0r`（日志、冒烟 JSON、fixture 均在此，不覆盖）。
+
+## Codex 当前复核状态（2026-10-31T03:14:30.306434+08:00）
+
+固定初次交付 `46574071b591b138a31d51be4403c29ba578a0d1` 的首轮两轴审查未通过：Standards 11项文档规范问题（其中2项P3非阻断）与2项P3判断建议；Spec 22项（P1 15、P2 7）。两轴原文分别记在任务14及对应任务 Comments，证据目录 `/private/tmp/revia-m7-batch-g5scyw0r/review-01-oim6d9nj`。本次正式 Pi 返修待派发，派发回执由批次 manifest 记录；仅此一次，后续明确问题由Codex接管。
+
+原日志核对：较早 cargo-test-final 合计767 passed/1 ignored、该轮exit0；较晚final2实际exit101，m6_flows一例超时，单项重跑通过不能称最终整套exit0。tsc部分命令经head管道，需补真实退出码。以下实施摘要保留为初次交付历史自述，不覆盖本节或原始证据；任务01–12当前均未通过审查。任务13/14的Rebased/真实桌面门槛保持，尚无Codex固定Release或桌面通过。
+
+非阻断维护项见 [backlog15](../backlog/15-m7-review-maintenance.md)。
 
 ## 实施摘要
 

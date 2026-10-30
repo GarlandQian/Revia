@@ -1,6 +1,6 @@
 # 09：同步现有 GitHub 受保护分支
 
-Status: done
+Status: ready-for-agent
 Blocked by: 06
 
 ## What to build
@@ -21,3 +21,17 @@ Blocked by: 06
 在生产入口和独占 fixture 中核对实际可观察结果；原始证据保存到交接指定目录。相关改动完成后集中验证，遵守本地验证规则。产品真实桌面由任务 14 统一完成。
 
 ## Comments
+
+### Codex / review01 Spec — 2026-10-31T03:14:30.306434+08:00
+
+固定候选 `46574071b591b138a31d51be4403c29ba578a0d1`，本轴正式意见与证据摘录按原文转录。来源：/private/tmp/revia-m7-batch-g5scyw0r/review-01-oim6d9nj/spec.md；完整证据附录保存在本轮证据目录。
+
+| F10 P1 | “取并集”“失败保留”：推送漏保护、失败覆盖缓存 | src-tauri/src/commands.rs:2300,2325；src-tauri/src/m7/github/pr.rs:997 |
+
+## F10 [P1] GitHub保护未用于实际保护判断且失败覆盖缓存
+
+规格 S111：“与本地保护列表取并集；完整分页成功才替换缓存。失败保留旧结果并标注可能过期，首次无缓存时明确未同步”。
+
+`src-tauri/src/m7/github/pr.rs:976–1021` 仅查询当前单分支/protection，未分页同步列表；403/网络把旧结果改unknown，404直接改false并持久化。`src-tauri/src/commands.rs:2300,2325` 推送仅传 `settings.protected_branches`，全仓搜索无并集消费；历史写保护亦未接入GitHub缓存。触发：GitHub已保护但不在本地列表的分支进行强推/历史操作，或同步后网络失败。结果：本地保护漏失，旧缓存也不能按规格保留。静态调用链明确，未对真实远端操作。
+
+Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
