@@ -81,6 +81,7 @@ export interface SettingsValues {
   /** 当前会话实际使用的 Git 程序（只读展示）。 */
   detectedGitPath: string | null;
   appUpdateMode: AppUpdateMode;
+  allowPrerelease: boolean;
   shortcuts: Record<string, string>;
 }
 
@@ -132,6 +133,7 @@ export interface SettingsPatch {
   pushDialogProtectedOnly?: boolean;
   protectedBranches?: string[];
   appUpdateMode?: AppUpdateMode;
+  allowPrerelease?: boolean;
   shortcuts?: Record<string, string>;
 }
 
@@ -1097,6 +1099,8 @@ export function SettingsDialog({
               <M7UpdateSettings
                 mode={values.appUpdateMode ?? "notify"}
                 onChangeMode={(mode) => commit({ appUpdateMode: mode })}
+                allowPrerelease={values.allowPrerelease ?? false}
+                onChangeAllowPrerelease={(value) => commit({ allowPrerelease: value })}
                 status={updateStatus}
                 onStatusChange={(status) => onUpdateStatus?.(status)}
               />

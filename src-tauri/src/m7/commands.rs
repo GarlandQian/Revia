@@ -422,6 +422,9 @@ pub struct PrNumberRequest {
     #[serde(default)]
     pub remote: Option<String>,
     pub number: u64,
+    /// F09：按此 head 过滤审阅草稿；PR 更新后旧 head 草稿不进入当前列表。
+    #[serde(default)]
+    pub head_sha: Option<String>,
 }
 
 #[tauri::command]
@@ -505,7 +508,7 @@ pub async fn m7_github_review_drafts(
     request: PrNumberRequest,
 ) -> Result<Vec<ReviewDraft>> {
     let repo_key = GithubState::repo_key(&session_for(&state, &request.worktree_id)?.path);
-    Ok(pr::list_drafts(&state.m7_github, &repo_key, request.number))
+    Ok(pr::list_drafts(&state.m7_github, &repo_key, request.number, request.head_sha.as_deref()))
 }
 
 #[tauri::command]
@@ -532,7 +535,8 @@ pub async fn m7_github_review_submit(
     let session = session_for(&state, &request.worktree_id)?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
-        let context = PrContext::new(&session, &github, None)?;
+        // F07：审阅必须落在用户所选的远端仓库上；请求缺 remote 时拒绝而不是回退 origin。
+        let context = PrContext::new(&session, &github, request.remote.as_deref())?;
         pr::submit_review(&context, &request)
     }).await
 }
@@ -573,9 +577,30 @@ pub async fn m7_github_pr_merge(
     let session = session_for(&state, &request.worktree_id)?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
-        let context = PrContext::new(&session, &github, None)?;
+        // F07：合并必须落在用户所选的远端仓库上；请求缺 remote 时拒绝而不是回退 origin。
+        let context = PrContext::new(&session, &github, request.remote.as_deref())?;
         pr::merge(&context, &request)
     }).await
+}
+
+/// F09：前端保存草稿需要与后端一致的 repoKey（worktree 规范路径 SHA）。
+/// F16：取消进行中的设备码授权。
+#[tauri::command]
+pub async fn m7_github_device_cancel(
+    state: State<'_, AppState>,
+    flow_id: String,
+) -> Result<()> {
+    let github = Arc::clone(&state.m7_github);
+    blocking(move || super::github::auth::cancel_device_flow(&github, &flow_id)).await
+}
+
+#[tauri::command]
+pub async fn m7_github_repo_key(
+    state: State<'_, AppState>,
+    worktree_id: String,
+) -> Result<String> {
+    let session = session_for(&state, &worktree_id)?;
+    Ok(GithubState::repo_key(&session.path))
 }
 
 #[tauri::command]
@@ -614,7 +639,32 @@ pub async fn m7_preview_diagnostics(
         None => None,
     };
     let command_log = Arc::clone(&state.command_log);
-    blocking(move || super::diagnostics::preview(&request, &settings, &command_log, session.as_deref())).await
+    let summaries = Arc::clone(&state.m7_diagnostics);
+    blocking(move || {
+        // F21：预览 / 导出时同步把失败摘要并入 7 天持久化存储（同一快照）。
+        let _ = super::diagnostics::persist_summaries(&request, &summaries, &command_log);
+        super::diagnostics::preview(&request, &settings, &command_log, session.as_deref())
+    }).await
+}
+
+/// F21：读取持久化的脱敏摘要（按当前 worktree 过滤，7 天内）。
+#[tauri::command]
+pub async fn m7_diagnostics_summary(
+    state: State<'_, AppState>,
+    worktree_id: Option<String>,
+) -> Result<Vec<crate::m7::diagnostics::DiagnosticsSummaryEntry>> {
+    let store = Arc::clone(&state.m7_diagnostics);
+    blocking(move || Ok(store.list(worktree_id.as_deref()))).await
+}
+
+/// F21：清空持久化摘要（默认当前 worktree；传 all 清全部）。
+#[tauri::command]
+pub async fn m7_diagnostics_clear(
+    state: State<'_, AppState>,
+    worktree_id: Option<String>,
+) -> Result<usize> {
+    let store = Arc::clone(&state.m7_diagnostics);
+    blocking(move || store.clear(worktree_id.as_deref())).await
 }
 
 #[tauri::command]
@@ -675,6 +725,16 @@ pub async fn m7_update_check(
     let mode = update_mode(&state)?;
     let update: Arc<UpdateState> = Arc::clone(&state.m7_update);
     super::update::check(app, &update, mode, force).await
+}
+
+#[tauri::command]
+pub async fn m7_update_download(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<AppUpdateStatus> {
+    let mode = update_mode(&state)?;
+    let update: Arc<UpdateState> = Arc::clone(&state.m7_update);
+    super::update::download_update(app, &update, mode).await
 }
 
 #[tauri::command]

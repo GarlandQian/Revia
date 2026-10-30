@@ -421,12 +421,15 @@ pub fn save(session: &WorktreeSession, request: &EditSaveRequest) -> Result<Edit
         Ok(())
     })();
     if let Err(error) = result {
+        // H7：内层错误（含 io::Error 的结构化载荷）作为 cause 保留，
+        // 不把整段中文诊断句塞进参数——英文界面按 ADR-0013 由 formatter 翻译外层。
         return Err(AppError::coded(
             ErrorKind::NeedsVerification,
             "errors.m7.editWriteFailedKeepDraft",
-            "写入文件失败，草稿已保留；请核对磁盘内容后再试：{error}",
-            &[("error", error.to_string())],
-        ));
+            "写入文件失败，草稿已保留；请核对磁盘内容后再试",
+            &[],
+        )
+        .cause(error));
     }
     // 写完立刻回读核对：读回失败或内容不符时结果待核对，不自动重发。
     let mut after = Vec::new();
@@ -441,12 +444,14 @@ pub fn save(session: &WorktreeSession, request: &EditSaveRequest) -> Result<Edit
             ))
         }
         Err(error) => {
+            // H7：io::Error → AppError（From），再挂为结构化 cause。
             return Err(AppError::coded(
                 ErrorKind::NeedsVerification,
                 "errors.m7.editWriteUnverifiedCause",
-                "写入后无法回读文件，结果待核对；草稿已保留：{error}",
-                &[("error", error.to_string())],
-            ))
+                "写入后无法回读文件，结果待核对；草稿已保留",
+                &[],
+            )
+            .cause(AppError::from(error)));
         }
     }
     let metadata = std::fs::metadata(&full)?;

@@ -100,8 +100,12 @@ export function EditableWorkspace({
   const draftTimer = useRef<number | null>(null);
   const latest = useRef({ text, baseSha, worktreeId, path: entry.path });
   latest.current = { text, baseSha, worktreeId, path: entry.path };
+  const savedTextRef = useRef(savedText);
+  savedTextRef.current = savedText;
 
   const dirty = file?.text !== null && text !== savedText;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
 
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -129,10 +133,19 @@ export function EditableWorkspace({
         setText(opened.text);
         const draft = await m7.loadEditDraft(worktreeId, entry.path).catch(() => null);
         if (cancelled) return;
-        // 草稿只在基线一致时恢复：磁盘已经换过版本时不能把旧内容当作当前内容。
-        if (draft && draft.baseSha256 === opened.baseSha256 && draft.text !== opened.text) {
-          setText(draft.text);
-          setDraftNotice(true);
+        if (draft && draft.text !== opened.text) {
+          if (draft.baseSha256 === opened.baseSha256) {
+            // 基线一致：草稿就是未保存的那一版。
+            setText(draft.text);
+            setDraftNotice(true);
+          } else {
+            // F03：磁盘基线已变——保留两版。界面显示磁盘内容，草稿留在存储里不覆盖，
+            // 冲突提示走既有 conflict 流程（重新加载或保留我的版本）。
+            setText(opened.text);
+            setSavedText(opened.text);
+            setConflict({ diskSha256: opened.baseSha256 });
+            setDraftNotice(true);
+          }
         }
         setLoading(false);
       } catch (caught) {
@@ -146,7 +159,7 @@ export function EditableWorkspace({
     };
   }, [worktreeId, entry.path]);
 
-  // 草稿自动保存：静默一会儿再写，关闭前由 flush 兜底。
+  // 草稿自动保存：静默一会儿再写，卸载 / 关闭前再兜底一次（H1/F03：切换不丢最新输入）。
   const saveDraft = useCallback(async () => {
     const current = latest.current;
     if (!current.baseSha || current.text === savedText) return;
@@ -172,6 +185,19 @@ export function EditableWorkspace({
       if (draftTimer.current !== null) {
         window.clearTimeout(draftTimer.current);
         draftTimer.current = null;
+      }
+      // 卸载（切文件 / 切 worktree / 关面板）时立刻落草稿：不能只取消定时器。
+      const current = latest.current;
+      if (current.baseSha && current.text !== savedTextRef.current) {
+        void m7
+          .saveEditDraft({
+            worktreeId: current.worktreeId,
+            path: current.path,
+            baseSha256: current.baseSha,
+            text: current.text,
+            updatedAtMs: Date.now(),
+          })
+          .catch(() => undefined);
       }
     };
   }, [text, dirty, baseSha, saveDraft]);
@@ -445,8 +471,13 @@ export function EditableWorkspace({
                 type="button"
                 className="toolbar-widget h-7 px-3"
                 onClick={() => {
+                  // H1 修正：「放弃」丢弃未保存改动并清掉草稿，不再保存草稿。
                   setConfirmClose(false);
-                  void saveDraft().finally(onClose);
+                  const current = latest.current;
+                  void m7
+                    .clearEditDraft(current.worktreeId, current.path)
+                    .catch(() => undefined)
+                    .finally(onClose);
                 }}
               >
                 {t("edit.closeDiscard")}
@@ -456,10 +487,12 @@ export function EditableWorkspace({
                 className="toolbar-widget h-7 px-3"
                 disabled={saving}
                 onClick={() => {
-                  void save().then(() => {
+                  // H2/F04 修正：保存成功（回到磁盘基线）后关闭面板。
+                  void (async () => {
+                    await save();
                     setConfirmClose(false);
-                    if (!latest.current.baseSha) onClose();
-                  });
+                    if (!dirtyRef.current) onClose();
+                  })();
                 }}
               >
                 {t("edit.closeSave")}

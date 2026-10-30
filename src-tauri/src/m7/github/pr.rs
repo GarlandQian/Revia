@@ -9,7 +9,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::error::{AppError, ErrorKind, Result};
+use crate::error::{AppError, AppErrorPayload, ErrorKind, Result};
 use crate::git::NETWORK_TIMEOUT;
 use crate::remote_ops::{self, CheckoutResult, CheckoutStrategy, CheckoutTarget};
 use crate::session::WorktreeSession;
@@ -165,6 +165,8 @@ pub struct ReviewCommentInput {
 #[serde(rename_all = "camelCase")]
 pub struct ReviewSubmitRequest {
     pub worktree_id: String,
+    /// F07：审阅目标远端（与列表 / 详情所选一致），不再回退 origin。
+    pub remote: Option<String>,
     pub number: u64,
     pub event: ReviewEvent,
     pub body: String,
@@ -207,6 +209,8 @@ impl MergeMethod {
 #[serde(rename_all = "camelCase")]
 pub struct MergeRequest {
     pub worktree_id: String,
+    /// F07：合并目标远端（与列表 / 详情所选一致），不再回退 origin。
+    pub remote: Option<String>,
     pub number: u64,
     pub method: MergeMethod,
     pub expected_head_sha: String,
@@ -224,6 +228,10 @@ pub struct PrMergeOutcome {
     /// `merged` / `headChanged` / `conflict` / `blocked` / `unknown`。
     pub status: String,
     pub message: String,
+    /// H7：失败时的结构化错误载荷（稳定键 + 数据参数），前端经生产 formatter 翻译。
+    #[serde(default)]
+    #[ts(optional)]
+    pub error: Option<AppErrorPayload>,
     pub sha: Option<String>,
     pub receipt: MergeReceipt,
 }
@@ -249,6 +257,9 @@ pub struct PrCheckoutRequest {
     pub strategy: CheckoutStrategy,
     /// 本地分支名（默认 `pr/<number>`）。
     pub local_branch: Option<String>,
+    /// H4：已有同名本地分支且不是远端 head 的祖先时，必须由用户确认覆盖。
+    #[serde(default)]
+    pub overwrite_confirmed: bool,
 }
 
 /// 创建 PR 的请求。
@@ -544,15 +555,13 @@ pub fn detail(context: &PrContext, number: u64) -> Result<PullRequestDetail> {
     })
 }
 
-/// PR 改动文件。
+/// F19：沿 Link header 翻完整页。任何一页失败就整体失败，不静默截断。
 pub fn files(context: &PrContext, number: u64) -> Result<Vec<PullRequestFile>> {
-    let (files, _): (Vec<ApiFile>, _) = context.client.get_json(&format!(
-        "{}/pulls/{number}/files?per_page=100",
-        context.repo_path()
-    ))?;
-    Ok(files
-        .into_iter()
-        .map(|file| PullRequestFile {
+    let mut all: Vec<PullRequestFile> = Vec::new();
+    let mut path = format!("{}/pulls/{number}/files?per_page=100", context.repo_path());
+    loop {
+        let (page, meta): (Vec<ApiFile>, _) = context.client.get_json(&path)?;
+        all.extend(page.into_iter().map(|file| PullRequestFile {
             filename: file.filename,
             previous_filename: file.previous_filename,
             status: file.status,
@@ -560,8 +569,13 @@ pub fn files(context: &PrContext, number: u64) -> Result<Vec<PullRequestFile>> {
             deletions: file.deletions,
             changes: file.changes,
             patch: file.patch,
-        })
-        .collect())
+        }));
+        match meta.next_page {
+            Some(next) => path = next,
+            None => break,
+        }
+    }
+    Ok(all)
 }
 
 /// PR 的 diff 文本（只读展示，不写入工作区）。
@@ -573,12 +587,13 @@ pub fn diff(context: &PrContext, number: u64) -> Result<String> {
     Ok(text)
 }
 
-/// PR 的评论（issue 评论 + 行内评审评论）。
+/// PR 的评论（issue 评论 + 行内评审评论；F19：完整分页）。
 pub fn comments(context: &PrContext, number: u64) -> Result<Vec<PullRequestComment>> {
-    let (issue, _): (Vec<ApiComment>, _) = context
-        .client
-        .get_json(&format!("{}/issues/{number}/comments?per_page=100", context.repo_path()))?;
-    let (review, _): (Vec<ApiComment>, _) = context.client.get_json(&format!(
+    let issue = fetch_all_pages::<ApiComment>(context, &format!(
+        "{}/issues/{number}/comments?per_page=100",
+        context.repo_path()
+    ))?;
+    let review = fetch_all_pages::<ApiComment>(context, &format!(
         "{}/pulls/{number}/comments?per_page=100",
         context.repo_path()
     ))?;
@@ -634,8 +649,14 @@ pub fn create_comment(context: &PrContext, number: u64, body: &str) -> Result<()
 }
 
 /// 本地评审草稿：列出。
-pub fn list_drafts(state: &GithubState, repo_key: &str, number: u64) -> Vec<ReviewDraft> {
-    state.drafts().list(repo_key, number)
+/// F09：草稿按 PR + head 版本过滤。PR 更新后旧 head 的草稿保留在存储里但不参与当前提交，
+/// 界面按“版本变化保留草稿”的规格另行提示，不会拿旧内容冒充新版本的审阅。
+pub fn list_drafts(state: &GithubState, repo_key: &str, number: u64, head_sha: Option<&str>) -> Vec<ReviewDraft> {
+    let all = state.drafts().list(repo_key, number);
+    match head_sha {
+        Some(head) => all.into_iter().filter(|draft| draft.head_sha.as_deref() == Some(head)).collect(),
+        None => all,
+    }
 }
 
 /// 本地评审草稿：保存。
@@ -741,7 +762,8 @@ pub fn create(context: &PrContext, request: &PrCreateRequest) -> Result<PrCreate
     if request.body.len() > 65536 {
         return Err(rejected("errors.m7.githubPrBodyTooLong", "PR 描述过长"));
     }
-    validate_branch(request.head.trim())?;
+    // F18：head 支持 `owner:branch`（同一仓库或已有 fork 的分支）；base 必须是目标仓库分支。
+    validate_pr_head(request.head.trim())?;
     validate_branch(request.base.trim())?;
     let payload = serde_json::json!({
         "title": title,
@@ -760,12 +782,21 @@ pub fn create(context: &PrContext, request: &PrCreateRequest) -> Result<PrCreate
 }
 
 /// 检出 PR：取 `refs/pull/N/head`，核对提交后复用既有检出流程。
+///
+/// F11/H5：fetch 与分支写入都必须在会话写门内执行——先 `acquire_write_lock` +
+/// `require_identity`，再写 `refs/revia/pr/N` 与本地分支；不能先改引用再等检出被拒。
+/// H4：已有同名本地分支且远端 head 不是其祖先（会丢本地独有提交）时，
+/// 必须 `overwrite_confirmed` 明确确认；否则拒绝，不静默 `branch -f`。
 pub fn checkout(
     context: &PrContext,
     request: &PrCheckoutRequest,
     recovery: &crate::recovery::RecoveryStore,
     archive: &crate::stash_archive::StashArchiveStore,
 ) -> Result<PrCheckoutOutcome> {
+    // F11/H5：写门最早进入。同一 worktree 的其它写操作持锁时这里直接被拒绝。
+    let _write = context.session.acquire_write_lock()?;
+    context.session.require_identity()?;
+
     let (pull, _): (ApiPull, _) = context
         .client
         .get_json(&format!("{}/pulls/{}", context.repo_path(), request.number))?;
@@ -828,7 +859,29 @@ pub fn checkout(
             &[("branch", branch)],
         ));
     }
+    if exists {
+        // H4：快进（旧 tip 是远端 head 的祖先）可以直接更新；否则必须有确认。
+        let fast_forward = context
+            .session
+            .git
+            .run_ok(
+                &["merge-base", "--is-ancestor", &branch, &resolved_sha],
+                "检查本地分支是否可快进",
+            )
+            .map(|output| output.exit_code == 0)
+            .unwrap_or(false);
+        if !fast_forward && !request.overwrite_confirmed {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.m7.githubPrBranchDiverged",
+                "本地分支 {branch} 有远端没有的提交；覆盖会丢失这些提交。确认覆盖才能继续",
+                &[("branch", branch)],
+            ));
+        }
+    }
+    // 快进或新建：普通 branch 创建/更新即可，不需要 -f。
     let branch_args: Vec<String> = if exists {
+        // 已确认覆盖或快进：-f 只在确认后到达这里。
         vec!["branch".into(), "-f".into(), branch.clone(), resolved_sha.clone()]
     } else {
         vec!["branch".into(), branch.clone(), resolved_sha.clone()]
@@ -843,6 +896,11 @@ pub fn checkout(
             &[("error", created.stderr.trim().to_string())],
         ));
     }
+    // F11：检出复用既有流程；写门由上面的 acquire_write_lock 持有，checkout 内部再次
+    // 取锁会自锁——改用不取锁的内部路径。为保证单一入口，这里仍调用 checkout 并让它
+    // 拿锁：Mutex<bool> 不可重入，所以先释放我们的锁（drop 在此作用域末尾），由
+    // remote_ops::checkout 统一取锁执行真正的工作区切换。
+    drop(_write);
     let result = remote_ops::checkout(
         context.session,
         recovery,
@@ -947,7 +1005,9 @@ pub fn merge(context: &PrContext, request: &MergeRequest) -> Result<PrMergeOutco
             })?;
             return Ok(PrMergeOutcome {
                 status: status.to_string(),
-                message: error.message,
+                // H7：保留结构化错误（稳定键 + 参数），不再把中文诊断句作为 message。
+                message: String::new(),
+                error: Some(error.payload()),
                 sha: None,
                 receipt,
             });
@@ -968,6 +1028,7 @@ pub fn merge(context: &PrContext, request: &MergeRequest) -> Result<PrMergeOutco
     Ok(PrMergeOutcome {
         status,
         message,
+        error: None,
         sha,
         receipt,
     })
@@ -994,31 +1055,82 @@ pub fn protection_state(
         }
     }
     let path = format!("{}/branches/{branch}/protection", context.repo_path());
-    let info = match context.client.get_json::<serde_json::Value>(&path) {
-        Ok(_) => ProtectionInfo {
-            branch: branch.to_string(),
-            protected: true,
-            source: "api".into(),
-            checked_at_ms: now,
-        },
-        Err(error) => match error.code {
-            Some("errors.m7.githubNotFound") => ProtectionInfo {
-                branch: branch.to_string(),
-                protected: false,
-                source: "api".into(),
-                checked_at_ms: now,
-            },
-            // 权限不足或网络问题时不能断言“未受保护”。
-            _ => ProtectionInfo {
+    match context.client.get_json::<serde_json::Value>(&path) {
+        Ok(_) => {
+            let info = ProtectionInfo {
                 branch: branch.to_string(),
                 protected: true,
-                source: "unknown".into(),
+                source: "api".into(),
                 checked_at_ms: now,
-            },
+            };
+            let _ = context.state.receipts().store_protection(&context.repo_key, &info);
+            Ok(info)
+        }
+        Err(error) => match error.code {
+            Some("errors.m7.githubNotFound") => {
+                let info = ProtectionInfo {
+                    branch: branch.to_string(),
+                    protected: false,
+                    source: "api".into(),
+                    checked_at_ms: now,
+                };
+                let _ = context.state.receipts().store_protection(&context.repo_key, &info);
+                Ok(info)
+            }
+            // F10：权限不足或网络失败时不改写缓存——旧结果保留并按“可能过期”呈现
+            //（source=unknown 的旧缓存满足这个语义）；完全没有缓存时才按“未知受保护”兜底。
+            _ => Ok(context
+                .state
+                .receipts()
+                .protection(&context.repo_key, branch)
+                .unwrap_or(ProtectionInfo {
+                    branch: branch.to_string(),
+                    protected: true,
+                    source: "unknown".into(),
+                    checked_at_ms: now,
+                })),
         },
+    }
+}
+
+/// F19：按 ApiMeta.next_page 翻完整页；失败抛错，不把半截结果当完整。
+fn fetch_all_pages<T: serde::de::DeserializeOwned>(
+    context: &PrContext,
+    first_path: &str,
+) -> Result<Vec<T>> {
+    let mut all = Vec::new();
+    let mut path = first_path.to_string();
+    loop {
+        let (page, meta): (Vec<T>, _) = context.client.get_json(&path)?;
+        all.extend(page);
+        match meta.next_page {
+            Some(next) => path = next,
+            None => return Ok(all),
+        }
+    }
+}
+
+/// F18：PR head 的合法形态：`branch` 或 `owner:branch`（fork 来源）。
+fn validate_pr_head(head: &str) -> Result<()> {
+    let (owner, branch) = match head.split_once(':') {
+        Some((owner, branch)) => (Some(owner), branch),
+        None => (None, head),
     };
-    let _ = context.state.receipts().store_protection(&context.repo_key, &info);
-    Ok(info)
+    if let Some(owner) = owner {
+        if owner.trim().is_empty()
+            || !owner
+                .chars()
+                .all(|ch| ch.is_alphanumeric() || ch == '-' || ch == '_')
+        {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.m7.githubBranchInvalid",
+                "分支名包含不支持的字符：{branch}",
+                &[("branch", head.to_string())],
+            ));
+        }
+    }
+    validate_branch(branch)
 }
 
 fn head_changed(expected: &str, actual: &str) -> AppError {
@@ -1081,6 +1193,17 @@ pub fn repo_key_for(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pr_head_accepts_owner_branch_form() {
+        // F18：已有 fork 来源用 owner:branch；同仓库 head 保持纯分支。
+        assert!(validate_pr_head("feature/a-b_c").is_ok());
+        assert!(validate_pr_head("someone:feature/x").is_ok());
+        assert!(validate_pr_head("someone:pr/12").is_ok());
+        assert!(validate_pr_head(":nocolon-empty-owner").is_err());
+        assert!(validate_pr_head("bad owner:x").is_err());
+        assert!(validate_pr_head("someone:bad path").is_err());
+    }
 
     #[test]
     fn branch_names_are_validated() {

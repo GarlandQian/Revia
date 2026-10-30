@@ -417,6 +417,35 @@ impl TerminalManager {
     }
 }
 
+#[cfg(test)]
+mod cwd_tests {
+    use super::*;
+
+    #[test]
+    fn resolve_cwd_accepts_absolute_path_inside_worktree() {
+        // F05：持久化页签恢复用绝对 cwd；worktree 内的绝对路径必须被接受。
+        let root = tempfile::tempdir().unwrap();
+        let worktree = root.path().join("repo");
+        let nested = worktree.join("src");
+        std::fs::create_dir_all(&nested).unwrap();
+        assert_eq!(
+            resolve_cwd(&worktree, nested.to_string_lossy().as_ref()).unwrap(),
+            nested.canonicalize().unwrap()
+        );
+        // 相对路径仍然可用。
+        assert_eq!(
+            resolve_cwd(&worktree, "src").unwrap(),
+            nested.canonicalize().unwrap()
+        );
+        // worktree 外的绝对路径仍然拒绝。
+        let outside = root.path().join("elsewhere");
+        std::fs::create_dir_all(&outside).unwrap();
+        assert!(resolve_cwd(&worktree, outside.to_string_lossy().as_ref()).is_err());
+        // .. 逃逸仍然拒绝。
+        assert!(resolve_cwd(&worktree, "../elsewhere").is_err());
+    }
+}
+
 fn unknown_session() -> AppError {
     AppError::coded(
         ErrorKind::Rejected,
@@ -428,25 +457,23 @@ fn unknown_session() -> AppError {
 
 fn resolve_cwd(worktree_path: &Path, relative: &str) -> Result<PathBuf> {
     let candidate = Path::new(relative);
-    if candidate.is_absolute() {
-        return Err(AppError::coded(
-            ErrorKind::Rejected,
-            "errors.m7.terminalCwdOutsideWorktree",
-            "终端工作目录必须在当前 worktree 内",
-            &[],
-        ));
-    }
-    for component in candidate.components() {
-        if !matches!(component, std::path::Component::Normal(_) | std::path::Component::CurDir) {
-            return Err(AppError::coded(
-                ErrorKind::Rejected,
-                "errors.m7.terminalCwdOutsideWorktree",
-                "终端工作目录必须在当前 worktree 内",
-                &[],
-            ));
+    // F05：持久化页签里存的是会话返回的绝对 cwd；恢复时同样是绝对路径。
+    // 只要求最终位置在 worktree 内，相对/绝对都接受。
+    let full = if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        for component in candidate.components() {
+            if !matches!(component, std::path::Component::Normal(_) | std::path::Component::CurDir) {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.m7.terminalCwdOutsideWorktree",
+                    "终端工作目录必须在当前 worktree 内",
+                    &[],
+                ));
+            }
         }
-    }
-    let full = worktree_path.join(candidate);
+        worktree_path.join(candidate)
+    };
     let canonical = std::fs::canonicalize(&full).map_err(|_| {
         AppError::coded(
             ErrorKind::Rejected,

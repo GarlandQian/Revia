@@ -169,6 +169,8 @@ export interface SettingsPayload {
   protectedBranches: string[];
   /** 应用更新方式（M7、Q199）。 */
   appUpdateMode: AppUpdateMode;
+  /** F22：预发布渠道开关。 */
+  allowPrerelease: boolean;
   /** 用户自定义快捷键（动作 id → 加速键）。 */
   shortcuts: Record<string, string>;
 }
@@ -233,6 +235,7 @@ export interface SettingsPatchPayload {
   pushDialogProtectedOnly?: boolean;
   protectedBranches?: string[];
   appUpdateMode?: AppUpdateMode;
+  allowPrerelease?: boolean;
   shortcuts?: Record<string, string>;
 }
 

@@ -184,6 +184,9 @@ export function M7ShortcutSettings({
   const captureRef = useRef<string | null>(null);
   captureRef.current = capturing;
 
+  // F17：冲突不再直接拒绝——先询问“确认替换”，用户确认后两个动作一起落盘。
+  const [pendingReplace, setPendingReplace] = useState<{ action: string; accelerator: string; conflict: string } | null>(null);
+
   useEffect(() => {
     if (capturing === null) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -198,7 +201,9 @@ export function M7ShortcutSettings({
       if (!captured) return;
       const conflict = conflictFor(captured, capturing as never, shortcuts);
       if (conflict) {
-        setError(t("settings.m7.shortcuts.conflict", { action: shortcutLabel(conflict) }));
+        // 记录待确认替换；用户点击确认才改绑定。
+        setPendingReplace({ action: capturing, accelerator: captured, conflict });
+        setCapturing(null);
         return;
       }
       setError(null);
@@ -213,6 +218,34 @@ export function M7ShortcutSettings({
     <div className="space-y-3">
       <p className="text-[12px] text-descriptionforeground">{t("settings.m7.shortcuts.hint")}</p>
       {error ? <p role="alert" className="text-[12px] text-[color:var(--gitdecoration-conflictingresourceforeground)]">{error}</p> : null}
+      {pendingReplace ? (
+        <div role="alertdialog" aria-modal="false" className="flex items-center gap-2 rounded border border-panel-border px-2 py-1.5 text-[12px]">
+          <span className="min-w-0 flex-1">
+            {t("settings.m7.shortcuts.confirmReplace", {
+              action: shortcutLabel(pendingReplace.action as never),
+              accelerator: formatAccelerator(pendingReplace.accelerator),
+              conflict: shortcutLabel(pendingReplace.conflict as never),
+            })}
+          </span>
+          <button
+            type="button"
+            className="toolbar-widget h-6 px-2 font-semibold"
+            onClick={() => {
+              // 确认替换：新动作绑定新键，冲突动作回落默认值。
+              let next = withoutShortcut(shortcuts, pendingReplace.conflict as never);
+              next = withShortcut(next, pendingReplace.action as never, pendingReplace.accelerator);
+              void onChange(next);
+              setPendingReplace(null);
+              setError(null);
+            }}
+          >
+            {t("settings.m7.shortcuts.replaceConfirm")}
+          </button>
+          <button type="button" className="toolbar-widget h-6 px-2" onClick={() => setPendingReplace(null)}>
+            {t("common.cancel")}
+          </button>
+        </div>
+      ) : null}
       <table className="w-full text-[12px]">
         <tbody>
           {shortcutDefs.map((def) => {
@@ -376,7 +409,7 @@ export function M7GithubSettings({
 
 // ---------------- 应用更新 ----------------
 
-const UPDATE_MODES: AppUpdateMode[] = ["manual", "notify", "automatic"];
+const UPDATE_MODES: AppUpdateMode[] = ["manual", "notify"];
 
 function updateModeLabel(mode: AppUpdateMode): string {
   switch (mode) {
@@ -384,19 +417,24 @@ function updateModeLabel(mode: AppUpdateMode): string {
       return t("settings.m7.update.modeManual");
     case "notify":
       return t("settings.m7.update.modeNotify");
-    case "automatic":
-      return t("settings.m7.update.modeAutomatic");
+    default:
+      return mode;
   }
 }
 
 export function M7UpdateSettings({
   mode,
   onChangeMode,
+  allowPrerelease,
+  onChangeAllowPrerelease,
   status,
   onStatusChange,
 }: {
   mode: AppUpdateMode;
   onChangeMode: (mode: AppUpdateMode) => Promise<boolean>;
+  /** F22：预发布渠道开关（用户主动开启；默认稳定版）。 */
+  allowPrerelease: boolean;
+  onChangeAllowPrerelease: (value: boolean) => Promise<boolean>;
   status: AppUpdateStatus | null;
   onStatusChange: (status: AppUpdateStatus) => void;
 }) {
@@ -431,6 +469,17 @@ export function M7UpdateSettings({
             </option>
           ))}
         </select>
+      </Row>
+      <Row label={t("settings.m7.update.prerelease")}>
+        <label className="flex items-center gap-2 text-[12px]">
+          <input
+            type="checkbox"
+            className="accent-[var(--focusborder)]"
+            checked={allowPrerelease}
+            onChange={(event) => void onChangeAllowPrerelease(event.target.checked)}
+          />
+          {t("settings.m7.update.prereleaseHint")}
+        </label>
       </Row>
       <Row label={t("settings.m7.update.version")}>
         <div className="space-y-1 text-[12px]">

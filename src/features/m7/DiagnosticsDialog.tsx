@@ -27,6 +27,7 @@ export function DiagnosticsDialog({ open, worktreeId, onClose }: DiagnosticsDial
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AppErrorPayload | null>(null);
+  const [noticeText, setNoticeText] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -107,12 +108,25 @@ export function DiagnosticsDialog({ open, worktreeId, onClose }: DiagnosticsDial
           <button type="button" className="toolbar-widget h-6 px-2 font-semibold" disabled={busy} onClick={() => void exportFile()}>
             {t("diagnostics.export")}
           </button>
+          <button
+            type="button"
+            className="toolbar-widget h-6 px-2"
+            onClick={() => {
+              // F21：清空 7 天持久化摘要（当前仓库范围）。
+              void (worktreeId
+                ? m7.diagnosticsClear(worktreeId).then(() => setNoticeText(t("diagnostics.cleared"))).catch(() => undefined)
+                : Promise.resolve());
+            }}
+          >
+            {t("diagnostics.clear")}
+          </button>
         </div>
         {error ? (
           <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1">
             {formatAppError(error)}
           </p>
         ) : null}
+        {noticeText ? <p role="status">{noticeText}</p> : null}
         {notice ? <p role="status">{notice}</p> : null}
       </div>
       <pre className="min-h-0 flex-1 overflow-auto bg-[var(--editor-background)] p-3 font-mono text-[11.5px] whitespace-pre-wrap">{text}</pre>

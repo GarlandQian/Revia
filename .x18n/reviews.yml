@@ -49,6 +49,8 @@ sources:
     en: fc71620a63b15
   commit.operationTerminal:
     en: 4332b3a6f35d4
+  common.cancel:
+    en: ac7950f3a317e
   common.close:
     en: 1a1d699a24749c
   common.delete:
@@ -59,6 +61,10 @@ sources:
     en: 4c1d4ed5a8494
   common.refresh:
     en: 12071186b7b43f
+  diagnostics.clear:
+    en: 1aadd54fc13f06
+  diagnostics.cleared:
+    en: 159e52338c1109
   diagnostics.copy:
     en: 1b771529ca2fea
   diagnostics.export:
@@ -345,6 +351,10 @@ sources:
     en: 54a65c435fbdb
   errors.rewrite.rootCommitNotSupported:
     en: fb2eb7ae5afc3
+  errors.update.installBlockedBusy:
+    en: 68e91373c418e
+  errors.update.installBlockedTerminal:
+    en: 464d3d8910a8f
   github.account:
     en: 10910fba2d05e1
   github.checkout:
@@ -367,6 +377,8 @@ sources:
     en: 1265d9e4da232
   github.createHead:
     en: 5993cb58b91af
+  github.createSource:
+    en: 4b11911f51c27
   github.createSubmit:
     en: 1a2fbcb8014e75
   github.createTitle:
@@ -377,6 +389,8 @@ sources:
     en: 93a4949977af2
   github.detailMeta:
     en: 1a2113ca3dd0e2
+  github.deviceCancel:
+    en: 94c1102fe9276
   github.deviceCode:
     en: 1c777584cda62d
   github.deviceCopy:
@@ -391,6 +405,10 @@ sources:
     en: 14867678e6bef9
   github.deviceUnconfigured:
     en: 1deede7abe6e1a
+  github.divergedConfirm:
+    en: 18499cc6738598
+  github.divergedOverwrite:
+    en: 1b123981e5777a
   github.draftAdd:
     en: 134af4b1748c92
   github.draftBadge:
@@ -465,6 +483,8 @@ sources:
     en: 4efa703e340d9
   github.receiptsTitle:
     en: b48dba55c7cc2
+  github.remoteRequired:
+    en: 50a7ef4147828
   github.reviewBody:
     en: 6e54b6c1beea2
   github.reviewEmpty:
@@ -497,6 +517,8 @@ sources:
     en: 78cd118da1b06
   github.tokenTitle:
     en: c657c12531460
+  github.viewFullDiff:
+    en: 1e655c4dfb1ba9
   historyActions.cherryPickHintMany:
     en: f4d51d451eebe
   historyActions.publishedWarning:
@@ -581,6 +603,8 @@ sources:
     en: db8314acd269a
   settings.m7.github.tokenPlaceholder:
     en: 78cd118da1b06
+  settings.m7.shortcuts.confirmReplace:
+    en: d9758385a5b8c
   settings.m7.shortcuts.conflict:
     en: 22c0f3d2ac366
   settings.m7.shortcuts.current:
@@ -593,6 +617,8 @@ sources:
     en: 1e220570697bb0
   settings.m7.shortcuts.press:
     en: 9d78010e30d5f
+  settings.m7.shortcuts.replaceConfirm:
+    en: ff4cd55c49098
   settings.m7.shortcuts.reset:
     en: 14c57040cbbc8c
   settings.m7.shortcuts.resetAll:
@@ -645,6 +671,10 @@ sources:
     en: 11610af25e9b6b
   settings.m7.update.modeNotify:
     en: 494fef822c930
+  settings.m7.update.prerelease:
+    en: 3c1e6d1d69451
+  settings.m7.update.prereleaseHint:
+    en: 1704310daa9b40
   settings.m7.update.receipt:
     en: 140762b4478af0
   settings.m7.update.receiptValue:
@@ -668,13 +698,13 @@ sources:
   shortcuts.actions.nextFile:
     en: 938b92ae781a2
   shortcuts.actions.nextHunk:
-    en: 148f10b33a8aac
+    en: abc07dbd4cba4
   shortcuts.actions.openRepo:
     en: 165a915a95398a
   shortcuts.actions.prevFile:
     en: e9f768ca0e802
   shortcuts.actions.prevHunk:
-    en: abfd0d3113da0
+    en: 187c7ae9c4f083
   shortcuts.actions.pullRequests:
     en: 500c50df7064d
   shortcuts.actions.refresh:
@@ -703,6 +733,10 @@ sources:
     en: e8b9f10217ce4
   terminal.closePanel:
     en: ee9c6e43198b
+  terminal.closeRunningConfirm:
+    en: 1b4bf117677415
+  terminal.closeRunningYes:
+    en: 185213478e4d1e
   terminal.closeTab:
     en: 1ad199da1e31de
   terminal.empty:
@@ -737,8 +771,14 @@ sources:
     en: f31d3ba73a150
   update.current:
     en: 13e26c66d979c9
+  update.downloadConfirm:
+    en: 1f2bc1089753c4
+  update.downloading:
+    en: 10233493f816b9
   update.install:
     en: 1cf3950ba6371f
+  update.installNow:
+    en: 17080ba5f033c7
   update.installed:
     en: 136e936b41f521
   update.lastChecked:
@@ -763,3 +803,7 @@ sources:
     en: 3f60d96ed3c09
   workspace.editDirty:
     en: 16ae31817f28bb
+  workspace.editSwitchToSplit:
+    en: 10fdcca7093e81
+  workspace.editUnsavedBlock:
+    en: f6b2699a3cb09

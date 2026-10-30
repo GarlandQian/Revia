@@ -193,6 +193,60 @@ impl TokenStore {
             .map_err(|_| not_logged_in(login))
     }
 
+    /// F16：刷新令牌与访问令牌分服务存储，不混用同一个 keyring 条目。
+    fn refresh_service() -> &'static str {
+        "Revia GitHub Refresh"
+    }
+
+    pub fn save_refresh(&self, login: &str, refresh_token: &str) -> Result<()> {
+        if refresh_token.is_empty() {
+            return Ok(());
+        }
+        if let Some(directory) = &self.acceptance_file {
+            std::fs::create_dir_all(directory)?;
+            let path = directory.join(format!("{}.refresh.txt", super::safe_slug(login)));
+            super::atomic_write(&path, refresh_token.as_bytes())?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+            }
+            return Ok(());
+        }
+        keyring::Entry::new(Self::refresh_service(), login)
+            .and_then(|entry| entry.set_password(refresh_token))
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.m7.githubKeychainFailed",
+                    "无法把 GitHub 凭据写入系统钥匙串：{error}",
+                    &[("error", error.to_string())],
+                )
+            })
+    }
+
+    pub fn load_refresh(&self, login: &str) -> Option<String> {
+        if let Some(directory) = &self.acceptance_file {
+            let path = directory.join(format!("{}.refresh.txt", super::safe_slug(login)));
+            return std::fs::read_to_string(&path).ok().filter(|t| !t.is_empty());
+        }
+        keyring::Entry::new(Self::refresh_service(), login)
+            .and_then(|entry| entry.get_password())
+            .ok()
+            .filter(|t| !t.is_empty())
+    }
+
+    pub fn delete_refresh(&self, login: &str) {
+        if let Some(directory) = &self.acceptance_file {
+            let path = directory.join(format!("{}.refresh.txt", super::safe_slug(login)));
+            let _ = std::fs::remove_file(path);
+            return;
+        }
+        if let Ok(entry) = keyring::Entry::new(Self::refresh_service(), login) {
+            let _ = entry.delete_credential();
+        }
+    }
+
     pub fn delete(&self, login: &str) -> Result<()> {
         if let Some(directory) = &self.acceptance_file {
             let path = directory.join(format!("{}.txt", super::safe_slug(login)));
@@ -279,6 +333,8 @@ impl GithubState {
         let mut bindings = self.bindings.load();
         bindings.retain(|_, bound| bound != login);
         self.bindings.save(&bindings)?;
+        // F16：登出同时清掉刷新令牌，避免残留可换新令牌的凭据。
+        self.tokens.delete_refresh(login);
         self.tokens.delete(login)
     }
 
@@ -378,6 +434,8 @@ pub struct GithubClient {
 pub struct ApiMeta {
     pub rate_limit: RateLimit,
     pub scopes: Vec<String>,
+    /// F19：Link header 里的下一页完整 URL（没有下一页为 None）。
+    pub next_page: Option<String>,
 }
 
 impl GithubClient {
@@ -521,7 +579,24 @@ fn meta_of(headers: &reqwest::header::HeaderMap) -> ApiMeta {
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.trim().parse::<u64>().ok())
     };
+    let next_page = headers
+        .get("link")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| {
+            // Link: <https://api.github.com/...?page=2>; rel="next", <...>; rel="last"
+            value.split(',').find_map(|part| {
+                let part = part.trim();
+                if part.contains("rel=\"next\"") {
+                    part.split(';').next().map(|url| {
+                        url.trim().trim_start_matches('<').trim_end_matches('>').to_string()
+                    })
+                } else {
+                    None
+                }
+            })
+        });
     ApiMeta {
+        next_page,
         rate_limit: RateLimit {
             remaining: number("x-ratelimit-remaining").map(|value| value as u32),
             reset_at_ms: number("x-ratelimit-reset").map(|value| value * 1000),
@@ -620,6 +695,7 @@ mod tests {
             Some("errors.m7.githubUnauthorized")
         );
         let limited = ApiMeta {
+            next_page: None,
             rate_limit: RateLimit {
                 remaining: Some(0),
                 reset_at_ms: Some(1_700_000_000_000),

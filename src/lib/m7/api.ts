@@ -12,6 +12,7 @@ import type { CloneFinished } from "@/types/bindings/CloneFinished";
 import type { CloneProgress } from "@/types/bindings/CloneProgress";
 import type { DiagnosticsExport } from "@/types/bindings/DiagnosticsExport";
 import type { DiagnosticsPreview } from "@/types/bindings/DiagnosticsPreview";
+import type { DiagnosticsSummaryEntry } from "@/types/bindings/DiagnosticsSummaryEntry";
 import type { DevicePoll } from "@/types/bindings/DevicePoll";
 import type { DeviceStart } from "@/types/bindings/DeviceStart";
 import type { EditDraft } from "@/types/bindings/EditDraft";
@@ -82,6 +83,8 @@ export interface PrCheckoutPayload {
   expectedHeadSha: string;
   strategy: CheckoutStrategy;
   localBranch: string | null;
+  /** H4：同名本地分支分叉时，用户已确认覆盖。 */
+  overwriteConfirmed?: boolean;
 }
 
 export interface PrCreatePayload {
@@ -96,6 +99,8 @@ export interface PrCreatePayload {
 
 export interface ReviewSubmitPayload {
   worktreeId: string;
+  /** F07：审阅目标远端（与列表 / 详情所选一致）。 */
+  remote: string | null;
   number: number;
   event: ReviewEvent;
   body: string;
@@ -105,6 +110,8 @@ export interface ReviewSubmitPayload {
 
 export interface MergePayload {
   worktreeId: string;
+  /** F07：合并目标远端（与列表 / 详情所选一致）。 */
+  remote: string | null;
   number: number;
   method: MergeMethod;
   expectedHeadSha: string;
@@ -117,6 +124,8 @@ export interface PrRefPayload {
   worktreeId: string;
   remote: string | null;
   number: number;
+  /** F09：当前 head；草稿列表按它过滤。 */
+  headSha?: string | null;
 }
 
 export const m7 = {
@@ -165,6 +174,8 @@ export const m7 = {
     invoke<GithubStatus>("m7_github_status", { worktreeId }),
   githubDeviceStart: () => invoke<DeviceStart>("m7_github_device_start"),
   githubDevicePoll: (flowId: string) => invoke<DevicePoll>("m7_github_device_poll", { flowId }),
+  /** F16：取消设备码授权。 */
+  githubDeviceCancel: (flowId: string) => invoke<void>("m7_github_device_cancel", { flowId }),
   githubLoginToken: (token: string) => invoke<GithubAccount>("m7_github_login_token", { token }),
   githubLogout: (login: string) => invoke<void>("m7_github_logout", { login }),
   githubBindRepo: (worktreeId: string, login: string) =>
@@ -179,6 +190,7 @@ export const m7 = {
     invoke<PullRequestComment[]>("m7_github_pr_comments", { request }),
   prCommentCreate: (request: PrRefPayload & { body: string }) =>
     invoke<void>("m7_github_pr_comment_create", { request }),
+  githubRepoKey: (worktreeId: string) => invoke<string>("m7_github_repo_key", { worktreeId }),
   reviewDrafts: (request: PrRefPayload) =>
     invoke<ReviewDraft[]>("m7_github_review_drafts", { request }),
   reviewDraftSave: (draft: ReviewDraft) =>
@@ -200,10 +212,16 @@ export const m7 = {
     invoke<DiagnosticsPreview>("m7_preview_diagnostics", { request }),
   exportDiagnostics: (request: DiagnosticsExportPayload) =>
     invoke<DiagnosticsExport>("m7_export_diagnostics", { request }),
+  /** F21：7 天脱敏摘要（跨重启保留）。 */
+  diagnosticsSummary: (worktreeId: string) =>
+    invoke<DiagnosticsSummaryEntry[]>("m7_diagnostics_summary", { worktreeId }),
+  diagnosticsClear: (worktreeId: string) =>
+    invoke<number>("m7_diagnostics_clear", { worktreeId }),
 
   // 应用更新
   updateStatus: () => invoke<AppUpdateStatus>("m7_update_status"),
   updateCheck: (force: boolean) => invoke<AppUpdateStatus>("m7_update_check", { force }),
+  updateDownload: () => invoke<AppUpdateStatus>("m7_update_download"),
   updateInstall: () => invoke<AppUpdateStatus>("m7_update_install"),
   updateRestart: () => invoke<void>("m7_update_restart"),
 };

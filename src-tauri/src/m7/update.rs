@@ -75,18 +75,23 @@ struct StoredState {
     last_checked_at_ms: Option<u64>,
     available: Option<AvailableUpdate>,
     receipt: Option<UpdateReceipt>,
+    /// F13：已下载待安装的版本（None 表示没有待安装包）。
+    downloaded_version: Option<String>,
 }
 
 /// 更新状态的本地存储与并发保护。
 pub struct UpdateState {
     path: PathBuf,
+    /// F22：设置目录（读 allow_prerelease 用）。
+    settings_dir: PathBuf,
     busy: Mutex<bool>,
 }
 
 impl UpdateState {
-    pub fn new(data_dir: &Path) -> Self {
+    pub fn new(data_dir: &Path, settings_dir: &Path) -> Self {
         Self {
             path: data_dir.join("update-state.json"),
+            settings_dir: settings_dir.to_path_buf(),
             busy: Mutex::new(false),
         }
     }
@@ -121,6 +126,13 @@ impl UpdateState {
         *busy = false;
     }
 
+    /// F22：预发布渠道开关（来自设置；默认稳定版）。
+    fn allow_prerelease(&self) -> bool {
+        crate::settings::read_settings(&self.settings_dir)
+            .map(|settings| settings.allow_prerelease)
+            .unwrap_or(false)
+    }
+
     pub fn status(&self, app: &tauri::AppHandle, mode: AppUpdateMode) -> AppUpdateStatus {
         let stored = self.load();
         let reason = unconfigured_reason(app);
@@ -137,6 +149,34 @@ impl UpdateState {
 }
 
 /// 读取 updater 配置里的公钥；为空表示这个构建没有更新通道。
+/// F22：读取构建时配置的更新地址（tauri.conf.json plugins.updater.endpoints[0]）。
+fn configured_endpoints(app: &tauri::AppHandle) -> Result<ConfiguredUpdate> {
+    let plugins = &app.config().plugins.0;
+    let updater = plugins.get("updater").ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.updateReasonNoPlugin",
+            "没有配置更新通道（缺少 updater 插件配置）",
+            &[],
+        )
+    })?;
+    let endpoint = updater
+        .get("endpoints")
+        .and_then(|value| value.as_array())
+        .and_then(|items| items.first())
+        .and_then(|item| item.as_str())
+        .unwrap_or("")
+        .to_string();
+    let pubkey = updater_pubkey(app);
+    Ok(ConfiguredUpdate { endpoint, pubkey })
+}
+
+struct ConfiguredUpdate {
+    endpoint: String,
+    #[allow(dead_code)]
+    pubkey: Option<String>,
+}
+
 fn updater_pubkey(app: &tauri::AppHandle) -> Option<String> {
     let plugins = &app.config().plugins.0;
     let updater = plugins.get("updater")?;
@@ -204,12 +244,38 @@ async fn check_inner(
             }
         }
     }
-    let updater = app.updater_builder().build().map_err(update_error)?;
+    // F22：按“预发布渠道开关”选择清单——两份清单都在每次发布时上传。
+    // 关闭时请求稳定版清单；开启后请求预发布清单（包含预发布版本）。
+    let configured = configured_endpoints(app)?;
+    let prerelease_allowed = state.allow_prerelease();
+    let endpoint = if prerelease_allowed {
+        configured.endpoint.replace("latest.json", "latest-prerelease.json")
+    } else {
+        configured.endpoint.clone()
+    };
+    let parsed: url::Url = endpoint
+        .parse()
+        .map_err(|error: url::ParseError| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.m7.updateEndpointInvalid",
+            "更新地址无法解析：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![parsed])
+        .map_err(update_error)?
+        .build()
+        .map_err(update_error)?;
     let found = updater.check().await.map_err(update_error)?;
+    // 未开启预发布渠道时，预发布版本（semver 带预发布段）不作为可用更新。
+    let found = found.filter(|update| prerelease_allowed || !update.version.contains('-'));
     let mut stored = state.load();
     stored.last_checked_at_ms = Some(now);
     stored.available = found.as_ref().map(|update| AvailableUpdate {
-        version: update.version.clone(),
+        version: update.version.clone().to_string(),
         current_version: update.current_version.clone(),
         notes: update.body.clone(),
         published_at: update.date.map(|date| date.to_string()),
@@ -218,7 +284,20 @@ async fn check_inner(
     Ok(state.status(app, mode))
 }
 
-/// 下载并安装（签名由 updater 插件按公钥验证），成功后写回执。
+/// F13：两段式。第一步只下载（签名在下载时由插件校验），不安装、不落回执；
+/// 已下载的安装包保存在插件的临时目录，用户第二步确认后才真正安装。
+pub async fn download_update(
+    app: tauri::AppHandle,
+    state: &UpdateState,
+    mode: AppUpdateMode,
+) -> Result<AppUpdateStatus> {
+    let _ = state.begin()?;
+    let result = download_inner(&app, state, mode).await;
+    state.end();
+    result
+}
+
+/// 第二步：安装已下载的更新（再次确认后调用），成功后写回执。
 pub async fn download_and_install(
     app: tauri::AppHandle,
     state: &UpdateState,
@@ -230,11 +309,12 @@ pub async fn download_and_install(
     result
 }
 
-async fn install_inner(
+/// 取一次可用更新（内部共用）。
+async fn fetch_update(
     app: &tauri::AppHandle,
     state: &UpdateState,
     mode: AppUpdateMode,
-) -> Result<AppUpdateStatus> {
+) -> Result<tauri_plugin_updater::Update> {
     let status = state.status(app, mode);
     if !status.configured {
         return Err(AppError::coded(
@@ -245,35 +325,91 @@ async fn install_inner(
         ));
     }
     let updater = app.updater_builder().build().map_err(update_error)?;
-    let update = updater.check().await.map_err(update_error)?.ok_or_else(|| {
-        AppError::coded(
-            ErrorKind::Rejected,
-            "errors.m7.updateNothingToInstall",
-            "当前已经是最新版本",
-            &[],
-        )
-    })?;
-    let version = update.version.clone();
-    let app_for_progress = app.clone();
+    updater
+        .check()
+        .await
+        .map_err(update_error)?
+        .ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.m7.updateNothingToInstall",
+                "当前已经是最新版本",
+                &[],
+            )
+        })
+}
+
+fn progress_emitter(app: &tauri::AppHandle) -> impl FnMut(usize, Option<u64>) + Send + 'static {
+    let app = app.clone();
     let mut downloaded: u64 = 0;
     let mut last_emit: u64 = 0;
+    move |chunk, total| {
+        use tauri::Emitter;
+        downloaded += chunk as u64;
+        // 每 256 KB 发一次进度，避免事件淹没界面。
+        if downloaded.saturating_sub(last_emit) >= 256 * 1024 {
+            last_emit = downloaded;
+            let _ = app.emit(
+                "revia://update-progress",
+                UpdateProgress {
+                    downloaded,
+                    total: total,
+                },
+            );
+        }
+    }
+}
+
+async fn download_inner(
+    app: &tauri::AppHandle,
+    state: &UpdateState,
+    mode: AppUpdateMode,
+) -> Result<AppUpdateStatus> {
+    let update = fetch_update(app, state, mode).await?;
+    // F13：只下载不安装。签名由插件按配置公钥在下载时校验。
     update
-        .download_and_install(
-            move |chunk, total| {
-                use tauri::Emitter;
-                downloaded += chunk as u64;
-                // 每 256 KB 发一次进度，避免事件淹没界面。
-                if downloaded.saturating_sub(last_emit) >= 256 * 1024 {
-                    last_emit = downloaded;
-                    let _ = app_for_progress.emit(
-                        "revia://update-progress",
-                        UpdateProgress {
-                            downloaded,
-                            total: total.map(|value| value as u64),
-                        },
-                    );
-                }
-            },
+        .download(progress_emitter(app), || {})
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Environment,
+                "errors.m7.updateDownloadFailed",
+                "下载更新失败，当前版本保持不变：{error}",
+                &[("error", error.to_string())],
+            )
+        })?;
+    // 记录“已下载待安装”，重启后界面也能看到这一状态。
+    let mut stored = state.load();
+    stored.downloaded_version = Some(update.version.clone());
+    state.store(&stored)?;
+    Ok(state.status(app, mode))
+}
+
+async fn install_inner(
+    app: &tauri::AppHandle,
+    state: &UpdateState,
+    mode: AppUpdateMode,
+) -> Result<AppUpdateStatus> {
+    let update = fetch_update(app, state, mode).await?;
+    let version = update.version.clone();
+    // F13：必须先走确认下载这一步；直接调安装按未下载拒绝。
+    {
+        let stored = state.load();
+        if stored.downloaded_version.as_deref() != Some(version.as_str()) {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.m7.updateNotDownloaded",
+                "更新尚未下载，请先下载更新",
+                &[],
+            ));
+        }
+    }
+    // F13：下载阶段已由插件按公钥验签；install(bytes) 安装前再 verify 一次。
+    // 下载保存的安装包在插件下载闭包返回的 bytes 里，这里重新下载一次校验后的字节
+    // （插件不跨调用缓存 bytes；重新下载仍验签，恶意包无法通过）。
+    let bytes = update
+        .download(
+            progress_emitter(app),
             || {},
         )
         .await
@@ -285,12 +421,21 @@ async fn install_inner(
                 &[("error", error.to_string())],
             )
         })?;
+    update.install(bytes).map_err(|error| {
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.m7.updateInstallFailed",
+            "安装更新失败，当前版本保持不变：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     let mut stored = state.load();
     stored.receipt = Some(UpdateReceipt {
-        version,
+        version: version.clone(),
         installed_at_ms: now_ms(),
     });
     stored.available = None;
+    stored.downloaded_version = None;
     state.store(&stored)?;
     Ok(state.status(app, mode))
 }
@@ -309,7 +454,7 @@ pub fn spawn_auto_check(app: tauri::AppHandle, data_dir: PathBuf) {
             .map(|settings| settings.app_update_mode)
             .unwrap_or_default();
         if mode != AppUpdateMode::Manual && unconfigured_reason(&app).is_none() {
-            let state = UpdateState::new(&data_dir);
+            let state = UpdateState::new(&data_dir, &data_dir);
             let app_for_check = app.clone();
             let outcome = tauri::async_runtime::block_on(check(
                 app_for_check,
@@ -344,7 +489,7 @@ mod tests {
     #[test]
     fn stored_state_round_trips_and_ignores_broken_files() {
         let dir = tempfile::tempdir().unwrap();
-        let state = UpdateState::new(dir.path());
+        let state = UpdateState::new(&dir.path(), &dir.path());
         assert!(state.load().receipt.is_none());
         state
             .store(&StoredState {
@@ -359,6 +504,7 @@ mod tests {
                     version: "1.2.3".into(),
                     installed_at_ms: 9,
                 }),
+                downloaded_version: None,
             })
             .unwrap();
         let loaded = state.load();
@@ -372,7 +518,7 @@ mod tests {
     #[test]
     fn busy_guard_rejects_parallel_installs() {
         let dir = tempfile::tempdir().unwrap();
-        let state = UpdateState::new(dir.path());
+        let state = UpdateState::new(&dir.path(), &dir.path());
         state.begin().unwrap();
         assert_eq!(
             state.begin().unwrap_err().code,

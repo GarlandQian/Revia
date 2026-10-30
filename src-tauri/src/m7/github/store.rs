@@ -21,6 +21,10 @@ pub struct ReviewDraft {
     pub id: String,
     pub repo_key: String,
     pub number: u64,
+    /// F09：草稿绑定的 PR head SHA——PR 更新后旧草稿不再被误当当前版本提交。
+    #[serde(default)]
+    #[ts(optional)]
+    pub head_sha: Option<String>,
     pub path: String,
     /// `new`（新增行）或 `old`（删除行）。
     pub side: String,
@@ -209,6 +213,23 @@ impl ReceiptStore {
             .collect()
     }
 
+    /// F10：某仓库所有已缓存“确实受保护”的分支名（去重），供推送 / 历史保护取并集。
+    pub fn protected_branches(&self, repo_key: &str) -> Vec<String> {
+        let mut branches: Vec<String> = self
+            .load_protection()
+            .get(repo_key)
+            .map(|map| {
+                map.iter()
+                    .filter(|(_, info)| info.protected)
+                    .map(|(branch, _)| branch.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        branches.sort();
+        branches.dedup();
+        branches
+    }
+
     pub fn protection(&self, repo_key: &str, branch: &str) -> Option<ProtectionInfo> {
         self.load_protection()
             .get(repo_key)
@@ -251,6 +272,7 @@ mod tests {
             id: String::new(),
             repo_key: "repo".into(),
             number: 7,
+            head_sha: Some("abc123".into()),
             path: "src/a.ts".into(),
             side: "new".into(),
             line: 12,

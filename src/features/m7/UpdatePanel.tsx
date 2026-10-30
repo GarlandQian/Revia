@@ -33,6 +33,9 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // F13：检查(idle/available) → 确认下载 → 已下载待安装 → 已安装待重启。
+  const [phase, setPhase] = useState<"idle" | "available" | "downloading" | "downloaded" | "installed">("idle");
+  const [installedVersion, setInstalledVersion] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -46,7 +49,12 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
     setProgress(null);
     setError(null);
     setNotice(null);
-    void m7.updateStatus().then(onStatusChange).catch(() => undefined);
+    void m7.updateStatus().then((next) => {
+      onStatusChange(next);
+      // 已装过的版本在状态里：重启入口直接可达，不再依赖 available 分支。
+      setInstalledVersion(next.receipt?.version ?? null);
+      setPhase(next.available ? "available" : "idle");
+    }).catch(() => undefined);
   }, [onStatusChange, open]);
 
   useEffect(() => {
@@ -70,16 +78,30 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
     }
   };
 
+  // F13：检查 → 用户确认下载 → 已下载待安装 → 安装 → 再确认重启，状态分开。
   const install = async () => {
     setBusy(true);
     setError(null);
     try {
       if (!(await onBeforeInstall())) return;
-      const next = await m7.updateInstall();
-      onStatusChange(next);
-      setNotice(t("update.installed", { version: next.available?.version ?? next.receipt?.version ?? "" }));
+      if (phase === "available") {
+        // 第一步：用户确认后才下载（不落盘安装）。
+        await m7.updateDownload();
+        setPhase("downloaded");
+        setNotice(null);
+        return;
+      }
+      if (phase === "downloaded") {
+        // 第二步：用户再确认安装。
+        const next = await m7.updateInstall();
+        onStatusChange(next);
+        setPhase("installed");
+        setNotice(t("update.installed", { version: next.receipt?.version ?? "" }));
+        return;
+      }
     } catch (caught) {
       setError(toAppError(caught));
+      setPhase(status?.available ? "available" : "idle");
     } finally {
       setBusy(false);
     }
@@ -122,13 +144,20 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
           <select className="settings-select h-6 w-auto" value={mode} onChange={(event) => onModeChange(event.target.value as AppUpdateMode)}>
             <option value="manual">{t("update.modeManual")}</option>
             <option value="notify">{t("update.modeNotify")}</option>
-            <option value="automatic">{t("update.modeAutomatic")}</option>
           </select>
           <button type="button" className="toolbar-widget h-6 px-2" disabled={busy} onClick={() => void check(true)}>
             {busy ? t("update.checking") : t("update.check")}
           </button>
         </div>
-        {status?.available ? (
+        {installedVersion ? (
+          // F13：安装成功后重启入口可达（不再嵌在 available 分支里）。
+          <div className="space-y-2 rounded border border-panel-border p-2">
+            <p className="font-semibold">{t("update.installed", { version: installedVersion })}</p>
+            <button type="button" className="toolbar-widget h-7 px-3 font-semibold" onClick={() => void restart()}>
+              {t("update.restart")}
+            </button>
+          </div>
+        ) : status?.available ? (
           <div className="space-y-2 rounded border border-panel-border p-2">
             <p className="font-semibold">{t("update.available", { version: status.available.version })}</p>
             {status.available.publishedAt ? <p className="text-descriptionforeground">{t("update.published", { time: status.available.publishedAt })}</p> : null}
@@ -140,13 +169,9 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
             ) : null}
             <div className="flex items-center gap-2">
               <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy} onClick={() => void install()}>
-                {t("update.install")}
+                {phase === "downloaded" ? t("update.installNow") : t("update.downloadConfirm")}
               </button>
-              {status.receipt && status.receipt.version === status.available.version ? (
-                <button type="button" className="toolbar-widget h-7 px-3" onClick={() => void restart()}>
-                  {t("update.restart")}
-                </button>
-              ) : null}
+              {phase === "downloading" ? <span className="text-descriptionforeground">{t("update.downloading")}</span> : null}
             </div>
           </div>
         ) : (

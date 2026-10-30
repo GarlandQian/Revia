@@ -29,6 +29,9 @@ export function GlassLayer({
       className={["glass-layer", `glass-layer--${variant}`, flat ? "glass-layer--flat" : "", className ?? ""]
         .filter(Boolean)
         .join(" ")}
+      // F01：vendor 默认 200×80 行内尺寸会把材质层钉成小块；显式铺满宿主。
+      width="100%"
+      height="100%"
       borderRadius={radius}
       borderWidth={GLASS_SURFACE.borderWidth}
       backgroundOpacity={GLASS_SURFACE.backgroundOpacity}

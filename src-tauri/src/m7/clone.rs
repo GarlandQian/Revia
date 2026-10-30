@@ -74,19 +74,25 @@ struct CloneJob {
 pub struct CloneManager {
     jobs: Mutex<HashMap<u64, CloneJob>>,
     counter: AtomicU64,
+    /// H8：设置里手动指定的 Git 程序（Q27）；None 时与统一执行器一致用 PATH。
+    git_program: Option<std::path::PathBuf>,
+    /// H8：统一命令日志。
+    log: Arc<crate::git::CommandLog>,
 }
 
 impl Default for CloneManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(None, Arc::new(crate::git::CommandLog::default()))
     }
 }
 
 impl CloneManager {
-    pub fn new() -> Self {
+    pub fn new(git_program: Option<std::path::PathBuf>, log: Arc<crate::git::CommandLog>) -> Self {
         Self {
             jobs: Mutex::new(HashMap::new()),
             counter: AtomicU64::new(1),
+            git_program,
+            log,
         }
     }
 
@@ -109,8 +115,10 @@ impl CloneManager {
             },
         );
         let manager = Arc::clone(self);
+        let git_program = self.git_program.clone();
+        let log = Arc::clone(&self.log);
         std::thread::spawn(move || {
-            run(app, job_id, validated, shell_env, cancelled, child);
+            run(app, job_id, validated, shell_env, cancelled, child, git_program, log);
             manager
                 .jobs
                 .lock()
@@ -254,13 +262,18 @@ fn run(
     shell_env: crate::shell::ShellEnv,
     cancelled: Arc<AtomicBool>,
     child_slot: Arc<Mutex<Option<Child>>>,
+    git_program: Option<std::path::PathBuf>,
+    log: Arc<crate::git::CommandLog>,
 ) {
     use tauri::Emitter;
-    let program = shell_env
-        .which("git")
-        .map(|path| path.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "git".to_string());
-    let mut command = Command::new(program);
+    // H8：程序选择与统一 Git 执行器同源（设置路径优先，否则 PATH 里的 git）。
+    let program = git_program
+        .clone()
+        .or_else(|| shell_env.which("git"))
+        .unwrap_or_else(|| std::path::PathBuf::from("git"));
+    let program_text = program.to_string_lossy().into_owned();
+    let started = std::time::Instant::now();
+    let mut command = Command::new(&program);
     command
         .arg("clone")
         .arg("--progress")
@@ -331,6 +344,51 @@ fn run(
         .and_then(|child| child.wait().ok());
     let was_cancelled = cancelled.load(Ordering::Relaxed);
     let success = status.as_ref().map(|status| status.success()).unwrap_or(false) && !was_cancelled;
+    // H8：克隆进入统一 Git 命令日志（参数打码、耗时、退出码；输出只留尾部摘要）。
+    {
+        let exit_code = status
+            .as_ref()
+            .and_then(|status| status.code())
+            .unwrap_or(if was_cancelled { -1 } else { -1 });
+        log.record(crate::git::CommandRecord {
+            sequence: 0,
+            worktree_id: None,
+            started_at_ms: crate::m7::now_ms().saturating_sub(started.elapsed().as_millis() as u64),
+            program: program_text.clone(),
+            args: ["clone".to_string(), request.url.clone(), request.target.to_string_lossy().into_owned()]
+                .into_iter()
+                .chain(
+                    request
+                        .branch
+                        .as_ref()
+                        .map(|b| format!("--branch={b}"))
+                        .into_iter()
+                        .chain(request.depth.map(|d| format!("--depth={d}")).into_iter()),
+                )
+                .collect(),
+            directory: request
+                .target
+                .parent()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            exit_code,
+            elapsed_ms: started.elapsed().as_millis() as u64,
+            timed_out: false,
+            stdout_bytes: 0,
+            stderr_excerpt: tail
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .last()
+                .cloned()
+                .unwrap_or_default(),
+            output: tail
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .join("
+"),
+            output_truncated: false,
+        });
+    }
     // 取消或失败都保留目标目录里的残留内容，由用户在界面上决定是否清理。
     let message = if success {
         None

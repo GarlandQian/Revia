@@ -140,6 +140,8 @@ pub struct AppState {
     pub m7_github: Arc<crate::m7::github::GithubState>,
     /// M7：应用更新状态。
     pub m7_update: Arc<crate::m7::update::UpdateState>,
+    /// M7：诊断摘要（F21：脱敏摘要持久化 7 天，可清空）。
+    pub m7_diagnostics: Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>,
     /// 提交操作 ID 计数器（实时输出事件归属用）。
     commit_ops: std::sync::atomic::AtomicU64,
 }
@@ -147,14 +149,19 @@ pub struct AppState {
 impl AppState {
     pub fn new(data_dir: PathBuf) -> Self {
         let command_log = Arc::new(CommandLog::default());
+        // H8：克隆与统一 Git 执行器同源——设置里手动指定的 Git 程序（Q27）。
+        let git_program_for_clone = crate::settings::read_settings(&data_dir)
+            .ok()
+            .and_then(|settings| settings.git_path)
+            .map(std::path::PathBuf::from);
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
             stash_archive: crate::stash_archive::StashArchiveStore::new(&data_dir.clone()),
             autostash: crate::autostash::AutostashStore::new(&data_dir.clone()),
             review: Arc::new(crate::review::ReviewStore::new(data_dir.clone())),
-            registry: Mutex::new(Registry::load(data_dir.clone(), command_log.clone())),
+            registry: Mutex::new(Registry::load(data_dir.clone(), Arc::clone(&command_log))),
             sessions: Mutex::new(HashMap::new()),
-            command_log,
+            command_log: Arc::clone(&command_log),
             history: Arc::new(HistoryStore::new()),
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
@@ -165,9 +172,13 @@ impl AppState {
             m7_edit_drafts: Arc::new(crate::m7::edit::EditDraftStore::new(&data_dir)),
             m7_terminal: Arc::new(crate::m7::terminal::TerminalManager::new()),
             m7_terminal_tabs: Arc::new(crate::m7::terminal::TerminalTabStore::new(&data_dir)),
-            m7_clone: Arc::new(crate::m7::clone::CloneManager::new()),
+            m7_clone: Arc::new(crate::m7::clone::CloneManager::new(
+                git_program_for_clone.clone(),
+                Arc::clone(&command_log),
+            )),
             m7_github: Arc::new(crate::m7::github::GithubState::new(&data_dir)),
-            m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir)),
+            m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir, &data_dir)),
+            m7_diagnostics: Arc::new(crate::m7::diagnostics::DiagnosticsSummaryStore::new(&data_dir)),
             data_dir,
             commit_ops: std::sync::atomic::AtomicU64::new(1),
         }
@@ -2289,6 +2300,22 @@ pub async fn update_project(
 }
 
 /// 推送对话框的预览：目标远端 / 分支、将要推送的提交与受保护分支判断。
+/// F10：本地保护列表与 GitHub 保护缓存取并集（远端已保护而本地未配置的分支同样拦强推）。
+fn protected_with_github(
+    github: &Arc<crate::m7::github::GithubState>,
+    session: &crate::session::WorktreeSession,
+    local: &[String],
+) -> Vec<String> {
+    let mut merged: Vec<String> = local.to_vec();
+    let repo_key = crate::m7::github::GithubState::repo_key(&session.path);
+    for branch in github.receipts().protected_branches(&repo_key) {
+        if !merged.contains(&branch) {
+            merged.push(branch);
+        }
+    }
+    merged
+}
+
 #[tauri::command]
 pub async fn push_preview(
     state: State<'_, AppState>,
@@ -2296,8 +2323,10 @@ pub async fn push_preview(
 ) -> Result<crate::remote_ops::PushPreview> {
     let settings = settings_snapshot(&state)?;
     let session = state.worktree_session(&request.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
-        crate::remote_ops::push_preview(&session, &settings.protected_branches)
+        let protected = protected_with_github(&github, &session, &settings.protected_branches);
+        crate::remote_ops::push_preview(&session, &protected)
     })
     .await
     .map_err(|error| {
@@ -2318,11 +2347,14 @@ pub async fn push_branch(
 ) -> Result<crate::remote_ops::PushResult> {
     let settings = settings_snapshot(&state)?;
     let session = state.worktree_session(&request.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
+        // F10：实际推送保护使用并集。
+        let protected = protected_with_github(&github, &session, &settings.protected_branches);
         crate::remote_ops::push(
             &session,
             &request.request,
-            &settings.protected_branches,
+            &protected,
             crate::remote_ops::default_network_timeout(),
         )
     })

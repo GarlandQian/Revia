@@ -68,7 +68,8 @@ function reviewEventLabel(event: ReviewEvent): string {
 }
 
 function patchLines(patch: string) {
-  return patch.split("\n").slice(0, 400);
+  // F19：完整显示 patch 行；视口滚动由 max-h/overflow 控制，不再静默裁剪。
+  return patch.split("\n");
 }
 
 export function GithubPanel({
@@ -118,8 +119,19 @@ export function GithubPanel({
   const [createBody, setCreateBody] = useState("");
   const [createBase, setCreateBase] = useState("main");
   const [createDraft, setCreateDraft] = useState(false);
+  // F18：创建 PR 的来源远端（fork 场景可与目标远端不同）。
+  const [createSourceRemote, setCreateSourceRemote] = useState<string | null>(null);
+  // H4：同名本地分支有独有提交，等待用户确认覆盖。
+  const [divergedBranch, setDivergedBranch] = useState(false);
+  // F19：完整 PR diff（github diff 媒体类型，不裁剪）。
+  const [fullDiff, setFullDiff] = useState<string | null>(null);
 
   const login = status?.repoAccount ?? status?.accounts[0]?.login ?? null;
+  // F09：后端计算的 repoKey（worktree 规范路径 SHA），保存草稿时使用。
+  const [backendRepoKey, setBackendRepoKey] = useState<string>("");
+  useEffect(() => {
+    void m7.githubRepoKey(worktreeId).then(setBackendRepoKey).catch(() => setBackendRepoKey(""));
+  }, [worktreeId]);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -138,21 +150,25 @@ export function GithubPanel({
     void m7.githubReceipts(worktreeId).then(setReceipts).catch(() => undefined);
   }, [loadStatus, worktreeId]);
 
+  const listEpoch = useRef(0);
   const loadList = useCallback(
     async (nextPage: number) => {
       if (remote === null) return;
+      const epoch = ++listEpoch.current;
       setBusy("list");
       setError(null);
       try {
         const result = await m7.prList(worktreeId, remote, filter, nextPage);
+        // F08：只有最新一次列表请求可以落状态。
+        if (epoch !== listEpoch.current) return;
         setItems(result.items);
         setHasMore(result.hasMore);
         setPage(nextPage);
         setRateLimit(result.rateLimit);
       } catch (caught) {
-        setError(toAppError(caught));
+        if (epoch === listEpoch.current) setError(toAppError(caught));
       } finally {
-        setBusy(null);
+        if (epoch === listEpoch.current) setBusy(null);
       }
     },
     [filter, remote, worktreeId],
@@ -162,17 +178,41 @@ export function GithubPanel({
     if (login !== null) void loadList(1);
   }, [login, loadList]);
 
+  // F08：切 worktree / remote 后旧目标的选中与详情全部失效。
+  useEffect(() => {
+    setSelected(null);
+    setDetail(null);
+    setFiles([]);
+    setComments([]);
+    setDrafts([]);
+    setProtection(null);
+    setReceipts([]);
+    requestEpoch.current += 1;
+    currentRequest.current = null;
+  }, [remote, worktreeId]);
+
+  // F08：请求代际。切 worktree / 换 remote / 打开另一个 PR 后，晚到的旧响应必须丢弃，
+  // 不能把旧目标的 selected / detail / files 覆盖到新目标上。
+  const requestEpoch = useRef(0);
+  const currentRequest = useRef<{ worktreeId: string; remote: string | null; number: number } | null>(null);
+
   const openDetail = useCallback(
     async (summary: PullRequestSummary) => {
+      const epoch = ++requestEpoch.current;
+      const request = { worktreeId, remote, number: summary.number, headSha: summary.headSha };
+      currentRequest.current = request;
       setSelected(summary);
       setDetail(null);
       setFiles([]);
       setComments([]);
       setDrafts([]);
       setProtection(null);
+      setFullDiff(null);
+      // F09：正文草稿按 PR 保留——切到另一个 PR 时清空（本地 state 不跨 PR 共享）。
+      setReviewBody("");
+      setCommentBody("");
       setBusy("detail");
       setError(null);
-      const request = { worktreeId, remote, number: summary.number };
       try {
         const [detailResult, fileList, commentList, draftList] = await Promise.all([
           m7.prDetail(request),
@@ -180,6 +220,15 @@ export function GithubPanel({
           m7.prComments(request),
           m7.reviewDrafts(request),
         ]);
+        // 身份核对：只有仍然是“这一目标”的请求才能落状态；否则静默丢弃。
+        const current = currentRequest.current;
+        if (epoch !== requestEpoch.current
+          || !current
+          || current.worktreeId !== worktreeId
+          || current.remote !== remote
+          || current.number !== summary.number) {
+          return;
+        }
         setDetail(detailResult);
         setFiles(fileList);
         setComments(commentList);
@@ -187,12 +236,17 @@ export function GithubPanel({
         setCreateBase(summary.baseRef);
         void m7
           .protectionRefresh(worktreeId, remote, summary.baseRef)
-          .then(setProtection)
+          .then((info) => {
+            const still = currentRequest.current;
+            if (epoch === requestEpoch.current && still && still.number === summary.number) {
+              setProtection(info);
+            }
+          })
           .catch(() => undefined);
       } catch (caught) {
-        setError(toAppError(caught));
+        if (epoch === requestEpoch.current) setError(toAppError(caught));
       } finally {
-        setBusy(null);
+        if (epoch === requestEpoch.current) setBusy(null);
       }
     },
     [remote, worktreeId],
@@ -271,10 +325,16 @@ export function GithubPanel({
     if (!selected || !login || draftPath.trim().length === 0) return;
     const line = Math.max(1, Number.parseInt(draftLine, 10) || 1);
     try {
+      // F09：草稿绑定后端 repoKey（worktree 路径 SHA）与当前 head；前端不再伪造 repoKey。
+      if (remote === null || detail?.summary.headSha == null) {
+        setError({ kind: "rejected", message: t("github.remoteRequired"), params: {} });
+        return;
+      }
       await m7.reviewDraftSave({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        repoKey: `${login}/${selected.headRef}`,
+        repoKey: backendRepoKey,
         number: selected.number,
+        headSha: detail.summary.headSha,
         path: draftPath.trim(),
         side: "new",
         line,
@@ -298,8 +358,14 @@ export function GithubPanel({
     setBusy("review");
     setError(null);
     try {
+      // F07：审阅落在列表 / 详情所选的远端仓库，不回退 origin。
+      if (remote === null) {
+        setError({ kind: "rejected", message: t("github.remoteRequired"), params: {} });
+        return;
+      }
       const receipt = await m7.reviewSubmit({
         worktreeId,
+        remote,
         number: selected.number,
         event: reviewEvent,
         body: reviewBody,
@@ -316,9 +382,9 @@ export function GithubPanel({
     } finally {
       setBusy(null);
     }
-  }, [detail, drafts, onWorkspaceTouched, reviewBody, reviewEvent, selected, worktreeId]);
+  }, [detail, drafts, onWorkspaceTouched, remote, reviewBody, reviewEvent, selected, worktreeId]);
 
-  const checkout = useCallback(async () => {
+  const checkout = useCallback(async (overwriteConfirmed = false) => {
     if (!selected || !detail || remote === null) return;
     setBusy("checkout");
     setError(null);
@@ -330,11 +396,17 @@ export function GithubPanel({
         expectedHeadSha: detail.summary.headSha,
         strategy: "smart",
         localBranch: null,
+        overwriteConfirmed,
       });
       setNotice(t("github.checkoutDone", { branch: outcome.branch }));
       onCheckedOut(outcome);
     } catch (caught) {
-      setError(toAppError(caught));
+      const failure = toAppError(caught);
+      // H4：分支分叉时给用户一次明确确认覆盖的机会。
+      if (failure.code === "errors.m7.githubPrBranchDiverged" && !overwriteConfirmed) {
+        setDivergedBranch(true);
+      }
+      setError(failure);
     } finally {
       setBusy(null);
     }
@@ -345,8 +417,14 @@ export function GithubPanel({
     setBusy("merge");
     setError(null);
     try {
+      // F07：合并落在列表 / 详情所选的远端仓库，不回退 origin。
+      if (remote === null) {
+        setError({ kind: "rejected", message: t("github.remoteRequired"), params: {} });
+        return;
+      }
       const outcome = await m7.prMerge({
         worktreeId,
+        remote,
         number: selected.number,
         method: mergeMethod,
         expectedHeadSha: detail.summary.headSha,
@@ -354,11 +432,14 @@ export function GithubPanel({
         commitMessage: null,
         confirmed: mergeConfirmed,
       });
-      setNotice(
-        outcome.status === "merged"
-          ? t("github.mergeDone", { sha: outcome.sha ?? "" })
-          : t("github.mergeNotDone", { status: outcome.status, message: outcome.message }),
-      );
+      if (outcome.status === "merged") {
+        setNotice(t("github.mergeDone", { sha: outcome.sha ?? "" }));
+      } else if (outcome.error) {
+        // H7：结构化错误走生产 formatter（双语），不嵌中文诊断句。
+        setError(outcome.error);
+      } else {
+        setNotice(t("github.mergeNotDone", { status: outcome.status, message: outcome.message }));
+      }
       setReceipts(await m7.githubReceipts(worktreeId));
       setMergeConfirmed(false);
       onWorkspaceTouched();
@@ -374,10 +455,13 @@ export function GithubPanel({
     setBusy("create");
     setError(null);
     try {
+      // F18：head 按“来源远端 owner:branch”（同仓库省略 owner）；支持已有 fork。
+      const source = remotes.find((entry) => entry.name === createSourceRemote);
+      const ownerPrefix = source?.owner && createSourceRemote !== remote ? `${source.owner}:` : "";
       const created = await m7.prCreate({
         worktreeId,
         remote,
-        head: currentBranch ?? "",
+        head: `${ownerPrefix}${currentBranch ?? ""}`,
         base: createBase.trim(),
         title: createTitle.trim(),
         body: createBody,
@@ -391,7 +475,7 @@ export function GithubPanel({
     } finally {
       setBusy(null);
     }
-  }, [createBase, createBody, createDraft, createTitle, currentBranch, loadList, remote, worktreeId]);
+  }, [createBase, createBody, createDraft, createSourceRemote, createTitle, currentBranch, loadList, remote, remotes, worktreeId]);
 
   const needConfirm = useMemo(() => {
     if (!detail) return false;
@@ -455,6 +539,18 @@ export function GithubPanel({
                   <p className="text-descriptionforeground">{device.verificationUri}</p>
                   <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void navigator.clipboard.writeText(device.userCode)}>
                     {t("github.deviceCopy")}
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-widget h-6 px-2"
+                    onClick={() => {
+                      // F16：取消授权——停止轮询并结束本地流程。
+                      if (pollTimer.current !== null) window.clearTimeout(pollTimer.current);
+                      void m7.githubDeviceCancel(device.flowId).catch(() => undefined);
+                      setDevice(null);
+                    }}
+                  >
+                    {t("github.deviceCancel")}
                   </button>
                 </div>
               ) : (
@@ -589,6 +685,22 @@ export function GithubPanel({
 
                 {detail.body.trim().length > 0 ? (
                   <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-panel-border bg-[var(--side-bar-background)] p-2">{detail.body}</pre>
+                ) : null}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="toolbar-widget h-6 px-2"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      // F19：完整 diff 走 GitHub diff 媒体类型，不受 files 补丁裁剪影响。
+                      void m7.prDiff({ worktreeId, remote, number: selected.number }).then(setFullDiff).catch((caught) => setError(toAppError(caught)));
+                    }}
+                  >
+                    {t("github.viewFullDiff")}
+                  </button>
+                </div>
+                {fullDiff !== null ? (
+                  <pre className="max-h-96 overflow-auto rounded border border-panel-border bg-[var(--editor-background)] p-2 font-mono text-[11.5px]">{fullDiff}</pre>
                 ) : null}
 
                 <section className="space-y-1">
@@ -756,6 +868,20 @@ export function GithubPanel({
             <input type="checkbox" className="accent-[var(--focusborder)]" checked={createDraft} onChange={(event) => setCreateDraft(event.target.checked)} />
             {t("github.createDraft")}
           </label>
+          <label className="block">
+            <span className="mb-1 block font-semibold">{t("github.createSource")}</span>
+            <select
+              className="settings-select w-full"
+              value={createSourceRemote ?? remote ?? ""}
+              onChange={(event) => setCreateSourceRemote(event.target.value || null)}
+            >
+              {remotes.map((entry) => (
+                <option key={entry.name} value={entry.name}>
+                  {entry.owner ? `${entry.name} (${entry.owner})` : entry.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="text-descriptionforeground">{t("github.createHead", { head: currentBranch ?? "?" })}</p>
           <button
             type="button"
@@ -786,6 +912,29 @@ export function GithubPanel({
           </div>
         </div>
       )}
+      {divergedBranch ? (
+        // H4：覆盖本地分支的独有提交前必须由用户确认。
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30">
+          <div role="dialog" aria-modal="true" className="w-[420px] rounded-md border border-panel-border bg-[var(--editor-background)] p-4 text-[12.5px]">
+            <p className="mb-3">{t("github.divergedConfirm", { branch: `pr/${selected?.number ?? ""}` })}</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="toolbar-widget h-7 px-3" onClick={() => setDivergedBranch(false)}>
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                className="toolbar-widget h-7 px-3 font-semibold"
+                onClick={() => {
+                  setDivergedBranch(false);
+                  void checkout(true);
+                }}
+              >
+                {t("github.divergedOverwrite")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

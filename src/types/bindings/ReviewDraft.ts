@@ -3,7 +3,11 @@
 /**
  * 一条本地评审草稿（未提交的评论）。
  */
-export type ReviewDraft = { id: string, repoKey: string, number: number, path: string, 
+export type ReviewDraft = { id: string, repoKey: string, number: number, 
+/**
+ * F09：草稿绑定的 PR head SHA——PR 更新后旧草稿不再被误当当前版本提交。
+ */
+headSha?: string, path: string, 
 /**
  * `new`（新增行）或 `old`（删除行）。
  */

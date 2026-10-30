@@ -910,6 +910,10 @@
       "updateReasonNoPubkey": "No update signing public key is configured, so packages cannot be verified",
       "updateReasonNoEndpoints": "No update check URL is configured",
       "writeTargetDirectory": "The write target is missing a directory"
+    },
+    "update": {
+      "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
+      "installBlockedTerminal": "A terminal session is still running — close it before installing the update"
     }
   },
   "app": {
@@ -1585,7 +1589,9 @@
         "reset": "Reset",
         "resetAll": "Reset all",
         "diffOnly": "(needs a selected file)",
-        "current": "Current: {list}"
+        "current": "Current: {list}",
+        "confirmReplace": "“{accelerator}” is bound to “{conflict}”. Rebind it to “{action}” and reset “{conflict}” to default?",
+        "replaceConfirm": "Replace"
       },
       "github": {
         "title": "GitHub accounts",
@@ -1616,7 +1622,9 @@
         "receiptValue": "{version} · {time}",
         "modeManual": "Check manually",
         "modeNotify": "Notify when available",
-        "modeAutomatic": "Download automatically (never install)"
+        "modeAutomatic": "Download automatically (never install)",
+        "prerelease": "Prerelease channel",
+        "prereleaseHint": "Also check prerelease versions when enabled (stable only by default)"
       }
     },
     "licenseReactBits": "React Bits glass components (MIT + Commons Clause, see src/components/m7/glass/LICENSE.md)"
@@ -2044,7 +2052,8 @@
     "dismiss": "Dismiss",
     "delete": "Delete",
     "loading": "Loading…",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "cancel": "Cancel"
   },
   "nativeMenu": {
     "file": "File",
@@ -2112,7 +2121,9 @@
     "closeTab": "Close tab",
     "new": "New terminal",
     "closePanel": "Close terminal panel",
-    "empty": "No terminal tabs yet"
+    "empty": "No terminal tabs yet",
+    "closeRunningConfirm": "Process still running — closing terminates it.",
+    "closeRunningYes": "Terminate & close"
   },
   "clone": {
     "title": "Clone repository",
@@ -2215,7 +2226,13 @@
     "createSubmit": "Create",
     "created": "Created #{number}",
     "receiptsTitle": "Local receipts",
-    "noReceipts": "No receipts yet."
+    "noReceipts": "No receipts yet.",
+    "remoteRequired": "Select a GitHub remote first",
+    "divergedConfirm": "Local branch pr/{branch} has commits not on the remote — overwriting loses them. Overwrite with the remote PR head?",
+    "divergedOverwrite": "Overwrite local branch",
+    "deviceCancel": "Cancel sign-in",
+    "viewFullDiff": "View full diff",
+    "createSource": "Source repository (pick a fork remote if needed)"
   },
   "diagnostics": {
     "title": "Diagnostics",
@@ -2225,7 +2242,9 @@
     "copy": "Copy",
     "export": "Export…",
     "saveTitle": "Save diagnostics",
-    "exported": "Exported to {path} ({bytes} bytes, {redactions} redactions)"
+    "exported": "Exported to {path} ({bytes} bytes, {redactions} redactions)",
+    "clear": "Clear summary",
+    "cleared": "Cleared the redacted summary for this repository"
   },
   "update": {
     "title": "App update",
@@ -2244,7 +2263,10 @@
     "upToDate": "You are on the latest version.",
     "lastChecked": "Last checked: {time}",
     "banner": "Version {version} is available.",
-    "bannerOpen": "View"
+    "bannerOpen": "View",
+    "downloadConfirm": "Download update",
+    "downloading": "Downloading…",
+    "installNow": "Install (confirm to restart)"
   },
   "shortcuts": {
     "actions": {
@@ -2252,8 +2274,8 @@
       "stageFile": "Stage current file",
       "discardFile": "Discard current file changes",
       "reviewNextFile": "Mark reviewed and go to next file",
-      "nextHunk": "Next hunk",
-      "prevHunk": "Previous hunk",
+      "nextHunk": "Next block",
+      "prevHunk": "Previous block",
       "nextFile": "Next file",
       "prevFile": "Previous file",
       "openRepo": "Open repository…",
@@ -2271,6 +2293,8 @@
   },
   "workspace": {
     "edit": "Edit this file",
-    "editDirty": "Unsaved changes"
+    "editDirty": "Unsaved changes",
+    "editUnsavedBlock": "Unsaved edits — save or discard before continuing",
+    "editSwitchToSplit": "Switch to split view to edit the working-tree side"
   }
 }

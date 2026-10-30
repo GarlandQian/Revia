@@ -1302,6 +1302,10 @@
       "updateReasonNoPlugin": "没有配置更新通道（缺少 updater 插件配置）",
       "updateReasonNoPubkey": "没有配置更新签名公钥，无法验证安装包",
       "updateReasonNoEndpoints": "没有配置更新检查地址"
+    },
+    "update": {
+      "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
+      "installBlockedTerminal": "有运行中的终端会话，请先关闭终端再安装更新"
     }
   },
   "commit": {
@@ -1566,7 +1570,9 @@
         "reset": "恢复默认",
         "resetAll": "全部恢复默认",
         "diffOnly": "（需要选中文件）",
-        "current": "当前：{list}"
+        "current": "当前：{list}",
+        "confirmReplace": "“{accelerator}”已绑定“{conflict}”。用它替换“{action}”的绑定并让“{conflict}”恢复默认吗？",
+        "replaceConfirm": "替换"
       },
       "github": {
         "title": "GitHub 账号",
@@ -1597,7 +1603,9 @@
         "receiptValue": "{version} · {time}",
         "modeManual": "手动检查",
         "modeNotify": "有新版本时提示",
-        "modeAutomatic": "自动下载（不自动安装）"
+        "modeAutomatic": "自动下载（不自动安装）",
+        "prerelease": "预发布渠道",
+        "prereleaseHint": "开启后同时检查预发布版本（默认只查稳定版）"
       }
     },
     "licenseReactBits": "React Bits 玻璃组件（MIT + Commons Clause，见 src/components/m7/glass/LICENSE.md）"
@@ -2044,7 +2052,8 @@
     "dismiss": "关闭提示",
     "delete": "删除",
     "loading": "载入中…",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "cancel": "取消"
   },
   "nativeMenu": {
     "file": "文件",
@@ -2112,7 +2121,9 @@
     "closeTab": "关闭页签",
     "new": "新建终端",
     "closePanel": "关闭终端面板",
-    "empty": "还没有终端页签"
+    "empty": "还没有终端页签",
+    "closeRunningConfirm": "进程仍在运行，关闭会终止它。",
+    "closeRunningYes": "终止并关闭"
   },
   "clone": {
     "title": "克隆仓库",
@@ -2215,7 +2226,13 @@
     "createSubmit": "创建",
     "created": "已创建 #{number}",
     "receiptsTitle": "本地回执",
-    "noReceipts": "还没有回执。"
+    "noReceipts": "还没有回执。",
+    "remoteRequired": "请先选择 GitHub 远端仓库",
+    "divergedConfirm": "本地分支 pr/{branch} 有远端没有的提交，覆盖会丢失它们。确定用远端 PR head 覆盖吗？",
+    "divergedOverwrite": "覆盖本地分支",
+    "deviceCancel": "取消授权",
+    "viewFullDiff": "查看完整 diff",
+    "createSource": "来源仓库（已有 fork 可选其它远端）"
   },
   "diagnostics": {
     "title": "诊断信息",
@@ -2225,7 +2242,9 @@
     "copy": "复制",
     "export": "导出…",
     "saveTitle": "保存诊断信息",
-    "exported": "已导出到 {path}（{bytes} 字节，脱敏 {redactions} 处）"
+    "exported": "已导出到 {path}（{bytes} 字节，脱敏 {redactions} 处）",
+    "clear": "清空摘要",
+    "cleared": "已清空本仓库的脱敏摘要"
   },
   "update": {
     "title": "应用更新",
@@ -2244,7 +2263,10 @@
     "upToDate": "已是最新版本。",
     "lastChecked": "上次检查：{time}",
     "banner": "有新版本 {version} 可用。",
-    "bannerOpen": "查看"
+    "bannerOpen": "查看",
+    "downloadConfirm": "下载更新",
+    "downloading": "正在下载…",
+    "installNow": "安装并重启前确认"
   },
   "shortcuts": {
     "actions": {
@@ -2252,8 +2274,8 @@
       "stageFile": "暂存当前文件",
       "discardFile": "丢弃当前文件改动",
       "reviewNextFile": "标记已审阅并跳到下一个文件",
-      "nextHunk": "下一个 hunk",
-      "prevHunk": "上一个 hunk",
+      "nextHunk": "下一个块",
+      "prevHunk": "上一个块",
       "nextFile": "下一个文件",
       "prevFile": "上一个文件",
       "openRepo": "打开仓库…",
@@ -2271,6 +2293,8 @@
   },
   "workspace": {
     "edit": "编辑此文件",
-    "editDirty": "有未保存改动"
+    "editDirty": "有未保存改动",
+    "editUnsavedBlock": "有未保存的编辑，请先保存或放弃再继续",
+    "editSwitchToSplit": "切到并排视图后编辑工作区一侧"
   }
 }

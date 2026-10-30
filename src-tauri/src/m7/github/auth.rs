@@ -66,6 +66,13 @@ struct TokenResponse {
     error: Option<String>,
     #[serde(default)]
     interval: Option<u64>,
+    /// F16：GitHub App 用户令牌会过期；refresh_token 及其过期时间一并接收。
+    #[serde(default)]
+    refresh_token: Option<String>,
+    #[serde(default)]
+    expires_in: Option<u64>,
+    #[serde(default)]
+    refresh_token_expires_in: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -186,6 +193,27 @@ pub fn start_device_flow(state: &GithubState) -> Result<DeviceStart> {
     })
 }
 
+/// F16：取消设备码授权——移除进行中的流程，后续轮询按"未知流程"结束；
+/// 已填的用户码不再有效。这是本地取消，不访问网络。
+pub fn cancel_device_flow(state: &GithubState, flow_id: &str) -> Result<()> {
+    let removed = state
+        .flows
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .remove(flow_id)
+        .is_some();
+    if removed {
+        Ok(())
+    } else {
+        Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.githubDeviceFlowUnknown",
+            "登录流程已结束，请重新开始",
+            &[],
+        ))
+    }
+}
+
 /// 轮询一次设备码授权状态。
 pub fn poll_device_flow(state: &GithubState, flow_id: &str) -> Result<DevicePoll> {
     let client_id = client_id().ok_or_else(missing_client_id)?;
@@ -254,7 +282,14 @@ pub fn poll_device_flow(state: &GithubState, flow_id: &str) -> Result<DevicePoll
                 )
             })?;
             drop(flows);
-            let account = login_with_token(state, &token, body.scope.as_deref(), GithubAuthMethod::DeviceFlow)?;
+            // F16：设备码流程的 refresh_token 一并传给登录持久化。
+            let account = login_with_token_full(
+                state,
+                &token,
+                body.scope.as_deref(),
+                GithubAuthMethod::DeviceFlow,
+                body.refresh_token.as_deref(),
+            )?;
             state
                 .flows
                 .lock()
@@ -315,6 +350,17 @@ pub fn login_with_token(
     scopes_hint: Option<&str>,
     method: GithubAuthMethod,
 ) -> Result<GithubAccount> {
+    login_with_token_full(state, token, scopes_hint, method, None)
+}
+
+/// F16：带刷新令牌的完整登录路径；设备码流程拿到 refresh_token 时走这里。
+pub fn login_with_token_full(
+    state: &GithubState,
+    token: &str,
+    scopes_hint: Option<&str>,
+    method: GithubAuthMethod,
+    refresh: Option<&str>,
+) -> Result<GithubAccount> {
     let token = token.trim();
     if token.is_empty() {
         return Err(AppError::coded(
@@ -356,6 +402,8 @@ pub fn login_with_token(
         added_at_ms: super::super::now_ms(),
     };
     state.tokens.save(&account.login, token)?;
+    // F16：刷新令牌（如有）一并持久化，过期轮换时使用。
+    state.tokens.save_refresh(&account.login, refresh.unwrap_or(""))?;
     state.upsert_account(account.clone())?;
     Ok(account)
 }

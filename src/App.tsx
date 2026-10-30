@@ -382,11 +382,15 @@ export function App() {
   /** 正在编辑的文件（同一时刻只编辑一个，切换文件前先处理未保存改动）。 */
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editDirty, setEditDirty] = useState(false);
+  const editingRef = useRef<{ path: string | null; dirty: boolean }>({ path: null, dirty: false });
+  editingRef.current = { path: editingPath, dirty: editDirty };
   const [cloneOpen, setCloneOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [appUpdateMode, setAppUpdateMode] = useState<AppUpdateMode>("notify");
+  /** F22：预发布渠道开关（设置持久化）。 */
+  const [allowPrerelease, setAllowPrerelease] = useState(false);
   const [shortcutsSnapshot, setShortcutsSnapshot] = useState<Record<string, string>>({});
   const themeKind = useThemeKind();
   const reducedMotion = useReducedMotion();
@@ -1299,6 +1303,7 @@ export function App() {
         setSidebarWidth(settings.sidebarWidth);
         setView(settings.viewMode);
         setUiZoom(settings.uiZoom);
+        setAllowPrerelease(settings.allowPrerelease ?? false);
         setTreeGroupByDirectory(settings.treeGroupByDirectory);
         setDiffOptions({
           contextLines: settings.diffContextLines,
@@ -1574,6 +1579,8 @@ export function App() {
    * 待核对结果先展示。从不杀 Git、不重跑写命令。
    */
   const closeCoordinatorRef = useRef(new CloseCoordinator());
+  /** 终端是否有运行中的会话（任务 04 / F13）：关闭协调与更新安装都要用它。 */
+  const terminalRunningRef = useRef(false);
   /** 当前需要用户选择的关闭/退出请求（`null` 表示没有）。 */
   const [closeRequest, setCloseRequest] = useState<CloseDecision | null>(null);
   /** 当前询问对应的原动作（close / exit）：由 reconcile 从被保留的原请求写入。 */
@@ -1633,6 +1640,28 @@ export function App() {
   const flushCommitDraftRef = useRef<(targetWorktreeId?: string) => Promise<void>>(
     async () => undefined,
   );
+
+  /** 更新安装前的协调入口（任务 11 / F13）：完整走关闭协调，不只是落草稿。 */
+  const beforeUpdateInstallRef = useRef<() => Promise<boolean>>(async () => true);
+  beforeUpdateInstallRef.current = async () => {
+    // F13：安装前完整协调编辑、合并编辑、Git 写、结果待核对与终端运行中。
+    await flushCommitDraftRef.current();
+    await flushM7State();
+    if (closeCoordinatorRef.current.hasWriting() || closeCoordinatorRef.current.hasPending()) {
+      // 有在途写或待核对：不能同时进入原生安装；提示与窗口关闭一致。
+      setAppError(localizedError("rejected", "errors.update.installBlockedBusy"), null);
+      return false;
+    }
+    if (terminalRunningRef.current) {
+      setAppError(localizedError("rejected", "errors.update.installBlockedTerminal"), null);
+      return false;
+    }
+    if (editingRef.current.dirty) {
+      setAppError(localizedError("rejected", "workspace.editUnsavedBlock"), null);
+      return false;
+    }
+    return true;
+  };
 
   /** 先落草稿再执行不可撤销的原生动作；失败时抛出，绝不静默关闭。 */
   const closeAfterDraftFlush = useCallback(
@@ -1864,11 +1893,32 @@ export function App() {
     }
   }, [acceptSnapshot, notify, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
 
-  const { performBatchWrite, stageFile, unstageFile } = useBatchWrite({
+  const { performBatchWrite: performBatchWriteInner, stageFile: stageFileInner, unstageFile: unstageFileInner } = useBatchWrite({
     worktreeIdRef, writingWorktreesRef, setWritingWorktrees, writeOrchestrator,
     operationGateRef, reviewOverlayRef, acceptSnapshot, scheduleReviewRecovery,
     refreshTarget, setAppError, notify, expandToSelection,
   });
+
+  // H3/F04：编辑器有未保存内容时，暂存 / 取消暂存 / 丢弃必须先处理该文件的草稿，
+  // 不能拿着旧磁盘内容继续写。门禁只挡编辑器当前打开且脏的那一个文件。
+  const blockOnDirtyEdit = useCallback((): boolean => {
+    const editing = editingRef.current;
+    if (!editing.dirty || !editing.path) return false;
+    setAppError(localizedError("rejected", "workspace.editUnsavedBlock"), worktreeIdRef.current);
+    return true;
+  }, []);
+  const performBatchWrite = useCallback<typeof performBatchWriteInner>((...args) => {
+    if (blockOnDirtyEdit()) return Promise.resolve();
+    return performBatchWriteInner(...args);
+  }, [blockOnDirtyEdit, performBatchWriteInner]);
+  const stageFile = useCallback<typeof stageFileInner>((...args) => {
+    if (blockOnDirtyEdit()) return;
+    return stageFileInner(...args);
+  }, [blockOnDirtyEdit, stageFileInner]);
+  const unstageFile = useCallback<typeof unstageFileInner>((...args) => {
+    if (blockOnDirtyEdit()) return;
+    return unstageFileInner(...args);
+  }, [blockOnDirtyEdit, unstageFileInner]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -2351,6 +2401,14 @@ export function App() {
     }
     const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
+    // H3/F04：有未保存编辑时先保存或放弃，提交磁盘旧内容是数据遗漏。
+    {
+      const editing = editingRef.current;
+      if (editing.dirty && editing.path) {
+        setAppError(localizedError("rejected", "workspace.editUnsavedBlock"), target);
+        return;
+      }
+    }
     const context = commitContextRef.current;
     if (!context || context.worktreeId !== target) {
       setAppError(localizedError("rejected", "commit.stale"), target);
@@ -4301,6 +4359,7 @@ export function App() {
         pushDialogProtectedOnly: patch.pushDialogProtectedOnly,
         protectedBranches: patch.protectedBranches,
         appUpdateMode: patch.appUpdateMode,
+        allowPrerelease: patch.allowPrerelease,
         shortcuts: patch.shortcuts,
       });
       if (patch.shortcuts) {
@@ -5299,6 +5358,7 @@ export function App() {
     protectedBranches: pushSettings.protectedBranches.join("\n"),
     detectedGitPath: info?.gitPath ?? null,
     appUpdateMode,
+    allowPrerelease,
     shortcuts: shortcutsSnapshot,
   };
 
@@ -5323,6 +5383,36 @@ export function App() {
           }}
         />
         <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
+
+      {cloneOpen ? (
+        <CloneDialog
+          open
+          onClose={() => setCloneOpen(false)}
+          onRegistered={(repo) => {
+            setCloneOpen(false);
+            setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
+            void openRepo(repo);
+          }}
+        />
+      ) : null}
+      {diagnosticsOpen ? <DiagnosticsDialog open worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} /> : null}
+      {updateOpen ? (
+        <UpdatePanel
+          open
+          status={updateStatus}
+          mode={appUpdateMode}
+          onModeChange={(mode) => {
+            setAppUpdateMode(mode);
+            void ipc.updateSettings({ appUpdateMode: mode }).catch(() => undefined);
+          }}
+          onStatusChange={(status) => {
+            setUpdateStatus(status);
+            if (!status.available) setUpdateBannerVersion(null);
+          }}
+          onBeforeInstall={() => beforeUpdateInstallRef.current()}
+          onClose={() => setUpdateOpen(false)}
+        />
+      ) : null}
         {settingsOpen ? (
           <SettingsDialog
             open
@@ -5336,15 +5426,6 @@ export function App() {
             onThemesChanged={reloadImportedThemes}
           />
         ) : null}
-        <CloneDialog
-          open={cloneOpen}
-          onClose={() => setCloneOpen(false)}
-          onRegistered={(repo) => {
-            setCloneOpen(false);
-            setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
-            void openRepo(repo);
-          }}
-        />
         <DiagnosticsDialog open={diagnosticsOpen} worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} />
         <UpdatePanel
           open={updateOpen}
@@ -5358,10 +5439,7 @@ export function App() {
             setUpdateStatus(status);
             if (!status.available) setUpdateBannerVersion(null);
           }}
-          onBeforeInstall={async () => {
-            await flushM7State();
-            return true;
-          }}
+          onBeforeInstall={() => beforeUpdateInstallRef.current()}
           onClose={() => setUpdateOpen(false)}
         />
         {closeRequest && closeRequest.action !== "proceed" ? (
@@ -5792,16 +5870,32 @@ export function App() {
                   changeCount={displayChangeCount}
                 />
               </div>
-              {!selectedEntry.unmerged && !selectedEntry.binary ? (
+              {/* F20：编辑只作用于 split 视图的工作区侧（unstaged）。
+               * 统一视图 / 暂存区 / 历史保持只读；统一视图点编辑先切到同文件的并排视图。 */}
+              {!selectedEntry.unmerged && !selectedEntry.binary && selectedEntry.changes === "unstaged" ? (
                 <button
                   type="button"
                   className="toolbar-widget mr-1 shrink-0"
-                  aria-pressed={editingPath === selectedEntry.path}
-                  title={editDirty ? t("workspace.editDirty") : t("workspace.edit")}
-                  onClick={() => setEditingPath(editingPath === selectedEntry.path ? null : selectedEntry.path)}
+                  aria-pressed={editingPath === selectedEntry.path && view === "split"}
+                  title={
+                    view !== "split"
+                      ? t("workspace.editSwitchToSplit")
+                      : editDirty
+                        ? t("workspace.editDirty")
+                        : t("workspace.edit")
+                  }
+                  onClick={() => {
+                    if (view !== "split") {
+                      // 统一视图提供同文件并排入口：切换后自动进入编辑。
+                      void switchView("split");
+                      setEditingPath(selectedEntry.path);
+                      return;
+                    }
+                    setEditingPath(editingPath === selectedEntry.path ? null : selectedEntry.path);
+                  }}
                 >
-                  <Codicon name={editingPath === selectedEntry.path ? "close" : "edit"} size={13} />
-                  <span>{editingPath === selectedEntry.path ? t("common.close") : t("workspace.edit")}</span>
+                  <Codicon name={editingPath === selectedEntry.path && view === "split" ? "close" : "edit"} size={13} />
+                  <span>{editingPath === selectedEntry.path && view === "split" ? t("common.close") : t("workspace.edit")}</span>
                 </button>
               ) : null}
             </div>
@@ -6027,6 +6121,10 @@ export function App() {
               height={terminalHeight}
               onHeightChange={setTerminalHeight}
               onActivity={onTerminalActivity}
+              // F13：运行中的终端阻止更新安装；面板随隐藏/关闭同步这个 ref。
+              onRunningChange={(running) => {
+                terminalRunningRef.current = running;
+              }}
               onClose={() => setTerminalOpen(false)}
             />
           ) : null}
@@ -6282,6 +6380,10 @@ export function App() {
           onClose={() => setSettingsOpen(false)}
           onChange={updateSettings}
           onReloadEnvironment={reloadEnvironment}
+          worktreeId={worktreeId}
+          updateStatus={updateStatus}
+          onUpdateStatus={setUpdateStatus}
+          onThemesChanged={reloadImportedThemes}
         />
       ) : null}
 

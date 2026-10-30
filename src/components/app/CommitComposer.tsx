@@ -11,7 +11,7 @@ import type { CommitContext } from "@/types/bindings/CommitContext";
 import type { CommitHookChanges } from "@/types/bindings/CommitHookChanges";
 import type { CommitOutcome } from "@/types/bindings/CommitOutcome";
 import { messages } from "@/lib/i18n/index";
-import { COMMIT_SHORTCUT_LABEL, isCommitShortcut } from "@/lib/platform";
+import { acceleratorOf, formatAccelerator, matchesAccelerator } from "@/lib/shortcuts";
 import { Codicon } from "@/components/ui/codicon";
 import type { NoticeText } from "./Notifications";
 import { Popover } from "@/components/ui/popover";
@@ -245,7 +245,8 @@ export function CommitArea({
         disabled={submitting}
         onChange={(event) => onMessage(event.target.value)}
         onKeyDown={(event) => {
-          if (isCommitShortcut(event)) {
+          // F17：提交框跟随用户自定义的提交快捷键（acceleratorOf 读实时 overrides）。
+          if (matchesAccelerator(event.nativeEvent, acceleratorOf("commit"))) {
             event.preventDefault();
             if (!disabled && !document.querySelector("[role='dialog'], dialog[open]")) onSubmit();
           }
@@ -292,7 +293,7 @@ export function CommitArea({
         >
           {submitting ? <Codicon name="loading" size={14} spin /> : <Codicon name="check" size={14} />}
           {submitting ? messages.commit.submitting : messages.commit.submit}
-          {!submitting ? <span className="text-[11px] opacity-70">{COMMIT_SHORTCUT_LABEL}</span> : null}
+          {!submitting ? <span className="text-[11px] opacity-70">{formatAccelerator(acceleratorOf("commit"))}</span> : null}
         </GlassButton>
         <button
           type="button"

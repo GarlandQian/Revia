@@ -112,8 +112,11 @@ pub struct Settings {
     pub push_dialog_protected_only: bool,
     /// 受保护分支（每行一个，支持 `*` 通配；默认 master、main）。
     pub protected_branches: Vec<String>,
-    /// 应用更新方式（M7、Q199）：手动检查 / 提示 / 自动下载但不自动安装。
+    /// 应用更新方式（M7、Q199）：手动检查 / 提示。F22：自动下载未实现，已移除。
     pub app_update_mode: AppUpdateMode,
+    /// F22：用户主动开启预发布渠道（默认稳定版）。
+    #[serde(default)]
+    pub allow_prerelease: bool,
     /// 用户自定义快捷键（动作 id → 加速键）；未列出的动作用默认快捷键（Q199）。
     pub shortcuts: BTreeMap<String, String>,
 }
@@ -405,6 +408,7 @@ impl Default for Settings {
                 .map(|name| name.to_string())
                 .collect(),
             app_update_mode: AppUpdateMode::default(),
+            allow_prerelease: false,
             shortcuts: BTreeMap::new(),
         }
     }
@@ -467,6 +471,9 @@ pub struct SettingsPatch {
     pub push_dialog_protected_only: Option<bool>,
     pub protected_branches: Option<Vec<String>>,
     pub app_update_mode: Option<AppUpdateMode>,
+    /// F22：预发布渠道开关。
+    #[serde(default)]
+    pub allow_prerelease: Option<bool>,
     pub shortcuts: Option<BTreeMap<String, String>>,
 }
 
@@ -817,6 +824,9 @@ impl Registry {
         }
         if let Some(value) = patch.app_update_mode {
             next.app_update_mode = value;
+        }
+        if let Some(value) = patch.allow_prerelease {
+            next.allow_prerelease = value;
         }
         if let Some(value) = &patch.shortcuts {
             let mut shortcuts = BTreeMap::new();

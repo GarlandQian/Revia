@@ -991,16 +991,17 @@
   pointer-events: none;
 }
 
-/* 弹层内容挂在顶层（返修 B3、Comments 3）：由 Base UI 的 portal 定位。 */
+/* 弹层内容挂在顶层（返修 B3、Comments 3）：由 Base UI 的 portal 定位。
+ * 背景 F01：材质由内部 GlassLayer 提供，这里只保留圆角 / 边框 / 阴影兜底。 */
 .revia-popper {
   max-height: min(70vh, var(--available-height));
   max-width: var(--available-width);
   z-index: 60;
-  border-radius: 6px;
-  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  border: 1px solid var(--glass-line, var(--panel-border));
   background: var(--editorwidget-background);
   color: var(--foreground);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 28%);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
   animation: revia-pop-in 120ms ease;
 }
 
@@ -1786,6 +1787,10 @@ html[data-kind="light"] {
   .glass-layer.glass-surface {
     position: absolute !important;
     inset: 0 !important;
+    /* F01：清除 vendor 默认 200×80 行内宽高的布局影响（width/height="100%" 为基础，
+     * !important 保证样式优先级不依赖加载顺序）。 */
+    width: 100% !important;
+    height: 100% !important;
     z-index: 0;
     pointer-events: none;
     contain: layout style;

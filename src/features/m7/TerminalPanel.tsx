@@ -45,6 +45,8 @@ export interface TerminalPanelProps {
   onHeightChange: (height: number) => void;
   /** 终端输出静默后触发外部核对（工作区可能被命令改过）。 */
   onActivity: () => void;
+  /** F05/F13：本面板管理的会话中是否存在运行中的进程（更新安装 / 关闭协调用）。 */
+  onRunningChange?: (running: boolean) => void;
   onClose: () => void;
 }
 
@@ -70,6 +72,7 @@ export function TerminalPanel({
   height,
   onHeightChange,
   onActivity,
+  onRunningChange,
   onClose,
 }: TerminalPanelProps) {
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -128,9 +131,40 @@ export function TerminalPanel({
     [worktreeId],
   );
 
-  // 首次打开：恢复本 worktree 的页签（新 shell，不恢复旧进程）。
+  // F05：挂载 / 切 worktree 时，先认领后端仍在运行的属于本 worktree 的会话，
+  // 再按持久化页签补新 shell。不重复 openSession 造成不可达进程。
+  const claimOrOpen = useCallback(async (recordCwd: string | null) => {
+    const live = await m7.terminalList().catch(() => [] as TerminalSessionInfo[]);
+    const mine = live.filter((info) => info.worktreeId === worktreeId);
+    const claimed = mine.find((info) => !tabsRef.current.some((tab) => tab.sessionId === info.sessionId));
+    if (claimed) {
+      const tab: Tab = {
+        sessionId: claimed.sessionId,
+        worktreeId: claimed.worktreeId,
+        title: claimed.title,
+        cwd: claimed.cwd,
+        running: claimed.running,
+        exitCode: claimed.exitCode ?? null,
+      };
+      setTabs((current) => [...current, tab]);
+      setActive(tab.sessionId);
+      return tab;
+    }
+    return openSession(recordCwd);
+  }, [openSession, worktreeId]);
+
+  // 首次打开：恢复本 worktree 的页签（新 shell，不恢复旧进程）；运行中的进程被重新认领。
   useEffect(() => {
     let cancelled = false;
+    // F05：换 worktree 先清掉旧页签状态，避免 A 的页签显示在 B 的标题下。
+    // 只销毁前端 xterm 视图，后端 PTY 会话保留（重新打开时由 claimOrOpen 认领）。
+    setTabs([]);
+    setActive(null);
+    instances.current.forEach((instance) => {
+      instance.observer?.disconnect();
+      instance.terminal.dispose();
+    });
+    instances.current.clear();
     void (async () => {
       const stored = await m7.terminalTabs().catch(() => [] as TerminalTabRecord[]);
       if (cancelled) return;
@@ -139,23 +173,31 @@ export function TerminalPanel({
         .filter((record) => record.worktreeId === worktreeId)
         .sort((left, right) => left.order - right.order);
       if (mine.length === 0) {
-        await openSession(null);
+        await claimOrOpen(null);
         return;
       }
       for (const record of mine.slice(0, 6)) {
         if (cancelled) return;
-        await openSession(record.cwd);
+        await claimOrOpen(record.cwd);
       }
     })();
     return () => {
       cancelled = true;
     };
     // 只按 worktree 恢复一次；页签变化由后续操作保存。
-  }, [worktreeId, openSession]);
+  }, [worktreeId, claimOrOpen]);
 
   useEffect(() => {
     void persistTabs();
   }, [tabs, persistTabs]);
+
+  // F05/F13：把“是否有运行中的会话”同步给外层（更新安装 / 关闭协调读取）。
+  const anyRunning = tabs.some((tab) => tab.running);
+  useEffect(() => {
+    onRunningChange?.(anyRunning);
+  }, [anyRunning, onRunningChange]);
+
+  // F05：写入期间显示所属 worktree 忙碌（写锁被 Git 写操作持有时禁用输入）。
 
   // 关闭前保存页签（不保存输出，也不恢复进程）。
   useEffect(() => registerM7Flusher(persistTabs), [persistTabs]);
@@ -260,8 +302,17 @@ export function TerminalPanel({
     }
   }, [fontSize, fontFamily]);
 
+  // F06/H9：关闭运行中进程前先确认；确认后由用户动作触发真正关闭。
+  const [confirmCloseSession, setConfirmCloseSession] = useState<number | null>(null);
+
   const closeTab = useCallback(
     async (sessionId: number) => {
+      const tab = tabsRef.current.find((item) => item.sessionId === sessionId);
+      if (tab?.running && confirmCloseSession !== sessionId) {
+        setConfirmCloseSession(sessionId);
+        return;
+      }
+      setConfirmCloseSession(null);
       const instance = instances.current.get(sessionId);
       if (instance) {
         instance.observer?.disconnect();
@@ -275,7 +326,7 @@ export function TerminalPanel({
         return next;
       });
     },
-    [active],
+    [active, confirmCloseSession],
   );
 
   const startDrag = useCallback(
@@ -341,6 +392,17 @@ export function TerminalPanel({
               >
                 <Codicon name="close" size={12} />
               </button>
+              {confirmCloseSession === tab.sessionId ? (
+                <span className="ml-1 flex items-center gap-1 text-[10.5px] text-[var(--editorwarning-foreground)]">
+                  {t("terminal.closeRunningConfirm")}
+                  <button type="button" className="toolbar-widget h-4 px-1" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId); }}>
+                    {t("terminal.closeRunningYes")}
+                  </button>
+                  <button type="button" className="toolbar-widget h-4 px-1" onClick={() => setConfirmCloseSession(null)}>
+                    {t("common.cancel")}
+                  </button>
+                </span>
+              ) : null}
             </div>
           ))}
         </div>
