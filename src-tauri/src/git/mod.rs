@@ -87,6 +87,7 @@ pub struct CommandRecord {
 #[derive(Debug, Default)]
 pub struct CommandLog {
     inner: Mutex<LogInner>,
+    diagnostics: Option<Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>>,
 }
 
 #[derive(Debug, Default)]
@@ -96,11 +97,32 @@ struct LogInner {
 }
 
 impl CommandLog {
+    pub(crate) fn with_diagnostics_snapshot<T>(&self, read: impl FnOnce(&[CommandRecord]) -> Result<T>) -> Result<T> {
+        let inner = self.inner.lock().unwrap_or_else(|error| error.into_inner());
+        let records: Vec<_> = inner.records.iter().cloned().collect();
+        read(&records)
+    }
+
+    pub fn with_diagnostics(store: Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>) -> Self {
+        Self { inner: Mutex::new(LogInner::default()), diagnostics: Some(store) }
+    }
+
+    pub fn clear_diagnostics(&self, worktree_id: Option<&str>) -> Result<usize> {
+        let mut inner = self.inner.lock().unwrap_or_else(|error| error.into_inner());
+        let removed = match &self.diagnostics {
+            Some(store) => store.clear(worktree_id)?,
+            None => 0,
+        };
+        inner.records.retain(|record| record.worktree_id.as_deref() != worktree_id);
+        Ok(removed)
+    }
+
     pub fn record(&self, record: CommandRecord) {
         if let Ok(mut inner) = self.inner.lock() {
             inner.next_sequence += 1;
             let mut record = record;
             record.sequence = inner.next_sequence;
+            if let Some(store) = &self.diagnostics { store.observe(&record); }
             inner.records.push_back(record);
             while inner.records.len() > LOG_CAPACITY {
                 inner.records.pop_front();

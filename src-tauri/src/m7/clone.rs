@@ -74,36 +74,38 @@ struct CloneJob {
 pub struct CloneManager {
     jobs: Mutex<HashMap<u64, CloneJob>>,
     counter: AtomicU64,
-    /// H8：设置里手动指定的 Git 程序（Q27）；None 时与统一执行器一致用 PATH。
-    git_program: Option<std::path::PathBuf>,
     /// H8：统一命令日志。
     log: Arc<crate::git::CommandLog>,
 }
 
 impl Default for CloneManager {
     fn default() -> Self {
-        Self::new(None, Arc::new(crate::git::CommandLog::default()))
+        Self::new(Arc::new(crate::git::CommandLog::default()))
     }
 }
 
 impl CloneManager {
-    pub fn new(git_program: Option<std::path::PathBuf>, log: Arc<crate::git::CommandLog>) -> Self {
+    pub fn new(log: Arc<crate::git::CommandLog>) -> Self {
         Self {
             jobs: Mutex::new(HashMap::new()),
             counter: AtomicU64::new(1),
-            git_program,
             log,
         }
     }
 
     /// 启动克隆：立即返回 job id，进度与结果走事件。
-    pub fn start(
+    pub fn start<R: tauri::Runtime>(
         self: &Arc<Self>,
-        app: tauri::AppHandle,
+        app: tauri::AppHandle<R>,
         request: CloneRequest,
         shell_env: crate::shell::ShellEnv,
+        git_program: Option<PathBuf>,
     ) -> Result<u64> {
         let validated = validate(&request)?;
+        let git = crate::git::Git::with_program(
+            validated.target.parent().unwrap_or(Path::new(".")),
+            &shell_env, Arc::clone(&self.log), git_program.as_deref(),
+        )?;
         let job_id = self.counter.fetch_add(1, Ordering::Relaxed);
         let cancelled = Arc::new(AtomicBool::new(false));
         let child = Arc::new(Mutex::new(None));
@@ -115,7 +117,7 @@ impl CloneManager {
             },
         );
         let manager = Arc::clone(self);
-        let git_program = self.git_program.clone();
+        let git_program = git.program;
         let log = Arc::clone(&self.log);
         std::thread::spawn(move || {
             run(app, job_id, validated, shell_env, cancelled, child, git_program, log);
@@ -255,22 +257,18 @@ fn rejected(code: &'static str, message: &'static str) -> AppError {
     AppError::coded(ErrorKind::Rejected, code, message, &[])
 }
 
-fn run(
-    app: tauri::AppHandle,
+fn run<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     job_id: u64,
     request: ValidatedClone,
     shell_env: crate::shell::ShellEnv,
     cancelled: Arc<AtomicBool>,
     child_slot: Arc<Mutex<Option<Child>>>,
-    git_program: Option<std::path::PathBuf>,
+    git_program: PathBuf,
     log: Arc<crate::git::CommandLog>,
 ) {
     use tauri::Emitter;
-    // H8：程序选择与统一 Git 执行器同源（设置路径优先，否则 PATH 里的 git）。
-    let program = git_program
-        .clone()
-        .or_else(|| shell_env.which("git"))
-        .unwrap_or_else(|| std::path::PathBuf::from("git"));
+    let program = git_program;
     let program_text = program.to_string_lossy().into_owned();
     let started = std::time::Instant::now();
     let mut command = Command::new(&program);
@@ -290,15 +288,16 @@ fn run(
         command.arg("--recurse-submodules");
     }
     command.arg("--").arg(&request.url).arg(&request.target);
+    command.env_clear();
     command.env("PATH", shell_env.path_string());
-    command.env("GIT_TERMINAL_PROMPT", "0");
-    command.env("GCM_INTERACTIVE", "never");
     for (key, value) in &shell_env.vars {
         if key == "PATH" || key == "Path" || key == "path" {
             continue;
         }
         command.env(key, value);
     }
+    command.env("GIT_TERMINAL_PROMPT", "0");
+    command.env("GCM_INTERACTIVE", "never");
     command.current_dir(
         request
             .target
@@ -306,10 +305,20 @@ fn run(
             .unwrap_or_else(|| Path::new(".")),
     );
 
+    let args: Vec<String> = command.get_args().map(|arg|
+        crate::git::mask_credentials(&arg.to_string_lossy())).collect();
     let spawned = command.spawn();
     let mut child = match spawned {
         Ok(child) => child,
         Err(error) => {
+            log.record(crate::git::CommandRecord {
+                sequence: 0, worktree_id: None, started_at_ms: crate::m7::now_ms(),
+                program: program_text.clone(), args,
+                directory: request.target.parent().unwrap_or(Path::new(".")).display().to_string(),
+                exit_code: -1, elapsed_ms: started.elapsed().as_millis() as u64, timed_out: false,
+                stdout_bytes: 0, stderr_excerpt: crate::git::mask_credentials(&error.to_string()),
+                output: crate::git::mask_credentials(&error.to_string()), output_truncated: false,
+            });
             let _ = app.emit(
                 "revia://clone-finished",
                 CloneFinished {
@@ -344,28 +353,19 @@ fn run(
         .and_then(|child| child.wait().ok());
     let was_cancelled = cancelled.load(Ordering::Relaxed);
     let success = status.as_ref().map(|status| status.success()).unwrap_or(false) && !was_cancelled;
+    let output_tail = tail.lock().unwrap_or_else(|error| error.into_inner()).clone();
     // H8：克隆进入统一 Git 命令日志（参数打码、耗时、退出码；输出只留尾部摘要）。
     {
         let exit_code = status
             .as_ref()
             .and_then(|status| status.code())
-            .unwrap_or(if was_cancelled { -1 } else { -1 });
+            .unwrap_or(-1);
         log.record(crate::git::CommandRecord {
             sequence: 0,
             worktree_id: None,
             started_at_ms: crate::m7::now_ms().saturating_sub(started.elapsed().as_millis() as u64),
             program: program_text.clone(),
-            args: ["clone".to_string(), request.url.clone(), request.target.to_string_lossy().into_owned()]
-                .into_iter()
-                .chain(
-                    request
-                        .branch
-                        .as_ref()
-                        .map(|b| format!("--branch={b}"))
-                        .into_iter()
-                        .chain(request.depth.map(|d| format!("--depth={d}")).into_iter()),
-                )
-                .collect(),
+            args,
             directory: request
                 .target
                 .parent()
@@ -375,17 +375,8 @@ fn run(
             elapsed_ms: started.elapsed().as_millis() as u64,
             timed_out: false,
             stdout_bytes: 0,
-            stderr_excerpt: tail
-                .lock()
-                .unwrap_or_else(|error| error.into_inner())
-                .last()
-                .cloned()
-                .unwrap_or_default(),
-            output: tail
-                .lock()
-                .unwrap_or_else(|error| error.into_inner())
-                .join("
-"),
+            stderr_excerpt: output_tail.last().cloned().unwrap_or_default(),
+            output: output_tail.join("\n"),
             output_truncated: false,
         });
     }
@@ -395,11 +386,7 @@ fn run(
     } else if was_cancelled {
         Some("cancelled".to_string())
     } else {
-        Some(
-            tail.lock()
-                .unwrap_or_else(|error| error.into_inner())
-                .join("\n"),
-        )
+        Some(output_tail.join("\n"))
     };
     let _ = app.emit(
         "revia://clone-finished",
@@ -414,9 +401,9 @@ fn run(
     );
 }
 
-fn pump_stream<R: std::io::Read + Send>(
+fn pump_stream<R: std::io::Read + Send, T: tauri::Runtime>(
     stream: Option<R>,
-    app: &tauri::AppHandle,
+    app: &tauri::AppHandle<T>,
     job_id: u64,
     tail: &Arc<Mutex<Vec<String>>>,
 ) {
@@ -424,6 +411,7 @@ fn pump_stream<R: std::io::Read + Send>(
     let Some(stream) = stream else { return };
     for line in BufReader::new(stream).lines().map_while(|line| line.ok()) {
         for part in split_progress(&line) {
+            let part = crate::git::mask_credentials(&part);
             if let Ok(mut tail) = tail.lock() {
                 if tail.len() >= 40 {
                     tail.remove(0);

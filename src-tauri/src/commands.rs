@@ -148,12 +148,8 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(data_dir: PathBuf) -> Self {
-        let command_log = Arc::new(CommandLog::default());
-        // H8：克隆与统一 Git 执行器同源——设置里手动指定的 Git 程序（Q27）。
-        let git_program_for_clone = crate::settings::read_settings(&data_dir)
-            .ok()
-            .and_then(|settings| settings.git_path)
-            .map(std::path::PathBuf::from);
+        let diagnostics = Arc::new(crate::m7::diagnostics::DiagnosticsSummaryStore::new(&data_dir));
+        let command_log = Arc::new(CommandLog::with_diagnostics(Arc::clone(&diagnostics)));
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
             stash_archive: crate::stash_archive::StashArchiveStore::new(&data_dir.clone()),
@@ -173,12 +169,11 @@ impl AppState {
             m7_terminal: Arc::new(crate::m7::terminal::TerminalManager::new()),
             m7_terminal_tabs: Arc::new(crate::m7::terminal::TerminalTabStore::new(&data_dir)),
             m7_clone: Arc::new(crate::m7::clone::CloneManager::new(
-                git_program_for_clone.clone(),
                 Arc::clone(&command_log),
             )),
             m7_github: Arc::new(crate::m7::github::GithubState::new(&data_dir)),
             m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir, &data_dir)),
-            m7_diagnostics: Arc::new(crate::m7::diagnostics::DiagnosticsSummaryStore::new(&data_dir)),
+            m7_diagnostics: diagnostics,
             data_dir,
             commit_ops: std::sync::atomic::AtomicU64::new(1),
         }

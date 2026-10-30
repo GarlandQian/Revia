@@ -12,6 +12,16 @@ Status: ready-for-agent
 
 原始末轮Rust日志确为772通过/0失败/1忽略、记录exit0，其它末轮检查即时exit0，但多数输出合流且无逐轮输入hash；证据限制见review02/delivery-evidence-audit.md。原实现报告保留在下方作为历史，不代表本候选通过，不能以构建/冒烟代替真实桌面。任务13/14事实门槛仍未满足。
 
+## Codex 直接修复首组（进行中，非最终候选）
+
+已直接修正：真实仓库主分支的克隆/诊断/更新对话框挂载；诊断严格字段投影、七天摘要/清空和预览快照导出；克隆每次读取当前Git设置、实际argv与凭据打码；构建签名不再二次base64编码，公钥接受原文/外包base64；快捷键替换用显式空绑定，单项恢复默认同样先确认冲突。隔离本地克隆测试另外复现并修正了完成日志重复获取缓冲锁导致的卡死。
+
+本组证据在`codex-checks/`，每轮保存跟踪/未跟踪源码hash、精确argv、原stdout/stderr、真实exit。`diagnostics-clone-updater-cargo-03`通过4项真实生产入口集成回归（诊断2、克隆1、更新清单与锁定Tauri updater下载验签1），`shortcuts-node-01`通过2项实际模块按键分派回归，`shortcuts-persistence-01`通过1项Registry保存/重载回归；前端构建`codex-frontend-build-02`、绑定收敛后的类型检查`codex-frontend-types-03`、`codex-lint-02`均exit0；`codex-x18n-01`为0错误/69警告（不声明警告均为旧问题）。公开签名测试仅下载验签，不执行安装；mock app仅承载事件和updater，不属于桌面验收。
+
+失败原件全部保留：`diagnostics-clone-cargo-01`真实exit101复现日志锁死；`updater-metadata-cargo-01`独占PATH漏Node、`-02`fixture漏插件配置均exit101，补齐fixture后`-03`通过；绑定格式化`diagnostics-bindings-whitespace-01`子进程未启动（launcher exit1，不能记作node退出码）。工具造成的99个无关绑定空白变化已逐项比对并回退，回退前字节另存`impl/binding-whitespace-before-revert`，三个诊断绑定语义变化保留。
+
+编辑/草稿、终端生命周期、PR身份/保护/检出、令牌到期刷新、更新包保留及渠道/安装协调等明确问题仍在处理。全量最终检查、全新独立增量两轴和Release尚未完成；任务13/14真实桌面门槛未满足。formalRepairUsed保持true，不再次派Pi。
+
 ## 版本历史
 
 | 提交 | 内容 |

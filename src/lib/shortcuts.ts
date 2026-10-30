@@ -113,12 +113,25 @@ export function conflictFor(
   current: Record<string, string> = overrides,
 ): ShortcutId | null {
   const normalized = normalizeAccelerator(accelerator);
+  if (!normalized) return null;
   for (const def of shortcutDefs) {
     if (def.id === except) continue;
     const active = current[def.id] ?? def.defaultAccelerator;
     if (active === normalized) return def.id;
   }
   return null;
+}
+
+/** 只在用户已确认替换后调用；空字符串显式解除旧动作，不恢复冲突默认键。 */
+export function replaceShortcut(current: Record<string, string>, id: ShortcutId, accelerator: string): Record<string, string> {
+  const normalized = normalizeAccelerator(accelerator);
+  let next = { ...current };
+  let conflict = conflictFor(normalized, id, next);
+  while (conflict !== null) {
+    next = withShortcut(next, conflict, "");
+    conflict = conflictFor(normalized, id, next);
+  }
+  return withShortcut(next, id, normalized);
 }
 
 export function shortcutLabel(id: ShortcutId): string {

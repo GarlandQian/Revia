@@ -276,7 +276,8 @@ pub async fn m7_clone_start(
     let target = PathBuf::from(request.target.trim());
     let parent = target.parent().unwrap_or(&home).to_path_buf();
     let shell_env = crate::shell::resolve(&home, &parent);
-    state.m7_clone.start(app, request, shell_env)
+    let git_program = crate::commands::settings_snapshot(&state)?.git_path.map(PathBuf::from);
+    state.m7_clone.start(app, request, shell_env, git_program)
 }
 
 #[tauri::command]
@@ -640,11 +641,9 @@ pub async fn m7_preview_diagnostics(
     };
     let command_log = Arc::clone(&state.command_log);
     let summaries = Arc::clone(&state.m7_diagnostics);
-    blocking(move || {
-        // F21：预览 / 导出时同步把失败摘要并入 7 天持久化存储（同一快照）。
-        let _ = super::diagnostics::persist_summaries(&request, &summaries, &command_log);
-        super::diagnostics::preview(&request, &settings, &command_log, session.as_deref())
-    }).await
+    blocking(move || super::diagnostics::preview(
+        &request, &settings, &command_log, &summaries, session.as_deref(),
+    )).await
 }
 
 /// F21：读取持久化的脱敏摘要（按当前 worktree 过滤，7 天内）。
@@ -654,17 +653,17 @@ pub async fn m7_diagnostics_summary(
     worktree_id: Option<String>,
 ) -> Result<Vec<crate::m7::diagnostics::DiagnosticsSummaryEntry>> {
     let store = Arc::clone(&state.m7_diagnostics);
-    blocking(move || Ok(store.list(worktree_id.as_deref()))).await
+    blocking(move || store.list(worktree_id.as_deref())).await
 }
 
-/// F21：清空持久化摘要（默认当前 worktree；传 all 清全部）。
+/// 清空当前 worktree 摘要；无 worktree 时只清环境探测，并同步清除内存与预览。
 #[tauri::command]
 pub async fn m7_diagnostics_clear(
     state: State<'_, AppState>,
     worktree_id: Option<String>,
 ) -> Result<usize> {
-    let store = Arc::clone(&state.m7_diagnostics);
-    blocking(move || store.clear(worktree_id.as_deref())).await
+    let log = Arc::clone(&state.command_log);
+    blocking(move || log.clear_diagnostics(worktree_id.as_deref())).await
 }
 
 #[tauri::command]
@@ -672,25 +671,8 @@ pub async fn m7_export_diagnostics(
     state: State<'_, AppState>,
     request: DiagnosticsRequest,
 ) -> Result<DiagnosticsExport> {
-    let settings = {
-        let registry = state.registry.lock().map_err(|_| {
-            AppError::coded(
-                ErrorKind::Internal,
-                "errors.commands.repositoryListLockFailed6",
-                "仓库列表锁失败",
-                &[],
-            )
-        })?;
-        registry.settings().clone()
-    };
-    let session = match &request.worktree_id {
-        Some(id) => Some(session_for(&state, id)?),
-        None => None,
-    };
-    let command_log = Arc::clone(&state.command_log);
-    blocking(move || {
-        super::diagnostics::export(&request, &settings, &command_log, session.as_deref())
-    }).await
+    let store = Arc::clone(&state.m7_diagnostics);
+    blocking(move || super::diagnostics::export(&request, &store)).await
 }
 
 // ---------- 应用更新（任务 10） ----------

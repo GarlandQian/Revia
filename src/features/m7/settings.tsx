@@ -25,7 +25,7 @@ import {
   shortcutDefs,
   shortcutLabel,
   withShortcut,
-  withoutShortcut,
+  replaceShortcut,
 } from "@/lib/shortcuts";
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -231,9 +231,7 @@ export function M7ShortcutSettings({
             type="button"
             className="toolbar-widget h-6 px-2 font-semibold"
             onClick={() => {
-              // 确认替换：新动作绑定新键，冲突动作回落默认值。
-              let next = withoutShortcut(shortcuts, pendingReplace.conflict as never);
-              next = withShortcut(next, pendingReplace.action as never, pendingReplace.accelerator);
+              const next = replaceShortcut(shortcuts, pendingReplace.action as never, pendingReplace.accelerator);
               void onChange(next);
               setPendingReplace(null);
               setError(null);
@@ -270,7 +268,11 @@ export function M7ShortcutSettings({
                     type="button"
                     className="toolbar-widget h-6 px-2"
                     disabled={shortcuts[def.id] === undefined}
-                    onClick={() => void onChange(withoutShortcut(shortcuts, def.id))}
+                    onClick={() => {
+                      const conflict = conflictFor(def.defaultAccelerator, def.id, shortcuts);
+                      if (conflict) setPendingReplace({ action: def.id, accelerator: def.defaultAccelerator, conflict });
+                      else void onChange(withShortcut(shortcuts, def.id, def.defaultAccelerator));
+                    }}
                   >
                     {t("settings.m7.shortcuts.reset")}
                   </button>

@@ -34,25 +34,26 @@ if (!/^https:\/\//.test(endpoint)) fail("REVIA_UPDATE_ENDPOINT must be an https 
  * 统一转换成 base64，写错格式在 CI 上立即失败而不是等客户端验签时才发现。
  */
 function normalizePubkey(input) {
-  const lines = input.split("\n").map((line) => line.trim()).filter(Boolean);
-  if (lines[0]?.startsWith("untrusted comment:")) {
-    // minisign 公钥文件全文：第二行是 base64。解码后校验它确实是 minisign 公钥
-    //（以 "untrusted comment: " 开头，第二行才是 RW 开头的密钥体），再重新编码。
-    if (lines.length < 2) fail("REVIA_UPDATE_PUBKEY minisign key file is missing the key line");
-    const keyLine = lines[1];
-    const decoded = Buffer.from(keyLine, "base64");
-    const text = decoded.toString("utf8");
-    if (!text.startsWith("untrusted comment:")) {
-      fail("REVIA_UPDATE_PUBKEY second line does not decode to a minisign public key");
+  const raw = input.trim();
+  let text = raw;
+  if (!raw.startsWith("untrusted comment:")) {
+    const decoded = Buffer.from(raw, "base64");
+    if (decoded.toString("base64") !== raw) {
+      fail("REVIA_UPDATE_PUBKEY must be a minisign public key or its STANDARD base64 encoding");
     }
-    return Buffer.from(text, "utf8").toString("base64");
+    text = decoded.toString("utf8");
   }
-  // 纯 base64 输入：解码确认是 minisign 公钥再原样通过。
-  const decoded = Buffer.from(input, "base64");
-  if (!decoded.toString("utf8").startsWith("untrusted comment:")) {
-    fail("REVIA_UPDATE_PUBKEY does not decode to a minisign public key");
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length !== 2 || !lines[0].startsWith("untrusted comment:")) {
+    fail("REVIA_UPDATE_PUBKEY must contain a minisign comment and key line");
   }
-  return input.replace(/\s+/g, "");
+  const key = Buffer.from(lines[1], "base64");
+  // 对应锁定 minisign-verify 的42字节公钥及 Ed/ED 算法标识。
+  if (key.toString("base64") !== lines[1] || key.length !== 42
+    || !["Ed", "ED"].includes(key.subarray(0, 2).toString("ascii"))) {
+    fail("REVIA_UPDATE_PUBKEY contains an invalid minisign public key");
+  }
+  return Buffer.from(lines.join("\n"), "utf8").toString("base64");
 }
 
 const pubkey = normalizePubkey(pubkeyRaw);

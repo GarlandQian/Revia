@@ -4366,7 +4366,8 @@ export function App() {
         setShortcutsSnapshot(patch.shortcuts);
         applyShortcutOverrides(patch.shortcuts);
       }
-      if (patch.appUpdateMode) setAppUpdateMode(patch.appUpdateMode);
+      setAppUpdateMode(next.appUpdateMode);
+      setAllowPrerelease(next.allowPrerelease ?? false);
       setThemeLight(next.themeLight);
       setThemeDark(next.themeDark);
       setCodeFontFamily(next.codeFontFamily);
@@ -5362,6 +5363,33 @@ export function App() {
     shortcuts: shortcutsSnapshot,
   };
 
+  const m7Dialogs = (
+    <>
+      <CloneDialog
+        open={cloneOpen}
+        onClose={() => setCloneOpen(false)}
+        onRegistered={(repo) => {
+          setCloneOpen(false);
+          setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
+          void openRepo(repo);
+        }}
+      />
+      <DiagnosticsDialog open={diagnosticsOpen} worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} />
+      <UpdatePanel
+        open={updateOpen}
+        status={updateStatus}
+        mode={appUpdateMode}
+        onModeChange={(mode) => void updateSettings({ appUpdateMode: mode })}
+        onStatusChange={(status) => {
+          setUpdateStatus(status);
+          if (!status.available) setUpdateBannerVersion(null);
+        }}
+        onBeforeInstall={() => beforeUpdateInstallRef.current()}
+        onClose={() => setUpdateOpen(false)}
+      />
+    </>
+  );
+
   if (!activeRepo) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
@@ -5373,46 +5401,8 @@ export function App() {
           onCloneRepo={() => setCloneOpen(true)}
           error={error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
         />
-        <CloneDialog
-          open={cloneOpen}
-          onClose={() => setCloneOpen(false)}
-          onRegistered={(repo) => {
-            setCloneOpen(false);
-            setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
-            void openRepo(repo);
-          }}
-        />
+        {m7Dialogs}
         <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
-
-      {cloneOpen ? (
-        <CloneDialog
-          open
-          onClose={() => setCloneOpen(false)}
-          onRegistered={(repo) => {
-            setCloneOpen(false);
-            setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
-            void openRepo(repo);
-          }}
-        />
-      ) : null}
-      {diagnosticsOpen ? <DiagnosticsDialog open worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} /> : null}
-      {updateOpen ? (
-        <UpdatePanel
-          open
-          status={updateStatus}
-          mode={appUpdateMode}
-          onModeChange={(mode) => {
-            setAppUpdateMode(mode);
-            void ipc.updateSettings({ appUpdateMode: mode }).catch(() => undefined);
-          }}
-          onStatusChange={(status) => {
-            setUpdateStatus(status);
-            if (!status.available) setUpdateBannerVersion(null);
-          }}
-          onBeforeInstall={() => beforeUpdateInstallRef.current()}
-          onClose={() => setUpdateOpen(false)}
-        />
-      ) : null}
         {settingsOpen ? (
           <SettingsDialog
             open
@@ -5426,22 +5416,6 @@ export function App() {
             onThemesChanged={reloadImportedThemes}
           />
         ) : null}
-        <DiagnosticsDialog open={diagnosticsOpen} worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} />
-        <UpdatePanel
-          open={updateOpen}
-          status={updateStatus}
-          mode={appUpdateMode}
-          onModeChange={(mode) => {
-            setAppUpdateMode(mode);
-            void ipc.updateSettings({ appUpdateMode: mode }).catch(() => undefined);
-          }}
-          onStatusChange={(status) => {
-            setUpdateStatus(status);
-            if (!status.available) setUpdateBannerVersion(null);
-          }}
-          onBeforeInstall={() => beforeUpdateInstallRef.current()}
-          onClose={() => setUpdateOpen(false)}
-        />
         {closeRequest && closeRequest.action !== "proceed" ? (
           <CloseRequestDialog
             intent={closeIntentRef.current}
@@ -6372,6 +6346,8 @@ export function App() {
           </div>
         </Modal>
       ) : null}
+
+      {m7Dialogs}
 
       {settingsOpen ? (
         <SettingsDialog

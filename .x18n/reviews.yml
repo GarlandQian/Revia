@@ -189,6 +189,10 @@ sources:
     en: a81212f3c67ab
   errors.m7.diagnosticsPathNotAbsolute:
     en: 14cad811441e92
+  errors.m7.diagnosticsSnapshotExpired:
+    en: 1796b80f02dbf8
+  errors.m7.diagnosticsStoreFailed:
+    en: 73512307a8bea
   errors.m7.editBinaryReadonly:
     en: 18de50b413c89a
   errors.m7.editEncodingReadonly:

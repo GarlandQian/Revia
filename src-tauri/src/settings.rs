@@ -147,7 +147,11 @@ fn is_function_key(value: &str) -> bool {
 /// 自定义快捷键的合法字符：修饰键名、字母、数字与常见符号，用 `+` 连接。
 fn normalize_shortcut(value: &str) -> Option<String> {
     let trimmed = value.trim();
-    if trimmed.is_empty() || trimmed.len() > 64 {
+    // 空覆盖值表示该动作未分配；缺少覆盖项才恢复默认快捷键。
+    if trimmed.is_empty() {
+        return Some(String::new());
+    }
+    if trimmed.len() > 64 {
         return None;
     }
     let mut normalized = String::new();
@@ -1023,6 +1027,24 @@ mod tests {
         assert_eq!(read.theme_light, DEFAULT_LIGHT_THEME);
         assert_eq!(read.theme_dark, DEFAULT_DARK_THEME);
         assert!(read.stash_compare_local);
+    }
+
+    #[test]
+    fn unassigned_shortcut_override_survives_settings_save_and_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut registry = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        let updated = registry.update_settings(&SettingsPatch {
+            shortcuts: Some(BTreeMap::from([("commit".into(), String::new()), ("cloneRepo".into(), "mod+k".into())])),
+            ..SettingsPatch::default()
+        }).unwrap();
+        assert_eq!(updated.shortcuts.get("commit").map(String::as_str), Some(""));
+        let reloaded = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        assert_eq!(reloaded.settings().shortcuts, updated.shortcuts);
+        assert_eq!(read_settings(dir.path()).unwrap().shortcuts, updated.shortcuts);
+        registry.update_settings(&SettingsPatch {
+            shortcuts: Some(BTreeMap::new()), ..SettingsPatch::default()
+        }).unwrap();
+        assert!(read_settings(dir.path()).unwrap().shortcuts.is_empty());
     }
 
     #[test]

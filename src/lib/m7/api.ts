@@ -74,6 +74,7 @@ export interface TerminalOpenPayload {
 export interface DiagnosticsExportPayload {
   destination: string;
   worktreeId: string | null;
+  snapshotId?: string;
 }
 
 export interface PrCheckoutPayload {
@@ -213,9 +214,9 @@ export const m7 = {
   exportDiagnostics: (request: DiagnosticsExportPayload) =>
     invoke<DiagnosticsExport>("m7_export_diagnostics", { request }),
   /** F21：7 天脱敏摘要（跨重启保留）。 */
-  diagnosticsSummary: (worktreeId: string) =>
+  diagnosticsSummary: (worktreeId: string | null) =>
     invoke<DiagnosticsSummaryEntry[]>("m7_diagnostics_summary", { worktreeId }),
-  diagnosticsClear: (worktreeId: string) =>
+  diagnosticsClear: (worktreeId: string | null) =>
     invoke<number>("m7_diagnostics_clear", { worktreeId }),
 
   // 应用更新
