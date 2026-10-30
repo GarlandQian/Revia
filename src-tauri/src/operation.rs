@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::Git;
 
 /// 进行中的操作类型（术语见 GLOSSARY：进行中的操作）。
@@ -60,12 +60,18 @@ pub struct OperationState {
     pub kind: OperationKind,
     /// 是否处于多提交序列（sequencer）中间阶段。
     pub sequencer_pending: bool,
+    /// 交互式 rebase 停在一个明确的 edit 停点（Q166）：允许 amend / 新建提交。
+    pub edit_stop: bool,
     /// 未解决冲突的去重路径数；大于 0 时提交一律禁用。
     pub conflict_count: usize,
     /// 真实操作元数据版本：覆盖 MERGE_HEAD、rebase 状态文件、CHERRY_PICK_HEAD /
     /// REVERT_HEAD、sequencer 待办等**内容**。同一种操作内容变化时版本也变，
     /// 旧确认随之失效（F03.2）。
     pub metadata_version: String,
+    /// Confirmation includes current file bytes, index and branch identity.
+    pub confirmation_state: String,
+    pub continuation_only: bool,
+    pub needs_verification: bool,
 }
 
 impl OperationState {
@@ -83,6 +89,7 @@ impl OperationState {
             return false;
         }
         matches!(self.kind, OperationKind::Merge)
+            || (self.kind == OperationKind::Rebase && self.edit_stop)
     }
 
     /// merge 无冲突：允许「没有暂存差异」的普通提交完成合并（F03.4）。
@@ -106,9 +113,12 @@ pub fn resolve_dirs(git: &Git) -> Result<(PathBuf, PathBuf)> {
         // 只去掉 Git 追加的一个换行符；路径自身可以包含换行（Unix 合法）。
         let value = text.strip_suffix('\n').unwrap_or(&text);
         if value.is_empty() {
-            return Err(AppError::environment(format!(
-                "Git 未返回 {flag} 的真实路径"
-            )));
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.operation.gitDidReturnRealPath",
+                "Git 未返回 {flag} 的真实路径",
+                &[("flag", format!("{}", flag))],
+            ));
         }
         Ok(PathBuf::from(value))
     };
@@ -116,7 +126,7 @@ pub fn resolve_dirs(git: &Git) -> Result<(PathBuf, PathBuf)> {
 }
 
 /// 让 Git 解析一个状态标记的真实路径（`rev-parse --git-path`）。
-fn marker_path(git: &Git, name: &str) -> Result<PathBuf> {
+pub(crate) fn marker_path(git: &Git, name: &str) -> Result<PathBuf> {
     let output = git.run_ok(
         &["rev-parse", "--path-format=absolute", "--git-path", name],
         "解析 Git 状态标记路径",
@@ -124,12 +134,19 @@ fn marker_path(git: &Git, name: &str) -> Result<PathBuf> {
     let text = output.stdout_lossy();
     let value = text.strip_suffix('\n').unwrap_or(&text).to_string();
     if value.is_empty() {
-        return Err(AppError::environment(format!(
-            "Git 未返回状态标记 {name} 的路径"
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Environment,
+            "errors.operation.gitDidReturnPathStatusMarker",
+            "Git 未返回状态标记 {name} 的路径",
+            &[("name", format!("{}", name))],
+        ));
     }
     let path = PathBuf::from(value);
-    Ok(if path.is_absolute() { path } else { git.directory.join(path) })
+    Ok(if path.is_absolute() {
+        path
+    } else {
+        git.directory.join(path)
+    })
 }
 
 /// 标记是否存在；元数据不可访问（权限等 IO 错误）与「不存在」必须区分。
@@ -138,10 +155,15 @@ fn marker_state(git: &Git, name: &str) -> Result<bool> {
     match fs::symlink_metadata(&path) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(AppError::environment(format!(
-            "读取操作标记失败（{}）：{error}",
-            path.display()
-        ))),
+        Err(error) => Err(AppError::coded(
+            ErrorKind::Environment,
+            "errors.operation.failedReadOperationMarker",
+            "读取操作标记失败（{0}）：{error}",
+            &[
+                ("0", format!("{:}", path.display())),
+                ("error", format!("{}", error)),
+            ],
+        )),
     }
 }
 
@@ -183,10 +205,15 @@ fn hash_marker(hasher: &mut Sha256, path: &Path) -> Result<()> {
                 Ok(_) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => {
-                    return Err(AppError::environment(format!(
-                        "读取操作状态文件失败（{}）：{error}",
-                        candidate.display()
-                    )))
+                    return Err(AppError::coded(
+                        ErrorKind::Environment,
+                        "errors.operation.failedReadOperationStateFile",
+                        "读取操作状态文件失败（{0}）：{error}",
+                        &[
+                            ("0", format!("{:}", candidate.display())),
+                            ("error", format!("{}", error)),
+                        ],
+                    ));
                 }
             }
         }
@@ -213,7 +240,7 @@ fn hash_file(hasher: &mut Sha256, path: &Path) -> Result<()> {
 /// 探测当前 worktree 的进行中操作。
 ///
 /// 返回 (kind, sequencer 中间阶段, 元数据版本)。
-fn probe(git: &Git) -> Result<Option<(OperationKind, bool, String)>> {
+pub(crate) fn probe(git: &Git) -> Result<Option<(OperationKind, bool, String)>> {
     // 顺序即优先级：rebase 期间 CHERRY_PICK_HEAD 是从属标记，不能当成冲突。
     const MARKERS: &[(&str, OperationKind)] = &[
         ("rebase-merge", OperationKind::Rebase),
@@ -243,30 +270,47 @@ fn probe(git: &Git) -> Result<Option<(OperationKind, bool, String)>> {
     let kinds: BTreeSet<&str> = present.iter().map(|(_, kind, _)| kind.label()).collect();
     // rebase --rebase-merges 可以合法同时保留 MERGE_HEAD；整个阶段仍按 rebase 禁提交。
     if !kinds.contains("rebase") && kinds.len() > 1 {
-        return Err(AppError::environment("Git 元数据中存在互斥操作标记，请在终端处理"));
+        return Err(AppError::coded(
+            ErrorKind::Environment,
+            "errors.operation.gitMetadataContainsConflictingOperationMark",
+            "Git 元数据中存在互斥操作标记，请在终端处理",
+            &[],
+        ));
     }
 
     let (kind, sequencer_pending) = match present.first() {
         Some((_, kind, _)) => (*kind, sequencer_present),
         None => {
             // 只有 sequencer：多提交序列（cherry-pick / revert 序列），用待办首行区分。
-            let directory = sequencer_dir
-                .as_ref()
-                .ok_or_else(|| AppError::internal("sequencer 路径缺失"))?;
+            let directory = sequencer_dir.as_ref().ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.operation.theSequencerPathMissing",
+                    "sequencer 路径缺失",
+                    &[],
+                )
+            })?;
             let todo = directory.join("todo");
             let first = match fs::read_to_string(&todo) {
                 Ok(text) => text.lines().next().unwrap_or("").trim().to_string(),
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    return Err(AppError::environment(format!(
-                        "sequencer 目录缺少待办文件：{}",
-                        todo.display()
-                    )))
+                    return Err(AppError::coded(
+                        ErrorKind::Environment,
+                        "errors.operation.theSequencerDirectoryMissingTodoFile",
+                        "sequencer 目录缺少待办文件：{0}",
+                        &[("0", format!("{:}", todo.display()))],
+                    ));
                 }
                 Err(error) => {
-                    return Err(AppError::environment(format!(
-                        "读取 sequencer 待办失败（{}）：{error}",
-                        todo.display()
-                    )))
+                    return Err(AppError::coded(
+                        ErrorKind::Environment,
+                        "errors.operation.failedReadSequencerTodoList",
+                        "读取 sequencer 待办失败（{0}）：{error}",
+                        &[
+                            ("0", format!("{:}", todo.display())),
+                            ("error", format!("{}", error)),
+                        ],
+                    ));
                 }
             };
             let kind = if first.starts_with("revert") {
@@ -274,10 +318,12 @@ fn probe(git: &Git) -> Result<Option<(OperationKind, bool, String)>> {
             } else if first.starts_with("pick") {
                 OperationKind::CherryPick
             } else {
-                return Err(AppError::environment(format!(
-                    "无法识别 sequencer 待办内容（{}）",
-                    todo.display()
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.operation.unrecognizedSequencerTodoContent",
+                    "无法识别 sequencer 待办内容（{0}）",
+                    &[("0", format!("{:}", todo.display()))],
+                ));
             };
             (kind, true)
         }
@@ -308,12 +354,59 @@ fn probe(git: &Git) -> Result<Option<(OperationKind, bool, String)>> {
 
 /// 检测当前 worktree 的进行中操作（`conflict_count` 来自 index 的 unmerged 条目）。
 pub fn detect(git: &Git, conflict_count: usize) -> Result<Option<OperationState>> {
-    Ok(probe(git)?.map(|(kind, sequencer_pending, metadata_version)| OperationState {
+    let Some((kind, sequencer_pending, metadata_version)) = probe(git)? else {
+        return Ok(None);
+    };
+    // Read errors must not silently downgrade an edit stop to a conflict stop:
+    // that would disable amend/new commits for a state we could not verify.
+    let edit_stop = kind == OperationKind::Rebase && conflict_count == 0 && rebase_edit_stop(git)?;
+    let targets = crate::write_guard::operation_targets(git, kind)?;
+    let paths = crate::write_guard::paths(git, &targets.iter().map(String::as_str).collect::<Vec<_>>())?;
+    let confirmation_state = crate::write_guard::fingerprint(git, &paths)?;
+    Ok(Some(OperationState {
         kind,
         sequencer_pending,
+        edit_stop,
         conflict_count,
         metadata_version,
+        confirmation_state,
+        continuation_only: false,
+        needs_verification: false,
     }))
+}
+
+/// Interactive rebase writes the executed action to `rebase-merge/done`.  A
+/// final `edit` line means the current stop is a user edit stop, not a
+/// conflict stop.  Read errors are surfaced so a damaged state cannot be
+/// mistaken for a normal conflict stop.
+fn rebase_edit_stop(git: &Git) -> Result<bool> {
+    let path = marker_path(git, "rebase-merge/done")?;
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    let last = text
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("");
+    if !last.trim_start().starts_with("edit ") {
+        return Ok(false);
+    }
+    // Git writes `amend` only after an edit command actually applied. An edit
+    // that stopped on conflict has the same `done` line but no amend marker,
+    // including after the user stages the conflict resolution.
+    let amend = match fs::read_to_string(marker_path(git, "rebase-merge/amend")?) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    let oid = amend.trim();
+    if !matches!(oid.len(), 40 | 64) || !oid.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AppError::coded(ErrorKind::Environment, "errors.operation.invalidEditStop", "编辑停点元数据无效，不能开放提交", &[]));
+    }
+    Ok(true)
 }
 
 /// 未解决冲突的去重路径数（直接复用既有 status 解析）。

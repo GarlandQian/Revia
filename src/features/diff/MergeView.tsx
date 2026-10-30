@@ -1,3 +1,4 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * 合并页签（Q143，设计见 docs/milestones/m4/merge-design.md），照 Rebased 的合并窗口：
  * 你的版本 | 结果 | 对方的版本 三栏，中间两条窄栏用弧形色带连起对应的块，
@@ -15,8 +16,15 @@ import type { MergeLayout } from "@/types/bindings/MergeLayout";
 import type { MergeChunk } from "@/types/bindings/MergeChunk";
 import type { MergeSide } from "@/types/bindings/MergeSide";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
-import { getErrorMessage, toAppError } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import {
+  conflictCountText,
+  mergeAcceptSideState,
+  mergeConfirm,
+  mergeSideTitle,
+  mergeUnavailableText,
+} from "@/lib/i18n/text";
+import { formatAppError, toAppError } from "@/lib/error";
 import { Codicon } from "@/components/ui/codicon";
 import { Modal } from "@/components/app/Dialogs";
 import { mapLine, type SyncSegment } from "./syncScroll";
@@ -49,13 +57,15 @@ export interface MergeViewProps {
   fontFamily: string | null;
   softWrap: boolean;
   onClose: () => void;
+  /** 外部合并工具：发起前 Rust 会保存冲突文件，退出后重新读取冲突状态。 */
+  onExternalMerge?: (fingerprint: string) => void;
   /** 写入（应用或接受一侧）：由 App 经全局写门禁与关闭/退出保护执行，并重读原目标。 */
   onWrite: (request: MergeWriteRequest) => Promise<void>;
 }
 
-export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, onClose, onWrite }: MergeViewProps) {
+export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, onClose, onExternalMerge, onWrite }: MergeViewProps) {
   const [layout, setLayout] = useState<MergeLayout | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<AppErrorPayload | null>(null);
   const [generation, setGeneration] = useState(0);
 
   useEffect(() => {
@@ -68,7 +78,7 @@ export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, on
         if (!cancelled) setLayout(next);
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setLoadError(getErrorMessage(caught));
+        if (!cancelled) setLoadError(toAppError(caught));
       });
     return () => {
       cancelled = true;
@@ -81,7 +91,7 @@ export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, on
     return (
       <div className="merge-message">
         <p className="font-medium">{messages.merge.loadFailed}</p>
-        <p className="text-descriptionforeground">{loadError}</p>
+        <p className="text-descriptionforeground">{formatAppError(loadError)}</p>
         <button type="button" className="merge-button" onClick={reload}>
           {messages.merge.reload}
         </button>
@@ -90,7 +100,7 @@ export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, on
   }
   if (!layout) return <div className="merge-message text-descriptionforeground">{messages.changes.loading}</div>;
   if (layout.unavailable) {
-    return <AcceptOnly layout={layout} onWrite={onWrite} onClose={onClose} onReload={reload} />;
+    return <AcceptOnly layout={layout} onWrite={onWrite} onClose={onClose} onReload={reload} onExternalMerge={onExternalMerge} />;
   }
   return (
     <MergeEditor
@@ -102,6 +112,7 @@ export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, on
       onWrite={onWrite}
       onClose={onClose}
       onReload={reload}
+      onExternalMerge={onExternalMerge}
     />
   );
 }
@@ -277,6 +288,7 @@ function MergeEditor({
   onWrite,
   onClose,
   onReload,
+  onExternalMerge,
 }: {
   layout: MergeLayout;
   fontSize: number;
@@ -285,6 +297,7 @@ function MergeEditor({
   onWrite: (request: MergeWriteRequest) => Promise<void>;
   onClose: () => void;
   onReload: () => void;
+  onExternalMerge?: (fingerprint: string) => void;
 }) {
   const texts = useMemo(() => mergeTexts(layout.leftText, layout.baseText, layout.rightText), [layout]);
   const leftHost = useRef<HTMLDivElement>(null);
@@ -302,7 +315,7 @@ function MergeEditor({
   const [touched, setTouched] = useState(false);
   const [confirm, setConfirm] = useState<null | "apply" | "cancel" | MergeSide>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ message: string; stale: boolean } | null>(null);
+  const [error, setError] = useState<{ payload: AppErrorPayload; stale: boolean } | null>(null);
   const mounted = useMountedRef();
 
   const conflicts = unresolvedConflicts(chunks);
@@ -566,7 +579,7 @@ function MergeEditor({
       } catch (caught) {
         if (!mounted.current) return;
         const appError = toAppError(caught);
-        setError({ message: appError.message, stale: appError.kind === "rejected" });
+        setError({ payload: appError, stale: appError.kind === "rejected" });
       } finally {
         if (mounted.current) setBusy(false);
       }
@@ -647,12 +660,17 @@ function MergeEditor({
           {messages.merge.applyAllClean}
         </button>
         <span className="flex-1" />
-        <span className={conflicts > 0 ? "merge-count merge-count-open" : "merge-count"} data-merge-conflicts>{messages.merge.conflictCount(conflicts)}</span>
+        {onExternalMerge ? (
+          <button type="button" className="merge-button" disabled={busy} onClick={() => onExternalMerge(layout.fingerprint)}>
+            {messages.externalTools.openMerge}
+          </button>
+        ) : null}
+        <span className={conflicts > 0 ? "merge-count merge-count-open" : "merge-count"} data-merge-conflicts>{conflictCountText(conflicts)}</span>
       </div>
       {error ? (
         <div role="alert" className="editor-banner shrink-0" data-tone="error">
           <Codicon name="error" size={16} />
-          <div className="min-w-0 flex-1">{error.message}</div>
+          <div className="min-w-0 flex-1">{formatAppError(error.payload)}</div>
           {error.stale ? (
             <button type="button" className="banner-link" onClick={onReload}>
               {messages.merge.reload}
@@ -713,7 +731,7 @@ function MergeEditor({
 
 function sideTitle(layout: MergeLayout, side: MergeSideName): string {
   const label = side === "ours" ? layout.leftLabel : layout.rightLabel;
-  return messages.merge.sideTitle(side, label.role, label.name);
+  return mergeSideTitle(side, label.role, label.name);
 }
 
 // ---------- 窄栏 ----------
@@ -830,7 +848,7 @@ function MergeConfirm({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const text = messages.merge.confirm(kind, conflicts);
+  const text = mergeConfirm(kind, conflicts);
   return (
     <Modal title={text.title} onClose={onCancel} width={460}>
       <p className="text-[12.5px] leading-relaxed">{text.body}</p>
@@ -851,14 +869,16 @@ function AcceptOnly({
   onWrite,
   onClose,
   onReload,
+  onExternalMerge,
 }: {
   layout: MergeLayout;
   onWrite: (request: MergeWriteRequest) => Promise<void>;
   onClose: () => void;
   onReload: () => void;
+  onExternalMerge?: (fingerprint: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ message: string; stale: boolean } | null>(null);
+  const [error, setError] = useState<{ payload: AppErrorPayload; stale: boolean } | null>(null);
   const mounted = useMountedRef();
   const accept = async (side: MergeSide) => {
     setBusy(true);
@@ -874,7 +894,7 @@ function AcceptOnly({
     } catch (caught) {
       if (!mounted.current) return;
       const appError = toAppError(caught);
-      setError({ message: appError.message, stale: appError.kind === "rejected" });
+      setError({ payload: appError, stale: appError.kind === "rejected" });
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -882,10 +902,10 @@ function AcceptOnly({
   return (
     <div className="merge-message">
       <p className="font-medium">{messages.merge.cannotMerge}</p>
-      <p className="text-descriptionforeground">{layout.unavailable ? messages.merge.unavailable[layout.unavailable] : null}</p>
+      <p className="text-descriptionforeground">{layout.unavailable ? mergeUnavailableText(layout.unavailable) : null}</p>
       {error ? (
         <p role="alert" className="text-destructive">
-          {error.message}
+          {formatAppError(error.payload)}
           {error.stale ? (
             <button type="button" className="banner-link ml-2" onClick={onReload}>
               {messages.merge.reload}
@@ -895,11 +915,16 @@ function AcceptOnly({
       ) : null}
       <div className="flex gap-2">
         <button type="button" className="merge-button" disabled={busy} onClick={() => void accept("ours")}>
-          {messages.merge.acceptSideState("ours", layout.oursState)}
+          {mergeAcceptSideState("ours", layout.oursState)}
         </button>
         <button type="button" className="merge-button" disabled={busy} onClick={() => void accept("theirs")}>
-          {messages.merge.acceptSideState("theirs", layout.theirsState)}
+          {mergeAcceptSideState("theirs", layout.theirsState)}
         </button>
+        {onExternalMerge ? (
+          <button type="button" className="merge-button" disabled={busy} onClick={() => onExternalMerge(layout.fingerprint)}>
+            {messages.externalTools.openMerge}
+          </button>
+        ) : null}
       </div>
     </div>
   );

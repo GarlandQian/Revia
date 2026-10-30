@@ -10,9 +10,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CommitContext } from "@/types/bindings/CommitContext";
 import type { CommitHookChanges } from "@/types/bindings/CommitHookChanges";
 import type { CommitOutcome } from "@/types/bindings/CommitOutcome";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
 import { COMMIT_SHORTCUT_LABEL, isCommitShortcut } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
+import type { NoticeText } from "./Notifications";
 import { Popover } from "@/components/ui/popover";
 
 /** 首行字符数建议上限（按字符计数，不按 UTF-8 字节，F02.2）。 */
@@ -50,18 +51,21 @@ export function operationHint(context: CommitContext): string | null {
   })();
   const sequencer = gates.operationSequencerPending ? messages.commit.operationSequencer : "";
   const conflicts = gates.hasConflicts ? messages.commit.conflictBlocked(gates.conflictCount) : "";
-  return `${[base + sequencer, conflicts, messages.commit.operationTerminal]
+  // 句末标点和句间空格随语言走资源，不在这里写死中文句号。
+  return [base + sequencer, conflicts, messages.commit.operationTerminal]
     .filter((part) => part.length > 0)
-    .join("。")}。`;
+    .map((part) => messages.commit.operationHintSentence(part))
+    .join("")
+    .trim();
 }
 
 /** 提交结果面板的数据（成功/失败/待核对都保留在发起它的 worktree 上）。 */
 export interface CommitResultView {
   worktreeId: string;
   /** 结果的标题文案。 */
-  title: string;
+  title: NoticeText;
   /** 结果正文（错误信息或成功说明）。 */
-  detail: string | null;
+  detail: NoticeText | null;
   outcome: CommitOutcome | null;
   /** 实时输出（可能来自事件流，也可能是结果里的聚合尾部）。 */
   output: string[];

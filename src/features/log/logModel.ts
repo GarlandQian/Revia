@@ -14,6 +14,7 @@ import type { HistoryFilter } from "@/types/bindings/HistoryFilter";
 import type { HistoryRefLabel } from "@/types/bindings/HistoryRefLabel";
 import type { HistoryStart } from "@/types/bindings/HistoryStart";
 import type { HistoryRefKind } from "@/types/bindings/HistoryRefKind";
+import { t } from "@/lib/i18n/index";
 
 export function logVisibleEnd(scrollTop: number, viewport: number, rowHeight: number): number {
   return Math.ceil((scrollTop + viewport) / rowHeight);
@@ -57,6 +58,11 @@ export function defaultFilter(): LogFilterState {
     until: "",
     paths: [],
   };
+}
+
+/** Navigation to one fixed commit must not inherit unrelated query filters. */
+export function filterForCommit(oid: string): LogFilterState {
+  return { ...defaultFilter(), text: oid };
 }
 
 /** 输入是否看起来像哈希前缀（与 Rust 侧同一个判定：至少 4 位十六进制）。 */
@@ -166,8 +172,8 @@ export function formatCommitDate(unixSeconds: number, now: number = Date.now()):
   const startOfToday = new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime();
   const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const diffDays = Math.round((startOfToday - day) / DAY_MS);
-  if (diffDays === 0) return `今天 ${time}`;
-  if (diffDays === 1) return `昨天 ${time}`;
+  if (diffDays === 0) return t("log.today", { time });
+  if (diffDays === 1) return t("log.yesterday", { time });
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${time}`;
 }
 

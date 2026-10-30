@@ -29,9 +29,9 @@ use crate::commit::{
     self, CommitDraft, CommitExpectation, CommitRun, DraftClear, DraftStore, UpstreamStatus,
 };
 use crate::commit_snapshot::{self, HookBaseline, SnapshotBaseline};
-use crate::error::{AppError, AppErrorPayload, Result};
+use crate::error::{AppError, AppErrorPayload, ErrorKind, Result};
 use crate::operation;
-use crate::recovery::{DiscardOutcome, RecoveryRecord, RecoveryStore, RecordUse, WorktreeIdentity};
+use crate::recovery::{DiscardOutcome, RecordUse, RecoveryRecord, RecoveryStore, WorktreeIdentity};
 use crate::session::WorktreeSession;
 
 /// 客户端 nonce 的长度上限（实时输出事件的归属校验）。
@@ -117,7 +117,7 @@ pub struct CommitOutcome {
     /// 草稿是否已清除（成功且仍是本次输入时清除）。
     pub draft_cleared: bool,
     /// 草稿收尾失败的原因（持久化失败必须可见，F02.5）。
-    pub draft_error: Option<String>,
+    pub draft_error: Option<AppErrorPayload>,
     /// 结果是否需要用户核对真实状态（F03.5）。
     pub needs_verification: bool,
     /// 操作结束后重新读到的提交预期（前端据此刷新列表与审阅进度）。
@@ -125,7 +125,7 @@ pub struct CommitOutcome {
     /// 已确认失败时的错误（Git 类）；成功或结果不确定时为 None。
     pub error: Option<AppErrorPayload>,
     /// 结果已确定但收尾需要核对（例如快照收尾落盘失败）时的说明。
-    pub verification_note: Option<String>,
+    pub verification_note: Option<AppErrorPayload>,
     /// 本次操作 ID（与实时输出事件里的 operationId 对应）。
     pub operation_id: String,
     /// 前端发起时提供的 nonce（原样带回，供前端确认事件归属）。
@@ -159,13 +159,13 @@ pub struct CommitContext {
     /// `commit.template` 的内容；未设置或读取失败为 None。
     pub template: Option<String>,
     /// 模板读取失败的原因（可见，但不阻断读草稿与提交，F02.3）。
-    pub template_error: Option<String>,
+    pub template_error: Option<AppErrorPayload>,
     /// 最近 N 条提交信息（完整多行原文，最多 20 条）。
     pub recent_messages: Vec<String>,
     /// 该 worktree 的持久草稿；没有为 None。
     pub draft: Option<CommitDraft>,
     /// 草稿读取失败的原因（持久化失败必须可见，F02.5）；成功为 None。
-    pub draft_error: Option<String>,
+    pub draft_error: Option<AppErrorPayload>,
     /// 本地上游包含状态（截至上次 fetch，F06.3）。
     pub upstream: UpstreamStatus,
     /// 本地上游跟踪分支名；未配置为 None。
@@ -185,9 +185,9 @@ pub struct CommitGates {
     pub has_conflicts: bool,
     /// 是否有禁用提交的进行中操作（rebase/cherry-pick/revert）。
     pub operation_blocks_commit: bool,
-    /// 是否有任意进行中操作（禁 amend，F01.3）。
+    /// 进行中操作是否仍禁止 amend（交互式 rebase 的 edit 停点例外，Q158/Q166）。
     pub operation_blocks_amend: bool,
-    /// 是否允许 amend（无 HEAD 或进行中操作时为 false）。
+    /// 是否允许 amend（无 HEAD 或不允许的进行中操作时为 false）。
     pub amend_available: bool,
     /// 普通提交是否有已暂存内容（暂存删除算内容，intent-to-add 不算）。
     pub has_staged_changes: bool,
@@ -231,7 +231,7 @@ impl WorktreeSession {
         // 模板读取失败不能连带挡住草稿与提交：把原因作为可见字段返回（F02.3）。
         let (template, template_error) = match commit::read_template(git) {
             Ok(template) => (template, None),
-            Err(error) => (None, Some(error.message)),
+            Err(error) => (None, Some(error.payload())),
         };
         let recent = commit::read_recent_messages(git, commit::RECENT_COMMIT_LIMIT)?;
         let upstream = commit::upstream_read(git)?;
@@ -256,20 +256,35 @@ impl WorktreeSession {
     /// 只读取用户所见 HEAD 的完整信息；读取期间 HEAD 变化即拒绝旧预填。
     pub fn amend_head_message(&self, expected_head: &str) -> Result<Option<String>> {
         if commit::read_head(&self.git)?.as_deref() != Some(expected_head) {
-            return Err(AppError::rejected("HEAD 已变化，请刷新后重新选择修改上一次提交"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.headChangedRefreshReselectAmendingLast",
+                "HEAD 已变化，请刷新后重新选择修改上一次提交",
+                &[],
+            ));
         }
         let message = commit::read_last_message(&self.git, expected_head)?;
         if commit::read_head(&self.git)?.as_deref() != Some(expected_head) {
-            return Err(AppError::rejected("读取期间 HEAD 已变化，请刷新后重新选择修改上一次提交"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.headChangedDuringReadRefreshReselect",
+                "读取期间 HEAD 已变化，请刷新后重新选择修改上一次提交",
+                &[],
+            ));
         }
         Ok(Some(message))
     }
 
     /// 保存提交草稿（F02.5）：身份绑定 + 原子落盘；失败如实上报。
     pub fn save_commit_draft(&self, drafts: &DraftStore, draft: &CommitDraft) -> Result<()> {
-        let identity = self
-            .captured_identity()?
-            .ok_or_else(|| AppError::environment("worktree 身份不可用，不能保存提交草稿"))?;
+        let identity = self.captured_identity()?.ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Environment,
+                "errors.commitFlow.theWorktreeIdentityUnavailableSaveCommit",
+                "worktree 身份不可用，不能保存提交草稿",
+                &[],
+            )
+        })?;
         drafts.save(&identity, draft)
     }
 
@@ -283,26 +298,57 @@ impl WorktreeSession {
     }
 
     /// 读取该 worktree 的草稿：身份/读取失败时给出可见原因，不阻断提交。
-    fn load_draft(&self, drafts: &DraftStore) -> (Option<String>, Option<CommitDraft>, Option<String>) {
+    fn load_draft(
+        &self,
+        drafts: &DraftStore,
+    ) -> (Option<String>, Option<CommitDraft>, Option<AppErrorPayload>) {
         let identity = match self.captured_identity() {
             Ok(Some(identity)) => identity,
-            Ok(None) => return (None, None, Some("worktree 身份已变化，本次不读取也不保存提交草稿".to_string())),
-            Err(error) => return (None, None, Some(error.message)),
+            Ok(None) => {
+                return (
+                    None,
+                    None,
+                    Some(
+                        AppError::coded(
+                            ErrorKind::Environment,
+                            "errors.commitFlow.draftIdentityChanged",
+                            "worktree 身份已变化，本次不读取也不保存提交草稿",
+                            &[],
+                        )
+                        .payload(),
+                    ),
+                );
+            }
+            Err(error) => return (None, None, Some(error.payload())),
         };
         let key = match DraftStore::identity_key(&identity) {
             Ok(key) => key,
-            Err(error) => return (None, None, Some(error.message)),
+            Err(error) => return (None, None, Some(error.payload())),
         };
         let loaded = drafts.load(&identity);
         // 身份键与正文来自同一次读取，结束前再确认，不返回失效身份的旧正文。
         match self.captured_identity() {
             Ok(Some(current)) if current == identity => {}
-            Ok(_) => return (None, None, Some("读取期间 worktree 身份已变化，未载入旧草稿".to_string())),
-            Err(error) => return (None, None, Some(error.message)),
+            Ok(_) => {
+                return (
+                    None,
+                    None,
+                    Some(
+                        AppError::coded(
+                            ErrorKind::Environment,
+                            "errors.commitFlow.draftIdentityChangedDuringRead",
+                            "读取期间 worktree 身份已变化，未载入旧草稿",
+                            &[],
+                        )
+                        .payload(),
+                    ),
+                );
+            }
+            Err(error) => return (None, None, Some(error.payload())),
         }
         match loaded {
             Ok(draft) => (Some(key), draft, None),
-            Err(error) => (Some(key), None, Some(error.message)),
+            Err(error) => (Some(key), None, Some(error.payload())),
         }
     }
 
@@ -318,7 +364,14 @@ impl WorktreeSession {
     ) -> Result<CommitOutcome> {
         // 1. 写门：同 worktree 非排队互斥（Q90）。占用时立即拒绝，不排队。
         let _write = self.acquire_write_lock()?;
-        self.run_commit_flow(drafts, recovery_store, hooks_off_root, options, operation_id, emit)
+        self.run_commit_flow(
+            drafts,
+            recovery_store,
+            hooks_off_root,
+            options,
+            operation_id,
+            emit,
+        )
     }
 
     /// 写门内的实际流程（`execute_commit_flow` 已持有写锁）。
@@ -341,7 +394,12 @@ impl WorktreeSession {
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
         {
-            return Err(AppError::rejected("提交请求缺少有效的操作凭据，请重试"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.theCommitRequestMissingValidOperation",
+                "提交请求缺少有效的操作凭据，请重试",
+                &[],
+            ));
         }
         let client_nonce = options.client_nonce.clone();
         // 交给 Git 的信息去掉尾部换行（与 Git 自己的 cleanup 语义一致），
@@ -351,14 +409,22 @@ impl WorktreeSession {
 
         // 3a. 空白信息不能提交（F02.2）。
         if git_message.trim().is_empty() {
-            return Err(AppError::rejected("提交信息不能为空"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.theCommitMessageEmpty",
+                "提交信息不能为空",
+                &[],
+            ));
         }
 
         // 2. 写前重新读取真实提交预期并逐项比较（F03.2、F01.3）。
         let current = commit::capture(git)?;
         if !commit::expectations_match(&current, &options.expected) {
-            return Err(AppError::rejected(
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.theCommitContentChangedIndexHead",
                 "提交内容已变化（暂存区、HEAD 或进行中操作与确认时不一致），请重新确认",
+                &[],
             ));
         }
 
@@ -366,39 +432,62 @@ impl WorktreeSession {
         if current.has_unmerged() {
             // index 的 unmerged 条目独立于操作标记：`git stash pop` 之类会留下
             // 冲突却没有 MERGE_HEAD，同样必须禁用提交（F01.2）。
-            return Err(AppError::rejected(format!(
-                "有 {} 个文件存在未解决冲突，不能提交",
-                current.unmerged_paths().len()
-            )));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.filesUnresolvedConflictsCommit",
+                "有 {0} 个文件存在未解决冲突，不能提交",
+                &[("0", format!("{:}", current.unmerged_paths().len()))],
+            ));
         }
         if let Some(state) = &current.operation {
             if state.has_conflicts() {
-                return Err(AppError::rejected("存在未解决冲突，不能提交"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commitFlow.unresolvedConflictsRemainCommit",
+                    "存在未解决冲突，不能提交",
+                    &[],
+                ));
             }
             if !state.commit_allowed() {
-                return Err(AppError::rejected(format!(
-                    "有进行中的 {} 操作，请到终端处理后再提交",
-                    state.kind.label()
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commitFlow.aOperationProgressResolveTerminalBefore",
+                    "有进行中的 {0} 操作，请到终端处理后再提交",
+                    &[("0", format!("{:}", state.kind.label()))],
+                ));
             }
         }
         if options.amend {
             // amend：无 HEAD（unborn）不可用；任意进行中操作禁 amend（F01.3、F06.1）。
             if current.head.is_none() {
-                return Err(AppError::rejected("仓库还没有任何提交，不能修改上一次提交"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commitFlow.theRepositoryNoCommitsYetAmend",
+                    "仓库还没有任何提交，不能修改上一次提交",
+                    &[],
+                ));
             }
-            if current.operation.is_some() {
-                return Err(AppError::rejected("有进行中的操作，不能修改上一次提交"));
+            if current
+                .operation
+                .as_ref()
+                .is_some_and(|state| !operation_allows_amend(state))
+            {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commitFlow.anOperationProgressAmendLastCommit",
+                    "有进行中的操作，不能修改上一次提交",
+                    &[],
+                ));
             }
             // F06.2：HEAD 已包含于本地上游，或本地无法判断是否已发布（Unknown）
             // 时，都必须有绑定预期/信息/选项的二次确认——不能把「无法判断」当成
             // 「未发布」来放行。
             let upstream = commit::upstream_read(git)?;
-            if upstream.status == UpstreamStatus::Contained || upstream.status == UpstreamStatus::Unknown {
+            if upstream.status == UpstreamStatus::Contained
+                || upstream.status == UpstreamStatus::Unknown
+            {
                 let confirmation = options.amend_confirmation.as_ref().ok_or_else(|| {
-                    AppError::rejected(
-                        "上一次提交已包含于上游（按本地上游记录），或本地无法判断是否已发布，修改它需要再次确认",
-                    )
+                    AppError::coded(ErrorKind::Rejected, "errors.commitFlow.theLastCommitAlreadyContainedUpstream", "上一次提交已包含于上游（按本地上游记录），或本地无法判断是否已发布，修改它需要再次确认", &[])
                 })?;
                 verify_amend_confirmation(
                     confirmation,
@@ -412,15 +501,24 @@ impl WorktreeSession {
         } else if !current.has_staged_changes() && !current.allows_empty_diff_commit() {
             // 普通提交必须有真实暂存内容；无冲突 merge 收尾允许 index 与 HEAD 相同
             // （Git 仍会写出真正的 merge commit）。不自动暂存、不提供 allow-empty（F03.4）。
-            return Err(AppError::rejected(
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.theIndexNoStagedChangesCommit",
                 "暂存区没有已暂存的改动，不能提交（无冲突 merge 收尾除外）",
+                &[],
             ));
         }
 
         // 4. 部分暂存文件先存完整工作区快照（F05.1：失败则不启动 commit）。
         let partial_paths = commit_snapshot::partial_staged_paths(git)?;
-        let identity = self.captured_identity()?
-            .ok_or_else(|| AppError::rejected("worktree 身份已变化，请重新打开后提交"))?;
+        let identity = self.captured_identity()?.ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitFlow.theWorktreeIdentityChangedReopenBefore",
+                "worktree 身份已变化，请重新打开后提交",
+                &[],
+            )
+        })?;
         recovery_store.ensure_outside(&identity)?;
         let snapshot: Option<(RecoveryRecord, RecordUse, SnapshotBaseline)> =
             if partial_paths.is_empty() {
@@ -446,16 +544,28 @@ impl WorktreeSession {
             if !commit::expectations_match(&recheck, &current)
                 || !identity.confirmed_match(&WorktreeIdentity::capture(git)?)
             {
-                return Err(AppError::rejected("保存快照后提交内容或 worktree 身份发生变化，请重新确认"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commitFlow.theCommitContentWorktreeIdentityChanged",
+                    "保存快照后提交内容或 worktree 身份发生变化，请重新确认",
+                    &[],
+                ));
             }
             if let Some((_, _, snapshot_baseline)) = &snapshot {
                 if !snapshot_baseline.matches_now(git)? {
-                    return Err(AppError::rejected("保存快照后工作区内容发生变化，已保留快照，请重新确认"));
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.commitFlow.theWorkingTreeChangedAfterSnapshot",
+                        "保存快照后工作区内容发生变化，已保留快照，请重新确认",
+                        &[],
+                    ));
                 }
             }
             let hooks_off_dir = if options.skip_hooks {
                 Some(commit::prepare_hooks_off_dir(&hooks_off_root)?)
-            } else { None };
+            } else {
+                None
+            };
             Ok((baseline, hooks_off_dir))
         })();
         let (baseline, hooks_off_dir) = match preflight {
@@ -463,7 +573,7 @@ impl WorktreeSession {
             Err(error) => {
                 if let Some((record, _, _)) = &snapshot {
                     recovery_store.finish(record, &DiscardOutcome::NotApplied).map_err(|receipt| {
-                        AppError::needs_verification(format!("Git 未启动，但快照回执写入失败，记录待核对：{receipt}；原错误：{error}"))
+                        AppError::coded(ErrorKind::NeedsVerification, "errors.commitFlow.gitDidStartButWritingSnapshot", "Git 未启动，但快照回执写入失败，记录待核对：{cause}", &[]).cause(receipt).related(&error)
                     })?;
                 }
                 return Err(error);
@@ -491,30 +601,50 @@ impl WorktreeSession {
         }
 
         let (success, exit_code, output) = match run {
-            CommitRun::Finished { success, exit_code, output } => (success, Some(exit_code), output),
+            CommitRun::Finished {
+                success,
+                exit_code,
+                output,
+            } => (success, Some(exit_code), output),
             CommitRun::SpawnFailed(reason) => {
                 // 命令从未运行：快照记「未执行」，草稿保留（F03.5/F05.3）。
                 if let Some((record, _, _)) = &snapshot {
                     recovery_store.finish(record, &DiscardOutcome::NotApplied)?;
                 }
-                return Err(AppError::environment(format!(
-                    "{reason}；提交没有启动，草稿已保留"
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.commitFlow.theCommitDidStartDraftKept",
+                    "{cause}；提交没有启动，草稿已保留",
+                    &[],
+                ).cause(reason));
             }
             CommitRun::Uncertain(reason) => {
                 // 已启动但结果不确定：不杀进程、不重跑；快照保持无回执（待核对），
                 // 草稿保留，阻止静默退出（F03.5、F05.4）。
-                return Err(AppError::needs_verification(format!(
-                    "{reason}；已保留提交草稿与提交前快照，请核对真实状态后再继续"
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::NeedsVerification,
+                    "errors.commitFlow.theCommitDraftPreCommitSnapshot",
+                    "{cause}；已保留提交草稿与提交前快照，请核对真实状态后再继续",
+                    &[],
+                ).cause(reason));
             }
         };
 
         let observed_head = commit::read_head(git).map_err(|error| {
-            AppError::needs_verification(format!("提交进程已结束，但无法核对 HEAD，草稿与快照已保留：{error}"))
+            AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.commitFlow.theCommitProcessExitedButHead",
+                "提交进程已结束，但无法核对 HEAD，草稿与快照已保留：{cause}",
+                &[],
+            ).cause(error)
         })?;
         if !success && observed_head != current.head {
-            return Err(AppError::needs_verification(format!("git commit 非零退出但 HEAD 已变化，不能当作未提交；请核对真实状态，草稿与快照已保留：\n{output}")));
+            return Err(AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.commitFlow.gitCommitExitedNonZeroBut",
+                "git commit 非零退出但 HEAD 已变化，不能当作未提交；请核对真实状态，草稿与快照已保留：\n{output}",
+                &[("output", format!("{}", output))],
+            ));
         }
 
         // 8. 收尾：先落真实快照基准，再汇总结果。
@@ -523,50 +653,84 @@ impl WorktreeSession {
         // 此时若只记「未执行」，快照就无法在后续恢复中安全比对，等于丢掉唯一的备份。
         // 只有「命令从未启动」才是 NotApplied。
         let mut needs_verification = false;
-        let mut verification_note: Option<String> = None;
+        let mut verification_note: Option<AppErrorPayload> = None;
         if let Some((record, _, snapshot_baseline)) = &snapshot {
             match snapshot_baseline.capture_now(git) {
                 Ok(after) => {
-                    if let Err(error) = recovery_store
-                        .finish(record, &DiscardOutcome::Completed { after })
+                    if let Err(error) =
+                        recovery_store.finish(record, &DiscardOutcome::Completed { after })
                     {
                         needs_verification = true;
-                        verification_note = Some(format!(
-                            "快照收尾记录失败，结果待核对：{error}"
-                        ));
+                        verification_note = Some(
+                            AppError::coded(
+                                ErrorKind::NeedsVerification,
+                                "errors.commitFlow.snapshotFinishFailed",
+                                "快照收尾记录失败，结果待核对：{cause}",
+                                &[],
+                            )
+                            .cause(error)
+                            .payload(),
+                        );
                     }
                 }
                 Err(error) => {
                     // 读不到真实操作后状态：不伪造基准，保留无回执（待核对）。
                     needs_verification = true;
-                    verification_note = Some(format!(
-                        "无法读取操作后的真实状态，快照保持待核对（不伪造基准）：{error}"
-                    ));
+                    verification_note = Some(
+                        AppError::coded(
+                            ErrorKind::NeedsVerification,
+                            "errors.commitFlow.snapshotAfterStateUnreadable",
+                            "无法读取操作后的真实状态，快照保持待核对（不伪造基准）：{cause}",
+                            &[],
+                        )
+                        .cause(error).payload(),
+                    );
                 }
             }
         }
 
         // hooks 对照：成功时有新 tree 作为正常收尾的对照基准。
         let new_head = if success {
-            Some(observed_head.ok_or_else(|| AppError::needs_verification(
-                "Git 成功退出但 HEAD 不存在，草稿与快照已保留，请核对真实状态"
-            ))?)
-        } else { None };
+            Some(observed_head.ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::NeedsVerification,
+                    "errors.commitFlow.gitExitedSuccessfullyButHeadDoes",
+                    "Git 成功退出但 HEAD 不存在，草稿与快照已保留，请核对真实状态",
+                    &[],
+                )
+            })?)
+        } else {
+            None
+        };
         let hook_changes = match baseline.diff_against(git, new_head.as_deref()) {
             Ok(changes) => Some(to_hook_changes(changes)),
             Err(error) => {
                 if success {
                     // 提交已成功：不冒称提交失败，但对照读失败必须待核对。
-                    return Err(AppError::needs_verification(format!(
-                        "提交已成功（新 HEAD {}），但 hooks 改动对照读取失败（结果待核对）：{error}",
-                        new_head.as_deref().unwrap_or("<未知>")
-                    )));
+                    return Err(AppError::coded(
+                        ErrorKind::NeedsVerification,
+                        "errors.commitFlow.theCommitSucceededNewHeadBut",
+                        "提交已成功（新 HEAD {0}），但 hooks 改动对照读取失败（结果待核对）：{cause}",
+                        &[
+                            (
+                                "0",
+                                format!("{:}", new_head.as_deref().unwrap_or("unknown")),
+                            ),
+                        ],
+                    ).cause(error));
                 }
                 // 提交已确认失败：没有 hook 报告也要如实说明读取失败。
                 needs_verification = true;
-                verification_note = Some(format!(
-                    "提交失败，且 hooks 改动对照读取失败（结果待核对）：{error}"
-                ));
+                verification_note = Some(
+                    AppError::coded(
+                        ErrorKind::NeedsVerification,
+                        "errors.commitFlow.hooksComparisonUnreadableAfterFailure",
+                        "提交失败，且 hooks 改动对照读取失败（结果待核对）：{cause}",
+                        &[],
+                    )
+                    .cause(error)
+                    .payload(),
+                );
                 None
             }
         };
@@ -574,7 +738,16 @@ impl WorktreeSession {
             Ok(after) => Some(after),
             Err(error) => {
                 needs_verification = true;
-                verification_note.get_or_insert_with(|| format!("提交后的真实状态读取失败，需要核对：{error}"));
+                verification_note.get_or_insert_with(|| {
+                    AppError::coded(
+                        ErrorKind::NeedsVerification,
+                        "errors.commitFlow.stateAfterCommitUnreadable",
+                        "提交后的真实状态读取失败，需要核对：{cause}",
+                        &[],
+                    )
+                    .cause(error)
+                    .payload()
+                });
                 None
             }
         };
@@ -584,7 +757,12 @@ impl WorktreeSession {
             let (draft_cleared, draft_error) = if needs_verification {
                 (false, None)
             } else {
-                self.clear_draft_if_matches(drafts, &raw_message, options.amend, &options.draft_revision)
+                self.clear_draft_if_matches(
+                    drafts,
+                    &raw_message,
+                    options.amend,
+                    &options.draft_revision,
+                )
             };
             return Ok(CommitOutcome {
                 success: true,
@@ -607,31 +785,26 @@ impl WorktreeSession {
         }
 
         // 已确认的 Git 非零退出：返回**结构化**结果，草稿保留，错误按 Git 类上报。
-        let detail = hook_changes
-            .as_ref()
-            .filter(|changes| !(changes.worktree.is_empty() && changes.index.is_empty()))
-            .map(|changes| {
-                format!(
-                    "\nhooks 修改过的文件（未自动撤销）：工作区 {}；暂存区 {}",
-                    join_or_none(&changes.worktree),
-                    join_or_none(&changes.index)
-                )
-            })
-            .unwrap_or_default();
-        let message = format!(
-            "git commit 失败（退出码 {}）：{}{detail}",
-            exit_code.unwrap_or(-1),
-            if output.trim().is_empty() {
-                "（Git 未输出内容）".to_string()
-            } else {
-                output.trim().to_string()
-            }
+        let mut error = AppError::coded(
+            ErrorKind::Git,
+            "errors.commitFlow.gitCommitFailed",
+            "git commit 失败（退出码 {exit_code}）：{output}",
+            &[
+                ("exit_code", exit_code.unwrap_or(-1).to_string()),
+                ("output", output.trim().to_string()),
+            ],
         );
-        let mut error = AppError::git(message).payload();
-        if let Some(note) = verification_note {
+        if let Some(changes) = hook_changes.as_ref()
+            .filter(|changes| !(changes.worktree.is_empty() && changes.index.is_empty())) {
+            error = error.related(&AppError::coded(ErrorKind::Git,
+                "errors.commitFlow.hookChangedFiles",
+                "hooks 修改过的文件（未自动撤销）：工作区 [{worktree}]；暂存区 [{index}]",
+                &[("worktree", changes.worktree.join(", ")), ("index", changes.index.join(", "))]));
+        }
+        let error = error.payload();
+        if verification_note.is_some() {
             // 快照/hook 对照收尾失败时，失败本身已确认，但收尾仍需核对。
             needs_verification = true;
-            error.message = format!("{}（{}）", error.message, note);
         }
         Ok(CommitOutcome {
             success: false,
@@ -647,7 +820,7 @@ impl WorktreeSession {
             needs_verification,
             expectation_after,
             error: Some(error),
-            verification_note: None,
+            verification_note,
             operation_id,
             client_nonce,
         })
@@ -663,17 +836,17 @@ impl WorktreeSession {
         raw_message: &str,
         amend: bool,
         revision: &str,
-    ) -> (bool, Option<String>) {
+    ) -> (bool, Option<AppErrorPayload>) {
         let identity = match self.captured_identity() {
             Ok(Some(identity)) => identity,
             Ok(None) => return (false, None),
-            Err(error) => return (false, Some(error.message)),
+            Err(error) => return (false, Some(error.payload())),
         };
         match drafts.clear_if_matches(&identity, raw_message, amend, revision) {
             Ok(DraftClear::Cleared) => (true, None),
             Ok(DraftClear::Absent) => (false, None),
             Ok(DraftClear::Changed) => (false, None),
-            Err(error) => (false, Some(error.message)),
+            Err(error) => (false, Some(error.payload())),
         }
     }
 }
@@ -688,38 +861,54 @@ fn verify_amend_confirmation(
     skip_hooks: bool,
 ) -> Result<()> {
     if confirmation.upstream_version != upstream_version {
-        return Err(AppError::rejected(
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitFlow.theUpstreamReadingChangedAmendConfirmation",
             "上游读数已变化，修改上一次提交的确认已失效，请重新确认",
+            &[],
         ));
     }
     if confirmation.expectation_fingerprint != current.fingerprint {
-        return Err(AppError::rejected(
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitFlow.theCommitContentChangedAmendConfirmation",
             "提交内容已变化，修改上一次提交的确认已失效，请重新确认",
+            &[],
         ));
     }
     if confirmation.message != raw_message {
-        return Err(AppError::rejected(
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitFlow.theCommitMessageChangedAmendConfirmation",
             "提交信息已变化，修改上一次提交的确认已失效，请重新确认",
+            &[],
         ));
     }
     if confirmation.amend != amend || confirmation.skip_hooks != skip_hooks {
-        return Err(AppError::rejected(
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitFlow.theCommitOptionsChangedAmendConfirmation",
             "提交选项已变化，修改上一次提交的确认已失效，请重新确认",
+            &[],
         ));
     }
     Ok(())
 }
 
 fn to_hook_changes(changes: commit_snapshot::HookChanges) -> CommitHookChanges {
-    CommitHookChanges { worktree: changes.worktree, index: changes.index }
+    CommitHookChanges {
+        worktree: changes.worktree,
+        index: changes.index,
+    }
 }
 
-fn join_or_none(paths: &[String]) -> String {
-    if paths.is_empty() {
-        "（无）".to_string()
-    } else {
-        paths.join(", ")
-    }
+/// An interactive rebase edit stop is an explicit commit boundary: amend and
+/// creating a new commit are how the user splits or extends the stopped commit
+/// (Q158/Q166).  Every other in-progress operation still blocks amend.
+fn operation_allows_amend(state: &crate::operation::OperationState) -> bool {
+    state.kind == crate::operation::OperationKind::Rebase
+        && state.edit_stop
+        && !state.has_conflicts()
 }
 
 /// 门禁摘要（纯函数：预期 + 上游读数 → 前端展示用）。
@@ -732,12 +921,12 @@ pub fn commit_gates(
         expectation.has_unmerged() || operation.is_some_and(|state| state.has_conflicts());
     let operation_blocks_commit =
         operation.is_some_and(|state| !state.commit_allowed() && !state.has_conflicts());
-    let operation_blocks_amend = operation.is_some();
+    let operation_blocks_amend = operation.is_some_and(|state| !operation_allows_amend(state));
     CommitGates {
         has_conflicts,
         operation_blocks_commit,
         operation_blocks_amend,
-        amend_available: expectation.head.is_some() && operation.is_none(),
+        amend_available: expectation.head.is_some() && !operation_blocks_amend,
         has_staged_changes: expectation.has_staged_changes(),
         allows_empty_diff_commit: expectation.allows_empty_diff_commit(),
         operation_kind: operation.map(|state| state.kind),

@@ -20,7 +20,7 @@ export interface GuardedWriteDeps<Token> {
   /** 门禁变化后同步到界面状态。 */
   publishWriting: () => void;
   /** 共享异步编排（`WriteGuardOrchestrator`）。 */
-  begin: (worktreeId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
+  begin: (worktreeId: string) => Promise<{ ok: true } | { ok: false; reason: string | AppErrorPayload }>;
   end: (worktreeId: string, needsVerification: boolean) => void;
   /** 操作结果通道（`OperationResultGate`）：较新的操作会让旧结果失去记录资格。 */
   beginOperation: (worktreeId: string) => Token;
@@ -52,7 +52,7 @@ export async function runGuardedWrite<TRequest extends GuardedWriteRequest, Toke
   }
   deps.writing.add(worktreeId);
   deps.publishWriting();
-  let started: { ok: true } | { ok: false; reason: string };
+  let started: { ok: true } | { ok: false; reason: string | AppErrorPayload };
   try {
     started = await deps.begin(worktreeId);
   } catch (caught) {
@@ -63,7 +63,8 @@ export async function runGuardedWrite<TRequest extends GuardedWriteRequest, Toke
   if (!started.ok) {
     deps.writing.delete(worktreeId);
     deps.publishWriting();
-    const unavailable: AppErrorPayload = { kind: "internal", message: deps.guardUnavailable(started.reason) };
+    const unavailable: AppErrorPayload = typeof started.reason === "string"
+      ? { kind: "internal", message: deps.guardUnavailable(started.reason) } : started.reason;
     throw unavailable;
   }
 

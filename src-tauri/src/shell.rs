@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 
 #[cfg(unix)]
 mod capture;
@@ -307,11 +307,7 @@ fn split_path(vars: &HashMap<String, String>) -> Vec<String> {
             std::env::split_paths(value)
                 .filter_map(|entry| {
                     let s = entry.to_string_lossy().trim().to_string();
-                    if s.is_empty() {
-                        None
-                    } else {
-                        Some(s)
-                    }
+                    if s.is_empty() { None } else { Some(s) }
                 })
                 .collect()
         })
@@ -387,15 +383,26 @@ pub fn home_dir() -> Result<PathBuf> {
                 return Ok(path);
             }
         }
-        if let (Some(drive), Some(homepath)) = (std::env::var_os("HOMEDRIVE"), std::env::var_os("HOMEPATH")) {
-            let path = PathBuf::from(format!("{}{}", drive.to_string_lossy(), homepath.to_string_lossy()));
+        if let (Some(drive), Some(homepath)) =
+            (std::env::var_os("HOMEDRIVE"), std::env::var_os("HOMEPATH"))
+        {
+            let path = PathBuf::from(format!(
+                "{}{}",
+                drive.to_string_lossy(),
+                homepath.to_string_lossy()
+            ));
             if path.is_dir() {
                 return Ok(path);
             }
         }
     }
 
-    Err(AppError::environment("找不到用户主目录（HOME 或 USERPROFILE 未设置）"))
+    Err(AppError::coded(
+        ErrorKind::Environment,
+        "errors.shell.cannotFindUserHomeDirectoryHome",
+        "找不到用户主目录（HOME 或 USERPROFILE 未设置）",
+        &[],
+    ))
 }
 
 #[cfg(test)]

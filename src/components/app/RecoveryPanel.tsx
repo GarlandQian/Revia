@@ -1,3 +1,5 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import type { NoticeText } from "@/components/app/Notifications";
 /**
  * 回收区页签（M4 F06、Q29、Q85–Q87、ADR-0010）。
  *
@@ -15,8 +17,8 @@ import type { RecoveryState } from "@/types/bindings/RecoveryState";
 import type { RecoverySummary } from "@/types/bindings/RecoverySummary";
 import type { RestoreAttempt } from "@/types/bindings/RestoreAttempt";
 import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
-import { messages } from "@/lib/i18n/zh-CN";
-import { getErrorMessage } from "@/lib/error";
+import { getLocale, messages } from "@/lib/i18n/index";
+import { getErrorMessage, formatAppError, toAppError } from "@/lib/error";
 import { ipc } from "@/lib/ipc";
 import { Codicon } from "@/components/ui/codicon";
 import { Modal } from "./Dialogs";
@@ -38,6 +40,22 @@ function sourceLabel(source: RecoverySource): string {
       return messages.recovery.sourceCheckoutForce;
     case "updateAutostash":
       return messages.recovery.sourceUpdateAutostash;
+    case "stashApply":
+      return messages.recovery.sourceStashApply;
+    case "historyAutostash":
+      return messages.recovery.sourceHistoryAutostash;
+    case "operationContinue":
+      return messages.recovery.sourceOperationContinue;
+    case "operationAbort":
+      return messages.recovery.sourceOperationAbort;
+    case "operationSkip":
+      return messages.recovery.sourceOperationSkip;
+    case "historyReset":
+      return messages.recovery.sourceHistoryReset;
+    case "historyOverwrite":
+      return messages.recovery.sourceHistoryOverwrite;
+    case "externalTool":
+      return messages.recovery.sourceExternalTool;
   }
 }
 
@@ -76,14 +94,14 @@ export function RecoveryPanel({
     expectedState: RecoveryState;
   }) => Promise<RestoreOutcome>;
   onSaveAs: (request: { recordId: string; path: string; destination: string }) => Promise<number>;
-  onNotify: (notice: { tone: NoticeTone; title: string; detail?: string; persistent?: boolean }) => void;
+  onNotify: (notice: { tone: NoticeTone; title: NoticeText; detail?: NoticeText; persistent?: boolean }) => void;
 }) {
   const [records, setRecords] = useState<RecoverySummary[] | null>(null);
   const [maintenance, setMaintenance] = useState<RecoveryMaintenance | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppErrorPayload | null>(null);
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<RecoveryInspection | null>(null);
-  const [diff, setDiff] = useState<{ path: string; text: string | null; error: string | null } | null>(null);
+  const [diff, setDiff] = useState<{ path: string; text: string | null; error: AppErrorPayload | null } | null>(null);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -129,7 +147,7 @@ export function RecoveryPanel({
         if (epoch === panelEpoch.current) setRecords(result);
       })
       .catch((caught) => {
-        if (epoch === panelEpoch.current) setError(getErrorMessage(caught));
+        if (epoch === panelEpoch.current) setError(toAppError(caught));
       });
     void ipc.recoveryMaintenance()
       .then((result) => {
@@ -164,7 +182,7 @@ export function RecoveryPanel({
         setSelected(inspection);
       })
       .catch((caught) => {
-        if (panel === panelEpoch.current && request === requestEpoch.current) setError(getErrorMessage(caught));
+        if (panel === panelEpoch.current && request === requestEpoch.current) setError(toAppError(caught));
       })
       .finally(() => endRequest(token));
   };
@@ -184,7 +202,7 @@ export function RecoveryPanel({
       .catch((caught) => {
         if (panel !== panelEpoch.current || request !== requestEpoch.current) return;
         if (selectedRef.current?.id !== recordId) return;
-        setDiff({ path, text: null, error: getErrorMessage(caught) });
+        setDiff({ path, text: null, error: toAppError(caught) });
       });
   };
 
@@ -209,13 +227,13 @@ export function RecoveryPanel({
         const done = outcome.attempt?.state === "completed";
         onNotify({
           tone: done ? "success" : "warning",
-          title: done ? messages.recovery.restoreDone : messages.recovery.restoreNeedsCheck,
+          title: () => (done ? messages.recovery.restoreDone : messages.recovery.restoreNeedsCheck),
           persistent: !done,
         });
       })
       .catch((caught) => {
         if (panel !== panelEpoch.current) return;
-        onNotify({ tone: "error", title: messages.recovery.restoreNeedsCheck, detail: getErrorMessage(caught), persistent: true });
+        onNotify({ tone: "error", title: () => (messages.recovery.restoreNeedsCheck), detail: () => (getErrorMessage(caught)), persistent: true });
       })
       .finally(() => endRequest(token));
   };
@@ -229,10 +247,10 @@ export function RecoveryPanel({
     try {
       const bytes = await onSaveAs({ recordId: selected.id, path, destination: picked });
       if (panel !== panelEpoch.current) return;
-      onNotify({ tone: "success", title: messages.recovery.saveAsDone, detail: `${bytes} ${messages.recovery.bytes}` });
+      onNotify({ tone: "success", title: () => (messages.recovery.saveAsDone), detail: () => (`${bytes} ${messages.recovery.bytes}`) });
     } catch (caught) {
       if (panel !== panelEpoch.current) return;
-      onNotify({ tone: "error", title: messages.recovery.saveAsFailed, detail: getErrorMessage(caught), persistent: true });
+      onNotify({ tone: "error", title: () => (messages.recovery.saveAsFailed), detail: () => (getErrorMessage(caught)), persistent: true });
     } finally {
       endRequest(token);
     }
@@ -245,12 +263,12 @@ export function RecoveryPanel({
     void ipc.clearRecovery()
       .then((count) => {
         if (panel !== panelEpoch.current) return;
-        onNotify({ tone: "success", title: `${messages.recovery.cleared}：${count}` });
+        onNotify({ tone: "success", title: () => (`${messages.recovery.cleared}：${count}`) });
         refreshList();
       })
       .catch((caught) => {
         if (panel !== panelEpoch.current) return;
-        onNotify({ tone: "error", title: messages.recovery.clear, detail: getErrorMessage(caught), persistent: true });
+        onNotify({ tone: "error", title: () => (messages.recovery.clear), detail: () => (getErrorMessage(caught)), persistent: true });
       })
       .finally(() => endRequest(token));
   };
@@ -261,12 +279,12 @@ export function RecoveryPanel({
     void ipc.purgeRecovery()
       .then((count) => {
         if (panel !== panelEpoch.current) return;
-        onNotify({ tone: "info", title: `${messages.recovery.purged}：${count}` });
+        onNotify({ tone: "info", title: () => (`${messages.recovery.purged}：${count}`) });
         refreshList();
       })
       .catch((caught) => {
         if (panel === panelEpoch.current) {
-          onNotify({ tone: "error", title: messages.recovery.purge, detail: getErrorMessage(caught), persistent: true });
+          onNotify({ tone: "error", title: () => (messages.recovery.purge), detail: () => (getErrorMessage(caught)), persistent: true });
         }
       })
       .finally(() => endRequest(token));
@@ -294,12 +312,12 @@ export function RecoveryPanel({
         <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-descriptionforeground">{messages.recovery.viewOnly}</p>
         {maintenance?.error ? (
           <p role="alert" className="mb-2 px-1 text-[11.5px] text-destructive">
-            {`${messages.recovery.maintenanceFailed}：${maintenance.error}`}
+            {`${messages.recovery.maintenanceFailed}：${formatAppError(maintenance.error)}`}
           </p>
         ) : null}
         {error ? (
           <p role="alert" className="mb-2 px-1 text-[11.5px] text-destructive">
-            {error}
+            {formatAppError(error)}
           </p>
         ) : null}
 
@@ -311,15 +329,15 @@ export function RecoveryPanel({
             </button>
             <h3 className="break-all font-mono text-[12px] font-semibold">{selected.target}</h3>
             <p className="text-descriptionforeground">
-              {new Date(selected.createdAtMs).toLocaleString()} · {selected.worktreePath}
+              {new Date(selected.createdAtMs).toLocaleString(getLocale())} · {selected.worktreePath}
             </p>
             <p>{sourceLabel(selected.source)}</p>
             <p role="status" className="font-semibold">{stateLabel(selected.state)}</p>
             <p className="text-descriptionforeground">{messages.recovery.restoreFullFile}</p>
             {selected.restore ? (
               <p role="status" className={selected.restore.state === "needsVerification" ? "text-destructive" : "text-descriptionforeground"}>
-                {`${messages.recovery.attemptLabel}：${attemptLabel(selected.restore)} · ${new Date(selected.restore.atMs).toLocaleString()}`}
-                {selected.restore.message ? ` · ${selected.restore.message}` : ""}
+                {`${messages.recovery.attemptLabel}：${attemptLabel(selected.restore)} · ${new Date(selected.restore.atMs).toLocaleString(getLocale())}`}
+                {selected.restore.error ? ` · ${formatAppError(selected.restore.error)}` : selected.restore.message ? ` · ${messages.recovery.legacyDiagnostic}` : ""}
               </p>
             ) : null}
             <div className="space-y-2">
@@ -354,7 +372,7 @@ export function RecoveryPanel({
                       </button>
                       {diff?.path === file.path ? (
                         diff.error ? (
-                          <p role="alert" className="text-destructive">{`${messages.recovery.diffUnavailable}：${diff.error}`}</p>
+                          <p role="alert" className="text-destructive">{`${messages.recovery.diffUnavailable}：${formatAppError(diff.error)}`}</p>
                         ) : diff.text === null ? (
                           <p className="text-descriptionforeground">{messages.recovery.loading}</p>
                         ) : (
@@ -405,13 +423,13 @@ export function RecoveryPanel({
                 <article key={record.id} className="rounded border border-panel-border p-2">
                   <h3 className="break-all font-mono text-[11.5px] font-semibold">{record.target}</h3>
                   <p className="text-[11px] text-descriptionforeground">
-                    {new Date(record.createdAtMs).toLocaleString()} · {record.bytes} {messages.recovery.bytes}
+                    {new Date(record.createdAtMs).toLocaleString(getLocale())} · {record.bytes} {messages.recovery.bytes}
                   </p>
                   <p className="text-[11px]">{sourceLabel(record.source)}</p>
                   <p className="text-[11px]">{statusLabel(record.source, record.status)}</p>
                   {record.restore ? (
                     <p className={`text-[11px] ${record.restore.state === "needsVerification" ? "text-destructive" : "text-descriptionforeground"}`}>
-                      {`${messages.recovery.attemptLabel}：${attemptLabel(record.restore)} · ${new Date(record.restore.atMs).toLocaleString()}`}
+                      {`${messages.recovery.attemptLabel}：${attemptLabel(record.restore)} · ${new Date(record.restore.atMs).toLocaleString(getLocale())}`}
                     </p>
                   ) : null}
                   <p className="break-all text-[11px] text-descriptionforeground">{record.worktreePath}</p>

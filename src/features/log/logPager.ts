@@ -1,3 +1,5 @@
+import { toAppError } from "@/lib/error";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * 日志分页（M5 L02）。
  *
@@ -40,7 +42,7 @@ export interface LogSnapshot {
   spanExceeded: boolean;
   loading: boolean;
   /** 加载失败的原因（原始文字）。 */
-  error: string | null;
+  error: AppErrorPayload | null;
   /** 当前查询的筛选标识：换了筛选就重新开始。 */
   queryKey: string;
 }
@@ -63,7 +65,7 @@ export class LogPager {
   private exhausted = false;
   private spanExceeded = false;
   private loading = false;
-  private error: string | null = null;
+  private error: AppErrorPayload | null = null;
   private queryKey = "";
   /** 每次重置递增：晚到的旧响应据此丢弃。 */
   private generation = 0;
@@ -174,10 +176,14 @@ export class LogPager {
     } catch (caught) {
       if (token !== this.generation || targetId !== this.targetId) return;
       this.loading = false;
-      const message = errorMessage(caught);
+      const failure = toAppError(caught);
       // 超过跨度上限是明确状态：不显示为“历史末尾”，也不自动重试。
-      this.spanExceeded = message.includes("上限") || message.includes("跨度");
-      this.error = message;
+      const code = caught && typeof caught === "object" && "code" in caught
+        ? (caught as { code?: unknown }).code
+        : undefined;
+      this.spanExceeded = code === "errors.history.historyPagingExceededQuerySLimit"
+        || code === "errors.history.scannedCommitsWithoutFillingQueryS";
+      this.error = failure;
       this.exhausted = true;
       this.emit();
     }
@@ -208,13 +214,4 @@ export class LogPager {
   private emit(): void {
     this.listener?.(this.snapshot());
   }
-}
-
-/** 把未知错误整理成可显示的文字（不发请求、不做映射）。 */
-export function errorMessage(caught: unknown): string {
-  if (caught && typeof caught === "object" && "message" in caught) {
-    const message = (caught as { message?: unknown }).message;
-    if (typeof message === "string" && message.length > 0) return message;
-  }
-  return String(caught);
 }

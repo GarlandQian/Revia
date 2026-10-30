@@ -5,7 +5,9 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
-import { messages } from "@/lib/i18n/zh-CN";
+import type { CommitWarning } from "@/types/bindings/CommitWarning";
+import { messages } from "@/lib/i18n/index";
+import { commitWarningText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
 import { FileTypeIcon } from "./FileTypeIcon";
 
@@ -186,7 +188,7 @@ export function CommitWarningDialog({
   onContinue,
   onCancel,
 }: {
-  warnings: Array<{ kind: string; path: string | null; message: string }>;
+  warnings: CommitWarning[];
   onContinue: () => void;
   onCancel: () => void;
 }) {
@@ -197,7 +199,7 @@ export function CommitWarningDialog({
         {warnings.map((warning, index) => (
           <li key={`${warning.kind}-${index}`} className="flex items-start gap-1.5">
             <Codicon name="warning" size={13} className="mt-0.5 shrink-0 text-[var(--editorwarning-foreground)]" />
-            <span className="min-w-0 break-words">{warning.message}</span>
+            <span className="min-w-0 break-words">{commitWarningText(warning)}</span>
           </li>
         ))}
       </ul>

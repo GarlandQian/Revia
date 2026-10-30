@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://x18n.antfu.dev/schema/reviews.json
+x18n: 1
+sources:
+  commit.operationCherryPick:
+    en: 7ac76241d749c
+  commit.operationHintSentence:
+    en: 16e2520cb80ce8
+  commit.operationRebase:
+    en: 5b690d579c901
+  commit.operationRevert:
+    en: fc71620a63b15
+  commit.operationTerminal:
+    en: 4332b3a6f35d4
+  diff.foldLines:
+    en: 1efa5f6dda2ac7
+  errors.autostash.restoreTargetChanged:
+    en: 6f613417e2307
+  errors.closeGuard.exitListener:
+    en: 1295d917cebcc3
+  errors.closeGuard.installing:
+    en: 19fcb9ccc0bc53
+  errors.closeGuard.unavailable:
+    en: 12b6e8da47703c
+  errors.closeGuard.windowListener:
+    en: 1d6f3d30060efd
+  errors.commitOutput.listenerFailed:
+    en: 6e0952918824e
+  errors.nativeMenu.unavailable:
+    en: ce9301a54a131
+  errors.review.failedSyncReviewMarksCause:
+    en: 54a65c435fbdb
+  errors.rewrite.rootCommitNotSupported:
+    en: fb2eb7ae5afc3
+  historyActions.cherryPickHintMany:
+    en: f4d51d451eebe
+  historyActions.publishedWarning:
+    en: 10e8b6854dadc8
+  historyActions.revertHintMany:
+    en: 1dbd8f170539b2
+  historyActions.selectionHasMerge:
+    en: cfee598b03894
+  historyActions.singleCommitOnly:
+    en: 1c1d2a90834706
+  nativeMenu.about:
+    en: 63a0b7a9801bb
+  nativeMenu.closeAll:
+    en: f1e5597843ba4
+  nativeMenu.closeWindow:
+    en: 1250fb89111c5
+  nativeMenu.copy:
+    en: 1b771529ca2fea
+  nativeMenu.cut:
+    en: 1a1e395f52a526
+  nativeMenu.edit:
+    en: 16d59411550747
+  nativeMenu.file:
+    en: 17f5ffc7b33c3b
+  nativeMenu.fullscreen:
+    en: 1cf7ad047a7c96
+  nativeMenu.help:
+    en: f92970976e8be
+  nativeMenu.hide:
+    en: 7ea52240bc133
+  nativeMenu.hideOthers:
+    en: cd5239628038c
+  nativeMenu.maximize:
+    en: 110b4a593cade8
+  nativeMenu.minimize:
+    en: 2ebe4a724e1bc
+  nativeMenu.paste:
+    en: 1c32312acb30b2
+  nativeMenu.quit:
+    en: 1c0e295c9321d2
+  nativeMenu.redo:
+    en: 1092af20115879
+  nativeMenu.selectAll:
+    en: d38f1b124e97
+  nativeMenu.services:
+    en: 1dd3d19de0d52a
+  nativeMenu.undo:
+    en: dff389c0e796b
+  nativeMenu.view:
+    en: 19cc0df051dcd9
+  nativeMenu.window:
+    en: 1e404fd210058d
+  operation.autostashRestoredRemoved:
+    en: 3b4ee28ef8bfa
+  operation.confirmSkipTitle:
+    en: 1f700c27694201
+  settings.keywords.commitMessage:
+    en: 838d5b3afb2c6
+  stash.applyConflictHint:
+    en: 1cbc99aab2d08b
+  stash.archives:
+    en: 34b7eb26908eb
+  stash.clearConfirm:
+    en: e0e8ecd497b0f
+  stash.otherArchives:
+    en: e8b9f10217ce4

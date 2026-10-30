@@ -5,7 +5,8 @@
 
 import type { ComposerInput } from "@/lib/commitDraft";
 import type { CommitDraft } from "@/types/bindings/CommitDraft";
-import { getErrorMessage } from "@/lib/error";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { getErrorMessage, toAppError } from "@/lib/error";
 import { ipc } from "@/lib/ipc";
 
 const DRAFT_DEBOUNCE_MS = 400;
@@ -19,12 +20,12 @@ export interface DraftWrite {
 
 interface DraftSettlement {
   write: DraftWrite;
-  error: string | null;
+  error: AppErrorPayload | null;
 }
 
 export class CommitDraftPersistence {
   private queues = new Map<string, Promise<void>>();
-  private failures = new Map<string, string>();
+  private failures = new Map<string, AppErrorPayload>();
   private pending: DraftWrite | null = null;
   private timer: number | null = null;
   private saveEpoch = 0;
@@ -40,6 +41,11 @@ export class CommitDraftPersistence {
   }
 
   failureFor(worktreeId: string): string | null {
+    const error = this.failurePayloadFor(worktreeId);
+    return error ? getErrorMessage(error) : null;
+  }
+
+  failurePayloadFor(worktreeId: string): AppErrorPayload | null {
     return this.failures.get(worktreeId) ?? null;
   }
 
@@ -47,7 +53,7 @@ export class CommitDraftPersistence {
   save(write: DraftWrite): Promise<void> {
     const epoch = ++this.saveEpoch;
     const next = this.waitFor(write.worktreeId).then(async () => {
-      let error: string | null = null;
+      let error: AppErrorPayload | null = null;
       try {
         if (inputDirty(write.input)) {
           await ipc.saveCommitDraft({
@@ -59,7 +65,7 @@ export class CommitDraftPersistence {
         }
         this.failures.delete(write.worktreeId);
       } catch (caught) {
-        error = getErrorMessage(caught);
+        error = toAppError(caught);
         this.failures.set(write.worktreeId, error);
       }
       // 保存提示只属于最新发起的写入；旧失败仍保留，供提交与关闭核对。
@@ -97,7 +103,7 @@ export class CommitDraftPersistence {
       if (hasPending || changed) continue;
       for (const target of targets) {
         const failure = this.failureFor(target);
-        if (failure !== null) throw new Error(failure);
+        if (failure !== null) throw Object.assign(new Error(failure), this.failurePayloadFor(target));
       }
       return;
     }

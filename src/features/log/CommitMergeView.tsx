@@ -1,3 +1,4 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * merge 提交的三栏只读视图（M5 L05、Q147）。
  *
@@ -11,8 +12,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { HistoryMergeView } from "@/types/bindings/HistoryMergeView";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
-import { getErrorMessage } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import { formatAppError, toAppError } from "@/lib/error";
 import { Codicon } from "@/components/ui/codicon";
 
 export interface CommitMergeViewProps {
@@ -28,7 +29,7 @@ export interface CommitMergeViewProps {
 export function CommitMergeView(props: CommitMergeViewProps) {
   const { targetId, commit, path, fontSize, fontFamily } = props;
   const [layout, setLayout] = useState<HistoryMergeView | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppErrorPayload | null>(null);
   const panes = useRef<Array<HTMLDivElement | null>>([]);
   const syncing = useRef(false);
 
@@ -42,7 +43,7 @@ export function CommitMergeView(props: CommitMergeViewProps) {
         if (!cancelled) setLayout(next);
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setError(getErrorMessage(caught));
+        if (!cancelled) setError(toAppError(caught));
       });
     return () => {
       cancelled = true;
@@ -63,7 +64,7 @@ export function CommitMergeView(props: CommitMergeViewProps) {
     syncing.current = false;
   };
 
-  const unavailable = error ?? layout?.unavailable ?? null;
+  const unavailable = error ? formatAppError(error) : layout?.unavailable ? formatAppError(layout.unavailable) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col" style={{ fontSize, fontFamily: fontFamily ?? undefined }}>

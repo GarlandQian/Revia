@@ -15,6 +15,7 @@ pub mod history;
 pub mod rows;
 pub mod segments;
 pub mod status;
+pub(crate) mod stash_lock;
 
 use std::collections::VecDeque;
 use std::io::{self, Read, Write};
@@ -30,7 +31,7 @@ use crate::git::segments::IgnoreWhitespace;
 use sha2::{Digest, Sha256};
 use wait_timeout::ChildExt;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::shell::ShellEnv;
 
 /// 使用到的最老参数（`--no-textconv`、`--porcelain=v2`）需要 2.11+。
@@ -137,15 +138,22 @@ impl GitOutput {
     }
 
     /// 要求退出码为 0，否则按 Git 命令失败上报。
-    pub fn into_success(self, what: &str) -> Result<Self> {
+    pub fn into_success(self, _what: &str) -> Result<Self> {
         if self.exit_code == 0 {
             Ok(self)
         } else {
-            Err(AppError::git(format!(
-                "{what}失败（退出码 {}）：{}",
-                self.exit_code,
-                self.stderr.trim()
-            )))
+            // `what` used to be free-form, often Chinese, text.  Keeping it
+            // out of the payload lets the frontend translate the whole error
+            // and leaves stderr (untrusted Git output) as the only detail.
+            Err(AppError::coded(
+                ErrorKind::Git,
+                "errors.mod.failedExitCode",
+                "Git 命令失败（退出码 {0}）：{1}",
+                &[
+                    ("0", format!("{:}", self.exit_code)),
+                    ("1", format!("{:}", self.stderr.trim())),
+                ],
+            ))
         }
     }
 }
@@ -175,9 +183,14 @@ impl Git {
     ) -> Result<Self> {
         let program = match program {
             Some(program) => program.to_path_buf(),
-            None => shell_env
-                .which("git")
-                .ok_or_else(|| AppError::environment("登录 shell 的 PATH 中找不到 git"))?,
+            None => shell_env.which("git").ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.mod.gitFoundLoginShellPath",
+                    "登录 shell 的 PATH 中找不到 git",
+                    &[],
+                )
+            })?,
         };
         Ok(Self {
             program,
@@ -271,9 +284,7 @@ impl Git {
             .env
             .iter()
             .filter(|(key, _)| {
-                if key
-                    .to_ascii_uppercase()
-                    .starts_with("GIT_CONFIG_KEY_")
+                if key.to_ascii_uppercase().starts_with("GIT_CONFIG_KEY_")
                     || key.to_ascii_uppercase().starts_with("GIT_CONFIG_VALUE_")
                 {
                     return false;
@@ -304,24 +315,77 @@ impl Git {
     }
 
     /// 带显式超时的一次调用（网络操作用 10 分钟上限，规格 B01）。
-    ///
-    /// 超时不是普通失败：调用者必须按「结果待核对」处理（Q96），并重新读取引用与状态。
     pub fn run_with_timeout(&self, args: &[&str], timeout: Duration) -> Result<GitOutput> {
+        self.run_with_options(args, None, timeout, None, true)
+    }
+
+    /// Mutations run once: an abnormal exit may follow a committed write.
+    /// Positive exits remain available to callers handling real conflict stops.
+    pub fn run_write(&self, args: &[&str]) -> Result<GitOutput> {
+        self.run_write_with_timeout(args, GIT_TIMEOUT)
+    }
+
+    pub fn run_write_with_timeout(&self, args: &[&str], timeout: Duration) -> Result<GitOutput> {
+        let output = self.run_with_options(args, None, timeout, None, false)
+            .map_err(crate::recovery::pending_write)?;
+        if output.timed_out || output.exit_code < 0 {
+            let cause = AppError::coded(ErrorKind::Git, "errors.mod.failedExitCode",
+                "Git 命令失败（退出码 {0}）：{1}",
+                &[("0", output.exit_code.to_string()), ("1", output.stderr.trim().to_string())]);
+            return Err(crate::recovery::pending_write(cause));
+        }
+        Ok(output)
+    }
+
+    /// 运行可能长时间停留的外部工具（T03）。
+    ///
+    /// 复用同一套环境、命令日志和超时回收路径，但把 stdout/stderr 在读取时
+    /// 就限制在上限内，避免外部工具刷屏时把整个输出驻留内存。
+    pub fn run_external_tool(
+        &self,
+        args: &[&str],
+        timeout: Duration,
+        output_limit: usize,
+    ) -> Result<GitOutput> {
+        self.run_with_options(args, None, timeout, Some(output_limit), false)
+    }
+
+    fn run_with_options(
+        &self,
+        args: &[&str],
+        input: Option<Vec<u8>>,
+        timeout: Duration,
+        output_limit: Option<usize>,
+        retry_lock: bool,
+    ) -> Result<GitOutput> {
         let mut last: Option<GitOutput> = None;
-        for attempt in 0..=LOCK_RETRIES {
-            let output = self.run_once_with_timeout(args, None, timeout)?;
-            if !is_lock_error(&output) {
+        let attempts = if retry_lock { LOCK_RETRIES + 1 } else { 1 };
+        for attempt in 0..attempts {
+            let output = self.run_once_with_timeout(args, input.clone(), timeout, output_limit)?;
+            if !retry_lock || !is_lock_error(&output) {
                 return Ok(output);
             }
             last = Some(output);
-            if attempt < LOCK_RETRIES {
+            if attempt + 1 < attempts {
                 sleep(LOCK_RETRY_DELAY * (attempt + 1));
             }
         }
-        Err(AppError::rejected(format!(
-            "Git 索引被其他进程占用（index.lock），已重试 {LOCK_RETRIES} 次：{}",
-            last.map(|out| out.stderr.trim().to_string()).unwrap_or_default()
-        )))
+        Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.mod.theGitIndexLockedAnotherProcess",
+            "Git 索引被其他进程占用（index.lock），已重试 {LOCK_RETRIES} 次：{0}",
+            &[
+                (
+                    "0",
+                    format!(
+                        "{:}",
+                        last.map(|out| out.stderr.trim().to_string())
+                            .unwrap_or_default()
+                    ),
+                ),
+                ("LOCK_RETRIES", format!("{}", LOCK_RETRIES)),
+            ],
+        ))
     }
 
     /// 网络命令（fetch / pull / push / 检查远端）：10 分钟上限，且不等待任何输入。
@@ -344,20 +408,24 @@ impl Git {
 
     /// 带 stdin 的一次调用（只用于只读计算，例如按仓库哈希算法求空 tree）。
     pub fn run_with_input(&self, args: &[&str], input: Vec<u8>) -> Result<GitOutput> {
-        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT)
+        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT, None)
     }
 
     /// 允许非零退出码（例如 `git diff --no-index` 在有差异时返回 1）。
-    pub fn run_allow_difference(&self, args: &[&str], what: &str) -> Result<GitOutput> {
+    pub fn run_allow_difference(&self, args: &[&str], _what: &str) -> Result<GitOutput> {
         let output = self.run(args)?;
         if output.exit_code == 0 || output.exit_code == 1 {
             Ok(output)
         } else {
-            Err(AppError::git(format!(
-                "{what}失败（退出码 {}）：{}",
-                output.exit_code,
-                output.stderr.trim()
-            )))
+            Err(AppError::coded(
+                ErrorKind::Git,
+                "errors.mod.failedExitCode2",
+                "Git 命令失败（退出码 {0}）：{1}",
+                &[
+                    ("0", format!("{:}", output.exit_code)),
+                    ("1", format!("{:}", output.stderr.trim())),
+                ],
+            ))
         }
     }
 
@@ -372,7 +440,7 @@ impl Git {
     }
 
     fn run_once(&self, args: &[&str]) -> Result<GitOutput> {
-        self.run_once_with_timeout(args, None, GIT_TIMEOUT)
+        self.run_once_with_timeout(args, None, GIT_TIMEOUT, None)
     }
 
     fn run_once_with_timeout(
@@ -380,6 +448,7 @@ impl Git {
         args: &[&str],
         input: Option<Vec<u8>>,
         timeout: Duration,
+        output_limit: Option<usize>,
     ) -> Result<GitOutput> {
         let started = Instant::now();
         let started_at_ms = std::time::SystemTime::now()
@@ -387,37 +456,51 @@ impl Git {
             .map(|value| value.as_millis() as u64)
             .unwrap_or_default();
         let has_input = input.is_some();
+        let (stdout_pipe, stdout_writer) = crate::platform::output_pipe::OutputPipe::new()?;
+        let (stderr_pipe, stderr_writer) = crate::platform::output_pipe::OutputPipe::new()?;
+        let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut command = Command::new(&self.program);
         command
             .current_dir(&self.directory)
             .args(args)
-            .stdin(if has_input { Stdio::piped() } else { Stdio::null() })
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdin(if has_input {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
+            .stdout(stdout_writer)
+            .stderr(stderr_writer)
             .env_clear();
         for (key, value) in self.env.iter() {
             command.env(key, value);
         }
 
         let mut child = command.spawn().map_err(|error| match error.kind() {
-            io::ErrorKind::NotFound => AppError::environment(format!(
-                "找不到 git 程序：{}",
-                self.program.display()
-            )),
-            _ => AppError::environment(format!("执行 git 失败：{error}")),
+            io::ErrorKind::NotFound => AppError::coded(
+                ErrorKind::Environment,
+                "errors.mod.gitProgramFound",
+                "找不到 git 程序：{0}",
+                &[("0", format!("{:}", self.program.display()))],
+            ),
+            _ => AppError::coded(
+                ErrorKind::Environment,
+                "errors.mod.failedRunGit",
+                "执行 git 失败：{error}",
+                &[("error", format!("{}", error))],
+            ),
         })?;
 
         let sequence = self.log.next_sequence();
         // 三条管道并发处理；stdin 大补丁也必须受同一超时约束。
-        let stdout_pipe = child.stdout.take();
-        let stderr_pipe = child.stderr.take();
-        let stdout_reader = std::thread::spawn(move || read_pipe(stdout_pipe));
-        let stderr_reader = std::thread::spawn(move || read_pipe(stderr_pipe));
+        drop(command);
+        let stdout_finished = finished.clone(); let stderr_finished = finished.clone();
+        let stdout_reader = std::thread::spawn(move || read_pipe(stdout_pipe, output_limit, stdout_finished));
+        let stderr_reader = std::thread::spawn(move || read_pipe(stderr_pipe, output_limit, stderr_finished));
         let stdin_writer = input.map(|bytes| {
             let pipe = child.stdin.take();
-            std::thread::spawn(move || -> io::Result<()> {
-                let mut pipe = pipe.ok_or_else(|| io::Error::other("Git stdin 管道不可用"))?;
-                pipe.write_all(&bytes)
+            std::thread::spawn(move || -> Result<()> {
+                let mut pipe = pipe.ok_or_else(|| AppError::coded(ErrorKind::Internal, "errors.mod.stdinUnavailable", "Git stdin 管道不可用", &[]))?;
+                pipe.write_all(&bytes).map_err(AppError::from)
             })
         });
 
@@ -427,17 +510,22 @@ impl Git {
             let _ = child.kill();
         }
         let status = child.wait();
+        finished.store(true, std::sync::atomic::Ordering::Release);
         // 包括超时/中断路径：先结束子进程，再回收全部管道线程。
         let input_error = stdin_writer.and_then(|writer| match writer.join() {
             Ok(Ok(())) => None,
-            Ok(Err(error)) => Some(error.to_string()),
-            Err(_) => Some("Git stdin 写入线程中断".to_string()),
+            Ok(Err(error)) => Some(error),
+            Err(_) => Some(AppError::coded(ErrorKind::Internal, "errors.mod.stdinInterrupted", "Git stdin 写入线程中断", &[])),
         });
         let stdout = stdout_reader.join().unwrap_or_default();
         let stderr_bytes = stderr_reader.join().unwrap_or_default();
         let elapsed = started.elapsed();
         let stderr = String::from_utf8_lossy(&stderr_bytes).into_owned();
-        let exit_code = status.as_ref().ok().and_then(|value| value.code()).unwrap_or(-1);
+        let exit_code = status
+            .as_ref()
+            .ok()
+            .and_then(|value| value.code())
+            .unwrap_or(-1);
         let (output, output_truncated) = command_output(&stdout, &stderr_bytes);
 
         self.log.record(CommandRecord {
@@ -458,14 +546,29 @@ impl Git {
 
         if let Some(error) = waited.err().or_else(|| status.err()) {
             return Err(if has_input {
-                AppError::needs_verification(format!("等待 Git 写入结果失败，结果待核对：{error}"))
+                AppError::coded(
+                    ErrorKind::NeedsVerification,
+                    "errors.mod.failedWhileWaitingGitWriteResult",
+                    "等待 Git 写入结果失败，结果待核对：{error}",
+                    &[("error", format!("{}", error))],
+                )
             } else {
-                AppError::environment(format!("等待 git 结束失败：{error}"))
+                AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.mod.failedWhileWaitingGitExit",
+                    "等待 git 结束失败：{error}",
+                    &[("error", format!("{}", error))],
+                )
             });
         }
         if exit_code == 0 {
             if let Some(error) = input_error {
-                return Err(AppError::needs_verification(format!("无法确认补丁完整写入，结果待核对：{error}")));
+                return Err(AppError::coded(
+                    ErrorKind::NeedsVerification,
+                    "errors.mod.couldConfirmPatchFullyWrittenResult",
+                    "无法确认补丁完整写入，结果待核对：{cause}",
+                    &[],
+                ).cause(error));
             }
         }
         // Git 因锁占用等先退出时，stdin 的 BrokenPipe 不覆盖真实退出原因。
@@ -495,7 +598,13 @@ impl Git {
     pub fn worktrees(&self) -> Result<Vec<crate::session::WorktreeEntry>> {
         let text = self
             .run_ok(
-                &["-c", "core.quotePath=false", "worktree", "list", "--porcelain"],
+                &[
+                    "-c",
+                    "core.quotePath=false",
+                    "worktree",
+                    "list",
+                    "--porcelain",
+                ],
                 "列出 worktree",
             )?
             .stdout_lossy();
@@ -574,12 +683,21 @@ impl Git {
 
     /// 带忽略空白档位的未暂存 diff（返修 Q140）：结果只用于显示与段计算，
     /// 指纹仍由普通 diff 计算，两者分开。
-    pub fn diff_worktree_with_ignore(&self, path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
+    pub fn diff_worktree_with_ignore(
+        &self,
+        path: Option<&str>,
+        ignore: IgnoreWhitespace,
+    ) -> Result<Vec<u8>> {
         self.diff_with_extra(None, path, ignore.diff_args(), ignore.ignore_blank_lines())
     }
 
     /// 带忽略空白档位的已暂存 diff（返修 Q140）。
-    pub fn diff_index_with_ignore(&self, path: &str, orig_path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
+    pub fn diff_index_with_ignore(
+        &self,
+        path: &str,
+        orig_path: Option<&str>,
+        ignore: IgnoreWhitespace,
+    ) -> Result<Vec<u8>> {
         let mut args: Vec<&str> = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
         args.extend_from_slice(DIFF_FLAGS);
         args.extend_from_slice(ignore.diff_args());
@@ -642,7 +760,14 @@ impl Git {
 
     /// 整文件暂存：调用 git --literal-pathspecs add -A -- <paths>（Q8、Q79、Q83、审查 1）。
     pub fn stage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
-        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "add", "-A", "--"];
+        let mut args = vec![
+            "--literal-pathspecs",
+            "-c",
+            "core.quotePath=false",
+            "add",
+            "-A",
+            "--",
+        ];
         if let Some(orig) = orig_path {
             args.push(orig);
         }
@@ -652,7 +777,13 @@ impl Git {
 
     /// 整文件取消暂存：调用 git --literal-pathspecs reset -- <paths>（Q8、Q79、T04、审查 1）。
     pub fn unstage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
-        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "reset", "--"];
+        let mut args = vec![
+            "--literal-pathspecs",
+            "-c",
+            "core.quotePath=false",
+            "reset",
+            "--",
+        ];
         if let Some(orig) = orig_path {
             args.push(orig);
         }
@@ -662,9 +793,18 @@ impl Git {
 
     /// 单次应用已校验的原始 hunk，只写暂存区；锁重试由会话层重新校验后决定。
     /// `ignore_whitespace`：忽略空白档位下按段写时补丁来自 -w diff，应用加 --ignore-whitespace（返修 Q140）。
-    pub fn apply_index_patch(&self, patch: Vec<u8>, reverse: bool, ignore_whitespace: bool) -> Result<GitOutput> {
+    pub fn apply_index_patch(
+        &self,
+        patch: Vec<u8>,
+        reverse: bool,
+        ignore_whitespace: bool,
+    ) -> Result<GitOutput> {
         let mut args = vec![
-            "-c", "apply.ignoreWhitespace=no", "apply", "--cached", "--whitespace=nowarn",
+            "-c",
+            "apply.ignoreWhitespace=no",
+            "apply",
+            "--cached",
+            "--whitespace=nowarn",
         ];
         if ignore_whitespace {
             args.push("--ignore-whitespace");
@@ -673,7 +813,7 @@ impl Git {
             args.push("--reverse");
         }
         args.push("-");
-        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT)
+        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT, None)
     }
 
     pub fn discard_patch(&self, path: &str) -> Result<Vec<u8>> {
@@ -685,7 +825,19 @@ impl Git {
 
     /// No --index/--cached/--3way: discarding must not change the index.
     pub fn apply_worktree_patch(&self, patch: Vec<u8>) -> Result<GitOutput> {
-        self.run_once_with_timeout(&["-c", "apply.ignoreWhitespace=no", "apply", "--reverse", "--whitespace=nowarn", "-"], Some(patch), GIT_TIMEOUT)
+        self.run_once_with_timeout(
+            &[
+                "-c",
+                "apply.ignoreWhitespace=no",
+                "apply",
+                "--reverse",
+                "--whitespace=nowarn",
+                "-",
+            ],
+            Some(patch),
+            GIT_TIMEOUT,
+            None,
+        )
     }
 
     fn diff(&self, extra: Option<&str>, path: Option<&str>) -> Result<Vec<u8>> {
@@ -758,12 +910,28 @@ impl Git {
     }
 }
 
-fn read_pipe(pipe: Option<impl Read>) -> Vec<u8> {
-    let Some(mut pipe) = pipe else {
-        return Vec::new();
-    };
-    let mut buffer = Vec::new();
-    let _ = pipe.read_to_end(&mut buffer);
+fn read_pipe(mut pipe: crate::platform::output_pipe::OutputPipe, limit: Option<usize>, finished: Arc<std::sync::atomic::AtomicBool>) -> Vec<u8> {
+    let mut buffer = Vec::new(); let mut chunk = [0u8; 16 * 1024]; let mut exited = None;
+    loop {
+        if finished.load(std::sync::atomic::Ordering::Acquire) {
+            // Drain bytes already written by Git, but never wait indefinitely
+            // for a hook/tool descendant retaining a copy of the output pipe.
+            let at = exited.get_or_insert_with(Instant::now);
+            if at.elapsed() >= Duration::from_millis(100) { break; }
+        }
+        match pipe.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(read) => {
+                let take = limit.map_or(read, |limit| read.min(limit.saturating_sub(buffer.len())));
+                buffer.extend_from_slice(&chunk[..take]);
+            }
+            Err(error) if matches!(error.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted) => {
+                if finished.load(std::sync::atomic::Ordering::Acquire) { break; }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            Err(_) => break,
+        }
+    }
     buffer
 }
 
@@ -906,6 +1074,15 @@ pub fn cap_output_text(text: &str, force_truncated: bool) -> (String, bool) {
     }
 }
 
+/// Read-only patches must preserve text exactly, including at a byte cap.
+/// Unsupported bytes are reported by the caller rather than replaced.
+pub(crate) fn readonly_patch(bytes: &[u8], limit: usize) -> Option<(String, bool)> {
+    let text = std::str::from_utf8(bytes).ok().filter(|text| !text.contains('\0'))?;
+    let mut end = text.len().min(limit);
+    while !text.is_char_boundary(end) { end -= 1; }
+    Some((text[..end].to_string(), text.len() > limit))
+}
+
 /// diff 指纹（ADR-0005）：对原始 diff 输出取 SHA-256。
 pub fn fingerprint(parts: &[&[u8]]) -> String {
     let mut hasher = Sha256::new();
@@ -975,10 +1152,7 @@ mod tests {
             "git@github.com:owner/repo.git",
             "SSH 的 user@host 不是 URL userinfo，不当成凭据"
         );
-        assert_eq!(
-            mask_credentials("--password=hunter2"),
-            "--password=***"
-        );
+        assert_eq!(mask_credentials("--password=hunter2"), "--password=***");
         assert_eq!(
             mask_credentials("-c http.extraHeader=Authorization: Bearer abc"),
             "-c http.extraHeader=***"
@@ -1018,7 +1192,10 @@ mod tests {
         }
         let snapshot = log.snapshot();
         assert_eq!(snapshot.len(), LOG_CAPACITY);
-        assert_eq!(snapshot.last().map(|record| record.sequence), Some(LOG_CAPACITY as u64 + 5));
+        assert_eq!(
+            snapshot.last().map(|record| record.sequence),
+            Some(LOG_CAPACITY as u64 + 5)
+        );
         assert_eq!(snapshot.first().map(|record| record.sequence), Some(6));
 
         let big = "x".repeat(LOG_OUTPUT_LIMIT + 100);

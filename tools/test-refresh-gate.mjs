@@ -165,6 +165,34 @@ test("刷新协调器单轮失败不终止后续刷新", async () => {
   assert.equal(runs, 2, "失败后仍应响应新的刷新请求");
 });
 
+test("写入期间自动刷新只记脏，释放后合并补读且不忙轮询", async () => {
+  let writing = true; let reads = 0;
+  const coordinator = new RefreshCoordinator(async () => { reads++; }, () => !writing);
+  for (let i = 0; i < 50; i++) coordinator.request();
+  await coordinator.whenIdle(); assert.equal(reads, 0); assert.equal(coordinator.isRunning(), false);
+  coordinator.resume(); assert.equal(reads, 0);
+  writing = false; coordinator.resume(); await coordinator.whenIdle();
+  assert.equal(reads, 1); coordinator.resume(); assert.equal(reads, 1);
+});
+
+test("写门禁等已发自动读取收尾，后来事件不再读到写入中间状态", async () => {
+  let writing = false; let reads = 0; let release;
+  const first = new Promise(resolve => { release = resolve; });
+  const coordinator = new RefreshCoordinator(async () => { if (++reads === 1) await first; }, () => !writing);
+  coordinator.request(); writing = true;
+  let settled = false; const idle = coordinator.whenIdle().then(() => { settled = true; });
+  coordinator.request(); await Promise.resolve(); assert.equal(settled, false);
+  release(); await idle; assert.equal(reads, 1); assert.equal(settled, true);
+  writing = false; coordinator.resume(); await coordinator.whenIdle(); assert.equal(reads, 2);
+});
+
+test("自动读取失败或卸载也释放写前等待，卸载不再补读", async () => {
+  let release; let reads = 0;
+  const coordinator = new RefreshCoordinator(async () => { reads++; await new Promise(resolve => { release = resolve; }); throw new Error("native read failed"); });
+  coordinator.request(); coordinator.request(); const idle = coordinator.whenIdle(); coordinator.dispose();
+  release(); await idle; coordinator.resume(); assert.equal(reads, 1); assert.equal(coordinator.isRunning(), false);
+});
+
 test("刷新协调器 dispose 后不再执行", async () => {
   let runs = 0;
   const coordinator = new RefreshCoordinator(async () => {

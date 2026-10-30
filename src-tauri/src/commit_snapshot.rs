@@ -32,9 +32,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
-use crate::git::status::ChangesKind;
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::Git;
+use crate::git::status::ChangesKind;
 use crate::recovery::{self, RecoverySource, RecoveryStore, SavedFile, WorktreeIdentity};
 
 /// 摘要读取的分片大小（内存有界）。
@@ -79,15 +79,27 @@ pub fn save_snapshot(
     store: &RecoveryStore,
     identity: &WorktreeIdentity,
     paths: &[String],
-) -> Result<(recovery::RecoveryRecord, recovery::RecordUse, SnapshotBaseline)> {
+) -> Result<(
+    recovery::RecoveryRecord,
+    recovery::RecordUse,
+    SnapshotBaseline,
+)> {
     if paths.is_empty() {
-        return Err(AppError::rejected("没有需要快照的文件"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitSnapshot.thereNoFilesSnapshot",
+            "没有需要快照的文件",
+            &[],
+        ));
     }
     store.ensure_outside(identity)?;
     let before = recovery::capture_files(&git.directory, paths).map_err(|error| {
-        AppError::rejected(format!(
-            "部分暂存的文件无法完整保存到回收区，已取消提交（不改动任何内容）：{error}"
-        ))
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitSnapshot.someStagedFilesCouldFullySaved",
+            "部分暂存的文件无法完整保存到回收区，已取消提交（不改动任何内容）：{cause}",
+            &[],
+        ).cause(error)
     })?;
     let (record, guard) = store.save(
         identity.clone(),
@@ -97,7 +109,14 @@ pub fn save_snapshot(
         // 提交前快照不做补丁预览，没有补丁上下文；存空指纹。
         String::new(),
     )?;
-    Ok((record, guard, SnapshotBaseline { paths: paths.to_vec(), files: before }))
+    Ok((
+        record,
+        guard,
+        SnapshotBaseline {
+            paths: paths.to_vec(),
+            files: before,
+        },
+    ))
 }
 
 impl SnapshotBaseline {
@@ -158,18 +177,31 @@ fn digest_path(git: &Git, path: &str, gitlink: bool, depth: usize) -> Result<Wor
                 kind: WorktreeEntryKind::Missing,
                 executable: false,
                 content: None,
-            })
+            });
         }
         Err(error) => {
-            return Err(AppError::environment(format!(
-                "读取工作区状态失败（{}）：{error}",
-                full.display()
-            )))
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commitSnapshot.failedReadWorkingTreeStatus",
+                "读取工作区状态失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", full.display())),
+                    ("error", format!("{}", error)),
+                ],
+            ));
         }
     };
     if metadata.file_type().is_symlink() {
         let target = std::fs::read_link(&full).map_err(|error| {
-            AppError::environment(format!("读取符号链接失败（{}）：{error}", full.display()))
+            AppError::coded(
+                ErrorKind::Environment,
+                "errors.commitSnapshot.failedReadSymbolicLink",
+                "读取符号链接失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", full.display())),
+                    ("error", format!("{}", error)),
+                ],
+            )
         })?;
         let mut hasher = Sha256::new();
         hasher.update(target.as_os_str().as_encoded_bytes());
@@ -181,9 +213,17 @@ fn digest_path(git: &Git, path: &str, gitlink: bool, depth: usize) -> Result<Wor
     }
     if metadata.is_dir() {
         return Ok(WorktreeDigest {
-            kind: if gitlink { WorktreeEntryKind::Submodule } else { WorktreeEntryKind::Directory },
+            kind: if gitlink {
+                WorktreeEntryKind::Submodule
+            } else {
+                WorktreeEntryKind::Directory
+            },
             executable: false,
-            content: if gitlink { digest_submodule(git, &full, depth + 1)? } else { None },
+            content: if gitlink {
+                digest_submodule(git, &full, depth + 1)?
+            } else {
+                None
+            },
         });
     }
     if !metadata.is_file() {
@@ -195,13 +235,29 @@ fn digest_path(git: &Git, path: &str, gitlink: bool, depth: usize) -> Result<Wor
         });
     }
     let mut file = std::fs::File::open(&full).map_err(|error| {
-        AppError::environment(format!("读取工作区文件失败（{}）：{error}", full.display()))
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.commitSnapshot.failedReadWorkingTreeFile",
+            "读取工作区文件失败（{0}）：{error}",
+            &[
+                ("0", format!("{:}", full.display())),
+                ("error", format!("{}", error)),
+            ],
+        )
     })?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; DIGEST_CHUNK_BYTES];
     loop {
         let read = file.read(&mut buffer).map_err(|error| {
-            AppError::environment(format!("读取工作区文件失败（{}）：{error}", full.display()))
+            AppError::coded(
+                ErrorKind::Environment,
+                "errors.commitSnapshot.failedReadWorkingTreeFile2",
+                "读取工作区文件失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", full.display())),
+                    ("error", format!("{}", error)),
+                ],
+            )
         })?;
         if read == 0 {
             break;
@@ -218,48 +274,109 @@ fn digest_path(git: &Git, path: &str, gitlink: bool, depth: usize) -> Result<Wor
 /// 子模块只读摘要；未初始化的空检出不向上查找父仓库。
 fn digest_submodule(git: &Git, root: &Path, depth: usize) -> Result<Option<String>> {
     if depth > 32 {
-        return Err(AppError::rejected("子模块嵌套过深，无法可靠对照 hooks 改动，请在终端提交"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitSnapshot.theSubmoduleNestedTooDeeplyCompare",
+            "子模块嵌套过深，无法可靠对照 hooks 改动，请在终端提交",
+            &[],
+        ));
     }
     match std::fs::symlink_metadata(root.join(".git")) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(AppError::environment(format!(
-            "读取子模块 Git 入口失败（{}）：{error}", root.display()
-        ))),
-        Ok(metadata) if metadata.file_type().is_symlink()
-            || !(metadata.is_file() || metadata.is_dir()) => {
-                return Err(AppError::rejected("子模块 Git 入口类型无法安全处理"));
-            }
+        Err(error) => {
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commitSnapshot.failedReadSubmoduleGitEntry",
+                "读取子模块 Git 入口失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", root.display())),
+                    ("error", format!("{}", error)),
+                ],
+            ));
+        }
+        Ok(metadata)
+            if metadata.file_type().is_symlink() || !(metadata.is_file() || metadata.is_dir()) =>
+        {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitSnapshot.theSubmoduleGitEntryTypeHandled",
+                "子模块 Git 入口类型无法安全处理",
+                &[],
+            ));
+        }
         Ok(_) => {}
     }
     // 去掉父仓库的 Git 定位环境；所有文件仍走 safe_join，不跟随链接父路径。
     let submodule = git.in_isolated_directory(root);
     let prefix = submodule.run_ok(&["rev-parse", "--show-prefix"], "确认子模块根目录")?;
     if prefix.stdout.as_slice() != b"\n" {
-        return Err(AppError::rejected("子模块路径不再对应其根目录，无法对照 hooks 改动"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitSnapshot.theSubmodulePathNoLongerMaps",
+            "子模块路径不再对应其根目录，无法对照 hooks 改动",
+            &[],
+        ));
     }
     let head = crate::commit::read_head(&submodule)?;
     let index = submodule.run_ok(
-        &["--no-optional-locks", "ls-files", "--stage", "-z"], "读取子模块暂存区"
+        &["--no-optional-locks", "ls-files", "--stage", "-z"],
+        "读取子模块暂存区",
     )?;
     let mut gitlinks = BTreeSet::new();
-    for record in index.stdout.split(|byte| *byte == 0).filter(|record| !record.is_empty()) {
-        let text = std::str::from_utf8(record)
-            .map_err(|_| AppError::rejected("子模块包含无法无损处理的非 UTF-8 路径，请在终端提交"))?;
-        let (fields, path) = text.split_once('\t')
-            .ok_or_else(|| AppError::internal("子模块暂存区条目格式无法解析"))?;
+    for record in index
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+    {
+        let text = std::str::from_utf8(record).map_err(|_| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commitSnapshot.theSubmoduleContainsNonUtf8",
+                "子模块包含无法无损处理的非 UTF-8 路径，请在终端提交",
+                &[],
+            )
+        })?;
+        let (fields, path) = text.split_once('\t').ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commitSnapshot.cannotParseSubmoduleIndexEntryFormat",
+                "子模块暂存区条目格式无法解析",
+                &[],
+            )
+        })?;
         if fields.split(' ').next() == Some("160000") {
             gitlinks.insert(path.to_string());
         }
     }
     let listing = submodule.run_ok(
-        &["--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        &[
+            "--no-optional-locks",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
         "读取子模块文件列表",
     )?;
     let mut paths = BTreeSet::new();
-    for record in listing.stdout.split(|byte| *byte == 0).filter(|record| !record.is_empty()) {
-        paths.insert(std::str::from_utf8(record)
-            .map_err(|_| AppError::rejected("子模块包含无法无损处理的非 UTF-8 路径，请在终端提交"))?
-            .to_string());
+    for record in listing
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+    {
+        paths.insert(
+            std::str::from_utf8(record)
+                .map_err(|_| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.commitSnapshot.theSubmoduleContainsNonUtf82",
+                        "子模块包含无法无损处理的非 UTF-8 路径，请在终端提交",
+                        &[],
+                    )
+                })?
+                .to_string(),
+        );
     }
     let mut hasher = Sha256::new();
     hash_digest_field(&mut hasher, head.as_deref().unwrap_or("").as_bytes());
@@ -268,7 +385,10 @@ fn digest_submodule(git: &Git, root: &Path, depth: usize) -> Result<Option<Strin
         let digest = digest_path(&submodule, &path, gitlinks.contains(&path), depth)?;
         hash_digest_field(&mut hasher, path.as_bytes());
         hasher.update([digest.kind as u8, u8::from(digest.executable)]);
-        hash_digest_field(&mut hasher, digest.content.as_deref().unwrap_or("").as_bytes());
+        hash_digest_field(
+            &mut hasher,
+            digest.content.as_deref().unwrap_or("").as_bytes(),
+        );
     }
     Ok(Some(hex(&hasher.finalize())))
 }
@@ -283,18 +403,42 @@ fn safe_join(root: &Path, path: &str) -> Result<std::path::PathBuf> {
     let relative = Path::new(path);
     if path.is_empty()
         || (cfg!(windows) && path.contains('\\'))
-        || relative.components().any(|part| !matches!(part, std::path::Component::Normal(_)))
-        || path.split('/').any(|part| part.is_empty() || part == "." || part == ".." || part.eq_ignore_ascii_case(".git"))
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        || path.split('/').any(|part| {
+            part.is_empty() || part == "." || part == ".." || part.eq_ignore_ascii_case(".git")
+        })
     {
-        return Err(AppError::rejected("文件路径无法安全处理"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commitSnapshot.theFilePathHandledSafely",
+            "文件路径无法安全处理",
+            &[],
+        ));
     }
     let full = root.join(relative);
     if let Some(parent) = full.parent() {
         if parent != root {
-            let parent_relative = parent.strip_prefix(root)
-                .map_err(|_| AppError::rejected("文件路径越界"))?;
-            crate::recovery::checked_path(root, parent_relative.to_str()
-                .ok_or_else(|| AppError::rejected("文件路径无法无损处理"))?)?;
+            let parent_relative = parent.strip_prefix(root).map_err(|_| {
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commitSnapshot.theFilePathEscapesRoot",
+                    "文件路径越界",
+                    &[],
+                )
+            })?;
+            crate::recovery::checked_path(
+                root,
+                parent_relative.to_str().ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.commitSnapshot.theFilePathHandledLosslessly",
+                        "文件路径无法无损处理",
+                        &[],
+                    )
+                })?,
+            )?;
         }
     }
     Ok(full)
@@ -346,9 +490,18 @@ pub fn capture_hook_baseline(
         if record.is_empty() {
             continue;
         }
-        paths.insert(std::str::from_utf8(record)
-            .map_err(|_| AppError::rejected("hook 对照包含无法无损处理的非 UTF-8 路径，请在终端提交"))?
-            .to_string());
+        paths.insert(
+            std::str::from_utf8(record)
+                .map_err(|_| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.commitSnapshot.theHooksComparisonContainsNonUtf",
+                        "hook 对照包含无法无损处理的非 UTF-8 路径，请在终端提交",
+                        &[],
+                    )
+                })?
+                .to_string(),
+        );
     }
     // 本次提交涉及的路径（含重命名源）一定在内；显式并进来，避免列表与预期不一致。
     for path in expectation.changed_paths() {
@@ -398,9 +551,18 @@ impl HookBaseline {
             if record.is_empty() {
                 continue;
             }
-            paths.insert(std::str::from_utf8(record)
-            .map_err(|_| AppError::rejected("hook 对照包含无法无损处理的非 UTF-8 路径，请在终端提交"))?
-            .to_string());
+            paths.insert(
+                std::str::from_utf8(record)
+                    .map_err(|_| {
+                        AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.commitSnapshot.theHooksComparisonContainsNonUtf2",
+                            "hook 对照包含无法无损处理的非 UTF-8 路径，请在终端提交",
+                            &[],
+                        )
+                    })?
+                    .to_string(),
+            );
         }
         let status_now = crate::git::status::read(git)?;
         for entry in &status_now.entries {
@@ -414,7 +576,9 @@ impl HookBaseline {
 
         let mut worktree_changes = Vec::new();
         for path in &paths {
-            let gitlink = index_now.get(path).is_some_and(|(mode, _)| mode == "160000");
+            let gitlink = index_now
+                .get(path)
+                .is_some_and(|(mode, _)| mode == "160000");
             let now = digest_path(git, path, gitlink, 0)?;
             match self.worktree.get(path) {
                 Some(before) if *before == now => {}

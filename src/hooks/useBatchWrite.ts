@@ -5,8 +5,9 @@ import type { BatchTarget } from "@/types/bindings/BatchTarget";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { OperationContext, OperationResultGate, ReviewOverlay, ReviewRecoveryBatchOutcome, WriteGuardOrchestrator } from "@/lib/refreshGate";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
-import { toAppError } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import { readonlyReasonText } from "@/lib/i18n/text";
+import { closeGuardBlockedError, formatAppError, toAppError } from "@/lib/error";
 import { logToBackend as debugLog } from "@/features/diff/log";
 import type { NoticeInput } from "./useNotifications";
 
@@ -14,7 +15,7 @@ interface BatchWriteOptions {
   worktreeIdRef: RefObject<string | null>;
   writingWorktreesRef: RefObject<Set<string>>;
   setWritingWorktrees: Dispatch<SetStateAction<Set<string>>>;
-  writeOrchestrator: WriteGuardOrchestrator;
+  writeOrchestrator: WriteGuardOrchestrator<AppErrorPayload>;
   operationGateRef: RefObject<OperationResultGate>;
   reviewOverlayRef: RefObject<ReviewOverlay>;
   acceptSnapshot: (token: OperationContext, snapshot: ChangesSnapshot) => boolean;
@@ -41,14 +42,14 @@ export function useBatchWrite({
     if (writingWorktreesRef.current.has(targetWorktreeId)) return;
     const writable = entries.filter((entry) => !entry.readonlyReason);
     const readonly = entries.filter((entry) => entry.readonlyReason);
-    const readonlyLines = readonly.map(
-      (entry) => `${entry.path}：${messages.changes.readonlyReasons[entry.readonlyReason!]}`,
+    const readonlyLines = () => readonly.map(
+      (entry) => `${entry.path}: ${readonlyReasonText(entry.readonlyReason!)}`,
     );
     if (writable.length === 0) {
       notify({
         tone: "warning",
-        title: messages.changes.batchNothing,
-        detail: readonlyLines.join("\n"),
+        title: () => (messages.changes.batchNothing),
+        detail: () => readonlyLines().join("\n"),
         persistent: true,
       });
       return;
@@ -60,7 +61,7 @@ export function useBatchWrite({
       if (!started.ok) {
         writingWorktreesRef.current.delete(targetWorktreeId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
-        setAppError({ kind: "internal", message: messages.close.guardUnavailable(started.reason) }, targetWorktreeId);
+        setAppError(closeGuardBlockedError(started.reason), targetWorktreeId);
         return;
       }
     } catch (caught) {
@@ -95,6 +96,7 @@ export function useBatchWrite({
           operationGateRef.current.acceptSuccess(opToken, outcome.snapshot);
           acceptSnapshot(opToken, written.snapshot);
         } else {
+          // x18n-ignore
           debugLog(`批量写结果读取不可信，重新核对：${written.worktreeId}@${written.observedSeq}`);
           await scheduleReviewRecovery(written.worktreeId);
         }
@@ -103,12 +105,12 @@ export function useBatchWrite({
       const ok = outcome.results.filter((result) => result.ok).length;
       const failed = outcome.results.filter((result) => !result.ok && !result.skipped);
       const skipped = outcome.results.filter((result) => result.skipped);
-      const lines = [
-        ...failed.map((result) => `${result.path}：${result.error?.message ?? messages.changes.notExecuted}`),
-        ...skipped.map((result) => `${result.path}：${result.skipped}`),
-        ...readonlyLines,
+      const lines = () => [
+        ...failed.map((result) => `${result.path}: ${result.error ? formatAppError(result.error) : messages.changes.notExecuted}`),
+        ...skipped.map((result) => `${result.path}: ${result.skipped ? formatAppError(result.skipped) : messages.changes.notExecuted}`),
+        ...readonlyLines(),
       ];
-      const doneTitle = kind === "stage"
+      const doneTitle = () => kind === "stage"
         ? messages.changes.batchStaged(ok)
         : kind === "unstage"
           ? messages.changes.batchUnstaged(ok)
@@ -116,26 +118,26 @@ export function useBatchWrite({
       if (needsVerification) {
         notify({
           tone: "warning",
-          title: messages.changes.batchNeedsCheck,
-          detail: lines.join("\n") || undefined,
+          title: () => (messages.changes.batchNeedsCheck),
+          detail: () => lines().join("\n") || undefined,
           persistent: true,
         });
       } else if (failed.length > 0) {
         notify({
           tone: "warning",
-          title: messages.changes.batchPartial(doneTitle, failed.length),
-          detail: lines.join("\n"),
+          title: () => (messages.changes.batchPartial(doneTitle(), failed.length)),
+          detail: () => lines().join("\n"),
           persistent: true,
         });
       } else {
-        notify({ tone: "success", kind: kind === "discard" ? "discard" : "stage", title: doneTitle, detail: lines.join("\n") || undefined });
+        notify({ tone: "success", kind: kind === "discard" ? "discard" : "stage", title: doneTitle, detail: () => lines().join("\n") || undefined });
       }
       if (operationGateRef.current.canRecord(opToken)) setAppError(null, targetWorktreeId);
     } catch (caught) {
       const err = toAppError(caught);
       needsVerification = err.kind === "needsVerification";
       if (operationGateRef.current.canRecord(opToken)) setAppError(err, targetWorktreeId);
-      notify({ tone: "error", title: messages.changes.batchFailedTitle, detail: err.message, persistent: true });
+      notify({ tone: "error", title: () => (messages.changes.batchFailedTitle), detail: () => (formatAppError(err)), persistent: true });
       void refreshTarget(targetWorktreeId);
     } finally {
       writingWorktreesRef.current.delete(targetWorktreeId);

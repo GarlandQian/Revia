@@ -3,6 +3,9 @@
 #[cfg(target_os = "macos")]
 mod macos_exit;
 
+mod language;
+pub use language::{language_from_locale, system_language};
+
 pub(crate) mod output_pipe;
 
 use std::fs;
@@ -11,6 +14,14 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use crate::error::Result;
+
+/// Git evaluates GIT_EDITOR / GIT_SEQUENCE_EDITOR with its command shell.
+/// Quote the executable as one argument, even inside Application Support or a
+/// user-selected data directory containing spaces, quotes or metacharacters.
+pub fn git_shell_argument(path: &Path) -> String {
+    let value = external_path(path).to_string_lossy().into_owned();
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
 
 /// Install after Tauri builds its native application, before its event loop starts.
 pub fn install_exit_interceptor(app: &tauri::AppHandle) -> Result<()> {
@@ -69,6 +80,14 @@ pub fn executable(metadata: &fs::Metadata) -> bool {
     }
     #[cfg(not(unix))]
     { let _ = metadata; false }
+}
+
+/// Expected worktree permission for a Git tree mode on this platform.
+pub fn git_executable(mode: &str) -> bool {
+    #[cfg(unix)]
+    { mode == "100755" }
+    #[cfg(not(unix))]
+    { let _ = mode; false }
 }
 
 pub fn set_executable(path: &Path, executable: bool) -> Result<()> {

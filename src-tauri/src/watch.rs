@@ -13,11 +13,24 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use notify::{Event, EventKind, RecursiveMode, Watcher};
+
+use crate::error::{AppError, AppErrorPayload, ErrorKind};
+
+/// 监视不可用的统一结构化原因：`detail` 只放路径与系统错误等数据。
+fn unavailable(detail: String) -> AppErrorPayload {
+    AppError::coded(
+        ErrorKind::Environment,
+        "errors.watch.unavailable",
+        "自动刷新不可用：{detail}",
+        &[("detail", detail)],
+    )
+    .payload()
+}
 use serde::Serialize;
 
 /// 合并窗口：把短时间内的连续事件折叠成一次刷新（编辑器保存常产生多个事件）。
@@ -30,7 +43,7 @@ pub struct WatchStatus {
     /// 是否正在监视。
     pub active: bool,
     /// 监视失败时的原因；成功重建后清空。
-    pub error: Option<String>,
+    pub error: Option<AppErrorPayload>,
     /// 本次激活的代号；前端用它拒绝旧 worktree 的迟到事件。
     pub activation: u64,
     /// 当前监视目标（worktree 路径）；前端据此确认状态属于自己请求的目标。
@@ -41,7 +54,13 @@ pub struct WatchStatus {
 
 impl WatchStatus {
     pub fn idle() -> Self {
-        Self { active: false, error: None, activation: 0, target: None, roots: 0 }
+        Self {
+            active: false,
+            error: None,
+            activation: 0,
+            target: None,
+            roots: 0,
+        }
     }
 }
 
@@ -72,9 +91,17 @@ pub struct WatchRoots {
 }
 
 /// 解析需要监视的路径。linked worktree 的 `.git` 是文件，读取其中的 `gitdir:` 指向。
-pub fn resolve_roots(worktree: &Path, git_dir: Option<PathBuf>, common_dir: Option<PathBuf>) -> WatchRoots {
+pub fn resolve_roots(
+    worktree: &Path,
+    git_dir: Option<PathBuf>,
+    common_dir: Option<PathBuf>,
+) -> WatchRoots {
     let resolved_git_dir = git_dir.unwrap_or_else(|| resolve_dot_git(worktree));
-    WatchRoots { worktree: worktree.to_path_buf(), git_dir: resolved_git_dir, common_dir }
+    WatchRoots {
+        worktree: worktree.to_path_buf(),
+        git_dir: resolved_git_dir,
+        common_dir,
+    }
 }
 
 /// 从工作区的 `.git` 解析真实 gitDir；目录则直接使用，文件则读取 `gitdir:` 行。
@@ -86,7 +113,11 @@ fn resolve_dot_git(worktree: &Path) -> PathBuf {
     if let Ok(text) = std::fs::read_to_string(&dot_git) {
         if let Some(rest) = text.trim().strip_prefix("gitdir:") {
             let target = PathBuf::from(rest.trim());
-            return if target.is_absolute() { target } else { worktree.join(target) };
+            return if target.is_absolute() {
+                target
+            } else {
+                worktree.join(target)
+            };
         }
     }
     dot_git
@@ -115,15 +146,15 @@ impl WorktreeWatcher {
         // 运行时错误不能丢弃：记录第一条，状态对外持续为不可用（Q95）。
         let callback_errors = runtime_errors.clone();
         let filter = WatchFilter::from_roots(&roots);
-        let mut watcher = match notify::recommended_watcher(move |result: notify::Result<Event>| {
-            match result {
+        let mut watcher =
+            match notify::recommended_watcher(move |result: notify::Result<Event>| match result {
                 Ok(event) => {
                     if filter.event_relevant(&event) {
                         let _ = tx.send(Ok(()));
                     }
                 }
                 Err(error) => {
-                    let text = format!("文件监视运行出错：{error}");
+                    let text = error.to_string();
                     if let Ok(mut guard) = callback_errors.lock() {
                         if guard.is_empty() {
                             guard.push(text.clone());
@@ -131,32 +162,47 @@ impl WorktreeWatcher {
                     }
                     let _ = tx.send(Err(text));
                 }
-            }
-        }) {
-            Ok(watcher) => watcher,
-            Err(error) => {
-                // 启动失败就是降级，不重试、不 panic、不谎报 active。
-                if let Ok(mut guard) = status.lock() {
-                    guard.active = false;
-                    guard.error = Some(format!("自动刷新不可用：无法启动文件监视：{error}"));
+            }) {
+                Ok(watcher) => watcher,
+                Err(error) => {
+                    // 启动失败就是降级，不重试、不 panic、不谎报 active。
+                    if let Ok(mut guard) = status.lock() {
+                        guard.active = false;
+                        guard.error = Some(
+                            AppError::coded(
+                                ErrorKind::Environment,
+                                "errors.watch.startFailed",
+                                "自动刷新不可用：无法启动文件监视：{error}",
+                                &[("error", error.to_string())],
+                            )
+                            .payload(),
+                        );
+                    }
+                    return Self {
+                        activation,
+                        stop,
+                        status,
+                        thread: None,
+                        _watcher: None,
+                    };
                 }
-                return Self { activation, stop, status, thread: None, _watcher: None };
-            }
-        };
+            };
 
         // 工作区递归：编辑器改动、新建/删除/原子替换都在这里。
         match watcher.watch(&roots.worktree, RecursiveMode::Recursive) {
             Ok(()) => root_count += 1,
-            Err(error) => failures.push(format!("工作区 {}：{error}", roots.worktree.display())),
+            Err(error) => failures.push(format!("{}: {error}", roots.worktree.display())),
         }
         // 该 worktree 自己的 gitDir：index / HEAD / ORIG_HEAD 等私有元数据。
         //
         // 对普通仓库这是 `<worktree>/.git`，已被上面的工作区递归覆盖（含 index），无需重复注册；
         // 对 linked worktree 它是 `<common>/worktrees/<name>`，必须单独监视。
-        if roots.git_dir != roots.worktree.join(".git") && !roots.git_dir.starts_with(&roots.worktree) {
+        if roots.git_dir != roots.worktree.join(".git")
+            && !roots.git_dir.starts_with(&roots.worktree)
+        {
             match watcher.watch(&roots.git_dir, RecursiveMode::Recursive) {
                 Ok(()) => root_count += 1,
-                Err(error) => failures.push(format!("Git 目录 {}：{error}", roots.git_dir.display())),
+                Err(error) => failures.push(format!("{}: {error}", roots.git_dir.display())),
             }
         }
         // 共享 commonDir 只注册**影响当前 worktree 状态**的元数据，不递归整棵 .git：
@@ -168,7 +214,7 @@ impl WorktreeWatcher {
             if refs.exists() {
                 match watcher.watch(&refs, RecursiveMode::Recursive) {
                     Ok(()) => root_count += 1,
-                    Err(error) => failures.push(format!("{}：{error}", refs.display())),
+                    Err(error) => failures.push(format!("{}: {error}", refs.display())),
                 }
             }
             for name in ["packed-refs", "HEAD", "ORIG_HEAD"] {
@@ -176,7 +222,7 @@ impl WorktreeWatcher {
                 if file.exists() {
                     match watcher.watch(&file, RecursiveMode::NonRecursive) {
                         Ok(()) => root_count += 1,
-                        Err(error) => failures.push(format!("{}：{error}", file.display())),
+                        Err(error) => failures.push(format!("{}: {error}", file.display())),
                     }
                 }
             }
@@ -189,7 +235,7 @@ impl WorktreeWatcher {
             guard.error = if failures.is_empty() {
                 None
             } else {
-                Some(format!("自动刷新不可用：{}", failures.join("；")))
+                Some(unavailable(failures.join("; ")))
             };
         }
 
@@ -213,11 +259,14 @@ impl WorktreeWatcher {
                                 return;
                             }
                             // 运行时错误立即把状态降级，避免谎报可用。
-                            let runtime_error = thread_errors.lock().ok().and_then(|guard| guard.first().cloned());
+                            let runtime_error = thread_errors
+                                .lock()
+                                .ok()
+                                .and_then(|guard| guard.first().cloned());
                             if let Some(error) = runtime_error {
                                 if let Ok(mut guard) = thread_status.lock() {
                                     guard.active = false;
-                                    guard.error = Some(format!("自动刷新不可用：{error}"));
+                                    guard.error = Some(unavailable(error));
                                 }
                                 continue;
                             }
@@ -226,7 +275,7 @@ impl WorktreeWatcher {
                         Ok(Err(error)) => {
                             if let Ok(mut guard) = thread_status.lock() {
                                 guard.active = false;
-                                guard.error = Some(format!("自动刷新不可用：{error}"));
+                                guard.error = Some(unavailable(error));
                             }
                         }
                         Err(RecvTimeoutError::Timeout) => continue,
@@ -238,13 +287,27 @@ impl WorktreeWatcher {
             Err(error) => {
                 if let Ok(mut guard) = status.lock() {
                     guard.active = false;
-                    guard.error = Some(format!("自动刷新不可用：无法启动监视线程：{error}"));
+                    guard.error = Some(
+                        AppError::coded(
+                            ErrorKind::Environment,
+                            "errors.watch.threadStartFailed",
+                            "自动刷新不可用：无法启动监视线程：{error}",
+                            &[("error", error.to_string())],
+                        )
+                        .payload(),
+                    );
                 }
                 None
             }
         };
 
-        Self { activation, stop, status, thread, _watcher: Some(watcher) }
+        Self {
+            activation,
+            stop,
+            status,
+            thread,
+            _watcher: Some(watcher),
+        }
     }
 
     pub fn activation(&self) -> u64 {
@@ -252,7 +315,10 @@ impl WorktreeWatcher {
     }
 
     pub fn status(&self) -> WatchStatus {
-        self.status.lock().map(|guard| guard.clone()).unwrap_or_else(|_| WatchStatus::idle())
+        self.status
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| WatchStatus::idle())
     }
 }
 
@@ -335,10 +401,16 @@ impl WatchFilter {
 
         // 1. 共享 commonDir 的 refs 子树：任何深度都相关。
         //    仅当该目录确实不同于工作区本身时才按 commonDir 规则判定。
-        if let Some(common) = self.common_dir.as_ref().filter(|common| common.as_path() != self.worktree) {
+        if let Some(common) = self
+            .common_dir
+            .as_ref()
+            .filter(|common| common.as_path() != self.worktree)
+        {
             if let Ok(relative) = path.strip_prefix(common) {
                 let mut components = relative.components();
-                let first = components.next().map(|part| part.as_os_str().to_string_lossy().into_owned());
+                let first = components
+                    .next()
+                    .map(|part| part.as_os_str().to_string_lossy().into_owned());
                 if first.as_deref() == Some("refs") {
                     return true;
                 }
@@ -366,7 +438,9 @@ impl WatchFilter {
         // 3. 工作区里的普通文件改动；排除 `.git` 子树（含其他 worktree 的私有元数据）。
         if let Ok(relative) = path.strip_prefix(&self.worktree) {
             let mut components = relative.components();
-            let first = components.next().map(|part| part.as_os_str().to_string_lossy().into_owned());
+            let first = components
+                .next()
+                .map(|part| part.as_os_str().to_string_lossy().into_owned());
             if first.as_deref() != Some(".git") {
                 return true;
             }
@@ -459,7 +533,13 @@ impl WatchController {
         self.activate_with_start(roots, requested, on_change, || {})
     }
 
-    fn activate_with_start<F, S>(&self, roots: WatchRoots, requested: u64, on_change: F, before_start: S) -> WatchStatus
+    fn activate_with_start<F, S>(
+        &self,
+        roots: WatchRoots,
+        requested: u64,
+        on_change: F,
+        before_start: S,
+    ) -> WatchStatus
     where
         F: Fn(u64) + Send + 'static,
         S: FnOnce(),
@@ -467,13 +547,24 @@ impl WatchController {
         let target = roots.worktree.display().to_string();
         let superseded = || WatchStatus {
             active: false,
-            error: Some("自动刷新不可用：监视请求已被更新的切换取代".into()),
+            error: Some(
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.watch.superseded",
+                    "自动刷新不可用：监视请求已被更新的切换取代",
+                    &[],
+                )
+                .payload(),
+            ),
             activation: requested,
             target: Some(target.clone()),
             roots: 0,
         };
         let installation = {
-            let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             if requested < state.accepted {
                 return superseded();
             }
@@ -482,13 +573,19 @@ impl WatchController {
             state.installation
         };
         before_start();
-        let failure = self.forced_failure.lock().ok().and_then(|guard| guard.clone());
-        let watcher = failure.is_none().then(|| Arc::new(WorktreeWatcher::start(roots, requested, on_change)));
+        let failure = self
+            .forced_failure
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        let watcher = failure
+            .is_none()
+            .then(|| Arc::new(WorktreeWatcher::start(roots, requested, on_change)));
         let status = match &watcher {
             Some(watcher) => watcher.status(),
             None => WatchStatus {
                 active: false,
-                error: failure,
+                error: failure.map(unavailable),
                 activation: requested,
                 target: Some(target.clone()),
                 roots: 0,
@@ -496,7 +593,10 @@ impl WatchController {
         };
         // 受理与最终安装共用同一把锁；慢启动不能覆盖更新的激活或停止请求。
         let previous = {
-            let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             if state.installation != installation {
                 drop(state);
                 drop(watcher);
@@ -511,12 +611,16 @@ impl WatchController {
 
     /// 显式诊断接缝：停止当前通知，但保留实际失败状态直到重新激活。
     pub fn fail_current(&self, reason: String) {
-        let watcher = self.state.lock().ok().and_then(|state| state.current.clone());
+        let watcher = self
+            .state
+            .lock()
+            .ok()
+            .and_then(|state| state.current.clone());
         if let Some(watcher) = watcher {
             watcher.stop.store(true, Ordering::Relaxed);
             if let Ok(mut status) = watcher.status.lock() {
                 status.active = false;
-                status.error = Some(reason);
+                status.error = Some(unavailable(reason));
             }
         }
     }
@@ -525,7 +629,10 @@ impl WatchController {
     pub fn stop(&self) -> WatchStatus {
         let status = WatchStatus::idle();
         let previous = {
-            let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             state.installation += 1;
             state.last = status.clone();
             state.current.take()
@@ -535,8 +642,16 @@ impl WatchController {
     }
 
     pub fn status(&self) -> WatchStatus {
-        self.state.lock().ok()
-            .map(|state| state.current.as_ref().map(|watcher| watcher.status()).unwrap_or_else(|| state.last.clone()))
+        self.state
+            .lock()
+            .ok()
+            .map(|state| {
+                state
+                    .current
+                    .as_ref()
+                    .map(|watcher| watcher.status())
+                    .unwrap_or_else(|| state.last.clone())
+            })
             .unwrap_or_else(WatchStatus::idle)
     }
 }
@@ -552,7 +667,11 @@ mod tests {
         std::fs::create_dir_all(&worktree).unwrap();
         let real_git_dir = dir.path().join("main/.git/worktrees/linked");
         std::fs::create_dir_all(&real_git_dir).unwrap();
-        std::fs::write(worktree.join(".git"), format!("gitdir: {}\n", real_git_dir.display())).unwrap();
+        std::fs::write(
+            worktree.join(".git"),
+            format!("gitdir: {}\n", real_git_dir.display()),
+        )
+        .unwrap();
 
         let roots = resolve_roots(&worktree, None, None);
         assert_eq!(roots.git_dir, real_git_dir);
@@ -603,7 +722,9 @@ mod tests {
         assert!(
             filter.event_relevant(&modify(root.join("src/app.ts"))),
             "工作区文件改动必须相关；worktree={:?} git_dir={:?} common={:?}",
-            filter.worktree, filter.git_dir, filter.common_dir
+            filter.worktree,
+            filter.git_dir,
+            filter.common_dir
         );
         assert!(
             filter.event_relevant(&modify(root.join(".git/index"))),
@@ -629,10 +750,19 @@ mod tests {
         let common = dir.path().join("main/.git");
         let linked = dir.path().join("linked");
         let own = common.join("worktrees/linked");
-        for path in [&own, &common.join("worktrees/other"), &common.join("refs/heads"), &linked] {
+        for path in [
+            &own,
+            &common.join("worktrees/other"),
+            &common.join("refs/heads"),
+            &linked,
+        ] {
             std::fs::create_dir_all(path).unwrap();
         }
-        let filter = WatchFilter::from_roots(&resolve_roots(&linked, Some(own.clone()), Some(common.clone())));
+        let filter = WatchFilter::from_roots(&resolve_roots(
+            &linked,
+            Some(own.clone()),
+            Some(common.clone()),
+        ));
         assert!(filter.path_relevant(&own.join("index")));
         assert!(filter.path_relevant(&own.join("HEAD")));
         assert!(filter.path_relevant(&common.join("refs/heads/main")));
@@ -666,16 +796,25 @@ mod tests {
             let pending = controller.clone();
             let roots = resolve_roots(&a, None, None);
             let worker = std::thread::spawn(move || {
-                pending.activate_with_start(roots, activation, |_| {}, || {
-                    entered_tx.send(()).unwrap();
-                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-                })
+                pending.activate_with_start(
+                    roots,
+                    activation,
+                    |_| {},
+                    || {
+                        entered_tx.send(()).unwrap();
+                        release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    },
+                )
             });
             entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             if stop {
                 controller.stop();
             } else {
-                assert!(controller.activate(resolve_roots(&b, None, None), 2, |_| {}).active);
+                assert!(
+                    controller
+                        .activate(resolve_roots(&b, None, None), 2, |_| {})
+                        .active
+                );
             }
             release_tx.send(()).unwrap();
             assert!(!worker.join().unwrap().active, "早受理的请求不得晚安装");
@@ -714,8 +853,14 @@ mod tests {
         assert!(status_a.active);
         let status_b = controller.activate(resolve_roots(&second, None, None), 2, |_| {});
         assert!(status_b.active);
-        assert!(status_b.activation > status_a.activation, "切换必须产生新的激活代号");
-        assert_eq!(status_b.target.as_deref(), Some(second.display().to_string().as_str()));
+        assert!(
+            status_b.activation > status_a.activation,
+            "切换必须产生新的激活代号"
+        );
+        assert_eq!(
+            status_b.target.as_deref(),
+            Some(second.display().to_string().as_str())
+        );
 
         let stopped = controller.stop();
         assert!(!stopped.active);
@@ -735,7 +880,10 @@ mod tests {
         let status_a1 = controller.activate(resolve_roots(&a, None, None), 1, |_| {});
         assert!(status_a1.active);
         let status_b = controller.activate(resolve_roots(&b, None, None), 2, |_| {});
-        assert_eq!(status_b.target.as_deref(), Some(b.display().to_string().as_str()));
+        assert_eq!(
+            status_b.target.as_deref(),
+            Some(b.display().to_string().as_str())
+        );
 
         // 迟到进入的旧 A(1) 请求：必须被拒绝，不能把监视切回 A。
         let late = controller.activate(resolve_roots(&a, None, None), 1, |_| {});
@@ -750,7 +898,10 @@ mod tests {
         // 真正的新 A(3) 才能切换过去。
         let status_a3 = controller.activate(resolve_roots(&a, None, None), 3, |_| {});
         assert!(status_a3.active);
-        assert_eq!(status_a3.target.as_deref(), Some(a.display().to_string().as_str()));
+        assert_eq!(
+            status_a3.target.as_deref(),
+            Some(a.display().to_string().as_str())
+        );
     }
 
     /// 切换后旧目录的改动不得再触发当前目标的刷新通知。
@@ -786,7 +937,12 @@ mod tests {
         std::fs::write(b.join("existing.txt"), b"changed in b").unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         while std::time::Instant::now() < deadline {
-            if hits.lock().unwrap().iter().any(|activation| *activation == 2) {
+            if hits
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|activation| *activation == 2)
+            {
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
@@ -810,10 +966,13 @@ mod tests {
         std::fs::create_dir_all(&path).unwrap();
 
         let controller = WatchController::new();
-        controller.force_failure(Some("自动刷新不可用：测试注入的监视失败".into()));
+        controller.force_failure(Some("测试注入的监视失败".into()));
         let status = controller.activate(resolve_roots(&path, None, None), 1, |_| {});
         assert!(!status.active);
-        assert_eq!(status.error.as_deref(), Some("自动刷新不可用：测试注入的监视失败"));
+        assert_eq!(
+            status.error.as_ref().map(|e| e.message.as_str()),
+            Some("自动刷新不可用：测试注入的监视失败")
+        );
 
         // 手动刷新不改变监视失败状态：不能假装监视已恢复。
         assert!(!controller.status().active);

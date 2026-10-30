@@ -13,7 +13,8 @@ import type { BranchOverview } from "@/types/bindings/BranchOverview";
 import type { BranchStart } from "@/types/bindings/BranchStart";
 import type { PushPreview } from "@/types/bindings/PushPreview";
 import type { PushForce } from "@/types/bindings/PushForce";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
+import { formatAppError } from "@/lib/error";
 import { formatCommitDate, shortOid } from "@/features/log/logModel";
 import { Codicon } from "@/components/ui/codicon";
 import { Modal } from "@/components/app/Dialogs";
@@ -153,7 +154,11 @@ export function PushDialog({
   const [tags, setTags] = useState(false);
   const [forceConfirmed, setForceConfirmed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const forceProblem = preview.forceAllowed ? null : preview.forceReason ?? messages.branches.forceDisabled;
+  const forceProblem = preview.forceAllowed
+    ? null
+    : preview.forceReason
+      ? formatAppError(preview.forceReason)
+      : messages.branches.forceDisabled;
   const commits = useMemo(() => preview.commits.slice(0, 50), [preview.commits]);
 
   useEffect(() => {

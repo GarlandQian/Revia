@@ -1,3 +1,4 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * 左右对照视图（返修 A1/Q138，设计见 docs/milestones/m4/side-by-side-design.md）。
  *
@@ -20,8 +21,9 @@ import type { SegmentAction } from "@/types/bindings/SegmentAction";
 import type { FoldRange } from "@/types/bindings/FoldRange";
 import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import { ipc } from "@/lib/ipc";
-import { getErrorMessage } from "@/lib/error";
-import { messages } from "@/lib/i18n/zh-CN";
+import { formatAppError, toAppError } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import { sideLabels } from "@/lib/i18n/text";
 import { codeFontStack } from "@/lib/theme";
 import type { DiffHighlights } from "./highlightStore";
 import type { HistorySideSource } from "@/features/log/historySideSource";
@@ -114,7 +116,7 @@ export function SideBySideView(props: SideBySideViewProps) {
   const { ignoreWhitespace, highlight, foldUnchanged, syncScroll, showWhitespace, softWrap } = options;
   const [loadedLayout, setLayout] = useState<SideBySideLayout | HistorySideLayout | null>(null);
   const [layoutKey, setLayoutKey] = useState<string | null>(null);
-  const [layoutError, setLayoutError] = useState<string | null>(null);
+  const [layoutError, setLayoutError] = useState<AppErrorPayload | null>(null);
   const [cacheVersion, setCacheVersion] = useState(0);
   const [expandedFolds, setExpandedFolds] = useState<Set<number>>(new Set());
   const [columnWidths, setColumnWidths] = useState({ left: 0, right: 0 });
@@ -171,7 +173,7 @@ export function SideBySideView(props: SideBySideViewProps) {
         setLayout(null);
         setLayoutKey(null);
         onLayout?.(null);
-        setLayoutError(getErrorMessage(error));
+        setLayoutError(toAppError(error));
       });
     return () => {
       cancelled = true;
@@ -430,7 +432,7 @@ export function SideBySideView(props: SideBySideViewProps) {
   }, [onSample, layout, cacheVersion, leftRows, leftHeights, heightsVersion]);
 
   if (layoutError) {
-    return <div role="status" className="p-3 text-[12px] text-destructive">{layoutError}</div>;
+    return <div role="status" className="p-3 text-[12px] text-destructive">{formatAppError(layoutError)}</div>;
   }
   if (!layout) {
     return <div className="p-3 text-[12px] text-descriptionforeground">{messages.changes.loading}</div>;
@@ -447,7 +449,7 @@ export function SideBySideView(props: SideBySideViewProps) {
   const labels = history
     ? { left: history.file.parent ? messages.history.parent(history.file.parent) : messages.log.rootCommit,
       right: messages.history.commit(history.file.commit) }
-    : messages.diff.sideLabels(workspaceLayout!.changes, workspaceLayout!.conflict);
+    : sideLabels(workspaceLayout!.changes, workspaceLayout!.conflict);
   // 冲突文件只读：不显示块按钮（设计 3.2）。
   const leftActions = !workspaceLayout || workspaceLayout.conflict ? "none" : workspaceLayout.changes === "unstaged" ? "discard" : workspaceLayout.changes === "staged" ? "unstage" : "none";
   const rightActions = !workspaceLayout || workspaceLayout.conflict ? "none" : workspaceLayout.changes === "unstaged" ? "stage" : "none";

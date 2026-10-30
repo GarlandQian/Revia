@@ -1,3 +1,7 @@
+import type { NoticeText } from "@/components/app/Notifications";
+import { closeGuardBlockedError, closeGuardFailure, commitOutputListenerFailure, localizedError } from "@/lib/error";
+import { checkoutNoteText } from "@/lib/i18n/text";
+import { updateNativeMenu } from "@/lib/nativeMenu";
 /**
  * 应用外壳：文件列表与只读 diff；M2 提供目标明确的整文件和 hunk 暂存操作。
  */
@@ -18,6 +22,12 @@ import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { WorktreeSessionInfo } from "@/types/bindings/WorktreeSessionInfo";
 import type { WorktreeStatusEntry } from "@/types/bindings/WorktreeStatusEntry";
+import type { OperationState } from "@/types/bindings/OperationState";
+import type { OperationAction } from "@/types/bindings/OperationAction";
+import type { AutostashLink } from "@/types/bindings/AutostashLink";
+import type { AutostashRestoreOutcome } from "@/types/bindings/AutostashRestoreOutcome";
+import type { HistoryCommit } from "@/types/bindings/HistoryCommit";
+import type { RewriteOutcome } from "@/types/bindings/RewriteOutcome";
 import type { AmendConfirmation } from "@/types/bindings/AmendConfirmation";
 import type { CommitContext } from "@/types/bindings/CommitContext";
 import type { CommitOutputEvent } from "@/types/bindings/CommitOutputEvent";
@@ -74,18 +84,27 @@ import { CheckoutConflictDialog, NewBranchDialog, PushDialog } from "@/features/
 import { useBranches } from "@/features/branches/useBranches";
 import type { IncomingToken } from "@/features/branches/incomingState";
 import { useLogWorkspace } from "@/features/log/useLogWorkspace";
+import { filterForCommit } from "@/features/log/logModel";
 import { useCommitTabs } from "@/features/log/logTabs";
-import { LogView } from "@/features/log/LogView";
+import { LogView, type LogHistoryAction } from "@/features/log/LogView";
+import { OperationBanner } from "@/features/m6/OperationBanner";
+import { readM6State, type M6ReadState } from "@/features/m6/readState";
+import { StashPanel } from "@/features/m6/StashPanel";
+import { HistoryActionDialog, type HistoryActionRequest } from "@/features/m6/HistoryActionDialog";
+import { FileHistoryDialog } from "@/features/m6/FileHistoryDialog";
+import { savedAutostashNotice, rewriteOutcomeDetail, rewriteFailureNotice } from "@/features/m6/notices";
+import { ExternalToolDialog, type ExternalToolTarget } from "@/features/m6/ExternalToolDialog";
 import { CommitDiffView } from "@/features/log/CommitDiffView";
 import { CommitMergeView } from "@/features/log/CommitMergeView";
 import { CommandLogPanel } from "@/features/commands/CommandLogPanel";
 import { EditorView } from "@codemirror/view";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
 import { soakScroller } from "@/lib/soakScroller";
-import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus } from "@/lib/ipc";
+import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus, type WatchStatusPayload } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, type LanguagePreference } from "@/lib/i18n/index";
+import { operationKindText, readonlyReasonText } from "@/lib/i18n/text";
 import { isButtonTarget, isCommitMessageTarget, isCommitShortcut, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
@@ -95,9 +114,9 @@ import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
 import type { ReviewReadAttempt, ReviewRecoveryBatchOutcome } from "@/lib/refreshGate";
 import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
-import { getErrorMessage, toAppError } from "@/lib/error";
+import { formatAppError, resultNeedsVerification, getErrorMessage, toAppError } from "@/lib/error";
 import { useAppearance } from "@/hooks/useAppearance";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications, type NoticeInput } from "@/hooks/useNotifications";
 import { useTreeSelection } from "@/hooks/useTreeSelection";
 import { useEditorTabs } from "@/hooks/useEditorTabs";
 import { activeMergeEntry } from "@/hooks/editorTabsState";
@@ -208,7 +227,7 @@ export function App() {
    * 版本真的变了则不叠加，标记按后端结果失效。
    */
   const reviewOverlayRef = useRef(new ReviewOverlay());
-  const [watchState, setWatchState] = useState<{ active: boolean; error: string | null }>({
+  const [watchState, setWatchState] = useState<Pick<WatchStatusPayload, "active" | "error">>({
     active: false,
     error: null,
   });
@@ -252,8 +271,15 @@ export function App() {
   diffOptionsRef.current = diffOptions;
 
   const { notifyKinds, setNotifyKinds, notify, setCommitResults, allNotices, dismissAllNotices } = useNotifications();
+  const notifyM6 = useCallback((target: string, notice: NoticeInput) => {
+    const path = repos.flatMap((repo) => repo.worktrees).find((worktree) => worktree.id === target)?.path ?? target;
+    notify({ ...notice, worktreePath: path });
+  }, [notify, repos]);
   /** 合并时自动应用无冲突改动（Q143）。 */
   const [mergeAutoApply, setMergeAutoApply] = useState(true);
+  /** 文件历史是否显示每次提交对应的文件名/路径（F01，默认关）。 */
+  const [fileHistoryShowNames, setFileHistoryShowNames] = useState(false);
+  const [stashCompareLocal, setStashCompareLocal] = useState(true);
 
   // ---------- M5 第二批：日志、分支与远端状态 ----------
   /** 日志设置（F06，随现有设置持久化）。 */
@@ -305,7 +331,7 @@ export function App() {
   const [newBranchStart, setNewBranchStart] = useState<{ origin: RemoteTarget; start: BranchStart } | null>(null);
   const newBranchDialogRef = useRef(newBranchStart);
   newBranchDialogRef.current = newBranchStart;
-  const [newBranchError, setNewBranchError] = useState<string | null>(null);
+  const [newBranchError, setNewBranchError] = useState<AppErrorPayload | null>(null);
   const [checkoutBlocked, setCheckoutBlocked] = useState<{
     origin: RemoteTarget; target: CheckoutTarget; label: string; files: string[];
   } | null>(null);
@@ -331,7 +357,10 @@ export function App() {
   // ---------- M4 界面状态 ----------
   /** 左侧工具窗口是否显示；点击图标条切换（F02.2）。 */
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [sideTab, setSideTab] = useState<"commit" | "recovery">("commit");
+  const [sideTab, setSideTab] = useState<"commit" | "recovery" | "stash">("commit");
+  /** 语言切换后强制整树重新渲染（messages 代理随语言变化）。 */
+  const [localeRevision, setLocaleRevision] = useState(0);
+  useEffect(() => subscribeLocale(() => setLocaleRevision((value) => value + 1)), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** 冲突对话框（返修 F10）。 */
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
@@ -350,6 +379,32 @@ export function App() {
 
   const [gitPath, setGitPath] = useState<string | null>(null);
   const [mergeTool, setMergeTool] = useState<string | null>(null);
+  const [diffTool, setDiffTool] = useState<string | null>(null);
+  const [language, setLanguage] = useState<LanguagePreference>("auto");
+  const [cherryPickKeepEmpty, setCherryPickKeepEmpty] = useState(false);
+  const [cherryPickIncludeSource, setCherryPickIncludeSource] = useState(false);
+  // M6：进行中操作、Stash 自动保存与历史改写 / 文件历史的界面状态。
+  const [m6State, setM6State] = useState<(M6ReadState & { origin: RemoteTarget }) | null>(null);
+  const m6ReadSeq = useRef(0);
+  const currentM6 = m6State && remoteTargetIsCurrent(m6State.origin, gateRef.current.token()) ? m6State : null;
+  const operationState = currentM6?.operation ?? null;
+  const autostashLink = currentM6?.pending?.link ?? null;
+  const [m6Busy, setM6Busy] = useState(false);
+  const [stashRevision, setStashRevision] = useState(0);
+  const [stashFocusOid, setStashFocusOid] = useState<string | null>(null);
+  const [historyAction, setHistoryAction] = useState<HistoryActionRequest | null>(null);
+  const historyActionSeqRef = useRef(0);
+  const notifiedAutostashRef = useRef(new Set<string>());
+  const [historyMessage, setHistoryMessage] = useState("");
+  const [fileHistory, setFileHistory] = useState<{ path: string; revision: string | null; origin: RemoteTarget } | null>(null);
+  const openFileHistory = useCallback((path: string, revision: string | null, origin: RemoteTarget | null) => {
+    if (origin && remoteTargetIsCurrent(origin, gateRef.current.token())) setFileHistory({ path, revision, origin });
+  }, []);
+  const [externalTool, setExternalTool] = useState<ExternalToolTarget | null>(null);
+  /** 外部工具对话框绑定打开时的目标，而不是写操作发生时的当前 worktree。 */
+  const openExternalTool = useCallback((target: Omit<ExternalToolTarget, "origin">, origin: RemoteTarget | null) => {
+    if (origin && remoteTargetIsCurrent(origin, gateRef.current.token())) setExternalTool({ ...target, origin });
+  }, []);
   const [busy, setBusy] = useState(false);
   /**
    * 状态文案。任务 12 起不再显示在工具栏（工具栏只保留日常操作），
@@ -402,6 +457,17 @@ export function App() {
       setGlobalError(err);
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const failed = (caught: unknown) => {
+      if (active) setGlobalError({ ...localizedError("environment", "errors.nativeMenu.unavailable"), cause: toAppError(caught) });
+    };
+    void updateNativeMenu(() => {
+      void getCurrentWindow().close().catch((caught) => { if (active) setGlobalError(toAppError(caught)); });
+    }).catch(failed);
+    return () => { active = false; };
+  }, [localeRevision]);
 
   /** 记录一次无归属操作的结果；`seq` 用来拒绝旧完成覆盖较新的错误。 */
   const recordExternalResult = useCallback((seq: number, err: AppErrorPayload | null) => {
@@ -587,7 +653,7 @@ export function App() {
         const loaded = slice.entry;
         if (loaded.path !== entry.path || loaded.changes !== entry.changes
           || loaded.fingerprint !== entry.fingerprint || loaded.snapshotRevision !== entry.snapshotRevision) {
-          throw { kind: "rejected", message: messages.changes.fileChanged };
+          throw localizedError("rejected", "changes.fileChanged");
         }
         // 不能用旧 entry **整条**替换：那会连带把同版本已成功的审阅状态勾回去，
         // 而进度仍保留，出现两处状态分裂（SP07-R7-3）。只合并审阅字段并重算进度。
@@ -716,6 +782,9 @@ export function App() {
       if (id !== worktreeIdRef.current) resetMergeTabs();
       // 切换请求发起时立即改激活目标：此后旧 worktree 的响应一律丢弃（含 A→B→A）。
       gateRef.current.activate(id);
+      setM6State(null);
+      setHistoryAction(null);
+      setExternalTool(null);
       setCheckoutBlocked(null);
       setPushDialog(null);
       setPushDialogError(null);
@@ -730,7 +799,8 @@ export function App() {
         setWorktreeId(id);
         const failed = sessionInfo.checks.filter((check) => !check.ok);
         if (failed.length > 0) {
-          setAppError({ kind: "environment", message: failed.map((check) => `${check.name}：${check.detail}`).join("\n") }, id);
+          const errors = failed.flatMap((check) => check.hint ? [check.detail, check.hint] : [check.detail]);
+          setAppError({ ...errors[0], related: errors.slice(1) }, id);
         }
 
         // 监视只跟随当前 worktree；切换即释放旧监视（Q88）。
@@ -766,7 +836,7 @@ export function App() {
           setStatus(messages.changes.empty);
           return null;
         }
-        setStatus(`${next.entries.length} 个文件`);
+        setStatus(messages.changes.fileCount(next.entries.length));
         const firstRowsStart = performance.now();
         debugLog(`选中文件：${entry.path}（${entry.changes}）`);
         const opened = await openEntry(entry, {
@@ -820,7 +890,7 @@ export function App() {
       applyRefreshedSnapshot(snap);
       // 监视、手动刷新、写后重读与恢复均在门禁接受后通知引用消费者。
       setWatchRevision((value) => value + 1);
-      setStatus(snap.entries.length > 0 ? `${snap.entries.length} 个文件` : messages.changes.empty);
+      setStatus(snap.entries.length > 0 ? messages.changes.fileCount(snap.entries.length) : messages.changes.empty);
       return true;
     },
     [applyRefreshedSnapshot],
@@ -870,7 +940,7 @@ export function App() {
         setAppError(
           failure && failure.status === "error"
             ? toAppError(failure.error)
-            : { kind: "rejected", message: messages.review.recoveryExhausted },
+            : localizedError("rejected", "review.recoveryExhausted"),
           worktreeId,
         );
       },
@@ -898,6 +968,10 @@ export function App() {
   const refresh = useCallback(async () => {
     if (!worktreeId) return;
     const targetWorktreeId = worktreeId;
+    gateRef.current.activate(targetWorktreeId);
+    setM6State(null);
+    setHistoryAction(null);
+    setExternalTool(null);
     const token = gateRef.current.token();
     setBusy(true);
     try {
@@ -982,9 +1056,14 @@ export function App() {
           setAppError(toAppError(caught), active);
         }
       }
+    }, () => {
+      const active = gateRef.current.current().worktreeId;
+      return !active || !writingWorktreesRef.current.has(active);
     }),
     [readAndAccept, setAppError],
   );
+  const refreshCoordinatorRef = useRef(refreshCoordinator);
+  refreshCoordinatorRef.current = refreshCoordinator;
 
   useEffect(() => () => refreshCoordinator.dispose(), [refreshCoordinator]);
 
@@ -1071,16 +1150,15 @@ export function App() {
   useEffect(() => {
     let disposed = false;
     const stops: Array<() => void> = [];
-    const fail = (what: string) => (caught: unknown) => {
+    const fail = (what: "window" | "exit") => (caught: unknown) => {
       if (disposed) return;
       // 保护安装失败：标记为不可用，写入口会据此拒绝开始写入（ST-B03-08-2）。
-      closeGuardsRef.current.markFailed(
-        messages.close.guardUnavailable(messages.close.listenerFailed(what, getErrorMessage(caught))),
-      );
-      setAppError({ kind: "internal", message: closeGuardsRef.current.blockedReason ?? "" }, null);
+      const failure = closeGuardFailure(what, caught);
+      closeGuardsRef.current.markFailed(failure);
+      setAppError(failure, null);
     };
     // 每次（重）装都从未就绪开始：安装中不允许写入。
-    closeGuardsRef.current = new CloseGuardGate();
+    closeGuardsRef.current = new CloseGuardGate<AppErrorPayload>();
     void (async () => {
       let windowGuard = false;
       let exitGuard = false;
@@ -1095,7 +1173,7 @@ export function App() {
         if (disposed) stop(); else stops.push(stop);
         windowGuard = true;
       } catch (caught) {
-        fail(messages.close.guardWindowClose)(caught);
+        fail("window")(caught);
       }
       try {
         // 原生退出：Rust 已阻止退出并通知前端，这里按同一套编排询问用户。
@@ -1108,7 +1186,7 @@ export function App() {
         if (disposed) stop(); else stops.push(stop);
         exitGuard = true;
       } catch (caught) {
-        fail(messages.close.guardNativeExit)(caught);
+        fail("exit")(caught);
       }
       // 两个监听都装好才算就绪：缺一个都可能让关闭/退出绕过保护。
       if (!disposed && windowGuard && exitGuard) {
@@ -1146,7 +1224,7 @@ export function App() {
         setActiveRepo(repo);
         const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
         if (!worktree) {
-          setAppError({ kind: "rejected", message: messages.firstRun.notARepo });
+          setAppError(localizedError("rejected", "firstRun.notARepo"));
           return;
         }
         await ipc.selectRepo(repo.id, worktree.id);
@@ -1170,13 +1248,24 @@ export function App() {
   useEffect(() => {
     void (async () => {
       try {
-        const [settings, list] = await Promise.all([ipc.listSettings(), ipc.listRepos()]);
+        const [settings, list, systemLanguage] = await Promise.all([
+          ipc.listSettings(),
+          ipc.listRepos(),
+          ipc.systemLanguage().catch(() => ""),
+        ]);
+        if (systemLanguage) setSystemLanguage(systemLanguage);
         setFontSize(settings.diffFontSize);
         setThemeLight(settings.themeLight);
         setThemeDark(settings.themeDark);
         setCodeFontFamily(settings.codeFontFamily);
         setGitPath(settings.gitPath);
         setMergeTool(settings.mergeTool);
+        setDiffTool(settings.diffTool);
+        const preference = (settings.language ?? "auto") as LanguagePreference;
+        setLanguage(preference);
+        setLocale(resolveLocale(preference));
+        setCherryPickKeepEmpty(settings.cherryPickKeepEmpty);
+        setCherryPickIncludeSource(settings.cherryPickIncludeSource);
         setSidebarWidth(settings.sidebarWidth);
         setView(settings.viewMode);
         setUiZoom(settings.uiZoom);
@@ -1203,6 +1292,8 @@ export function App() {
         });
         setNotifyKinds(settings.notify);
         setMergeAutoApply(settings.mergeAutoApply);
+        setFileHistoryShowNames(settings.fileHistoryShowNames);
+        setStashCompareLocal(settings.stashCompareLocal);
         setLogSettings({
           columns: settings.logColumns,
           longEdges: settings.logLongEdges,
@@ -1442,6 +1533,7 @@ export function App() {
 
   const [writingWorktrees, setWritingWorktrees] = useState<Set<string>>(new Set());
   const writingWorktreesRef = useRef(new Set<string>());
+  useEffect(() => refreshCoordinator.resume(), [refreshCoordinator, writingWorktrees, worktreeId]);
   /**
    * 写入期间的安全关闭/退出编排（任务 08，Q90/Q91/Q96）。
    *
@@ -1459,7 +1551,7 @@ export function App() {
    * 只有窗口关闭监听**和**原生退出监听都装好，才允许开始写入；
    * 安装中/失败/卸载时写入口会拒绝执行（ST-B03-08-2）。
    */
-  const closeGuardsRef = useRef(new CloseGuardGate());
+  const closeGuardsRef = useRef(new CloseGuardGate<AppErrorPayload>());
   /** reconcile 的转发（监听回调早于其定义注册）。 */
   const reconcileCloseRef = useRef<(() => void) | null>(null);
   const isWriting = worktreeId ? writingWorktrees.has(worktreeId) : false;
@@ -1610,17 +1702,20 @@ export function App() {
    *
    * 依赖全部经 ref/回调读取，所以实例稳定；App 与 Node 回归用同一个类。
    */
-  const writeOrchestratorRef = useRef<WriteGuardOrchestrator | null>(null);
+  const writeOrchestratorRef = useRef<WriteGuardOrchestrator<AppErrorPayload> | null>(null);
   if (writeOrchestratorRef.current === null) {
-    writeOrchestratorRef.current = new WriteGuardOrchestrator({
+    writeOrchestratorRef.current = new WriteGuardOrchestrator<AppErrorPayload>({
       closeDriver,
-      closeBlockedReason: messages.close.closing,
+      closeBlockedReason: () => localizedError("internal", "close.closing"),
       guardsReady: () => closeGuardsRef.current.ready,
-      guardBlockedReason: () => closeGuardsRef.current.blockedReason,
+      guardBlockedReason: () => closeGuardsRef.current.blockedReason ?? localizedError("internal", "errors.closeGuard.installing"),
       register: (worktreeId) => {
         closeCoordinatorRef.current.beginWrite(worktreeId);
       },
-      guard: () => syncExitBlocked(true),
+      guard: async () => {
+        await syncExitBlocked(true);
+        await refreshCoordinatorRef.current.whenIdle();
+      },
       rollback: (worktreeId) => {
         closeCoordinatorRef.current.rollbackWrite(worktreeId);
       },
@@ -1647,7 +1742,7 @@ export function App() {
         writingWorktreesRef.current.delete(opWorktreeId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
         setAppError(
-          { kind: "internal", message: messages.close.guardUnavailable(started.reason) },
+          closeGuardBlockedError(started.reason),
           opWorktreeId,
         );
         return;
@@ -1675,13 +1770,13 @@ export function App() {
           ...target.segment,
         };
         if (discard) {
-          if (!("snapshotRevision" in target)) throw { kind: "rejected", message: messages.changes.fileChanged };
+          if (!("snapshotRevision" in target)) throw localizedError("rejected", "changes.fileChanged");
           next = await ipc.discardSegment({ ...segmentRequest, snapshotRevision: target.snapshotRevision });
         } else {
           next = await (unstaging ? ipc.unstageSegment : ipc.stageSegment)(segmentRequest);
         }
       } else if (discard) {
-        if (!("snapshotRevision" in target)) throw { kind: "rejected", message: messages.changes.fileChanged };
+        if (!("snapshotRevision" in target)) throw localizedError("rejected", "changes.fileChanged");
         next = await ipc.discardHunk({ ...request, snapshotRevision: target.snapshotRevision, hunkId: target.hunkId });
       } else {
         next = await (unstaging ? ipc.unstageHunk : ipc.stageHunk)({ ...request, hunkId: target.hunkId });
@@ -1703,11 +1798,11 @@ export function App() {
         notify({
           tone: "success",
           kind: discard ? "discard" : "stage",
-          title: discard
+          title: () => (discard
             ? messages.changes.segmentDiscarded
             : unstaging
               ? messages.changes.segmentUnstaged
-              : messages.changes.segmentStaged,
+              : messages.changes.segmentStaged),
         });
       } else {
         debugLog(`写结果快照被接收门丢弃：${next.worktreeId}@${next.revision}`);
@@ -1720,8 +1815,8 @@ export function App() {
       if (operationGateRef.current.canRecord(opToken)) {
         notify({
           tone: err.kind === "needsVerification" ? "warning" : "error",
-          title: err.kind === "needsVerification" ? messages.errors.needsVerification : messages.changes.writeFailedTitle,
-          detail: err.message,
+          title: () => (err.kind === "needsVerification" ? messages.errors.needsVerification : messages.changes.writeFailedTitle),
+          detail: () => (formatAppError(err)),
           persistent: true,
         });
         if (operationGateRef.current.acceptFailure(opToken)
@@ -1753,7 +1848,7 @@ export function App() {
   }) => {
     const opWorktreeId = request.worktreeId;
     if (writingWorktreesRef.current.has(opWorktreeId)) {
-      throw { kind: "rejected", message: messages.recovery.busy };
+      throw localizedError("rejected", "recovery.busy");
     }
     writingWorktreesRef.current.add(opWorktreeId);
     setWritingWorktrees(new Set(writingWorktreesRef.current));
@@ -1763,7 +1858,7 @@ export function App() {
       if (!started.ok) {
         writingWorktreesRef.current.delete(opWorktreeId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
-        throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+        throw closeGuardBlockedError(started.reason);
       }
     } catch (caught) {
       writingWorktreesRef.current.delete(opWorktreeId);
@@ -1815,8 +1910,8 @@ export function App() {
     refreshTarget,
     reportFailure: (_worktreeId, error) => notify({
       tone: error.kind === "needsVerification" ? "warning" : "error",
-      title: error.kind === "needsVerification" ? messages.errors.needsVerification : messages.merge.writeFailedTitle,
-      detail: error.message,
+      title: () => (error.kind === "needsVerification" ? messages.errors.needsVerification : messages.merge.writeFailedTitle),
+      detail: () => (formatAppError(error)),
       persistent: true,
     }),
     toError: toAppError,
@@ -1859,7 +1954,7 @@ export function App() {
       // 共享异步编排：失败时已回滚并真实收尾。
       const started = await writeOrchestrator.begin(provisionalKey);
       if (!started.ok) {
-        throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+        throw closeGuardBlockedError(started.reason);
       }
     } catch (caught) {
       setAppError(toAppError(caught), null);
@@ -1873,7 +1968,7 @@ export function App() {
       if (ownerId) {
         if (writingWorktreesRef.current.has(ownerId)) {
           // 目标已有在途写操作：本请求没有取得门禁，也不取新的结果令牌。
-          throw { kind: "rejected", message: messages.recovery.busy };
+          throw localizedError("rejected", "recovery.busy");
         }
         writingWorktreesRef.current.add(ownerId);
         heldGateId = ownerId;
@@ -1941,13 +2036,13 @@ export function App() {
   const [commitContext, setCommitContext] = useState<CommitContext | null>(null);
   const commitContextRef = useRef<CommitContext | null>(null);
   commitContextRef.current = commitContext;
-  const [commitContextError, setCommitContextError] = useState<string | null>(null);
+  const [commitContextError, setCommitContextError] = useState<AppErrorPayload | null>(null);
   const [commitSubmittingWorktrees, setCommitSubmittingWorktrees] = useState<Set<string>>(new Set());
   const commitSubmittingRef = useRef(new Set<string>());
   const commitSubmitting = worktreeId !== null && commitSubmittingWorktrees.has(worktreeId);
   // 磁盘保存失败时仍按身份保留本地输入；切换回来先核身份，不能继承同路径旧仓库。
   const localDraftsRef = useRef(new Map<string, { input: ComposerInput; revision: string; identity: string | null }>());
-  const [commitDraftNotice, setCommitDraftNotice] = useState<string | null>(null);
+  const [commitDraftNotice, setCommitDraftNotice] = useState<NoticeText | null>(null);
   const setCommitResultFor = useCallback((view: CommitResultView) => {
     setCommitResults((current) => ({ ...current, [view.worktreeId]: view }));
   }, [setCommitResults]);
@@ -1988,9 +2083,9 @@ export function App() {
     draftPersistenceRef.current = new CommitDraftPersistence(({ write, error }) => {
       if (worktreeIdRef.current !== write.worktreeId) return;
       if (error !== null) {
-        setCommitDraftNotice(messages.commit.draftFailed(error));
+        setCommitDraftNotice(() => () => messages.commit.draftFailed(formatAppError(error)));
       } else if (commitStateRef.current.recordSaved(write.worktreeId, write.generation, write.input)) {
-        setCommitDraftNotice(messages.commit.draftSaved);
+        setCommitDraftNotice(() => () => messages.commit.draftSaved);
       }
     });
   }
@@ -2033,8 +2128,8 @@ export function App() {
       commitContextRef.current = next;
       setCommitContext(next);
       setCommitContextError(null);
-      if (next.templateError) setCommitDraftNotice(messages.commit.templateFailed(next.templateError));
-      if (next.draftError) setCommitDraftNotice(messages.commit.draftLoadFailed(next.draftError));
+      if (next.templateError) setCommitDraftNotice(() => () => messages.commit.templateFailed(formatAppError(next.templateError!)));
+      if (next.draftError) setCommitDraftNotice(() => () => messages.commit.draftLoadFailed(formatAppError(next.draftError!)));
       const state = commitStateRef.current;
       if (closeDriver.currentPhase() === "closing" || !next.draftIdentity) return next;
       const cached = localDraftsRef.current.get(targetWorktreeId);
@@ -2047,8 +2142,8 @@ export function App() {
         state.edit(restored);
         commitInputRef.current = restored;
         setCommitInput(restored);
-        const failure = draftPersistence.failureFor(targetWorktreeId);
-        if (failure) setCommitDraftNotice(messages.commit.draftFailed(failure));
+        const failure = draftPersistence.failurePayloadFor(targetWorktreeId);
+        if (failure) setCommitDraftNotice(() => () => messages.commit.draftFailed(formatAppError(failure)));
         return next;
       }
       if (cached?.identity && next.draftIdentity && cached.identity !== next.draftIdentity) {
@@ -2061,7 +2156,7 @@ export function App() {
         });
         commitInputRef.current = loaded.input;
         setCommitInput(loaded.input);
-        setCommitDraftNotice(messages.commit.draftRestored);
+        setCommitDraftNotice(() => () => messages.commit.draftRestored);
       } else if (!next.draftError && state.needsTemplateSeed()) {
         // 没有草稿且用户还没输入：用模板初始化**一次**（模板不覆盖用户输入，F02.3）。
         // 初始化后立刻排队保存，避免「只是接受模板、没编辑」时正常关闭丢稿。
@@ -2076,7 +2171,7 @@ export function App() {
           state.edit(seeded);
           commitInputRef.current = seeded;
           setCommitInput(seeded);
-          setCommitDraftNotice(messages.commit.templateUsed);
+          setCommitDraftNotice(() => () => messages.commit.templateUsed);
           queueCommitDraft(targetWorktreeId, seeded);
         }
       }
@@ -2084,7 +2179,7 @@ export function App() {
     } catch (caught) {
       if (epoch !== commitContextEpochRef.current) return null;
       if (worktreeIdRef.current !== targetWorktreeId) return null;
-      setCommitContextError(getErrorMessage(caught));
+      setCommitContextError(toAppError(caught));
       return null;
     }
   }, [closeDriver, draftPersistence, queueCommitDraft]);
@@ -2189,11 +2284,11 @@ export function App() {
         if (!canApplyPrefill()) return;
         const seeded = { ...commitInputRef.current, message: message ?? "" };
         updateCommitInput(seeded);
-        setCommitDraftNotice(messages.commit.amendPrefilled);
+        setCommitDraftNotice(() => () => messages.commit.amendPrefilled);
       })
       .catch(() => {
         if (!canApplyPrefill()) return;
-        setCommitDraftNotice(messages.commit.amendPrefillFailed);
+        setCommitDraftNotice(() => () => messages.commit.amendPrefillFailed);
       });
   }, [closeDriver, queueCommitDraft, updateCommitInput]);
 
@@ -2216,19 +2311,19 @@ export function App() {
   ) => {
     const origin = captureRemoteTarget(gateRef.current.token(), worktreeIdRef.current);
     if (!origin) {
-      setAppError({ kind: "rejected", message: messages.commit.noWorktree }, null);
+      setAppError(localizedError("rejected", "commit.noWorktree"), null);
       return;
     }
     const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
     const context = commitContextRef.current;
     if (!context || context.worktreeId !== target) {
-      setAppError({ kind: "rejected", message: messages.commit.stale }, target);
+      setAppError(localizedError("rejected", "commit.stale"), target);
       return;
     }
     const input = commitInputRef.current;
     if (!messageSubmittable(input.message)) {
-      setAppError({ kind: "rejected", message: messages.commit.emptyMessage }, target);
+      setAppError(localizedError("rejected", "commit.emptyMessage"), target);
       return;
     }
     // amend 且 HEAD 已包含于本地上游（或本地无法判断是否已发布）：必须有一次
@@ -2295,7 +2390,7 @@ export function App() {
     try {
       // 先登记生命周期再等待草稿，关闭不能越过这段异步准备去销毁窗口。
       const started = await writeOrchestrator.begin(target);
-      if (!started.ok) throw { kind: "internal", message: messages.close.guardUnavailable(started.reason) };
+      if (!started.ok) throw closeGuardBlockedError(started.reason);
       gateHeld = true;
       await draftPersistence.flush(target);
       // 即使草稿来自加载/模板，也保存并绑定这一次提交的精确版本。
@@ -2307,12 +2402,12 @@ export function App() {
           generation: commitStateRef.current.current().generation,
         });
       }
-      const failure = draftPersistence.failureFor(target);
-      if (failure) throw { kind: "internal", message: messages.commit.draftFailed(failure) };
+      const failure = draftPersistence.failurePayloadFor(target);
+      if (failure) throw failure;
       if (confirmation && (commitContextEpochRef.current !== contextEpochAtSubmit
         || gateRef.current.token().activation !== activationAtSubmit
         || localDraftsRef.current.get(target)?.revision !== submittedRevision)) {
-        throw { kind: "rejected", message: messages.commit.amendConfirmStale };
+        throw localizedError("rejected", "commit.amendConfirmStale");
       }
     } catch (caught) {
       setAppError(toAppError(caught), target);
@@ -2329,7 +2424,7 @@ export function App() {
     setCommitLiveOutput({ worktreeId: target, output: [] });
     setCommitResultFor({
       worktreeId: target,
-      title: messages.commit.outputTitle(targetTitle),
+      title: () => messages.commit.outputTitle(targetTitle),
       detail: null,
       outcome: null,
       output: [],
@@ -2357,18 +2452,18 @@ export function App() {
       needsVerification = outcome.needsVerification;
       setCommitResultFor({
         worktreeId: target,
-        title: outcome.success
+        title: () => outcome.success
           ? (submitted.amend
             ? messages.commit.resultAmend(outcome.newHead ?? "")
             : messages.commit.resultSuccess(outcome.newHead ?? ""))
           : gitError
             ? messages.commit.resultGitFailed(outcome.exitCode ?? -1)
             : messages.commit.resultTitle,
-        detail: outcome.draftError
-          ? messages.commit.resultDraftError(outcome.draftError)
+        detail: () => outcome.draftError
+          ? messages.commit.resultDraftError(formatAppError(outcome.draftError))
           : [
             submitted.message.split("\n")[0],
-            outcome.verificationNote,
+            outcome.verificationNote ? formatAppError(outcome.verificationNote) : null,
           ].filter((part): part is string => typeof part === "string" && part.length > 0).join("\n") || null,
         outcome,
         output: commitOutputs.finish(outputRun, outcome.output),
@@ -2380,13 +2475,13 @@ export function App() {
       if (failed) {
         // 已确认失败：错误按 Git 类归原 worktree，草稿保留。
         if (operationGateRef.current.canRecord(opToken)) {
-          setAppError(gitError ?? { kind: "git", message: messages.commit.resultTitle }, target);
+          setAppError(gitError ?? localizedError("git", "commit.resultTitle"), target);
         }
       } else if (outcome.needsVerification) {
         // 提交已成功但收尾（如快照记录）需要核对：如实提示。
         if (operationGateRef.current.canRecord(opToken)) {
           setAppError(
-            { kind: "needsVerification", message: messages.commit.resultNeedsVerification },
+            localizedError("needsVerification", "commit.resultNeedsVerification"),
             target,
           );
         }
@@ -2416,8 +2511,8 @@ export function App() {
       const lines = commitOutputs.snapshot(outputRun);
       setCommitResultFor({
         worktreeId: target,
-        title: err.kind === "needsVerification" ? messages.commit.resultNeedsVerification : err.message,
-        detail: err.kind === "needsVerification" ? err.message : null,
+        title: () => err.kind === "needsVerification" ? messages.commit.resultNeedsVerification : formatAppError(err),
+        detail: () => err.kind === "needsVerification" ? formatAppError(err) : null,
         outcome: null,
         output: lines,
         needsVerification: err.kind === "needsVerification",
@@ -2469,7 +2564,7 @@ export function App() {
       || context.upstreamVersion !== pending.confirmation.upstreamVersion
       || !(context.gates.upstreamContainsHead || context.gates.upstreamUnknown)) {
       setAmendConfirm(null);
-      setAppError({ kind: "rejected", message: messages.commit.amendConfirmStale }, worktreeIdRef.current);
+      setAppError(localizedError("rejected", "commit.amendConfirmStale"), worktreeIdRef.current);
       return;
     }
     setAmendConfirm(null);
@@ -2499,7 +2594,7 @@ export function App() {
     }).catch((caught) => {
       if (disposed) return;
       // 监听安装失败必须可见：否则用户以为有实时输出而实际没有（F04.1）。
-      setAppError({ kind: "internal", message: messages.close.listenerFailed(messages.commit.outputLive, getErrorMessage(caught)) }, null);
+      setAppError(commitOutputListenerFailure(caught), null);
     });
     return () => {
       disposed = true;
@@ -2529,7 +2624,7 @@ export function App() {
     // 版本无法确认时本地就阻止新增认领（SP07-R4-1）：后端也会拒绝，但不必先发一次请求。
     // 取消已有标记不受限制，保留清理能力。
     if (marked && !entry.worktreeVersionConfirmed) {
-      setAppError({ kind: "rejected", message: messages.review.unconfirmed }, targetWorktreeId);
+      setAppError(localizedError("rejected", "review.unconfirmed"), targetWorktreeId);
       return null;
     }
     const targetActivation = gateRef.current.token().activation;
@@ -2690,7 +2785,7 @@ export function App() {
       (entry) => current && entry.path === current.path && entry.changes === current.changes,
     );
     if (!entry || !matchesHunkAction(action, worktreeIdRef.current ?? "", entry)) {
-      setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+      setAppError(localizedError("rejected", "changes.fileChanged"), action.worktreeId);
       if (worktreeIdRef.current === action.worktreeId) void refresh();
       return;
     }
@@ -2725,7 +2820,7 @@ export function App() {
         || current.changes !== action.changes
         || worktreeIdRef.current !== action.worktreeId
       ) {
-        setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+        setAppError(localizedError("rejected", "changes.fileChanged"), action.worktreeId);
         void refresh();
         return;
       }
@@ -2742,7 +2837,7 @@ export function App() {
         (candidate) => candidate.path === action.path && candidate.changes === action.changes,
       );
       if (!current || !entry || current.path !== action.path || current.changes !== action.changes) {
-        setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+        setAppError(localizedError("rejected", "changes.fileChanged"), action.worktreeId);
         return;
       }
       setDiscardRequest({
@@ -2769,10 +2864,10 @@ export function App() {
     if (discardable.length === 0) {
       notify({
         tone: "warning",
-        title: messages.changes.nothingToDiscard,
-        detail: candidates
+        title: () => (messages.changes.nothingToDiscard),
+        detail: () => candidates
           .filter((entry) => entry.readonlyReason)
-          .map((entry) => `${entry.path}：${messages.changes.readonlyReasons[entry.readonlyReason!]}`)
+          .map((entry) => `${entry.path}: ${readonlyReasonText(entry.readonlyReason!)}`)
           .join("\n") || undefined,
         persistent: true,
       });
@@ -2791,7 +2886,7 @@ export function App() {
     const current = selectedRef.current;
     const entry = snapshotRef.current?.entries.find((entry) => entry.path === current?.path && entry.changes === current.changes);
     if (!entry || !matchesHunkAction(action, worktreeIdRef.current ?? "", entry)) {
-      setAppError({ kind: "rejected", message: messages.changes.fileChanged }, action.worktreeId);
+      setAppError(localizedError("rejected", "changes.fileChanged"), action.worktreeId);
       return;
     }
     setDiscardRequest({
@@ -2876,7 +2971,7 @@ export function App() {
           if (unstaged.length > 0) await performBatchWrite("stage", unstaged);
           if (staged.length > 0) await performBatchWrite("unstage", staged);
           if (unstaged.length === 0 && staged.length === 0 && entries.length > 0) {
-            notify({ tone: "warning", title: messages.changes.batchNothing, persistent: true });
+            notify({ tone: "warning", title: () => (messages.changes.batchNothing), persistent: true });
           }
         };
         void runSequentially();
@@ -2932,6 +3027,7 @@ export function App() {
 
   // ---------------- 测量 ----------------
 
+  // x18n-ignore-start
   const runMeasurement = useCallback(
     async (
       targetView: ViewMode,
@@ -4010,6 +4106,7 @@ export function App() {
     },
     [runMeasurement],
   );
+  // x18n-ignore-end
 
   // ---------------- 设置、worktree 状态与页签 ----------------
 
@@ -4034,7 +4131,7 @@ export function App() {
       });
   }, []);
 
-  const updateSettings = useCallback(async (patch: SettingsPatch): Promise<string | null> => {
+  const updateSettings = useCallback(async (patch: SettingsPatch): Promise<AppErrorPayload | null> => {
     try {
       const next = await ipc.updateSettings({
         themeLight: patch.themeLight,
@@ -4043,6 +4140,10 @@ export function App() {
         diffFontSize: patch.diffFontSize,
         gitPath: patch.gitPath,
         mergeTool: patch.mergeTool,
+        diffTool: patch.diffTool,
+        language: patch.language,
+        cherryPickKeepEmpty: patch.cherryPickKeepEmpty,
+        cherryPickIncludeSource: patch.cherryPickIncludeSource,
         sidebarWidth: patch.sidebarWidth,
         viewMode: patch.viewMode,
         uiZoom: patch.uiZoom,
@@ -4066,6 +4167,8 @@ export function App() {
         notify: patch.notify,
         mergeAutoApply: patch.mergeAutoApply,
         logColumns: patch.logColumns,
+        fileHistoryShowNames: patch.fileHistoryShowNames,
+        stashCompareLocal: patch.stashCompareLocal,
         logLongEdges: patch.logLongEdges,
         logFirstParent: patch.logFirstParent,
         logPreviewPosition: patch.logPreviewPosition,
@@ -4084,6 +4187,12 @@ export function App() {
       setFontSize(next.diffFontSize);
       setGitPath(next.gitPath);
       setMergeTool(next.mergeTool);
+      setDiffTool(next.diffTool);
+      const preference = (next.language ?? "auto") as LanguagePreference;
+      setLanguage(preference);
+      setLocale(resolveLocale(preference));
+      setCherryPickKeepEmpty(next.cherryPickKeepEmpty);
+      setCherryPickIncludeSource(next.cherryPickIncludeSource);
       setSidebarWidth(next.sidebarWidth);
       setView(next.viewMode);
       setUiZoom(next.uiZoom);
@@ -4110,6 +4219,8 @@ export function App() {
       });
       setNotifyKinds(next.notify);
       setMergeAutoApply(next.mergeAutoApply);
+      setFileHistoryShowNames(next.fileHistoryShowNames);
+      setStashCompareLocal(next.stashCompareLocal);
       setLogSettings({
         columns: next.logColumns,
         longEdges: next.logLongEdges,
@@ -4128,13 +4239,15 @@ export function App() {
       });
       return null;
     } catch (caught) {
-      return getErrorMessage(caught);
+      return toAppError(caught);
     }
   }, []);
 
   /** 重新加载登录 shell 环境与 Git 程序（F08）。 */
-  const reloadEnvironment = useCallback(async (): Promise<string | null> => {
+  const reloadEnvironment = useCallback(async (): Promise<AppErrorPayload | null> => {
     try {
+      if (worktreeId) gateRef.current.activate(worktreeId);
+      setM6State(null); setHistoryAction(null); setExternalTool(null);
       await ipc.reloadEnvironment();
       if (worktreeId) {
         const session = await ipc.openWorktree(worktreeId);
@@ -4145,7 +4258,7 @@ export function App() {
       }
       return null;
     } catch (caught) {
-      return getErrorMessage(caught);
+      return toAppError(caught);
     }
   }, [refresh, worktreeId]);
 
@@ -4169,7 +4282,7 @@ export function App() {
       setActiveRepo(repo);
       const worktree = repo.worktrees.find((entry) => !entry.bare) ?? repo.worktrees[0];
       if (!worktree) {
-        setAppError({ kind: "rejected", message: messages.firstRun.notARepo });
+        setAppError(localizedError("rejected", "firstRun.notARepo"));
         return;
       }
       await ipc.selectRepo(repo.id, worktree.id);
@@ -4279,7 +4392,7 @@ export function App() {
       case "push":
         return ipc.pushBranch({ worktreeId: intent.worktreeId, request: intent.request });
       default:
-        return Promise.reject({ kind: "internal", message: "未知的远端操作" });
+        return Promise.reject(localizedError("internal", "errors.app.unknownRemoteOperation"));
     }
   }, []);
 
@@ -4308,20 +4421,20 @@ export function App() {
           refreshTarget,
           reportFailure: (_id, error) => {
             if (options.silent) {
-              setAutoFetchError(error.message);
+              setAutoFetchError(error);
               return;
             }
             notify({
               tone: error.kind === "needsVerification" ? "warning" : "error",
               title:
-                error.kind === "needsVerification"
+                () => (error.kind === "needsVerification"
                   ? messages.errors.needsVerification
                   : error.kind === "rejected"
                     ? messages.remote.rejectedTitle
                     : error.kind === "environment"
                       ? messages.remote.environmentTitle
-                      : messages.remote.gitFailedTitle,
-              detail: error.message,
+                      : messages.remote.gitFailedTitle),
+              detail: () => (formatAppError(error)),
               persistent: true,
             });
           },
@@ -4362,10 +4475,10 @@ export function App() {
       setCheckoutBlocked((current) => current?.origin === origin ? null : current);
       notify({
         tone: "success",
-        title: messages.remote.checkoutDone(result.branch),
-        detail: [result.stashKept ? messages.remote.checkoutStashKept : null, ...result.notes]
+        title: () => (messages.remote.checkoutDone(result.branch)),
+        detail: () => ([result.stashKept ? messages.remote.checkoutStashKept : null, ...result.notes.map(checkoutNoteText)]
           .filter((part): part is string => Boolean(part))
-          .join("\n") || undefined,
+          .join("\n") || undefined),
       });
     },
     [notify, performRemoteWrite],
@@ -4391,7 +4504,7 @@ export function App() {
       if (!outcome.ok) {
         // 对话框直接显示后端（Git）给出的原因，例如名字不合法。
         if (newBranchDialogRef.current === pending && remoteTargetIsCurrent(pending.origin, gateRef.current.token())) {
-          setNewBranchError(branchFailureDetail(outcome.error));
+          setNewBranchError(outcome.error);
         }
         return;
       }
@@ -4399,9 +4512,9 @@ export function App() {
       setNewBranchStart((current) => current === pending ? null : current);
       notify({
         tone: "success",
-        title: result.checkedOut
+        title: () => (result.checkedOut
           ? messages.remote.branchCreatedCheckedOut(result.name)
-          : messages.remote.branchCreated(result.name),
+          : messages.remote.branchCreated(result.name)),
       });
     },
     [newBranchStart, notify, performRemoteWrite],
@@ -4421,7 +4534,7 @@ export function App() {
         // fetch 成功：远端对象已取回，“远端有新提交”标记不再需要（不额外联网核对）。
         branchesIncomingRef.current.clearIncoming(incomingToken);
         if (reason === "user") {
-          notify({ tone: "success", title: messages.remote.fetchDone(result.remotes.join("、")) });
+          notify({ tone: "success", title: () => (messages.remote.fetchDone(result.remotes.join("、"))) });
         }
       }
     },
@@ -4475,7 +4588,7 @@ export function App() {
         setPushRejected({ origin, request });
       }
       if (next === "update-failed") {
-        notify({ tone: "warning", title: messages.remote.autoUpdateFailed });
+        notify({ tone: "warning", title: () => (messages.remote.autoUpdateFailed) });
       }
     },
     [notify, performRemoteWrite],
@@ -4494,8 +4607,8 @@ export function App() {
             if (afterCommit && closeCoordinatorRef.current.pendingIntent() !== null) {
               applyEffect(closeDriver.handleChoice("stay"));
               notify({
-                tone: "warning", title: messages.remote.pushConfirmationPending,
-                detail: messages.remote.pushConfirmationPendingDetail, persistent: true,
+                tone: "warning", title: () => (messages.remote.pushConfirmationPending),
+                detail: () => (messages.remote.pushConfirmationPendingDetail), persistent: true,
               });
             }
           },
@@ -4505,11 +4618,11 @@ export function App() {
         } else if (next.kind === "push") {
           await performPush(next.origin, next.request, { lease });
         } else if (afterCommit) {
-          setAppError({ kind: "rejected", message: messages.remote.pushConfirmationOtherWorktree }, origin.worktreeId);
+          setAppError(localizedError("rejected", "remote.pushConfirmationOtherWorktree"), origin.worktreeId);
         }
       } catch (caught) {
         setAppError(toAppError(caught), origin.worktreeId);
-        notify({ tone: "error", title: messages.remote.pushRejected, detail: getErrorMessage(caught), persistent: true });
+        notify({ tone: "error", title: () => (messages.remote.pushRejected), detail: () => (getErrorMessage(caught)), persistent: true });
       }
     },
     [applyEffect, closeDriver, notify, performPush, setAppError],
@@ -4523,7 +4636,7 @@ export function App() {
   };
 
   /** 自动 fetch 失败的状态栏提示（不弹通知，Q152）。 */
-  const [autoFetchError, setAutoFetchError] = useState<string | null>(null);
+  const [autoFetchError, setAutoFetchError] = useState<AppErrorPayload | null>(null);
   const branches = useBranches({
     worktreeId,
     refreshKey: refsRevision + watchRevision,
@@ -4537,6 +4650,301 @@ export function App() {
     },
   });
   branchesIncomingRef.current = branches;
+
+  // ---------------- M6：Stash、进行中操作、历史改写、文件历史、外部工具 ----------------
+
+  /** 读取进行中操作与自动保存的改动；只对当前 worktree 的迟到结果生效。 */
+  const refreshM6State = useCallback(async (targetWorktreeId: string) => {
+    const origin = captureRemoteTarget(gateRef.current.token(), targetWorktreeId);
+    const sequence = origin ? ++m6ReadSeq.current : null;
+    // Always read the original target. Only UI acceptance depends on activation;
+    // failures propagate to the write lifecycle and preserve NeedsVerification.
+    const next = await readM6State(
+      ipc.operationState(targetWorktreeId),
+      ipc.autostashPending(targetWorktreeId),
+    );
+    if (origin && sequence === m6ReadSeq.current && remoteTargetIsCurrent(origin, gateRef.current.token())) {
+      setM6State({ origin, ...next });
+    }
+    if (next.readErrors.length) throw next.readErrors[0];
+  }, []);
+
+  useEffect(() => {
+    if (!worktreeId) {
+      setM6State(null);
+      return;
+    }
+    void refreshM6State(worktreeId).catch(() => undefined);
+  }, [refreshM6State, refsRevision, snapshot?.revision, watchRevision, worktreeId]);
+
+  const savedStashAction = useCallback((target: string, link: AutostashLink) => ({
+    label: () => messages.operation.viewStash,
+    run: () => {
+      if (worktreeIdRef.current !== target) {
+        notifyM6(target, { tone: "warning", title: () => messages.operation.stashTargetChanged, detail: link.worktreePath });
+        return;
+      }
+      setStashFocusOid(link.stashOid);
+      setSideTab("stash");
+    },
+  }), [notifyM6]);
+
+  const notifyAutostashSaved = useCallback((target: string, link: AutostashLink, removed = false) => {
+    if (notifiedAutostashRef.current.has(link.id)) return;
+    notifiedAutostashRef.current.add(link.id);
+    notifyM6(target, savedAutostashNotice(link, savedStashAction(target, link), removed));
+  }, [notifyM6, savedStashAction]);
+
+  useEffect(() => {
+    if (autostashLink && worktreeId) notifyAutostashSaved(worktreeId, autostashLink);
+  }, [autostashLink, worktreeId, notifyAutostashSaved]);
+
+  const reportAutostash = useCallback((target: string, result: AutostashRestoreOutcome | null) => {
+    if (!result) return false;
+    notifyAutostashSaved(target, result.link, result.restored && result.removed);
+    if (result.restored && result.removed) return false;
+    notifyM6(target, {
+      tone: "warning",
+      title: () => result.cleanupError ? formatAppError(result.cleanupError) : result.conflicted ? messages.operation.autostashConflicted
+        : result.restored ? messages.operation.autostashRestoredNotRemoved : messages.operation.autostashNotRestored,
+      persistent: true,
+      action: savedStashAction(target, result.link),
+    });
+    return true;
+  }, [notifyM6, savedStashAction, notifyAutostashSaved]);
+
+  /**
+   * M6 写操作的统一入口：与恢复、合并共用全局写门禁和关闭/退出保护。
+   * 操作完成后真实重读当前 worktree、引用与进行中状态；不依赖 watcher。
+   */
+  async function performM6Write<T>(targetWorktreeId: string, work: () => Promise<T>, onResult?: (result: T) => void): Promise<T> {
+    if (writingWorktreesRef.current.has(targetWorktreeId)) {
+      throw localizedError("rejected", "recovery.busy");
+    }
+    writingWorktreesRef.current.add(targetWorktreeId);
+    setWritingWorktrees(new Set(writingWorktreesRef.current));
+    setM6Busy(true);
+    try {
+      const started = await writeOrchestrator.begin(targetWorktreeId);
+      if (!started.ok) {
+        throw closeGuardBlockedError(started.reason);
+      }
+    } catch (caught) {
+      writingWorktreesRef.current.delete(targetWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+      setM6Busy(false);
+      const failure = toAppError(caught);
+      setAppError(failure, targetWorktreeId);
+      throw failure;
+    }
+    setAppError(null, targetWorktreeId);
+    let needsVerification = false;
+    let completedWrite = false;
+    try {
+      const result = await work();
+      completedWrite = true;
+      needsVerification = resultNeedsVerification(result);
+      onResult?.(result);
+      if (!await refreshTarget(targetWorktreeId)) {
+        throw localizedError("needsVerification", "errors.recovery.writeResultNeedsVerification");
+      }
+      bumpRefsRevision();
+      await refreshM6State(targetWorktreeId);
+      setStashRevision((value) => value + 1);
+      return result;
+    } catch (caught) {
+      let failure = toAppError(caught);
+      if (completedWrite) failure = { ...localizedError("needsVerification", "errors.recovery.writeResultNeedsVerification"), cause: failure };
+      needsVerification ||= failure.kind === "needsVerification";
+      const retainReadFailure = (caught: unknown) => {
+        failure = { ...failure, related: [...(failure.related ?? []), toAppError(caught)] };
+      };
+      await refreshTarget(targetWorktreeId).catch(retainReadFailure);
+      await refreshM6State(targetWorktreeId).catch(retainReadFailure);
+      setAppError(failure, targetWorktreeId);
+      throw failure;
+    } finally {
+      writingWorktreesRef.current.delete(targetWorktreeId);
+      setWritingWorktrees(new Set(writingWorktreesRef.current));
+      setM6Busy(false);
+      writeOrchestrator.end(targetWorktreeId, needsVerification);
+    }
+  }
+
+  const performOperationAction = useCallback(async (action: OperationAction, origin: RemoteTarget, operation: OperationState) => {
+    const target = origin.worktreeId;
+    if (!remoteTargetIsCurrent(origin, gateRef.current.token()) || operation.metadataVersion !== operationState?.metadataVersion || operation.kind !== operationState?.kind || operation.confirmationState !== operationState?.confirmationState) {
+      notifyM6(target, { tone: "warning", title: () => messages.commit.stale });
+      return;
+    }
+    let received: RewriteOutcome | null = null;
+    try {
+      const outcome = await performM6Write(target, () => ipc.operationExecute(target, {
+        kind: operation.kind,
+        metadataVersion: operation.metadataVersion,
+        expectedState: operation.confirmationState,
+        action,
+      }), (result) => {
+        received = result.continuation ?? null;
+        if (result.autostash) notifyAutostashSaved(target, result.autostash.link, result.autostash.removed);
+      });
+      const continuation = outcome.continuation;
+      const detail = () => rewriteOutcomeDetail(continuation);
+      if (continuation?.error) {
+        notifyM6(target, { tone: "warning", title: () => formatAppError(continuation.error!), detail, persistent: true });
+      } else if (!outcome?.completed) {
+        notifyM6(target, {
+          tone: "warning",
+          title: () => (messages.operation.stopped(
+            operationKindText(outcome?.kind ?? operation.kind),
+            outcome?.state?.conflictCount ?? 0,
+          )),
+          persistent: true,
+        });
+      } else if (reportAutostash(target, outcome.autostash)) {
+        // The history operation finished, but its saved changes did not fully
+        // restore/clean up. The warning owns this result, not a success toast.
+      } else {
+        notifyM6(target, { tone: "success", title: () => (messages.operation.completed), detail });
+      }
+    } catch (caught) {
+      const failure = toAppError(caught);
+      notifyM6(target, received ? rewriteFailureNotice(received, failure) : {
+        tone: failure.kind === "needsVerification" ? "warning" : "error",
+        title: () => (formatAppError(failure)),
+        persistent: true,
+      });
+    }
+  }, [notifyM6, operationState, reportAutostash, notifyAutostashSaved]);
+
+  const performAutostashRestore = useCallback(async () => {
+    const captured = currentM6;
+    const confirmation = captured?.pending?.confirmationState;
+    if (!captured?.pending || !confirmation || !remoteTargetIsCurrent(captured.origin, gateRef.current.token())) return;
+    const target = captured.origin.worktreeId;
+    try {
+      const outcome = await performM6Write(target, () => ipc.autostashRestore(target, captured.pending!.link, confirmation), (result) => {
+        if (result) notifyAutostashSaved(target, result.link, result.removed);
+      });
+      if (reportAutostash(target, outcome)) {
+        // Saved changes remain available through the linked stash entry.
+      } else if (outcome?.restored) {
+        notifyM6(target, { tone: "success", title: () => (messages.operation.autostashRestored) });
+      }
+    } catch (caught) {
+      const failure = toAppError(caught);
+      notifyM6(target, {
+        tone: failure.kind === "needsVerification" ? "warning" : "error",
+        title: () => (formatAppError(failure)),
+        persistent: true,
+      });
+    }
+  }, [currentM6, notifyM6, reportAutostash, notifyAutostashSaved]);
+
+  const keepAutostash = useCallback(async () => {
+    const captured = currentM6;
+    const link = captured?.pending?.link;
+    if (!captured || !link || !remoteTargetIsCurrent(captured.origin, gateRef.current.token())) return;
+    const target = captured.origin.worktreeId;
+    try {
+      await performM6Write(target, () => ipc.autostashForget(target, link.id));
+      notifyM6(target, { tone: "info", title: () => messages.operation.autostashKept, action: savedStashAction(target, link) });
+    } catch (caught) {
+      const error = toAppError(caught);
+      notifyM6(target, { tone: "warning", title: () => formatAppError(error), persistent: true });
+    }
+  }, [currentM6, notifyM6, savedStashAction]);
+
+  /** 日志右键菜单打开改写对话框；reword 先取完整正文（只读，不改工作区）。 */
+  const openHistoryAction = useCallback(async (
+    action: LogHistoryAction,
+    commit: HistoryCommit,
+    commits: HistoryCommit[],
+    selection: HistoryCommit[],
+    origin: RemoteTarget | null,
+  ) => {
+    const sequence = ++historyActionSeqRef.current;
+    if (!origin || !remoteTargetIsCurrent(origin, gateRef.current.token())) {
+      notifyM6(origin?.worktreeId ?? worktreeIdRef.current ?? "", { tone: "warning", title: () => (messages.commit.stale) });
+      return;
+    }
+    const head = branches.overview?.headCommit ?? null;
+    if (!head) {
+      notifyM6(origin?.worktreeId ?? worktreeIdRef.current ?? "", { tone: "warning", title: () => (messages.historyActions.noHead) });
+      return;
+    }
+    let rangeCommits = commits;
+    if (action === "interactive" || action === "reword") {
+      try {
+        rangeCommits = await ipc.rewriteRange(origin.worktreeId, commit.oid, head);
+      } catch (caught) {
+        if (sequence === historyActionSeqRef.current && remoteTargetIsCurrent(origin, gateRef.current.token())) {
+          notifyM6(origin?.worktreeId ?? worktreeIdRef.current ?? "", { tone: "warning", title: () => formatAppError(toAppError(caught)) });
+        }
+        return;
+      }
+    }
+    let message = commit.subject;
+    if (action === "reword" && historyTargetId) {
+      try {
+        message = (await ipc.historyCommit(historyTargetId, commit.oid)).message;
+      } catch (caught) {
+        if (sequence !== historyActionSeqRef.current || !remoteTargetIsCurrent(origin, gateRef.current.token())) return;
+        notifyM6(origin?.worktreeId ?? worktreeIdRef.current ?? "", { tone: "error", title: () => (formatAppError(toAppError(caught))), persistent: true });
+        return;
+      }
+    }
+    if (sequence !== historyActionSeqRef.current || !remoteTargetIsCurrent(origin, gateRef.current.token())) return;
+    setHistoryMessage(message);
+    setHistoryAction({ origin, action, commit, commits: rangeCommits, selection, head });
+  }, [branches.overview?.headCommit, historyTargetId, notifyM6]);
+
+  const runHistoryRewrite = useCallback(async (origin: RemoteTarget, run: () => Promise<RewriteOutcome>) => {
+    if (!remoteTargetIsCurrent(origin, gateRef.current.token())) {
+      setHistoryAction(null);
+      notifyM6(origin.worktreeId, { tone: "warning", title: () => (messages.commit.stale) });
+      return;
+    }
+    let received: RewriteOutcome | null = null;
+    try {
+      const outcome = await performM6Write(origin.worktreeId, run, (result) => {
+        received = result;
+        if (result.autostash) notifyAutostashSaved(origin.worktreeId, result.autostash.link, result.autostash.removed);
+      });
+      setHistoryAction((current) => current?.origin.worktreeId === origin.worktreeId && current.origin.activation === origin.activation ? null : current);
+      const detail = () => rewriteOutcomeDetail(outcome);
+      if (outcome.error) {
+        notifyM6(origin.worktreeId, {
+          tone: outcome.error.kind === "needsVerification" ? "warning" : "error",
+          title: () => (formatAppError(outcome.error!)),
+          detail: () => (detail() ?? messages.historyActions.conflictHint),
+          persistent: true,
+        });
+      } else if (!outcome.completed) {
+        notifyM6(origin.worktreeId, { tone: "warning", title: () => (messages.historyActions.needsContinue), detail, persistent: true });
+      } else if (reportAutostash(origin.worktreeId, outcome.autostash)) {
+        // The operation completed, while local changes still need attention.
+      } else {
+        notifyM6(origin.worktreeId, { tone: "success", title: () => (messages.historyActions.completed), detail });
+      }
+    } catch (caught) {
+      if (!received) throw caught;
+      // The backend has already returned a receipt. Close only its original
+      // confirmation and report the known boundary with the readback failure.
+      setHistoryAction((current) => current?.origin.worktreeId === origin.worktreeId && current.origin.activation === origin.activation ? null : current);
+      notifyM6(origin.worktreeId, rewriteFailureNotice(received, toAppError(caught)));
+    }
+  }, [notifyM6, reportAutostash, notifyAutostashSaved]);
+
+  /** 从文件历史跳到日志中的同一提交：用哈希筛选，避免提交不在当前分页里。 */
+  const jumpToCommit = useCallback((oid: string) => {
+    setMainView("log");
+    logWorkspace.update({
+      selectedCommit: oid,
+      scrollTop: 0,
+      filter: filterForCommit(oid),
+    });
+  }, [logWorkspace]);
 
   /** 复制到剪贴板（提交哈希等）：失败不打断操作。 */
   const copyText = useCallback((text: string) => {
@@ -4638,10 +5046,11 @@ export function App() {
   }, [diffArea, selectedEntry]);
 
   if (!bootstrapDone) {
-    return <div className="flex h-full items-center justify-center text-descriptionforeground">载入中…</div>;
+    return <div className="flex h-full items-center justify-center text-descriptionforeground">{messages.app.loading}</div>;
   }
 
   const activeKey = mergeTabPath ? mergeTabKey(mergeTabPath) : selected ? tabKey(selected.path, selected.changes) : null;
+  const displayedM6Origin = captureRemoteTarget(gateRef.current.token(), worktreeId);
   const mergeEntry = snapshot?.worktreeId === worktreeId
     ? activeMergeEntry(mergeTabTargetRef.current, snapshot)
     : null;
@@ -4688,6 +5097,10 @@ export function App() {
     fontSize,
     gitPath: gitPath ?? "",
     mergeTool: mergeTool ?? "",
+    diffTool: diffTool ?? "",
+    language,
+    cherryPickKeepEmpty,
+    cherryPickIncludeSource,
     sidebarWidth,
     uiZoom,
     treeGroupByDirectory,
@@ -4710,6 +5123,8 @@ export function App() {
     notify: notifyKinds,
     mergeAutoApply,
     logColumns: logSettings.columns,
+    fileHistoryShowNames,
+    stashCompareLocal,
     logLongEdges: logSettings.longEdges,
     logFirstParent: logSettings.firstParent,
     logPreviewPosition: logSettings.previewPosition,
@@ -4851,6 +5266,17 @@ export function App() {
               <button
                 type="button"
                 className="side-tab"
+                aria-selected={sideTab === "stash"}
+                onClick={() => {
+                  setStashFocusOid(null);
+                  setSideTab("stash");
+                }}
+              >
+                {messages.stash.title}
+              </button>
+              <button
+                type="button"
+                className="side-tab"
                 aria-selected={sideTab === "recovery"}
                 onClick={() => setSideTab("recovery")}
               >
@@ -4948,8 +5374,8 @@ export function App() {
                     submitting={commitSubmitting}
                     reviewedCount={reviewedCount}
                     totalFiles={reviewTotal}
-                    draftNotice={commitContextError ?? commitDraftNotice}
-                    templateError={commitContext?.templateError ?? null}
+                    draftNotice={commitContextError ? formatAppError(commitContextError) : typeof commitDraftNotice === "function" ? commitDraftNotice() ?? null : commitDraftNotice}
+                    templateError={commitContext?.templateError ? formatAppError(commitContext.templateError) : null}
                     amendConfirm={amendConfirm}
                     liveOutput={
                       commitLiveOutput && commitLiveOutput.worktreeId === worktreeId
@@ -4971,6 +5397,53 @@ export function App() {
                   />
                 ) : null}
               </>
+            ) : sideTab === "stash" ? (
+              <StashPanel
+                key={`${worktreeId}:${gateRef.current.token().activation}`}
+                worktreeId={worktreeId}
+                busy={isWriting || m6Busy}
+                activation={gateRef.current.token().activation}
+                refreshKey={`${stashRevision}:${watchRevision}:${refsRevision}`}
+                focusOid={stashFocusOid}
+                compareLocal={stashCompareLocal}
+                onCompareLocal={(value) => updateSettings({ stashCompareLocal: value })}
+                onSave={(message, keepIndex, expectedState) => {
+                  if (!worktreeId) return Promise.resolve();
+                  return performM6Write(worktreeId, () => ipc.stashSave(worktreeId, { message, keepIndex, expectedState })).then(() => undefined);
+                }}
+                onApply={async (entry, options) => {
+                  if (!worktreeId) return;
+                  const origin = captureRemoteTarget(gateRef.current.token(), worktreeId);
+                  if (!origin) return;
+                  const outcome = await performM6Write(worktreeId, () => ipc.stashApply(worktreeId, {
+                    oid: entry.oid,
+                    entryKey: entry.key,
+                    restoreIndex: options.restoreIndex,
+                    deleteAfter: options.deleteAfter,
+                    newBranch: options.newBranch,
+                    expectedState: options.expectedState,
+                  }));
+                  if (outcome?.conflicted && remoteTargetIsCurrent(origin, gateRef.current.token())) {
+                    setSideTab("commit");
+                    setConflictDialogOpen(true);
+                  }
+                  return outcome;
+                }}
+                onDrop={(entry, expectedState) => {
+                  if (!worktreeId) return Promise.resolve();
+                  return performM6Write(worktreeId, () => ipc.stashDrop(worktreeId, entry, expectedState)).then(() => undefined);
+                }}
+                onClear={(oids, expectedState) => {
+                  if (!worktreeId) return Promise.resolve();
+                  return performM6Write(worktreeId, () => ipc.stashClear(worktreeId, oids, expectedState)).then(() => undefined);
+                }}
+                onRestoreArchive={(archive, expectedState) => {
+                  if (!worktreeId) return Promise.resolve();
+                  return performM6Write(worktreeId, () => ipc.stashArchiveRestore(worktreeId, archive.id, expectedState)).then(() => undefined);
+                }}
+                onRefresh={() => setStashRevision((value) => value + 1)}
+                onNotify={(notice) => notifyM6(worktreeId ?? "", notice)}
+              />
             ) : (
               <RecoveryPanel
                 worktreeId={worktreeId}
@@ -4987,6 +5460,23 @@ export function App() {
         ) : null}
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+          <OperationBanner
+            origin={captureRemoteTarget(gateRef.current.token(), worktreeId)}
+            state={operationState}
+            autostash={autostashLink}
+            autostashError={currentM6?.pending?.error ?? null}
+            canRestoreAutostash={!!currentM6?.pending?.confirmationState}
+            readErrors={currentM6?.readErrors ?? []}
+            busy={isWriting || m6Busy}
+            onAction={(action, origin, operation) => void performOperationAction(action, origin, operation)}
+            onRestoreAutostash={() => void performAutostashRestore()}
+          onKeepStash={() => void keepAutostash()}
+            onViewStash={() => {
+              if (!autostashLink) return;
+              setStashFocusOid(autostashLink.stashOid);
+              setSideTab("stash");
+            }}
+          />
           <EditorTabs
             tabs={tabs}
             activeKey={mainView === "diff" ? activeKey : null}
@@ -5008,6 +5498,10 @@ export function App() {
             onFileNext={() => focusNextFile(1)}
             onToggleReview={toggleReviewCurrent}
             onRefresh={() => void refresh()}
+            onFileHistory={(path) => openFileHistory(path, null, displayedM6Origin)}
+            onExternalDiff={() => {
+              if (selectedEntry) openExternalTool({ kind: "diff", path: selectedEntry.path, revision: null, changesKind: selectedEntry.changes, expectedFingerprint: selectedEntry.fingerprint }, displayedM6Origin);
+            }}
             logActive={mainView === "log"}
             onActivateLog={() => setMainView("log")}
             commitTabs={commitTabs.tabs}
@@ -5056,7 +5550,7 @@ export function App() {
           {mainView === "diff" && selectedEntry && diffArea === "readonly" && selectedEntry.readonlyReason ? (
             <EditorBanner tone="info" icon="lock">
               <span className="mr-1.5 font-semibold">{messages.changes.readonly}</span>
-              {messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
+              {readonlyReasonText(selectedEntry.readonlyReason)}
             </EditorBanner>
           ) : null}
           {mainView === "diff" && selectedEntry && diffArea === "collapsed" ? (
@@ -5065,7 +5559,7 @@ export function App() {
               icon="info"
               action={{ label: messages.changes.expandDiff, run: expandActive }}
             >
-              {`${messages.changes.collapsed}：${messages.changes.collapsedDetail}`}
+              {`${messages.changes.collapsed}: ${messages.changes.collapsedDetail}`}
             </EditorBanner>
           ) : null}
 
@@ -5079,6 +5573,7 @@ export function App() {
                 fontFamily={codeFontFamily}
                 softWrap={diffOptions.softWrap}
                 onClose={() => closeMergeTab(mergeEntry.path)}
+                onExternalMerge={(fingerprint) => openExternalTool({ kind: "merge", path: mergeEntry.path, revision: null, changesKind: null, expectedFingerprint: fingerprint }, displayedM6Origin)}
                 onWrite={performMergeWrite}
               />
             ) : !selectedEntry ? (
@@ -5101,7 +5596,7 @@ export function App() {
             ) : diffArea === "readonly" && selectedEntry.readonlyReason ? (
               <Hint
                 title={messages.changes.readonly}
-                detail={messages.changes.readonlyReasons[selectedEntry.readonlyReason]}
+                detail={readonlyReasonText(selectedEntry.readonlyReason)}
               />
             ) : diffArea === "loading" ? (
               <Hint title={messages.changes.loadingFile} />
@@ -5188,6 +5683,9 @@ export function App() {
                   setNewBranchError(null);
                   openNewBranch({ kind: "commit", oid: commit });
                 }}
+                onFileHistory={(commit, path) => openFileHistory(path, commit, displayedM6Origin)}
+                onFileExternalDiff={(commit, path) => openExternalTool({ kind: "diff", path, revision: commit, changesKind: null }, displayedM6Origin)}
+                onHistoryAction={(action, commit, commits, selection) => void openHistoryAction(action, commit, commits, selection, displayedM6Origin)}
                 onCopy={copyText}
                 onNotify={(notice) => notify(notice)}
               />
@@ -5248,10 +5746,79 @@ export function App() {
         total={reviewTotal}
         onRefresh={() => void refresh()}
         onOpenCommandLog={() => setCommandLogOpen((value) => !value)}
-        autoFetchError={autoFetchError}
+        autoFetchError={autoFetchError ? formatAppError(autoFetchError) : null}
       />
 
       <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
+
+      {historyAction && worktreeId ? (
+        <HistoryActionDialog
+          request={historyAction}
+          initialMessage={historyMessage}
+          cherryPickKeepEmpty={cherryPickKeepEmpty}
+          cherryPickIncludeSource={cherryPickIncludeSource}
+          busy={isWriting || m6Busy}
+          onClose={() => setHistoryAction(null)}
+          onRun={(run) => historyAction
+            ? runHistoryRewrite(historyAction.origin, run)
+            : Promise.resolve()}
+          onNotify={(notice) => notifyM6(historyAction.origin.worktreeId, notice)}
+        />
+      ) : null}
+
+      {fileHistory && remoteTargetIsCurrent(fileHistory.origin, gateRef.current.token()) ? (
+        <FileHistoryDialog
+          key={`${fileHistory.origin.worktreeId}:${fileHistory.path}:${fileHistory.revision ?? "working"}`}
+          worktreeId={fileHistory.origin.worktreeId}
+          path={fileHistory.path}
+          revision={fileHistory.revision}
+          showFileNames={fileHistoryShowNames}
+          onClose={() => setFileHistory(null)}
+          onJumpCommit={(oid) => {
+            jumpToCommit(oid);
+            setFileHistory(null);
+          }}
+          onNotify={(notice) => notifyM6(fileHistory.origin.worktreeId, notice)}
+        />
+      ) : null}
+
+      {externalTool ? (
+        <ExternalToolDialog
+          target={externalTool}
+          busy={isWriting || m6Busy}
+          onClose={() => setExternalTool(null)}
+          onLaunch={async (run, tool) => {
+            if (!remoteTargetIsCurrent(externalTool.origin, gateRef.current.token())) {
+              setExternalTool(null);
+              notifyM6(externalTool.origin.worktreeId, { tone: "warning", title: () => (messages.commit.stale) });
+              return;
+            }
+            void ipc.updateSettings(externalTool.kind === "diff" ? { diffTool: tool } : { mergeTool: tool })
+              .catch((caught) => {
+                const failure = toAppError(caught);
+                notifyM6(externalTool.origin.worktreeId, {
+                  tone: "warning", title: () => formatAppError(failure), persistent: true,
+                });
+              });
+            const outcome = await performM6Write(externalTool.origin.worktreeId, run);
+            setExternalTool((current) => current?.origin.worktreeId === externalTool.origin.worktreeId
+              && current.origin.activation === externalTool.origin.activation ? null : current);
+            if (outcome.stillConflicted) {
+              notifyM6(externalTool.origin.worktreeId, { tone: "warning", title: () => (messages.externalTools.stillConflicted), persistent: true });
+            } else if (outcome.exitCode !== null && outcome.exitCode !== 0) {
+              notifyM6(externalTool.origin.worktreeId, {
+                tone: "warning",
+                title: () => (messages.externalTools.failedExit(outcome.tool, outcome.exitCode!)),
+                detail: (outcome.stderr || outcome.stdout).trim() || undefined,
+                persistent: true,
+              });
+            } else {
+              notifyM6(externalTool.origin.worktreeId, { tone: "success", title: () => (messages.externalTools.finished(outcome.tool)) });
+            }
+          }}
+          onNotify={(notice) => notifyM6(externalTool.origin.worktreeId, notice)}
+        />
+      ) : null}
 
       {discardRequest ? (
         <DiscardDialog
@@ -5308,7 +5875,7 @@ export function App() {
           overview={branches.overview}
           start={newBranchStart.start}
           busy={isWriting}
-          error={newBranchError}
+          error={newBranchError ? branchFailureDetail(newBranchError) : null}
           onCancel={() => {
             setNewBranchStart(null);
             setNewBranchError(null);
@@ -5545,11 +6112,12 @@ function ErrorBanner({ error, onDismiss }: { error: AppErrorPayload; onDismiss: 
       action={{ label: messages.errors.dismiss, run: onDismiss }}
     >
       <strong className="mr-1.5 font-semibold">{title}</strong>
-      <span className={error.kind === "git" ? "font-mono text-xs whitespace-pre-wrap" : "whitespace-pre-wrap"}>{error.message}</span>
+      <span className={error.kind === "git" ? "font-mono text-xs whitespace-pre-wrap" : "whitespace-pre-wrap"}>{formatAppError(error)}</span>
     </EditorBanner>
   );
 }
 
+// x18n-ignore-start
 function MeasurePanel({
   open,
   status,
@@ -5626,6 +6194,7 @@ function Metric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+// x18n-ignore-end
 
 function AmendConfirmationOf(context: CommitContext, input: ComposerInput): AmendConfirmation {
   return {

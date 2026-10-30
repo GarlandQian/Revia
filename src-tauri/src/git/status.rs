@@ -48,6 +48,38 @@ pub enum ReadonlyReason {
 }
 
 impl ReadonlyReason {
+    /// 只读限制对应的结构化错误：前端按键查文案，参数为空。
+    pub fn error(self) -> crate::error::AppError {
+        use crate::error::{AppError, ErrorKind};
+        let (code, template) = match self {
+            Self::Symlink => (
+                "errors.readonly.symlink",
+                "符号链接为只读类型，不支持在应用内暂存或取消暂存",
+            ),
+            Self::Submodule => (
+                "errors.readonly.submodule",
+                "子模块为只读类型，不支持在应用内暂存或取消暂存",
+            ),
+            Self::NestedRepo => (
+                "errors.readonly.nestedRepo",
+                "嵌套仓库为只读类型，不支持在应用内暂存",
+            ),
+            Self::Conflict => (
+                "errors.readonly.conflict",
+                "文件存在未解决的冲突，不支持通过普通操作暂存",
+            ),
+            Self::NonUtf8Path => (
+                "errors.readonly.nonUtf8Path",
+                "非 UTF-8 路径无法无损处理，仅供只读查看",
+            ),
+            Self::Unreadable => (
+                "errors.readonly.unreadable",
+                "文件无法读取或无访问权限，仅供只读查看",
+            ),
+        };
+        AppError::coded(ErrorKind::Rejected, code, template, &[])
+    }
+
     pub fn description(&self) -> &'static str {
         match self {
             Self::Symlink => "符号链接为只读类型，不支持在应用内暂存或取消暂存",
@@ -178,7 +210,9 @@ pub fn parse(bytes: &[u8]) -> WorktreeStatus {
                     || head.get(4).is_some_and(|m| *m == "160000")
                     || head.get(5).is_some_and(|m| *m == "160000");
                 let has_non_utf8 = path.contains('\u{FFFD}')
-                    || original_path.as_deref().is_some_and(|orig| orig.contains('\u{FFFD}'));
+                    || original_path
+                        .as_deref()
+                        .is_some_and(|orig| orig.contains('\u{FFFD}'));
                 let readonly_reason = if is_symlink {
                     Some(ReadonlyReason::Symlink)
                 } else if is_submodule {
@@ -317,7 +351,11 @@ mod tests {
 
     #[test]
     fn parses_branch_and_modified_file() {
-        let bytes = nul(&["# branch.oid abc", "# branch.head main", "1 .M N... 100644 100644 100644 aaa bbb src/app.ts"]);
+        let bytes = nul(&[
+            "# branch.oid abc",
+            "# branch.head main",
+            "1 .M N... 100644 100644 100644 aaa bbb src/app.ts",
+        ]);
         let status = parse(&bytes);
         assert_eq!(status.branch.as_deref(), Some("main"));
         assert!(!status.detached);
@@ -339,7 +377,10 @@ mod tests {
 
     #[test]
     fn parses_rename_with_original_path() {
-        let bytes = nul(&["2 R. N... 100644 100644 100644 aaa bbb R100 new.ts", "old.ts"]);
+        let bytes = nul(&[
+            "2 R. N... 100644 100644 100644 aaa bbb R100 new.ts",
+            "old.ts",
+        ]);
         let status = parse(&bytes);
         assert_eq!(status.entries.len(), 1);
         assert_eq!(status.entries[0].status, FileStatus::Renamed);

@@ -1,3 +1,5 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { formatAppError } from "@/lib/error";
 /**
  * 设置对话框（M4 F08、返修 E/Q139）：左上角搜索、左侧分类可展开、右侧顶部
  * 显示“分类 › 页名”，外观照 VS Code。
@@ -15,7 +17,13 @@ import type {
   UpdateMode,
 } from "@/lib/ipc";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
+import { highlightLevelText, notifyKindText } from "@/lib/i18n/text";
+
+/** 搜索关键词在资源里以 `|` 分隔，避免运行期拼接翻译键（Q171）。 */
+function keywordList(value: string): string[] {
+  return value.split("|");
+}
 import { themesOfKind } from "@/lib/theme";
 import { Codicon } from "@/components/ui/codicon";
 
@@ -26,6 +34,10 @@ export interface SettingsValues {
   fontSize: number;
   gitPath: string;
   mergeTool: string;
+  diffTool: string;
+  language: "auto" | "zh-CN" | "en";
+  cherryPickKeepEmpty: boolean;
+  cherryPickIncludeSource: boolean;
   sidebarWidth: number;
   uiZoom: number;
   treeGroupByDirectory: boolean;
@@ -48,6 +60,8 @@ export interface SettingsValues {
   notify: NotifyKinds;
   mergeAutoApply: boolean;
   logColumns: LogColumns;
+  fileHistoryShowNames: boolean;
+  stashCompareLocal: boolean;
   logLongEdges: boolean;
   logFirstParent: boolean;
   logPreviewPosition: LogPreviewPosition;
@@ -71,6 +85,10 @@ export interface SettingsPatch {
   diffFontSize?: number;
   gitPath?: string;
   mergeTool?: string;
+  diffTool?: string;
+  language?: string;
+  cherryPickKeepEmpty?: boolean;
+  cherryPickIncludeSource?: boolean;
   sidebarWidth?: number;
   viewMode?: "split" | "unified";
   uiZoom?: number;
@@ -94,6 +112,8 @@ export interface SettingsPatch {
   notify?: NotifyKinds;
   mergeAutoApply?: boolean;
   logColumns?: LogColumns;
+  fileHistoryShowNames?: boolean;
+  stashCompareLocal?: boolean;
   logLongEdges?: boolean;
   logFirstParent?: boolean;
   logPreviewPosition?: LogPreviewPosition;
@@ -110,11 +130,13 @@ export interface SettingsPatch {
 type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "about";
 type Page =
   | "theme"
+  | "language"
   | "font"
   | "commitMessage"
   | "commitWarnings"
   | "diffDisplay"
   | "logSettings"
+  | "fileHistory"
   | "notifications"
   | "gitTools"
   | "updatePush"
@@ -133,13 +155,15 @@ interface CategoryDef {
   pages: PageDef[];
 }
 
-const CATEGORIES: CategoryDef[] = [
+function buildCategories(): CategoryDef[] {
+  return [
   {
     id: "appearance",
     title: messages.settings.appearance,
     pages: [
-      { id: "theme", title: messages.settings.pages.theme, keywords: messages.settings.keywords.theme },
-      { id: "font", title: messages.settings.pages.font, keywords: messages.settings.keywords.font },
+      { id: "theme", title: messages.settings.pages.theme, keywords: keywordList(messages.settings.keywords.theme) },
+      { id: "language", title: messages.settings.pages.language, keywords: keywordList(messages.settings.keywords.language) },
+      { id: "font", title: messages.settings.pages.font, keywords: keywordList(messages.settings.keywords.font) },
     ],
   },
   {
@@ -149,12 +173,12 @@ const CATEGORIES: CategoryDef[] = [
       {
         id: "commitMessage",
         title: messages.settings.pages.commitMessage,
-        keywords: messages.settings.keywords.commitMessage,
+        keywords: keywordList(messages.settings.keywords.commitMessage),
       },
       {
         id: "commitWarnings",
         title: messages.settings.pages.commitWarnings,
-        keywords: messages.settings.keywords.commitWarnings,
+        keywords: keywordList(messages.settings.keywords.commitWarnings),
       },
     ],
   },
@@ -165,7 +189,7 @@ const CATEGORIES: CategoryDef[] = [
       {
         id: "diffDisplay",
         title: messages.settings.pages.diffDisplay,
-        keywords: messages.settings.keywords.diffDisplay,
+        keywords: keywordList(messages.settings.keywords.diffDisplay),
       },
     ],
   },
@@ -173,14 +197,15 @@ const CATEGORIES: CategoryDef[] = [
     id: "log",
     title: messages.log.title,
     pages: [
-      { id: "logSettings", title: messages.settings.pages.log, keywords: messages.settings.keywords.log },
+      { id: "logSettings", title: messages.settings.pages.log, keywords: keywordList(messages.settings.keywords.log) },
+      { id: "fileHistory", title: messages.settings.pages.fileHistory, keywords: keywordList(messages.settings.keywords.fileHistory) },
     ],
   },
   {
     id: "notifications",
     title: messages.settings.notifications,
     pages: [
-      { id: "notifications", title: messages.settings.pages.notifications, keywords: messages.settings.keywords.notifications },
+      { id: "notifications", title: messages.settings.pages.notifications, keywords: keywordList(messages.settings.keywords.notifications) },
     ],
   },
   {
@@ -190,29 +215,32 @@ const CATEGORIES: CategoryDef[] = [
       {
         id: "gitTools",
         title: messages.settings.pages.gitTools,
-        keywords: messages.settings.keywords.gitTools,
+        keywords: keywordList(messages.settings.keywords.gitTools),
       },
       {
         id: "updatePush",
         title: messages.settings.pages.updatePush,
-        keywords: messages.settings.keywords.updatePush,
+        keywords: keywordList(messages.settings.keywords.updatePush),
       },
     ],
   },
   {
     id: "about",
     title: messages.settings.about,
-    pages: [{ id: "about", title: messages.settings.about, keywords: messages.settings.keywords.about }],
+    pages: [{ id: "about", title: messages.settings.about, keywords: keywordList(messages.settings.keywords.about) }],
   },
-];
+  ];
+}
 
 const CATEGORY_OF_PAGE: Record<Page, Category> = {
   theme: "appearance",
+  language: "appearance",
   font: "appearance",
   commitMessage: "commit",
   commitWarnings: "commit",
   diffDisplay: "diff",
   logSettings: "log",
+  fileHistory: "log",
   notifications: "notifications",
   gitTools: "git",
   updatePush: "git",
@@ -229,8 +257,8 @@ export function SettingsDialog({
   open: boolean;
   values: SettingsValues;
   onClose: () => void;
-  onChange: (patch: SettingsPatch) => Promise<string | null>;
-  onReloadEnvironment: () => Promise<string | null>;
+  onChange: (patch: SettingsPatch) => Promise<AppErrorPayload | null>;
+  onReloadEnvironment: () => Promise<AppErrorPayload | null>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [page, setPage] = useState<Page>("theme");
@@ -240,12 +268,14 @@ export function SettingsDialog({
   const [size, setSize] = useState(String(values.fontSize));
   const [zoom, setZoom] = useState(String(values.uiZoom));
   const [gitPath, setGitPath] = useState(values.gitPath);
+  const [mergeTool, setMergeTool] = useState(values.mergeTool);
+  const [diffTool, setDiffTool] = useState(values.diffTool);
   const [subjectLimit, setSubjectLimit] = useState(String(values.commitSubjectLimit));
   const [bodyLimit, setBodyLimit] = useState(String(values.commitBodyLineLimit));
   const [largeFileMb, setLargeFileMb] = useState(String(Math.round(values.commitWarnLargeFileBytes / (1024 * 1024))));
   const [protectedBranches, setProtectedBranches] = useState(values.protectedBranches);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<AppErrorPayload | null>(null);
+  const [notice, setNotice] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -253,12 +283,14 @@ export function SettingsDialog({
     setSize(String(values.fontSize));
     setZoom(String(values.uiZoom));
     setGitPath(values.gitPath);
+    setMergeTool(values.mergeTool);
+    setDiffTool(values.diffTool);
     setSubjectLimit(String(values.commitSubjectLimit));
     setBodyLimit(String(values.commitBodyLineLimit));
     setLargeFileMb(String(Math.round(values.commitWarnLargeFileBytes / (1024 * 1024))));
     setProtectedBranches(values.protectedBranches);
     setError(null);
-    setNotice(null);
+    setNotice(false);
     setQuery("");
   }, [
     open,
@@ -266,6 +298,8 @@ export function SettingsDialog({
     values.fontSize,
     values.uiZoom,
     values.gitPath,
+    values.mergeTool,
+    values.diffTool,
     values.commitSubjectLimit,
     values.commitBodyLineLimit,
     values.commitWarnLargeFileBytes,
@@ -279,19 +313,20 @@ export function SettingsDialog({
     return () => dialog.close();
   }, [open]);
 
+  const categories = buildCategories();
   const trimmedQuery = query.trim();
   const matches = useMemo(() => {
     if (!trimmedQuery) return null;
     const text = trimmedQuery.toLowerCase();
     const result: PageDef[] = [];
-    for (const category of CATEGORIES) {
+    for (const category of categories) {
       for (const candidate of category.pages) {
         const haystack = [category.title, candidate.title, ...candidate.keywords].join(" ").toLowerCase();
         if (haystack.includes(text)) result.push(candidate);
       }
     }
     return result;
-  }, [trimmedQuery]);
+  }, [categories, trimmedQuery]);
 
   if (!open) return null;
 
@@ -312,7 +347,7 @@ export function SettingsDialog({
     else reset(String(current));
   };
 
-  const activePage = CATEGORIES.find((category) => category.id === CATEGORY_OF_PAGE[page]);
+  const activePage = categories.find((category) => category.id === CATEGORY_OF_PAGE[page]);
   const activePageTitle = activePage?.pages.find((candidate) => candidate.id === page)?.title ?? "";
   const activeCategoryTitle = activePage?.title ?? "";
 
@@ -322,8 +357,8 @@ export function SettingsDialog({
   };
 
   const visibleCategories = trimmedQuery && matches
-    ? CATEGORIES.filter((category) => category.pages.some((candidate) => matches.includes(candidate)))
-    : CATEGORIES;
+    ? categories.filter((category) => category.pages.some((candidate) => matches.includes(candidate)))
+    : categories;
 
   return (
     <dialog
@@ -410,12 +445,12 @@ export function SettingsDialog({
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             {error ? (
               <p role="alert" className="mb-3 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] bg-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_10%,var(--editor-background))] px-3 py-2 text-[12px]">
-                {error}
+                {formatAppError(error)}
               </p>
             ) : null}
             {notice ? (
               <p role="status" className="mb-3 text-[12px] text-descriptionforeground">
-                {notice}
+                {messages.settings.reloaded}
               </p>
             ) : null}
 
@@ -446,6 +481,22 @@ export function SettingsDialog({
                         {theme.label}
                       </option>
                     ))}
+                  </select>
+                </Field>
+              </div>
+            ) : null}
+
+            {page === "language" ? (
+              <div className="space-y-5">
+                <Field label={messages.settings.language} hint={messages.settings.languageHint}>
+                  <select
+                    className="settings-select"
+                    value={values.language}
+                    onChange={(event) => void commit({ language: event.target.value === "auto" ? "" : event.target.value })}
+                  >
+                    <option value="auto">{messages.settings.languageAuto}</option>
+                    <option value="zh-CN">{messages.settings.languageChinese}</option>
+                    <option value="en">{messages.settings.languageEnglish}</option>
                   </select>
                 </Field>
               </div>
@@ -515,6 +566,18 @@ export function SettingsDialog({
 
             {page === "commitMessage" ? (
               <div className="space-y-5">
+                <Toggle
+                  label={messages.settings.cherryPickKeepEmpty}
+                  hint={messages.settings.cherryPickKeepEmptyHint}
+                  checked={values.cherryPickKeepEmpty}
+                  onChange={(value) => void commit({ cherryPickKeepEmpty: value })}
+                />
+                <Toggle
+                  label={messages.settings.cherryPickIncludeSource}
+                  hint={messages.settings.cherryPickIncludeSourceHint}
+                  checked={values.cherryPickIncludeSource}
+                  onChange={(value) => void commit({ cherryPickIncludeSource: value })}
+                />
                 <Field label={messages.settings.commitSubjectLimit} hint={messages.settings.commitSubjectLimitHint}>
                   <input
                     className="settings-input w-24"
@@ -670,7 +733,7 @@ export function SettingsDialog({
                   >
                     {(["word", "line", "char", "none"] as const).map((level) => (
                       <option key={level} value={level}>
-                        {messages.diff.highlightLevels[level]}
+                        {highlightLevelText(level)}
                       </option>
                     ))}
                   </select>
@@ -686,6 +749,24 @@ export function SettingsDialog({
                     <option value={2}>{messages.diff.ignoreWhitespaceLevels.all}</option>
                     <option value={3}>{messages.diff.ignoreWhitespaceLevels.allBlank}</option>
                   </select>
+                </Field>
+              </div>
+            ) : null}
+
+            {page === "fileHistory" ? (
+              <div className="space-y-5">
+                <Field
+                  label={messages.settings.fileHistoryShowNames}
+                  hint={messages.settings.fileHistoryShowNamesHint}
+                >
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input
+                      type="checkbox"
+                      checked={values.fileHistoryShowNames}
+                      onChange={(event) => void commit({ fileHistoryShowNames: event.target.checked })}
+                    />
+                    {messages.settings.fileHistoryShowNames}
+                  </label>
                 </Field>
               </div>
             ) : null}
@@ -846,7 +927,7 @@ export function SettingsDialog({
                 {(["stage", "discard", "commit", "recovery"] as const).map((kind) => (
                   <Toggle
                     key={kind}
-                    label={messages.settings.notifyKinds[kind]}
+                    label={notifyKindText(kind)}
                     checked={values.notify[kind]}
                     onChange={(value) => void commit({ notify: { ...values.notify, [kind]: value } })}
                   />
@@ -856,6 +937,12 @@ export function SettingsDialog({
 
             {page === "gitTools" ? (
               <div className="space-y-5">
+                <Toggle
+                  label={messages.stash.compareLocal}
+                  hint={messages.settings.stashComparisonHint}
+                  checked={values.stashCompareLocal}
+                  onChange={(value) => void commit({ stashCompareLocal: value })}
+                />
                 <Field
                   label={messages.settings.gitPath}
                   hint={
@@ -878,6 +965,36 @@ export function SettingsDialog({
                     }}
                   />
                 </Field>
+                <Field label={messages.settings.mergeTool} hint={messages.settings.mergeToolHint}>
+                  <input
+                    className="settings-input font-mono text-[12px]"
+                    value={mergeTool}
+                    placeholder={messages.settings.toolPlaceholder}
+                    spellCheck={false}
+                    onChange={(event) => setMergeTool(event.target.value)}
+                    onBlur={() => {
+                      if (mergeTool !== values.mergeTool) void commit({ mergeTool });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && mergeTool !== values.mergeTool) void commit({ mergeTool });
+                    }}
+                  />
+                </Field>
+                <Field label={messages.settings.diffTool} hint={messages.settings.diffToolHint}>
+                  <input
+                    className="settings-input font-mono text-[12px]"
+                    value={diffTool}
+                    placeholder={messages.settings.toolPlaceholder}
+                    spellCheck={false}
+                    onChange={(event) => setDiffTool(event.target.value)}
+                    onBlur={() => {
+                      if (diffTool !== values.diffTool) void commit({ diffTool });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && diffTool !== values.diffTool) void commit({ diffTool });
+                    }}
+                  />
+                </Field>
                 <Toggle
                   label={messages.settings.mergeAutoApply}
                   hint={messages.settings.mergeAutoApplyHint}
@@ -891,7 +1008,7 @@ export function SettingsDialog({
                     onClick={() => {
                       void onReloadEnvironment().then((failure) => {
                         setError(failure);
-                        setNotice(failure ? null : messages.settings.reloaded);
+                        setNotice(!failure);
                       });
                     }}
                   >

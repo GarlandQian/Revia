@@ -11,7 +11,8 @@ import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { DiffHighlight } from "@/features/diff/SideBySideView";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
+import { highlightLevelText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
 import { FileTypeIcon } from "./FileTypeIcon";
@@ -82,6 +83,8 @@ export function EditorTabs({
   onFileNext,
   onToggleReview,
   onRefresh,
+  onFileHistory,
+  onExternalDiff,
   logActive,
   onActivateLog,
   commitTabs,
@@ -110,6 +113,9 @@ export function EditorTabs({
   onFileNext: () => void;
   onToggleReview: () => void;
   onRefresh: () => void;
+  /** 文件历史 / Blame 与外部 diff（M6）。 */
+  onFileHistory: (path: string) => void;
+  onExternalDiff: () => void;
   /** 日志页签（固定在最左，不可关闭）。 */
   logActive: boolean;
   onActivateLog: () => void;
@@ -388,7 +394,7 @@ export function EditorTabs({
                 selected={diffOptions.highlight === level}
                 onClick={() => onDiffOption({ highlight: level })}
               >
-                {messages.diff.highlightLevels[level]}
+                {highlightLevelText(level)}
               </MenuItem>
             ))}
             <MenuSeparator />
@@ -467,6 +473,13 @@ export function EditorTabs({
             </MenuItem>
             <MenuItem disabled={tabs.length === 0} onClick={onCloseAll}>
               {messages.changes.closeAllTabs}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem disabled={!entry} onClick={() => entry && onFileHistory(entry.path)}>
+              {messages.fileHistory.open}
+            </MenuItem>
+            <MenuItem disabled={!entry || entry.unmerged} onClick={onExternalDiff}>
+              {messages.externalTools.openDiff}
             </MenuItem>
             <MenuSeparator />
             <MenuItem onClick={onRefresh}>{messages.changes.refresh}</MenuItem>

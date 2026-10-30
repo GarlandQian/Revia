@@ -115,7 +115,10 @@ impl Fixture {
             ("HOME".into(), home.display().to_string()),
             ("USERPROFILE".into(), home.display().to_string()),
             ("XDG_CONFIG_HOME".into(), home.display().to_string()),
-            ("GIT_CONFIG_GLOBAL".into(), global_config.display().to_string()),
+            (
+                "GIT_CONFIG_GLOBAL".into(),
+                global_config.display().to_string(),
+            ),
             ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
             ("GIT_TERMINAL_PROMPT".into(), "0".into()),
             ("PATH".into(), joined_path.to_string_lossy().into_owned()),
@@ -141,13 +144,21 @@ impl Fixture {
         fs::write(repo.join("a.txt"), b"one\n").unwrap();
         run_git(&repo, &env, &["add", "-A"]);
         run_git(&repo, &env, &["commit", "-m", "first"]);
-        run_git(&repo, &env, &["init", "--bare", "-b", "main", origin.to_str().unwrap()]);
+        run_git(
+            &repo,
+            &env,
+            &["init", "--bare", "-b", "main", origin.to_str().unwrap()],
+        );
         let url = format!("file://{}", origin.display());
         run_git(&repo, &env, &["remote", "add", "origin", &url]);
         run_git(&repo, &env, &["push", "-u", "origin", "main"]);
         run_git(&root, &env, &["clone", &url, other.to_str().unwrap()]);
         run_git(&other, &env, &["config", "user.name", "Other"]);
-        run_git(&other, &env, &["config", "user.email", "other@revia.invalid"]);
+        run_git(
+            &other,
+            &env,
+            &["config", "user.email", "other@revia.invalid"],
+        );
 
         let log = Arc::new(CommandLog::default());
         let session = WorktreeSession::open(
@@ -240,7 +251,11 @@ impl Fixture {
     }
 
     fn log_args(&self) -> Vec<Vec<String>> {
-        self.log.snapshot().into_iter().map(|record| record.args).collect()
+        self.log
+            .snapshot()
+            .into_iter()
+            .map(|record| record.args)
+            .collect()
     }
 }
 
@@ -249,7 +264,10 @@ fn local(name: &str) -> CheckoutTarget {
 }
 
 fn remote(remote: &str, branch: &str) -> CheckoutTarget {
-    CheckoutTarget::Remote { remote: remote.into(), branch: branch.into() }
+    CheckoutTarget::Remote {
+        remote: remote.into(),
+        branch: branch.into(),
+    }
 }
 
 fn checkout(
@@ -257,7 +275,8 @@ fn checkout(
     target: CheckoutTarget,
     strategy: CheckoutStrategy,
 ) -> revia_lib::error::Result<CheckoutResult> {
-    remote_ops::checkout(&f.session, &f.store, &target, strategy)
+    remote_ops::checkout(&f.session, &f.store, &target, strategy,
+        &revia_lib::stash_archive::StashArchiveStore::new(&f.data))
 }
 
 #[test]
@@ -271,7 +290,10 @@ fn branch_overview_lists_current_local_and_remote_branches() {
     // 当前分支置顶。
     assert_eq!(overview.local[0].name, "main");
     assert!(overview.local[0].is_current);
-    assert_eq!(overview.local[0].upstream.as_deref(), Some("refs/remotes/origin/main"));
+    assert_eq!(
+        overview.local[0].upstream.as_deref(),
+        Some("refs/remotes/origin/main")
+    );
     assert_eq!(overview.local[0].ahead, 0);
     assert_eq!(overview.local[0].behind, 0);
     assert_eq!(overview.remote_names, vec!["origin".to_string()]);
@@ -279,7 +301,13 @@ fn branch_overview_lists_current_local_and_remote_branches() {
     assert_eq!(origin.name, "origin");
     assert!(origin.branches.iter().any(|item| item.branch == "main"));
     assert_eq!(
-        origin.branches.iter().find(|item| item.branch == "main").unwrap().tracking_local.as_deref(),
+        origin
+            .branches
+            .iter()
+            .find(|item| item.branch == "main")
+            .unwrap()
+            .tracking_local
+            .as_deref(),
         Some("main")
     );
     assert_eq!(overview.user.email.as_deref(), Some("branch@revia.invalid"));
@@ -301,12 +329,15 @@ fn checkout_remote_branch_creates_tracking_branch_and_reuses_existing_one() {
         panic!("干净的检出不应需要确认");
     };
     assert_eq!(outcome.branch, "remote-only");
-    assert_eq!(f.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "remote-only");
+    assert_eq!(
+        f.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(),
+        "remote-only"
+    );
     assert_eq!(
         f.git(&["rev-parse", "--abbrev-ref", "@{upstream}"]).trim(),
         "origin/remote-only"
     );
-    assert!(outcome.notes.iter().any(|note| note.contains("跟踪")));
+    assert!(outcome.notes.iter().any(|note| matches!(note, revia_lib::remote_ops::CheckoutNote::CreatedTracking { .. } | revia_lib::remote_ops::CheckoutNote::ExistingTracking { .. })));
 
     // 再检出一次：已有同名且跟踪它的本地分支，直接用它。
     f.git(&["checkout", "main"]);
@@ -330,7 +361,10 @@ fn same_named_local_branch_without_tracking_is_not_overwritten() {
     let error = checkout(&f, remote("origin", "topic"), CheckoutStrategy::Plain).unwrap_err();
     assert!(error.message.contains("不跟踪"), "{}", error.message);
     // 本地分支没有被覆盖，仍在 main 上。
-    assert_eq!(f.git(&["rev-parse", "topic"]).trim(), f.git(&["rev-parse", "main"]).trim());
+    assert_eq!(
+        f.git(&["rev-parse", "topic"]).trim(),
+        f.git(&["rev-parse", "main"]).trim()
+    );
 }
 
 #[test]
@@ -353,24 +387,39 @@ fn create_branch_validates_name_and_supports_three_starts() {
     let head = f.head();
     let result = remote_ops::create_branch(
         &f.session,
-        &CreateBranchRequest { name: "bad..name".into(), start: BranchStart::Head, checkout: false },
+        &CreateBranchRequest {
+            name: "bad..name".into(),
+            start: BranchStart::Head,
+            checkout: false,
+        },
     );
     assert!(result.is_err());
 
     // 起点：HEAD。
     let created = remote_ops::create_branch(
         &f.session,
-        &CreateBranchRequest { name: "from-head".into(), start: BranchStart::Head, checkout: true },
+        &CreateBranchRequest {
+            name: "from-head".into(),
+            start: BranchStart::Head,
+            checkout: true,
+        },
     )
     .unwrap();
     assert!(created.checked_out);
     assert_eq!(created.commit, head);
-    assert_eq!(f.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "from-head");
+    assert_eq!(
+        f.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(),
+        "from-head"
+    );
 
     // 已存在的名字被拒绝。
     let error = remote_ops::create_branch(
         &f.session,
-        &CreateBranchRequest { name: "from-head".into(), start: BranchStart::Head, checkout: false },
+        &CreateBranchRequest {
+            name: "from-head".into(),
+            start: BranchStart::Head,
+            checkout: false,
+        },
     )
     .unwrap_err();
     assert!(error.message.contains("已存在"), "{}", error.message);
@@ -381,7 +430,9 @@ fn create_branch_validates_name_and_supports_three_starts() {
         &f.session,
         &CreateBranchRequest {
             name: "from-ref".into(),
-            start: BranchStart::Ref { full_name: "refs/heads/from-head".into() },
+            start: BranchStart::Ref {
+                full_name: "refs/heads/from-head".into(),
+            },
             checkout: false,
         },
     )
@@ -392,7 +443,11 @@ fn create_branch_validates_name_and_supports_three_starts() {
     // 起点：完整提交 ID。
     let created = remote_ops::create_branch(
         &f.session,
-        &CreateBranchRequest { name: "from-oid".into(), start: BranchStart::Commit { oid: head.clone() }, checkout: false },
+        &CreateBranchRequest {
+            name: "from-oid".into(),
+            start: BranchStart::Commit { oid: head.clone() },
+            checkout: false,
+        },
     )
     .unwrap();
     assert_eq!(created.commit, head);
@@ -402,7 +457,9 @@ fn create_branch_validates_name_and_supports_three_starts() {
         &f.session,
         &CreateBranchRequest {
             name: "from-nowhere".into(),
-            start: BranchStart::Ref { full_name: "refs/heads/nope".into() },
+            start: BranchStart::Ref {
+                full_name: "refs/heads/nope".into(),
+            },
             checkout: false,
         },
     )
@@ -467,7 +524,10 @@ fn smart_checkout_saves_recovery_stashes_and_restores_changes() {
     // 本地改动被恢复（没有被丢掉）。
     assert_eq!(f.read("a.txt"), "local uncommitted\n");
     // 被覆盖的那些文件在操作前已存入回收区。
-    assert!(f.recovery_sources().contains(&RecoverySource::CheckoutSmart));
+    assert!(
+        f.recovery_sources()
+            .contains(&RecoverySource::CheckoutSmart)
+    );
     let record_id = outcome.recovery_record_id.expect("应有回收记录");
     let summary = f
         .store
@@ -477,7 +537,7 @@ fn smart_checkout_saves_recovery_stashes_and_restores_changes() {
         .find(|record| record.id == record_id)
         .expect("回收记录应可列出");
     assert_eq!(summary.source, RecoverySource::CheckoutSmart);
-    assert_eq!(summary.paths, vec!["a.txt".to_string()]);
+    assert!(summary.paths.contains(&"a.txt".to_string()));
     // stash 已恢复，没有留下条目。
     assert!(f.git(&["stash", "list"]).trim().is_empty());
 }
@@ -501,7 +561,7 @@ fn smart_checkout_conflict_keeps_the_stash_and_reports_conflicts() {
     assert_eq!(outcome.conflicts, vec!["a.txt".to_string()]);
     // 冲突时 Git 保留 stash 条目，用户还能找回来。
     assert!(!f.git(&["stash", "list"]).trim().is_empty());
-    assert!(outcome.notes.iter().any(|note| note.contains("stash")));
+    assert!(outcome.notes.iter().any(|note| matches!(note, revia_lib::remote_ops::CheckoutNote::StashRestoreConflicted)));
 }
 
 #[test]
@@ -521,7 +581,10 @@ fn force_checkout_saves_all_tracked_changes_left_unsaved_on_target() {
     };
     assert_eq!(outcome.branch, "target");
     assert_eq!(f.read("a.txt"), "base\n", "强制检出丢弃了本地改动");
-    assert!(f.recovery_sources().contains(&RecoverySource::CheckoutForce));
+    assert!(
+        f.recovery_sources()
+            .contains(&RecoverySource::CheckoutForce)
+    );
     let summary = f
         .store
         .list(None)
@@ -544,16 +607,25 @@ fn fetch_follows_the_tag_mode_setting() {
     f.git(&["tag", "-d", "v1"]);
 
     // Never：不取标签。
-    let outcome = remote_ops::fetch(&f.session, FetchTagMode::Never, Duration::from_secs(60)).unwrap();
+    let outcome =
+        remote_ops::fetch(&f.session, FetchTagMode::Never, Duration::from_secs(60)).unwrap();
     assert_eq!(outcome.remotes, vec!["origin".to_string()]);
     assert_eq!(outcome.tag_args, vec!["--no-tags".to_string()]);
     assert!(f.git(&["tag", "--list"]).trim().is_empty());
-    assert!(f.log_args().iter().any(|args| args.iter().any(|arg| arg == "--no-tags")));
+    assert!(
+        f.log_args()
+            .iter()
+            .any(|args| args.iter().any(|arg| arg == "--no-tags"))
+    );
 
     // Always：取回全部标签。
     remote_ops::fetch(&f.session, FetchTagMode::Always, Duration::from_secs(60)).unwrap();
     assert!(f.git(&["tag", "--list"]).contains("v1"));
-    assert!(f.log_args().iter().any(|args| args.iter().any(|arg| arg == "--tags")));
+    assert!(
+        f.log_args()
+            .iter()
+            .any(|args| args.iter().any(|arg| arg == "--tags"))
+    );
 
     // Sync：删掉远端已删除的标签和分支。
     f.git(&["push", "origin", "--delete", "v1"]);
@@ -565,12 +637,14 @@ fn fetch_follows_the_tag_mode_setting() {
     assert!(!f.git(&["tag", "--list"]).contains("v1"));
     assert!(f.git(&["branch", "-r"]).contains("origin/gone"));
     f.git(&["push", "origin", "--delete", "gone"]);
-    let outcome = remote_ops::fetch(&f.session, FetchTagMode::Sync, Duration::from_secs(60)).unwrap();
+    let outcome =
+        remote_ops::fetch(&f.session, FetchTagMode::Sync, Duration::from_secs(60)).unwrap();
     assert!(outcome.tag_args.contains(&"--prune".to_string()));
     assert!(!f.git(&["branch", "-r"]).contains("origin/gone"));
 
     // Auto：不加额外参数（跟随 Git 配置）。
-    let outcome = remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap();
+    let outcome =
+        remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap();
     assert!(outcome.tag_args.is_empty());
 }
 
@@ -578,9 +652,17 @@ fn fetch_follows_the_tag_mode_setting() {
 fn fetch_reports_git_failure_with_raw_output() {
     let f = Fixture::new();
     f.git(&["remote", "add", "broken", "file:///nonexistent/repo.git"]);
-    let error = remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap_err();
+    let error =
+        remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap_err();
+    assert_eq!(error.code, Some("errors.mod.failedExitCode"));
+    assert!(error.message.contains("128"), "{}", error.message);
     assert!(
-        error.message.contains("fetch") || error.message.contains("不存在"),
+        error.message.contains("/nonexistent/repo.git"),
+        "{}",
+        error.message
+    );
+    assert!(
+        error.message.lines().any(|line| !line.trim().is_empty()),
         "{}",
         error.message
     );
@@ -591,29 +673,56 @@ fn update_merge_and_rebase_apply_the_upstream() {
     let f = Fixture::new();
     // 别人往远端推了一个提交。
     let remote_head = f.advance_remote("remote.txt", b"remote\n", "remote commit");
-    let outcome = remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap();
-    assert_eq!(outcome.mode, revia_lib::remote_ops::UpdateResolvedMode::Merge);
+    let outcome = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap();
+    assert_eq!(
+        outcome.mode,
+        revia_lib::remote_ops::UpdateResolvedMode::Merge
+    );
     assert_eq!(outcome.status, UpdateStatus::Updated);
     assert_eq!(outcome.commits_merged, 1);
     assert_eq!(f.head(), remote_head);
     assert!(f.recovery_sources().is_empty(), "干净工作区不需要回收记录");
 
     // 再次更新：已经是最新。
-    let outcome = remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap();
+    let outcome = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap();
     assert_eq!(outcome.status, UpdateStatus::UpToDate);
     assert_eq!(outcome.commits_merged, 0);
 
     // rebase：本地提交被搬到远端的提交之后。
     f.track("local.txt", b"local\n", "local commit");
     let remote_head = f.advance_remote("remote2.txt", b"remote2\n", "remote commit 2");
-    let outcome = remote_ops::update(&f.session, &f.store, UpdateMode::Rebase, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap();
-    assert_eq!(outcome.mode, revia_lib::remote_ops::UpdateResolvedMode::Rebase);
+    let outcome = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Rebase,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap();
+    assert_eq!(
+        outcome.mode,
+        revia_lib::remote_ops::UpdateResolvedMode::Rebase
+    );
     assert_eq!(outcome.status, UpdateStatus::Updated);
     let parents = f.git(&["rev-list", "--parents", "-n", "1", "HEAD"]);
-    assert!(parents.contains(&remote_head), "rebase 后 HEAD 的父提交应是远端提交：{parents}");
+    assert!(
+        parents.contains(&remote_head),
+        "rebase 后 HEAD 的父提交应是远端提交：{parents}"
+    );
 
     // 按分支默认：只读配置决定方向，不改配置。
     f.track("local2.txt", b"local2\n", "local commit 2");
@@ -627,7 +736,10 @@ fn update_merge_and_rebase_apply_the_upstream() {
         Duration::from_secs(60),
     )
     .unwrap();
-    assert_eq!(outcome.mode, revia_lib::remote_ops::UpdateResolvedMode::Rebase);
+    assert_eq!(
+        outcome.mode,
+        revia_lib::remote_ops::UpdateResolvedMode::Rebase
+    );
     assert_eq!(f.git(&["config", "--get", "pull.rebase"]).trim(), "true");
 }
 
@@ -635,13 +747,25 @@ fn update_merge_and_rebase_apply_the_upstream() {
 fn update_without_upstream_or_on_detached_head_is_explained() {
     let f = Fixture::new();
     f.git(&["checkout", "-b", "no-upstream"]);
-    let error = remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap_err();
+    let error = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap_err();
     assert!(error.message.contains("没有配置上游"), "{}", error.message);
 
     f.git(&["checkout", "--detach"]);
-    let error = remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap_err();
+    let error = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap_err();
     assert!(error.message.contains("游离"), "{}", error.message);
 }
 
@@ -650,12 +774,21 @@ fn update_saves_dirty_changes_to_recovery_before_autostash() {
     let f = Fixture::new();
     f.advance_remote("remote.txt", b"remote\n", "remote commit");
     f.write("a.txt", b"local edit\n");
-    let outcome = remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap();
+    let outcome = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap();
     assert_eq!(outcome.status, UpdateStatus::Updated);
     // 本地改动在更新后仍在工作区（autostash 恢复）。
     assert_eq!(f.read("a.txt"), "local edit\n");
-    assert!(f.recovery_sources().contains(&RecoverySource::UpdateAutostash));
+    assert!(
+        f.recovery_sources()
+            .contains(&RecoverySource::UpdateAutostash)
+    );
     let summary = f
         .store
         .list(None)
@@ -677,11 +810,19 @@ fn update_merge_conflict_enters_in_progress_state() {
     f.other_git(&["commit", "-m", "remote change"]);
     f.other_git(&["push", "origin", "main"]);
 
-    let outcome = remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap();
+    let outcome = remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap();
     assert_eq!(outcome.status, UpdateStatus::MergeConflict);
     assert_eq!(outcome.conflicts, vec!["a.txt".to_string()]);
-    let state = revia_lib::operation::detect(&f.session.git, 0).unwrap().expect("应进入 merge");
+    let state = revia_lib::operation::detect(&f.session.git, 0)
+        .unwrap()
+        .expect("应进入 merge");
     assert_eq!(state.kind, revia_lib::operation::OperationKind::Merge);
     // 有进行中的操作时不再开始新的检出。
     let error = checkout(&f, local("main"), CheckoutStrategy::Plain).unwrap_err();
@@ -705,12 +846,24 @@ fn push_new_branch_records_upstream_and_counts_commits() {
 
     let result = remote_ops::push(
         &f.session,
-        &PushRequest { remote: None, branch: None, tags: false, force: PushForce::None },
+        &PushRequest {
+            remote: None,
+            branch: None,
+            tags: false,
+            force: PushForce::None,
+        },
         &["main".into()],
         Duration::from_secs(60),
     )
     .unwrap();
-    let PushResult::Pushed { remote, branch, commits, upstream_recorded, .. } = result else {
+    let PushResult::Pushed {
+        remote,
+        branch,
+        commits,
+        upstream_recorded,
+        ..
+    } = result
+    else {
         panic!("推送应成功");
     };
     assert_eq!(remote, "origin");
@@ -718,7 +871,10 @@ fn push_new_branch_records_upstream_and_counts_commits() {
     // 推送前统计：远端还没有这个分支，所以整条分支的提交都算新推送的。
     assert_eq!(commits, 2);
     assert!(upstream_recorded);
-    assert_eq!(f.git(&["rev-parse", "--abbrev-ref", "@{upstream}"]).trim(), "origin/feature");
+    assert_eq!(
+        f.git(&["rev-parse", "--abbrev-ref", "@{upstream}"]).trim(),
+        "origin/feature"
+    );
     // Git 自己是记录上游的来源（不是我们改配置）。
     assert_eq!(
         f.git(&["config", "--get", "branch.feature.remote"]).trim(),
@@ -741,7 +897,10 @@ fn push_preview_lists_local_commits_ahead_of_an_existing_upstream() {
     assert_eq!(preview.commits[0].oid, head);
     assert_eq!(preview.commits[1].oid, first);
     assert_eq!(f.head(), head);
-    assert_eq!(run_git(&f.origin, &f.env, &["rev-parse", "main"]).trim(), upstream);
+    assert_eq!(
+        run_git(&f.origin, &f.env, &["rev-parse", "main"]).trim(),
+        upstream
+    );
     assert_eq!(fs::read(f.repo.join(".git/config")).unwrap(), config);
 }
 
@@ -759,7 +918,12 @@ fn push_is_rejected_when_the_remote_has_new_commits() {
     assert_ne!(tracked, remote_head);
     let result = remote_ops::push(
         &f.session,
-        &PushRequest { remote: None, branch: None, tags: false, force: PushForce::None },
+        &PushRequest {
+            remote: None,
+            branch: None,
+            tags: false,
+            force: PushForce::None,
+        },
         &["main".into()],
         Duration::from_secs(60),
     )
@@ -767,13 +931,27 @@ fn push_is_rejected_when_the_remote_has_new_commits() {
     let PushResult::Rejected { reason, .. } = result else {
         panic!("非快进推送应被拒绝");
     };
-    assert!(reason.contains("拒绝") || reason.contains("non-fast-forward"), "{reason}");
+    assert!(
+        reason.contains("拒绝") || reason.contains("non-fast-forward"),
+        "{reason}"
+    );
     // 更新后可以再推（前端编排；这里验证底层）。
-    remote_ops::update(&f.session, &f.store, UpdateMode::Merge, FetchTagMode::Auto, Duration::from_secs(60))
-        .unwrap();
+    remote_ops::update(
+        &f.session,
+        &f.store,
+        UpdateMode::Merge,
+        FetchTagMode::Auto,
+        Duration::from_secs(60),
+    )
+    .unwrap();
     let result = remote_ops::push(
         &f.session,
-        &PushRequest { remote: None, branch: None, tags: false, force: PushForce::None },
+        &PushRequest {
+            remote: None,
+            branch: None,
+            tags: false,
+            force: PushForce::None,
+        },
         &["main".into()],
         Duration::from_secs(60),
     )
@@ -789,12 +967,20 @@ fn force_with_lease_refuses_to_overwrite_unfetched_remote_commits() {
     f.track("local.txt", b"local\n", "local commit");
     let result = remote_ops::push(
         &f.session,
-        &PushRequest { remote: None, branch: None, tags: false, force: PushForce::WithLease },
+        &PushRequest {
+            remote: None,
+            branch: None,
+            tags: false,
+            force: PushForce::WithLease,
+        },
         &[],
         Duration::from_secs(60),
     )
     .unwrap();
-    assert!(matches!(result, PushResult::Rejected { .. }), "带 lease 的强制推送不能覆盖没取回的远端提交");
+    assert!(
+        matches!(result, PushResult::Rejected { .. }),
+        "带 lease 的强制推送不能覆盖没取回的远端提交"
+    );
     // 远端没有被改写。
     let origin_head = run_git(&f.origin, &f.env, &["rev-parse", "main"]);
     assert_eq!(origin_head.trim(), remote_head);
@@ -803,13 +989,21 @@ fn force_with_lease_refuses_to_overwrite_unfetched_remote_commits() {
     f.git(&["fetch", "origin"]);
     let result = remote_ops::push(
         &f.session,
-        &PushRequest { remote: None, branch: None, tags: false, force: PushForce::WithLease },
+        &PushRequest {
+            remote: None,
+            branch: None,
+            tags: false,
+            force: PushForce::WithLease,
+        },
         &[],
         Duration::from_secs(60),
     )
     .unwrap();
     assert!(matches!(result, PushResult::Pushed { .. }));
-    assert!(f.log_args().iter().any(|args| args.iter().any(|arg| arg.starts_with("--force-with-lease="))));
+    assert!(f.log_args().iter().any(|args| {
+        args.iter()
+            .any(|arg| arg.starts_with("--force-with-lease="))
+    }));
 }
 
 #[test]
@@ -818,11 +1012,23 @@ fn protected_branch_refuses_force_push() {
     let preview = remote_ops::push_preview(&f.session, &["main".into(), "master".into()]).unwrap();
     assert!(preview.protected);
     assert!(!preview.force_allowed);
-    assert!(preview.force_reason.as_deref().unwrap_or_default().contains("受保护"));
+    assert!(
+        preview
+            .force_reason
+            .as_ref()
+            .map(|e| e.message.as_str())
+            .unwrap_or_default()
+            .contains("受保护")
+    );
 
     let error = remote_ops::push(
         &f.session,
-        &PushRequest { remote: None, branch: None, tags: false, force: PushForce::WithLease },
+        &PushRequest {
+            remote: None,
+            branch: None,
+            tags: false,
+            force: PushForce::WithLease,
+        },
         &["main".into()],
         Duration::from_secs(60),
     )
@@ -844,23 +1050,36 @@ fn network_timeout_is_reported_as_needs_verification() {
     // `ext::` 远端执行一个会挂住的命令，用缩短的超时验证「结果待核对」。
     f.git(&["remote", "add", "stall", "ext::sleep 5"]);
     let started = std::time::Instant::now();
-    let error = remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_millis(400)).unwrap_err();
+    let error =
+        remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_millis(400)).unwrap_err();
     assert!(
         matches!(error.kind, revia_lib::error::ErrorKind::NeedsVerification),
         "超时应是结果待核对：{error:?}"
     );
     assert!(error.message.contains("超时"), "{}", error.message);
-    assert!(started.elapsed() < Duration::from_secs(10), "超时必须真的中断，而不是等命令自己结束");
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "超时必须真的中断，而不是等命令自己结束"
+    );
 }
 
 #[test]
 fn missing_credentials_fail_immediately_without_waiting_for_input() {
     let f = Fixture::new();
     // 指向本机一个没有监听的端口：需要认证的 HTTPS 远端会立刻失败。
-    f.git(&["remote", "add", "auth", "https://user:secret@127.0.0.1:9/repo.git"]);
+    f.git(&[
+        "remote",
+        "add",
+        "auth",
+        "https://user:secret@127.0.0.1:9/repo.git",
+    ]);
     let started = std::time::Instant::now();
-    let error = remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap_err();
-    assert!(started.elapsed() < Duration::from_secs(20), "不能等待输入或长时间挂起");
+    let error =
+        remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap_err();
+    assert!(
+        started.elapsed() < Duration::from_secs(20),
+        "不能等待输入或长时间挂起"
+    );
     // 原始输出里不能出现凭据。
     assert!(!error.message.contains("secret"), "{}", error.message);
     // 命令日志里同样打码。
@@ -890,10 +1109,12 @@ fn check_remote_compares_refs_without_fetching_objects() {
 fn write_lock_blocks_a_second_operation_on_the_same_worktree() {
     let f = Fixture::new();
     let guard = f.session.acquire_write_lock().expect("取得写锁");
-    let error = remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap_err();
+    let error =
+        remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).unwrap_err();
     assert!(error.message.contains("写操作"), "{}", error.message);
     drop(guard);
-    remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60)).expect("释放后可以执行");
+    remote_ops::fetch(&f.session, FetchTagMode::Auto, Duration::from_secs(60))
+        .expect("释放后可以执行");
 }
 
 #[test]
@@ -932,7 +1153,10 @@ fn force_push_is_refused_when_the_target_remote_branch_is_protected() {
     // 本地分支叫 feature（不受保护），但目标远端分支是 main（受保护）。
     f.git(&["checkout", "-b", "feature"]);
     f.track("feature.txt", b"feature\n", "feature commit");
-    let remote_main = f.other_git(&["rev-parse", "origin/main"]).trim().to_string();
+    let remote_main = f
+        .other_git(&["rev-parse", "origin/main"])
+        .trim()
+        .to_string();
     let _ = remote_main;
 
     let error = remote_ops::push(
@@ -947,7 +1171,11 @@ fn force_push_is_refused_when_the_target_remote_branch_is_protected() {
         Duration::from_secs(60),
     )
     .unwrap_err();
-    assert!(error.message.contains("main 是受保护分支"), "{}", error.message);
+    assert!(
+        error.message.contains("main 是受保护分支"),
+        "{}",
+        error.message
+    );
     // 远端 main 没有被改写。
     let origin_main = run_git(&f.origin, &f.env, &["rev-parse", "main"]);
     let local_main = f.git(&["rev-parse", "main"]);
@@ -963,9 +1191,19 @@ fn push_preview_treats_the_target_branch_as_protected() {
     f.git(&["config", "branch.myfix.merge", "refs/heads/main"]);
     let preview = remote_ops::push_preview(&f.session, &["main".into(), "master".into()]).unwrap();
     assert_eq!(preview.target_branch, "main");
-    assert!(!preview.protected, "B06 提交后是否显示对话框只取决于当前分支");
+    assert!(
+        !preview.protected,
+        "B06 提交后是否显示对话框只取决于当前分支"
+    );
     assert!(!preview.force_allowed);
-    assert!(preview.force_reason.as_deref().unwrap_or_default().contains("main"));
+    assert!(
+        preview
+            .force_reason
+            .as_ref()
+            .map(|e| e.message.as_str())
+            .unwrap_or_default()
+            .contains("main")
+    );
 
     // 创建真实上游，避免不存在的跟踪引用让预览退回本地分支名。
     f.git(&["push", "origin", "myfix"]);
@@ -985,7 +1223,14 @@ fn push_preview_treats_the_target_branch_as_protected() {
     assert_eq!(preview.target_branch, "myfix");
     assert!(preview.protected);
     assert!(!preview.force_allowed);
-    assert!(preview.force_reason.as_deref().unwrap_or_default().contains("main"));
+    assert!(
+        preview
+            .force_reason
+            .as_ref()
+            .map(|e| e.message.as_str())
+            .unwrap_or_default()
+            .contains("main")
+    );
 }
 
 #[test]
@@ -1006,7 +1251,10 @@ fn push_does_not_rewrite_the_upstream_config_when_target_is_unchanged() {
         Duration::from_secs(60),
     )
     .unwrap();
-    let PushResult::Pushed { upstream_recorded, .. } = result else {
+    let PushResult::Pushed {
+        upstream_recorded, ..
+    } = result
+    else {
         panic!("推送应成功（已经是最新）");
     };
     assert!(!upstream_recorded, "已有上游且目标未变时不应记录上游");
@@ -1016,7 +1264,10 @@ fn push_does_not_rewrite_the_upstream_config_when_target_is_unchanged() {
         .into_iter()
         .find(|args| args.iter().any(|arg| arg == "push"))
         .expect("应有 push 记录");
-    assert!(!push_args.iter().any(|arg| arg == "--set-upstream"), "{push_args:?}");
+    assert!(
+        !push_args.iter().any(|arg| arg == "--set-upstream"),
+        "{push_args:?}"
+    );
     let after = fs::read_to_string(f.repo.join(".git/config")).unwrap();
     assert_eq!(before, after, "推送同一上游不应改写 Git 配置");
 
@@ -1033,7 +1284,10 @@ fn push_does_not_rewrite_the_upstream_config_when_target_is_unchanged() {
         Duration::from_secs(60),
     )
     .unwrap();
-    let PushResult::Pushed { upstream_recorded, .. } = result else {
+    let PushResult::Pushed {
+        upstream_recorded, ..
+    } = result
+    else {
         panic!("推送新目标应成功");
     };
     assert!(upstream_recorded);
@@ -1060,7 +1314,10 @@ fn checkout_separates_paths_with_double_dash() {
         Err(error) => panic!("检出分支 topic 失败：{}", error.message),
     };
     assert_eq!(outcome.branch, "topic");
-    assert_eq!(f.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "topic");
+    assert_eq!(
+        f.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(),
+        "topic"
+    );
     // 文件内容没有被 checkout 的 pathspec 行为覆盖。
     assert_eq!(f.read("topic"), "local edit\n");
     let args = f

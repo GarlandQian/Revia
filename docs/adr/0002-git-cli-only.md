@@ -1,5 +1,7 @@
 # Git 操作只通过 Git CLI 执行
 
+2026-10-29 补充：仅 stash 删除/清空允许按 [ADR-0014](./0014-stash-deletion-transaction-exception.md) 评估并验证持锁 reflog 事务；其余规则不变。
+
 Revia 的所有 Git 读写都由 Rust 层调用系统的 Git 命令行完成，不引入 git2（libgit2）或 gix。这样可以直接沿用用户已有的 Git 配置、hooks、SSH 和凭证工具，行为与终端一致，也不必维护多套实现之间的差异。读取状态一律使用机器可读格式（如 `git status --porcelain=v2 -z`）；前端只能调用 Rust 层提供的固定、带类型的操作，不能传入任意 Git 参数或 shell 命令。
 
 ## Consequences

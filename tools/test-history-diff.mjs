@@ -99,7 +99,7 @@ test("历史左右源拒绝其他目标或档位的布局", async () => {
     const source = createHistorySideSource("history-a", file, options, {
       historyFileSideLayout: async () => ({ ...layout, ...changed }), historyFileSideLines: async () => [],
     });
-    await assert.rejects(source.layout(), /读取目标不一致/);
+    await assert.rejects(source.layout(), { kind: "rejected", code: "errors.history.layoutTargetMismatch" });
   }
 });
 

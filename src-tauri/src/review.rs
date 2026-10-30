@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::Git;
 use crate::platform;
 use crate::recovery::WorktreeIdentity;
@@ -106,14 +106,22 @@ pub struct ReviewStore {
 
 impl ReviewStore {
     pub fn new(data_directory: PathBuf) -> Self {
-        Self { directory: data_directory, transaction: Arc::new(Mutex::new(())) }
+        Self {
+            directory: data_directory,
+            transaction: Arc::new(Mutex::new(())),
+        }
     }
 
     /// 进入一次存储事务：整个读改写期间持有锁。
     fn begin_transaction(&self) -> Result<std::sync::MutexGuard<'_, ()>> {
-        self.transaction
-            .lock()
-            .map_err(|_| AppError::internal("审阅标记存储锁失败"))
+        self.transaction.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.reviewMarkStoreLockFailed",
+                "审阅标记存储锁失败",
+                &[],
+            )
+        })
     }
 
     fn path(&self) -> PathBuf {
@@ -133,7 +141,11 @@ impl ReviewStore {
         }
         let mut hasher = Sha256::new();
         hasher.update(b"revia-review-identity-v1");
-        for path in [&identity.worktree_path, &identity.git_dir, &identity.common_dir] {
+        for path in [
+            &identity.worktree_path,
+            &identity.git_dir,
+            &identity.common_dir,
+        ] {
             hasher.update(path.to_string_lossy().as_bytes());
             hasher.update([0]);
         }
@@ -144,15 +156,35 @@ impl ReviewStore {
             }
             hasher.update([0]);
         }
-        Some(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect())
+        Some(
+            hasher
+                .finalize()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect(),
+        )
     }
 
     fn read_file(&self) -> Result<ReviewFile> {
         match fs::read(self.path()) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map_err(|error| AppError::internal(format!("审阅标记文件无法解析：{error}"))),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(ReviewFile { version: 1, worktrees: BTreeMap::new() }),
-            Err(error) => Err(AppError::internal(format!("读取审阅标记失败：{error}"))),
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.review.cannotParseReviewMarkFileCause",
+                    "审阅标记文件无法解析：{error}",
+                    &[("error", error.to_string())],
+                )
+            }),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(ReviewFile {
+                version: 1,
+                worktrees: BTreeMap::new(),
+            }),
+            Err(error) => Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.failedReadReviewMarks",
+                "读取审阅标记失败：{error}",
+                &[("error", format!("{}", error))],
+            )),
         }
     }
 
@@ -168,38 +200,72 @@ impl ReviewStore {
             let path = self
                 .directory
                 .join(format!("review-{}-{nanos}-{nonce}.tmp", std::process::id()));
-            match fs::OpenOptions::new().create_new(true).write(true).open(&path) {
+            match fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&path)
+            {
                 Ok(handle) => return Ok((path, handle)),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => {
-                    return Err(AppError::internal(format!("创建审阅标记临时文件失败：{error}")))
+                    return Err(AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.review.failedCreateReviewMarkTemporaryFile",
+                        "创建审阅标记临时文件失败：{error}",
+                        &[("error", format!("{}", error))],
+                    ));
                 }
             }
         }
-        Err(AppError::internal("无法创建审阅标记临时文件"))
+        Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.review.cannotCreateReviewMarkTemporaryFile",
+            "无法创建审阅标记临时文件",
+            &[],
+        ))
     }
 
     fn write_file(&self, value: &ReviewFile) -> Result<()> {
         use std::io::Write;
-        fs::create_dir_all(&self.directory)
-            .map_err(|error| AppError::internal(format!("创建数据目录失败：{error}")))?;
+        fs::create_dir_all(&self.directory).map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.failedCreateDataDirectoryCause",
+                "创建数据目录失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?;
         let path = self.path();
         let (temp, mut handle) = self.exclusive_temp()?;
         let text = serde_json::to_vec_pretty(value)?;
-        let write = handle
-            .write_all(&text)
-            .and_then(|()| handle.sync_all());
+        let write = handle.write_all(&text).and_then(|()| handle.sync_all());
         drop(handle);
         if let Err(error) = write {
             let _ = fs::remove_file(&temp);
-            return Err(AppError::internal(format!("写入审阅标记失败：{error}")));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.failedWriteReviewMarks",
+                "写入审阅标记失败：{error}",
+                &[("error", format!("{}", error))],
+            ));
         }
         if let Err(error) = fs::rename(&temp, &path) {
             let _ = fs::remove_file(&temp);
-            return Err(AppError::internal(format!("保存审阅标记失败：{error}")));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.failedSaveReviewMarks",
+                "保存审阅标记失败：{error}",
+                &[("error", format!("{}", error))],
+            ));
         }
-        platform::sync_directory(&self.directory)
-            .map_err(|error| AppError::internal(format!("同步审阅标记失败：{error}")))?;
+        platform::sync_directory(&self.directory).map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.failedSyncReviewMarksCause",
+                "同步审阅标记失败：{cause}",
+                &[],
+            ).cause(error)
+        })?;
         Ok(())
     }
 
@@ -229,14 +295,24 @@ impl ReviewStore {
         marked: bool,
     ) -> Result<Vec<ReviewMark>> {
         let _transaction = self.begin_transaction()?;
-        let key = Self::identity_key(identity)
-            .ok_or_else(|| AppError::internal("worktree 身份不明确，无法保存审阅标记"))?;
+        let key = Self::identity_key(identity).ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.theWorktreeIdentityAmbiguousSaveReview",
+                "worktree 身份不明确，无法保存审阅标记",
+                &[],
+            )
+        })?;
         let mut file = self.read_file()?;
         let entry = file.worktrees.entry(key.clone()).or_default();
         if marked {
             entry.insert(
                 path.to_string(),
-                ReviewMark { path: path.to_string(), reviewed: true, versions },
+                ReviewMark {
+                    path: path.to_string(),
+                    reviewed: true,
+                    versions,
+                },
             );
         } else {
             entry.remove(path);
@@ -300,7 +376,14 @@ pub fn worktree_version(git: Option<&Git>, root: &Path, path: &str) -> Result<Op
     let meta = match fs::symlink_metadata(&full) {
         Ok(meta) => meta,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(AppError::internal(format!("读取文件状态失败：{error}"))),
+        Err(error) => {
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.review.failedReadFileStatus",
+                "读取文件状态失败：{error}",
+                &[("error", format!("{}", error))],
+            ));
+        }
     };
     let mut hasher = Sha256::new();
     if meta.file_type().is_symlink() {
@@ -318,7 +401,13 @@ pub fn worktree_version(git: Option<&Git>, root: &Path, path: &str) -> Result<Op
         hasher.update(b"file:");
         hasher.update(fs::read(&full)?);
     }
-    Ok(Some(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()))
+    Ok(Some(
+        hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect(),
+    ))
 }
 
 /// 用现有 Git CLI 读取子模块当前检出的提交号。
@@ -365,7 +454,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let first = identity(dir.path(), "inode-1");
         let second = identity(dir.path(), "inode-2");
-        assert_ne!(ReviewStore::identity_key(&first), ReviewStore::identity_key(&second));
+        assert_ne!(
+            ReviewStore::identity_key(&first),
+            ReviewStore::identity_key(&second)
+        );
     }
 
     #[test]
@@ -374,7 +466,10 @@ mod tests {
         let store = ReviewStore::new(dir.path().join("data"));
         let a = identity(dir.path(), "inode-a");
         let b = identity(dir.path(), "inode-b");
-        let versions = ReviewVersions { head: Some("h".into()), worktree: Some("w".into()) };
+        let versions = ReviewVersions {
+            head: Some("h".into()),
+            worktree: Some("w".into()),
+        };
         store.set_mark(&a, "x.txt", versions.clone(), true).unwrap();
         // 重新打开：仍然读得到（重启后保留）。
         let reopened = ReviewStore::new(dir.path().join("data"));
@@ -388,7 +483,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = ReviewStore::new(dir.path().join("data"));
         let a = identity(dir.path(), "inode-a");
-        let v = |n: &str| ReviewVersions { head: Some(n.into()), worktree: Some(n.into()) };
+        let v = |n: &str| ReviewVersions {
+            head: Some(n.into()),
+            worktree: Some(n.into()),
+        };
         store.set_mark(&a, "one.txt", v("1"), true).unwrap();
         store.set_mark(&a, "two.txt", v("2"), true).unwrap();
         store.set_mark(&a, "one.txt", v("1"), false).unwrap();

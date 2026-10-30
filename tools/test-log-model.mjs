@@ -20,11 +20,12 @@ const imports = registerHooks({
   },
 });
 const {
-  defaultFilter, toHistoryFilter, filterKey, filterStart, activeFilterCount, hasActiveFilter,
+  defaultFilter, filterForCommit, toHistoryFilter, filterKey, filterStart, activeFilterCount, hasActiveFilter,
   dateFilterOf, isDateText, looksLikeHash, formatCommitDate, refChips, authorKey, authorLabel,
   branchFilterOptions, commitTabKey, commitTabTitle, shortOid, logVisibleEnd, selectedLogCommit,
 } = await import("../src/features/log/logModel.ts");
 const { appendGraphRows, emptyGraphState, collapseLongEdges, laneColor } = await import("../src/features/log/logGraph.ts");
+const { formatAppError } = await import("../src/lib/error.ts");
 const { LogPager, LOG_PAGE_SIZE } = await import("../src/features/log/logPager.ts");
 const { buildFileTree, effectiveMergeMode, firstHistoryFile } = await import("../src/features/log/logFiles.ts");
 const { showCommitTab } = await import("../src/features/log/logTabs.ts");
@@ -142,7 +143,7 @@ test("历史行空结果可缓存；忽略设置缩短文件时接受后端裁�
 test("历史行拒绝目标错配的响应，界面使用现有受控渲染器而非原生滚动", async () => {
   const reader = new HistoryRowsReader(async (request) => ({ ...rowSlice(request), targetId: "wrong-target" }));
   const state = await reader.read(historyRequest());
-  assert.match(state.error, /读取目标不一致/);
+  assert.equal(state.error.code, "errors.history.rowsTargetMismatch");
   assert.deepEqual(state.rows, []);
   const view = readFileSync(new URL("../src/features/log/CommitDiffView.tsx", import.meta.url), "utf8");
   assert.match(view, /new HistoryRowsStore/);
@@ -492,7 +493,12 @@ test("分页：超过跨度上限是明确状态，不伪装成历史末尾", as
   const pager = new LogPager({
     targetId: "t1",
     loader: async () => {
-      throw { kind: "rejected", message: "已扫描 20000 条提交仍未取满本次查询上限（20000 条）" };
+      throw {
+        kind: "rejected",
+        code: "errors.history.historyPagingExceededQuerySLimit",
+        params: { "0": "20000" },
+        message: "scanned 20000 commits without filling the query limit",
+      };
     },
   });
   pager.setQuery({ text: "x", caseSensitive: false, regex: false, branches: [], authors: [], paths: [], date: null }, false);
@@ -501,7 +507,7 @@ test("分页：超过跨度上限是明确状态，不伪装成历史末尾", as
   const snapshot = pager.snapshot();
   assert.equal(snapshot.spanExceeded, true);
   assert.equal(snapshot.exhausted, true);
-  assert.match(snapshot.error, /上限/);
+  assert.match(formatAppError(snapshot.error), /20000/);
   // 不自动重试。
   await pager.loadMore();
   assert.equal(pager.snapshot().error, snapshot.error);
@@ -539,7 +545,7 @@ test("分页：切换目标时清空，失败状态可重试", async () => {
   pager.setQuery({ text: null, caseSensitive: false, regex: false, branches: [], authors: [], paths: [], date: null }, false);
   pager.reset("k");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(pager.snapshot().error, /读取失败/);
+  assert.match(formatAppError(pager.snapshot().error), /读取失败/);
   assert.equal(pager.snapshot().spanExceeded, false);
 
   pager.setTarget("t2");
@@ -864,4 +870,18 @@ test("卸载日志后取消分页监听，在途旧页不再回填视图", async
   assert.equal(received.length, before);
   const source = readFileSync(new URL("../src/features/log/LogView.tsx", import.meta.url), "utf8");
   assert.match(source, /return \(\) => pager\.setListener\(null\)/);
+});
+
+
+test("文件历史跳转使用完整OID并清除旧作者日期路径与分支条件", () => {
+  const store = new LogWorkspaceStore();
+  store.update("worktree", { filter: { ...defaultFilter(), text: "old", regex: true, caseSensitive: true,
+    authors: ["Old Author <old@fixture.invalid>"], branches: ["refs/heads/unrelated"],
+    paths: ["other.txt"], date: "range", since: "2020-01-01", until: "2020-01-02" }, scrollTop: 4200 });
+  const oid = "abcdef0123456789".repeat(2) + "abcdef01";
+  store.update("worktree", { selectedCommit: oid, scrollTop: 0, filter: filterForCommit(oid) });
+  const state = store.read("worktree");
+  assert.equal(state.selectedCommit, oid); assert.equal(state.scrollTop, 0);
+  assert.deepEqual(toHistoryFilter(state.filter), { text: oid, caseSensitive: false, regex: false,
+    branches: [], authors: [], paths: [], date: null });
 });

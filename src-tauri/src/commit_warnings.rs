@@ -22,6 +22,29 @@ pub enum CommitWarningKind {
     InvalidFilename,
 }
 
+/// 文件名不合法的具体原因；由前端按完整字面量键翻译。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum InvalidFilenameReason {
+    Character { character: String },
+    ControlCharacter,
+    TrailingSpaceOrDot,
+    ReservedName { component: String },
+}
+
+/// 警告的机器可读数据；Rust 不返回任何面向用户的句子。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum CommitWarningDetail {
+    DetachedHead,
+    RebaseInProgress,
+    Crlf,
+    LargeFile { size_mb: u64, limit_mb: u64 },
+    InvalidFilename { reason: InvalidFilenameReason },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -29,7 +52,7 @@ pub struct CommitWarning {
     pub kind: CommitWarningKind,
     /// 相关文件路径；与操作整体有关的警告（游离 HEAD、rebase）为 None。
     pub path: Option<String>,
-    pub message: String,
+    pub detail: CommitWarningDetail,
 }
 
 /// 检查项开关（来自设置）。
@@ -73,14 +96,14 @@ pub fn evaluate(
         warnings.push(CommitWarning {
             kind: CommitWarningKind::DetachedOrRebase,
             path: None,
-            message: "当前是游离 HEAD，提交后不在任何分支上".into(),
+            detail: CommitWarningDetail::DetachedHead,
         });
     }
     if options.detached && rebase_in_progress {
         warnings.push(CommitWarning {
             kind: CommitWarningKind::DetachedOrRebase,
             path: None,
-            message: "rebase 进行中，此时提交会进入 rebase 流程".into(),
+            detail: CommitWarningDetail::RebaseInProgress,
         });
     }
     for file in files {
@@ -88,19 +111,17 @@ pub fn evaluate(
             warnings.push(CommitWarning {
                 kind: CommitWarningKind::Crlf,
                 path: Some(file.path.clone()),
-                message: format!("{}：使用 CRLF 换行", file.path),
+                detail: CommitWarningDetail::Crlf,
             });
         }
         if options.large_file_bytes > 0 && file.size > options.large_file_bytes {
             warnings.push(CommitWarning {
                 kind: CommitWarningKind::LargeFile,
                 path: Some(file.path.clone()),
-                message: format!(
-                    "{}：{} MB，超过 {} MB",
-                    file.path,
-                    file.size / (1024 * 1024),
-                    options.large_file_bytes / (1024 * 1024)
-                ),
+                detail: CommitWarningDetail::LargeFile {
+                    size_mb: file.size / (1024 * 1024),
+                    limit_mb: options.large_file_bytes / (1024 * 1024),
+                },
             });
         }
         if options.invalid_filename {
@@ -108,7 +129,7 @@ pub fn evaluate(
                 warnings.push(CommitWarning {
                     kind: CommitWarningKind::InvalidFilename,
                     path: Some(file.path.clone()),
-                    message: format!("{}：{reason}", file.path),
+                    detail: CommitWarningDetail::InvalidFilename { reason },
                 });
             }
         }
@@ -123,23 +144,23 @@ const RESERVED_NAMES: &[&str] = &[
 ];
 
 /// 在其他系统（Windows / macOS 默认文件系统）上不合法的路径部分。
-pub fn invalid_path_reason(path: &str) -> Option<String> {
+pub fn invalid_path_reason(path: &str) -> Option<InvalidFilenameReason> {
     for component in path.split('/') {
         if component.is_empty() {
             continue;
         }
         if let Some(ch) = component.chars().find(|ch| matches!(ch, '<' | '>' | ':' | '"' | '\\' | '|' | '?' | '*')) {
-            return Some(format!("文件名含字符 {ch}，在 Windows 上不合法"));
+            return Some(InvalidFilenameReason::Character { character: ch.to_string() });
         }
         if component.chars().any(|ch| (ch as u32) < 0x20) {
-            return Some("文件名含控制字符".into());
+            return Some(InvalidFilenameReason::ControlCharacter);
         }
         if component.ends_with(' ') || component.ends_with('.') {
-            return Some("文件名以空格或句点结尾，在 Windows 上不合法".into());
+            return Some(InvalidFilenameReason::TrailingSpaceOrDot);
         }
         let stem = component.split('.').next().unwrap_or(component).to_ascii_lowercase();
         if RESERVED_NAMES.contains(&stem.as_str()) {
-            return Some(format!("{component} 是 Windows 保留名称"));
+            return Some(InvalidFilenameReason::ReservedName { component: component.to_string() });
         }
         // 大小写不敏感的系统上会冲突的名字不在单文件层面判断（需要全量列表）。
     }

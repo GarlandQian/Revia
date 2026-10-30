@@ -6,23 +6,27 @@
  * - 提交输出可以展开、复制；提交前快照与 hooks 改动的说明也在这里。
  */
 
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
 import { useEffect, useRef, useState } from "react";
 import { Codicon } from "@/components/ui/codicon";
 
 export type NoticeTone = "info" | "success" | "warning" | "error";
+export type NoticeText = string | (() => string | null | undefined);
 
 export interface NoticeView {
   id: string;
   tone: NoticeTone;
-  title: string;
-  detail?: string | null;
+  title: NoticeText;
+  detail?: NoticeText | null;
+  action?: { label: NoticeText; run: () => void };
   /** 可展开的输出（例如 Git / hooks 输出）。 */
   output?: string[];
   /** 输出区标题。 */
   outputLabel?: string;
   /** 失败与待核对的通知不自动消失。 */
   persistent?: boolean;
+  /** Frozen originating path, so late results remain identifiable after switching. */
+  worktreePath?: string;
 }
 
 const TONE_ICON: Record<NoticeTone, string> = {
@@ -50,6 +54,8 @@ export function NotificationCard({
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const output = notice.output ?? [];
+  const title = typeof notice.title === "function" ? notice.title() : notice.title;
+  const detail = typeof notice.detail === "function" ? notice.detail() : notice.detail;
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -77,8 +83,9 @@ export function NotificationCard({
         style={{ color: TONE_COLOR[notice.tone] }}
       />
       <div className="min-w-0 flex-1">
+        {notice.worktreePath ? <p className="mb-1 truncate text-[11px] text-descriptionforeground" title={notice.worktreePath}>{notice.worktreePath}</p> : null}
         <div className="flex items-start gap-2">
-          <p className="min-w-0 flex-1 text-[12.5px] font-semibold break-words">{notice.title}</p>
+          <p className="min-w-0 flex-1 text-[12.5px] font-semibold break-words">{title}</p>
           <button
             type="button"
             className="icon-action size-5 shrink-0"
@@ -89,10 +96,15 @@ export function NotificationCard({
             <Codicon name="close" size={14} />
           </button>
         </div>
-        {notice.detail ? (
+        {detail ? (
           <p className="mt-1 text-[12px] leading-relaxed break-words whitespace-pre-wrap text-descriptionforeground">
-            {notice.detail}
+            {detail}
           </p>
+        ) : null}
+        {notice.action ? (
+          <button type="button" className="banner-link mt-1 text-[12px]" onClick={notice.action.run}>
+            {typeof notice.action.label === "function" ? notice.action.label() : notice.action.label}
+          </button>
         ) : null}
         {output.length > 0 ? (
           <div className="mt-1.5">

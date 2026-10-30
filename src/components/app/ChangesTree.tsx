@@ -10,7 +10,8 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
+import { readonlyReasonText, renamedFrom } from "@/lib/i18n/text";
 import { isAltModifier, isPrimaryClick, isPrimaryModifier } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import { FileTypeIcon } from "./FileTypeIcon";
@@ -35,11 +36,11 @@ export function treeOrder(snapshot: ChangesSnapshot): ChangeEntry[] {
   return [...conflicts, ...staged, ...unstaged, ...untracked];
 }
 
-const GROUPS: Array<{ kind: TreeGroupKey; title: string }> = [
-  { kind: "conflicts", title: messages.merge.conflictsGroup },
-  { kind: "staged", title: messages.changes.staged },
-  { kind: "unstaged", title: messages.changes.unstaged },
-  { kind: "untracked", title: messages.changes.untracked },
+const GROUPS: Array<{ kind: TreeGroupKey; title: () => string }> = [
+  { kind: "conflicts", title: () => messages.merge.conflictsGroup },
+  { kind: "staged", title: () => messages.changes.staged },
+  { kind: "unstaged", title: () => messages.changes.unstaged },
+  { kind: "untracked", title: () => messages.changes.untracked },
 ];
 
 /** 条目属于哪个显示分组：冲突文件不再出现在已暂存、未暂存组里（Q143）。 */
@@ -73,7 +74,7 @@ interface ChangesTreeProps {
 }
 
 type TreeItem =
-  | { type: "header"; kind: TreeGroupKey; title: string; entries: ChangeEntry[] }
+  | { type: "header"; kind: TreeGroupKey; title: () => string; entries: ChangeEntry[] }
   | { type: "dir"; kind: TreeGroupKey; dir: string }
   | { type: "row"; entry: ChangeEntry };
 
@@ -221,7 +222,7 @@ export function ChangesTree(props: ChangesTreeProps) {
               <GroupHeader
                 key={`header-${item.kind}`}
                 kind={item.kind}
-                title={item.title}
+                title={item.title()}
                 entries={item.entries}
                 open={open[item.kind]}
                 top={index * TREE_ROW_HEIGHT}
@@ -384,11 +385,11 @@ function ChangeRow({
   const name = entry.path.slice(slash + 1);
   const dir = slash > 0 ? entry.path.slice(0, slash) : "";
   const detail = entry.originalPath
-    ? messages.changes.renamedFrom(dir, entry.originalPath)
+    ? renamedFrom(dir, entry.originalPath)
     : entry.collapsed
       ? `${dir ? `${dir} · ` : ""}${messages.changes.collapsed}`
       : dir;
-  const readonlyDesc = entry.readonlyReason ? messages.changes.readonlyReasons[entry.readonlyReason] : null;
+  const readonlyDesc = entry.readonlyReason ? readonlyReasonText(entry.readonlyReason) : null;
   // 未跟踪文件只能整文件操作：行内提供丢弃（先存回收区再删除）与暂存（F03.4、Q120）。
   const showDiscard = (entry.changes === "unstaged" || entry.changes === "untracked") && !entry.readonlyReason;
   return (

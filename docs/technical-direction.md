@@ -37,7 +37,7 @@ Git 执行：Rust 层调用系统 Git CLI
 
 ## Git 执行边界
 
-- 所有 Git 读写都由 Rust 层调用系统的 Git 命令行完成，不引入 git2（libgit2）或 gix，见 [ADR-0002](./adr/0002-git-cli-only.md)。
+- Git 读写由 Rust 层调用系统的 Git 命令行完成，见 [ADR-0002](./adr/0002-git-cli-only.md)。仅 stash 删除/清空获准按 [ADR-0014](./adr/0014-stash-deletion-transaction-exception.md) 评估并验证 git2/libgit2 持锁事务；验证失败仍拒绝删除。
 - 读取状态一律使用机器可读格式，例如 `git status --porcelain=v2 -z`。
 - Rust 层只向前端提供固定、带类型的操作（例如“暂存这个 hunk”）。前端不能传入任意 Git 参数或 shell 命令。
 - 界面显示的 hunk 由 Rust 层解析 `git diff` 输出得到；暂存、取消暂存、丢弃都使用同一个 hunk 生成的补丁，见 [ADR-0004](./adr/0004-hunks-come-from-git.md)。

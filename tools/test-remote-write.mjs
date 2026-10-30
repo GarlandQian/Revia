@@ -519,7 +519,7 @@ test("更新与推送结果的通知文案覆盖每种状态", () => {
   assert.equal(updateNotice({ ...base, status: "updated", commitsMerged: 3 }).tone, "success");
   assert.equal(updateNotice({ ...base, status: "mergeConflict", conflicts: ["a.txt"] }).tone, "warning");
   assert.equal(updateNotice({ ...base, status: "rebaseConflict", conflicts: ["a.txt"] }).tone, "warning");
-  assert.match(updateNotice({ ...base, status: "autostashConflict", stashKept: "stash@{0}" }).title, /stash|冲突/);
+  assert.match(updateNotice({ ...base, status: "autostashConflict", stashKept: "stash@{0}" }).title(), /stash|冲突/);
   assert.equal(pushNotice({ kind: "pushed", remote: "origin", branch: "main", commits: 2, upstreamRecorded: true, output: "" }).tone, "success");
   assert.equal(pushNotice({ kind: "rejected", remote: "origin", branch: "main", reason: "非快进", output: "" }).tone, "warning");
 });
@@ -554,7 +554,8 @@ test("新建分支失败时对话框显示后端（Git）给出的原因", () =>
 
 test("新建分支对话框的错误来自写编排的返回，不是通用提示", () => {
   const app = readFileSync(new URL("App.tsx", sourceRoot), "utf8");
-  assert.match(app, /setNewBranchError\(branchFailureDetail\(outcome\.error\)\)/);
+  assert.match(app, /setNewBranchError\(outcome\.error\)/);
+  assert.match(app, /error=\{newBranchError \? branchFailureDetail\(newBranchError\) : null\}/);
   // 统一编排把错误原样返回给调用方（对话框与通知共用同一个原因）。
   assert.match(app, /Promise<\{ ok: true; result: unknown \} \| \{ ok: false; error: AppErrorPayload \}>/);
 });

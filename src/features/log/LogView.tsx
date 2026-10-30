@@ -1,3 +1,4 @@
+import type { NoticeText } from "@/components/app/Notifications";
 /**
  * 提交日志（M5 F01、F06，规格 L01–L06）。
  *
@@ -20,8 +21,10 @@ import type { HistoryRef } from "@/types/bindings/HistoryRef";
 import type { HistoryRefLabel } from "@/types/bindings/HistoryRefLabel";
 import type { LogColumns } from "@/lib/ipc";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
-import { getErrorMessage } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import { columnLabel, dateLabel } from "@/lib/i18n/text";
+import { formatAppError, toAppError } from "@/lib/error";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import { Codicon } from "@/components/ui/codicon";
 import { Dropdown, MenuItem, MenuSeparator } from "@/components/ui/popover";
 import { FileTypeIcon } from "@/components/app/FileTypeIcon";
@@ -55,6 +58,15 @@ export const LOG_ROW_HEIGHT = 26;
 export const LOG_LANE_WIDTH = 14;
 /** 表格在滚动时多渲染的行数，避免快速滚动出现空白。 */
 const ROW_OVERSCAN = 8;
+/**
+ * 日期列宽（backlog 07 / D01）：表头、行与表格最小宽度共用同一约束。
+ * 列宽不够时行内截断加省略号（whitespace-nowrap），不折行、不压相邻行；
+ * 完整内容通过 title 悬浮可查。
+ */
+// 16 个字符（如 2026/09/29 17:00）在 12px 系统字体下约 101.4px，加左右 8px 内边距需 118px；取 124px 留出字体差异余量。
+const DATE_COLUMN_WIDTH = 124;
+/** 主题列最小宽度：默认 1280 宽窗口展开详情面板时，日期列仍能完整落在日志面板内（D01）。 */
+const SUBJECT_MIN_WIDTH = 160;
 
 export interface LogSettings {
   columns: LogColumns;
@@ -93,9 +105,15 @@ export interface LogViewProps {
   refsWatchRevision: number;
   onOpenCommitFile: (request: { target: HistoryFileTarget; title: string }) => void;
   onOpenMergeCommitFile: (request: { commit: string; path: string; title: string }) => void;
+  /** M6 F：从日志中的文件打开只读文件历史。 */
+  onFileHistory: (commit: string, path: string) => void;
+  /** M6 T：从日志中的文件打开外部 diff；merge 提交需先选父提交，不猜主线。 */
+  onFileExternalDiff: (commit: string, path: string) => void;
   onCreateBranchAt: (commit: string) => void;
+  /** M6 历史改写入口（由 App 打开确认对话框）。`selection` 保留日志中的新到旧顺序。 */
+  onHistoryAction: (action: LogHistoryAction, commit: HistoryCommit, commits: HistoryCommit[], selection: HistoryCommit[]) => void;
   onCopy: (text: string) => void;
-  onNotify: (notice: { tone: "success" | "warning" | "error"; title: string; detail?: string }) => void;
+  onNotify: (notice: { tone: "success" | "warning" | "error"; title: NoticeText; detail?: NoticeText }) => void;
 }
 
 interface DetailsState {
@@ -104,7 +122,7 @@ interface DetailsState {
   detail: HistoryCommitDetail | null;
   files: HistoryCommitFiles | null;
   merge: HistoryMergeFiles | null;
-  error: string | null;
+  error: AppErrorPayload | null;
   loading: boolean;
 }
 
@@ -114,7 +132,7 @@ export function LogView(props: LogViewProps) {
   const {
     worktreeId, targetId, initialRefs, active, state, onState, settings, onSettings, previewOpen, onPreviewOpen, diffPresentation,
     groupByDirectory, currentBranch, headCommit, me, refreshKey, refsWatchRevision, onOpenCommitFile, onOpenMergeCommitFile,
-    onCreateBranchAt, onCopy, onNotify,
+    onFileHistory, onFileExternalDiff, onCreateBranchAt, onHistoryAction, onCopy, onNotify,
   } = props;
 
   const [snapshot, setSnapshot] = useState<LogSnapshot>({
@@ -129,6 +147,8 @@ export function LogView(props: LogViewProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(400);
   const [filterFocus, setFilterFocus] = useState(false);
+  /** 日志多选：右键动作按选择集执行；单选时就是当前行。 */
+  const [selection, setSelection] = useState<string[]>([]);
 
   const filter = state.filter ?? defaultFilter();
   const firstParent = settings.firstParent;
@@ -159,6 +179,12 @@ export function LogView(props: LogViewProps) {
     pendingScrollRef.current = restoreScrollRef.current;
     pager.reset(queryKey, { force: true });
   }, [pager]);
+
+  useEffect(() => {
+    // A new history target or a different filter has a different row set;
+    // stale OIDs must not leak into the next rewrite action.
+    setSelection([]);
+  }, [targetId, key]);
 
   const resetGraph = useCallback((commits: HistoryCommit[]) => {
     const result = appendGraphRows(emptyGraphState(), commits, { firstParent });
@@ -338,7 +364,7 @@ export function LogView(props: LogViewProps) {
         }
       } catch (caught) {
         if (cancelled) return;
-        setDetails({ targetId, commit: null, detail: null, files: null, merge: null, error: getErrorMessage(caught), loading: false });
+        setDetails({ targetId, commit: null, detail: null, files: null, merge: null, error: toAppError(caught), loading: false });
       }
     })();
     return () => {
@@ -388,8 +414,8 @@ export function LogView(props: LogViewProps) {
   const visible = rows.slice(firstVisible, Math.max(firstVisible, lastVisible));
   const tableHeight = total * LOG_ROW_HEIGHT;
   const graphColumnWidth = Math.max(2, ...graphRows.map((row) => row.width)) * LOG_LANE_WIDTH;
-  const tableMinWidth = graphColumnWidth + 280 + (settings.columns.author ? 150 : 0)
-    + (settings.columns.date ? 110 : 0) + (settings.columns.hash ? 80 : 0);
+  const tableMinWidth = graphColumnWidth + SUBJECT_MIN_WIDTH + (settings.columns.author ? 150 : 0)
+    + (settings.columns.date ? DATE_COLUMN_WIDTH : 0) + (settings.columns.hash ? 80 : 0);
 
   // 滚动位置按 worktree 保留，但不逐像素写入全局状态：节流后再存，
   // 否则外层 App 会被每一次滚动事件重渲染。
@@ -437,6 +463,7 @@ export function LogView(props: LogViewProps) {
     else nextIndex = Math.min(rows.length - 1, Math.max(0, index + delta));
     const next = rows[nextIndex];
     if (!next || next.oid === selectedOid) return;
+    setSelection([next.oid]);
     onState({ selectedCommit: next.oid });
     revealRow(nextIndex);
   }, [onState, rows, selectedOid]);
@@ -538,12 +565,63 @@ export function LogView(props: LogViewProps) {
     onOpenCommitFile({ target, title });
   };
 
+  const selectRow = (event: React.MouseEvent, commit: HistoryCommit) => {
+    const current = selection.length > 0 ? selection : selectedOid ? [selectedOid] : [];
+    let next: string[];
+    if (event.metaKey || event.ctrlKey) {
+      next = current.includes(commit.oid)
+        ? current.filter((oid) => oid !== commit.oid)
+        : [...current, commit.oid];
+    } else if (event.shiftKey && selectedOid) {
+      const from = snapshot.commits.findIndex((entry) => entry.oid === selectedOid);
+      const to = snapshot.commits.findIndex((entry) => entry.oid === commit.oid);
+      if (from >= 0 && to >= 0) {
+        const [start, end] = from < to ? [from, to] : [to, from];
+        next = snapshot.commits.slice(start, end + 1).map((entry) => entry.oid);
+      } else {
+        next = [commit.oid];
+      }
+    } else {
+      next = [commit.oid];
+    }
+    setSelection(next);
+    onState({ selectedCommit: commit.oid });
+  };
+
+  const onFileContextMenu = async (event: React.MouseEvent, file: HistoryFile, parent: string | null) => {
+    event.preventDefault();
+    if (!selectedOid) return;
+    const target = toTarget(file, parent);
+    if (target) selectFile(target, commitTabTitle(file.path, selectedOid));
+    const merge = (details.detail?.parents.length ?? 0) > 1;
+    await showFileContextMenu({
+      history: () => onFileHistory(selectedOid, file.path),
+      external: merge ? null : () => onFileExternalDiff(selectedOid, file.path),
+    });
+  };
+
   const onRowContextMenu = async (event: React.MouseEvent, commit: HistoryCommit) => {
     event.preventDefault();
+    // Keep a multi-selection if the context row is part of it; otherwise the
+    // action applies to this row only.
+    const current = selection.length > 0 ? selection : selectedOid ? [selectedOid] : [];
+    const next = current.includes(commit.oid) ? current : [commit.oid];
+    setSelection(next);
     onState({ selectedCommit: commit.oid });
+    const selectedCommits = snapshot.commits.filter((entry) => next.includes(entry.oid));
+    if (!selectedCommits.some((entry) => entry.oid === commit.oid)) selectedCommits.unshift(commit);
+    const single = selectedCommits.length === 1;
+    let rangeLinear = false;
+    let rangeReason = "";
+    try {
+      if (single && headCommit) { await ipc.rewriteRange(worktreeId, commit.oid, headCommit); rangeLinear = true; }
+    } catch (caught) { rangeReason = formatAppError(toAppError(caught)); }
     await showCommitContextMenu({
       copy: () => onCopy(commit.oid),
       branch: () => onCreateBranchAt(commit.oid),
+      history: (action) => onHistoryAction(action, commit, snapshot.commits, selectedCommits),
+      linear: selectedCommits.every((entry) => entry.parents.length <= 1),
+      single, rangeLinear, rangeReason,
     });
   };
 
@@ -556,7 +634,7 @@ export function LogView(props: LogViewProps) {
           <Codicon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-descriptionforeground" />
           <input
             ref={filterInputRef}
-            className="log-input w-[220px] pl-6"
+            className="log-input log-input-search w-[220px]"
             placeholder={messages.log.textPlaceholder}
             aria-label={messages.log.text}
             spellCheck={false}
@@ -608,7 +686,7 @@ export function LogView(props: LogViewProps) {
           trigger={
             <button type="button" className={`log-filter-button${filter.date !== "all" ? " active" : ""}`}>
               <Codicon name="calendar" size={13} />
-              <span>{messages.log.dateLabels[filter.date] ?? messages.log.dateLabels.all}</span>
+              <span>{dateLabel(filter.date)}</span>
               <Codicon name="chevron-down" size={11} />
             </button>
           }
@@ -664,7 +742,7 @@ export function LogView(props: LogViewProps) {
                 checked={settings.columns[column]}
                 onChange={(event) => onSettings({ columns: { ...settings.columns, [column]: event.target.checked } })}
               />
-              {messages.log.columnLabels[column]}
+              {columnLabel(column)}
             </label>
           ))}
           <MenuSeparator />
@@ -711,17 +789,18 @@ export function LogView(props: LogViewProps) {
           >
             <div style={{ minWidth: tableMinWidth }}>
               <div className="log-table-head sticky top-0 z-[1] flex h-[24px] items-center border-b border-panel-border bg-[var(--editor-background)] text-[11px] text-descriptionforeground">
-                <span className="log-graph-col shrink-0" style={{ width: graphColumnWidth }}>{messages.log.graph}</span>
+                {/* 分支图列只有几条轨道宽，表头文字放不下；同 Rebased 不显示列名，只保留可读标签。 */}
+                <span className="log-graph-col shrink-0" style={{ width: graphColumnWidth }} title={messages.log.graph} aria-label={messages.log.graph} />
                 <span className="min-w-0 flex-1 px-2">{messages.log.subject}</span>
                 {settings.columns.author ? <span className="w-[150px] shrink-0 px-2">{messages.log.author}</span> : null}
-                {settings.columns.date ? <span className="w-[110px] shrink-0 px-2">{messages.log.date}</span> : null}
+                {settings.columns.date ? <span className="shrink-0 overflow-hidden text-ellipsis whitespace-nowrap px-2" style={{ width: DATE_COLUMN_WIDTH }}>{messages.log.date}</span> : null}
                 {settings.columns.hash ? <span className="w-[80px] shrink-0 px-2">{messages.log.hash}</span> : null}
               </div>
               <div className="relative" style={{ height: tableHeight }}>
                 {visible.map((commit, offset) => {
                   const index = firstVisible + offset;
                   const graph = graphRows[index];
-                  const selected = commit.oid === selectedOid;
+                  const selected = (selection.length > 0 ? selection.includes(commit.oid) : commit.oid === selectedOid);
                   const chips = refChips(
                     commit.refs,
                     currentBranch,
@@ -742,7 +821,7 @@ export function LogView(props: LogViewProps) {
                       tabIndex={-1}
                       className={`log-row absolute inset-x-0 flex items-center ${selected ? "selected" : ""}`}
                       style={{ top: index * LOG_ROW_HEIGHT, height: LOG_ROW_HEIGHT }}
-                      onClick={() => onState({ selectedCommit: commit.oid })}
+                      onClick={(event) => selectRow(event, commit)}
                       onDoubleClick={() => {
                         const first = firstFileOf(details, commit.oid);
                         if (first) activateFile(first.target, first.title);
@@ -785,7 +864,11 @@ export function LogView(props: LogViewProps) {
                         </span>
                       ) : null}
                       {settings.columns.date ? (
-                        <span className="w-[110px] shrink-0 px-2 text-[11.5px] text-descriptionforeground tabular-nums">
+                        <span
+                          className="shrink-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-[11.5px] text-descriptionforeground tabular-nums"
+                          style={{ width: DATE_COLUMN_WIDTH }}
+                          title={formatCommitDate(commit.author.time)}
+                        >
                           {formatCommitDate(commit.author.time)}
                         </span>
                       ) : null}
@@ -804,7 +887,7 @@ export function LogView(props: LogViewProps) {
               {snapshot.error ? (
                 <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-destructive">
                   <Codicon name="warning" size={13} />
-                  <span className="min-w-0 flex-1">{snapshot.error}</span>
+                  <span className="min-w-0 flex-1">{formatAppError(snapshot.error)}</span>
                   <button type="button" className="log-filter-button" onClick={() => resetLog(`${key}|retry`)}>
                     {messages.log.retry}
                   </button>
@@ -841,6 +924,7 @@ export function LogView(props: LogViewProps) {
               const target = toTarget(file, parent);
               if (target) activateFile(target, commitTabTitle(file.path, selectedOid ?? ""));
             }}
+            onFileContextMenu={(event, file, parent) => void onFileContextMenu(event, file, parent)}
             onCopy={onCopy}
             onLocateParent={(oid) => {
               const index = rows.findIndex((commit) => commit.oid === oid);
@@ -848,7 +932,7 @@ export function LogView(props: LogViewProps) {
                 onState({ selectedCommit: oid });
                 revealRow(index);
               } else {
-                onNotify({ tone: "warning", title: messages.log.parentNotLoaded });
+                onNotify({ tone: "warning", title: () => (messages.log.parentNotLoaded) });
               }
             }}
           />
@@ -975,6 +1059,7 @@ function CommitDetails({
   onMergeByParent,
   onSelectFile,
   onActivateFile,
+  onFileContextMenu,
   onCopy,
   onLocateParent,
 }: {
@@ -985,6 +1070,7 @@ function CommitDetails({
   onMergeByParent: (value: boolean) => void;
   onSelectFile: (file: HistoryFile, parent: string | null) => void;
   onActivateFile: (file: HistoryFile, parent: string | null) => void;
+  onFileContextMenu: (event: React.MouseEvent, file: HistoryFile, parent: string | null) => void;
   onCopy: (text: string) => void;
   onLocateParent: (oid: string) => void;
 }) {
@@ -994,7 +1080,7 @@ function CommitDetails({
     return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-descriptionforeground">{messages.log.loadingDetails}</div>;
   }
   if (details.error) {
-    return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-destructive">{details.error}</div>;
+    return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-destructive">{formatAppError(details.error)}</div>;
   }
   if (!detail) {
     return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-descriptionforeground">{messages.log.noSelection}</div>;
@@ -1016,6 +1102,7 @@ function CommitDetails({
         className="log-file-row"
         title={file.readonlyReason ? readonlyReasonText(file) : file.path}
         onClick={() => onSelectFile(file, parent)}
+        onContextMenu={(event) => onFileContextMenu(event, file, parent)}
         onDoubleClick={() => onActivateFile(file, parent)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -1209,18 +1296,73 @@ function firstFileOf(details: DetailsState, commit: string): { target: HistoryFi
 }
 
 /** 原生右键菜单（M5 只有“复制哈希”“从此提交新建分支…”）。 */
-async function showCommitContextMenu(actions: { copy: () => void; branch: () => void }): Promise<void> {
+export type LogHistoryAction = "cherryPick" | "revert" | "reset" | "reword" | "interactive";
+
+/** 文件右键菜单：只读文件历史与可选外部 diff；不把 merge 提交猜成第一父提交。 */
+async function showFileContextMenu(actions: {
+  history: () => void;
+  external: (() => void) | null;
+}): Promise<void> {
+  try {
+    const { Menu } = await import("@tauri-apps/api/menu");
+    const items = [
+      { id: "file-history", text: messages.fileHistory.open, action: () => actions.history() },
+      ...(actions.external
+        ? [{ id: "external-diff", text: messages.externalTools.openDiff, action: () => actions.external?.() }]
+        : []),
+    ];
+    const menu = await Menu.new({ items });
+    await menu.popup();
+  } catch {
+    actions.history();
+  }
+}
+
+/** 原生右键菜单：只读复制 / 新建分支，以及 M6 的历史改写入口。 */
+async function showCommitContextMenu(actions: {
+  copy: () => void;
+  branch: () => void;
+  history: (action: LogHistoryAction) => void;
+  linear: boolean;
+  /** 新建分支、改写说明、交互式 rebase 和 Reset 都只针对一个提交。 */
+  single: boolean;
+  rangeLinear: boolean;
+  rangeReason?: string;
+}): Promise<void> {
   try {
     const { Menu } = await import("@tauri-apps/api/menu");
     const menu = await Menu.new({
       items: [
         { id: "copy-hash", text: messages.log.copyHash, action: () => actions.copy() },
-        { id: "new-branch", text: messages.log.branchFromCommit, action: () => actions.branch() },
+        { id: "new-branch", text: messages.log.branchFromCommit, enabled: actions.single, action: () => actions.branch() },
+        ...(actions.linear
+          ? [
+              { id: "cherry-pick", text: messages.historyActions.cherryPick, action: () => actions.history("cherryPick") },
+              { id: "revert", text: messages.historyActions.revert, action: () => actions.history("revert") },
+            ]
+          : []),
+        ...(actions.rangeLinear
+          ? [
+              { id: "reword", text: messages.historyActions.reword, action: () => actions.history("reword") },
+              { id: "interactive", text: messages.historyActions.interactive, action: () => actions.history("interactive") },
+            ]
+          : [
+              { id: "reword", text: messages.historyActions.reword, enabled: false },
+              { id: "interactive", text: messages.historyActions.interactive, enabled: false },
+              {
+                id: "history-range-merge",
+                text: !actions.single
+                  ? (actions.linear ? messages.historyActions.singleCommitOnly : messages.historyActions.selectionHasMerge)
+                  : actions.rangeReason || messages.historyActions.rangeHasMerge,
+                enabled: false,
+              },
+            ]),
+        { id: "reset", text: messages.historyActions.reset, enabled: actions.single, action: () => actions.history("reset") },
       ],
     });
     await menu.popup();
   } catch {
-    // 原生菜单不可用时退到同一个动作的最小入口：复制哈希 + 新建分支由工具栏提供。
+    // 原生菜单不可用时只保留可安全执行的复制；其他动作仍可从页签菜单进入。
     actions.copy();
   }
 }
@@ -1352,7 +1494,7 @@ function DateFilterMenu({
         <MenuItem key={preset} onClick={() => onChange({ date: preset })}>
           <span className="flex items-center gap-2">
             {filter.date === preset ? <Codicon name="check" size={12} /> : <span className="w-3" />}
-            {messages.log.dateLabels[preset]}
+            {dateLabel(preset)}
           </span>
         </MenuItem>
       ))}

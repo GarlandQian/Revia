@@ -5,21 +5,23 @@
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportCritical } from "@/features/diff/log";
-import { getErrorMessage } from "@/lib/error";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { formatAppError, toAppError, getErrorMessage } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
 
 interface Props {
   children: ReactNode;
 }
 
 interface State {
-  message: string | null;
+  message: AppErrorPayload | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { message: null };
 
   static getDerivedStateFromError(error: unknown): State {
-    return { message: getErrorMessage(error) };
+    return { message: toAppError(error) };
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {
@@ -30,8 +32,8 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.message) {
       return (
         <div className="p-4 text-sm text-destructive">
-          <p className="font-medium">界面渲染出错</p>
-          <pre className="mt-2 whitespace-pre-wrap font-mono text-xs">{this.state.message}</pre>
+          <p className="font-medium">{messages.errors.app.renderTitle}</p>
+          <pre className="mt-2 whitespace-pre-wrap font-mono text-xs">{formatAppError(this.state.message)}</pre>
         </div>
       );
     }

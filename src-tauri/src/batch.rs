@@ -34,8 +34,8 @@ pub struct BatchFileResult {
     pub path: String,
     pub changes: ChangesKind,
     pub ok: bool,
-    /// 只读文件未执行时的原因（符号链接、子模块、冲突等）。
-    pub skipped: Option<String>,
+    /// 只读文件未执行时的结构化原因（符号链接、子模块、冲突等）。
+    pub skipped: Option<AppErrorPayload>,
     /// 失败原因；成功与跳过时为 None。
     pub error: Option<AppErrorPayload>,
 }
@@ -56,7 +56,7 @@ impl BatchFileResult {
             path: target.path.clone(),
             changes: target.changes,
             ok: false,
-            skipped: Some(reason.description().to_string()),
+            skipped: Some(reason.error().payload()),
             error: None,
         }
     }
@@ -87,7 +87,10 @@ pub struct BatchOutcome {
 impl BatchOutcome {
     pub fn all_failed(targets: &[BatchTarget], error: &AppError) -> Self {
         Self {
-            results: targets.iter().map(|target| BatchFileResult::failed(target, error)).collect(),
+            results: targets
+                .iter()
+                .map(|target| BatchFileResult::failed(target, error))
+                .collect(),
             snapshot: None,
             needs_verification: error.kind == ErrorKind::NeedsVerification,
         }
@@ -114,14 +117,18 @@ impl WorktreeSession {
                 [ChangesKind::Staged, ChangesKind::Staged]
             };
             let entry = status.as_ref().and_then(|status| {
-                status
-                    .entries
-                    .iter()
-                    .find(|entry| entry.path == target.path && expected_group.contains(&entry.changes))
+                status.entries.iter().find(|entry| {
+                    entry.path == target.path && expected_group.contains(&entry.changes)
+                })
             });
             match entry {
                 None => {
-                    let error = AppError::rejected("文件已变化，请重新确认");
+                    let error = AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.batch.theFileChangedConfirmAgain",
+                        "文件已变化，请重新确认",
+                        &[],
+                    );
                     needs_verification |= error.kind == ErrorKind::NeedsVerification;
                     results.push(BatchFileResult::failed(target, &error));
                     continue;
@@ -133,7 +140,8 @@ impl WorktreeSession {
                     }
                 }
             }
-            match self.execute_staging_op_locked(&target.path, &target.fingerprint, is_stage, None) {
+            match self.execute_staging_op_locked(&target.path, &target.fingerprint, is_stage, None)
+            {
                 Ok(next) => {
                     snapshot = Some(next);
                     results.push(BatchFileResult::success(target));
@@ -149,7 +157,11 @@ impl WorktreeSession {
         if let Ok(next) = self.refresh() {
             snapshot = Some(next);
         }
-        BatchOutcome { results, snapshot, needs_verification }
+        BatchOutcome {
+            results,
+            snapshot,
+            needs_verification,
+        }
     }
 
     /// 批量丢弃：整个批次只取一次写锁；每个文件先保存回收记录再写工作区。
@@ -186,7 +198,12 @@ impl WorktreeSession {
                 })
             });
             if !confirmed_ok {
-                let error = AppError::rejected("文件已变化，请重新确认");
+                let error = AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.batch.theFileChangedConfirmAgain2",
+                    "文件已变化，请重新确认",
+                    &[],
+                );
                 needs_verification |= error.kind == ErrorKind::NeedsVerification;
                 results.push(BatchFileResult::failed(target, &error));
                 continue;
@@ -228,7 +245,11 @@ impl WorktreeSession {
         if let Ok(next) = self.refresh() {
             snapshot = Some(next);
         }
-        BatchOutcome { results, snapshot, needs_verification }
+        BatchOutcome {
+            results,
+            snapshot,
+            needs_verification,
+        }
     }
 }
 
@@ -262,10 +283,18 @@ mod tests {
             .split(':')
             .map(str::to_string)
             .collect();
-        let vars = [("HOME".to_string(), std::env::var("HOME").unwrap_or_default()),
-            ("PATH".to_string(), std::env::var("PATH").unwrap_or_default())]
-            .into_iter()
-            .collect();
+        let vars = [
+            (
+                "HOME".to_string(),
+                std::env::var("HOME").unwrap_or_default(),
+            ),
+            (
+                "PATH".to_string(),
+                std::env::var("PATH").unwrap_or_default(),
+            ),
+        ]
+        .into_iter()
+        .collect();
         ShellEnv {
             vars,
             path: path.clone(),
@@ -330,7 +359,11 @@ mod tests {
         let targets = targets(&snapshot);
         assert_eq!(targets.len(), 2);
         let staged = session.stage_files(&targets, true);
-        assert!(staged.results.iter().all(|result| result.ok), "{:?}", staged.results);
+        assert!(
+            staged.results.iter().all(|result| result.ok),
+            "{:?}",
+            staged.results
+        );
         let snapshot = staged.snapshot.unwrap();
         assert_eq!(snapshot.staged_count, 2);
         let unstage = snapshot
@@ -344,7 +377,11 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let unstaged = session.stage_files(&unstage, false);
-        assert!(unstaged.results.iter().all(|result| result.ok), "{:?}", unstaged.results);
+        assert!(
+            unstaged.results.iter().all(|result| result.ok),
+            "{:?}",
+            unstaged.results
+        );
         assert_eq!(unstaged.snapshot.unwrap().staged_count, 0);
     }
 
@@ -373,7 +410,11 @@ mod tests {
         let targets = targets(&snapshot);
         let store = RecoveryStore::new(dir.path().join("data"));
         let outcome = session.discard_files(&targets, &snapshot.revision.to_string(), &store);
-        assert!(outcome.results.iter().all(|result| result.ok), "{:?}", outcome.results);
+        assert!(
+            outcome.results.iter().all(|result| result.ok),
+            "{:?}",
+            outcome.results
+        );
         assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "a1\n");
         assert_eq!(std::fs::read_to_string(repo.join("b.txt")).unwrap(), "b1\n");
         let records = store.list(None).unwrap();
@@ -387,7 +428,10 @@ mod tests {
         let session = open(&repo);
         let snapshot = session.refresh().unwrap();
         let targets = targets(&snapshot);
-        let target = targets.iter().find(|target| target.path == "new.txt").unwrap();
+        let target = targets
+            .iter()
+            .find(|target| target.path == "new.txt")
+            .unwrap();
         let store = RecoveryStore::new(dir.path().join("data"));
         let outcome = session.discard_files(
             std::slice::from_ref(target),
@@ -423,7 +467,11 @@ mod tests {
         assert!(!link.ok);
         assert!(link.skipped.is_some(), "只读文件应说明跳过原因");
         assert!(link.error.is_none());
-        let a = outcome.results.iter().find(|result| result.path == "a.txt").unwrap();
+        let a = outcome
+            .results
+            .iter()
+            .find(|result| result.path == "a.txt")
+            .unwrap();
         assert!(a.ok);
     }
 }

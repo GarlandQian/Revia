@@ -8,8 +8,8 @@ use std::path::Path;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::git::status;
 use crate::git::Git;
+use crate::git::status;
 use crate::operation::{self, OperationKind};
 use crate::session::WorktreeEntry;
 
@@ -26,7 +26,7 @@ pub struct WorktreeStatusEntry {
     /// 路径当前是否可访问（被移动或删除时仍列出，但标记不可用）。
     pub accessible: bool,
     /// 读取状态失败的原因。
-    pub error: Option<String>,
+    pub error: Option<crate::error::AppErrorPayload>,
     /// 是否有未提交改动（含未跟踪文件）。
     pub dirty: bool,
     /// 进行中的操作；没有时为 None。
@@ -70,7 +70,15 @@ pub fn read(git: &Git, entry: &WorktreeEntry) -> WorktreeStatusEntry {
         upstream: None,
     };
     if !result.accessible {
-        result.error = Some("worktree 路径不存在或无法访问".into());
+        result.error = Some(
+            crate::error::AppError::coded(
+                crate::error::ErrorKind::Environment,
+                "errors.worktreeStatus.pathUnavailable",
+                "worktree 路径不存在或无法访问",
+                &[],
+            )
+            .payload(),
+        );
         return result;
     }
     let local = git.in_directory(Path::new(&entry.path));
@@ -81,7 +89,7 @@ pub fn read(git: &Git, entry: &WorktreeEntry) -> WorktreeStatusEntry {
             result.dirty = !state.entries.is_empty();
         }
         Err(error) => {
-            result.error = Some(error.message);
+            result.error = Some(error.payload());
         }
     }
     if result.error.is_none() {
@@ -91,7 +99,7 @@ pub fn read(git: &Git, entry: &WorktreeEntry) -> WorktreeStatusEntry {
                 result.operation_label = Some(state.kind.label().to_string());
             }
             Ok(None) => {}
-            Err(error) => result.error = Some(error.message),
+            Err(error) => result.error = Some(error.payload()),
         }
     }
     // 领先 / 落后只按本地引用计算，不联网（Q10、Q126）。
@@ -105,12 +113,9 @@ pub fn read(git: &Git, entry: &WorktreeEntry) -> WorktreeStatusEntry {
         let name = name.trim().to_string();
         if !name.is_empty() {
             result.upstream = Some(name);
-            if let Some(text) = local.try_run(&[
-                "rev-list",
-                "--left-right",
-                "--count",
-                "HEAD...@{upstream}",
-            ]) {
+            if let Some(text) =
+                local.try_run(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
+            {
                 if let Some((ahead, behind)) = parse_ahead_behind(&text) {
                     result.ahead = ahead;
                     result.behind = behind;
@@ -135,10 +140,18 @@ mod tests {
             .split(':')
             .map(str::to_string)
             .collect();
-        let vars = [("HOME".to_string(), std::env::var("HOME").unwrap_or_default()),
-            ("PATH".to_string(), std::env::var("PATH").unwrap_or_default())]
-            .into_iter()
-            .collect();
+        let vars = [
+            (
+                "HOME".to_string(),
+                std::env::var("HOME").unwrap_or_default(),
+            ),
+            (
+                "PATH".to_string(),
+                std::env::var("PATH").unwrap_or_default(),
+            ),
+        ]
+        .into_iter()
+        .collect();
         ShellEnv {
             vars,
             path: path.clone(),
@@ -161,8 +174,16 @@ mod tests {
         let repo = dir.path().join("repo");
         std::fs::create_dir_all(&repo).unwrap();
         let run = |args: &[&str]| {
-            let output = Command::new("git").current_dir(&repo).args(args).output().unwrap();
-            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            let output = Command::new("git")
+                .current_dir(&repo)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         };
         run(&["init", "-q"]);
         run(&["config", "user.email", "revia@example.com"]);
@@ -170,7 +191,12 @@ mod tests {
         std::fs::write(repo.join("a.txt"), "a1\n").unwrap();
         run(&["add", "."]);
         run(&["commit", "-q", "-m", "init"]);
-        let git = Git::new(&repo, &shell_env(&repo), std::sync::Arc::new(CommandLog::default())).unwrap();
+        let git = Git::new(
+            &repo,
+            &shell_env(&repo),
+            std::sync::Arc::new(CommandLog::default()),
+        )
+        .unwrap();
         let entry = WorktreeEntry {
             id: "wt".into(),
             path: repo.display().to_string(),
@@ -188,7 +214,10 @@ mod tests {
         assert_eq!((clean.ahead, clean.behind), (0, 0));
         std::fs::write(repo.join("a.txt"), "a2\n").unwrap();
         assert!(read(&git, &entry).dirty);
-        let missing = WorktreeEntry { path: dir.path().join("missing").display().to_string(), ..entry };
+        let missing = WorktreeEntry {
+            path: dir.path().join("missing").display().to_string(),
+            ..entry
+        };
         let absent = read(&git, &missing);
         assert!(!absent.accessible);
         assert!(absent.error.is_some());

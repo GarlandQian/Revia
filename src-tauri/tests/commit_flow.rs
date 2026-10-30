@@ -263,6 +263,15 @@ fn failed_hook_records_real_after_and_snapshot_restores_only_the_working_copy() 
     let outcome = fixture.run(&session, options).unwrap();
     assert!(!outcome.success && !outcome.needs_verification && !outcome.draft_cleared);
     assert!(outcome.output.contains("hook diagnostic"));
+    let payload = outcome.error.as_ref().unwrap();
+    let detail = &payload.related.as_ref().unwrap()[0];
+    assert_eq!(detail.code.as_deref(), Some("errors.commitFlow.hookChangedFiles"));
+    assert_eq!(detail.params.as_ref().unwrap().get("worktree").unwrap(), "file.txt");
+    assert!(detail.params.as_ref().unwrap().get("index").unwrap().is_empty());
+    if let Some(path) = std::env::var_os("REVIA_M6_ERROR_FIXTURE") {
+        fs::write(format!("{}.hook.json", PathBuf::from(path).display()), serde_json::to_vec_pretty(payload).unwrap()).unwrap();
+    }
+
     assert!(outcome.hook_changes.unwrap().worktree.contains(&"file.txt".to_string()));
     let id = outcome.snapshot_record_id.unwrap();
     let inspection = session.inspect_record(&id, &fixture.recovery).unwrap();

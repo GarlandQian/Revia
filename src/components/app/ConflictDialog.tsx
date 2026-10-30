@@ -1,3 +1,4 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * 冲突对话框（Q143）：照 Rebased 的 Conflicts 对话框。
  *
@@ -12,8 +13,9 @@ import type { ConflictFile } from "@/types/bindings/ConflictFile";
 import { ipc } from "@/lib/ipc";
 import type { MergeWriteRequest } from "@/features/merge/mergeWrite";
 import { useMountedRef } from "@/hooks/useMountedRef";
-import { messages } from "@/lib/i18n/zh-CN";
-import { getErrorMessage } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import { conflictCountText, mergeUnavailableText } from "@/lib/i18n/text";
+import { formatAppError, toAppError } from "@/lib/error";
 import { Codicon } from "@/components/ui/codicon";
 import { Modal } from "./Dialogs";
 import { FileTypeIcon } from "./FileTypeIcon";
@@ -42,7 +44,7 @@ export function ConflictDialog({
 }) {
   const [files, setFiles] = useState<ConflictFile[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppErrorPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const mounted = useMountedRef();
 
@@ -57,7 +59,7 @@ export function ConflictDialog({
       })
       .catch((caught: unknown) => {
         if (cancelled) return;
-        setError(getErrorMessage(caught));
+        setError(toAppError(caught));
         setFiles([]);
       });
     return () => {
@@ -80,7 +82,7 @@ export function ConflictDialog({
       });
       if (mounted.current) onClose();
     } catch (caught) {
-      if (mounted.current) setError(getErrorMessage(caught));
+      if (mounted.current) setError(toAppError(caught));
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -91,13 +93,13 @@ export function ConflictDialog({
       <p className="text-[12.5px] text-descriptionforeground">{messages.merge.conflictDialogHint}</p>
       {error ? (
         <p role="alert" className="mt-2 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] bg-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_10%,var(--editor-background))] px-2 py-1 text-[12px]">
-          {error}
+          {formatAppError(error)}
         </p>
       ) : null}
       <div className="mt-2 flex min-h-[220px] gap-3">
         <ul className="min-w-0 flex-1 overflow-y-auto rounded border border-panel-border" data-conflict-list>
           {files === null ? <li className="px-2 py-1 text-[12px] text-descriptionforeground">{messages.changes.loading}</li> : null}
-          {files?.length === 0 ? <li className="px-2 py-1 text-[12px] text-descriptionforeground">{messages.merge.conflictCount(0)}</li> : null}
+          {files?.length === 0 ? <li className="px-2 py-1 text-[12px] text-descriptionforeground">{conflictCountText(0)}</li> : null}
           {(files ?? []).map((file) => (
             <li key={file.path}>
               <button
@@ -120,13 +122,13 @@ export function ConflictDialog({
                 <FileTypeIcon path={file.path} />
                 <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]">{file.path}</span>
                 <span className="shrink-0 text-[11px] text-descriptionforeground">
-                  {messages.merge.ourVersion}：{sideLabel(file.ours)}
+                  {messages.merge.ourVersion}: {sideLabel(file.ours)}
                 </span>
                 <span className="shrink-0 text-[11px] text-descriptionforeground">
-                  {messages.merge.theirVersion}：{sideLabel(file.theirs)}
+                  {messages.merge.theirVersion}: {sideLabel(file.theirs)}
                 </span>
                 {file.unavailable ? (
-                  <span className="shrink-0 text-[11px] text-descriptionforeground" title={messages.merge.unavailable[file.unavailable]}>
+                  <span className="shrink-0 text-[11px] text-descriptionforeground" title={mergeUnavailableText(file.unavailable)}>
                     {messages.merge.onlyAcceptSide}
                   </span>
                 ) : null}

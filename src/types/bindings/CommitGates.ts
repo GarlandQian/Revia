@@ -4,47 +4,47 @@ import type { OperationKind } from "./OperationKind";
 /**
  * 门禁摘要（前端禁用/提示用；真实门禁在执行时重新校验）。
  */
-export type CommitGates = { 
+export type CommitGates = {
 /**
  * 是否有未解决冲突（含没有进行中操作标记、但 index unmerged 的情况）。
  */
-hasConflicts: boolean, 
+hasConflicts: boolean,
 /**
  * 是否有禁用提交的进行中操作（rebase/cherry-pick/revert）。
  */
-operationBlocksCommit: boolean, 
+operationBlocksCommit: boolean,
 /**
- * 是否有任意进行中操作（禁 amend，F01.3）。
+ * 进行中操作是否仍禁止 amend（交互式 rebase 的 edit 停点例外，Q158/Q166）。
  */
-operationBlocksAmend: boolean, 
+operationBlocksAmend: boolean,
 /**
- * 是否允许 amend（无 HEAD 或进行中操作时为 false）。
+ * 是否允许 amend（无 HEAD 或不允许的进行中操作时为 false）。
  */
-amendAvailable: boolean, 
+amendAvailable: boolean,
 /**
  * 普通提交是否有已暂存内容（暂存删除算内容，intent-to-add 不算）。
  */
-hasStagedChanges: boolean, 
+hasStagedChanges: boolean,
 /**
  * 是否允许「没有暂存差异」的普通提交（无冲突 merge 收尾，F03.4）。
  */
-allowsEmptyDiffCommit: boolean, 
+allowsEmptyDiffCommit: boolean,
 /**
  * 进行中操作的类型（提示条文案用）；无操作时为 None。
  */
-operationKind: OperationKind | null, 
+operationKind: OperationKind | null,
 /**
  * 是否处于多提交序列中间阶段。
  */
-operationSequencerPending: boolean, 
+operationSequencerPending: boolean,
 /**
  * 未解决冲突文件数。
  */
-conflictCount: number, 
+conflictCount: number,
 /**
  * HEAD 是否已包含于本地上游（amend 需二次确认）。
  */
-upstreamContainsHead: boolean, 
+upstreamContainsHead: boolean,
 /**
  * 上游是否无法判断（本地没有上游引用）。
  */

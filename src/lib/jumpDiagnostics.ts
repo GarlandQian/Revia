@@ -1,3 +1,4 @@
+// x18n-ignore-file
 import type { DiffViewHandle } from "@/features/diff/DiffView";
 import type { HighlightStore } from "@/features/diff/highlightStore";
 import type { RowWindowStore } from "@/features/diff/rowWindowStore";

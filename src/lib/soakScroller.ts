@@ -1,3 +1,4 @@
+// x18n-ignore-file
 import type { DiffViewHandle } from "../features/diff/DiffView";
 import type { SideBySideHandle } from "../features/diff/SideBySideView";
 import type { ViewMode } from "../types/bindings/ViewMode";

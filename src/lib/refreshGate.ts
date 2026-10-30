@@ -89,36 +89,48 @@ export class RefreshCoordinator {
   private running = false;
   private dirty = false;
   private disposed = false;
+  private readonly idleWaiters = new Set<() => void>();
 
   private readonly run: () => Promise<void>;
+  private readonly canRun: () => boolean;
 
-  constructor(run: () => Promise<void>) {
+  constructor(run: () => Promise<void>, canRun: () => boolean = () => true) {
     this.run = run;
+    this.canRun = canRun;
   }
 
   /** 请求一次刷新；正在执行时只标记脏，不排队。 */
   request(): void {
     if (this.disposed) return;
-    if (this.running) {
-      this.dirty = true;
-      return;
-    }
-    void this.drain();
+    this.dirty = true;
+    this.resume();
+  }
+
+  /** 写门禁释放后补读一次；阻塞期间的通知只保留一个脏标记。 */
+  resume(): void {
+    if (!this.disposed && this.dirty && !this.running && this.canRun()) void this.drain();
+  }
+
+  /** 写入前等待已经发出的自动读取收尾，避免它迟到推进确认代次。 */
+  whenIdle(): Promise<void> {
+    return this.running ? new Promise((resolve) => this.idleWaiters.add(resolve)) : Promise.resolve();
   }
 
   private async drain(): Promise<void> {
     this.running = true;
     try {
-      do {
+      while (this.dirty && !this.disposed && this.canRun()) {
         this.dirty = false;
         try {
           await this.run();
         } catch {
           // 单轮失败不终止协调器；错误由 run 自身汇报。
         }
-      } while (this.dirty && !this.disposed);
+      }
     } finally {
       this.running = false;
+      for (const resolve of this.idleWaiters) resolve();
+      this.idleWaiters.clear();
     }
   }
 
@@ -1340,11 +1352,11 @@ export class ExitGuardSync {
  * 窗口关闭监听与原生退出监听**都**装好才允许开始写入；安装中、失败、卸载后
  * 一律视为未就绪。写入口据此拒绝执行，而不是"报告错误后继续未受保护地写"。
  */
-export class CloseGuardGate {
+export class CloseGuardGate<Reason = string> {
   private windowReady = false;
   private exitReady = false;
   private disposed = false;
-  private reason: string | null = null;
+  private reason: Reason | null = null;
 
   /** 记录某个监听安装成功。 */
   markInstalled(which: "window" | "exit"): void {
@@ -1354,7 +1366,7 @@ export class CloseGuardGate {
   }
 
   /** 记录安装失败（附带可见原因）。 */
-  markFailed(reason: string): void {
+  markFailed(reason: Reason): void {
     this.reason = reason;
   }
 
@@ -1371,7 +1383,7 @@ export class CloseGuardGate {
   }
 
   /** 未就绪时的原因（就绪时为 `null`）。 */
-  get blockedReason(): string | null {
+  get blockedReason(): Reason | null {
     if (this.ready) return null;
     return this.reason;
   }
@@ -1390,14 +1402,14 @@ export class CloseGuardGate {
  * - 保护失败时执行 `rollback` + `reconcile`，让已授权的等待请求当场得到处理，
  *   不留悬挂授权、不等下一笔无关写（ST-B04-08-3 / SP-B04-08-2）。
  */
-export interface WriteGuardDeps {
+export interface WriteGuardDeps<Reason = string> {
   /** 必填的生产关闭门禁；不能由调用者忘记在 guardsReady 中拼接。 */
   closeDriver: Pick<CloseDriver, "canStartWrite">;
-  closeBlockedReason: string;
+  closeBlockedReason: Reason | (() => Reason);
   /** 监听是否就绪（窗口关闭 + 原生退出都装好）。 */
   guardsReady: () => boolean;
   /** 监听未就绪时的可见原因。 */
-  guardBlockedReason: () => string | null;
+  guardBlockedReason: () => Reason | null;
   /** 登记在途。 */
   register: (worktreeId: string) => void;
   /** 建立保护（例如 await 版本化 setExitBlocked(true)）。 */
@@ -1410,10 +1422,10 @@ export interface WriteGuardDeps {
   endWrite: (worktreeId: string, needsVerification: boolean) => void;
 }
 
-export class WriteGuardOrchestrator {
-  private readonly deps: WriteGuardDeps;
+export class WriteGuardOrchestrator<Reason = string> {
+  private readonly deps: WriteGuardDeps<Reason>;
 
-  constructor(deps: WriteGuardDeps) {
+  constructor(deps: WriteGuardDeps<Reason>) {
     this.deps = deps;
   }
 
@@ -1422,9 +1434,9 @@ export class WriteGuardOrchestrator {
    *
    * 返回 `false` 时已完成回滚与真实收尾，调用方不得执行写命令。
    */
-  async begin(worktreeId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  async begin(worktreeId: string): Promise<{ ok: true } | { ok: false; reason: Reason | "" }> {
     if (!this.deps.closeDriver.canStartWrite()) {
-      return { ok: false, reason: this.deps.closeBlockedReason };
+      return { ok: false, reason: this.closeBlockedReason() };
     }
     if (!this.deps.guardsReady()) {
       return { ok: false, reason: this.deps.guardBlockedReason() ?? "" };
@@ -1445,10 +1457,15 @@ export class WriteGuardOrchestrator {
       return {
         ok: false,
         reason: !this.deps.closeDriver.canStartWrite()
-          ? this.deps.closeBlockedReason : this.deps.guardBlockedReason() ?? "",
+          ? this.closeBlockedReason() : this.deps.guardBlockedReason() ?? "",
       };
     }
     return { ok: true };
+  }
+
+  private closeBlockedReason(): Reason {
+    const reason = this.deps.closeBlockedReason;
+    return typeof reason === "function" ? (reason as () => Reason)() : reason;
   }
 
   /** 结束一次写操作并统一收尾。 */

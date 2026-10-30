@@ -1,7 +1,7 @@
 import type { HistoryFile } from "@/types/bindings/HistoryFile";
 import type { HistoryMergeFileGroup } from "@/types/bindings/HistoryMergeFileGroup";
 import type { HistoryMergeMode } from "@/types/bindings/HistoryMergeMode";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
 import { shortOid } from "./logModel";
 
 export function effectiveMergeMode(parentCount: number, byParent: boolean): HistoryMergeMode {

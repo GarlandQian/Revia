@@ -1,3 +1,4 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * 高亮缓存：按行范围请求 Rust 侧的 syntect 结果，按语法类别渲染（Q50，ADR-0006）。
  *
@@ -10,7 +11,7 @@
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { FileVersion } from "@/types/bindings/FileVersion";
 import { ipc, type HighlightLine } from "@/lib/ipc";
-import { getErrorMessage } from "@/lib/error";
+import { toAppError } from "@/lib/error";
 import { logToBackend } from "./log";
 
 /** 一次请求覆盖的行数。 */
@@ -31,7 +32,7 @@ export interface HighlightSnapshot {
   loadedLines: number;
   pending: number;
   supported: boolean;
-  error: string | null;
+  error: AppErrorPayload | null;
   /** 最近一次请求的往返耗时（毫秒），用于测量。 */
   lastRoundTripMs: number | null;
 }
@@ -136,6 +137,7 @@ export class HighlightStore {
       // 服务端可能已经前进到更新的快照：旧版本结果不能写进当前缓存（Q88）。
       if (String(result.revision) !== target.snapshotRevision) {
         logToBackend(
+          // x18n-ignore
           `丢弃旧高亮结果：${target.path} ${version} 版本 ${result.revision} ≠ ${target.snapshotRevision}`,
         );
         return;
@@ -155,7 +157,7 @@ export class HighlightStore {
     } catch (error) {
       if (epoch !== this.epoch) return;
       this.requested.add(key);
-      this.publish(getErrorMessage(error), true);
+      this.publish(toAppError(error), true);
     } finally {
       if (epoch === this.epoch) {
         this.pending.delete(key);
@@ -164,7 +166,7 @@ export class HighlightStore {
     }
   }
 
-  private publish(error: string | null, supported = this.snapshot.supported): void {
+  private publish(error: AppErrorPayload | null, supported = this.snapshot.supported): void {
     this.version += 1;
     this.snapshot = {
       version: this.version,

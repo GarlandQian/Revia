@@ -10,25 +10,31 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::State;
 
-use crate::acceptance::{deliver, Acceptance};
+use crate::acceptance::{Acceptance, deliver};
 use crate::batch::{BatchOutcome, BatchTarget};
-use crate::error::{AppError, Result};
+use crate::commit::{CommitDraft, DraftStore};
+use crate::commit_flow::{self, CommitOptions, CommitOutcome, CommitOutputEvent};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::highlight::HighlightResult;
 use crate::git::rows::ViewMode;
 use crate::git::segments::IgnoreWhitespace;
+use crate::git::status::ChangesKind;
+use crate::git::{CommandLog, CommandRecord};
 use crate::history::{
     HistoryCommitDetail, HistoryCommitFiles, HistoryFileTarget, HistoryPage, HistoryRowSlice,
     HistorySideLayout, HistoryStart, HistoryStore, HistoryTargetInfo,
 };
-use crate::git::status::ChangesKind;
-use crate::git::{CommandLog, CommandRecord};
-use crate::session::{ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession, WorktreeSessionInfo};
+use crate::recovery::{
+    self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation,
+    WorktreeIdentity,
+};
+use crate::session::{
+    ChangeEntry, ChangesSnapshot, FileVersion, RepoEntry, RowSlice, WorktreeSession,
+    WorktreeSessionInfo,
+};
 use crate::settings::{Registry, Settings};
+use crate::watch::{WatchController, WatchEvents, WatchStatus, resolve_roots};
 use crate::worktree_status::WorktreeStatusEntry;
-use crate::recovery::{self, RecoveryInspection, RecoveryState, RecoveryStore, RecoverySummary, RestoreExpectation, WorktreeIdentity};
-use crate::commit::{CommitDraft, DraftStore};
-use crate::commit_flow::{self, CommitOptions, CommitOutcome, CommitOutputEvent};
-use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 
 /// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
 ///
@@ -62,10 +68,25 @@ impl ExitGuard {
 
     /// 前端已锁住新写入后，最终复核退出保护再投递真正的应用退出。
     fn request_exit(&self, exit: impl FnOnce()) -> Result<()> {
-        let blocked = self.state.lock()
-            .map_err(|_| AppError::internal("退出保护锁失败"))?.1;
+        let blocked = self
+            .state
+            .lock()
+            .map_err(|_| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.exitGuardLockFailed",
+                    "退出保护锁失败",
+                    &[],
+                )
+            })?
+            .1;
         if blocked {
-            return Err(AppError::rejected("仍有写操作或结果待核对，不能退出"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commands.writeOperationsUnverifiedResultsRemainQuit",
+                "仍有写操作或结果待核对，不能退出",
+                &[],
+            ));
         }
         exit();
         Ok(())
@@ -89,6 +110,10 @@ pub struct AppState {
     pub watch_events: Arc<Mutex<WatchEvents>>,
     pub acceptance: Option<Arc<Acceptance>>,
     pub recovery: RecoveryStore,
+    /// 被删除 stash 的独立归档（ADR-0012）；位于应用数据目录。
+    pub stash_archive: crate::stash_archive::StashArchiveStore,
+    /// 历史改写前的自动 stash（Q161–Q162）。
+    pub autostash: crate::autostash::AutostashStore,
     /// 审阅标记存储（任务 07，持久化在 Revia 数据目录）。
     pub review: Arc<crate::review::ReviewStore>,
     /// 前端报告的「退出保护」状态与版本（任务 08、Q96）。
@@ -110,6 +135,8 @@ impl AppState {
         let command_log = Arc::new(CommandLog::default());
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
+            stash_archive: crate::stash_archive::StashArchiveStore::new(&data_dir.clone()),
+            autostash: crate::autostash::AutostashStore::new(&data_dir.clone()),
             review: Arc::new(crate::review::ReviewStore::new(data_dir.clone())),
             registry: Mutex::new(Registry::load(data_dir.clone(), command_log.clone())),
             sessions: Mutex::new(HashMap::new()),
@@ -143,30 +170,47 @@ impl AppState {
     /// 创建全程持有会话表锁：首次并发请求只发布一个会话，避免两个会话各自维护
     /// 快照代际、高亮线程与写锁（Q88、Q90）。
     fn session(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| AppError::internal("会话锁失败"))?;
+        let mut sessions = self.sessions.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.sessionLockFailed",
+                "会话锁失败",
+                &[],
+            )
+        })?;
         if let Some(session) = sessions.get(worktree_id) {
             return Ok(session.clone());
         }
         let path = {
-            let registry = self
-                .registry
-                .lock()
-                .map_err(|_| AppError::internal("仓库列表锁失败"))?;
-            registry
-                .worktree_path(worktree_id)
-                .ok_or_else(|| AppError::rejected("worktree 未登记，请先添加仓库"))?
+            let registry = self.registry.lock().map_err(|_| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.repositoryListLockFailed",
+                    "仓库列表锁失败",
+                    &[],
+                )
+            })?;
+            registry.worktree_path(worktree_id).ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commands.theWorktreeRegisteredAddRepositoryFirst",
+                    "worktree 未登记，请先添加仓库",
+                    &[],
+                )
+            })?
         };
         let home = crate::shell::home_dir()?;
         let shell_env = crate::shell::resolve(&home, &path);
         // 设置里手动指定的 Git 程序（Q27）；未指定时使用登录 shell PATH 中的 git。
         let git_program = {
-            let registry = self
-                .registry
-                .lock()
-                .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+            let registry = self.registry.lock().map_err(|_| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.repositoryListLockFailed2",
+                    "仓库列表锁失败",
+                    &[],
+                )
+            })?;
             registry
                 .settings()
                 .git_path
@@ -190,11 +234,28 @@ impl AppState {
     /// 有任何会话正在写操作时拒绝：清缓存会让下一次打开换一个新会话，
     /// 绕过它的写锁，同一 worktree 可能并发写（返修 C3，Q90）。
     pub fn reload_sessions(&self) -> Result<()> {
-        let sessions = self.sessions.lock().map_err(|_| AppError::internal("会话锁失败"))?;
+        let sessions = self.sessions.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.sessionLockFailed2",
+                "会话锁失败",
+                &[],
+            )
+        })?;
         for session in sessions.values() {
-            if *session.writing.lock().map_err(|_| AppError::internal("写操作锁失败"))? {
-                return Err(AppError::rejected(
+            if *session.writing.lock().map_err(|_| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.writeOperationLockFailed",
+                    "写操作锁失败",
+                    &[],
+                )
+            })? {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.commands.aWriteOperationProgressReloadEnvironment",
                     "有正在进行的写操作，完成后再重新加载环境",
+                    &[],
                 ));
             }
         }
@@ -231,7 +292,8 @@ impl AppState {
             .ok()
             .and_then(|mut sessions| sessions.remove(worktree_id));
         if let Some(session) = released {
-            self.history.invalidate_session(worktree_id, session.instance_id());
+            self.history
+                .invalidate_session(worktree_id, session.instance_id());
         }
         // 历史目标绑定这个 worktree 的会话实例，一起释放：旧 target_id 之后一律拒绝。
         self.history.close_worktree(worktree_id);
@@ -443,7 +505,14 @@ pub async fn list_conflicts(
     let session = state.session(&request.worktree_id)?;
     tauri::async_runtime::spawn_blocking(move || session.list_conflicts())
         .await
-        .map_err(|error| AppError::internal(format!("读取冲突列表失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadConflictListCause",
+                "读取冲突列表失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 合并页签的数据（Q143）。
@@ -456,10 +525,14 @@ pub async fn merge_open(
     let auto_apply = match request.auto_apply {
         Some(value) => value,
         None => {
-            let registry = state
-                .registry
-                .lock()
-                .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+            let registry = state.registry.lock().map_err(|_| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.repositoryListLockFailed3",
+                    "仓库列表锁失败",
+                    &[],
+                )
+            })?;
             registry.settings().merge_auto_apply
         }
     };
@@ -468,7 +541,14 @@ pub async fn merge_open(
     let worktree_id = request.worktree_id.clone();
     tauri::async_runtime::spawn_blocking(move || session.merge_layout(&data_dir, &path, auto_apply))
         .await
-        .map_err(|error| AppError::internal(format!("读取合并页签失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadMergeTabsCause",
+                "读取合并页签失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
         .map(|mut layout| {
             layout.worktree_id = worktree_id;
             layout
@@ -496,7 +576,14 @@ pub async fn merge_apply(
         session.merge_apply(&request.path, &request.result, &request.fingerprint, &store)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("应用合并结果时中断，结果待核对：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.applyingMergeResultInterruptedResultNeeds",
+            "应用合并结果时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -524,12 +611,22 @@ pub async fn merge_accept_side(
     let session = state.session(&request.worktree_id)?;
     let store = state.recovery.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let targets: Vec<(String, String)> =
-            request.targets.into_iter().map(|target| (target.path, target.fingerprint)).collect();
+        let targets: Vec<(String, String)> = request
+            .targets
+            .into_iter()
+            .map(|target| (target.path, target.fingerprint))
+            .collect();
         session.merge_accept_side(&targets, request.side, &store)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("接受一侧时中断，结果待核对：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.acceptingOneSideInterruptedResultNeeds",
+            "接受一侧时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[tauri::command]
@@ -539,10 +636,14 @@ pub async fn commit_warnings(
 ) -> Result<Vec<crate::commit_warnings::CommitWarning>> {
     let session = state.session(&request.worktree_id)?;
     let settings = {
-        let registry = state
-            .registry
-            .lock()
-            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        let registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed4",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
         registry.settings().clone()
     };
     let options = crate::commit_warnings::WarningOptions {
@@ -554,24 +655,39 @@ pub async fn commit_warnings(
     let git = session.git().clone();
     tauri::async_runtime::spawn_blocking(move || crate::commit_warnings::collect(&git, &options))
         .await
-        .map_err(|error| AppError::internal(format!("提交前检查失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.preCommitChecksFailedCause",
+                "提交前检查失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[tauri::command]
 pub async fn list_repos(state: State<'_, AppState>) -> Result<Vec<RepoEntry>> {
-    let registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    let registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed5",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     Ok(registry.list())
 }
 
 #[tauri::command]
 pub async fn list_settings(state: State<'_, AppState>) -> Result<Settings> {
-    let registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    let registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed6",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     Ok(registry.settings().clone())
 }
 
@@ -580,29 +696,44 @@ pub async fn list_settings(state: State<'_, AppState>) -> Result<Settings> {
 pub async fn add_repo(state: State<'_, AppState>, request: AddRepoRequest) -> Result<RepoEntry> {
     let path = request.path.clone();
     {
-        let mut registry = state
-            .registry
-            .lock()
-            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        let mut registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed7",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
         registry.add(&path)
     }
 }
 
 #[tauri::command]
-pub async fn select_repo(state: State<'_, AppState>, request: SelectRepoRequest) -> Result<RepoEntry> {
-    let mut registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+pub async fn select_repo(
+    state: State<'_, AppState>,
+    request: SelectRepoRequest,
+) -> Result<RepoEntry> {
+    let mut registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed8",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     registry.select(&request.repo_id, request.worktree_id.as_deref())
 }
 
 #[tauri::command]
 pub async fn set_diff_font_size(state: State<'_, AppState>, size: u32) -> Result<Settings> {
-    let mut registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    let mut registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed9",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     registry.update_font_size(size)
 }
 
@@ -612,10 +743,14 @@ pub async fn update_settings(
     state: State<'_, AppState>,
     request: crate::settings::SettingsPatch,
 ) -> Result<Settings> {
-    let mut registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    let mut registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed10",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     registry.update_settings(&request)
 }
 
@@ -633,21 +768,34 @@ pub async fn list_worktree_status(
     request: ListWorktreeStatusRequest,
 ) -> Result<Vec<WorktreeStatusEntry>> {
     let repo = {
-        let registry = state
-            .registry
-            .lock()
-            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
-        registry
-            .find(&request.repo_id)
-            .ok_or_else(|| AppError::rejected("仓库未登记，请先添加"))?
+        let registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed11",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
+        registry.find(&request.repo_id).ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commands.theRepositoryRegisteredAddFirst",
+                "仓库未登记，请先添加",
+                &[],
+            )
+        })?
     };
     // 优先使用该仓库已有会话的 Git 上下文（同一套登录 shell 环境），
     // 否则按仓库路径解析一次；不在命令里重复为每个 worktree 启动登录 shell。
     let git = {
-        let sessions = state
-            .sessions
-            .lock()
-            .map_err(|_| AppError::internal("会话锁失败"))?;
+        let sessions = state.sessions.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.sessionLockFailed3",
+                "会话锁失败",
+                &[],
+            )
+        })?;
         repo.worktrees
             .iter()
             .find_map(|worktree| sessions.get(&worktree.id).cloned())
@@ -659,17 +807,26 @@ pub async fn list_worktree_status(
             let path = std::path::PathBuf::from(&repo.path);
             let shell_env = crate::shell::resolve(&home, &path);
             let program = {
-                let registry = state
-                    .registry
-                    .lock()
-                    .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+                let registry = state.registry.lock().map_err(|_| {
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.commands.repositoryListLockFailed12",
+                        "仓库列表锁失败",
+                        &[],
+                    )
+                })?;
                 registry
                     .settings()
                     .git_path
                     .clone()
                     .map(std::path::PathBuf::from)
             };
-            crate::git::Git::with_program(&path, &shell_env, state.command_log.clone(), program.as_deref())?
+            crate::git::Git::with_program(
+                &path,
+                &shell_env,
+                state.command_log.clone(),
+                program.as_deref(),
+            )?
         }
     };
     let entries = repo.worktrees;
@@ -680,11 +837,21 @@ pub async fn list_worktree_status(
             .collect::<Vec<_>>()
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取 worktree 状态失败：{error}")))
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadWorktreeStatusCause",
+            "读取 worktree 状态失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })
 }
 
 #[tauri::command]
-pub async fn open_worktree(state: State<'_, AppState>, request: WorktreeRequest) -> Result<WorktreeSessionInfo> {
+pub async fn open_worktree(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<WorktreeSessionInfo> {
     log_measure(&format!("open_worktree 收到：id={}", request.worktree_id));
     let session = state.session(&request.worktree_id)?;
     log_measure(&format!("open_worktree 完成：{}", session.info.git_version));
@@ -695,12 +862,19 @@ pub async fn open_worktree(state: State<'_, AppState>, request: WorktreeRequest)
 ///
 /// `activation` 是前端发起时的激活代号：后端用它拒绝迟到进入的旧激活请求。
 #[tauri::command]
-pub async fn watch_worktree(state: State<'_, AppState>, request: WatchWorktreeRequest) -> Result<WatchStatus> {
+pub async fn watch_worktree(
+    state: State<'_, AppState>,
+    request: WatchWorktreeRequest,
+) -> Result<WatchStatus> {
     let session = state.session(&request.worktree_id)?;
     apply_acceptance_watch_failure(&state);
     let events = state.watch_events.clone();
     let status = state.watch.activate(
-        resolve_roots(&session.path, session.git_dir_path(), session.common_dir_path()),
+        resolve_roots(
+            &session.path,
+            session.git_dir_path(),
+            session.common_dir_path(),
+        ),
         request.activation,
         move |activation| {
             if let Ok(mut events) = events.lock() {
@@ -731,8 +905,14 @@ pub struct WatchSnapshot {
 pub async fn watch_status(state: State<'_, AppState>) -> Result<WatchSnapshot> {
     apply_acceptance_watch_failure(&state);
     let status = state.watch.status();
-    let events = state.watch_events.lock().map(|guard| *guard)
-        .map_err(|_| AppError::internal("监视事件锁失败"))?;
+    let events = state.watch_events.lock().map(|guard| *guard).map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.watchEventLockFailed",
+            "监视事件锁失败",
+            &[],
+        )
+    })?;
     Ok(WatchSnapshot {
         status,
         changed_activation: events.activation,
@@ -752,7 +932,10 @@ fn apply_acceptance_watch_failure(state: &AppState) {
 
 /// 写入测量日志文件（只在设置 REVIA_MEASURE_LOG 时生效）。
 pub fn log_measure(message: &str) {
-    let Some(path) = std::env::var("REVIA_MEASURE_LOG").ok().map(std::path::PathBuf::from) else {
+    let Some(path) = std::env::var("REVIA_MEASURE_LOG")
+        .ok()
+        .map(std::path::PathBuf::from)
+    else {
         return;
     };
     if minimal_soak_logging() {
@@ -760,7 +943,11 @@ pub fn log_measure(message: &str) {
     }
     let log = path.with_extension("log");
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&log) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log)
+    {
         let _ = writeln!(file, "{} {message}", chrono_like_stamp());
     }
 }
@@ -787,13 +974,23 @@ pub struct ReviewMarkRequest {
 /// 切换某个文件的审阅标记（任务 07）。
 ///
 /// 标记按 worktree 身份 + HEAD 版本 + 工作区版本记录；持久化失败如实返回错误。
-pub fn set_review_mark_impl(state: &AppState, request: &ReviewMarkRequest) -> Result<crate::review::ReviewMarks> {
+pub fn set_review_mark_impl(
+    state: &AppState,
+    request: &ReviewMarkRequest,
+) -> Result<crate::review::ReviewMarks> {
     let session = state.session(&request.worktree_id)?;
-    session.set_review_mark(&request.path, request.marked, Some(request.expected_versions.clone()))
+    session.set_review_mark(
+        &request.path,
+        request.marked,
+        Some(request.expected_versions.clone()),
+    )
 }
 
 #[tauri::command]
-pub async fn set_review_mark(state: State<'_, AppState>, request: ReviewMarkRequest) -> Result<crate::review::ReviewMarks> {
+pub async fn set_review_mark(
+    state: State<'_, AppState>,
+    request: ReviewMarkRequest,
+) -> Result<crate::review::ReviewMarks> {
     let session = state.session(&request.worktree_id)?;
     let path = request.path.clone();
     let marked = request.marked;
@@ -802,23 +999,58 @@ pub async fn set_review_mark(state: State<'_, AppState>, request: ReviewMarkRequ
     let result = tauri::async_runtime::spawn_blocking(move || {
         session.set_review_mark(&path, marked, Some(expected))
     })
-        .await
-        .map_err(|error| AppError::internal(format!("保存审阅标记失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "set_review_mark", &worktree_id, None, result).await
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedSaveReviewMarksCause",
+            "保存审阅标记失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "set_review_mark",
+        &worktree_id,
+        None,
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn list_changes(state: State<'_, AppState>, request: WorktreeRequest) -> Result<ChangesSnapshot> {
+pub async fn list_changes(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<ChangesSnapshot> {
     log_measure("list_changes 收到");
     let session = state.session(&request.worktree_id)?;
     log_measure("list_changes 会话就绪，开始读取");
     let result = tauri::async_runtime::spawn_blocking(move || session.refresh())
         .await
-        .map_err(|error| AppError::internal(format!("读取状态失败：{error}")))?;
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadStatusCause",
+                "读取状态失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?;
     if let Ok(inner) = &result {
-        log_measure(&format!("list_changes 完成：{} 个文件，{} ms", inner.entries.len(), inner.elapsed_ms));
+        log_measure(&format!(
+            "list_changes 完成：{} 个文件，{} ms",
+            inner.entries.len(),
+            inner.elapsed_ms
+        ));
     }
-    deliver(state.acceptance.as_ref(), "list_changes", &request.worktree_id, None, result).await
+    deliver(
+        state.acceptance.as_ref(),
+        "list_changes",
+        &request.worktree_id,
+        None,
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -826,15 +1058,32 @@ pub async fn stage_file(
     state: State<'_, AppState>,
     request: StageFileRequest,
 ) -> Result<ChangesSnapshot> {
-    log_measure(&format!("stage_file 收到：{} {}", request.worktree_id, request.path));
+    log_measure(&format!(
+        "stage_file 收到：{} {}",
+        request.worktree_id, request.path
+    ));
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         session.stage_file(&request.path, &request.fingerprint)
     })
     .await
-    .map_err(|error| AppError::internal(format!("暂存文件失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "stage_file", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedStageFilesCause",
+            "暂存文件失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "stage_file",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -842,54 +1091,143 @@ pub async fn unstage_file(
     state: State<'_, AppState>,
     request: UnstageFileRequest,
 ) -> Result<ChangesSnapshot> {
-    log_measure(&format!("unstage_file 收到：{} {}", request.worktree_id, request.path));
+    log_measure(&format!(
+        "unstage_file 收到：{} {}",
+        request.worktree_id, request.path
+    ));
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         session.unstage_file(&request.path, &request.fingerprint)
     })
     .await
-    .map_err(|error| AppError::internal(format!("取消暂存文件失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "unstage_file", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedUnstageFilesCause",
+            "取消暂存文件失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "unstage_file",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn stage_hunk(state: State<'_, AppState>, request: HunkRequest) -> Result<ChangesSnapshot> {
+pub async fn stage_hunk(
+    state: State<'_, AppState>,
+    request: HunkRequest,
+) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("暂存 hunk 任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "stage_hunk", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theStageHunkTaskInterruptedResult",
+            "暂存 hunk 任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "stage_hunk",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn unstage_hunk(state: State<'_, AppState>, request: HunkRequest) -> Result<ChangesSnapshot> {
+pub async fn unstage_hunk(
+    state: State<'_, AppState>,
+    request: HunkRequest,
+) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("取消暂存 hunk 任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "unstage_hunk", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theUnstageHunkTaskInterruptedResult",
+            "取消暂存 hunk 任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "unstage_hunk",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
-async fn execute_discard(state: State<'_, AppState>, request: DiscardRequest, hunk: bool) -> Result<ChangesSnapshot> {
-    if hunk != request.hunk_id.is_some() { return Err(AppError::rejected("丢弃目标范围不匹配")); }
+async fn execute_discard(
+    state: State<'_, AppState>,
+    request: DiscardRequest,
+    hunk: bool,
+) -> Result<ChangesSnapshot> {
+    if hunk != request.hunk_id.is_some() {
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commands.theDiscardTargetRangeDoesMatch",
+            "丢弃目标范围不匹配",
+            &[],
+        ));
+    }
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         if let Some(id) = request.hunk_id {
-            session.discard_hunk(&request.path, &request.fingerprint, &request.snapshot_revision, &id, &store)
+            session.discard_hunk(
+                &request.path,
+                &request.fingerprint,
+                &request.snapshot_revision,
+                &id,
+                &store,
+            )
         } else {
-            session.discard_file(&request.path, &request.fingerprint, &request.snapshot_revision, &store)
+            session.discard_file(
+                &request.path,
+                &request.fingerprint,
+                &request.snapshot_revision,
+                &store,
+            )
         }
-    }).await.map_err(|error| AppError::needs_verification(format!("丢弃任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), if hunk { "discard_hunk" } else { "discard_file" }, &context.worktree_id, Some(&context.path), result).await
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theDiscardTaskInterruptedResultNeeds",
+            "丢弃任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        if hunk { "discard_hunk" } else { "discard_file" },
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -899,12 +1237,25 @@ pub async fn stage_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        session.stage_files(&request.targets, true)
-    })
+    let result =
+        tauri::async_runtime::spawn_blocking(move || session.stage_files(&request.targets, true))
+            .await
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.batchStagingFailedCause",
+                    "批量暂存失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "stage_files",
+        &context.worktree_id,
+        None,
+        Ok(result),
+    )
     .await
-    .map_err(|error| AppError::internal(format!("批量暂存失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "stage_files", &context.worktree_id, None, Ok(result)).await
 }
 
 #[tauri::command]
@@ -914,12 +1265,25 @@ pub async fn unstage_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        session.stage_files(&request.targets, false)
-    })
+    let result =
+        tauri::async_runtime::spawn_blocking(move || session.stage_files(&request.targets, false))
+            .await
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commands.batchUnstagingFailedCause",
+                    "批量取消暂存失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "unstage_files",
+        &context.worktree_id,
+        None,
+        Ok(result),
+    )
     .await
-    .map_err(|error| AppError::internal(format!("批量取消暂存失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "unstage_files", &context.worktree_id, None, Ok(result)).await
 }
 
 #[tauri::command]
@@ -929,40 +1293,70 @@ pub async fn discard_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let store = state.recovery.clone();
-    let revision = request
-        .snapshot_revision
-        .clone()
-        .ok_or_else(|| AppError::rejected("批量丢弃缺少确认时的快照版本"))?;
+    let revision = request.snapshot_revision.clone().ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commands.batchDiscardMissingSnapshotRevisionConfirma",
+            "批量丢弃缺少确认时的快照版本",
+            &[],
+        )
+    })?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         session.discard_files(&request.targets, &revision, &store)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("批量丢弃任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "discard_files", &context.worktree_id, None, Ok(result)).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theBatchDiscardTaskInterruptedResult",
+            "批量丢弃任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "discard_files",
+        &context.worktree_id,
+        None,
+        Ok(result),
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn discard_file(state: State<'_, AppState>, request: DiscardRequest) -> Result<ChangesSnapshot> {
+pub async fn discard_file(
+    state: State<'_, AppState>,
+    request: DiscardRequest,
+) -> Result<ChangesSnapshot> {
     execute_discard(state, request, false).await
 }
 
 #[tauri::command]
-pub async fn discard_hunk(state: State<'_, AppState>, request: DiscardRequest) -> Result<ChangesSnapshot> {
+pub async fn discard_hunk(
+    state: State<'_, AppState>,
+    request: DiscardRequest,
+) -> Result<ChangesSnapshot> {
     execute_discard(state, request, true).await
 }
 
 /// 列出回收记录的实际执行函数：命令与测试共用。
 ///
 /// 原 worktree 可能已被移动或删除：取不到 session 时仍要能列出记录（Q87）。
-pub fn list_recovery_impl(state: &AppState, worktree_id: Option<&str>) -> Result<Vec<RecoverySummary>> {
+pub fn list_recovery_impl(
+    state: &AppState,
+    worktree_id: Option<&str>,
+) -> Result<Vec<RecoverySummary>> {
     let session = worktree_id.and_then(|id| state.session(id).ok());
     let identity = session.and_then(|session| WorktreeIdentity::capture(&session.git).ok());
     state.recovery.list(identity.as_ref())
 }
 
 #[tauri::command]
-pub async fn list_recovery(state: State<'_, AppState>, worktree_id: Option<String>) -> Result<Vec<RecoverySummary>> {
+pub async fn list_recovery(
+    state: State<'_, AppState>,
+    worktree_id: Option<String>,
+) -> Result<Vec<RecoverySummary>> {
     // 原 worktree 可能已被移动或删除：取不到 session 时仍要能列出记录（Q87）。
     let session = worktree_id.as_deref().and_then(|id| state.session(id).ok());
     let store = state.recovery.clone();
@@ -970,9 +1364,17 @@ pub async fn list_recovery(state: State<'_, AppState>, worktree_id: Option<Strin
         // Unavailable/replaced worktrees must not prevent viewing their saved records.
         let identity = session.and_then(|session| WorktreeIdentity::capture(&session.git).ok());
         store.list(identity.as_ref())
-    }).await.map_err(|error| AppError::internal(format!("读取回收区失败：{error}")))?
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadRecoveryAreaCause",
+            "读取回收区失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
-
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1013,7 +1415,10 @@ pub struct RecoverySaveAsRequest {
 /// 只读检查的实际执行函数：命令与测试共用。
 ///
 /// 没有当前 worktree 时回退为「当前侧不可用」，而不是直接报错（Q87）。
-pub fn inspect_recovery_impl(state: &AppState, request: &RecoveryInspectRequest) -> Result<RecoveryInspection> {
+pub fn inspect_recovery_impl(
+    state: &AppState,
+    request: &RecoveryInspectRequest,
+) -> Result<RecoveryInspection> {
     match state.session(&request.worktree_id) {
         Ok(session) => session.inspect_record(&request.record_id, &state.recovery),
         Err(_) => state.recovery.inspect(&request.record_id, None, None),
@@ -1022,7 +1427,10 @@ pub fn inspect_recovery_impl(state: &AppState, request: &RecoveryInspectRequest)
 
 /// 只读检查一条记录能否直接恢复，并给出对比所需的两侧状态。
 #[tauri::command]
-pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspectRequest) -> Result<RecoveryInspection> {
+pub async fn inspect_recovery(
+    state: State<'_, AppState>,
+    request: RecoveryInspectRequest,
+) -> Result<RecoveryInspection> {
     let store = state.recovery.clone();
     let session = state.session(&request.worktree_id).ok();
     tauri::async_runtime::spawn_blocking(move || match session {
@@ -1031,11 +1439,21 @@ pub async fn inspect_recovery(state: State<'_, AppState>, request: RecoveryInspe
         None => store.inspect(&request.record_id, None, None),
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取回收记录失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadRecoveryRecordCause",
+            "读取回收记录失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 恢复的实际执行函数：命令与测试共用。
-pub fn restore_recovery_impl(state: &AppState, request: &RecoveryRestoreRequest) -> Result<recovery::RestoreOutcome> {
+pub fn restore_recovery_impl(
+    state: &AppState,
+    request: &RecoveryRestoreRequest,
+) -> Result<recovery::RestoreOutcome> {
     let session = state.session(&request.worktree_id)?;
     let expected = RestoreExpectation {
         version: request.expected_version.clone(),
@@ -1047,7 +1465,10 @@ pub fn restore_recovery_impl(state: &AppState, request: &RecoveryRestoreRequest)
 
 /// 恢复保存时的完整工作区状态（不改变暂存区）。
 #[tauri::command]
-pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryRestoreRequest) -> Result<recovery::RestoreOutcome> {
+pub async fn restore_recovery(
+    state: State<'_, AppState>,
+    request: RecoveryRestoreRequest,
+) -> Result<recovery::RestoreOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
@@ -1060,8 +1481,22 @@ pub async fn restore_recovery(state: State<'_, AppState>, request: RecoveryResto
         session.restore_record(&request.record_id, &expected, &store)
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("恢复任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "restore_recovery", &context.worktree_id, None, result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theRestoreTaskInterruptedResultNeeds",
+            "恢复任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "restore_recovery",
+        &context.worktree_id,
+        None,
+        result,
+    )
+    .await
 }
 
 /// 另存目标的归属：落在哪个已登记 worktree 里，以及解析出的真实路径。
@@ -1088,11 +1523,18 @@ pub fn save_as_owner(registry: &Registry, destination: &std::path::Path) -> Opti
 /// 解析另存归属（前端在写入前调用）。
 ///
 /// 只解析、不写盘，也不取锁；真正的互斥在后端执行时按同一条规则再核对一次。
-pub fn resolve_save_as_owner(state: &AppState, destination: &std::path::Path) -> Result<SaveAsOwner> {
-    let registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+pub fn resolve_save_as_owner(
+    state: &AppState,
+    destination: &std::path::Path,
+) -> Result<SaveAsOwner> {
+    let registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed13",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     let owner = save_as_owner(&registry, destination);
     Ok(SaveAsOwner {
         worktree_id: owner,
@@ -1108,7 +1550,10 @@ pub struct SaveAsOwnerRequest {
 
 /// 查询另存目标的真实归属（固定类型接口；前端不自己判断路径）。
 #[tauri::command]
-pub async fn recovery_save_as_owner(state: State<'_, AppState>, request: SaveAsOwnerRequest) -> Result<SaveAsOwner> {
+pub async fn recovery_save_as_owner(
+    state: State<'_, AppState>,
+    request: SaveAsOwnerRequest,
+) -> Result<SaveAsOwner> {
     resolve_save_as_owner(&state, std::path::Path::new(&request.destination))
 }
 
@@ -1136,23 +1581,36 @@ pub fn execute_save_as(
 pub fn save_recovery_as_impl(state: &AppState, request: &RecoverySaveAsRequest) -> Result<u64> {
     let destination = std::path::PathBuf::from(&request.destination);
     let owner = {
-        let registry = state
-            .registry
-            .lock()
-            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        let registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed14",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
         save_as_owner(&registry, &destination)
     };
     // 归属必须与前端解析到的一致：界面按 A 进的门禁，不能在 B 上落盘（Q90）。
     if owner != request.expected_owner {
-        return Err(AppError::rejected(
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commands.theSaveAsTargetSOwnership",
             "另存目标的归属已变化，请重新选择路径后再试",
+            &[],
         ));
     }
     let session = match &owner {
         Some(worktree_id) => Some(state.session(worktree_id)?),
         None => None,
     };
-    execute_save_as(session.as_ref(), &state.recovery, &request.record_id, &request.path, &destination)
+    execute_save_as(
+        session.as_ref(),
+        &state.recovery,
+        &request.record_id,
+        &request.path,
+        &destination,
+    )
 }
 
 /// 把保存版本另存到尚不存在的新路径。
@@ -1160,13 +1618,20 @@ pub fn save_recovery_as_impl(state: &AppState, request: &RecoverySaveAsRequest) 
 /// 目标落在已登记 worktree 里时，写入归属**那个** worktree：取得它的非排队写锁，
 /// 并把结果交回它的结果通道；外部新路径不强行加锁，但仍逐级校验路径边界（Q90、T14）。
 #[tauri::command]
-pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveAsRequest) -> Result<u64> {
+pub async fn save_recovery_as(
+    state: State<'_, AppState>,
+    request: RecoverySaveAsRequest,
+) -> Result<u64> {
     let destination = std::path::PathBuf::from(&request.destination);
     let owner = {
-        let registry = state
-            .registry
-            .lock()
-            .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+        let registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed15",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
         save_as_owner(&registry, &destination)
     };
     let session = match &owner {
@@ -1179,13 +1644,38 @@ pub async fn save_recovery_as(state: State<'_, AppState>, request: RecoverySaveA
     let deliver_owner = owner.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         if owner != expected {
-            return Err(AppError::rejected("另存目标的归属已变化，请重新选择路径后再试"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commands.theSaveAsTargetSOwnership2",
+                "另存目标的归属已变化，请重新选择路径后再试",
+                &[],
+            ));
         }
-        execute_save_as(session.as_ref(), &store, &context.record_id, &context.path, &destination)
+        execute_save_as(
+            session.as_ref(),
+            &store,
+            &context.record_id,
+            &context.path,
+            &destination,
+        )
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("另存任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "save_recovery_as", deliver_owner.as_deref().unwrap_or(""), None, result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theSaveAsTaskInterruptedResult",
+            "另存任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "save_recovery_as",
+        deliver_owner.as_deref().unwrap_or(""),
+        None,
+        result,
+    )
+    .await
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1198,12 +1688,24 @@ pub struct RecoveryDiffRequest {
 
 /// 保存版本与当前内容的只读 diff（文本），由 Rust 侧真实 Git 生成。
 #[tauri::command]
-pub async fn recovery_text_diff(state: State<'_, AppState>, request: RecoveryDiffRequest) -> Result<String> {
+pub async fn recovery_text_diff(
+    state: State<'_, AppState>,
+    request: RecoveryDiffRequest,
+) -> Result<String> {
     let session = state.session(&request.worktree_id)?;
     let store = state.recovery.clone();
-    tauri::async_runtime::spawn_blocking(move || session.recovery_text_diff(&request.record_id, &request.path, &store))
-        .await
-        .map_err(|error| AppError::internal(format!("生成对比失败：{error}")))?
+    tauri::async_runtime::spawn_blocking(move || {
+        session.recovery_text_diff(&request.record_id, &request.path, &store)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedGenerateComparisonCause",
+            "生成对比失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 清空回收区（在途记录保留）。
@@ -1212,7 +1714,14 @@ pub async fn clear_recovery(state: State<'_, AppState>) -> Result<u64> {
     let store = state.recovery.clone();
     tauri::async_runtime::spawn_blocking(move || store.clear())
         .await
-        .map_err(|error| AppError::internal(format!("清空回收区失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedClearRecoveryAreaCause",
+                "清空回收区失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 启动与周期自动清理：由 `lib.rs` 在 setup 与后台线程调用。
@@ -1222,7 +1731,9 @@ pub fn purge_expired_now(store: &RecoveryStore) -> Result<u64> {
 
 /// 读取自动清理状态：普通模式下界面据此显示持久失败提示（Q9）。
 #[tauri::command]
-pub async fn recovery_maintenance(state: State<'_, AppState>) -> Result<recovery::RecoveryMaintenance> {
+pub async fn recovery_maintenance(
+    state: State<'_, AppState>,
+) -> Result<recovery::RecoveryMaintenance> {
     Ok(state.recovery.maintenance())
 }
 
@@ -1232,7 +1743,14 @@ pub async fn purge_recovery(state: State<'_, AppState>) -> Result<u64> {
     let store = state.recovery.clone();
     tauri::async_runtime::spawn_blocking(move || store.purge_expired())
         .await
-        .map_err(|error| AppError::internal(format!("清理过期记录失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedPurgeExpiredRecordsCause",
+                "清理过期记录失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[tauri::command]
@@ -1254,8 +1772,22 @@ pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Resul
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("取显示行失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "get_rows", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedGetDisplayLinesCause",
+            "取显示行失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "get_rows",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 /// 左右对照布局（返修 A1/Q138）：两侧行数、段、折叠区与段操作目标。
@@ -1275,8 +1807,22 @@ pub async fn side_by_side_layout(
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取左右对照布局失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "side_by_side_layout", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadSideSideLayoutCause",
+            "读取左右对照布局失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "side_by_side_layout",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 /// 左右对照取行（返修 A1/Q138）：按需取一侧的行、改动标记与词级区间。
@@ -1300,8 +1846,22 @@ pub async fn side_lines(
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("取左右对照的行失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "side_lines", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedGetSideSideRowsCause",
+            "取左右对照的行失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "side_lines",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 /// 暂存一段（块）（返修 A1/Q142）：补丁由 Rust 从同一个 Git hunk 按段切开。
@@ -1323,8 +1883,22 @@ pub async fn stage_segment(
         )
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("暂存块任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "stage_segment", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theStageBlockTaskInterruptedResult",
+            "暂存块任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "stage_segment",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 /// 取消暂存一段（块）（返修 A1/Q142）。
@@ -1346,8 +1920,22 @@ pub async fn unstage_segment(
         )
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("取消暂存块任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "unstage_segment", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theUnstageBlockTaskInterruptedResult",
+            "取消暂存块任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "unstage_segment",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 /// 丢弃一段（块）（返修 A1/Q142）：先存回收区，再反向应用补丁。
@@ -1371,8 +1959,22 @@ pub async fn discard_segment(
         )
     })
     .await
-    .map_err(|error| AppError::needs_verification(format!("丢弃块任务中断，结果待核对：{error}")))?;
-    deliver(state.acceptance.as_ref(), "discard_segment", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theDiscardBlockTaskInterruptedResult",
+            "丢弃块任务中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "discard_segment",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1385,15 +1987,28 @@ pub struct HighlightTextRequest {
 
 /// 合并页签按内容取高亮（Q143）。
 #[tauri::command]
-pub async fn highlight_text(state: State<'_, AppState>, request: HighlightTextRequest) -> Result<HighlightResult> {
+pub async fn highlight_text(
+    state: State<'_, AppState>,
+    request: HighlightTextRequest,
+) -> Result<HighlightResult> {
     let session = state.session(&request.worktree_id)?;
     tauri::async_runtime::spawn_blocking(move || session.highlight_text(request.request))
         .await
-        .map_err(|error| AppError::internal(format!("高亮失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.highlightingFailedCause",
+                "高亮失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[tauri::command]
-pub async fn highlight_range(state: State<'_, AppState>, request: HighlightRequestPayload) -> Result<HighlightResult> {
+pub async fn highlight_range(
+    state: State<'_, AppState>,
+    request: HighlightRequestPayload,
+) -> Result<HighlightResult> {
     log_measure(&format!(
         "highlight_range 收到：{} {:?} {:?} {}..{}",
         request.path, request.changes, request.version, request.from_line, request.to_line
@@ -1410,12 +2025,29 @@ pub async fn highlight_range(state: State<'_, AppState>, request: HighlightReque
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("高亮失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "highlight_range", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.highlightingFailedCause2",
+            "高亮失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "highlight_range",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn row_index_for_line(state: State<'_, AppState>, request: RowIndexRequest) -> Result<u32> {
+pub async fn row_index_for_line(
+    state: State<'_, AppState>,
+    request: RowIndexRequest,
+) -> Result<u32> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1431,8 +2063,22 @@ pub async fn row_index_for_line(state: State<'_, AppState>, request: RowIndexReq
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("换算行号失败：{error}")))?;
-    deliver(state.acceptance.as_ref(), "row_index_for_line", &context.worktree_id, Some(&context.path), result).await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedConvertLineNumbersCause",
+            "换算行号失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    deliver(
+        state.acceptance.as_ref(),
+        "row_index_for_line",
+        &context.worktree_id,
+        Some(&context.path),
+        result,
+    )
+    .await
 }
 
 // ---------- 分支与远端（M5 任务 03，规格 B01–B06） ----------
@@ -1470,10 +2116,14 @@ pub struct PushBranchPayload {
 
 /// 读一份设置快照（命令参数与网络选项都从这里取，前端不传设置值）。
 fn settings_snapshot(state: &State<'_, AppState>) -> Result<Settings> {
-    let registry = state
-        .registry
-        .lock()
-        .map_err(|_| AppError::internal("仓库列表锁失败"))?;
+    let registry = state.registry.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed16",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
     Ok(registry.settings().clone())
 }
 
@@ -1486,7 +2136,14 @@ pub async fn repo_files(
     let session = state.worktree_session(&request.worktree_id)?;
     tauri::async_runtime::spawn_blocking(move || crate::git::history::head_files(&session.git))
         .await
-        .map_err(|error| AppError::internal(format!("读取文件树失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadFileTreeCause",
+                "读取文件树失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 分支组件的只读状态：本地 / 远端分支、领先落后、当前分支与提交身份。
@@ -1501,7 +2158,14 @@ pub async fn branches_overview(
         crate::git::branch::read_overview(&session.git, &worktree_id)
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取分支失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadBranchesCause",
+            "读取分支失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 检出本地 / 远端分支（B02）。会被覆盖时返回需要确认的文件列表。
@@ -1512,11 +2176,19 @@ pub async fn checkout_branch(
 ) -> Result<crate::remote_ops::CheckoutResult> {
     let session = state.worktree_session(&request.worktree_id)?;
     let store = state.recovery.clone();
+    let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::remote_ops::checkout(&session, &store, &request.target, request.strategy)
+        crate::remote_ops::checkout(&session, &store, &request.target, request.strategy, &archive)
     })
     .await
-    .map_err(|error| AppError::internal(format!("检出分支失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedCheckOutBranchCause",
+            "检出分支失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 新建分支（可选同时检出）。
@@ -1530,7 +2202,14 @@ pub async fn create_branch(
         crate::remote_ops::create_branch(&session, &request.request)
     })
     .await
-    .map_err(|error| AppError::internal(format!("新建分支失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedCreateBranchCause",
+            "新建分支失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 对当前仓库的所有远端执行 fetch（标签方式来自设置）。
@@ -1549,7 +2228,14 @@ pub async fn fetch_remotes(
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("fetch 失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.fetchFailedCause",
+            "fetch 失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 更新项目（⌘T）：先 fetch 上游，再按设置的更新方式并入。
@@ -1571,7 +2257,14 @@ pub async fn update_project(
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("更新失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.updateFailedCause",
+            "更新失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 推送对话框的预览：目标远端 / 分支、将要推送的提交与受保护分支判断。
@@ -1586,7 +2279,14 @@ pub async fn push_preview(
         crate::remote_ops::push_preview(&session, &settings.protected_branches)
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取推送预览失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadPushPreviewCause",
+            "读取推送预览失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 推送（B05）：被拒时返回 Rejected，由前端决定是否「更新后再推送」。
@@ -1606,7 +2306,14 @@ pub async fn push_branch(
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("推送失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.pushFailedCause",
+            "推送失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 检查远端是否有新提交（只比较引用，不取回对象）。
@@ -1620,7 +2327,14 @@ pub async fn check_remote(
         crate::remote_ops::check_remote(&session, crate::remote_ops::default_network_timeout())
     })
     .await
-    .map_err(|error| AppError::internal(format!("检查远端失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedCheckRemoteCause",
+            "检查远端失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 语法类别名（按索引顺序），前端用它建立 index → CSS 变量的映射（Q50）。
@@ -1765,18 +2479,35 @@ pub async fn history_open(
     let store = state.history.clone();
     tauri::async_runtime::spawn_blocking(move || store.open(&session))
         .await
-        .map_err(|error| AppError::internal(format!("打开提交历史失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedOpenCommitHistoryCause",
+                "打开提交历史失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 关闭历史目标（幂等）。关闭后该目标的请求与分页游标一律失效。
 #[tauri::command]
-pub async fn history_close(state: State<'_, AppState>, request: HistoryTargetRequest) -> Result<bool> {
+pub async fn history_close(
+    state: State<'_, AppState>,
+    request: HistoryTargetRequest,
+) -> Result<bool> {
     // 关闭要等目标自身的锁（它可能正在跑 Git），放到阻塞线程里做，
     // 不占用异步运行时线程。
     let store = state.history.clone();
     tauri::async_runtime::spawn_blocking(move || Ok(store.close(&request.target_id)))
         .await
-        .map_err(|error| AppError::internal(format!("关闭提交历史失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedCloseCommitHistoryCause",
+                "关闭提交历史失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 重新读取本地引用。
@@ -1788,7 +2519,14 @@ pub async fn history_refs(
     let target = state.history.target(&request.target_id)?;
     tauri::async_runtime::spawn_blocking(move || target.refs())
         .await
-        .map_err(|error| AppError::internal(format!("读取引用失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadReferencesCause",
+                "读取引用失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 读取一页提交：起点固定为查询开始时的完整提交对象。
@@ -1807,7 +2545,14 @@ pub async fn history_log_page(
         target.log_page_filtered(start, first_parent, limit, cursor, &filter)
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取提交历史失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadCommitHistoryCause",
+            "读取提交历史失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// merge 提交的改动文件（默认合并视图 / 按父提交分组）。
@@ -1821,7 +2566,14 @@ pub async fn history_merge_files(
     let mode = request.mode;
     tauri::async_runtime::spawn_blocking(move || target.merge_files(&commit, mode))
         .await
-        .map_err(|error| AppError::internal(format!("读取合并提交的改动文件失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadChangedFilesMergeCommit",
+                "读取合并提交的改动文件失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// merge 提交的三栏只读内容（父提交 1 | 合并结果 | 父提交 2）。
@@ -1835,7 +2587,14 @@ pub async fn history_merge_view(
     let path = request.path;
     tauri::async_runtime::spawn_blocking(move || target.merge_view(&commit, &path))
         .await
-        .map_err(|error| AppError::internal(format!("读取合并提交的三栏内容失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadThreePaneContentMerge",
+                "读取合并提交的三栏内容失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 按固定提交对象读取完整提交信息与父提交列表。
@@ -1848,7 +2607,14 @@ pub async fn history_commit(
     let commit = request.commit;
     tauri::async_runtime::spawn_blocking(move || target.commit_detail(&commit))
         .await
-        .map_err(|error| AppError::internal(format!("读取提交详情失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadCommitDetailsCause",
+                "读取提交详情失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 读取提交相对显式父提交的改动文件（根提交用空 tree）。
@@ -1862,7 +2628,14 @@ pub async fn history_commit_files(
     let parent = request.parent;
     tauri::async_runtime::spawn_blocking(move || target.commit_files(&commit, parent.as_deref()))
         .await
-        .map_err(|error| AppError::internal(format!("读取改动文件失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadChangedFilesCause",
+                "读取改动文件失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 /// 提交 diff 的统一 / 左右布局显示行（只读，不签发任何写操作目标）。
@@ -1874,10 +2647,23 @@ pub async fn history_file_rows(
     let target = state.history.target(&request.target_id)?;
     let ignore = request.ignore_whitespace.unwrap_or_default();
     tauri::async_runtime::spawn_blocking(move || {
-        target.file_rows(&request.file, request.view, ignore, request.from, request.to)
+        target.file_rows(
+            &request.file,
+            request.view,
+            ignore,
+            request.from,
+            request.to,
+        )
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取提交显示行失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadCommitDisplayLinesCause",
+            "读取提交显示行失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 提交 diff 的左右对照布局：两侧行数、段与折叠区（没有段操作目标）。
@@ -1892,7 +2678,14 @@ pub async fn history_file_side_layout(
         target.file_side_layout(&request.file, ignore, request.context_lines)
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取提交左右对照失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadCommitSideSideComparison",
+            "读取提交左右对照失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 按需取提交左右对照一侧的行。
@@ -1915,7 +2708,14 @@ pub async fn history_file_side_lines(
         )
     })
     .await
-    .map_err(|error| AppError::internal(format!("读取提交左右行失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedReadCommitSideSideRows",
+            "读取提交左右行失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 提交文件的语法高亮（内容由 Rust 按对象 ID 读取，前端不传文件内容或路径）。
@@ -1927,10 +2727,23 @@ pub async fn history_file_highlight(
     let target = state.history.target(&request.target_id)?;
     let ignore = request.ignore_whitespace.unwrap_or_default();
     tauri::async_runtime::spawn_blocking(move || {
-        target.file_highlight(&request.file, ignore, request.version, request.from_line, request.to_line)
+        target.file_highlight(
+            &request.file,
+            ignore,
+            request.version,
+            request.from_line,
+            request.to_line,
+        )
     })
     .await
-    .map_err(|error| AppError::internal(format!("提交高亮失败：{error}")))?
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.commitHighlightingFailedCause",
+            "提交高亮失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 // ---------- 测量用命令（M1 验收需要；不上界面，只在这个里程碑使用） ----------
@@ -1979,11 +2792,28 @@ fn soak_diagnostic() -> Option<SoakDiagnosticConfig> {
     Some(SoakDiagnosticConfig {
         logging_mode,
         idle_seconds: std::env::var("REVIA_SOAK_IDLE_SECONDS")
-            .ok().and_then(|value| value.parse().ok()).unwrap_or(90),
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(90),
         cycles: std::env::var("REVIA_SOAK_DIAG_CYCLES")
-            .ok().and_then(|value| value.parse::<u64>().ok()).filter(|value| *value > 0),
-        focus: std::env::var("REVIA_SOAK_DIAG_FOCUS").ok()
-            .filter(|value| matches!(value.as_str(), "idle" | "ipc" | "highlight" | "channel" | "open" | "remount" | "switch" | "scroll" | "jump" | "view")),
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0),
+        focus: std::env::var("REVIA_SOAK_DIAG_FOCUS").ok().filter(|value| {
+            matches!(
+                value.as_str(),
+                "idle"
+                    | "ipc"
+                    | "highlight"
+                    | "channel"
+                    | "open"
+                    | "remount"
+                    | "switch"
+                    | "scroll"
+                    | "jump"
+                    | "view"
+            )
+        }),
     })
 }
 
@@ -2007,8 +2837,9 @@ fn is_soak_run() -> bool {
 }
 
 fn minimal_soak_logging() -> bool {
-    is_soak_run() && (std::env::var("REVIA_SOAK_MINIMAL_LOGGING").as_deref() == Ok("1")
-        || std::env::var("REVIA_SOAK_DIAG_LOGS").as_deref() == Ok("minimal"))
+    is_soak_run()
+        && (std::env::var("REVIA_SOAK_MINIMAL_LOGGING").as_deref() == Ok("1")
+            || std::env::var("REVIA_SOAK_DIAG_LOGS").as_deref() == Ok("minimal"))
 }
 
 #[tauri::command]
@@ -2041,7 +2872,10 @@ pub async fn measure_config() -> Result<MeasureConfig> {
 
 #[tauri::command]
 pub async fn write_measurement(payload: serde_json::Value) -> Result<Option<String>> {
-    let Some(path) = std::env::var("REVIA_MEASURE_LOG").ok().map(std::path::PathBuf::from) else {
+    let Some(path) = std::env::var("REVIA_MEASURE_LOG")
+        .ok()
+        .map(std::path::PathBuf::from)
+    else {
         return Ok(None);
     };
     if let Some(parent) = path.parent() {
@@ -2050,8 +2884,14 @@ pub async fn write_measurement(payload: serde_json::Value) -> Result<Option<Stri
         }
     }
     let text = serde_json::to_string_pretty(&payload)?;
-    std::fs::write(&path, text)
-        .map_err(|error| AppError::internal(format!("写入测量结果失败：{error}")))?;
+    std::fs::write(&path, text).map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.failedWriteMeasurementResultsCause",
+            "写入测量结果失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     // 自动测量可在写完结果后保留原进程供截图；不改变测量边界或数据。
     let keep_measurement_open = is_measure_auto_run()
         && !is_soak_run()
@@ -2072,12 +2912,19 @@ pub async fn write_measurement(payload: serde_json::Value) -> Result<Option<Stri
 /// 前端把关键步骤写进日志文件，便于在没有窗口时排查（测量用）。
 #[tauri::command]
 pub async fn debug_log(message: String) -> Result<()> {
-    let Some(path) = std::env::var("REVIA_MEASURE_LOG").ok().map(std::path::PathBuf::from) else {
+    let Some(path) = std::env::var("REVIA_MEASURE_LOG")
+        .ok()
+        .map(std::path::PathBuf::from)
+    else {
         return Ok(());
     };
     let log = path.with_extension("log");
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&log) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log)
+    {
         let _ = writeln!(file, "{message}");
     }
     Ok(())
@@ -2085,10 +2932,7 @@ pub async fn debug_log(message: String) -> Result<()> {
 
 /// 供测试与诊断：返回一个文件的列表元数据（不渲染）。
 #[tauri::command]
-pub async fn change_entry(
-    state: State<'_, AppState>,
-    request: RowsRequest,
-) -> Result<ChangeEntry> {
+pub async fn change_entry(state: State<'_, AppState>, request: RowsRequest) -> Result<ChangeEntry> {
     // 通过取一行来实现，保证校验逻辑一致。
     let slice = get_rows(
         state,
@@ -2135,7 +2979,14 @@ pub async fn commit_context(
     let drafts = state.drafts.clone();
     tauri::async_runtime::spawn_blocking(move || session.commit_context(&drafts))
         .await
-        .map_err(|error| AppError::internal(format!("读取提交上下文失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadCommitContextCause",
+                "读取提交上下文失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -2154,7 +3005,14 @@ pub async fn amend_head_message(
     let session = state.session(&request.worktree_id)?;
     tauri::async_runtime::spawn_blocking(move || session.amend_head_message(&request.expected_head))
         .await
-        .map_err(|error| AppError::internal(format!("读取最近提交信息失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedReadLatestCommitMessageCause",
+                "读取最近提交信息失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -2174,7 +3032,14 @@ pub async fn save_commit_draft(
     let drafts = state.drafts.clone();
     tauri::async_runtime::spawn_blocking(move || session.save_commit_draft(&drafts, &request.draft))
         .await
-        .map_err(|error| AppError::internal(format!("保存提交草稿失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedSaveCommitDraftCause",
+                "保存提交草稿失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -2193,7 +3058,14 @@ pub async fn clear_commit_draft(
     let drafts = state.drafts.clone();
     tauri::async_runtime::spawn_blocking(move || session.clear_commit_draft(&drafts))
         .await
-        .map_err(|error| AppError::internal(format!("清除提交草稿失败：{error}")))?
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.failedClearCommitDraftCause",
+                "清除提交草稿失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -2246,7 +3118,12 @@ pub async fn execute_commit(
     })
     .await
     .map_err(|error| {
-        AppError::needs_verification(format!("提交任务中断，结果待核对：{error}"))
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.theCommitTaskInterruptedResultNeeds",
+            "提交任务中断，结果待核对：{error}",
+            &[("error", format!("{}", error))],
+        )
     })?
 }
 
@@ -2295,4 +3172,693 @@ mod exit_guard_tests {
         assert!(!guard.apply(1, false), "同序号不得改变状态");
         assert!(guard.blocked());
     }
+}
+
+// ---------------------------------------------------------------------------
+// M6: stash, in-progress operations, history rewriting, file history/blame,
+// external tools, and first-run language.
+// ---------------------------------------------------------------------------
+
+/// Stashes of the worktree's common Git directory (newest first).
+#[tauri::command]
+pub async fn stash_list(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<Vec<crate::stash::StashEntry>> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || crate::stash::list(&session.git))
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.stashListInterrupted",
+                "读取 stash 列表时中断：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashOidRequest {
+    pub worktree_id: String,
+    pub oid: String,
+    pub entry_key: String,
+    pub expected_state: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashInspectCommand {
+    pub worktree_id: String,
+    pub oid: String,
+    pub entry_key: String,
+    #[serde(default)]
+    pub compare_local: bool,
+}
+
+#[tauri::command]
+pub async fn stash_inspect(
+    state: State<'_, AppState>,
+    request: StashInspectCommand,
+) -> Result<crate::stash::StashInspection> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::stash::inspect_selected(&session.git, &request.oid, Some(&request.entry_key), request.compare_local)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.stashInspectInterrupted",
+            "读取 stash 内容时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashPreflightCommand {
+    pub worktree_id: String,
+    pub oid: Option<String>,
+    pub entry_key: Option<String>,
+    #[serde(default)]
+    pub collection: bool,
+}
+
+#[tauri::command]
+pub async fn stash_preflight(state: State<'_, AppState>, request: StashPreflightCommand) -> Result<String> {
+    let session = state.session(&request.worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || if request.collection {
+        crate::stash::collection_preflight(&session)
+    } else { crate::stash::preflight_selected(&session, request.oid.as_deref(), request.entry_key.as_deref()) })
+        .await.map_err(|error| AppError::coded(ErrorKind::Internal,
+            "errors.commands.stashInspectInterrupted", "读取 stash 内容时中断：{error}", &[("error", error.to_string())]))?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashSaveCommand {
+    pub worktree_id: String,
+    pub expected_state: String,
+    #[serde(default)]
+    pub message: String,
+    #[serde(default)]
+    pub keep_index: bool,
+}
+
+#[tauri::command]
+pub async fn stash_save(
+    state: State<'_, AppState>,
+    request: StashSaveCommand,
+) -> Result<crate::stash::StashEntry> {
+    let session = state.session(&request.worktree_id)?;
+    let stash = crate::stash::StashSaveRequest {
+        message: request.message,
+        keep_index: request.keep_index,
+        expected_state: request.expected_state,
+    };
+    tauri::async_runtime::spawn_blocking(move || crate::stash::save(&session, &stash))
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.commands.stashSaveInterrupted",
+                "保存 stash 时中断，结果待核对：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashApplyCommand {
+    pub worktree_id: String,
+    pub expected_state: String,
+    pub oid: String,
+    pub entry_key: String,
+    #[serde(default)]
+    pub restore_index: bool,
+    #[serde(default)]
+    pub delete_after: bool,
+    #[serde(default)]
+    pub new_branch: Option<String>,
+}
+
+#[tauri::command]
+pub async fn stash_apply(
+    state: State<'_, AppState>,
+    request: StashApplyCommand,
+) -> Result<crate::stash::StashApplyOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let apply = crate::stash::StashApplyRequest {
+        oid: request.oid,
+        entry_key: Some(request.entry_key),
+        restore_index: request.restore_index,
+        delete_after: request.delete_after,
+        new_branch: request.new_branch,
+        expected_state: request.expected_state,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::stash::apply(&session, &recovery, &archive, &apply)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.stashApplyInterrupted",
+            "应用 stash 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn stash_drop(
+    state: State<'_, AppState>,
+    request: StashOidRequest,
+) -> Result<crate::stash::StashDropOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let archive = state.stash_archive.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::stash::drop_selected(&session, &archive, &request.oid, &request.entry_key, &request.expected_state)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.stashDropInterrupted",
+            "删除 stash 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashClearCommand {
+    pub worktree_id: String,
+    pub expected_oids: Vec<String>,
+    pub expected_state: String,
+}
+
+#[tauri::command]
+pub async fn stash_clear(
+    state: State<'_, AppState>,
+    request: StashClearCommand,
+) -> Result<crate::stash::StashClearOutcome> {
+    let session = state.session(&request.worktree_id)?;
+    let archive = state.stash_archive.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::stash::clear_confirmed(&session, &archive, &request.expected_oids, &request.expected_state)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.stashClearInterrupted",
+            "清空 stash 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn stash_archives(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<Vec<crate::stash_archive::StashArchiveSummary>> {
+    let session = state.session(&request.worktree_id)?;
+    let archive = state.stash_archive.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let identity = WorktreeIdentity::capture(&session.git)?;
+        archive.list(Some(&identity))
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.stashArchivesInterrupted",
+            "读取 stash 归档时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn stash_archive_restore(
+    state: State<'_, AppState>,
+    request: StashArchiveRestoreCommand,
+) -> Result<String> {
+    let session = state.session(&request.worktree_id)?;
+    let archive = state.stash_archive.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        archive.restore_confirmed(&session, &request.id, &request.expected_state)
+    })
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.commands.stashArchiveRestoreInterrupted",
+                "恢复 stash 归档时中断，结果待核对：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashArchiveRestoreCommand {
+    pub worktree_id: String,
+    pub id: String,
+    pub expected_state: String,
+}
+
+#[tauri::command]
+pub async fn autostash_pending(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<Option<crate::autostash::AutostashPending>> {
+    let session = state.session(&request.worktree_id)?;
+    let store = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || store.pending(&session))
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.autostashPendingInterrupted",
+                "读取自动 stash 时中断：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
+}
+
+#[tauri::command]
+pub async fn autostash_restore(
+    state: State<'_, AppState>,
+    request: AutostashRestoreCommand,
+) -> Result<Option<crate::autostash::AutostashRestoreOutcome>> {
+    let session = state.session(&request.worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let store = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _write = session.acquire_write_lock()?;
+        store.restore_confirmed(&session, &recovery, &archive, &request.link, &request.expected_state)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.autostashRestoreInterrupted",
+            "恢复自动 stash 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutostashRestoreCommand {
+    pub worktree_id: String,
+    pub link: crate::autostash::AutostashLink,
+    pub expected_state: String,
+}
+
+#[tauri::command]
+pub async fn autostash_forget(state: State<'_, AppState>, worktree_id: String, id: String) -> Result<()> {
+    let session = state.session(&worktree_id)?;
+    let store = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _write = session.acquire_write_lock()?;
+        store.forget(&session, &id)
+    }).await.map_err(|error| AppError::coded(ErrorKind::Internal, "errors.commands.autostashForgetInterrupted", "保留自动 stash 时中断：{error}", &[("error", error.to_string())]))?
+}
+
+#[tauri::command]
+pub async fn operation_state(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<Option<crate::operation::OperationState>> {
+    let session = state.session(&request.worktree_id)?;
+    let data = state.data_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::operation_flow::state(&session, &data))
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.operationStateInterrupted",
+            "读取进行中的操作时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn operation_execute(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::operation_flow::OperationActionRequest,
+) -> Result<crate::operation_flow::OperationOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let autostash = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::operation_flow::execute(&session, &recovery, &autostash, &archive, &request)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.operationExecuteInterrupted",
+            "执行操作时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn rewrite_range(
+    state: State<'_, AppState>, worktree_id: String, target: String, expected_head: String,
+) -> Result<Vec<crate::history::HistoryCommit>> {
+    let session = state.session(&worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || crate::rewrite::range(&session, &target, &expected_head))
+        .await.map_err(|error| AppError::coded(ErrorKind::Internal,
+            "errors.commands.rewritePreflightInterrupted", "检查本地改动时中断：{error}", &[("error", error.to_string())]))?
+}
+
+#[tauri::command]
+pub async fn rewrite_preflight(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    oids: Vec<String>,
+    reset_target: Option<String>,
+) -> Result<crate::rewrite::RewritePreflight> {
+    let session = state.session(&worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || match reset_target {
+        Some(target) => crate::rewrite::reset_preflight(&session, &target),
+        None => crate::rewrite::preflight(&session, &oids),
+    })
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.rewritePreflightInterrupted",
+                "检查本地改动时中断：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
+}
+
+#[tauri::command]
+pub async fn rewrite_cherry_pick(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::rewrite::CherryPickRequest,
+) -> Result<crate::rewrite::RewriteOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let autostash = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::cherry_pick(&session, &recovery, &autostash, &archive, &request)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.cherryPickInterrupted",
+            "cherry-pick 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn rewrite_revert(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::rewrite::RevertRequest,
+) -> Result<crate::rewrite::RewriteOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let autostash = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::revert(&session, &recovery, &autostash, &archive, &request)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.revertInterrupted",
+            "revert 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn rewrite_reset(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::rewrite::ResetRequest,
+) -> Result<crate::rewrite::RewriteOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let autostash = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::reset(&session, &recovery, &autostash, &archive, &request)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.resetInterrupted",
+            "reset 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RewordCommand {
+    pub target: String,
+    pub expected_context: String,
+    pub expected_state: String,
+    pub expected_head: String,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn rewrite_reword(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: RewordCommand,
+) -> Result<crate::rewrite::RewriteOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let data_dir = state.data_dir.clone();
+    let autostash = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::reword(
+            &session,
+            &recovery,
+            &autostash,
+            &archive,
+            &data_dir,
+            &request.target,
+            &request.expected_head,
+            &request.expected_context,
+            &request.expected_state,
+            &request.message,
+        )
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.rewordInterrupted",
+            "改写提交说明时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn rewrite_interactive(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::rewrite::InteractiveRebaseRequest,
+) -> Result<crate::rewrite::RewriteOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let archive = state.stash_archive.clone();
+    let data_dir = state.data_dir.clone();
+    let autostash = state.autostash.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::interactive(
+            &session, &recovery, &autostash, &archive, &data_dir, &request,
+        )
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.interactiveRebaseInterrupted",
+            "交互式 rebase 时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn file_history(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::file_history::FileHistoryRequest,
+) -> Result<crate::file_history::FileHistoryPage> {
+    let session = state.session(&worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::file_history::history(&session.git, &request)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.fileHistoryInterrupted",
+            "读取文件历史时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn file_blame(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::file_history::BlameRequest,
+) -> Result<crate::file_history::BlameResult> {
+    let session = state.session(&worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || crate::file_history::blame(&session.git, &request))
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.fileBlameInterrupted",
+                "读取 blame 时中断：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
+}
+
+#[tauri::command]
+pub async fn file_previous_revision(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    oid: String,
+    path: String,
+) -> Result<Option<crate::file_history::FileRevision>> {
+    let session = state.session(&worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::file_history::previous_revision(&session.git, &oid, &path)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.filePreviousRevisionInterrupted",
+            "读取上一版本时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn external_tool_choices(
+    state: State<'_, AppState>,
+    request: WorktreeRequest,
+) -> Result<crate::external_tools::ExternalToolSetup> {
+    let session = state.session(&request.worktree_id)?;
+    let settings = {
+        let registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed11",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
+        registry.settings().clone()
+    };
+    let configured_diff = settings.diff_tool.clone();
+    let configured_merge = settings.merge_tool.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<crate::external_tools::ExternalToolSetup> {
+        let choices = crate::external_tools::choices(
+            &session.git,
+            configured_diff.as_deref(),
+            configured_merge.as_deref(),
+        );
+        Ok(crate::external_tools::ExternalToolSetup { choices,
+            context: crate::external_tools::confirmation_context(&session)? })
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.externalToolChoicesInterrupted",
+            "读取外部工具列表时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+#[tauri::command]
+pub async fn external_tool_launch(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::external_tools::ExternalToolRequest,
+) -> Result<crate::external_tools::ExternalToolOutcome> {
+    let session = state.session(&worktree_id)?;
+    let recovery = state.recovery.clone();
+    let settings = {
+        let registry = state.registry.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed12",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
+        registry.settings().clone()
+    };
+    let configured = match request.kind {
+        crate::external_tools::ExternalToolKind::Diff => settings.diff_tool,
+        crate::external_tools::ExternalToolKind::Merge => settings.merge_tool,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::external_tools::launch(&session, &recovery, &request, configured.as_deref())
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commands.externalToolInterrupted",
+            "外部工具运行时中断，结果待核对：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
+}
+
+/// First-run language when settings has no explicit choice.
+#[tauri::command]
+pub async fn system_language() -> Result<String> {
+    Ok(crate::settings::system_language())
 }

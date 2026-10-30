@@ -15,9 +15,10 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize, Serializer};
 use syntect::parsing::{ParseState, ScopeStack, SyntaxSet};
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 
-static SYNTAX_SET: std::sync::LazyLock<SyntaxSet> = std::sync::LazyLock::new(two_face::syntax::extra_newlines);
+static SYNTAX_SET: std::sync::LazyLock<SyntaxSet> =
+    std::sync::LazyLock::new(two_face::syntax::extra_newlines);
 
 /// 每隔多少行打一个解析状态检查点（越大越省内存，跳转越慢）。
 const CHECKPOINT_INTERVAL: usize = 512;
@@ -296,7 +297,14 @@ impl Document {
         let ops = self
             .parse_state
             .parse_line(line, &SYNTAX_SET)
-            .map_err(|error| AppError::internal(format!("syntect 解析失败：{error}")))?;
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.highlight.syntectParsingFailedCause",
+                    "syntect 解析失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?;
 
         let mut tokens: Vec<HighlightToken> = Vec::new();
         let mut cursor = 0usize;
@@ -312,9 +320,14 @@ impl Document {
                 });
                 cursor = offset;
             }
-            stack
-                .apply(op)
-                .map_err(|error| AppError::internal(format!("syntect scope 栈异常：{error}")))?;
+            stack.apply(op).map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.highlight.syntectScopeStackErrorCause",
+                    "syntect scope 栈异常：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?;
         }
         if cursor < line.len() {
             let category = classify(&stack, &mut self.category_cache);
@@ -420,18 +433,31 @@ impl Highlighter {
     }
 
     pub fn clone_handle(&self) -> Self {
-        Self { sender: self.sender.clone(), counter: self.counter.clone() }
+        Self {
+            sender: self.sender.clone(),
+            counter: self.counter.clone(),
+        }
     }
 
     /// 同步返回；调用方（Tauri 命令）把它放到阻塞线程池执行。
     pub fn highlight(&self, request: HighlightRequest) -> Result<HighlightResult> {
         let (reply, receiver) = std::sync::mpsc::channel();
-        self.sender
-            .send(Job { request, reply })
-            .map_err(|_| AppError::internal("高亮线程已退出"))?;
-        receiver
-            .recv()
-            .map_err(|_| AppError::internal("高亮线程没有返回结果"))?
+        self.sender.send(Job { request, reply }).map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.highlight.theHighlightingThreadExited",
+                "高亮线程已退出",
+                &[],
+            )
+        })?;
+        receiver.recv().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.highlight.theHighlightingThreadReturnedNoResult",
+                "高亮线程没有返回结果",
+                &[],
+            )
+        })?
     }
 }
 
@@ -456,7 +482,10 @@ fn evict_documents(
     }
 }
 
-fn run_job(documents: &mut HashMap<String, Document>, request: HighlightRequest) -> Result<HighlightResult> {
+fn run_job(
+    documents: &mut HashMap<String, Document>,
+    request: HighlightRequest,
+) -> Result<HighlightResult> {
     let started = Instant::now();
     let known = documents
         .get(&request.document_id)
@@ -482,9 +511,14 @@ fn run_job(documents: &mut HashMap<String, Document>, request: HighlightRequest)
         );
     }
 
-    let document = documents
-        .get_mut(&request.document_id)
-        .ok_or_else(|| AppError::internal("高亮状态丢失"))?;
+    let document = documents.get_mut(&request.document_id).ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.highlight.highlightingStateLost",
+            "高亮状态丢失",
+            &[],
+        )
+    })?;
     let before = document.cursor;
     let lines = document.highlight_range(request.from_line, request.to_line)?;
     let kind = if document.supported {
@@ -544,7 +578,12 @@ mod tests {
             .iter()
             .map(|line| {
                 line.as_ref()
-                    .map(|tokens| tokens.iter().map(|token| token.text.as_str()).collect::<String>())
+                    .map(|tokens| {
+                        tokens
+                            .iter()
+                            .map(|token| token.text.as_str())
+                            .collect::<String>()
+                    })
                     .unwrap_or_default()
             })
             .collect::<Vec<_>>()
@@ -565,8 +604,16 @@ mod tests {
         let source = "// 注释\nconst name = \"值\";\nlet n = 42;\n";
         let result = highlighter.highlight(request(source, "ts", 0, 3)).unwrap();
         let lines = categories(&result);
-        assert!(lines[0].contains(&SyntaxCategory::Comment), "{:?}", lines[0]);
-        assert!(lines[1].contains(&SyntaxCategory::Keyword), "{:?}", lines[1]);
+        assert!(
+            lines[0].contains(&SyntaxCategory::Comment),
+            "{:?}",
+            lines[0]
+        );
+        assert!(
+            lines[1].contains(&SyntaxCategory::Keyword),
+            "{:?}",
+            lines[1]
+        );
         assert!(lines[1].contains(&SyntaxCategory::String), "{:?}", lines[1]);
         assert!(lines[2].contains(&SyntaxCategory::Number), "{:?}", lines[2]);
     }
@@ -577,9 +624,17 @@ mod tests {
         let source = "/* 开始\n仍在注释里\n结束 */\nconst a = 1;\n";
         let result = highlighter.highlight(request(source, "js", 0, 4)).unwrap();
         let lines = categories(&result);
-        assert!(lines[1].contains(&SyntaxCategory::Comment), "第二行仍是注释：{:?}", lines[1]);
+        assert!(
+            lines[1].contains(&SyntaxCategory::Comment),
+            "第二行仍是注释：{:?}",
+            lines[1]
+        );
         assert!(!lines[3].is_empty());
-        assert!(lines[3].contains(&SyntaxCategory::Keyword), "注释结束后恢复代码类别：{:?}", lines[3]);
+        assert!(
+            lines[3].contains(&SyntaxCategory::Keyword),
+            "注释结束后恢复代码类别：{:?}",
+            lines[3]
+        );
     }
 
     #[test]
@@ -605,10 +660,16 @@ mod tests {
 
         let chunked = Highlighter::start();
         let first = chunked
-            .highlight(HighlightRequest { document_id: "chunk".into(), ..request(source, "js", 0, 2) })
+            .highlight(HighlightRequest {
+                document_id: "chunk".into(),
+                ..request(source, "js", 0, 2)
+            })
             .unwrap();
         let second = chunked
-            .highlight(HighlightRequest { document_id: "chunk".into(), ..request(source, "js", 2, 5) })
+            .highlight(HighlightRequest {
+                document_id: "chunk".into(),
+                ..request(source, "js", 2, 5)
+            })
             .unwrap();
         assert_eq!(format!("{}\n{}", flat(&first), flat(&second)), full_flat);
     }
@@ -622,11 +683,14 @@ mod tests {
         }
         let highlighter = Highlighter::start();
         let tail = highlighter
-            .highlight(request(&source, "ts", CHECKPOINT_INTERVAL + 10, CHECKPOINT_INTERVAL + 12))
+            .highlight(request(
+                &source,
+                "ts",
+                CHECKPOINT_INTERVAL + 10,
+                CHECKPOINT_INTERVAL + 12,
+            ))
             .unwrap();
-        let head = highlighter
-            .highlight(request(&source, "ts", 3, 5))
-            .unwrap();
+        let head = highlighter.highlight(request(&source, "ts", 3, 5)).unwrap();
         let fresh = Highlighter::start();
         let expected = fresh.highlight(request(&source, "ts", 3, 5)).unwrap();
         assert_eq!(flat(&head), flat(&expected), "回跳后应与从头解析一致");
@@ -649,7 +713,9 @@ mod tests {
     #[test]
     fn unknown_language_is_plain_text() {
         let highlighter = Highlighter::start();
-        let result = highlighter.highlight(request("some text\n", "weird-ext", 0, 1)).unwrap();
+        let result = highlighter
+            .highlight(request("some text\n", "weird-ext", 0, 1))
+            .unwrap();
         assert_eq!(result.kind, HighlightKind::PlainText);
         assert!(result.lines.is_empty());
     }
@@ -663,7 +729,9 @@ mod tests {
         assert!(categories(&result)[1].contains(&SyntaxCategory::Tag));
 
         let swift = "import Foundation\n\nstruct A: B {\n    let value: Int\n}\n";
-        let result = highlighter.highlight(request(swift, "swift", 0, 5)).unwrap();
+        let result = highlighter
+            .highlight(request(swift, "swift", 0, 5))
+            .unwrap();
         assert_eq!(result.kind, HighlightKind::Highlighted);
         assert!(categories(&result)[0].contains(&SyntaxCategory::Keyword));
     }
@@ -672,7 +740,10 @@ mod tests {
     fn supported_extensions_cover_our_languages() {
         let extensions = supported_extensions();
         for language in ["ts", "vue", "swift", "json", "yaml", "md", "rs", "py"] {
-            assert!(extensions.contains(&language.to_string()), "缺少语法：{language}");
+            assert!(
+                extensions.contains(&language.to_string()),
+                "缺少语法：{language}"
+            );
         }
     }
 }

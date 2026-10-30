@@ -15,15 +15,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::status::{ChangesKind, FileStatus, StatusEntry};
 use crate::git::{CommandRecord, Git};
 use crate::operation;
@@ -121,7 +121,9 @@ impl CommitExpectation {
     ///
     /// 暂存删除算内容；intent-to-add 不算（Git 也不会把它写进提交）。
     pub fn has_staged_changes(&self) -> bool {
-        self.index.iter().any(CommitExpectationIndexEntry::is_committable_change)
+        self.index
+            .iter()
+            .any(CommitExpectationIndexEntry::is_committable_change)
     }
 
     /// index 中未解决冲突的去重路径数。
@@ -160,39 +162,64 @@ pub fn read_head(git: &Git) -> Result<Option<String>> {
         0 => {
             let value = output.stdout_lossy().trim().to_string();
             if value.is_empty() {
-                return Err(AppError::git("读取 HEAD 失败：Git 返回为空"));
+                return Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.failedReadHeadGitReturnedNothing",
+                    "读取 HEAD 失败：Git 返回为空",
+                    &[],
+                ));
             }
             Ok(Some(value))
         }
         1 => {
             let symbolic = git.run(&["symbolic-ref", "-q", "HEAD"])?;
             if symbolic.exit_code != 0 {
-                return Err(AppError::git(format!(
-                    "读取 HEAD 失败（无法解析为提交，且不是分支引用）：{}",
-                    output.stderr.trim()
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.failedReadHeadCommitBranchReference",
+                    "读取 HEAD 失败（无法解析为提交，且不是分支引用）：{0}",
+                    &[("0", format!("{:}", output.stderr.trim()))],
+                ));
             }
             let reference = symbolic.stdout_lossy().trim().to_string();
             if reference.is_empty() {
-                return Err(AppError::git("读取 HEAD 失败：分支引用为空"));
+                return Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.failedReadHeadBranchReferenceEmpty",
+                    "读取 HEAD 失败：分支引用为空",
+                    &[],
+                ));
             }
             let exists = git.run(&["show-ref", "--verify", "--quiet", &reference])?;
             match exists.exit_code {
                 // 引用存在却解析不出提交：损坏或对象缺失，不能当作未初始化分支。
-                0 => Err(AppError::git(format!(
-                    "读取 HEAD 失败：分支 {reference} 存在但无法解析成提交，请在终端检查仓库"
-                ))),
+                0 => Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.failedReadHeadBranchExistsBut",
+                    "读取 HEAD 失败：分支 {reference} 存在但无法解析成提交，请在终端检查仓库",
+                    &[("reference", format!("{}", reference))],
+                )),
                 1 => Ok(None),
-                other => Err(AppError::git(format!(
-                    "读取 HEAD 失败（检查分支引用退出码 {other}）：{}",
-                    exists.stderr.trim()
-                ))),
+                other => Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.failedReadHeadCheckingBranchReference",
+                    "读取 HEAD 失败（检查分支引用退出码 {other}）：{0}",
+                    &[
+                        ("0", format!("{:}", exists.stderr.trim())),
+                        ("other", format!("{}", other)),
+                    ],
+                )),
             }
         }
-        other => Err(AppError::git(format!(
-            "读取 HEAD 失败（退出码 {other}）：{}",
-            output.stderr.trim()
-        ))),
+        other => Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.commit.failedReadHeadExitCode",
+            "读取 HEAD 失败（退出码 {other}）：{0}",
+            &[
+                ("0", format!("{:}", output.stderr.trim())),
+                ("other", format!("{}", other)),
+            ],
+        )),
     }
 }
 
@@ -201,11 +228,24 @@ fn read_branch(git: &Git) -> Result<Option<String>> {
     match output.exit_code {
         0 => {
             let name = output.stdout_lossy().trim().to_string();
-            if name.is_empty() { Err(AppError::git("Git 返回的分支引用为空")) }
-            else { Ok(Some(name)) }
+            if name.is_empty() {
+                Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.gitReturnedEmptyBranchReference",
+                    "Git 返回的分支引用为空",
+                    &[],
+                ))
+            } else {
+                Ok(Some(name))
+            }
         }
         1 => Ok(None),
-        _ => Err(AppError::git(format!("读取分支引用失败：{}", output.stderr.trim()))),
+        _ => Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.commit.failedReadBranchReference",
+            "读取分支引用失败：{0}",
+            &[("0", format!("{:}", output.stderr.trim()))],
+        )),
     }
 }
 
@@ -228,7 +268,12 @@ pub fn read_index_entries(git: &Git) -> Result<Vec<CommitExpectationIndexEntry>>
         (entry.changes == ChangesKind::Staged || entry.unmerged)
             && entry.readonly_reason == Some(crate::git::status::ReadonlyReason::NonUtf8Path)
     }) {
-        return Err(AppError::rejected("提交包含无法无损处理的非 UTF-8 路径，请在终端处理"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.commit.theCommitContainsNonUtf8",
+            "提交包含无法无损处理的非 UTF-8 路径，请在终端处理",
+            &[],
+        ));
     }
     let mut staged: BTreeMap<String, StatusEntry> = BTreeMap::new();
     let mut unstaged_added: BTreeSet<String> = BTreeSet::new();
@@ -251,32 +296,49 @@ pub fn read_index_entries(git: &Git) -> Result<Vec<CommitExpectationIndexEntry>>
         if record.is_empty() {
             continue;
         }
-        let text = std::str::from_utf8(record)
-            .map_err(|_| AppError::rejected("暂存区包含无法无损处理的非 UTF-8 路径，请在终端处理"))?;
+        let text = std::str::from_utf8(record).map_err(|_| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commit.theIndexContainsNonUtf8",
+                "暂存区包含无法无损处理的非 UTF-8 路径，请在终端处理",
+                &[],
+            )
+        })?;
         // <mode> <oid> <stage>\t<path>
         let Some((head, path)) = text.split_once('\t') else {
-            return Err(AppError::internal("暂存区条目格式无法解析"));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.cannotParseIndexEntryFormat",
+                "暂存区条目格式无法解析",
+                &[],
+            ));
         };
         let fields: Vec<&str> = head.split(' ').collect();
         if fields.len() != 3 {
-            return Err(AppError::internal("暂存区条目格式无法解析"));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.cannotParseIndexEntryFormat2",
+                "暂存区条目格式无法解析",
+                &[],
+            ));
         }
         let (mode, oid, stage) = (fields[0], fields[1], fields[2]);
         if stage != "0" {
             // unmerged 路径会有 stage 1/2/3 多行：按路径去重后标记冲突。
-            let slot = entries.entry(path.to_string()).or_insert_with(|| {
-                CommitExpectationIndexEntry {
-                    path: path.to_string(),
-                    original_path: None,
-                    mode: mode.to_string(),
-                    oid: None,
-                    status: "U".into(),
-                    unmerged: true,
-                    deleted: false,
-                    intent_to_add: false,
-                    head_oid: None,
-                }
-            });
+            let slot =
+                entries
+                    .entry(path.to_string())
+                    .or_insert_with(|| CommitExpectationIndexEntry {
+                        path: path.to_string(),
+                        original_path: None,
+                        mode: mode.to_string(),
+                        oid: None,
+                        status: "U".into(),
+                        unmerged: true,
+                        deleted: false,
+                        intent_to_add: false,
+                        head_oid: None,
+                    });
             slot.unmerged = true;
             slot.oid = None;
             continue;
@@ -377,17 +439,36 @@ pub fn tree_blob_map(git: &Git, revision: &str) -> Result<BTreeMap<String, (Stri
         if record.is_empty() {
             continue;
         }
-        let text = std::str::from_utf8(record)
-            .map_err(|_| AppError::rejected("暂存区包含无法无损处理的非 UTF-8 路径，请在终端处理"))?;
+        let text = std::str::from_utf8(record).map_err(|_| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.commit.theIndexContainsNonUtf82",
+                "暂存区包含无法无损处理的非 UTF-8 路径，请在终端处理",
+                &[],
+            )
+        })?;
         let Some((head, path)) = text.split_once('\t') else {
-            return Err(AppError::internal("tree 条目格式无法解析"));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.cannotParseTreeEntryFormat",
+                "tree 条目格式无法解析",
+                &[],
+            ));
         };
         // <mode> SP <type> SP <object>
         let fields: Vec<&str> = head.split(' ').collect();
         if fields.len() != 3 {
-            return Err(AppError::internal("tree 条目格式无法解析"));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.cannotParseTreeEntryFormat2",
+                "tree 条目格式无法解析",
+                &[],
+            ));
         }
-        map.insert(path.to_string(), (fields[0].to_string(), fields[2].to_string()));
+        map.insert(
+            path.to_string(),
+            (fields[0].to_string(), fields[2].to_string()),
+        );
     }
     Ok(map)
 }
@@ -425,7 +506,13 @@ pub fn fingerprint_of(expected: &CommitExpectation) -> String {
     hasher.update(b"head\0");
     hasher.update(expected.head.as_deref().unwrap_or("<unborn>").as_bytes());
     hasher.update(b"\0branch\0");
-    hasher.update(expected.branch.as_deref().unwrap_or("<detached>").as_bytes());
+    hasher.update(
+        expected
+            .branch
+            .as_deref()
+            .unwrap_or("<detached>")
+            .as_bytes(),
+    );
     hasher.update(b"\0op\0");
     match &expected.operation {
         None => {
@@ -434,7 +521,11 @@ pub fn fingerprint_of(expected: &CommitExpectation) -> String {
         Some(state) => {
             hasher.update(state.kind.label().as_bytes());
             hasher.update(b"\0");
-            hasher.update(if state.sequencer_pending { b"seq1" } else { b"seq0" });
+            hasher.update(if state.sequencer_pending {
+                b"seq1"
+            } else {
+                b"seq0"
+            });
             hasher.update(b"\0conflicts=");
             hasher.update((state.conflict_count as u64).to_le_bytes());
             hasher.update(b"\0meta=");
@@ -466,7 +557,11 @@ pub fn fingerprint_of(expected: &CommitExpectation) -> String {
         hasher.update(entry.status.as_bytes());
         hasher.update(if entry.unmerged { b"\0u1" } else { b"\0u0" });
         hasher.update(if entry.deleted { b"\0d1" } else { b"\0d0" });
-        hasher.update(if entry.intent_to_add { b"\0i1" } else { b"\0i0" });
+        hasher.update(if entry.intent_to_add {
+            b"\0i1"
+        } else {
+            b"\0i0"
+        });
         hasher.update(b"\0");
         hasher.update(entry.head_oid.as_deref().unwrap_or("<none>").as_bytes());
     }
@@ -497,24 +592,53 @@ pub fn read_template(git: &Git) -> Result<Option<String>> {
         0 => {}
         1 => return Ok(None),
         other => {
-            return Err(AppError::environment(format!(
-                "读取 commit.template 配置失败（退出码 {other}）：{}",
-                output.stderr.trim()
-            )))
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedReadCommitTemplateSettingExit",
+                "读取 commit.template 配置失败（退出码 {other}）：{0}",
+                &[
+                    ("0", format!("{:}", output.stderr.trim())),
+                    ("other", format!("{}", other)),
+                ],
+            ));
         }
     }
-    let value = output.stdout.strip_suffix(&[0])
-        .ok_or_else(|| AppError::environment("commit.template 配置缺少记录结束符"))?;
-    let value = std::str::from_utf8(value)
-        .map_err(|_| AppError::environment("commit.template 路径无法无损处理"))?;
+    let value = output.stdout.strip_suffix(&[0]).ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.commit.theCommitTemplateSettingMissingRecord",
+            "commit.template 配置缺少记录结束符",
+            &[],
+        )
+    })?;
+    let value = std::str::from_utf8(value).map_err(|_| {
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.commit.theCommitTemplatePathHandledLosslessly",
+            "commit.template 路径无法无损处理",
+            &[],
+        )
+    })?;
     if value.is_empty() {
         return Ok(None);
     }
     // `--path` 已把 `~/` 展开成绝对路径；其余相对路径按仓库根解析（Git 的语义）。
     let path = PathBuf::from(value);
-    let path = if path.is_absolute() { path } else { git.directory.join(path) };
+    let path = if path.is_absolute() {
+        path
+    } else {
+        git.directory.join(path)
+    };
     let text = std::fs::read_to_string(&path).map_err(|error| {
-        AppError::environment(format!("读取提交信息模板失败（{}）：{error}", path.display()))
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.commit.failedReadCommitMessageTemplate",
+            "读取提交信息模板失败（{0}）：{error}",
+            &[
+                ("0", format!("{:}", path.display())),
+                ("error", format!("{}", error)),
+            ],
+        )
     })?;
     Ok(Some(text))
 }
@@ -556,10 +680,17 @@ pub fn read_recent_messages(git: &Git, limit: usize) -> Result<Vec<String>> {
 /// 固定提交对象的完整信息，保留正文自带的尾随换行。
 pub fn read_last_message(git: &Git, head: &str) -> Result<String> {
     let output = git.run_ok(
-        &["log", "-1", "-z", "--format=%B", head, "--"], "读取最近提交信息"
+        &["log", "-1", "-z", "--format=%B", head, "--"],
+        "读取最近提交信息",
     )?;
-    let message = output.stdout.strip_suffix(&[0])
-        .ok_or_else(|| AppError::environment("最近提交信息缺少记录结束符"))?;
+    let message = output.stdout.strip_suffix(&[0]).ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.commit.theLatestCommitMessageMissingRecord",
+            "最近提交信息缺少记录结束符",
+            &[],
+        )
+    })?;
     Ok(String::from_utf8_lossy(message).into_owned())
 }
 
@@ -598,7 +729,10 @@ pub struct UpstreamRead {
 /// 上游配置的读取结果：必须区分「未配置」「已配置但本地没有引用」与读取错误。
 enum UpstreamConfig {
     NotConfigured,
-    Configured { name: String, object: Option<String> },
+    Configured {
+        name: String,
+        object: Option<String>,
+    },
 }
 
 /// 读取当前分支配置的上游名与本地对象名。
@@ -612,10 +746,15 @@ fn read_upstream_config(git: &Git, branch: &str) -> Result<UpstreamConfig> {
         0 => {}
         1 => return Ok(UpstreamConfig::NotConfigured),
         other => {
-            return Err(AppError::environment(format!(
-                "读取分支上游配置失败（退出码 {other}）：{}",
-                remote.stderr.trim()
-            )))
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedReadBranchUpstreamSettingExit",
+                "读取分支上游配置失败（退出码 {other}）：{0}",
+                &[
+                    ("0", format!("{:}", remote.stderr.trim())),
+                    ("other", format!("{}", other)),
+                ],
+            ));
         }
     }
     let remote_name = remote.stdout_lossy().trim().to_string();
@@ -624,10 +763,15 @@ fn read_upstream_config(git: &Git, branch: &str) -> Result<UpstreamConfig> {
         0 => {}
         1 => return Ok(UpstreamConfig::NotConfigured),
         other => {
-            return Err(AppError::environment(format!(
-                "读取分支上游合并配置失败（退出码 {other}）：{}",
-                merge.stderr.trim()
-            )))
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedReadBranchUpstreamMergeSetting",
+                "读取分支上游合并配置失败（退出码 {other}）：{0}",
+                &[
+                    ("0", format!("{:}", merge.stderr.trim())),
+                    ("other", format!("{}", other)),
+                ],
+            ));
         }
     }
     let merge_ref = merge.stdout_lossy().trim().to_string();
@@ -665,10 +809,15 @@ fn read_upstream_config(git: &Git, branch: &str) -> Result<UpstreamConfig> {
         }
         1 => None,
         other => {
-            return Err(AppError::environment(format!(
-                "读取上游引用失败（退出码 {other}）：{}",
-                object.stderr.trim()
-            )))
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedReadUpstreamReferenceExitCode",
+                "读取上游引用失败（退出码 {other}）：{0}",
+                &[
+                    ("0", format!("{:}", object.stderr.trim())),
+                    ("other", format!("{}", other)),
+                ],
+            ));
         }
     };
     Ok(UpstreamConfig::Configured { name, object })
@@ -707,21 +856,44 @@ pub fn upstream_read(git: &Git) -> Result<UpstreamRead> {
     } else if object.is_none() {
         UpstreamStatus::Unknown
     } else {
-        let head_object = head.as_deref().ok_or_else(|| AppError::internal("HEAD 缺失"))?;
-        let upstream_object = object.as_deref().ok_or_else(|| AppError::internal("上游对象缺失"))?;
+        let head_object = head.as_deref().ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.headMissing",
+                "HEAD 缺失",
+                &[],
+            )
+        })?;
+        let upstream_object = object.as_deref().ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.theUpstreamObjectMissing",
+                "上游对象缺失",
+                &[],
+            )
+        })?;
         let output = git.run(&["merge-base", "--is-ancestor", head_object, upstream_object])?;
         match output.exit_code {
             0 => UpstreamStatus::Contained,
             1 => UpstreamStatus::NotContained,
             other => {
-                return Err(AppError::git(format!(
-                    "判断上游包含关系失败（退出码 {other}）：{}",
-                    output.stderr.trim()
-                )))
+                return Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.commit.failedCheckUpstreamContainmentExitCode",
+                    "判断上游包含关系失败（退出码 {other}）：{0}",
+                    &[
+                        ("0", format!("{:}", output.stderr.trim())),
+                        ("other", format!("{}", other)),
+                    ],
+                ));
             }
         }
     };
-    Ok(UpstreamRead { status, upstream, version })
+    Ok(UpstreamRead {
+        status,
+        upstream,
+        version,
+    })
 }
 
 /// 只要状态（内部与门禁摘要用）。
@@ -799,8 +971,11 @@ impl DraftStore {
     /// 身份 → 存储键：真实身份的全部字段 + 文件系统标识一起哈希。
     pub fn identity_key(identity: &crate::recovery::WorktreeIdentity) -> Result<String> {
         if !identity.filesystem_ids.iter().all(Option::is_some) {
-            return Err(AppError::environment(
+            return Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.theWorktreeFilesystemIdentityUnavailableBin",
                 "worktree 文件系统标识不可用，不能绑定提交草稿",
+                &[],
             ));
         }
         let mut hasher = Sha256::new();
@@ -824,31 +999,52 @@ impl DraftStore {
     }
 
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, ()>> {
-        self.lock
-            .lock()
-            .map_err(|_| AppError::internal("提交草稿锁失败"))
+        self.lock.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commit.commitDraftLockFailed",
+                "提交草稿锁失败",
+                &[],
+            )
+        })
     }
 
     fn read_file(path: &Path) -> Result<Option<CommitDraft>> {
         match std::fs::read(path) {
             Ok(bytes) => {
                 let mut draft: CommitDraft = serde_json::from_slice(&bytes).map_err(|error| {
-                    AppError::environment(format!("提交草稿损坏（{}）：{error}", path.display()))
+                    AppError::coded(
+                        ErrorKind::Environment,
+                        "errors.commit.theCommitDraftCorrupt",
+                        "提交草稿损坏（{0}）：{error}",
+                        &[
+                            ("0", format!("{:}", path.display())),
+                            ("error", format!("{}", error)),
+                        ],
+                    )
                 })?;
                 // 跳过 hooks 是本次命令的选项，永不从磁盘恢复。
                 draft.skip_hooks = false;
                 Ok(Some(draft))
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(AppError::environment(format!(
-                "读取提交草稿失败（{}）：{error}",
-                path.display()
-            ))),
+            Err(error) => Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedReadCommitDraft",
+                "读取提交草稿失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", path.display())),
+                    ("error", format!("{}", error)),
+                ],
+            )),
         }
     }
 
     /// 读取该身份的草稿；没有草稿返回 None；损坏或读取失败如实报错。
-    pub fn load(&self, identity: &crate::recovery::WorktreeIdentity) -> Result<Option<CommitDraft>> {
+    pub fn load(
+        &self,
+        identity: &crate::recovery::WorktreeIdentity,
+    ) -> Result<Option<CommitDraft>> {
         let path = self.draft_path(identity)?;
         Self::read_file(&path)
     }
@@ -895,12 +1091,20 @@ impl DraftStore {
         let path = self.draft_path(identity)?;
         let _guard = self.lock()?;
         match std::fs::remove_file(&path) {
-            Ok(()) => path.parent().map(crate::platform::sync_directory).unwrap_or(Ok(())),
+            Ok(()) => path
+                .parent()
+                .map(crate::platform::sync_directory)
+                .unwrap_or(Ok(())),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(error) => Err(AppError::environment(format!(
-                "清除提交草稿失败（{}）：{error}",
-                path.display()
-            ))),
+            Err(error) => Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedClearCommitDraft",
+                "清除提交草稿失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", path.display())),
+                    ("error", format!("{}", error)),
+                ],
+            )),
         }
     }
 
@@ -921,19 +1125,29 @@ impl DraftStore {
             return Ok(DraftClear::Absent);
         };
         // 逐字比较原文：不能用 trim 后的文本，否则「提交后再补一句」的新稿会被误删。
-        if saved.message != expected_message || saved.amend != expected_amend || saved.revision != expected_revision {
+        if saved.message != expected_message
+            || saved.amend != expected_amend
+            || saved.revision != expected_revision
+        {
             return Ok(DraftClear::Changed);
         }
         match std::fs::remove_file(&path) {
             Ok(()) => {
-                if let Some(parent) = path.parent() { crate::platform::sync_directory(parent)?; }
+                if let Some(parent) = path.parent() {
+                    crate::platform::sync_directory(parent)?;
+                }
                 Ok(DraftClear::Cleared)
-            },
+            }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(DraftClear::Absent),
-            Err(error) => Err(AppError::environment(format!(
-                "清除提交草稿失败（{}）：{error}",
-                path.display()
-            ))),
+            Err(error) => Err(AppError::coded(
+                ErrorKind::Environment,
+                "errors.commit.failedClearCommitDraft2",
+                "清除提交草稿失败（{0}）：{error}",
+                &[
+                    ("0", format!("{:}", path.display())),
+                    ("error", format!("{}", error)),
+                ],
+            )),
         }
     }
 }
@@ -969,9 +1183,9 @@ pub enum CommitRun {
         output: String,
     },
     /// 启动失败（命令尚未启动，无结果风险）。
-    SpawnFailed(String),
+    SpawnFailed(AppError),
     /// 等待退出失败（进程已启动但结果不确定；不杀进程、不重跑）。
-    Uncertain(String),
+    Uncertain(AppError),
 }
 
 /// 流式提交监听器：每收到一片可交付文本回调一次（在读取线程上执行）。
@@ -1001,17 +1215,23 @@ impl OutputTail {
         if stderr {
             if let Ok(mut tail) = self.stderr.lock() {
                 tail.push_str(text);
-                    trim_front_bytes(&mut tail, STDERR_TAIL_BYTES);
+                trim_front_bytes(&mut tail, STDERR_TAIL_BYTES);
             }
         }
     }
 
     fn text(&self) -> String {
-        self.text.lock().map(|tail| tail.clone()).unwrap_or_default()
+        self.text
+            .lock()
+            .map(|tail| tail.clone())
+            .unwrap_or_default()
     }
 
     fn stderr_text(&self) -> String {
-        self.stderr.lock().map(|tail| tail.clone()).unwrap_or_default()
+        self.stderr
+            .lock()
+            .map(|tail| tail.clone())
+            .unwrap_or_default()
     }
 
     fn byte_count(&self) -> usize {
@@ -1064,19 +1284,30 @@ fn read_stream<R: Read>(
             Ok(0) => break,
             Ok(read) => read,
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {
-                if finished.load(Ordering::Acquire) { break; }
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                if finished.load(Ordering::Acquire) {
+                    break;
+                }
                 std::thread::sleep(Duration::from_millis(10));
                 continue;
             }
             Err(error) => return Err(error),
         };
-        if draining.is_some() { drained += read; }
+        if draining.is_some() {
+            drained += read;
+        }
         pending.extend_from_slice(&chunk[..read]);
         loop {
             match std::str::from_utf8(&pending) {
                 Ok(text) => {
-                    if !text.is_empty() { deliver(text); }
+                    if !text.is_empty() {
+                        deliver(text);
+                    }
                     pending.clear();
                     break;
                 }
@@ -1100,7 +1331,9 @@ fn read_stream<R: Read>(
             }
         }
     }
-    if !pending.is_empty() { deliver(&String::from_utf8_lossy(&pending)); }
+    if !pending.is_empty() {
+        deliver(&String::from_utf8_lossy(&pending));
+    }
     Ok(())
 }
 
@@ -1147,7 +1380,17 @@ pub fn execute_commit(
     })();
     let (stdout, stdout_writer, stderr, stderr_writer) = match pipes {
         Ok(pipes) => pipes,
-        Err(error) => return CommitRun::SpawnFailed(format!("创建提交输出通道失败：{error}")),
+        Err(error) => {
+            return CommitRun::SpawnFailed(
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.commit.failedCreateCommitOutputChannel",
+                    "创建提交输出通道失败：{cause}",
+                    &[],
+                )
+                .cause(error.into()),
+            );
+        }
     };
     let tail = Arc::new(OutputTail::default());
     let finished = Arc::new(AtomicBool::new(false));
@@ -1167,11 +1410,22 @@ pub fn execute_commit(
     let mut child = match builder.spawn() {
         Ok(child) => child,
         Err(error) => {
-            return CommitRun::SpawnFailed(match error.kind() {
-                std::io::ErrorKind::NotFound => {
-                    format!("启动 git commit 失败：找不到 {}", git.program.display())
-                }
-                _ => format!("启动 git commit 失败：{error}"),
+            let not_found = error.kind() == std::io::ErrorKind::NotFound;
+            return CommitRun::SpawnFailed(if not_found {
+                AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.commit.failedStartGitCommitNotFound",
+                    "启动 git commit 失败：找不到 {program}",
+                    &[("program", git.program.display().to_string())],
+                )
+            } else {
+                AppError::coded(
+                    ErrorKind::Environment,
+                    "errors.commit.failedStartGitCommit",
+                    "启动 git commit 失败：{cause}",
+                    &[],
+                )
+                .cause(error.into())
             });
         }
     };
@@ -1183,7 +1437,7 @@ pub fn execute_commit(
     let stdin = child.stdin.take();
     let message_bytes = command.message.as_bytes().to_vec();
     let stdin_result = std::thread::spawn(move || -> std::io::Result<()> {
-        let mut pipe = stdin.ok_or_else(|| std::io::Error::other("stdin 管道不可用"))?;
+        let mut pipe = stdin.ok_or_else(|| std::io::Error::other("Git stdin pipe unavailable"))?;
         pipe.write_all(&message_bytes)?;
         pipe.flush()?;
         Ok(())
@@ -1194,7 +1448,9 @@ pub fn execute_commit(
         let sink = sink.clone();
         let tail = tail.clone();
         let finished = finished.clone();
-        readers.push(std::thread::spawn(move || read_stream(pipe, sink, tail, is_stderr, finished)));
+        readers.push(std::thread::spawn(move || {
+            read_stream(pipe, sink, tail, is_stderr, finished)
+        }));
     }
 
     // 始终持有 Child 和写门，直到真正回收进程。等待出错不是 Git 已退出的证据；
@@ -1206,10 +1462,10 @@ pub fn execute_commit(
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) => {
                 if wait_error.is_none() {
-                    let note = format!("等待 git commit 终态失败，继续保留写入保护并等待：{error}\n");
+                    let note = format!("{error}\n");
                     sink.on_output(&note, true);
                     tail.push(&note, true);
-                    wait_error = Some(error.to_string());
+                    wait_error = Some(AppError::from(error));
                 }
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
@@ -1220,15 +1476,19 @@ pub fn execute_commit(
 
     let stdin_error = match stdin_result.join() {
         Ok(Ok(())) => None,
-        Ok(Err(error)) => Some(error.to_string()),
-        Err(_) => Some("提交信息写入线程中断".into()),
+        Ok(Err(error)) => Some(AppError::from(error)),
+        Err(_) => Some(AppError::coded(ErrorKind::NeedsVerification, "errors.commit.messageWriterInterrupted", "提交信息写入线程中断", &[])),
     };
     let mut output_error = None;
     for reader in readers {
         match reader.join() {
             Ok(Ok(())) => {}
-            Ok(Err(error)) => { output_error = Some(error.to_string()); }
-            Err(_) => { output_error = Some("输出读取线程中断".to_string()); }
+            Ok(Err(error)) => {
+                output_error = Some(AppError::from(error));
+            }
+            Err(_) => {
+                output_error = Some(AppError::coded(ErrorKind::NeedsVerification, "errors.commit.outputReaderInterrupted", "输出读取线程中断", &[]));
+            }
         }
     }
 
@@ -1246,34 +1506,65 @@ pub fn execute_commit(
             .map(|value| value.as_millis() as u64)
             .unwrap_or_default(),
         program: git.program.display().to_string(),
-        args: args.iter().map(|arg| crate::git::mask_credentials(arg)).collect(),
+        args: args
+            .iter()
+            .map(|arg| crate::git::mask_credentials(arg))
+            .collect(),
         directory: git.directory.display().to_string(),
         exit_code,
         elapsed_ms: elapsed.as_millis() as u64,
         timed_out: false,
         stdout_bytes: tail.byte_count(),
-        stderr_excerpt: crate::git::mask_credentials(&tail.stderr_text().chars().take(400).collect::<String>()),
+        stderr_excerpt: crate::git::mask_credentials(
+            &tail.stderr_text().chars().take(400).collect::<String>(),
+        ),
         output: masked_output.0,
         output_truncated: masked_output.1,
     });
 
     if let Some(error) = wait_error.or(output_error) {
-        return CommitRun::Uncertain(format!("提交进程已结束，但结果记录需要核对：{error}\n{}", tail.text()));
+        return CommitRun::Uncertain(AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commit.commitEndedButResultRecordingFailed",
+            "提交进程已结束，但结果记录需要核对：{cause}\n{output}",
+            &[("output", tail.text())],
+        ).cause(error));
     }
     if status.code().is_none() {
-        return CommitRun::Uncertain(format!("git commit 非正常终止，不能确定是否已创建提交，请核对 HEAD：\n{}", tail.text()));
+        return CommitRun::Uncertain(AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.commit.gitCommitTerminatedAbnormally",
+            "git commit 非正常终止，不能确定是否已创建提交，请核对 HEAD：\n{output}",
+            &[("output", tail.text())],
+        ));
     }
     if status.success() {
         if let Some(error) = stdin_error {
-            return CommitRun::Uncertain(format!("无法确认提交信息完整写入，结果待核对：{error}\n{}", tail.text()));
+            return CommitRun::Uncertain(AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.commit.cannotConfirmCommitMessageWritten",
+                "无法确认提交信息完整写入，结果待核对：{cause}\n{output}",
+                &[("output", tail.text())],
+            ).cause(error));
         }
     }
-    CommitRun::Finished { success: status.success(), exit_code, output: tail.text() }
+    CommitRun::Finished {
+        success: status.success(),
+        exit_code,
+        output: tail.text(),
+    }
 }
 
 /// 提交后读取真实新 HEAD（成功反馈与审阅刷新用）。失败显式报错。
 pub fn read_head_after(git: &Git) -> Result<String> {
-    read_head(git)?.ok_or_else(|| AppError::git("提交后读取 HEAD 失败：Git 报告无 HEAD"))
+    read_head(git)?.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Git,
+            "errors.commit.failedReadHeadAfterCommittingGit",
+            "提交后读取 HEAD 失败：Git 报告无 HEAD",
+            &[],
+        )
+    })
 }
 
 /// 跳过 hooks 用的空目录：每次提交在 `root` 下建一个新的空目录，
@@ -1289,10 +1580,15 @@ pub fn prepare_hooks_off_dir(root: &Path) -> Result<PathBuf> {
         COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir(&directory).map_err(|error| {
-        AppError::environment(format!(
-            "无法准备跳过 hooks 的空目录（{}）：{error}",
-            directory.display()
-        ))
+        AppError::coded(
+            ErrorKind::Environment,
+            "errors.commit.failedPrepareEmptyHooksSkippingDirectory",
+            "无法准备跳过 hooks 的空目录（{0}）：{error}",
+            &[
+                ("0", format!("{:}", directory.display())),
+                ("error", format!("{}", error)),
+            ],
+        )
     })?;
     Ok(directory)
 }

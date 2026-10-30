@@ -12,23 +12,37 @@ use objc2::{Encode, MainThreadMarker, ffi, sel};
 use objc2_app_kit::{NSApplication, NSApplicationTerminateReply};
 use tauri::{Emitter, Manager};
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 
 type ExitRequest = Box<dyn Fn() -> Result<()> + Send + Sync>;
 static EXIT_REQUEST: OnceLock<ExitRequest> = OnceLock::new();
 
 pub(super) fn install(app: &tauri::AppHandle) -> Result<()> {
-    let main_thread = MainThreadMarker::new()
-        .ok_or_else(|| AppError::internal("Native exit guard requires the main thread"))?;
+    let main_thread = MainThreadMarker::new().ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.macosExit.nativeExitGuardRequiresMainThread",
+            "Native exit guard requires the main thread",
+            &[],
+        )
+    })?;
     let application = NSApplication::sharedApplication(main_thread);
-    let delegate = application
-        .delegate()
-        .ok_or_else(|| AppError::internal("Native application delegate is missing"))?;
+    let delegate = application.delegate().ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.macosExit.nativeApplicationDelegateMissing",
+            "Native application delegate is missing",
+            &[],
+        )
+    })?;
     let delegate_object: &AnyObject = (*delegate).as_ref();
     let class = delegate_object.class();
     if class.name() != c"TaoAppDelegateParent" {
-        return Err(AppError::internal(
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.macosExit.unsupportedNativeApplicationDelegate",
             "Unsupported native application delegate",
+            &[],
         ));
     }
     ensure_unclaimed(class)?;
@@ -37,14 +51,26 @@ pub(super) fn install(app: &tauri::AppHandle) -> Result<()> {
         .set(Box::new(move || {
             if let Some(window) = app.get_webview_window("main") {
                 window.emit("revia://exit-requested", ()).map_err(|error| {
-                    AppError::internal(format!("Native exit request delivery failed: {error}"))
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.macosExit.nativeExitRequestDeliveryFailed",
+                        "Native exit request delivery failed: {error}",
+                        &[("error", format!("{}", error))],
+                    )
                 })
             } else {
                 app.exit(0);
                 Ok(())
             }
         }))
-        .map_err(|_| AppError::internal("Native exit guard is already installed"))?;
+        .map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.macosExit.nativeExitGuardAlreadyInstalled",
+                "Native exit guard is already installed",
+                &[],
+            )
+        })?;
     add_termination_method(class)?;
 
     // Refresh AppKit's optional-method cache without replacing Tao's delegate.
@@ -59,8 +85,11 @@ fn ensure_unclaimed(class: &AnyClass) -> Result<()> {
         .instance_method(sel!(applicationShouldTerminate:))
         .is_some()
     {
-        return Err(AppError::internal(
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.macosExit.nativeDelegateAlreadyHandlesTerminationRevi",
             "Native delegate already handles termination; review the adapter",
+            &[],
         ));
     }
     Ok(())
@@ -68,8 +97,15 @@ fn ensure_unclaimed(class: &AnyClass) -> Result<()> {
 
 fn add_termination_method(class: &AnyClass) -> Result<()> {
     ensure_unclaimed(class)?;
-    let encoding = CString::new(format!("{}@:@", NSApplicationTerminateReply::ENCODING))
-        .map_err(|_| AppError::internal("Invalid native termination encoding"))?;
+    let encoding =
+        CString::new(format!("{}@:@", NSApplicationTerminateReply::ENCODING)).map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.macosExit.invalidNativeTerminationEncoding",
+                "Invalid native termination encoding",
+                &[],
+            )
+        })?;
     let callback: unsafe extern "C-unwind" fn(
         &AnyObject,
         Sel,
@@ -87,8 +123,11 @@ fn add_termination_method(class: &AnyClass) -> Result<()> {
         )
     };
     if !added.as_bool() {
-        return Err(AppError::internal(
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.macosExit.cannotInstallNativeTerminationGuard",
             "Cannot install native termination guard",
+            &[],
         ));
     }
     Ok(())
@@ -117,9 +156,14 @@ unsafe extern "C-unwind" fn application_should_terminate(
     _sender: *mut AnyObject,
 ) -> NSApplicationTerminateReply {
     cancel_and_forward(|| {
-        EXIT_REQUEST
-            .get()
-            .ok_or_else(|| AppError::internal("Native exit handler is unavailable"))?()
+        EXIT_REQUEST.get().ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.macosExit.nativeExitHandlerUnavailable",
+                "Native exit handler is unavailable",
+                &[],
+            )
+        })?()
     })
 }
 
@@ -141,7 +185,12 @@ mod tests {
         assert_eq!(calls.get(), 1);
         assert_eq!(reply, NSApplicationTerminateReply::TerminateCancel);
         assert_eq!(
-            cancel_and_forward(|| Err(AppError::internal("fixture delivery failure"))),
+            cancel_and_forward(|| Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.macosExit.fixtureDeliveryFailure",
+                "fixture delivery failure",
+                &[]
+            ))),
             reply
         );
         assert_eq!(

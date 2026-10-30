@@ -20,7 +20,8 @@ import type { RenderRow } from "@/types/bindings/RenderRow";
 import type { RowCell } from "@/types/bindings/RowCell";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
+import { formatAppError } from "@/lib/error";
+import { getLocale, messages, type Locale } from "@/lib/i18n/index";
 import { codeFontStack } from "@/lib/theme";
 import { Codicon } from "@/components/ui/codicon";
 import { logToBackend } from "./log";
@@ -100,6 +101,7 @@ type DiffViewProps = DiffViewBaseProps & ({
 });
 
 export function DiffView(props: DiffViewProps) {
+  const locale = getLocale();
   const { worktreeId, entry, view, fontSize, fontFamily, rows, highlights, handleRef, onSample, isWriting, onHunkAction, onHunkDiscard } = props;
   const displayPath = props.history ? props.history.path : props.entry.path;
   const sourceKey = props.history ? props.history.key : `${props.entry.changes}/${props.entry.path}`;
@@ -212,8 +214,10 @@ export function DiffView(props: DiffViewProps) {
   // 组件卸载时清理所有定时器与 rAF
   useEffect(() => {
     const element = viewportRef.current;
+    // x18n-ignore
     logToBackend(`DiffView 已挂载：${displayPath}/${view} clientHeight=${element?.clientHeight}`);
     return () => {
+      // x18n-ignore
       logToBackend(`DiffView 卸载：${displayPath}/${view}`);
       cancelJumpRestore();
       if (idleTimer.current != null) {
@@ -519,6 +523,7 @@ export function DiffView(props: DiffViewProps) {
           return row ? (
             <RowView
               key={index}
+              locale={locale}
               index={index}
               row={row}
               top={heights.top(index)}
@@ -543,7 +548,7 @@ export function DiffView(props: DiffViewProps) {
       </div>
       {rowSnapshot.error ? (
         <div role="status" className="absolute inset-x-0 top-0 bg-background/95 px-3 py-2 font-sans text-xs text-destructive">
-          {rowSnapshot.error}
+          {formatAppError(rowSnapshot.error)}
         </div>
       ) : null}
       <div ref={trackRef} className="diff-scrollbar" onPointerDown={onTrackPointerDown}>
@@ -582,6 +587,8 @@ const RowView = memo(function RowView({
   hunkDisabled,
   segmentDisabled,
 }: {
+  /** Invalidate memoized labels while retaining cached rows and scroll state. */
+  locale: Locale;
   index: number;
   row: RenderRow;
   top: number;

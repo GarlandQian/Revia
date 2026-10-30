@@ -21,15 +21,16 @@ syntect = "5.3"
 two-face = { version = "0.5", features = ["syntect-default-onig"] }
 sha2 = "0.11"
 wait-timeout = "0.2"
+tempfile = "3"
 notify = "8"
 ts-rs = { version = "12", features = ["serde-compat", "no-serde-warnings"] }
+# ADR-0014: refs/stash deletion only; transport features stay disabled.
+git2 = { version = "=0.21.0", default-features = false, features = ["vendored-libgit2"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSLocale", "NSArray", "NSString"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder"] }
-
-[dev-dependencies]
-tempfile = "3"
 
 # 只构建 Apple Silicon（Q44）
 [profile.release]

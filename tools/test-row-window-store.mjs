@@ -23,7 +23,8 @@ const imports = registerHooks({
 });
 const { RowWindowStore } = await import("../src/features/diff/rowWindowStore.ts");
 const { matchesHunkAction, segmentActionDisabled } = await import("../src/features/diff/hunkAction.ts");
-const { messages } = await import("../src/lib/i18n/zh-CN.ts");
+const { formatAppError } = await import("../src/lib/error.ts");
+const { messages } = await import("../src/lib/i18n/index.ts");
 const { isLoggingEnabled } = await import("../src/features/diff/log.ts");
 imports.deregister();
 assert.equal(isLoggingEnabled(), false, "The default-disabled logger must not invoke Tauri");
@@ -220,7 +221,7 @@ for (const requestKind of ["slice", "chunk"]) {
 
       assert.equal(rowReads, 0, "Version validation must precede reading the row payload");
       assert.equal(f.store.getSnapshot().stale, true);
-      assert.equal(f.store.getSnapshot().error, messages.changes.fileChanged);
+      assert.equal(formatAppError(f.store.getSnapshot().error), messages.changes.fileChanged);
       assert.equal(f.store.getSnapshot().loadedChunks, 0);
       assert.equal(f.store.getSnapshot().pendingChunks, 0);
       assert.equal(f.store.getRow(0), null);
@@ -299,7 +300,7 @@ for (const requestKind of ["slice", "chunk"]) {
     old[requestKind].reject({ kind: "rejected", message: "No change content exists for this file" });
     await nextTurn();
     assert.equal(f.store.getSnapshot().stale, true);
-    assert.equal(f.store.getSnapshot().error, messages.changes.fileChanged);
+    assert.equal(formatAppError(f.store.getSnapshot().error), messages.changes.fileChanged);
     const issued = f.calls.length;
     for (let index = 0; index < 100; index += 1) {
       f.store.setTarget({ ...f.target }, ROW_COUNT, f.entry);
@@ -322,7 +323,7 @@ for (const requestKind of ["slice", "chunk"]) {
   });
 }
 
-test("a legacy fileChanged rejection string also disables the target", async () => {
+test("unstructured rejection strings conservatively disable the target", async () => {
   const f = fixture();
   const requested = requestWindow(f);
   requested.slice.reject(messages.changes.fileChanged);

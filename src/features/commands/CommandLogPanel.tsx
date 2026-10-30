@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CommandRecordPayload } from "@/lib/ipc";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
+import { getLocale, messages } from "@/lib/i18n/index";
 import { Codicon } from "@/components/ui/codicon";
 
 /** 面板打开时的刷新间隔（毫秒）。 */
@@ -66,7 +66,7 @@ export function CommandLogPanel({
   /** 单条命令的完整文本（复制用）。 */
   const recordText = (record: CommandRecordPayload): string =>
     [
-      `#${record.sequence} ${new Date(record.startedAtMs).toLocaleString()}`,
+      `#${record.sequence} ${new Date(record.startedAtMs).toLocaleString(getLocale())}`,
       `${record.program} ${record.args.join(" ")}`,
       `exit=${record.exitCode} time=${record.elapsedMs}ms${record.timedOut ? " (timeout)" : ""}`,
       record.directory,
@@ -117,7 +117,7 @@ export function CommandLogPanel({
                   <Codicon name={record.exitCode === 0 ? "pass" : record.timedOut ? "watch" : "error"} size={11} />
                 </span>
                 <span className="w-[54px] shrink-0 text-descriptionforeground tabular-nums">
-                  {new Date(record.startedAtMs).toLocaleTimeString()}
+                  {new Date(record.startedAtMs).toLocaleTimeString(getLocale())}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
                   {record.args.join(" ")}

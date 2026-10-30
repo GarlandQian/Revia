@@ -14,18 +14,18 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::branch;
 use crate::git::history::{self as gh, is_full_oid};
 use crate::git::status::{ChangesKind, StatusEntry};
 use crate::git::{Git, NETWORK_TIMEOUT};
 use crate::operation::{OperationKind, OperationState};
 use crate::recovery::{
-    self, capture_files, DiscardOutcome, RecoverySource, RecoveryStore, WorktreeIdentity,
+    self, DiscardOutcome, RecoverySource, RecoveryStore, WorktreeIdentity, capture_files,
 };
 use crate::session::WorktreeSession;
 pub use crate::settings::UpdateMode;
-use crate::settings::{matches_protected, FetchTagMode};
+use crate::settings::{FetchTagMode, matches_protected};
 
 /// merge 的 `--autostash` 需要 Git 2.27（更早的版本只支持 rebase 的 autostash）。
 pub const MERGE_AUTOSTASH_MIN: (u32, u32) = (2, 27);
@@ -96,7 +96,17 @@ pub struct CheckoutOutcome {
     /// 恢复 stash 后的冲突文件。
     pub conflicts: Vec<String>,
     /// 给用户看的说明（例如「已新建并跟踪 origin/main」）。
-    pub notes: Vec<String>,
+    pub notes: Vec<CheckoutNote>,
+}
+
+/// Machine-readable checkout notes; translate only when presented.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum CheckoutNote {
+    ExistingTracking { remote: String, branch: String },
+    CreatedTracking { remote: String, branch: String },
+    StashRestoreConflicted,
 }
 
 /// 新建分支的起点（B02：三种入口）。
@@ -254,7 +264,7 @@ pub struct PushPreview {
     pub truncated: bool,
     /// 是否允许强制推送；不允许时给出原因。
     pub force_allowed: bool,
-    pub force_reason: Option<String>,
+    pub force_reason: Option<crate::error::AppErrorPayload>,
     /// 当前分支是否是受保护分支。
     pub protected: bool,
 }
@@ -312,14 +322,23 @@ pub struct RemoteCheck {
 
 // ---------- 实现 ----------
 
-fn run_network(git: &Git, args: &[&str], what: &str, timeout: Duration) -> Result<crate::git::GitOutput> {
+fn run_network(
+    git: &Git,
+    args: &[&str],
+    _what: &str,
+    timeout: Duration,
+) -> Result<crate::git::GitOutput> {
     let output = git.run_network(args, timeout)?;
-    if output.timed_out {
+    if output.timed_out || output.exit_code < 0 {
         // 超时不是普通失败：结果无法确定，按待核对处理（Q96），不自动重试。
-        return Err(AppError::needs_verification(format!(
-            "{what}超时（{} 秒），结果待核对：请核对引用与工作区真实状态后再继续",
-            timeout.as_secs()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.remoteOps.timedOutSecondsResultNeedsVerification",
+            "Git 网络操作超时（{0} 秒），结果待核对：请核对引用与工作区真实状态后再继续",
+            &[
+                ("0", format!("{:}", timeout.as_secs())),
+            ],
+        ));
     }
     Ok(output)
 }
@@ -346,20 +365,26 @@ fn network_allow_failure(
 }
 
 fn non_network(git: &Git, args: &[&str], what: &str) -> Result<crate::git::GitOutput> {
-    let output = git.run(args)?;
-    if output.timed_out {
-        return Err(AppError::needs_verification(format!(
-            "{what}超时，结果待核对：请核对引用与工作区真实状态后再继续"
-        )));
+    let output = git.run_write(args)?;
+    if output.timed_out || output.exit_code < 0 {
+        return Err(AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.remoteOps.timedOutResultNeedsVerificationCheck",
+            "Git 操作超时，结果待核对：请核对引用与工作区真实状态后再继续",
+            &[],
+        ));
     }
     output.into_success(what)
 }
 
 fn non_network_allow_failure(git: &Git, args: &[&str]) -> Result<crate::git::GitOutput> {
-    let output = git.run(args)?;
-    if output.timed_out {
-        return Err(AppError::needs_verification(
+    let output = git.run_write(args)?;
+    if output.timed_out || output.exit_code < 0 {
+        return Err(AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.remoteOps.theGitCommandTimedOutResult",
             "Git 命令超时，结果待核对：请核对引用与工作区真实状态后再继续",
+            &[],
         ));
     }
     Ok(output)
@@ -470,7 +495,10 @@ fn finish_recovery(
     let _ = store.finish(&record.0, &DiscardOutcome::Completed { after });
 }
 
-fn abandon_recovery(store: &RecoveryStore, record: &(recovery::RecoveryRecord, recovery::RecordUse)) {
+fn abandon_recovery(
+    store: &RecoveryStore,
+    record: &(recovery::RecoveryRecord, recovery::RecordUse),
+) {
     let _ = store.finish(&record.0, &DiscardOutcome::NotApplied);
 }
 
@@ -480,14 +508,19 @@ struct CheckoutPlan {
     /// 传给 `git checkout` 的起点（本地分支名 / `-b` 的起点）。
     checkout_args: Vec<String>,
     commit: String,
-    notes: Vec<String>,
+    notes: Vec<CheckoutNote>,
 }
 
 fn plan_checkout(git: &Git, target: &CheckoutTarget) -> Result<CheckoutPlan> {
     match target {
         CheckoutTarget::Local { name } => {
             if name.trim().is_empty() {
-                return Err(AppError::rejected("分支名不能为空"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.remoteOps.theBranchNameEmpty",
+                    "分支名不能为空",
+                    &[],
+                ));
             }
             let full = format!("refs/heads/{name}");
             let refs = gh::list_refs(git)?;
@@ -495,7 +528,14 @@ fn plan_checkout(git: &Git, target: &CheckoutTarget) -> Result<CheckoutPlan> {
                 .iter()
                 .find(|(full_name, _, _)| full_name == &full)
                 .map(|(_, _, commit)| commit.clone())
-                .ok_or_else(|| AppError::rejected(format!("本地分支不存在：{name}")))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.remoteOps.theLocalBranchDoesExist",
+                        "本地分支不存在：{name}",
+                        &[("name", format!("{}", name))],
+                    )
+                })?;
             Ok(CheckoutPlan {
                 branch: name.clone(),
                 checkout_args: vec![name.clone()],
@@ -503,16 +543,32 @@ fn plan_checkout(git: &Git, target: &CheckoutTarget) -> Result<CheckoutPlan> {
                 notes: Vec::new(),
             })
         }
-        CheckoutTarget::Remote { remote, branch: name } => {
+        CheckoutTarget::Remote {
+            remote,
+            branch: name,
+        } => {
             let remote_ref = format!("refs/remotes/{remote}/{name}");
             let refs = gh::list_refs(git)?;
             let commit = refs
                 .iter()
                 .find(|(full_name, _, _)| full_name == &remote_ref)
                 .map(|(_, _, commit)| commit.clone())
-                .ok_or_else(|| AppError::rejected(format!("远端分支不存在：{remote}/{name}")))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.remoteOps.theRemoteBranchDoesExist",
+                        "远端分支不存在：{remote}/{name}",
+                        &[
+                            ("remote", format!("{}", remote)),
+                            ("name", format!("{}", name)),
+                        ],
+                    )
+                })?;
             let local_ref = format!("refs/heads/{name}");
-            if let Some((_, _, _)) = refs.iter().find(|(full_name, _, _)| full_name == &local_ref) {
+            if let Some((_, _, _)) = refs
+                .iter()
+                .find(|(full_name, _, _)| full_name == &local_ref)
+            {
                 // 已有同名本地分支：跟踪它就直接用它，不跟踪就要求改名（不覆盖）。
                 let tracking = gh::upstream_of(git, name)?;
                 if tracking.as_deref() == Some(remote_ref.as_str()) {
@@ -520,12 +576,19 @@ fn plan_checkout(git: &Git, target: &CheckoutTarget) -> Result<CheckoutPlan> {
                         branch: name.clone(),
                         checkout_args: vec![name.clone()],
                         commit,
-                        notes: vec![format!("已检出跟踪 {remote}/{name} 的本地分支 {name}")],
+                        notes: vec![CheckoutNote::ExistingTracking { remote: remote.clone(), branch: name.clone() }],
                     });
                 }
-                return Err(AppError::rejected(format!(
-                    "本地分支 {name} 已存在但不跟踪 {remote}/{name}；请为新分支改名后重试"
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.remoteOps.localBranchExistsButDoesTrack",
+                    "本地分支 {name} 已存在但不跟踪 {remote}/{name}；请为新分支改名后重试",
+                    &[
+                        ("name", format!("{}", name)),
+                        ("remote", format!("{}", remote)),
+                        ("name", format!("{}", name)),
+                    ],
+                ));
             }
             Ok(CheckoutPlan {
                 branch: name.clone(),
@@ -536,14 +599,18 @@ fn plan_checkout(git: &Git, target: &CheckoutTarget) -> Result<CheckoutPlan> {
                     format!("{remote}/{name}"),
                 ],
                 commit,
-                notes: vec![format!("已从 {remote}/{name} 新建本地分支 {name} 并跟踪它")],
+                notes: vec![CheckoutNote::CreatedTracking { remote: remote.clone(), branch: name.clone() }],
             })
         }
     }
 }
 
 /// 检出会被覆盖或丢弃的本地文件。
-fn overwrite_targets(git: &Git, plan: &CheckoutPlan, entries: &[StatusEntry]) -> Result<Vec<String>> {
+fn overwrite_targets(
+    git: &Git,
+    plan: &CheckoutPlan,
+    entries: &[StatusEntry],
+) -> Result<Vec<String>> {
     let head = gh::head_commit(git)?;
     let differing = match head {
         Some(head) => changed_between(git, &head, &plan.commit)?,
@@ -566,11 +633,17 @@ pub fn checkout(
     store: &RecoveryStore,
     target: &CheckoutTarget,
     strategy: CheckoutStrategy,
+    archive_store: &crate::stash_archive::StashArchiveStore,
 ) -> Result<CheckoutResult> {
     let _write = session.acquire_write_lock()?;
     let git = &session.git;
     if operation_state(git).is_some() {
-        return Err(AppError::rejected("有进行中的操作，请先完成或中止后再检出"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.anOperationProgressFinishAbortBefore",
+            "有进行中的操作，请先完成或中止后再检出",
+            &[],
+        ));
     }
     let plan = plan_checkout(git, target)?;
     let entries = dirty_paths(git)?;
@@ -594,56 +667,132 @@ pub fn checkout(
     let mut notes = plan.notes.clone();
 
     if strategy == CheckoutStrategy::Smart {
-        // 智能检出：先存回收区，再 stash 本地改动，检出后恢复 stash。
-        let paths: Vec<String> = if files.is_empty() { unreliable_scope(&entries) } else { files.clone() };
-        let record = save_recovery(session, store, source, &label, &paths, &identity)?;
-        recovery_record_id = record.as_ref().map(|(record, _)| record.id.clone());
-        let stash_args = ["stash", "push", "--include-untracked", "-m", "Revia 智能检出"];
-        let stash_output = non_network(git, &stash_args, "暂存本地改动")?;
-        let no_changes = stash_output.stdout_lossy().contains("No local changes");
-        // `--` 明确「后面没有路径」：否则与分支同名的文件会被当成 pathspec。
-        let checkout_args: Vec<&str> = std::iter::once("checkout")
-            .chain(plan.checkout_args.iter().map(String::as_str))
-            .chain(std::iter::once("--"))
-            .collect();
-        let checkout_output = non_network(git, &checkout_args, "检出分支");
-        let checkout_output = match checkout_output {
-            Ok(output) => output,
-            Err(error) => {
-                // 检出失败：尽量把 stash 恢复回工作区，保留回收记录并如实报错。
-                if !no_changes {
-                    let _ = git.run(&["stash", "pop"]);
-                }
-                if let Some(record) = &record {
-                    abandon_recovery(store, record);
-                }
-                return Err(error);
-            }
+        // Coordinate every Revia stash producer/consumer. Terminal writers do
+        // not take this lock, so restoration and deletion still use exact OIDs.
+        let _stash = crate::stash::lock_guard();
+        let entries = dirty_paths(git)?;
+        let paths = crate::write_guard::paths(git, &[&plan.commit])?;
+        let saved_paths: Vec<_> = entries.iter().flat_map(|entry|
+            std::iter::once(entry.path.clone()).chain(entry.original_path.iter().cloned())).collect();
+        let untouched_paths: Vec<_> = paths.iter().filter(|path| !saved_paths.contains(path)).cloned().collect();
+        let untouched_before = capture_files(&session.path, &untouched_paths)?;
+        let start_context = crate::write_guard::context(git)?;
+        let start_head = gh::head_commit(git)?;
+        let checkout_paths = match &start_head {
+            Some(head) => changed_between(git, head, &plan.commit)?,
+            None => Vec::new(),
         };
-        if !no_changes {
-            let pop = non_network_allow_failure(git, &["stash", "pop"])?;
-            if pop.exit_code != 0 {
-                stash_kept = true;
-                stash_restored = false;
+        let expected = crate::write_guard::fingerprint(git, &paths)?;
+        let record = crate::write_guard::protect(session, store, source, &label, &paths)?;
+        crate::write_guard::require(git, &paths, &expected)?;
+        recovery_record_id = record.as_ref().map(|record| record.id.clone());
+        let mut saved_oid = None;
+        let result = (|| -> Result<CheckoutResult> {
+            let before = crate::stash::list(git)?;
+            // Recompute the path set too: stash -u must not pick up a newly
+            // arrived, previously unconfirmed untracked path.
+            crate::write_guard::require(git, &crate::write_guard::paths(git, &[&plan.commit])?, &expected)?;
+            if !entries.is_empty() {
+                let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default().as_nanos();
+                let message = format!("Revia Smart Checkout {}-{nonce}", std::process::id());
+                non_network(git, &["stash", "push", "--include-untracked", "--message", &message], "暂存本地改动")?;
+                let mut saved: Vec<_> = crate::stash::list(git)?.into_iter()
+                    .filter(|entry| entry.message.ends_with(&message)
+                        && !before.iter().any(|old| old.oid == entry.oid)).collect();
+                if saved.len() != 1 { return Err(crate::write_guard::stale()); }
+                saved_oid = Some(saved.remove(0).oid);
+            }
+            // Only the known dirty paths were allowed to change during save.
+            // Sample the next fingerprint before validating that baseline so
+            // an intervening edit cannot be silently accepted by a new sample.
+            let switch_state = crate::write_guard::fingerprint(git, &paths)?;
+            if capture_files(&session.path, &untouched_paths)? != untouched_before
+                || !dirty_paths(git)?.is_empty() {
+                return Err(crate::write_guard::stale());
+            }
+            let before_switch = capture_files(&session.path, &paths)?;
+            session.require_identity()?;
+            if crate::write_guard::context(git)? != start_context || gh::head_commit(git)? != start_head
+                || plan_checkout(git, target)?.commit != plan.commit {
+                return Err(crate::write_guard::stale());
+            }
+            let checkout_args: Vec<&str> = std::iter::once("checkout")
+                .chain(plan.checkout_args.iter().map(String::as_str))
+                .chain(std::iter::once("--")).collect();
+            crate::write_guard::require(git, &paths, &switch_state)?;
+            non_network(git, &checkout_args, "检出分支")?;
+            let branch = git.run_ok(&["symbolic-ref", "--quiet", "HEAD"], "核对检出分支")?;
+            if branch.stdout_lossy().trim() != format!("refs/heads/{}", plan.branch)
+                || gh::head_commit(git)?.as_deref() != Some(&plan.commit) {
+                return Err(crate::write_guard::stale());
+            }
+            if let Some(oid) = &saved_oid {
+                if !crate::stash::list(git)?.iter().any(|entry| &entry.oid == oid) {
+                    return Err(crate::write_guard::stale());
+                }
+                // The target branch and hooks may have introduced files since
+                // saving. Snapshot those actual restore paths before apply.
+                let restore_paths = crate::stash::apply_paths(git, oid)?;
+                let expected = crate::write_guard::fingerprint(git, &restore_paths)?;
+                // Checkout may change its tree-diff paths, but must not grant
+                // permission to restore over files that arrived elsewhere.
+                let after_switch = capture_files(&session.path, &paths)?;
+                let tracked = git.run_ok(&["ls-files", "-z"], "核对检出后的文件集合")?;
+                let tracked: Vec<_> = tracked.stdout.split(|byte| *byte == 0).collect();
+                if before_switch.iter().zip(&after_switch).any(|(before, after)|
+                    !checkout_paths.contains(&before.path) && before != after)
+                    || after_switch.iter().any(|file| file.content.is_some() && checkout_paths.contains(&file.path)
+                        && !tracked.contains(&file.path.as_bytes()))
+                    || !dirty_paths(git)?.is_empty() {
+                    return Err(crate::write_guard::stale());
+                }
+                let restore_record = crate::write_guard::protect(session, store,
+                    RecoverySource::CheckoutSmart, "smart checkout restore", &restore_paths)?;
+                crate::write_guard::require(git, &restore_paths, &expected)?;
+                let applied = non_network_allow_failure(git, &["stash", "apply", oid]);
+                if let Some(record) = &restore_record { store.finish_snapshot(record)?; }
+                let applied = applied?;
                 conflicts = unmerged_paths(git)?;
-                notes.push("恢复本地改动时发生冲突：Git 保留了 stash 条目，请解决冲突后手动丢弃它".into());
+                stash_restored = applied.exit_code == 0 && conflicts.is_empty();
+                stash_kept = true;
+                if !conflicts.is_empty() {
+                    notes.push(CheckoutNote::StashRestoreConflicted);
+                } else if applied.exit_code != 0 {
+                    return Err(applied.into_success("恢复智能检出改动").unwrap_err());
+                } else {
+                    // Apply never deletes. Only archive + locked exact deletion
+                    // may remove the stash saved by this checkout.
+                    match crate::stash::drop_locked(session, archive_store, oid) {
+                        Ok(outcome) => stash_kept = !outcome.deleted,
+                        Err(error) => return Err(AppError::coded(ErrorKind::NeedsVerification,
+                            "errors.remoteOps.checkoutRestoredCleanupFailed",
+                            "已检出分支 {branch} 并恢复本地改动，但 stash {oid} 未确认清理：{cause}",
+                            &[("branch", plan.branch.clone()), ("oid", oid.clone())]).cause(error)),
+                    }
+                }
+            }
+            Ok(CheckoutResult::Done(CheckoutOutcome {
+                branch: plan.branch.clone(), strategy, commit: head_commit_or(git, &plan.commit)?,
+                recovery_record_id: recovery_record_id.clone(), stash_restored, stash_kept,
+                conflicts: conflicts.clone(), notes: notes.clone(),
+            }))
+        })();
+        let receipt = record.as_ref().map(|record| store.finish_snapshot(record)).transpose();
+        match (result, receipt) {
+            (Ok(outcome), Ok(_)) => return Ok(outcome),
+            (result, receipt) => {
+                let error = match (result, receipt) {
+                    (Err(error), Err(receipt)) => error.related(&receipt),
+                    (Err(error), _) | (_, Err(error)) => error,
+                    _ => unreachable!(),
+                };
+                return Err(AppError::coded(ErrorKind::NeedsVerification,
+                    "errors.remoteOps.smartCheckoutIncomplete",
+                    "智能检出已开始，结果待核对；本次 stash：{oid}。请核对分支与工作区，避免重复执行：{cause}",
+                    &[("oid", saved_oid.unwrap_or_default())]).cause(error));
             }
         }
-        if let Some(record) = &record {
-            finish_recovery(session, store, record, &paths);
-        }
-        let commit = head_commit_or(git, &plan.commit)?;
-        let _ = checkout_output;
-        return Ok(CheckoutResult::Done(CheckoutOutcome {
-            branch: plan.branch,
-            strategy,
-            commit,
-            recovery_record_id,
-            stash_restored,
-            stash_kept,
-            conflicts,
-            notes,
-        }));
     }
 
     // 直接检出 / 强制检出：都会被 Git 的工作区覆盖检查兜底。
@@ -687,7 +836,10 @@ pub fn checkout(
         stash_restored,
         stash_kept,
         conflicts,
-        notes: { let _ = output; notes },
+        notes: {
+            let _ = output;
+            notes
+        },
     }))
 }
 
@@ -705,17 +857,35 @@ pub fn create_branch(
     let name = request.name.trim();
     branch::validate_branch_name(git, name)?;
     if branch::branch_exists(git, name)? {
-        return Err(AppError::rejected(format!("分支已存在：{name}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.theBranchAlreadyExists",
+            "分支已存在：{name}",
+            &[("name", format!("{}", name))],
+        ));
     }
     let start = match &request.start {
-        BranchStart::Head => gh::head_commit(git)?
-            .ok_or_else(|| AppError::rejected("仓库还没有提交，无法新建分支"))?,
+        BranchStart::Head => gh::head_commit(git)?.ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.remoteOps.theRepositoryNoCommitsYetCreate",
+                "仓库还没有提交，无法新建分支",
+                &[],
+            )
+        })?,
         BranchStart::Ref { full_name } => {
             let refs = gh::list_refs(git)?;
             refs.iter()
                 .find(|(candidate, _, _)| candidate == full_name)
                 .map(|(_, _, commit)| commit.clone())
-                .ok_or_else(|| AppError::rejected(format!("起点引用不存在或不是提交：{full_name}")))?
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.remoteOps.theStartReferenceDoesExistCommit",
+                        "起点引用不存在或不是提交：{full_name}",
+                        &[("full_name", format!("{}", full_name))],
+                    )
+                })?
         }
         BranchStart::Commit { oid } => gh::verify_commit_oid(git, oid)?,
     };
@@ -741,7 +911,12 @@ pub fn fetch(
     let git = &session.git;
     let remotes = read_remotes(git)?;
     if remotes.is_empty() {
-        return Err(AppError::rejected("这个仓库没有配置任何远端"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.thisRepositoryNoRemotesConfigured",
+            "这个仓库没有配置任何远端",
+            &[],
+        ));
     }
     let mut outputs = Vec::new();
     for remote in &remotes {
@@ -778,11 +953,23 @@ fn upstream_details(git: &Git, branch: &str) -> Result<Option<(String, String, S
     };
     let short = full
         .strip_prefix("refs/remotes/")
-        .ok_or_else(|| AppError::rejected(format!("上游不是远端分支：{full}")))?
+        .ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.remoteOps.theUpstreamRemoteBranch",
+                "上游不是远端分支：{full}",
+                &[("full", format!("{}", full))],
+            )
+        })?
         .to_string();
-    let (remote, name) = short
-        .split_once('/')
-        .ok_or_else(|| AppError::rejected(format!("无法解析上游分支名：{full}")))?;
+    let (remote, name) = short.split_once('/').ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.cannotParseUpstreamBranchName",
+            "无法解析上游分支名：{full}",
+            &[("full", format!("{}", full))],
+        )
+    })?;
     Ok(Some((full, remote.to_string(), name.to_string())))
 }
 
@@ -797,18 +984,28 @@ pub fn update(
     let _write = session.acquire_write_lock()?;
     let git = &session.git;
     if let Some(state) = operation_state(git) {
-        return Err(AppError::rejected(format!(
-            "有进行中的操作（{}），请先完成或中止后再更新",
-            state.kind.label()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.anOperationProgressFinishAbortBefore2",
+            "有进行中的操作（{0}），请先完成或中止后再更新",
+            &[("0", format!("{:}", state.kind.label()))],
+        ));
     }
     let Some(branch_name) = git.current_branch() else {
-        return Err(AppError::rejected("游离 HEAD 没有上游分支，不能更新"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.aDetachedHeadNoUpstreamBranch",
+            "游离 HEAD 没有上游分支，不能更新",
+            &[],
+        ));
     };
     let Some((upstream, remote, _remote_branch)) = upstream_details(git, &branch_name)? else {
-        return Err(AppError::rejected(format!(
-            "分支 {branch_name} 没有配置上游，不能更新"
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.branchNoUpstreamConfiguredUpdate",
+            "分支 {branch_name} 没有配置上游，不能更新",
+            &[("branch_name", format!("{}", branch_name))],
+        ));
     };
     let resolved = match mode {
         UpdateMode::Merge => UpdateResolvedMode::Merge,
@@ -821,10 +1018,22 @@ pub fn update(
     let fetch_refs: Vec<&str> = fetch_args.iter().map(String::as_str).collect();
     network_expect(git, &fetch_refs, &format!("从 {remote} fetch"), timeout)?;
 
-    let upstream_commit = resolve_ref(git, &upstream)?
-        .ok_or_else(|| AppError::rejected(format!("上游引用不存在：{upstream}")))?;
-    let head = gh::head_commit(git)?
-        .ok_or_else(|| AppError::rejected("仓库还没有提交，不能更新"))?;
+    let upstream_commit = resolve_ref(git, &upstream)?.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.theUpstreamReferenceDoesExist",
+            "上游引用不存在：{upstream}",
+            &[("upstream", format!("{}", upstream))],
+        )
+    })?;
+    let head = gh::head_commit(git)?.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.theRepositoryNoCommitsYetUpdate",
+            "仓库还没有提交，不能更新",
+            &[],
+        )
+    })?;
     if head == upstream_commit {
         return Ok(UpdateOutcome {
             mode: resolved,
@@ -848,9 +1057,12 @@ pub fn update(
         let version = git.version()?;
         let parsed = crate::git::parse_version(&version).unwrap_or((0, 0));
         if resolved == UpdateResolvedMode::Merge && parsed < MERGE_AUTOSTASH_MIN {
-            return Err(AppError::rejected(format!(
-                "当前 Git（{version}）不支持 merge 的 autostash；请先提交或丢弃本地改动再更新"
-            )));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.remoteOps.theCurrentGitDoesSupportMerge",
+                "当前 Git（{version}）不支持 merge 的 autostash；请先提交或丢弃本地改动再更新",
+                &[("version", format!("{}", version))],
+            ));
         }
         // 有未提交改动：先把已跟踪文件的改动存入回收区，再带 autostash 执行。
         let saved = save_recovery(
@@ -884,6 +1096,7 @@ pub fn update(
     if dirty.is_empty() {
         args.retain(|arg| arg != "--autostash");
     }
+    let _stash = if dirty.is_empty() { None } else { Some(crate::stash::lock_guard()) };
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();
     let output = non_network_allow_failure(git, &refs)?;
     let combined = format!("{}{}", output.stdout_lossy(), output.stderr);
@@ -927,7 +1140,9 @@ pub fn update(
 }
 
 fn latest_stash(git: &Git) -> Option<String> {
-    let output = git.run(&["stash", "list", "--format=%gd", "-n", "1"]).ok()?;
+    let output = git
+        .run(&["stash", "list", "--format=%gd", "-n", "1"])
+        .ok()?;
     if output.exit_code != 0 {
         return None;
     }
@@ -963,11 +1178,21 @@ fn count_range(git: &Git, head: &str, upstream: &str) -> Result<u32> {
 pub fn push_preview(session: &WorktreeSession, protected: &[String]) -> Result<PushPreview> {
     let git = &session.git;
     let Some(branch_name) = git.current_branch() else {
-        return Err(AppError::rejected("游离 HEAD 没有可推送的分支"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.aDetachedHeadNoBranchPush",
+            "游离 HEAD 没有可推送的分支",
+            &[],
+        ));
     };
     let remotes = read_remotes(git)?;
     if remotes.is_empty() {
-        return Err(AppError::rejected("这个仓库没有配置任何远端"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.thisRepositoryNoRemotesConfigured2",
+            "这个仓库没有配置任何远端",
+            &[],
+        ));
     }
     let upstream = upstream_details(git, &branch_name)?;
     let has_upstream = upstream.is_some();
@@ -1017,7 +1242,13 @@ pub fn push_preview(session: &WorktreeSession, protected: &[String]) -> Result<P
         branch_name.clone()
     };
     let force_reason = (protected_branch || protected_target).then(|| {
-        format!("{protected_name} 是受保护分支，不能强制推送")
+        crate::error::AppError::coded(
+            crate::error::ErrorKind::Rejected,
+            "errors.remoteOps.protectedBranchForce",
+            "{branch} 是受保护分支，不能强制推送",
+            &[("branch", protected_name.clone())],
+        )
+        .payload()
     });
     Ok(PushPreview {
         branch: branch_name,
@@ -1047,7 +1278,12 @@ pub fn push(
     let _write = session.acquire_write_lock()?;
     let git = &session.git;
     let Some(branch_name) = git.current_branch() else {
-        return Err(AppError::rejected("游离 HEAD 没有可推送的分支"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.aDetachedHeadNoBranchPush2",
+            "游离 HEAD 没有可推送的分支",
+            &[],
+        ));
     };
     let remotes = read_remotes(git)?;
     let upstream = upstream_details(git, &branch_name)?;
@@ -1063,7 +1299,12 @@ pub fn push(
             }
         });
     if remote.is_empty() || !remotes.iter().any(|name| name == &remote) {
-        return Err(AppError::rejected(format!("远端不存在：{remote}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.theRemoteDoesExist",
+            "远端不存在：{remote}",
+            &[("remote", format!("{}", remote))],
+        ));
     }
     let target_branch = request.branch.clone().unwrap_or_else(|| {
         upstream
@@ -1072,7 +1313,12 @@ pub fn push(
             .unwrap_or_else(|| branch_name.clone())
     });
     if branch::validate_branch_name(git, &target_branch).is_err() {
-        return Err(AppError::rejected(format!("目标分支名不合法：{target_branch}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.invalidTargetBranchName",
+            "目标分支名不合法：{target_branch}",
+            &[("target_branch", format!("{}", target_branch))],
+        ));
     }
     // 只有「没有上游」或「用户把目标改成了不同远端 / 分支」时才记录上游；
     // 每次推送都带 `--set-upstream` 会重写 `branch.<name>.remote/merge`（B01、B05）。
@@ -1096,14 +1342,20 @@ pub fn push(
         PushForce::WithLease => {
             // 保护的是会被覆盖的远端分支：本地分支名与目标分支名任一受保护都拒绝。
             if matches_protected(&target_branch, protected) {
-                return Err(AppError::rejected(format!(
-                    "{target_branch} 是受保护分支，不能强制推送"
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.remoteOps.isProtectedBranchForcePush",
+                    "{target_branch} 是受保护分支，不能强制推送",
+                    &[("target_branch", format!("{}", target_branch))],
+                ));
             }
             if matches_protected(&branch_name, protected) {
-                return Err(AppError::rejected(format!(
-                    "{branch_name} 是受保护分支，不能强制推送"
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.remoteOps.isProtectedBranchForcePush2",
+                    "{branch_name} 是受保护分支，不能强制推送",
+                    &[("branch_name", format!("{}", branch_name))],
+                ));
             }
             // 带上推送前读取的远端跟踪分支值：期间远端前进则 Git 自己拒绝（Q123）。
             let tracking = format!("refs/remotes/{remote}/{target_branch}");
@@ -1129,15 +1381,19 @@ pub fn push(
             return Ok(PushResult::Rejected {
                 remote,
                 branch: target_branch,
-                reason: format!("远端有新提交，推送被拒绝：{}", combined.trim()),
+                reason: combined.trim().to_string(),
                 output: combined.trim().to_string(),
             });
         }
-        return Err(AppError::git(format!(
-            "推送失败（退出码 {}）：{}",
-            output.exit_code,
-            combined.trim()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.remoteOps.pushFailedExitCode",
+            "推送失败（退出码 {0}）：{1}",
+            &[
+                ("0", format!("{:}", output.exit_code)),
+                ("1", format!("{:}", combined.trim())),
+            ],
+        ));
     }
     Ok(PushResult::Pushed {
         remote,
@@ -1160,22 +1416,32 @@ fn count_unpushed(git: &Git, remote: &str, branch: &str) -> Result<u32> {
 }
 
 /// 检查远端是否有新提交（B03，只比较引用，不取回对象）。
-pub fn check_remote(
-    session: &WorktreeSession,
-    timeout: Duration,
-) -> Result<RemoteCheck> {
+pub fn check_remote(session: &WorktreeSession, timeout: Duration) -> Result<RemoteCheck> {
     let git = &session.git;
     let Some(branch_name) = git.current_branch() else {
-        return Err(AppError::rejected("游离 HEAD 没有上游分支"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.aDetachedHeadNoUpstreamBranch2",
+            "游离 HEAD 没有上游分支",
+            &[],
+        ));
     };
     let Some((upstream, remote, name)) = upstream_details(git, &branch_name)? else {
-        return Err(AppError::rejected(format!(
-            "分支 {branch_name} 没有配置上游，无法检查远端"
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.remoteOps.branchNoUpstreamConfiguredCheckRemote",
+            "分支 {branch_name} 没有配置上游，无法检查远端",
+            &[("branch_name", format!("{}", branch_name))],
+        ));
     };
     let output = network_expect(
         git,
-        &["ls-remote", "--heads", &remote, &format!("refs/heads/{name}")],
+        &[
+            "ls-remote",
+            "--heads",
+            &remote,
+            &format!("refs/heads/{name}"),
+        ],
         "检查远端",
         timeout,
     )?;

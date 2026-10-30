@@ -3,7 +3,7 @@ import type { HighlightSnapshot } from "@/features/diff/highlightStore";
 import type { HistoryFileTarget } from "@/types/bindings/HistoryFileTarget";
 import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import type { FileVersion } from "@/types/bindings/FileVersion";
-import { getErrorMessage } from "@/lib/error";
+import { toAppError } from "@/lib/error";
 
 const CHUNK = 400;
 const MAX_CHUNKS = 16;
@@ -111,7 +111,7 @@ export class HistoryHighlightStore {
     } catch (error) {
       if (generation !== this.generation) return;
       this.chunks.set(key, { version, from: fromLine, count: 0 });
-      this.snapshot = { ...this.snapshot, error: getErrorMessage(error) };
+      this.snapshot = { ...this.snapshot, error: toAppError(error) };
     } finally {
       if (generation === this.generation) {
         this.pending.delete(key);

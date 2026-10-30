@@ -9,7 +9,9 @@ import { useState } from "react";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeStatusEntry } from "@/types/bindings/WorktreeStatusEntry";
-import { messages } from "@/lib/i18n/zh-CN";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { messages } from "@/lib/i18n/index";
+import { formatAppError } from "@/lib/error";
 import { MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
@@ -172,7 +174,7 @@ export function TitleBar({
                           <Codicon name="arrow-down" size={11} />
                           {status.behind}
                         </span>
-                        {status.error ? <span className="text-destructive">{status.error}</span> : null}
+                        {status.error ? <span className="text-destructive">{formatAppError(status.error)}</span> : null}
                         {!status.accessible ? <span>{messages.toolbar.inaccessible}</span> : null}
                       </span>
                     ) : null}
@@ -233,7 +235,7 @@ export function StatusBar({
   branch: string | null;
   ahead: number;
   behind: number;
-  watchError: string | null;
+  watchError: AppErrorPayload | null;
   reviewed: number;
   total: number;
   onRefresh: () => void;
@@ -259,7 +261,7 @@ export function StatusBar({
         <button
           type="button"
           className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5 text-[var(--editorwarning-foreground)]"
-          title={watchError}
+          title={formatAppError(watchError)}
           onClick={onRefresh}
         >
           <Codicon name="refresh" size={13} />

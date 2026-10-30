@@ -6,6 +6,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
@@ -84,7 +85,7 @@ export interface HighlightRangeResult {
 /** 与 Rust 侧 `WatchStatus` 对应（Q88、Q95）。 */
 export interface WatchStatusPayload {
   active: boolean;
-  error: string | null;
+  error: AppErrorPayload | null;
   activation: number;
   /** 当前监视目标路径；前端据此确认状态属于自己请求的目标。 */
   target: string | null;
@@ -122,6 +123,10 @@ export interface SettingsPayload {
   codeFontFamily: string | null;
   gitPath: string | null;
   mergeTool: string | null;
+  diffTool: string | null;
+  language: string | null;
+  cherryPickKeepEmpty: boolean;
+  cherryPickIncludeSource: boolean;
   sidebarWidth: number;
   viewMode: "split" | "unified";
   uiZoom: number;
@@ -147,6 +152,8 @@ export interface SettingsPayload {
   mergeAutoApply: boolean;
   /** 日志设置（F06、L06）。 */
   logColumns: LogColumns;
+  fileHistoryShowNames: boolean;
+  stashCompareLocal: boolean;
   logLongEdges: boolean;
   logFirstParent: boolean;
   logPreviewPosition: LogPreviewPosition;
@@ -180,6 +187,10 @@ export interface SettingsPatchPayload {
   diffFontSize?: number;
   gitPath?: string;
   mergeTool?: string;
+  diffTool?: string;
+  language?: string;
+  cherryPickKeepEmpty?: boolean;
+  cherryPickIncludeSource?: boolean;
   sidebarWidth?: number;
   viewMode?: "split" | "unified";
   uiZoom?: number;
@@ -203,6 +214,8 @@ export interface SettingsPatchPayload {
   notify?: NotifyKinds;
   mergeAutoApply?: boolean;
   logColumns?: LogColumns;
+  fileHistoryShowNames?: boolean;
+  stashCompareLocal?: boolean;
   logLongEdges?: boolean;
   logFirstParent?: boolean;
   logPreviewPosition?: LogPreviewPosition;
@@ -618,4 +631,134 @@ export const ipc = {
     fromLine: number;
     toLine: number;
   }) => invoke<HighlightRangeResult>("history_file_highlight", { request }),
+  // ---------- M6: stash / operations / history rewriting ----------
+  operationState: (worktreeId: string) =>
+    invoke<import("@/types/bindings/OperationState").OperationState | null>("operation_state", {
+      request: { worktreeId },
+    }),
+  operationExecute: (worktreeId: string, request: {
+    kind: import("@/types/bindings/OperationKind").OperationKind;
+    metadataVersion: string;
+    expectedState: string;
+    action: import("@/types/bindings/OperationAction").OperationAction;
+  }) => invoke<import("@/types/bindings/OperationOutcome").OperationOutcome>("operation_execute", {
+    worktreeId, request,
+  }),
+  stashList: (worktreeId: string) =>
+    invoke<import("@/types/bindings/StashEntry").StashEntry[]>("stash_list", { request: { worktreeId } }),
+  stashInspect: (worktreeId: string, entry: import("@/types/bindings/StashEntry").StashEntry, compareLocal = false) =>
+    invoke<import("@/types/bindings/StashInspection").StashInspection>("stash_inspect", {
+      request: { worktreeId, oid: entry.oid, entryKey: entry.key, compareLocal },
+    }),
+  stashPreflight: (worktreeId: string, entry: import("@/types/bindings/StashEntry").StashEntry | null = null, collection = false) =>
+    invoke<string>("stash_preflight", { request: { worktreeId, oid: entry?.oid ?? null, entryKey: entry?.key ?? null, collection } }),
+  stashSave: (worktreeId: string, request: { message: string; keepIndex: boolean; expectedState: string }) =>
+    invoke<import("@/types/bindings/StashEntry").StashEntry>("stash_save", {
+      request: { worktreeId, ...request },
+    }),
+  stashApply: (worktreeId: string, request: {
+    oid: string; entryKey: string; restoreIndex: boolean; deleteAfter: boolean; newBranch?: string | null; expectedState: string;
+  }) => invoke<import("@/types/bindings/StashApplyOutcome").StashApplyOutcome>("stash_apply", {
+    request: { worktreeId, ...request },
+  }),
+  stashDrop: (worktreeId: string, entry: import("@/types/bindings/StashEntry").StashEntry, expectedState: string) =>
+    invoke<import("@/types/bindings/StashDropOutcome").StashDropOutcome>("stash_drop", {
+      request: { worktreeId, oid: entry.oid, entryKey: entry.key, expectedState },
+    }),
+  stashClear: (worktreeId: string, expectedOids: string[], expectedState: string) =>
+    invoke<import("@/types/bindings/StashClearOutcome").StashClearOutcome>("stash_clear", {
+      request: { worktreeId, expectedOids, expectedState },
+    }),
+  stashArchives: (worktreeId: string) =>
+    invoke<import("@/types/bindings/StashArchiveSummary").StashArchiveSummary[]>("stash_archives", {
+      request: { worktreeId },
+    }),
+  stashArchiveRestore: (worktreeId: string, id: string, expectedState: string) =>
+    invoke<string>("stash_archive_restore", { request: { worktreeId, id, expectedState } }),
+  autostashPending: (worktreeId: string) =>
+    invoke<import("@/types/bindings/AutostashPending").AutostashPending | null>("autostash_pending", {
+      request: { worktreeId },
+    }),
+  autostashRestore: (worktreeId: string, link: import("@/types/bindings/AutostashLink").AutostashLink, expectedState: string) =>
+    invoke<import("@/types/bindings/AutostashRestoreOutcome").AutostashRestoreOutcome | null>(
+      "autostash_restore", { request: { worktreeId, link, expectedState } },
+    ),
+  autostashForget: (worktreeId: string, id: string) => invoke<void>("autostash_forget", { worktreeId, id }),
+  rewritePreflight: (worktreeId: string, oids: string[], resetTarget: string | null = null) =>
+    invoke<import("@/types/bindings/RewritePreflight").RewritePreflight>("rewrite_preflight", {
+      worktreeId, oids, resetTarget,
+    }),
+  rewriteCherryPick: (worktreeId: string, request: {
+    oids: string[]; expectedHead: string;
+    expectedState?: string;
+    expectedContext: string;
+    dirtyStrategy?: import("@/types/bindings/DirtyStrategy").DirtyStrategy | null;
+    keepEmpty: boolean; includeSource: boolean;
+  }) => invoke<import("@/types/bindings/RewriteOutcome").RewriteOutcome>("rewrite_cherry_pick", {
+    worktreeId, request,
+  }),
+  rewriteRevert: (worktreeId: string, request: {
+    oids: string[]; expectedHead: string;
+    expectedState?: string;
+    expectedContext: string;
+    dirtyStrategy?: import("@/types/bindings/DirtyStrategy").DirtyStrategy | null;
+  }) => invoke<import("@/types/bindings/RewriteOutcome").RewriteOutcome>("rewrite_revert", {
+    worktreeId, request,
+  }),
+  rewriteReset: (worktreeId: string, request: {
+    target: string; mode: import("@/types/bindings/ResetMode").ResetMode; expectedHead: string;
+    expectedState?: string;
+    expectedContext: string;
+  }) => invoke<import("@/types/bindings/RewriteOutcome").RewriteOutcome>("rewrite_reset", {
+    worktreeId, request,
+  }),
+  rewriteReword: (worktreeId: string, request: {
+    target: string; expectedHead: string; message: string; expectedContext: string; expectedState: string;
+  }) => invoke<import("@/types/bindings/RewriteOutcome").RewriteOutcome>("rewrite_reword", {
+    worktreeId, request,
+  }),
+  rewriteInteractive: (worktreeId: string, request: {
+    upstream: string; expectedHead: string; expectedContext: string; expectedState: string;
+    entries: Array<{
+      oid: string; action: import("@/types/bindings/RebaseAction").RebaseAction; message?: string | null;
+    }>;
+  }) => invoke<import("@/types/bindings/RewriteOutcome").RewriteOutcome>("rewrite_interactive", {
+    worktreeId, request,
+  }),
+
+  // ---------- M6: file history / blame ----------
+  fileHistory: (worktreeId: string, request: {
+    path: string; allBranches: boolean; skip: number; limit: number; anchor?: string;
+  }) => invoke<import("@/types/bindings/FileHistoryPage").FileHistoryPage>("file_history", {
+    worktreeId, request,
+  }),
+  fileBlame: (worktreeId: string, request: {
+    path: string; revision?: string | null; ignoreWhitespace: boolean;
+    detectMoves: boolean; detectCopies: boolean;
+  }) => invoke<import("@/types/bindings/BlameResult").BlameResult>("file_blame", {
+    worktreeId, request,
+  }),
+  filePreviousRevision: (worktreeId: string, oid: string, path: string) =>
+    invoke<import("@/types/bindings/FileRevision").FileRevision | null>(
+      "file_previous_revision", { worktreeId, oid, path },
+    ),
+  rewriteRange: (worktreeId: string, target: string, expectedHead: string) =>
+    invoke<import("@/types/bindings/HistoryCommit").HistoryCommit[]>("rewrite_range", { worktreeId, target, expectedHead }),
+
+  // ---------- M6: external tools / language ----------
+  externalToolChoices: (worktreeId: string) =>
+    invoke<import("@/types/bindings/ExternalToolSetup").ExternalToolSetup>(
+      "external_tool_choices", { request: { worktreeId } },
+    ),
+  externalToolLaunch: (worktreeId: string, request: {
+    expectedContext: string;
+    kind: import("@/types/bindings/ExternalToolKind").ExternalToolKind;
+    path: string; tool?: string | null; revision?: string | null;
+    changesKind?: import("@/types/bindings/ChangesKind").ChangesKind | null;
+    expectedFingerprint?: string | null;
+  }) => invoke<import("@/types/bindings/ExternalToolOutcome").ExternalToolOutcome>(
+    "external_tool_launch", { worktreeId, request },
+  ),
+  systemLanguage: () => invoke<string>("system_language"),
+
 };

@@ -1,3 +1,4 @@
+import { formatAppError } from "@/lib/error";
 /** Fixed-object history data uses the same controlled renderers as worktree diffs. */
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { HistoryFileTarget } from "@/types/bindings/HistoryFileTarget";
@@ -6,7 +7,7 @@ import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { DiffOptions } from "@/features/diff/SideBySideView";
 import { DiffView } from "@/features/diff/DiffView";
 import { ipc } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
 import { Codicon } from "@/components/ui/codicon";
 import { HistoryRowsStore, historyRowsKey } from "./historyRows";
 import { HistoryHighlightStore } from "./historyHighlightStore";
@@ -65,7 +66,7 @@ function UnifiedHistoryDiff(props: CommitDiffViewProps) {
     rows.ensure(0, 60);
     return () => { rows.invalidate(); highlights.dispose(); };
   }, [highlights, rows]);
-  const emptyText = snapshot.error
+  const emptyText = (snapshot.error ? formatAppError(snapshot.error) : null)
     ?? (state?.binary ? messages.history.binary
       : state?.modeOnly ? messages.history.modeOnly
         : state?.emptyReason === "emptyFile" ? messages.history.emptyFile

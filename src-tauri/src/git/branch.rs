@@ -11,9 +11,9 @@
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
-use crate::git::history::is_full_oid;
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::Git;
+use crate::git::history::is_full_oid;
 use crate::operation::OperationKind;
 
 /// 一个本地分支及其上游跟踪信息。
@@ -114,7 +114,9 @@ pub fn parse_track(text: &str) -> (u32, u32, bool) {
         let mut words = part.split_whitespace();
         let Some(word) = words.next() else { continue };
         let Some(value) = words.next() else { continue };
-        let Ok(parsed) = value.parse::<u32>() else { continue };
+        let Ok(parsed) = value.parse::<u32>() else {
+            continue;
+        };
         match word {
             "ahead" => ahead = parsed,
             "behind" => behind = parsed,
@@ -128,7 +130,10 @@ pub fn parse_track(text: &str) -> (u32, u32, bool) {
 pub fn read_overview(git: &Git, worktree_id: &str) -> Result<BranchOverview> {
     let local = read_local_branches(git)?;
     let remote_groups = read_remote_groups(git, &local)?;
-    let remote_names: Vec<String> = remote_groups.iter().map(|group| group.name.clone()).collect();
+    let remote_names: Vec<String> = remote_groups
+        .iter()
+        .map(|group| group.name.clone())
+        .collect();
     let head_ref = crate::git::history::head_ref(git);
     let head_commit = crate::git::history::head_commit(git)?;
     let current_branch = head_ref
@@ -137,7 +142,9 @@ pub fn read_overview(git: &Git, worktree_id: &str) -> Result<BranchOverview> {
         .map(str::to_string);
     let detached = head_ref.is_none() && head_commit.is_some();
     let short_head = if detached {
-        head_commit.as_ref().map(|oid| oid.chars().take(7).collect())
+        head_commit
+            .as_ref()
+            .map(|oid| oid.chars().take(7).collect())
     } else {
         None
     };
@@ -270,14 +277,21 @@ fn read_remote_groups(git: &Git, local: &[LocalBranch]) -> Result<Vec<RemoteGrou
 /// 直接展示给用户，前端不自己实现一套规则。
 pub fn validate_branch_name(git: &Git, name: &str) -> Result<()> {
     if name.trim().is_empty() {
-        return Err(AppError::rejected("分支名不能为空"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.branch.theBranchNameEmpty",
+            "分支名不能为空",
+            &[],
+        ));
     }
     let output = git.run(&["check-ref-format", "--branch", name])?;
     if output.exit_code != 0 {
-        return Err(AppError::rejected(format!(
-            "分支名不合法：{}",
-            output.stderr.trim()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.branch.invalidBranchName",
+            "分支名不合法：{0}",
+            &[("0", format!("{:}", output.stderr.trim()))],
+        ));
     }
     Ok(())
 }

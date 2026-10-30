@@ -1,10 +1,11 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { HistoryFileTarget } from "@/types/bindings/HistoryFileTarget";
 import type { HistoryRowSlice } from "@/types/bindings/HistoryRowSlice";
 import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import type { ViewMode } from "@/types/bindings/ViewMode";
 import type { RenderRow } from "@/types/bindings/RenderRow";
 import type { DiffRows, RowWindowSnapshot } from "@/features/diff/rowWindowStore";
-import { getErrorMessage } from "@/lib/error";
+import { localizedError, toAppError } from "@/lib/error";
 
 export interface HistoryRowsIdentity {
   targetId: string;
@@ -27,7 +28,7 @@ export interface HistoryRowsState {
   binary: boolean;
   modeOnly: boolean;
   emptyReason: HistoryRowSlice["emptyReason"];
-  error: string | null;
+  error: AppErrorPayload | null;
 }
 
 export const EMPTY_HISTORY_ROWS: HistoryRowsState = {
@@ -79,12 +80,12 @@ export class HistoryRowsReader {
       if (generation !== this.generation) return null;
       if (slice.targetId !== request.targetId || slice.diffId !== request.file.diffId
         || slice.view !== request.view || slice.from !== Math.min(request.from, slice.rowCount)) {
-        throw new Error("提交 diff 响应与读取目标不一致");
+        throw localizedError("rejected", "errors.history.rowsTargetMismatch");
       }
       this.cached = { ...slice, key, to: request.to, error: null };
     } catch (caught) {
       if (generation !== this.generation) return null;
-      this.cached = { ...EMPTY_HISTORY_ROWS, key, from: request.from, to: request.to, error: getErrorMessage(caught) };
+      this.cached = { ...EMPTY_HISTORY_ROWS, key, from: request.from, to: request.to, error: toAppError(caught) };
     }
     return this.cached;
   }

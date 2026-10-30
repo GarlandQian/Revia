@@ -1,3 +1,4 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 /**
  * 显示行窗口：按可见范围分块取数据（Q46 的核心）。
  *
@@ -21,8 +22,7 @@ import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 export const CHUNK_ROWS = 500;
 
 import { logToBackend } from "./log";
-import { getErrorMessage, toAppError } from "@/lib/error";
-import { messages } from "@/lib/i18n/zh-CN";
+import { getErrorMessage, localizedError, toAppError } from "@/lib/error";
 /** 预取最多同时在途的块数；可见块的请求不受这个限制。 */
 const MAX_IN_FLIGHT = 2;
 /** 单独取可见行时，在可见范围上下各多取的行数。 */
@@ -53,7 +53,7 @@ export interface RowWindowSnapshot {
   chunkCount: number;
   loadedChunks: number;
   pendingChunks: number;
-  error: string | null;
+  error: AppErrorPayload | null;
   stale: boolean;
 }
 
@@ -191,6 +191,7 @@ export class RowWindowStore {
   ensure(from: number, to: number, prefetchScreens = 2): boolean {
     if (this.stale) return false;
     if (!this.target) {
+      // x18n-ignore
       logToBackend(`ensure 被调用但还没有目标文件（${from}..${to}）`);
       return false;
     }
@@ -275,12 +276,13 @@ export class RowWindowStore {
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
-      if (toAppError(error).kind === "rejected" || getErrorMessage(error) === messages.changes.fileChanged) {
+      if (toAppError(error).kind === "rejected" || typeof error === "string") {
         this.markStale();
         return;
       }
+      // x18n-ignore
       logToBackend(`取可见行 ${from}-${to} 失败：${getErrorMessage(error)}`);
-      this.publish(getErrorMessage(error));
+      this.publish(toAppError(error));
     } finally {
       if (epoch === this.epoch) this.sliceInFlight = false;
     }
@@ -302,6 +304,7 @@ export class RowWindowStore {
         this.markStale();
         return;
       }
+      // x18n-ignore
       logToBackend(`取块 ${chunkIndex}（${from}-${to}）完成：${slice.rows.length} 行`);
       this.chunks.set(chunkIndex, slice.rows);
       // 整块到了，块内单独取过的行不再需要。
@@ -316,12 +319,13 @@ export class RowWindowStore {
       this.publish(null, slice.entry);
     } catch (error) {
       if (epoch !== this.epoch) return;
-      if (toAppError(error).kind === "rejected" || getErrorMessage(error) === messages.changes.fileChanged) {
+      if (toAppError(error).kind === "rejected" || typeof error === "string") {
         this.markStale();
         return;
       }
+      // x18n-ignore
       logToBackend(`取块 ${chunkIndex} 失败：${getErrorMessage(error)}`);
-      this.publish(getErrorMessage(error));
+      this.publish(toAppError(error));
     } finally {
       if (epoch === this.epoch) {
         this.pending.delete(chunkIndex);
@@ -346,7 +350,7 @@ export class RowWindowStore {
     this.sliceInFlight = false;
     this.entry = null;
     this.navigationRows = null;
-    this.publish(messages.changes.fileChanged);
+    this.publish(localizedError("rejected", "changes.fileChanged"));
   }
 
   /** 缓存超过上限时，从离可见区域最远的块开始丢。 */
@@ -365,7 +369,7 @@ export class RowWindowStore {
     }
   }
 
-  private publish(error: string | null, entry: ChangeEntry | null = null): void {
+  private publish(error: AppErrorPayload | null, entry: ChangeEntry | null = null): void {
     this.version += 1;
     this.snapshot = {
       version: this.version,
@@ -383,7 +387,9 @@ export class RowWindowStore {
   /** 诊断：把当前窗口状态写进日志。 */
   logWindow(): void {
     logToBackend(
+      // x18n-ignore
       `窗口：target=${this.target ? `${this.target.path}/${this.target.view}/${this.target.changes}` : "(无)"} ` +
+        // x18n-ignore
         `rowCount=${this.rowCount} 已加载块=${this.chunks.size} 在途=${this.pending.size}`,
     );
   }

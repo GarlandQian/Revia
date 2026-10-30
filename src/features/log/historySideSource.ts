@@ -3,6 +3,7 @@ import type { HistoryFileTarget } from "@/types/bindings/HistoryFileTarget";
 import type { HistorySideLayout } from "@/types/bindings/HistorySideLayout";
 import type { DiffOptions } from "@/features/diff/SideBySideView";
 import type { Side } from "@/features/diff/rowIndex";
+import { localizedError } from "@/lib/error";
 
 type HistorySideApi = Pick<typeof ipc, "historyFileSideLayout" | "historyFileSideLines">;
 
@@ -39,7 +40,7 @@ export function createHistorySideSource(
     matches,
     async layout() {
       const layout = await api.historyFileSideLayout(request);
-      if (!matches(layout)) throw new Error("提交 diff 布局与读取目标不一致");
+      if (!matches(layout)) throw localizedError("rejected", "errors.history.layoutTargetMismatch");
       return layout;
     },
     lines: (side, from, to) => api.historyFileSideLines({

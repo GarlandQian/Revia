@@ -2,14 +2,16 @@ import { useCallback, useRef, useState } from "react";
 import type { CommitResultView } from "@/components/app/CommitComposer";
 import type { NoticeView } from "@/components/app/Notifications";
 import type { NotifyKinds } from "@/lib/ipc";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
+import { formatAppError } from "@/lib/error";
 
 export type NoticeInput = Omit<NoticeView, "id"> & { kind?: keyof NotifyKinds };
 
-function commitResultNotice(result: CommitResultView): NoticeView {
-  const detailParts = [
-    result.detail,
-    result.outcome?.error?.message,
+export function commitResultNotice(result: CommitResultView): NoticeView {
+  const detail = () => {
+    const detailParts = [
+    typeof result.detail === "function" ? result.detail() : result.detail,
+    result.outcome?.error ? formatAppError(result.outcome.error) : null,
     result.hookChanges && (result.hookChanges.worktree.length > 0 || result.hookChanges.index.length > 0)
       ? messages.commit.resultHookChanges(result.hookChanges.worktree, result.hookChanges.index)
       : null,
@@ -18,8 +20,10 @@ function commitResultNotice(result: CommitResultView): NoticeView {
     result.outcome && result.outcome.success && !result.outcome.draftCleared
       ? messages.commit.resultDraftKept
       : null,
-    result.outcome?.draftError ? messages.commit.resultDraftError(result.outcome.draftError) : null,
+    result.outcome?.draftError ? messages.commit.resultDraftError(formatAppError(result.outcome.draftError)) : null,
   ].filter((part): part is string => typeof part === "string" && part.length > 0);
+    return detailParts.length > 0 ? detailParts.join("\n") : null;
+  };
   return {
     id: `commit:${result.worktreeId}`,
     tone: result.outcome === null
@@ -30,7 +34,7 @@ function commitResultNotice(result: CommitResultView): NoticeView {
           ? "success"
           : "error",
     title: result.title,
-    detail: detailParts.length > 0 ? detailParts.join("\n") : null,
+    detail,
     output: result.output,
     persistent: result.outcome === null || !(result.outcome.success && !result.needsVerification),
   };

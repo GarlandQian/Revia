@@ -14,7 +14,7 @@ use revia_lib::git::status::ChangesKind;
 use revia_lib::git::{CommandLog, CommandRecord};
 use revia_lib::session::WorktreeSession;
 use revia_lib::shell::{EnvCaptureInfo, ShellEnv};
-use revia_lib::watch::{resolve_roots, WatchController};
+use revia_lib::watch::{WatchController, resolve_roots};
 
 struct TestContext {
     _temp_dir: tempfile::TempDir,
@@ -50,7 +50,10 @@ impl TestContext {
         let mut env = HashMap::from([
             ("HOME".into(), home.display().to_string()),
             ("USERPROFILE".into(), home.display().to_string()),
-            ("GIT_CONFIG_GLOBAL".into(), global_config.display().to_string()),
+            (
+                "GIT_CONFIG_GLOBAL".into(),
+                global_config.display().to_string(),
+            ),
             ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
             ("GIT_TERMINAL_PROMPT".into(), "0".into()),
             ("PATH".into(), joined_path.to_string_lossy().into_owned()),
@@ -61,7 +64,12 @@ impl TestContext {
             }
         }
 
-        let ctx = Self { _temp_dir: temp_dir, repo, env, paths };
+        let ctx = Self {
+            _temp_dir: temp_dir,
+            repo,
+            env,
+            paths,
+        };
         ctx.git(&["init", "-b", "main"]);
         for (key, value) in [
             ("user.name", "Revia Refresh Test"),
@@ -123,8 +131,13 @@ impl TestContext {
                 diagnostics: None,
             },
         };
-        WorktreeSession::open("refresh-worktree", &self.repo, shell_env, Arc::new(CommandLog::default()))
-            .unwrap()
+        WorktreeSession::open(
+            "refresh-worktree",
+            &self.repo,
+            shell_env,
+            Arc::new(CommandLog::default()),
+        )
+        .unwrap()
     }
 }
 
@@ -153,7 +166,13 @@ fn t13_same_row_count_content_change_updates_text_and_versions() {
         .find(|entry| entry.path == "src/app.ts" && entry.changes == ChangesKind::Unstaged)
         .expect("应有未暂存改动");
     let first_rows = session
-        .rows("src/app.ts", ChangesKind::Unstaged, revia_lib::git::rows::ViewMode::Unified, 0, 64)
+        .rows(
+            "src/app.ts",
+            ChangesKind::Unstaged,
+            revia_lib::git::rows::ViewMode::Unified,
+            0,
+            64,
+        )
         .unwrap();
     let first_text = row_texts(&first_rows.rows);
     assert!(
@@ -185,14 +204,23 @@ fn t13_same_row_count_content_change_updates_text_and_versions() {
     assert!(second.revision > first.revision, "顶层快照版本必须单调递增");
 
     let second_rows = session
-        .rows("src/app.ts", ChangesKind::Unstaged, revia_lib::git::rows::ViewMode::Unified, 0, 64)
+        .rows(
+            "src/app.ts",
+            ChangesKind::Unstaged,
+            revia_lib::git::rows::ViewMode::Unified,
+            0,
+            64,
+        )
         .unwrap();
     let second_text = row_texts(&second_rows.rows);
     assert!(
         second_text.iter().any(|text| text.contains("LINE two")),
         "刷新后必须显示新内容：{second_text:?}"
     );
-    assert_eq!(second_rows.revision, second.revision, "行切片的版本必须与快照一致");
+    assert_eq!(
+        second_rows.revision, second.revision,
+        "行切片的版本必须与快照一致"
+    );
 }
 
 /// 取显示行的文本（统一视图用 `text`，并排视图用左右单元格）。
@@ -233,10 +261,12 @@ fn t13_external_stage_and_unstage_are_reflected() {
 
     let session = ctx.open();
     let unstaged = session.refresh().unwrap();
-    assert!(unstaged
-        .entries
-        .iter()
-        .any(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Unstaged));
+    assert!(
+        unstaged
+            .entries
+            .iter()
+            .any(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Unstaged)
+    );
 
     // 外部（模拟终端）暂存。
     ctx.git(&["--literal-pathspecs", "add", "--", "file.txt"]);
@@ -252,10 +282,11 @@ fn t13_external_stage_and_unstage_are_reflected() {
     // 外部取消暂存。
     ctx.git(&["--literal-pathspecs", "reset", "--", "file.txt"]);
     let back = session.refresh().unwrap();
-    assert!(back
-        .entries
-        .iter()
-        .any(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Unstaged));
+    assert!(
+        back.entries
+            .iter()
+            .any(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Unstaged)
+    );
     assert!(back.revision > staged.revision);
 }
 
@@ -277,7 +308,13 @@ fn t13_untracked_content_change_updates_loaded_metrics() {
 
     // 首次取行会补全统计。
     let slice = session
-        .rows("new.txt", ChangesKind::Untracked, revia_lib::git::rows::ViewMode::Unified, 0, 8)
+        .rows(
+            "new.txt",
+            ChangesKind::Untracked,
+            revia_lib::git::rows::ViewMode::Unified,
+            0,
+            8,
+        )
         .unwrap();
     assert!(slice.entry.metrics_loaded, "取行后应补全统计");
     assert!(slice.row_count > 0, "未跟踪文件必须有可见内容");
@@ -290,10 +327,19 @@ fn t13_untracked_content_change_updates_loaded_metrics() {
         .iter()
         .find(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Untracked)
         .unwrap();
-    assert_ne!(first_entry.fingerprint, second_entry.fingerprint, "未跟踪内容变化必须改变指纹");
+    assert_ne!(
+        first_entry.fingerprint, second_entry.fingerprint,
+        "未跟踪内容变化必须改变指纹"
+    );
 
     let slice = session
-        .rows("new.txt", ChangesKind::Untracked, revia_lib::git::rows::ViewMode::Unified, 0, 16)
+        .rows(
+            "new.txt",
+            ChangesKind::Untracked,
+            revia_lib::git::rows::ViewMode::Unified,
+            0,
+            16,
+        )
         .unwrap();
     let text: Vec<String> = slice
         .rows
@@ -306,7 +352,10 @@ fn t13_untracked_content_change_updates_loaded_metrics() {
                 .unwrap_or_default()
         })
         .collect();
-    assert!(text.iter().any(|line| line.contains("third")), "刷新后必须读到新内容：{text:?}");
+    assert!(
+        text.iter().any(|line| line.contains("third")),
+        "刷新后必须读到新内容：{text:?}"
+    );
 }
 
 /// 高亮必须绑定到**展示版本的实际字节**：未 refresh 前外部等长改写，必须被拒绝，
@@ -324,14 +373,26 @@ fn t13_highlight_rejects_external_edit_before_refresh() {
     ctx.write("src/app.ts", b"const a = 7;\nconst b = 2;\n");
 
     let error = session
-        .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
+        .highlight(
+            "src/app.ts",
+            ChangesKind::Unstaged,
+            revia_lib::session::FileVersion::New,
+            1,
+            2,
+        )
         .expect_err("未刷新前外部改写后，高亮必须拒绝，而不是把新字节标成旧版本");
     assert_eq!(error.to_string(), "文件已变化，请重新确认");
 
     // 刷新后，高亮才与新的展示版本一致，且文本来自新内容。
     let refreshed = session.refresh().unwrap();
     let result = session
-        .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
+        .highlight(
+            "src/app.ts",
+            ChangesKind::Unstaged,
+            revia_lib::session::FileVersion::New,
+            1,
+            2,
+        )
         .unwrap();
     assert_eq!(result.revision, refreshed.revision);
     let text: String = result
@@ -341,7 +402,10 @@ fn t13_highlight_rejects_external_edit_before_refresh() {
         .flat_map(|tokens| tokens.iter())
         .map(|token| token.text.clone())
         .collect();
-    assert!(text.contains("const a = 7;"), "高亮文本必须来自刷新后的展示版本：{text:?}");
+    assert!(
+        text.contains("const a = 7;"),
+        "高亮文本必须来自刷新后的展示版本：{text:?}"
+    );
     assert!(!text.contains("const a = 9;"), "不能返回旧内容：{text:?}");
 }
 
@@ -357,12 +421,24 @@ fn t13_highlight_cache_stays_bounded_across_versions() {
 
     let mut max_documents = 0;
     for index in 0..40 {
-        ctx.write("src/app.ts", format!("const a = {};\nconst b = 2;\n", 100 + index).as_bytes());
+        ctx.write(
+            "src/app.ts",
+            format!("const a = {};\nconst b = 2;\n", 100 + index).as_bytes(),
+        );
         let snapshot = session.refresh().unwrap();
         let highlighted = session
-            .highlight("src/app.ts", ChangesKind::Unstaged, revia_lib::session::FileVersion::New, 1, 2)
+            .highlight(
+                "src/app.ts",
+                ChangesKind::Unstaged,
+                revia_lib::session::FileVersion::New,
+                1,
+                2,
+            )
             .unwrap();
-        assert_eq!(highlighted.revision, snapshot.revision, "高亮必须与最新快照对齐");
+        assert_eq!(
+            highlighted.revision, snapshot.revision,
+            "高亮必须与最新快照对齐"
+        );
         max_documents = max_documents.max(session.highlight_document_count());
     }
 
@@ -400,7 +476,8 @@ fn t13_concurrent_refreshes_never_publish_stale_content() {
         fingerprint_to_marker.insert(fingerprint, marker);
     }
     assert_eq!(
-        fingerprint_to_marker.len() as u64, VERSIONS,
+        fingerprint_to_marker.len() as u64,
+        VERSIONS,
         "每个版本必须有不同的文件指纹"
     );
 
@@ -460,7 +537,11 @@ fn t13_concurrent_refreshes_never_publish_stale_content() {
     revisions.sort_unstable();
     let total = revisions.len();
     revisions.dedup();
-    assert_eq!(revisions.len(), total, "每次刷新必须产生唯一版本，不能重复发布");
+    assert_eq!(
+        revisions.len(),
+        total,
+        "每次刷新必须产生唯一版本，不能重复发布"
+    );
 
     // 版本递增时内容标记不能倒退。
     all.sort_by_key(|(revision, _)| *revision);
@@ -509,7 +590,11 @@ fn t13_direct_save_short_read_never_publishes_forged_snapshot() {
             .clone();
         full_markers.insert(fingerprint, marker);
     }
-    assert_eq!(full_markers.len() as u64, VERSIONS, "每个完整版本必须有不同指纹");
+    assert_eq!(
+        full_markers.len() as u64,
+        VERSIONS,
+        "每个完整版本必须有不同指纹"
+    );
 
     // 截断前缀：直接保存过程中真实存在的内容（`""`、`"v"`、`"v1"` …）。
     let mut partial_fingerprints: HashMap<String, u64> = HashMap::new();
@@ -655,7 +740,14 @@ fn t13_watch_failure_stays_visible_across_manual_refresh() {
 
     let status = controller.activate(resolve_roots(&session.path, None, None), 1, |_| {});
     assert!(!status.active);
-    assert!(status.error.as_deref().unwrap_or("").contains("自动刷新不可用"));
+    assert!(
+        status
+            .error
+            .as_ref()
+            .map(|e| e.message.as_str())
+            .unwrap_or("")
+            .contains("自动刷新不可用")
+    );
 
     // 手动核对成功不改变监视状态。
     let snapshot = session.refresh().unwrap();
@@ -727,11 +819,15 @@ fn t13_refresh_keeps_write_preconditions_intact() {
         .iter()
         .find(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Unstaged)
         .unwrap();
-    let after = session.stage_file("file.txt", &fresh_entry.fingerprint).unwrap();
-    assert!(after
-        .entries
-        .iter()
-        .any(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Staged));
+    let after = session
+        .stage_file("file.txt", &fresh_entry.fingerprint)
+        .unwrap();
+    assert!(
+        after
+            .entries
+            .iter()
+            .any(|entry| entry.path == "file.txt" && entry.changes == ChangesKind::Staged)
+    );
     assert!(after.revision > fresh.revision, "写后快照必须是更新的版本");
 }
 
@@ -741,7 +837,10 @@ fn t13_refresh_does_not_spawn_per_file_git_processes() {
     let ctx = TestContext::new();
     for index in 0..5 {
         ctx.track(&format!("file{index}.txt"), b"base\n");
-        ctx.write(&format!("file{index}.txt"), format!("change{index}\n").as_bytes());
+        ctx.write(
+            &format!("file{index}.txt"),
+            format!("change{index}\n").as_bytes(),
+        );
     }
 
     let log = Arc::new(CommandLog::default());
@@ -759,7 +858,8 @@ fn t13_refresh_does_not_spawn_per_file_git_processes() {
             diagnostics: None,
         },
     };
-    let session = WorktreeSession::open("count-worktree", &ctx.repo, shell_env, log.clone()).unwrap();
+    let session =
+        WorktreeSession::open("count-worktree", &ctx.repo, shell_env, log.clone()).unwrap();
     let before = log.snapshot().len();
     let snapshot = session.refresh().unwrap();
     let after = log.snapshot().len();
@@ -798,8 +898,11 @@ fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
         session.common_dir_path(),
     );
     assert!(roots.git_dir.is_dir(), "必须解析出真实 gitDir");
-    assert_eq!(fs::canonicalize(&roots.git_dir).unwrap(), fs::canonicalize(&common).unwrap(),
-        "本用例监视主目录；linked 目标的私有元数据另有专门回归");
+    assert_eq!(
+        fs::canonicalize(&roots.git_dir).unwrap(),
+        fs::canonicalize(&common).unwrap(),
+        "本用例监视主目录；linked 目标的私有元数据另有专门回归"
+    );
 
     let hits = Arc::new(AtomicU64::new(0));
     let controller = WatchController::new();
@@ -807,7 +910,11 @@ fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
     let status = controller.activate(roots.clone(), 1, move |_| {
         counter.fetch_add(1, Ordering::Relaxed);
     });
-    assert!(status.active, "当前 worktree 应监视成功：{:?}", status.error);
+    assert!(
+        status.active,
+        "当前 worktree 应监视成功：{:?}",
+        status.error
+    );
 
     let wait_for_hit = |baseline: u64| -> bool {
         let deadline = Instant::now() + Duration::from_secs(3);
@@ -824,7 +931,10 @@ fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
     // 1. 当前文件改动：必须触发。
     let baseline = hits.load(Ordering::Relaxed);
     ctx.write("file.txt", b"changed\n");
-    assert!(wait_for_hit(baseline), "当前 worktree 的文件改动必须触发刷新");
+    assert!(
+        wait_for_hit(baseline),
+        "当前 worktree 的文件改动必须触发刷新"
+    );
 
     // 2. 编辑器原子替换（写临时文件后 rename 覆盖）：必须触发。
     settle();
@@ -859,7 +969,11 @@ fn t13_watch_scope_covers_current_worktree_but_not_unrelated_metadata() {
     settle();
     let baseline = hits.load(Ordering::Relaxed);
     std::fs::create_dir_all(common.join("refs/heads")).unwrap();
-    std::fs::write(common.join("refs/heads/another-branch"), "0".repeat(40) + "\n").unwrap();
+    std::fs::write(
+        common.join("refs/heads/another-branch"),
+        "0".repeat(40) + "\n",
+    )
+    .unwrap();
     assert!(wait_for_hit(baseline), "共享 refs 变化必须触发刷新");
 
     controller.stop();
@@ -873,14 +987,32 @@ fn t13_current_linked_worktree_notifies_for_own_index_head_but_not_other_index()
     ctx.track("file.txt", b"base\n");
     let linked = ctx._temp_dir.path().join("current-linked");
     let other = ctx._temp_dir.path().join("other-linked");
-    ctx.git(&["worktree", "add", "-b", "current-linked", &linked.display().to_string()]);
-    ctx.git(&["worktree", "add", "-b", "other-linked", &other.display().to_string()]);
+    ctx.git(&[
+        "worktree",
+        "add",
+        "-b",
+        "current-linked",
+        &linked.display().to_string(),
+    ]);
+    ctx.git(&[
+        "worktree",
+        "add",
+        "-b",
+        "other-linked",
+        &other.display().to_string(),
+    ]);
     ctx.git(&["branch", "linked-alias"]);
     let roots = resolve_roots(&linked, None, Some(ctx.repo.join(".git")));
     let hits = Arc::new(AtomicU64::new(0));
     let counter = hits.clone();
     let controller = WatchController::new();
-    assert!(controller.activate(roots, 1, move |_| { counter.fetch_add(1, Ordering::Relaxed); }).active);
+    assert!(
+        controller
+            .activate(roots, 1, move |_| {
+                counter.fetch_add(1, Ordering::Relaxed);
+            })
+            .active
+    );
     let expect_event = |operation: &dyn Fn()| {
         std::thread::sleep(Duration::from_millis(300));
         let baseline = hits.load(Ordering::Relaxed);
@@ -889,18 +1021,42 @@ fn t13_current_linked_worktree_notifies_for_own_index_head_but_not_other_index()
         while hits.load(Ordering::Relaxed) == baseline && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert!(hits.load(Ordering::Relaxed) > baseline, "当前 linked 的实际 Git 变化必须通知");
+        assert!(
+            hits.load(Ordering::Relaxed) > baseline,
+            "当前 linked 的实际 Git 变化必须通知"
+        );
     };
     expect_event(&|| fs::write(linked.join("file.txt"), b"changed\n").unwrap());
-    expect_event(&|| { ctx.git(&["-C", &linked.display().to_string(), "add", "--", "file.txt"]); });
-    expect_event(&|| { ctx.git(&["-C", &linked.display().to_string(), "reset", "--", "file.txt"]); });
-    expect_event(&|| { ctx.git(&["-C", &linked.display().to_string(), "symbolic-ref", "HEAD", "refs/heads/linked-alias"]); });
+    expect_event(&|| {
+        ctx.git(&["-C", &linked.display().to_string(), "add", "--", "file.txt"]);
+    });
+    expect_event(&|| {
+        ctx.git(&[
+            "-C",
+            &linked.display().to_string(),
+            "reset",
+            "--",
+            "file.txt",
+        ]);
+    });
+    expect_event(&|| {
+        ctx.git(&[
+            "-C",
+            &linked.display().to_string(),
+            "symbolic-ref",
+            "HEAD",
+            "refs/heads/linked-alias",
+        ]);
+    });
     std::thread::sleep(Duration::from_millis(300));
     let baseline = hits.load(Ordering::Relaxed);
     fs::write(other.join("file.txt"), b"unrelated\n").unwrap();
     ctx.git(&["-C", &other.display().to_string(), "add", "--", "file.txt"]);
     std::thread::sleep(Duration::from_millis(600));
-    assert_eq!(hits.load(Ordering::Relaxed), baseline, "其他 linked 的私有 index 不得通知当前目标");
+    assert_eq!(
+        hits.load(Ordering::Relaxed),
+        baseline,
+        "其他 linked 的私有 index 不得通知当前目标"
+    );
     controller.stop();
 }
-

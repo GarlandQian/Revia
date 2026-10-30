@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::Git;
 use crate::operation::{self, OperationKind};
 
@@ -201,21 +201,38 @@ impl ConflictStages {
 
 /// 读取未解决冲突的暂存区条目（`git ls-files -u -z`）；`path` 为空时读全部。
 pub fn read_stages(git: &Git, path: Option<&str>) -> Result<BTreeMap<String, ConflictStages>> {
-    let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "ls-files", "-u", "-z"];
+    let mut args = vec![
+        "--literal-pathspecs",
+        "-c",
+        "core.quotePath=false",
+        "ls-files",
+        "-u",
+        "-z",
+    ];
     if let Some(path) = path {
         args.extend(["--", path]);
     }
     let output = git.run_ok(&args, "读取冲突条目")?;
     let mut stages: BTreeMap<String, ConflictStages> = BTreeMap::new();
     // 每条：`<mode> <oid> <stage>\t<path>`
-    for entry in output.stdout.split(|byte| *byte == 0).filter(|entry| !entry.is_empty()) {
+    for entry in output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+    {
         let entry = String::from_utf8_lossy(entry);
-        let Some((meta, path)) = entry.split_once('\t') else { continue };
-        let mut fields = meta.split_whitespace();
-        let (Some(mode), Some(oid), Some(stage)) = (fields.next(), fields.next(), fields.next()) else {
+        let Some((meta, path)) = entry.split_once('\t') else {
             continue;
         };
-        let item = Some(StageEntry { mode: mode.to_string(), oid: oid.to_string() });
+        let mut fields = meta.split_whitespace();
+        let (Some(mode), Some(oid), Some(stage)) = (fields.next(), fields.next(), fields.next())
+        else {
+            continue;
+        };
+        let item = Some(StageEntry {
+            mode: mode.to_string(),
+            oid: oid.to_string(),
+        });
         let slot = stages.entry(path.to_string()).or_default();
         match stage {
             "1" => slot.base = item,
@@ -228,14 +245,22 @@ pub fn read_stages(git: &Git, path: Option<&str>) -> Result<BTreeMap<String, Con
 }
 
 fn stages_of(git: &Git, path: &str) -> Result<ConflictStages> {
-    read_stages(git, Some(path))?
-        .remove(path)
-        .ok_or_else(|| AppError::rejected(format!("{path} 没有未解决的冲突")))
+    read_stages(git, Some(path))?.remove(path).ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.merge.hasNoUnresolvedConflicts",
+            "{path} 没有未解决的冲突",
+            &[("path", format!("{}", path))],
+        )
+    })
 }
 
 fn blob(git: &Git, entry: Option<&StageEntry>) -> Result<Option<Vec<u8>>> {
     let Some(entry) = entry else { return Ok(None) };
-    Ok(Some(git.run_ok(&["cat-file", "blob", &entry.oid], "读取冲突版本")?.stdout))
+    Ok(Some(
+        git.run_ok(&["cat-file", "blob", &entry.oid], "读取冲突版本")?
+            .stdout,
+    ))
 }
 
 /// 与 Git 相同的二进制判断：前 8000 字节里有 NUL。
@@ -251,7 +276,12 @@ fn unavailable(stages: &ConflictStages, blobs: &[Option<&Vec<u8>>]) -> Option<Me
         (Some(_), None) => return Some(MergeUnavailable::TheirsDeleted),
         _ => {}
     }
-    let has_mode = |mode: &str| [&stages.base, &stages.ours, &stages.theirs].into_iter().flatten().any(|entry| entry.mode == mode);
+    let has_mode = |mode: &str| {
+        [&stages.base, &stages.ours, &stages.theirs]
+            .into_iter()
+            .flatten()
+            .any(|entry| entry.mode == mode)
+    };
     if has_mode("160000") {
         return Some(MergeUnavailable::Submodule);
     }
@@ -270,8 +300,15 @@ pub fn list_conflicts(git: &Git) -> Result<Vec<ConflictFile>> {
     read_stages(git, None)?
         .into_iter()
         .map(|(path, stages)| {
-            let blobs = [blob(git, stages.base.as_ref())?, blob(git, stages.ours.as_ref())?, blob(git, stages.theirs.as_ref())?];
-            let reason = unavailable(&stages, &[blobs[0].as_ref(), blobs[1].as_ref(), blobs[2].as_ref()]);
+            let blobs = [
+                blob(git, stages.base.as_ref())?,
+                blob(git, stages.ours.as_ref())?,
+                blob(git, stages.theirs.as_ref())?,
+            ];
+            let reason = unavailable(
+                &stages,
+                &[blobs[0].as_ref(), blobs[1].as_ref(), blobs[2].as_ref()],
+            );
             Ok(ConflictFile {
                 ours: stages.state(MergeSide::Ours),
                 theirs: stages.state(MergeSide::Theirs),
@@ -285,7 +322,9 @@ pub fn list_conflicts(git: &Git) -> Result<Vec<ConflictFile>> {
 
 /// 进行中操作的元数据版本（指纹的一部分：换了一步 rebase 也让旧页签失效）。
 fn operation_version(git: &Git) -> Result<String> {
-    Ok(operation::detect(git, 0)?.map(|state| state.metadata_version).unwrap_or_default())
+    Ok(operation::detect(git, 0)?
+        .map(|state| state.metadata_version)
+        .unwrap_or_default())
 }
 
 /// 合并相关的指纹：三个版本的模式与对象、工作区文件、进行中的操作。
@@ -294,28 +333,61 @@ pub fn fingerprint(git: &Git, path: &str) -> Result<String> {
     fingerprint_with(git, path, &stages, &operation_version(git)?)
 }
 
-fn fingerprint_with(git: &Git, path: &str, stages: &ConflictStages, operation: &str) -> Result<String> {
+fn fingerprint_with(
+    git: &Git,
+    path: &str,
+    stages: &ConflictStages,
+    operation: &str,
+) -> Result<String> {
     let stage_text = [&stages.base, &stages.ours, &stages.theirs]
         .iter()
-        .map(|entry| entry.as_ref().map(|entry| format!("{} {}", entry.mode, entry.oid)).unwrap_or_default())
+        .map(|entry| {
+            entry
+                .as_ref()
+                .map(|entry| format!("{} {}", entry.mode, entry.oid))
+                .unwrap_or_default()
+        })
         .collect::<Vec<_>>()
         .join("\n");
     let worktree = worktree_state(&git.directory.join(path))?;
-    Ok(crate::git::fingerprint(&[stage_text.as_bytes(), &worktree, operation.as_bytes()]))
+    Ok(crate::git::fingerprint(&[
+        stage_text.as_bytes(),
+        &worktree,
+        operation.as_bytes(),
+    ]))
 }
 
 /// 工作区里这个路径的状态（不跟随符号链接）。
 fn worktree_state(full: &Path) -> Result<Vec<u8>> {
     match std::fs::symlink_metadata(full) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(b"missing".to_vec()),
-        Err(error) => Err(AppError::rejected(format!("读取工作区文件失败：{error}"))),
+        Err(error) => Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.merge.failedReadWorkingTreeFile",
+            "读取工作区文件失败：{error}",
+            &[("error", format!("{}", error))],
+        )),
         Ok(meta) if meta.file_type().is_symlink() => {
-            let target = std::fs::read_link(full).map_err(|error| AppError::rejected(format!("读取符号链接失败：{error}")))?;
+            let target = std::fs::read_link(full).map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.merge.failedReadSymbolicLinkCause",
+                    "读取符号链接失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?;
             Ok([b"link:".as_slice(), target.to_string_lossy().as_bytes()].concat())
         }
         Ok(meta) if meta.is_dir() => Ok(b"dir".to_vec()),
         Ok(meta) => {
-            let mut bytes = std::fs::read(full).map_err(|error| AppError::rejected(format!("读取工作区文件失败：{error}")))?;
+            let mut bytes = std::fs::read(full).map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.merge.failedReadWorkingTreeFileCause",
+                    "读取工作区文件失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?;
             bytes.push(if is_executable(&meta) { b'x' } else { b'-' });
             Ok(bytes)
         }
@@ -347,29 +419,52 @@ pub fn side_labels(git: &Git, kind: Option<OperationKind>) -> (MergeSideLabel, M
                 .try_run(&["rev-parse", "--verify", "-q", "MERGE_HEAD"])
                 .and_then(|oid| {
                     let oid = oid.trim().to_string();
-                    git.try_run(&["name-rev", "--name-only", "--refs=refs/heads/*", "--no-undefined", &oid])
-                        .map(|name| name.trim().to_string())
-                        .or_else(|| Some(oid.chars().take(8).collect()))
+                    git.try_run(&[
+                        "name-rev",
+                        "--name-only",
+                        "--refs=refs/heads/*",
+                        "--no-undefined",
+                        &oid,
+                    ])
+                    .map(|name| name.trim().to_string())
+                    .or_else(|| Some(oid.chars().take(8).collect()))
                 });
-            (label(MergeSideRole::CurrentBranch, git.current_branch()), label(MergeSideRole::MergedIn, merged))
+            (
+                label(MergeSideRole::CurrentBranch, git.current_branch()),
+                label(MergeSideRole::MergedIn, merged),
+            )
         }
         Some(OperationKind::Rebase) => {
             let onto = rebase_onto(git).and_then(|oid| describe(&oid));
-            (label(MergeSideRole::Upstream, onto), label(MergeSideRole::YourCommit, describe("REBASE_HEAD")))
+            (
+                label(MergeSideRole::Upstream, onto),
+                label(MergeSideRole::YourCommit, describe("REBASE_HEAD")),
+            )
         }
-        Some(OperationKind::CherryPick) => (label(MergeSideRole::Head, None), label(MergeSideRole::AppliedCommit, describe("CHERRY_PICK_HEAD"))),
-        Some(OperationKind::Revert) => (label(MergeSideRole::Head, None), label(MergeSideRole::AppliedCommit, describe("REVERT_HEAD"))),
-        None => (label(MergeSideRole::Ours, None), label(MergeSideRole::Theirs, None)),
+        Some(OperationKind::CherryPick) => (
+            label(MergeSideRole::Head, None),
+            label(MergeSideRole::AppliedCommit, describe("CHERRY_PICK_HEAD")),
+        ),
+        Some(OperationKind::Revert) => (
+            label(MergeSideRole::Head, None),
+            label(MergeSideRole::AppliedCommit, describe("REVERT_HEAD")),
+        ),
+        None => (
+            label(MergeSideRole::Ours, None),
+            label(MergeSideRole::Theirs, None),
+        ),
     }
 }
 
 /// rebase 的 onto 提交（路径由 Git 解析，linked worktree 也正确）。
 fn rebase_onto(git: &Git) -> Option<String> {
-    ["rebase-merge/onto", "rebase-apply/onto"].iter().find_map(|name| {
-        let path = git.try_run(&["rev-parse", "--path-format=absolute", "--git-path", name])?;
-        let text = std::fs::read_to_string(PathBuf::from(path.trim_end_matches('\n'))).ok()?;
-        Some(text.trim().to_string()).filter(|oid| !oid.is_empty())
-    })
+    ["rebase-merge/onto", "rebase-apply/onto"]
+        .iter()
+        .find_map(|name| {
+            let path = git.try_run(&["rev-parse", "--path-format=absolute", "--git-path", name])?;
+            let text = std::fs::read_to_string(PathBuf::from(path.trim_end_matches('\n'))).ok()?;
+            Some(text.trim().to_string()).filter(|oid| !oid.is_empty())
+        })
 }
 
 /// 临时目录：放在 Revia 数据目录下，用完删除（设计第 3 节）。
@@ -388,7 +483,14 @@ impl TempDir {
                 .unwrap_or_default()
         );
         let path = data_dir.join("tmp").join(unique);
-        std::fs::create_dir_all(&path).map_err(|error| AppError::internal(format!("创建临时目录失败：{error}")))?;
+        std::fs::create_dir_all(&path).map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.merge.failedCreateTemporaryDirectoryCause",
+                "创建临时目录失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?;
         Ok(Self { path })
     }
 
@@ -398,7 +500,14 @@ impl TempDir {
 
     fn write(&self, name: &str, bytes: &[u8]) -> Result<PathBuf> {
         let path = self.path.join(name);
-        std::fs::write(&path, bytes).map_err(|error| AppError::internal(format!("写临时文件失败：{error}")))?;
+        std::fs::write(&path, bytes).map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.merge.failedWriteTemporaryFileCause",
+                "写临时文件失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?;
         Ok(path)
     }
 }
@@ -460,7 +569,13 @@ fn side_changes(git: &Git, base: &Path, side_path: &Path, side: MergeSide) -> Re
         .map(|hunk| {
             let (base_start, base_end) = range(hunk.old_start, hunk.old_count);
             let (side_start, side_end) = range(hunk.new_start, hunk.new_count);
-            Change { side, base_start, base_end, side_start, side_end }
+            Change {
+                side,
+                base_start,
+                base_end,
+                side_start,
+                side_end,
+            }
         })
         .collect())
 }
@@ -516,9 +631,23 @@ fn group_chunks(ours: &Text, theirs: &Text, changes: Vec<Change>) -> Vec<MergeCh
     let (mut ours_delta, mut theirs_delta) = (0i64, 0i64);
     let mut chunks = Vec::with_capacity(groups.len());
     for (id, group) in groups.iter().enumerate() {
-        let base_start = group.iter().map(|change| change.base_start).min().unwrap_or(0);
-        let base_end = group.iter().map(|change| change.base_end).max().unwrap_or(0);
-        let delta_of = |side| group.iter().filter(|change| change.side == side).map(Change::delta).sum::<i64>();
+        let base_start = group
+            .iter()
+            .map(|change| change.base_start)
+            .min()
+            .unwrap_or(0);
+        let base_end = group
+            .iter()
+            .map(|change| change.base_end)
+            .max()
+            .unwrap_or(0);
+        let delta_of = |side| {
+            group
+                .iter()
+                .filter(|change| change.side == side)
+                .map(Change::delta)
+                .sum::<i64>()
+        };
         let has = |side| group.iter().any(|change| change.side == side);
         let ours_start = (base_start as i64 + ours_delta) as u32;
         let theirs_start = (base_start as i64 + theirs_delta) as u32;
@@ -529,7 +658,9 @@ fn group_chunks(ours: &Text, theirs: &Text, changes: Vec<Change>) -> Vec<MergeCh
         let kind = match (has(MergeSide::Ours), has(MergeSide::Theirs)) {
             (true, false) => MergeChunkKind::Ours,
             (false, true) => MergeChunkKind::Theirs,
-            _ if ours.slice(ours_start, ours_end) == theirs.slice(theirs_start, theirs_end) => MergeChunkKind::Both,
+            _ if ours.slice(ours_start, ours_end) == theirs.slice(theirs_start, theirs_end) => {
+                MergeChunkKind::Both
+            }
             _ => MergeChunkKind::Conflict,
         };
         chunks.push(MergeChunk {
@@ -552,7 +683,13 @@ fn group_chunks(ours: &Text, theirs: &Text, changes: Vec<Change>) -> Vec<MergeCh
 
 /// 按块拼出结果：`apply` 为 true 时放进不冲突的块，冲突块保留共同祖先的内容。
 /// 同时填好每块在结果里的区间与初始状态。
-fn assemble(base: &Text, ours: &Text, theirs: &Text, chunks: &mut [MergeChunk], apply: bool) -> Vec<u8> {
+fn assemble(
+    base: &Text,
+    ours: &Text,
+    theirs: &Text,
+    chunks: &mut [MergeChunk],
+    apply: bool,
+) -> Vec<u8> {
     let mut out = Vec::new();
     let mut line_count = 0u32;
     let mut cursor = 0u32;
@@ -561,20 +698,32 @@ fn assemble(base: &Text, ours: &Text, theirs: &Text, chunks: &mut [MergeChunk], 
         *line_count += lines(bytes).len() as u32;
     };
     for chunk in chunks.iter_mut() {
-        push(&mut out, base.slice(cursor, chunk.base_start), &mut line_count);
+        push(
+            &mut out,
+            base.slice(cursor, chunk.base_start),
+            &mut line_count,
+        );
         chunk.result_start = line_count;
         let content = match (chunk.kind, apply) {
-            (MergeChunkKind::Ours | MergeChunkKind::Both, true) => ours.slice(chunk.ours_start, chunk.ours_end),
+            (MergeChunkKind::Ours | MergeChunkKind::Both, true) => {
+                ours.slice(chunk.ours_start, chunk.ours_end)
+            }
             (MergeChunkKind::Theirs, true) => theirs.slice(chunk.theirs_start, chunk.theirs_end),
             _ => base.slice(chunk.base_start, chunk.base_end),
         };
         push(&mut out, content, &mut line_count);
         chunk.result_end = line_count;
-        chunk.ours_applied = apply && matches!(chunk.kind, MergeChunkKind::Ours | MergeChunkKind::Both);
-        chunk.theirs_applied = apply && matches!(chunk.kind, MergeChunkKind::Theirs | MergeChunkKind::Both);
+        chunk.ours_applied =
+            apply && matches!(chunk.kind, MergeChunkKind::Ours | MergeChunkKind::Both);
+        chunk.theirs_applied =
+            apply && matches!(chunk.kind, MergeChunkKind::Theirs | MergeChunkKind::Both);
         cursor = chunk.base_end;
     }
-    push(&mut out, base.slice(cursor, base.line_count()), &mut line_count);
+    push(
+        &mut out,
+        base.slice(cursor, base.line_count()),
+        &mut line_count,
+    );
     out
 }
 
@@ -604,7 +753,12 @@ fn merge_file(git: &Git, ours: &Path, base: &Path, theirs: &Path) -> Result<(Vec
     let output = git.run(&args)?;
     // 退出码就是冲突数（上限 127）；更大表示出错。
     if output.timed_out || !(0..128).contains(&output.exit_code) {
-        return Err(AppError::git(format!("git merge-file 执行失败：{}", output.stderr.trim())));
+        return Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.merge.gitMergeFileFailed",
+            "git merge-file 执行失败：{0}",
+            &[("0", format!("{:}", output.stderr.trim()))],
+        ));
     }
     Ok((output.stdout, output.exit_code as u32))
 }
@@ -613,9 +767,13 @@ fn merge_file(git: &Git, ours: &Path, base: &Path, theirs: &Path) -> Result<(Vec
 fn merge_file_with_base(output: &[u8]) -> (Vec<Vec<u8>>, u32) {
     let marker = |ch: u8| {
         let prefix = vec![ch; MARKER_SIZE];
-        move |line: &[u8]| line.starts_with(&prefix) && matches!(line.get(MARKER_SIZE), Some(b' ' | b'\n' | b'\r') | None)
+        move |line: &[u8]| {
+            line.starts_with(&prefix)
+                && matches!(line.get(MARKER_SIZE), Some(b' ' | b'\n' | b'\r') | None)
+        }
     };
-    let (open, base_mark, separator, close) = (marker(b'<'), marker(b'|'), marker(b'='), marker(b'>'));
+    let (open, base_mark, separator, close) =
+        (marker(b'<'), marker(b'|'), marker(b'='), marker(b'>'));
     let mut result = Vec::new();
     let mut conflicts = 0;
     let mut section: Option<u8> = None; // 冲突里的哪一段：o / b / t
@@ -646,14 +804,24 @@ fn to_display(bytes: &[u8]) -> String {
 }
 
 /// 构造合并页签的数据。
-pub fn build_layout(git: &Git, data_dir: &Path, worktree_id: &str, path: &str, auto_apply: bool, language: String) -> Result<MergeLayout> {
+pub fn build_layout(
+    git: &Git,
+    data_dir: &Path,
+    worktree_id: &str,
+    path: &str,
+    auto_apply: bool,
+    language: String,
+) -> Result<MergeLayout> {
     let stages = stages_of(git, path)?;
     let operation = operation::detect(git, 0)?;
     let fingerprint = fingerprint_with(
         git,
         path,
         &stages,
-        &operation.as_ref().map(|state| state.metadata_version.clone()).unwrap_or_default(),
+        &operation
+            .as_ref()
+            .map(|state| state.metadata_version.clone())
+            .unwrap_or_default(),
     )?;
     let kind = operation.as_ref().map(|state| state.kind);
     let (left_label, right_label) = side_labels(git, kind);
@@ -671,7 +839,14 @@ pub fn build_layout(git: &Git, data_dir: &Path, worktree_id: &str, path: &str, a
         right_text: String::new(),
         result_text: String::new(),
         chunks: Vec::new(),
-        unavailable: unavailable(&stages, &[Some(&base_bytes), ours_bytes.as_ref(), theirs_bytes.as_ref()]),
+        unavailable: unavailable(
+            &stages,
+            &[
+                Some(&base_bytes),
+                ours_bytes.as_ref(),
+                theirs_bytes.as_ref(),
+            ],
+        ),
         ours_state: stages.state(MergeSide::Ours),
         theirs_state: stages.state(MergeSide::Theirs),
         crlf: false,
@@ -681,8 +856,19 @@ pub fn build_layout(git: &Git, data_dir: &Path, worktree_id: &str, path: &str, a
     if layout.unavailable.is_some() {
         return Ok(layout);
     }
-    let (ours_bytes, theirs_bytes) = (ours_bytes.unwrap_or_default(), theirs_bytes.unwrap_or_default());
-    let Some((chunks, result)) = chunk_merge(git, data_dir, &base_bytes, &ours_bytes, &theirs_bytes, auto_apply)? else {
+    let (ours_bytes, theirs_bytes) = (
+        ours_bytes.unwrap_or_default(),
+        theirs_bytes.unwrap_or_default(),
+    );
+    let Some((chunks, result)) = chunk_merge(
+        git,
+        data_dir,
+        &base_bytes,
+        &ours_bytes,
+        &theirs_bytes,
+        auto_apply,
+    )?
+    else {
         layout.unavailable = Some(MergeUnavailable::Inconsistent);
         return Ok(layout);
     };
@@ -709,8 +895,17 @@ pub fn chunk_merge(
     let ours_path = dir.write("ours", ours_bytes)?;
     let theirs_path = dir.write("theirs", theirs_bytes)?;
     let mut changes = side_changes(git, &base_path, &ours_path, MergeSide::Ours)?;
-    changes.extend(side_changes(git, &base_path, &theirs_path, MergeSide::Theirs)?);
-    let (base_lines, ours_lines, theirs_lines) = (Text::new(base_bytes), Text::new(ours_bytes), Text::new(theirs_bytes));
+    changes.extend(side_changes(
+        git,
+        &base_path,
+        &theirs_path,
+        MergeSide::Theirs,
+    )?);
+    let (base_lines, ours_lines, theirs_lines) = (
+        Text::new(base_bytes),
+        Text::new(ours_bytes),
+        Text::new(theirs_bytes),
+    );
     let mut chunks = group_chunks(&ours_lines, &theirs_lines, changes);
 
     // 与 Git 的合并结果核对：冲突处数相同，冲突块保留共同祖先时逐行相同。
@@ -718,31 +913,48 @@ pub fn chunk_merge(
     let (expected, marked) = merge_file_with_base(&merged);
     let check = assemble(&base_lines, &ours_lines, &theirs_lines, &mut chunks, true);
     let assembled: Vec<&[u8]> = lines(&check).into_iter().map(strip_eol).collect();
-    let conflicts = chunks.iter().filter(|chunk| chunk.kind == MergeChunkKind::Conflict).count() as u32;
+    let conflicts = chunks
+        .iter()
+        .filter(|chunk| chunk.kind == MergeChunkKind::Conflict)
+        .count() as u32;
     if conflicts != conflict_count.min(127) || conflicts != marked || assembled != expected {
         return Ok(None);
     }
-    let result = assemble(&base_lines, &ours_lines, &theirs_lines, &mut chunks, auto_apply);
+    let result = assemble(
+        &base_lines,
+        &ours_lines,
+        &theirs_lines,
+        &mut chunks,
+        auto_apply,
+    );
     Ok(Some((chunks, result)))
 }
 
 /// 合并结果按“你的版本”的换行写回（设计第 4 节）。
 pub fn result_bytes(text: &str, crlf: bool) -> Vec<u8> {
     let text = text.replace("\r\n", "\n");
-    if crlf { text.replace('\n', "\r\n").into_bytes() } else { text.into_bytes() }
+    if crlf {
+        text.replace('\n', "\r\n").into_bytes()
+    } else {
+        text.into_bytes()
+    }
 }
 
 /// 写入后暂存区应有的对象：按这个路径的属性（过滤、换行转换）计算工作区文件的对象 ID。
 pub fn worktree_blob_id(git: &Git, path: &str) -> Result<String> {
     let full = git.directory.join(path).display().to_string();
-    let output = git.run_ok(&["hash-object", "--path", path, "--", &full], "计算合并结果的对象")?;
+    let output = git.run_ok(
+        &["hash-object", "--path", path, "--", &full],
+        "计算合并结果的对象",
+    )?;
     Ok(output.stdout_lossy().trim().to_string())
 }
 
 /// 暂存区 stage 0 的对象 ID；路径不在暂存区时为 None。
 pub fn index_blob_id(git: &Git, path: &str) -> Option<String> {
     let spec = format!(":0:{path}");
-    git.try_run(&["rev-parse", "--verify", "-q", &spec]).map(|oid| oid.trim().to_string())
+    git.try_run(&["rev-parse", "--verify", "-q", &spec])
+        .map(|oid| oid.trim().to_string())
 }
 
 /// 整文件接受一侧时要用的 stage（与 `git checkout --ours/--theirs` 一致）。
@@ -763,7 +975,13 @@ mod tests {
     use super::*;
 
     fn change(side: MergeSide, base: (u32, u32), side_range: (u32, u32)) -> Change {
-        Change { side, base_start: base.0, base_end: base.1, side_start: side_range.0, side_end: side_range.1 }
+        Change {
+            side,
+            base_start: base.0,
+            base_end: base.1,
+            side_start: side_range.0,
+            side_end: side_range.1,
+        }
     }
 
     #[test]
@@ -773,7 +991,10 @@ mod tests {
         let chunks = group_chunks(
             &ours,
             &theirs,
-            vec![change(MergeSide::Ours, (1, 2), (1, 2)), change(MergeSide::Theirs, (2, 3), (2, 3))],
+            vec![
+                change(MergeSide::Ours, (1, 2), (1, 2)),
+                change(MergeSide::Theirs, (2, 3), (2, 3)),
+            ],
         );
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].kind, MergeChunkKind::Conflict);
@@ -789,11 +1010,18 @@ mod tests {
         let chunks = group_chunks(
             &ours,
             &theirs,
-            vec![change(MergeSide::Ours, (1, 1), (1, 3)), change(MergeSide::Theirs, (3, 4), (3, 4))],
+            vec![
+                change(MergeSide::Ours, (1, 1), (1, 3)),
+                change(MergeSide::Theirs, (3, 4), (3, 4)),
+            ],
         );
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[1].kind, MergeChunkKind::Theirs);
-        assert_eq!((chunks[1].ours_start, chunks[1].ours_end), (5, 6), "对方块在你的版本里的位置要算上前面插入的两行");
+        assert_eq!(
+            (chunks[1].ours_start, chunks[1].ours_end),
+            (5, 6),
+            "对方块在你的版本里的位置要算上前面插入的两行"
+        );
     }
 
     #[test]
@@ -803,7 +1031,10 @@ mod tests {
         let chunks = group_chunks(
             &ours,
             &theirs,
-            vec![change(MergeSide::Ours, (1, 2), (1, 2)), change(MergeSide::Theirs, (1, 2), (1, 2))],
+            vec![
+                change(MergeSide::Ours, (1, 2), (1, 2)),
+                change(MergeSide::Theirs, (1, 2), (1, 2)),
+            ],
         );
         assert_eq!(chunks[0].kind, MergeChunkKind::Both);
     }

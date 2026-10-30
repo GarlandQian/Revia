@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::CommandLog;
-use crate::session::{id_for_path, RepoEntry};
+use crate::session::{RepoEntry, id_for_path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -29,8 +29,16 @@ pub struct Settings {
     pub code_font_family: Option<String>,
     /// 手动指定的 Git 程序路径；None 表示使用登录 shell `PATH` 中的 git（Q27）。
     pub git_path: Option<String>,
-    /// 外部合并工具命令（M6 使用；现在只保存，不改用户的 Git 配置，Q28）。
+    /// 外部合并工具命令（M6；只传给 Git，不改用户的 Git 配置，Q28）。
     pub merge_tool: Option<String>,
+    /// 外部 diff 工具（M6 T）。
+    pub diff_tool: Option<String>,
+    /// 界面语言；None 表示首次按系统语言，之后保存为 `zh-CN` / `en`（Q164）。
+    pub language: Option<String>,
+    /// cherry-pick 空提交是否创建空提交；默认跳过（M6 H02）。
+    pub cherry_pick_keep_empty: bool,
+    /// cherry-pick 已发布提交是否加来源后缀；默认开（M6 H02）。
+    pub cherry_pick_include_source: bool,
     /// 提交工具窗口宽度（像素，Q139：可拖动分隔条）。
     pub sidebar_width: u32,
     /// 并排 / 统一视图（Q17：选择会被记住；返修 C12：不再用 localStorage）。
@@ -77,6 +85,10 @@ pub struct Settings {
     pub merge_auto_apply: bool,
     /// 日志表格显示哪些列（F06）：作者、日期、哈希（默认隐藏）。
     pub log_columns: LogColumns,
+    /// 文件历史是否显示每次提交对应的文件名/路径（F01，默认关，与 Rebased 一致）。
+    pub file_history_show_names: bool,
+    /// stash 差异与本地文件比较；本机 Rebased 当前参照默认选中。
+    pub stash_compare_local: bool,
     /// 合并线拉直（Rebased 的 Long Edges，默认关）：关闭时跨越很多行的边折成短箭头。
     pub log_long_edges: bool,
     /// 只看第一父提交（默认关）。
@@ -113,7 +125,11 @@ pub struct LogColumns {
 
 impl Default for LogColumns {
     fn default() -> Self {
-        Self { author: true, date: true, hash: false }
+        Self {
+            author: true,
+            date: true,
+            hash: false,
+        }
     }
 }
 
@@ -172,7 +188,9 @@ pub const DEFAULT_PROTECTED_BRANCHES: &[&str] = &["master", "main"];
 
 /// 分支名是否匹配受保护分支的某个模式（`*` 通配，`?` 单字符）。
 pub fn matches_protected(name: &str, patterns: &[String]) -> bool {
-    patterns.iter().any(|pattern| glob_matches(pattern.trim(), name))
+    patterns
+        .iter()
+        .any(|pattern| glob_matches(pattern.trim(), name))
 }
 
 /// 极简 glob：只支持 `*` 与 `?`，其余字符按字面比较（分支名里没有转义需求）。
@@ -222,7 +240,12 @@ pub struct NotifyKinds {
 
 impl Default for NotifyKinds {
     fn default() -> Self {
-        Self { stage: true, discard: true, commit: true, recovery: true }
+        Self {
+            stage: true,
+            discard: true,
+            commit: true,
+            recovery: true,
+        }
     }
 }
 
@@ -267,6 +290,10 @@ impl Default for Settings {
             code_font_family: None,
             git_path: None,
             merge_tool: None,
+            diff_tool: None,
+            language: None,
+            cherry_pick_keep_empty: false,
+            cherry_pick_include_source: true,
             sidebar_width: 330,
             view_mode: ViewModeSetting::Split,
             ui_zoom: 100,
@@ -290,6 +317,8 @@ impl Default for Settings {
             notify: NotifyKinds::default(),
             merge_auto_apply: true,
             log_columns: LogColumns::default(),
+            file_history_show_names: false,
+            stash_compare_local: true,
             log_long_edges: false,
             log_first_parent: false,
             log_preview_position: LogPreviewPosition::default(),
@@ -300,7 +329,10 @@ impl Default for Settings {
             auto_update_on_push_rejection: false,
             push_dialog_on_commit: true,
             push_dialog_protected_only: false,
-            protected_branches: DEFAULT_PROTECTED_BRANCHES.iter().map(|name| name.to_string()).collect(),
+            protected_branches: DEFAULT_PROTECTED_BRANCHES
+                .iter()
+                .map(|name| name.to_string())
+                .collect(),
         }
     }
 }
@@ -321,6 +353,10 @@ pub struct SettingsPatch {
     pub diff_font_size: Option<u32>,
     pub git_path: Option<String>,
     pub merge_tool: Option<String>,
+    pub diff_tool: Option<String>,
+    pub language: Option<String>,
+    pub cherry_pick_keep_empty: Option<bool>,
+    pub cherry_pick_include_source: Option<bool>,
     pub sidebar_width: Option<u32>,
     pub view_mode: Option<ViewModeSetting>,
     pub ui_zoom: Option<u32>,
@@ -344,6 +380,8 @@ pub struct SettingsPatch {
     pub notify: Option<NotifyKinds>,
     pub merge_auto_apply: Option<bool>,
     pub log_columns: Option<LogColumns>,
+    pub file_history_show_names: Option<bool>,
+    pub stash_compare_local: Option<bool>,
     pub log_long_edges: Option<bool>,
     pub log_first_parent: Option<bool>,
     pub log_preview_position: Option<LogPreviewPosition>,
@@ -408,10 +446,16 @@ impl Registry {
     pub fn add(&mut self, path: &str) -> Result<RepoEntry> {
         let candidate = PathBuf::from(path);
         if !candidate.is_dir() {
-            return Err(AppError::rejected(format!("目录不存在：{path}")));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.settings.directoryDoesExist",
+                "目录不存在：{path}",
+                &[("path", format!("{}", path))],
+            ));
         }
         let entry = RepoEntry::build(&candidate, self.command_log.clone())?;
-        let canonical = std::fs::canonicalize(Path::new(&entry.path)).unwrap_or_else(|_| PathBuf::from(&entry.path));
+        let canonical = std::fs::canonicalize(Path::new(&entry.path))
+            .unwrap_or_else(|_| PathBuf::from(&entry.path));
 
         let existing = self
             .repos
@@ -431,9 +475,14 @@ impl Registry {
 
     /// 选择当前仓库，并记录最近打开的 worktree。
     pub fn select(&mut self, repo_id: &str, worktree_id: Option<&str>) -> Result<RepoEntry> {
-        let entry = self
-            .find(repo_id)
-            .ok_or_else(|| AppError::rejected("仓库未登记，请先添加"))?;
+        let entry = self.find(repo_id).ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.settings.theRepositoryRegisteredAddFirst",
+                "仓库未登记，请先添加",
+                &[],
+            )
+        })?;
         if let Some(worktree_id) = worktree_id {
             self.settings.last_worktree_id = Some(worktree_id.to_string());
         }
@@ -479,7 +528,10 @@ impl Registry {
         };
         for repo in &self.repos {
             for worktree in &repo.worktrees {
-                consider(Path::new(&worktree.path), id_for_path(Path::new(&worktree.path)));
+                consider(
+                    Path::new(&worktree.path),
+                    id_for_path(Path::new(&worktree.path)),
+                );
             }
             consider(Path::new(&repo.path), repo.id.clone());
         }
@@ -497,19 +549,33 @@ impl Registry {
         let mut next = self.settings.clone();
         if let Some(theme) = &patch.theme_light {
             if !LIGHT_THEMES.contains(&theme.as_str()) {
-                return Err(AppError::rejected(format!("未知的浅色颜色主题：{theme}")));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.settings.unknownLightColorTheme",
+                    "未知的浅色颜色主题：{theme}",
+                    &[("theme", format!("{}", theme))],
+                ));
             }
             next.theme_light = theme.clone();
         }
         if let Some(theme) = &patch.theme_dark {
             if !DARK_THEMES.contains(&theme.as_str()) {
-                return Err(AppError::rejected(format!("未知的深色颜色主题：{theme}")));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.settings.unknownDarkColorTheme",
+                    "未知的深色颜色主题：{theme}",
+                    &[("theme", format!("{}", theme))],
+                ));
             }
             next.theme_dark = theme.clone();
         }
         if let Some(font) = &patch.code_font_family {
             let trimmed = font.trim();
-            next.code_font_family = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+            next.code_font_family = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
         }
         if let Some(size) = patch.diff_font_size {
             next.diff_font_size = size.clamp(9, 24);
@@ -521,14 +587,52 @@ impl Registry {
             } else {
                 let candidate = Path::new(trimmed);
                 if !candidate.is_file() {
-                    return Err(AppError::rejected(format!("Git 程序路径不是可执行文件：{trimmed}")));
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.settings.theGitProgramPathExecutableFile",
+                        "Git 程序路径不是可执行文件：{trimmed}",
+                        &[("trimmed", format!("{}", trimmed))],
+                    ));
                 }
                 next.git_path = Some(trimmed.to_string());
             }
         }
         if let Some(tool) = &patch.merge_tool {
             let trimmed = tool.trim();
-            next.merge_tool = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
+            next.merge_tool = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        if let Some(tool) = &patch.diff_tool {
+            let trimmed = tool.trim();
+            next.diff_tool = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        if let Some(language) = &patch.language {
+            let trimmed = language.trim();
+            if trimmed.is_empty() {
+                next.language = None;
+            } else if matches!(trimmed, "zh-CN" | "en") {
+                next.language = Some(trimmed.to_string());
+            } else {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.settings.unknownLanguage",
+                    "未知的界面语言：{language}",
+                    &[("language", trimmed.to_string())],
+                ));
+            }
+        }
+        if let Some(value) = patch.cherry_pick_keep_empty {
+            next.cherry_pick_keep_empty = value;
+        }
+        if let Some(value) = patch.cherry_pick_include_source {
+            next.cherry_pick_include_source = value;
         }
         if let Some(width) = patch.sidebar_width {
             next.sidebar_width = width.clamp(220, 720);
@@ -599,6 +703,10 @@ impl Registry {
         if let Some(value) = patch.log_columns {
             next.log_columns = value;
         }
+        if let Some(value) = patch.stash_compare_local { next.stash_compare_local = value; }
+        if let Some(value) = patch.file_history_show_names {
+            next.file_history_show_names = value;
+        }
         if let Some(value) = patch.log_long_edges {
             next.log_long_edges = value;
         }
@@ -651,7 +759,12 @@ fn normalize_patterns(values: &[String]) -> Result<Vec<String>> {
             continue;
         }
         if pattern.chars().any(char::is_whitespace) {
-            return Err(AppError::rejected(format!("受保护分支模式不能包含空白：{pattern}")));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.settings.protectedBranchPatternsContainWhitespace",
+                "受保护分支模式不能包含空白：{pattern}",
+                &[("pattern", format!("{}", pattern))],
+            ));
         }
         if !next.iter().any(|existing: &String| existing == pattern) {
             next.push(pattern.to_string());
@@ -666,17 +779,51 @@ pub fn settings_path(directory: &Path) -> PathBuf {
 
 fn read_settings(directory: &Path) -> Result<Settings> {
     let path = settings_path(directory);
-    let text = std::fs::read_to_string(&path).map_err(|error| AppError::internal(format!("读取设置失败：{error}")))?;
-    serde_json::from_str(&text).map_err(|error| AppError::internal(format!("解析设置失败：{error}")))
+    let text = std::fs::read_to_string(&path).map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.settings.failedReadSettingsCause",
+            "读取设置失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
+    serde_json::from_str(&text).map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.settings.failedParseSettingsCause",
+            "解析设置失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })
 }
 
 fn write_settings(directory: &Path, settings: &Settings) -> Result<()> {
-    std::fs::create_dir_all(directory)
-        .map_err(|error| AppError::internal(format!("创建数据目录失败：{error}")))?;
+    std::fs::create_dir_all(directory).map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.settings.failedCreateDataDirectoryCause",
+            "创建数据目录失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     let path = settings_path(directory);
     let text = serde_json::to_string_pretty(settings)?;
-    std::fs::write(&path, text).map_err(|error| AppError::internal(format!("写入设置失败：{error}")))
+    std::fs::write(&path, text).map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.settings.failedWriteSettingsCause",
+            "写入设置失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })
 }
+
+/// Platform-specific first-run language selection stays in the platform shell.
+pub fn system_language() -> String {
+    crate::platform::system_language()
+}
+
+pub use crate::platform::language_from_locale;
 
 #[cfg(test)]
 mod tests {
@@ -700,7 +847,10 @@ mod tests {
             diff_ignore_whitespace: 2,
             commit_subject_limit: 60,
             commit_warn_large_file_bytes: 1024,
-            notify: NotifyKinds { discard: false, ..NotifyKinds::default() },
+            notify: NotifyKinds {
+                discard: false,
+                ..NotifyKinds::default()
+            },
             ..Settings::default()
         };
         write_settings(dir.path(), &settings).unwrap();
@@ -724,27 +874,36 @@ mod tests {
     #[test]
     fn old_settings_files_get_theme_defaults() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(settings_path(dir.path()), r#"{"repos":[],"diffFontSize":11}"#).unwrap();
+        std::fs::write(
+            settings_path(dir.path()),
+            r#"{"repos":[],"diffFontSize":11}"#,
+        )
+        .unwrap();
         let read = read_settings(dir.path()).unwrap();
         assert_eq!(read.diff_font_size, 11);
         assert_eq!(read.theme_light, DEFAULT_LIGHT_THEME);
         assert_eq!(read.theme_dark, DEFAULT_DARK_THEME);
+        assert!(read.stash_compare_local);
     }
 
     #[test]
     fn update_settings_validates_theme_and_clamps_font() {
         let dir = tempfile::tempdir().unwrap();
-        let mut registry = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        let mut registry =
+            Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
         let updated = registry
             .update_settings(&SettingsPatch {
                 theme_light: Some("light-2026".into()),
                 theme_dark: Some("one-dark-pro".into()),
                 diff_font_size: Some(100),
+                stash_compare_local: Some(false),
                 ..SettingsPatch::default()
             })
             .unwrap();
         assert_eq!(updated.theme_light, "light-2026");
         assert_eq!(updated.diff_font_size, 24);
+        assert!(!updated.stash_compare_local);
+        assert!(!read_settings(dir.path()).unwrap().stash_compare_local);
         let rejected = registry.update_settings(&SettingsPatch {
             theme_light: Some("one-dark-pro".into()),
             ..SettingsPatch::default()
@@ -764,7 +923,8 @@ mod tests {
     #[test]
     fn font_size_is_clamped() {
         let dir = tempfile::tempdir().unwrap();
-        let mut registry = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        let mut registry =
+            Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
         assert_eq!(registry.update_font_size(100).unwrap().diff_font_size, 24);
         assert_eq!(registry.update_font_size(1).unwrap().diff_font_size, 9);
     }

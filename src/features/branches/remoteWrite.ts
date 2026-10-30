@@ -1,3 +1,4 @@
+import type { NoticeText } from "@/components/app/Notifications";
 /**
  * 分支与远端写操作的前端编排（M5 B01）。
  *
@@ -18,7 +19,8 @@ import type { CreateBranchRequest } from "@/types/bindings/CreateBranchRequest";
 import type { PushRequest } from "@/types/bindings/PushRequest";
 import type { PushResult } from "@/types/bindings/PushResult";
 import type { UpdateOutcome } from "@/types/bindings/UpdateOutcome";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
+import { formatAppError } from "@/lib/error";
 import { runGuardedWrite, type GuardedWriteDeps } from "@/lib/guardedWrite";
 
 export type RemoteWriteIntent =
@@ -50,8 +52,9 @@ export interface RemoteWriteLease {
  * 拒绝原因）优先，只有完全没有消息时才退回通用失败提示。
  */
 export function branchFailureDetail(error: AppErrorPayload | null | undefined): string {
-  const message = error?.message?.trim();
-  return message && message.length > 0 ? message : messages.branches.createFailed;
+  if (!error) return messages.branches.createFailed;
+  const message = formatAppError(error).trim();
+  return message.length > 0 ? message : messages.branches.createFailed;
 }
 
 /** 执行一次受保护的分支 / 远端写操作。 */
@@ -138,56 +141,56 @@ export function planAfterPushRejected(options: {
 /** 更新结果的通知文案（B04）。 */
 export function updateNotice(outcome: UpdateOutcome): {
   tone: "success" | "warning" | "error";
-  title: string;
-  detail?: string;
+  title: NoticeText;
+  detail?: NoticeText;
 } {
   switch (outcome.status) {
     case "upToDate":
-      return { tone: "success", title: messages.remote.upToDate };
+      return { tone: "success", title: () => messages.remote.upToDate };
     case "updated":
       return {
         tone: "success",
-        title: messages.remote.updated(outcome.commitsMerged),
+        title: () => messages.remote.updated(outcome.commitsMerged),
         detail: outcome.upstream,
       };
     case "mergeConflict":
       return {
         tone: "warning",
-        title: messages.remote.mergeConflict,
-        detail: outcome.conflicts.length ? messages.remote.conflictFiles(outcome.conflicts) : undefined,
+        title: () => messages.remote.mergeConflict,
+        detail: outcome.conflicts.length ? () => messages.remote.conflictFiles(outcome.conflicts) : undefined,
       };
     case "rebaseConflict":
       return {
         tone: "warning",
-        title: messages.remote.rebaseConflict,
-        detail: outcome.conflicts.length ? messages.remote.conflictFiles(outcome.conflicts) : undefined,
+        title: () => messages.remote.rebaseConflict,
+        detail: outcome.conflicts.length ? () => messages.remote.conflictFiles(outcome.conflicts) : undefined,
       };
     case "autostashConflict":
       return {
         tone: "warning",
-        title: messages.remote.autostashConflict,
-        detail: outcome.stashKept ? messages.remote.stashKept(outcome.stashKept) : undefined,
+        title: () => messages.remote.autostashConflict,
+        detail: outcome.stashKept ? () => messages.remote.stashKept(outcome.stashKept!) : undefined,
       };
     default:
-      return { tone: "warning", title: messages.remote.unknownUpdate };
+      return { tone: "warning", title: () => messages.remote.unknownUpdate };
   }
 }
 
 /** 推送结果的通知文案（B05）。 */
 export function pushNotice(result: PushResult): {
   tone: "success" | "warning" | "error";
-  title: string;
-  detail?: string;
+  title: NoticeText;
+  detail?: NoticeText;
 } {
   if (result.kind === "pushed") {
     return {
       tone: "success",
-      title: messages.remote.pushed(result.commits, `${result.remote}/${result.branch}`),
+      title: () => messages.remote.pushed(result.commits, `${result.remote}/${result.branch}`),
     };
   }
   return {
     tone: "warning",
-    title: messages.remote.pushRejected,
+    title: () => messages.remote.pushRejected,
     detail: result.reason,
   };
 }

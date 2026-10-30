@@ -43,6 +43,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -83,6 +84,7 @@
   --accent: var(--list-hoverbackground);
   --accent-foreground: var(--foreground);
   --destructive: var(--gitdecoration-conflictingresourceforeground);
+  --destructive-foreground: var(--input-background);
   --border: var(--panel-border);
   --input: var(--input-border);
   --ring: var(--focusborder);
@@ -1396,6 +1398,11 @@
   padding: 0 6px;
   font-family: var(--font-sans);
   outline: none;
+}
+
+/* 左侧有搜索图标的过滤框：未分层的 padding 会盖过 Tailwind 的 pl-*。 */
+.log-input-search {
+  padding-left: 24px;
 }
 
 .log-filter-button:hover:not(:disabled) {

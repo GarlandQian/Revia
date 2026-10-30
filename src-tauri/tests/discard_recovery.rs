@@ -9,7 +9,9 @@ use std::sync::Arc;
 use revia_lib::error::{AppError, ErrorKind};
 use revia_lib::git::{CommandLog, rows::ViewMode, status::ChangesKind};
 use revia_lib::platform;
-use revia_lib::recovery::{DiscardOutcome, DiscardPhase, RecoverySource, RecoveryStatus, RecoveryStore, WorktreeIdentity};
+use revia_lib::recovery::{
+    DiscardOutcome, DiscardPhase, RecoverySource, RecoveryStatus, RecoveryStore, WorktreeIdentity,
+};
 use revia_lib::session::{ChangeEntry, WorktreeSession};
 use revia_lib::shell::{EnvCaptureInfo, ShellEnv};
 
@@ -47,30 +49,64 @@ impl Fixture {
         fs::create_dir_all(&home).unwrap();
         fs::write(home.join(".gitconfig"), "").unwrap();
         let mut paths = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-            .map(|path| path.to_string_lossy().into_owned()).collect::<Vec<_>>();
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
         #[cfg(unix)]
         paths.extend(["/opt/homebrew/bin".into(), "/usr/bin".into(), "/bin".into()]);
         let mut vars = HashMap::from([
-            ("HOME".into(), home.display().to_string()), ("USERPROFILE".into(), home.display().to_string()),
+            ("HOME".into(), home.display().to_string()),
+            ("USERPROFILE".into(), home.display().to_string()),
             ("XDG_CONFIG_HOME".into(), home.display().to_string()),
-            ("GIT_CONFIG_GLOBAL".into(), home.join(".gitconfig").display().to_string()),
-            ("GIT_CONFIG_NOSYSTEM".into(), "1".into()), ("GIT_TERMINAL_PROMPT".into(), "0".into()),
-            ("PATH".into(), std::env::join_paths(paths.iter().map(Path::new)).unwrap().to_string_lossy().into_owned()),
+            (
+                "GIT_CONFIG_GLOBAL".into(),
+                home.join(".gitconfig").display().to_string(),
+            ),
+            ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
+            ("GIT_TERMINAL_PROMPT".into(), "0".into()),
+            (
+                "PATH".into(),
+                std::env::join_paths(paths.iter().map(Path::new))
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
         ]);
         for key in ["SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR"] {
-            if let Ok(value) = std::env::var(key) { vars.insert(key.into(), value); }
+            if let Ok(value) = std::env::var(key) {
+                vars.insert(key.into(), value);
+            }
         }
-        let result = Self { temp, repo, vars, paths };
+        let result = Self {
+            temp,
+            repo,
+            vars,
+            paths,
+        };
         result.git(&["init", "-b", "main"]);
-        for (key, value) in [("user.name", "Revia Fixture"), ("user.email", "fixture@example.invalid"), ("commit.gpgsign", "false"), ("core.autocrlf", "false")] {
+        for (key, value) in [
+            ("user.name", "Revia Fixture"),
+            ("user.email", "fixture@example.invalid"),
+            ("commit.gpgsign", "false"),
+            ("core.autocrlf", "false"),
+        ] {
             result.git(&["config", key, value]);
         }
         result
     }
 
     fn git(&self, args: &[&str]) -> Vec<u8> {
-        let output = Command::new("git").current_dir(&self.repo).env_clear().envs(&self.vars).args(args).output().unwrap();
-        assert!(output.status.success(), "Git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+        let output = Command::new("git")
+            .current_dir(&self.repo)
+            .env_clear()
+            .envs(&self.vars)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "Git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         output.stdout
     }
 
@@ -86,17 +122,43 @@ impl Fixture {
     }
 
     fn session_at(&self, path: &Path) -> Arc<WorktreeSession> {
-        WorktreeSession::open("fixture", path, ShellEnv {
-            vars: self.vars.clone(), path: self.paths.clone(),
-            info: EnvCaptureInfo { worktree: path.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
-                timed_out: false, used_fallback: true, var_count: self.vars.len(), path_entries: self.paths.clone(), diagnostics: None },
-        }, Arc::new(CommandLog::default())).unwrap()
+        WorktreeSession::open(
+            "fixture",
+            path,
+            ShellEnv {
+                vars: self.vars.clone(),
+                path: self.paths.clone(),
+                info: EnvCaptureInfo {
+                    worktree: path.display().to_string(),
+                    shell: "fixture".into(),
+                    elapsed_ms: 0,
+                    timed_out: false,
+                    used_fallback: true,
+                    var_count: self.vars.len(),
+                    path_entries: self.paths.clone(),
+                    diagnostics: None,
+                },
+            },
+            Arc::new(CommandLog::default()),
+        )
+        .unwrap()
     }
 
-    fn session(&self) -> Arc<WorktreeSession> { self.session_at(&self.repo) }
-    fn store(&self) -> RecoveryStore { RecoveryStore::with_clock(self.temp.path().join("data"), Arc::new(|| 1_792_742_400_123)) }
-    fn index(&self) -> Vec<u8> { self.git(&["ls-files", "--stage", "-z"]) }
-    fn read(&self, path: &str) -> Vec<u8> { fs::read(self.repo.join(path)).unwrap() }
+    fn session(&self) -> Arc<WorktreeSession> {
+        self.session_at(&self.repo)
+    }
+    fn store(&self) -> RecoveryStore {
+        RecoveryStore::with_clock(
+            self.temp.path().join("data"),
+            Arc::new(|| 1_792_742_400_123),
+        )
+    }
+    fn index(&self) -> Vec<u8> {
+        self.git(&["ls-files", "--stage", "-z"])
+    }
+    fn read(&self, path: &str) -> Vec<u8> {
+        fs::read(self.repo.join(path)).unwrap()
+    }
 
     fn changed(&self) -> Arc<WorktreeSession> {
         self.write("target.ts", &text(&[]));
@@ -108,10 +170,24 @@ impl Fixture {
 }
 
 fn text(changes: &[(usize, usize)]) -> Vec<u8> {
-    (1..=180).map(|line| format!("export const value{line:03} = {};\n", changes.iter().find(|(n, _)| *n == line).map(|(_, value)| *value).unwrap_or(line))).collect::<String>().into_bytes()
+    (1..=180)
+        .map(|line| {
+            format!(
+                "export const value{line:03} = {};\n",
+                changes
+                    .iter()
+                    .find(|(n, _)| *n == line)
+                    .map(|(_, value)| *value)
+                    .unwrap_or(line)
+            )
+        })
+        .collect::<String>()
+        .into_bytes()
 }
 
-fn expectation_of(inspection: &revia_lib::recovery::RecoveryInspection) -> revia_lib::recovery::RestoreExpectation {
+fn expectation_of(
+    inspection: &revia_lib::recovery::RecoveryInspection,
+) -> revia_lib::recovery::RestoreExpectation {
     revia_lib::recovery::RestoreExpectation {
         version: inspection.version.clone(),
         paths: inspection.paths.clone(),
@@ -120,11 +196,26 @@ fn expectation_of(inspection: &revia_lib::recovery::RecoveryInspection) -> revia
 }
 
 fn entry(session: &WorktreeSession, path: &str) -> ChangeEntry {
-    session.refresh().unwrap().entries.into_iter().find(|entry| entry.path == path && entry.changes == ChangesKind::Unstaged).unwrap()
+    session
+        .refresh()
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|entry| entry.path == path && entry.changes == ChangesKind::Unstaged)
+        .unwrap()
 }
 
-fn discard(session: &WorktreeSession, entry: &ChangeEntry, store: &RecoveryStore) -> revia_lib::error::Result<revia_lib::session::ChangesSnapshot> {
-    session.discard_file(&entry.path, &entry.fingerprint, &entry.snapshot_revision, store)
+fn discard(
+    session: &WorktreeSession,
+    entry: &ChangeEntry,
+    store: &RecoveryStore,
+) -> revia_lib::error::Result<revia_lib::session::ChangesSnapshot> {
+    session.discard_file(
+        &entry.path,
+        &entry.fingerprint,
+        &entry.snapshot_revision,
+        store,
+    )
 }
 
 #[test]
@@ -152,7 +243,9 @@ fn full_file_preserves_index_and_saves_complete_partial_staged_state() {
     let (record, outcome) = store.read(&summaries[0].id).unwrap();
     assert_eq!(record.before[0].content.as_ref().unwrap(), &before);
     assert!(matches!(record.source, RecoverySource::DiscardFile));
-    let Some(DiscardOutcome::Completed { after }) = outcome else { panic!("missing post-state") };
+    let Some(DiscardOutcome::Completed { after }) = outcome else {
+        panic!("missing post-state")
+    };
     assert_eq!(after[0].content.as_ref().unwrap(), &expected);
     assert_eq!(f.store().list(Some(&identity)).unwrap().len(), 1);
 }
@@ -162,19 +255,42 @@ fn hunk_uses_git_bytes_and_saves_whole_file_without_touching_other_hunks() {
     for crlf in [false, true] {
         let f = Fixture::new();
         let path = "中文 空格.ts";
-        let convert = |bytes: Vec<u8>| if crlf { String::from_utf8(bytes).unwrap().replace('\n', "\r\n").into_bytes() } else { bytes };
+        let convert = |bytes: Vec<u8>| {
+            if crlf {
+                String::from_utf8(bytes)
+                    .unwrap()
+                    .replace('\n', "\r\n")
+                    .into_bytes()
+            } else {
+                bytes
+            }
+        };
         f.write(path, &convert(text(&[])));
         f.commit();
         let before = convert(text(&[(10, 1010), (80, 1080), (140, 1140)]));
         f.write(path, &before);
         let session = f.session();
         let target = entry(&session, path);
-        let rows = session.rows(path, ChangesKind::Unstaged, ViewMode::Unified, 0, 200).unwrap();
-        let actions = rows.rows.iter().filter_map(|row| row.hunk_action.as_ref()).collect::<Vec<_>>();
+        let rows = session
+            .rows(path, ChangesKind::Unstaged, ViewMode::Unified, 0, 200)
+            .unwrap();
+        let actions = rows
+            .rows
+            .iter()
+            .filter_map(|row| row.hunk_action.as_ref())
+            .collect::<Vec<_>>();
         assert_eq!(actions.len(), 3);
         let index = f.index();
         let store = f.store();
-        session.discard_hunk(path, &target.fingerprint, &target.snapshot_revision, &actions[1].hunk_id, &store).unwrap();
+        session
+            .discard_hunk(
+                path,
+                &target.fingerprint,
+                &target.snapshot_revision,
+                &actions[1].hunk_id,
+                &store,
+            )
+            .unwrap();
         assert_eq!(f.read(path), convert(text(&[(10, 1010), (140, 1140)])));
         assert_eq!(f.index(), index);
         let summary = store.list(None).unwrap().remove(0);
@@ -208,9 +324,19 @@ fn binary_deleted_and_renamed_paths_have_full_records() {
     assert_eq!(f.read("new name"), b"rename original\n");
     assert!(!f.repo.join("old name").exists());
     let records = store.list(None).unwrap();
-    let deletion = records.iter().find(|record| record.target == "deleted").unwrap();
-    assert!(store.read(&deletion.id).unwrap().0.before[0].content.is_none());
-    let renamed = records.iter().find(|record| record.target == "new name").unwrap();
+    let deletion = records
+        .iter()
+        .find(|record| record.target == "deleted")
+        .unwrap();
+    assert!(
+        store.read(&deletion.id).unwrap().0.before[0]
+            .content
+            .is_none()
+    );
+    let renamed = records
+        .iter()
+        .find(|record| record.target == "new name")
+        .unwrap();
     assert!(renamed.paths.contains(&"old name".into()));
     assert_eq!(records.len(), 3);
 }
@@ -228,7 +354,9 @@ fn mode_only_discards_and_preserves_executable_pre_state() {
     let index = f.index();
     let store = f.store();
     discard(&session, &target, &store).unwrap();
-    assert!(!platform::executable(&fs::metadata(f.repo.join("mode.sh")).unwrap()));
+    assert!(!platform::executable(
+        &fs::metadata(f.repo.join("mode.sh")).unwrap()
+    ));
     assert_eq!(f.index(), index);
     let record = store.list(None).unwrap().remove(0);
     assert!(store.read(&record.id).unwrap().0.before[0].executable);
@@ -244,7 +372,14 @@ fn storage_failure_and_store_inside_repo_cannot_change_worktree() {
     let blocked = f.temp.path().join("blocked");
     fs::write(&blocked, "not a directory").unwrap();
     assert!(discard(&session, &target, &RecoveryStore::new(blocked)).is_err());
-    assert!(discard(&session, &target, &RecoveryStore::new(f.repo.join("forbidden"))).is_err());
+    assert!(
+        discard(
+            &session,
+            &target,
+            &RecoveryStore::new(f.repo.join("forbidden"))
+        )
+        .is_err()
+    );
     assert!(!f.repo.join("forbidden").exists());
     assert_eq!(f.read("target.ts"), before);
     assert_eq!(f.index(), index);
@@ -252,15 +387,34 @@ fn storage_failure_and_store_inside_repo_cannot_change_worktree() {
 
 #[test]
 fn interruption_keeps_saved_state_without_forging_post_state_or_resuming() {
-    for phase in [DiscardPhase::AfterSave, DiscardPhase::BeforeWrite, DiscardPhase::AfterWrite, DiscardPhase::BeforeComplete] {
+    for phase in [
+        DiscardPhase::AfterSave,
+        DiscardPhase::BeforeWrite,
+        DiscardPhase::AfterWrite,
+        DiscardPhase::BeforeComplete,
+    ] {
         let f = Fixture::new();
         let session = f.changed();
         let target = entry(&session, "target.ts");
         let before = f.read("target.ts");
         let index = f.index();
         let store = f.store();
-        let error = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store,
-            |current| if current == phase { Err(AppError::internal("controlled interruption")) } else { Ok(()) }).unwrap_err();
+        let error = session
+            .discard_with_hook(
+                "target.ts",
+                &target.fingerprint,
+                &target.snapshot_revision,
+                None,
+                &store,
+                |current| {
+                    if current == phase {
+                        Err(AppError::internal("controlled interruption"))
+                    } else {
+                        Ok(())
+                    }
+                },
+            )
+            .unwrap_err();
         assert_eq!(error.kind, ErrorKind::NeedsVerification);
         let summary = store.list(None).unwrap().remove(0);
         assert!(matches!(summary.status, RecoveryStatus::NeedsVerification));
@@ -268,7 +422,14 @@ fn interruption_keeps_saved_state_without_forging_post_state_or_resuming() {
         assert_eq!(record.before[0].content.as_ref().unwrap(), &before);
         assert!(outcome.is_none());
         let after = f.read("target.ts");
-        assert_eq!(after, if matches!(phase, DiscardPhase::AfterSave | DiscardPhase::BeforeWrite) { before } else { text(&[]) });
+        assert_eq!(
+            after,
+            if matches!(phase, DiscardPhase::AfterSave | DiscardPhase::BeforeWrite) {
+                before
+            } else {
+                text(&[])
+            }
+        );
         drop(session);
         let reopened = f.session();
         reopened.refresh().unwrap();
@@ -286,12 +447,22 @@ fn external_change_during_save_is_not_overwritten_but_unrelated_change_is_allowe
         let target = entry(&session, "target.ts");
         let store = f.store();
         let index = f.index();
-        let result = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-            if phase == DiscardPhase::AfterSave {
-                f.write(if related { "target.ts" } else { "other.txt" }, b"external change\n");
-            }
-            Ok(())
-        });
+        let result = session.discard_with_hook(
+            "target.ts",
+            &target.fingerprint,
+            &target.snapshot_revision,
+            None,
+            &store,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    f.write(
+                        if related { "target.ts" } else { "other.txt" },
+                        b"external change\n",
+                    );
+                }
+                Ok(())
+            },
+        );
         let summary = store.list(None).unwrap().remove(0);
         if related {
             assert_eq!(result.unwrap_err().kind, ErrorKind::Rejected);
@@ -312,10 +483,21 @@ fn changed_post_state_is_never_used_as_a_completed_baseline() {
     let session = f.changed();
     let target = entry(&session, "target.ts");
     let store = f.store();
-    let error = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-        if phase == DiscardPhase::AfterWrite { f.write("target.ts", b"later work\n"); }
-        Ok(())
-    }).unwrap_err();
+    let error = session
+        .discard_with_hook(
+            "target.ts",
+            &target.fingerprint,
+            &target.snapshot_revision,
+            None,
+            &store,
+            |phase| {
+                if phase == DiscardPhase::AfterWrite {
+                    f.write("target.ts", b"later work\n");
+                }
+                Ok(())
+            },
+        )
+        .unwrap_err();
     assert_eq!(error.kind, ErrorKind::NeedsVerification);
     assert_eq!(f.read("target.ts"), b"later work\n");
     let summary = store.list(None).unwrap().remove(0);
@@ -331,8 +513,17 @@ fn binary_stale_bytes_are_rejected_by_discard_and_staging() {
     let session = f.session();
     let target = entry(&session, "binary");
     f.write("binary", b"\0two");
-    assert_eq!(discard(&session, &target, &f.store()).unwrap_err().kind, ErrorKind::Rejected);
-    assert_eq!(session.stage_file("binary", &target.fingerprint).unwrap_err().kind, ErrorKind::Rejected);
+    assert_eq!(
+        discard(&session, &target, &f.store()).unwrap_err().kind,
+        ErrorKind::Rejected
+    );
+    assert_eq!(
+        session
+            .stage_file("binary", &target.fingerprint)
+            .unwrap_err()
+            .kind,
+        ErrorKind::Rejected
+    );
     assert_eq!(f.read("binary"), b"\0two");
     assert!(f.store().list(None).unwrap().is_empty());
 }
@@ -342,12 +533,33 @@ fn refresh_invalidates_confirmation_and_old_hunk_credentials() {
     let f = Fixture::new();
     let session = f.changed();
     let old = entry(&session, "target.ts");
-    let rows = session.rows("target.ts", ChangesKind::Unstaged, ViewMode::Split, 0, 100).unwrap();
-    let hunk = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).unwrap();
+    let rows = session
+        .rows("target.ts", ChangesKind::Unstaged, ViewMode::Split, 0, 100)
+        .unwrap();
+    let hunk = rows
+        .rows
+        .iter()
+        .find_map(|row| row.hunk_action.as_ref())
+        .unwrap();
     let new = entry(&session, "target.ts");
     assert_eq!(old.fingerprint, new.fingerprint);
-    assert_eq!(discard(&session, &old, &f.store()).unwrap_err().kind, ErrorKind::Rejected);
-    assert_eq!(session.discard_hunk("target.ts", &new.fingerprint, &new.snapshot_revision, &hunk.hunk_id, &f.store()).unwrap_err().kind, ErrorKind::Rejected);
+    assert_eq!(
+        discard(&session, &old, &f.store()).unwrap_err().kind,
+        ErrorKind::Rejected
+    );
+    assert_eq!(
+        session
+            .discard_hunk(
+                "target.ts",
+                &new.fingerprint,
+                &new.snapshot_revision,
+                &hunk.hunk_id,
+                &f.store()
+            )
+            .unwrap_err()
+            .kind,
+        ErrorKind::Rejected
+    );
     assert!(f.store().list(None).unwrap().is_empty());
 }
 
@@ -358,15 +570,36 @@ fn concurrent_writes_do_not_queue_or_save_extra_records() {
     let target = entry(&session, "target.ts");
     let store = f.store();
     let guard = session.acquire_write_lock().unwrap();
-    assert_eq!(discard(&session, &target, &store).unwrap_err().kind, ErrorKind::Rejected);
+    assert_eq!(
+        discard(&session, &target, &store).unwrap_err().kind,
+        ErrorKind::Rejected
+    );
     drop(guard);
-    session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-        if phase == DiscardPhase::AfterSave {
-            assert_eq!(session.stage_file("target.ts", &target.fingerprint).unwrap_err().kind, ErrorKind::Rejected);
-            assert_eq!(discard(&session, &target, &store).unwrap_err().kind, ErrorKind::Rejected);
-        }
-        Ok(())
-    }).unwrap();
+    session
+        .discard_with_hook(
+            "target.ts",
+            &target.fingerprint,
+            &target.snapshot_revision,
+            None,
+            &store,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    assert_eq!(
+                        session
+                            .stage_file("target.ts", &target.fingerprint)
+                            .unwrap_err()
+                            .kind,
+                        ErrorKind::Rejected
+                    );
+                    assert_eq!(
+                        discard(&session, &target, &store).unwrap_err().kind,
+                        ErrorKind::Rejected
+                    );
+                }
+                Ok(())
+            },
+        )
+        .unwrap();
     assert_eq!(store.list(None).unwrap().len(), 1);
 }
 
@@ -400,14 +633,37 @@ fn untracked_staged_unknown_and_out_of_bounds_targets_cannot_be_discarded() {
     let session = f.changed();
     f.write("untracked", b"keep");
     let snapshot = session.refresh().unwrap();
-    let untracked = snapshot.entries.iter().find(|entry| entry.path == "untracked").unwrap();
+    let untracked = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == "untracked")
+        .unwrap();
     assert!(discard(&session, untracked, &f.store()).is_err());
-    let target = snapshot.entries.iter().find(|entry| entry.path == "target.ts").unwrap();
+    let target = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == "target.ts")
+        .unwrap();
     for path in ["../outside", "/absolute", ".git/config", "unknown"] {
-        assert!(session.discard_file(path, &target.fingerprint, &target.snapshot_revision, &f.store()).is_err());
+        assert!(
+            session
+                .discard_file(
+                    path,
+                    &target.fingerprint,
+                    &target.snapshot_revision,
+                    &f.store()
+                )
+                .is_err()
+        );
     }
     f.git(&["add", "--", "target.ts"]);
-    let staged = session.refresh().unwrap().entries.into_iter().find(|entry| entry.path == "target.ts").unwrap();
+    let staged = session
+        .refresh()
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|entry| entry.path == "target.ts")
+        .unwrap();
     assert!(discard(&session, &staged, &f.store()).is_err());
     assert_eq!(f.read("untracked"), b"keep");
     assert!(f.store().list(None).unwrap().is_empty());
@@ -420,13 +676,20 @@ fn symlink_substitution_after_save_is_refused_without_touching_the_link_target()
     let session = f.changed();
     let target = entry(&session, "target.ts");
     let store = f.store();
-    let result = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-        if phase == DiscardPhase::AfterSave {
-            fs::remove_file(f.repo.join("target.ts")).unwrap();
-            std::os::unix::fs::symlink("other.txt", f.repo.join("target.ts")).unwrap();
-        }
-        Ok(())
-    });
+    let result = session.discard_with_hook(
+        "target.ts",
+        &target.fingerprint,
+        &target.snapshot_revision,
+        None,
+        &store,
+        |phase| {
+            if phase == DiscardPhase::AfterSave {
+                fs::remove_file(f.repo.join("target.ts")).unwrap();
+                std::os::unix::fs::symlink("other.txt", f.repo.join("target.ts")).unwrap();
+            }
+            Ok(())
+        },
+    );
     assert!(result.is_err());
     assert_eq!(f.read("other.txt"), b"other\n");
     assert!(f.repo.join("target.ts").is_symlink());
@@ -456,10 +719,18 @@ fn crlf_attribute_text_discards_with_matching_git_semantics() {
 
     discard(&session, &target, &store).unwrap();
 
-    assert_eq!(f.read("crlf.txt"), committed, "丢弃后必须回到提交时的 CRLF 字节");
+    assert_eq!(
+        f.read("crlf.txt"),
+        committed,
+        "丢弃后必须回到提交时的 CRLF 字节"
+    );
     assert_eq!(f.index(), index, "丢弃不得改变暂存区");
     let (record, outcome) = store.read(&store.list(None).unwrap()[0].id).unwrap();
-    assert_eq!(record.before[0].content.as_ref().unwrap(), &before, "保存的必须是丢弃前真实字节");
+    assert_eq!(
+        record.before[0].content.as_ref().unwrap(),
+        &before,
+        "保存的必须是丢弃前真实字节"
+    );
     assert!(matches!(outcome, Some(DiscardOutcome::Completed { .. })));
 }
 
@@ -524,13 +795,18 @@ fn intent_to_add_is_rejected_without_touching_the_file() {
     f.git(&["add", "-N", "--", "added.txt"]);
     let session = f.session();
     let snapshot = session.refresh().unwrap();
-    let target = snapshot.entries.iter()
+    let target = snapshot
+        .entries
+        .iter()
         .find(|entry| entry.path == "added.txt" && entry.changes == ChangesKind::Unstaged)
         .expect("intent-to-add 应作为未暂存新增出现");
     let before = f.read("added.txt");
     let index = f.index();
     let store = f.store();
-    assert_eq!(discard(&session, &target, &store).unwrap_err().kind, ErrorKind::Rejected);
+    assert_eq!(
+        discard(&session, &target, &store).unwrap_err().kind,
+        ErrorKind::Rejected
+    );
     assert_eq!(f.read("added.txt"), before, "拒绝时不得触碰文件");
     assert_eq!(f.index(), index, "拒绝时不得改变暂存区");
     assert!(store.list(None).unwrap().is_empty(), "拒绝时不产生回收记录");
@@ -547,12 +823,19 @@ fn index_or_mode_change_during_save_is_rejected() {
         let target = entry(&session, "target.ts");
         let store = f.store();
         let before = f.read("target.ts");
-        let result = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-            if phase == DiscardPhase::AfterSave {
-                f.git(&["add", "--", "target.ts"]);
-            }
-            Ok(())
-        });
+        let result = session.discard_with_hook(
+            "target.ts",
+            &target.fingerprint,
+            &target.snapshot_revision,
+            None,
+            &store,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    f.git(&["add", "--", "target.ts"]);
+                }
+                Ok(())
+            },
+        );
         assert_eq!(result.unwrap_err().kind, ErrorKind::Rejected);
         assert_eq!(f.read("target.ts"), before, "拒绝时不得改工作区");
         let summary = store.list(None).unwrap().remove(0);
@@ -563,12 +846,23 @@ fn index_or_mode_change_during_save_is_rejected() {
         let session2 = f2.changed();
         let target2 = entry(&session2, "target.ts");
         let store2 = f2.store();
-        let result2 = session2.discard_with_hook("target.ts", &target2.fingerprint, &target2.snapshot_revision, None, &store2, |phase| {
-            if phase == DiscardPhase::AfterSave {
-                fs::set_permissions(f2.repo.join("target.ts"), fs::Permissions::from_mode(0o755)).unwrap();
-            }
-            Ok(())
-        });
+        let result2 = session2.discard_with_hook(
+            "target.ts",
+            &target2.fingerprint,
+            &target2.snapshot_revision,
+            None,
+            &store2,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    fs::set_permissions(
+                        f2.repo.join("target.ts"),
+                        fs::Permissions::from_mode(0o755),
+                    )
+                    .unwrap();
+                }
+                Ok(())
+            },
+        );
         assert!(result2.is_err());
     }
 }
@@ -589,10 +883,19 @@ fn records_stay_viewable_when_worktree_is_unavailable() {
     assert_eq!(records[0].target, "target.ts");
     assert_eq!(records[0].paths, vec!["target.ts".to_string()]);
     assert!(matches!(records[0].status, RecoveryStatus::Completed));
-    assert!(!records[0].identity_confirmed, "worktree 不可用时身份不能确认");
+    assert!(
+        !records[0].identity_confirmed,
+        "worktree 不可用时身份不能确认"
+    );
     // 记录必须留在独立数据目录，不能写进用户仓库。
     assert!(store.list(None).unwrap()[0].bytes > 0);
-    assert!(!f.temp.path().join("data").join("recovery").starts_with(&f.repo));
+    assert!(
+        !f.temp
+            .path()
+            .join("data")
+            .join("recovery")
+            .starts_with(&f.repo)
+    );
 }
 
 /// 完成记录真实写入失败：已保存记录必须保留且不冒充完成，工作区写入已发生但不自动续跑。
@@ -606,15 +909,24 @@ fn completion_record_failure_keeps_saved_record_without_forging_completion() {
     let store = f.store();
     let index = f.index();
     let record_dir = {
-        let error = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-            if phase == DiscardPhase::BeforeComplete {
-                // 让 outcome 的真实落盘失败（不是靠 hook 假装失败）。
-                let id = store.list(None).unwrap()[0].id.clone();
-                let directory = f.temp.path().join("data").join("recovery").join(&id);
-                fs::set_permissions(&directory, fs::Permissions::from_mode(0o500)).unwrap();
-            }
-            Ok(())
-        }).unwrap_err();
+        let error = session
+            .discard_with_hook(
+                "target.ts",
+                &target.fingerprint,
+                &target.snapshot_revision,
+                None,
+                &store,
+                |phase| {
+                    if phase == DiscardPhase::BeforeComplete {
+                        // 让 outcome 的真实落盘失败（不是靠 hook 假装失败）。
+                        let id = store.list(None).unwrap()[0].id.clone();
+                        let directory = f.temp.path().join("data").join("recovery").join(&id);
+                        fs::set_permissions(&directory, fs::Permissions::from_mode(0o500)).unwrap();
+                    }
+                    Ok(())
+                },
+            )
+            .unwrap_err();
         assert_eq!(error.kind, ErrorKind::NeedsVerification);
         let id = store.list(None).unwrap()[0].id.clone();
         f.temp.path().join("data").join("recovery").join(id)
@@ -627,7 +939,10 @@ fn completion_record_failure_keeps_saved_record_without_forging_completion() {
     // 记录仍在，但没有 outcome，不能被当成已完成。
     let records = store.list(None).unwrap();
     assert_eq!(records.len(), 1);
-    assert!(matches!(records[0].status, RecoveryStatus::NeedsVerification));
+    assert!(matches!(
+        records[0].status,
+        RecoveryStatus::NeedsVerification
+    ));
     assert!(store.read(&records[0].id).unwrap().1.is_none());
     // 不自动续跑：重新打开会话只读真实状态，不会再写一次或新增记录。
     drop(session);
@@ -676,19 +991,47 @@ fn preview_isolates_git_location_environment_from_the_real_repository() {
     let mut env = f.vars.clone();
     env.insert("GIT_DIR".into(), f.repo.join(".git").display().to_string());
     env.insert("GIT_WORK_TREE".into(), f.repo.display().to_string());
-    let isolated_session = WorktreeSession::open("fixture-env", &f.repo, ShellEnv {
-        vars: env, path: f.paths.clone(),
-        info: EnvCaptureInfo { worktree: f.repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
-            timed_out: false, used_fallback: true, var_count: f.vars.len(), path_entries: f.paths.clone(), diagnostics: None },
-    }, Arc::new(CommandLog::default())).unwrap();
+    let isolated_session = WorktreeSession::open(
+        "fixture-env",
+        &f.repo,
+        ShellEnv {
+            vars: env,
+            path: f.paths.clone(),
+            info: EnvCaptureInfo {
+                worktree: f.repo.display().to_string(),
+                shell: "fixture".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: true,
+                var_count: f.vars.len(),
+                path_entries: f.paths.clone(),
+                diagnostics: None,
+            },
+        },
+        Arc::new(CommandLog::default()),
+    )
+    .unwrap();
 
     let target_env = entry(&isolated_session, "target.ts");
     isolated_session
-        .discard_file(&target_env.path, &target_env.fingerprint, &target_env.snapshot_revision, &store)
+        .discard_file(
+            &target_env.path,
+            &target_env.fingerprint,
+            &target_env.snapshot_revision,
+            &store,
+        )
         .expect("隔离环境下丢弃应当成功");
 
-    assert_eq!(fs::read(&config_path).unwrap(), config_before, "原仓库 config 不得被预览修改");
-    assert_eq!(f.git(&["config", "core.filemode"]), b"false\n", "预览不得把 core.filemode 改回 true");
+    assert_eq!(
+        fs::read(&config_path).unwrap(),
+        config_before,
+        "原仓库 config 不得被预览修改"
+    );
+    assert_eq!(
+        f.git(&["config", "core.filemode"]),
+        b"false\n",
+        "预览不得把 core.filemode 改回 true"
+    );
     assert_eq!(f.index(), index_before, "原仓库 index 不得被预览修改");
     assert_eq!(f.read("target.ts"), text(&[]));
     assert_ne!(before, f.read("target.ts"));
@@ -762,7 +1105,11 @@ fn preview_honors_local_clean_filter_configuration() {
     let target = entry(&session, "target.txt");
     let index = f.index();
     discard(&session, &target, &f.store()).expect("带本地 filter 的普通文本必须可丢弃");
-    assert_eq!(f.read("target.txt"), committed, "丢弃后应恢复提交时的工作区内容");
+    assert_eq!(
+        f.read("target.txt"),
+        committed,
+        "丢弃后应恢复提交时的工作区内容"
+    );
     assert_eq!(f.index(), index);
 }
 
@@ -777,28 +1124,50 @@ fn attribute_context_change_after_save_is_rejected_before_writing() {
     f.write("target.txt", &text(&[(10, 1010), (80, 1080), (140, 1140)]));
     let session = f.session();
     session.refresh().unwrap();
-    let rows = session.rows("target.txt", ChangesKind::Unstaged, ViewMode::Split, 0, 400).unwrap();
-    let action = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).expect("应有 hunk").clone();
+    let rows = session
+        .rows("target.txt", ChangesKind::Unstaged, ViewMode::Split, 0, 400)
+        .unwrap();
+    let action = rows
+        .rows
+        .iter()
+        .find_map(|row| row.hunk_action.as_ref())
+        .expect("应有 hunk")
+        .clone();
     let before = f.read("target.txt");
     let index = f.index();
     let store = f.store();
 
-    let error = session.discard_with_hook("target.txt", &action.fingerprint, &action.snapshot_revision,
-        Some(&action.hunk_id), &store, |phase| {
-            if phase == DiscardPhase::AfterSave {
-                // 目标字节与补丁都不变，只改转换上下文。
-                f.write(".gitattributes", b"target.txt text eol=crlf\n");
-            }
-            Ok(())
-        }).unwrap_err();
+    let error = session
+        .discard_with_hook(
+            "target.txt",
+            &action.fingerprint,
+            &action.snapshot_revision,
+            Some(&action.hunk_id),
+            &store,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    // 目标字节与补丁都不变，只改转换上下文。
+                    f.write(".gitattributes", b"target.txt text eol=crlf\n");
+                }
+                Ok(())
+            },
+        )
+        .unwrap_err();
 
-    assert_eq!(error.kind, ErrorKind::Rejected, "必须在写入前拒绝，而不是写后再待核对");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Rejected,
+        "必须在写入前拒绝，而不是写后再待核对"
+    );
     assert_eq!(f.read("target.txt"), before, "拒绝时不得写入工作区");
     assert_eq!(f.index(), index, "拒绝时不得改变暂存区");
     let records = store.list(None).unwrap();
     assert_eq!(records.len(), 1, "完整记录必须保留");
     assert!(matches!(records[0].status, RecoveryStatus::NotApplied));
-    assert!(matches!(store.read(&records[0].id).unwrap().1, Some(DiscardOutcome::NotApplied)));
+    assert!(matches!(
+        store.read(&records[0].id).unwrap().1,
+        Some(DiscardOutcome::NotApplied)
+    ));
     // 不自动续跑。
     drop(session);
     let reopened = f.session();
@@ -830,14 +1199,23 @@ fn unrelated_attribute_file_change_does_not_block_discard() {
     let session2 = f2.session();
     let target2 = entry(&session2, "target.txt");
     let store2 = f2.store();
-    session2.discard_with_hook("target.txt", &target2.fingerprint, &target2.snapshot_revision, None, &store2, |phase| {
-        if phase == DiscardPhase::AfterSave {
-            // 与目标无关的属性和文件变化。
-            f2.write("other.txt", b"other changed\n");
-            f2.write("unrelated.gitattributes", b"*.bin binary\n");
-        }
-        Ok(())
-    }).expect("无关文件变化不应阻止丢弃");
+    session2
+        .discard_with_hook(
+            "target.txt",
+            &target2.fingerprint,
+            &target2.snapshot_revision,
+            None,
+            &store2,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    // 与目标无关的属性和文件变化。
+                    f2.write("other.txt", b"other changed\n");
+                    f2.write("unrelated.gitattributes", b"*.bin binary\n");
+                }
+                Ok(())
+            },
+        )
+        .expect("无关文件变化不应阻止丢弃");
     assert_eq!(f2.read("target.txt"), text(&[]));
 }
 
@@ -858,8 +1236,16 @@ fn git_apply_lost_receipt_keeps_record_and_never_retries() {
     // 严格限定 fixture 的包装器：只对真实仓库目录下的 apply 生效，先执行真实写入，
     // 再让调用方「失去成功回执」；其他目录（预览 scratch）与其它子命令一律透传。
     let real_git = String::from_utf8(
-        Command::new("sh").arg("-c").arg("command -v git").output().unwrap().stdout,
-    ).unwrap().trim().to_string();
+        Command::new("sh")
+            .arg("-c")
+            .arg("command -v git")
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .to_string();
     let wrapper_dir = f.temp.path().join("wrapper");
     fs::create_dir_all(&wrapper_dir).unwrap();
     let counter = f.temp.path().join("apply-count");
@@ -875,23 +1261,53 @@ fn git_apply_lost_receipt_keeps_record_and_never_retries() {
     fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
 
     let mut vars = f.vars.clone();
-    vars.insert("WRAP_REPO".into(), fs::canonicalize(&f.repo).unwrap().display().to_string());
+    vars.insert(
+        "WRAP_REPO".into(),
+        fs::canonicalize(&f.repo).unwrap().display().to_string(),
+    );
     vars.insert("WRAP_COUNT".into(), counter.display().to_string());
     let mut paths = vec![wrapper_dir.display().to_string()];
     paths.extend(f.paths.clone());
-    let wrapped = WorktreeSession::open("fixture-wrapper", &f.repo, ShellEnv {
-        vars, path: paths.clone(),
-        info: EnvCaptureInfo { worktree: f.repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
-            timed_out: false, used_fallback: true, var_count: f.vars.len(), path_entries: paths, diagnostics: None },
-    }, Arc::new(CommandLog::default())).unwrap();
+    let wrapped = WorktreeSession::open(
+        "fixture-wrapper",
+        &f.repo,
+        ShellEnv {
+            vars,
+            path: paths.clone(),
+            info: EnvCaptureInfo {
+                worktree: f.repo.display().to_string(),
+                shell: "fixture".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: true,
+                var_count: f.vars.len(),
+                path_entries: paths,
+                diagnostics: None,
+            },
+        },
+        Arc::new(CommandLog::default()),
+    )
+    .unwrap();
 
     let store = f.store();
     let wrapped_target = entry(&wrapped, "target.ts");
-    assert_eq!(wrapped_target.fingerprint, target.fingerprint, "包装器不应改变真实状态");
+    assert_eq!(
+        wrapped_target.fingerprint, target.fingerprint,
+        "包装器不应改变真实状态"
+    );
     let error = wrapped
-        .discard_file("target.ts", &wrapped_target.fingerprint, &wrapped_target.snapshot_revision, &store)
+        .discard_file(
+            "target.ts",
+            &wrapped_target.fingerprint,
+            &wrapped_target.snapshot_revision,
+            &store,
+        )
         .expect_err("失去成功回执必须报待核对，而不是成功");
-    assert_eq!(error.kind, ErrorKind::NeedsVerification, "必须标结果待核对，不能断言未执行");
+    assert_eq!(
+        error.kind,
+        ErrorKind::NeedsVerification,
+        "必须标结果待核对，不能断言未执行"
+    );
 
     // 真实写入已经发生：工作区回到提交内容，index 未变。
     assert_eq!(f.read("target.ts"), text(&[]));
@@ -903,7 +1319,10 @@ fn git_apply_lost_receipt_keeps_record_and_never_retries() {
     // 完整记录保留，但没有完成回执，不能被当成已完成。
     let records = store.list(None).unwrap();
     assert_eq!(records.len(), 1, "必须保留已保存的完整记录");
-    assert!(matches!(records[0].status, RecoveryStatus::NeedsVerification));
+    assert!(matches!(
+        records[0].status,
+        RecoveryStatus::NeedsVerification
+    ));
     assert!(store.read(&records[0].id).unwrap().1.is_none());
     // 重新打开会话只读取真实状态，不自动续跑。
     drop(wrapped);
@@ -911,7 +1330,13 @@ fn git_apply_lost_receipt_keeps_record_and_never_retries() {
     reopened.refresh().unwrap();
     assert_eq!(f.read("target.ts"), text(&[]));
     assert_eq!(store.list(None).unwrap().len(), 1);
-    assert_eq!(fs::read_to_string(&counter).unwrap_or_default().matches('x').count(), 1);
+    assert_eq!(
+        fs::read_to_string(&counter)
+            .unwrap_or_default()
+            .matches('x')
+            .count(),
+        1
+    );
 }
 
 /// R04-R2-ST1 / R04-R2-SP3：`GIT_CONFIG` 指向真实配置时（Windows 生产会继承该变量），
@@ -933,22 +1358,54 @@ fn git_config_redirect_environment_never_writes_user_config() {
     // 模拟从设置了 GIT_CONFIG 的终端启动。
     let mut vars = f.vars.clone();
     vars.insert("GIT_CONFIG".into(), config_path.display().to_string());
-    let redirected = WorktreeSession::open("fixture-config-redirect", &f.repo, ShellEnv {
-        vars, path: f.paths.clone(),
-        info: EnvCaptureInfo { worktree: f.repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
-            timed_out: false, used_fallback: true, var_count: f.vars.len(), path_entries: f.paths.clone(), diagnostics: None },
-    }, Arc::new(CommandLog::default())).unwrap();
+    let redirected = WorktreeSession::open(
+        "fixture-config-redirect",
+        &f.repo,
+        ShellEnv {
+            vars,
+            path: f.paths.clone(),
+            info: EnvCaptureInfo {
+                worktree: f.repo.display().to_string(),
+                shell: "fixture".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: true,
+                var_count: f.vars.len(),
+                path_entries: f.paths.clone(),
+                diagnostics: None,
+            },
+        },
+        Arc::new(CommandLog::default()),
+    )
+    .unwrap();
     let redirected_target = entry(&redirected, "target.ts");
     let store = f.store();
     redirected
-        .discard_file("target.ts", &redirected_target.fingerprint, &redirected_target.snapshot_revision, &store)
+        .discard_file(
+            "target.ts",
+            &redirected_target.fingerprint,
+            &redirected_target.snapshot_revision,
+            &store,
+        )
         .expect("GIT_CONFIG 重定向下也必须能正常丢弃");
 
-    assert_eq!(fs::read(&config_path).unwrap(), config_before, "用户 Git 配置字节必须完全不变");
-    assert_eq!(f.git(&["config", "--get-all", "filter.demo.clean"]), b"cat\n", "filter 不得重复追加");
-    assert_eq!(f.git(&["config", "--get-all", "filter.demo.smudge"]), b"cat\n");
     assert_eq!(
-        f.git(&["config", "--get", "core.attributesFile"]).trim_ascii(),
+        fs::read(&config_path).unwrap(),
+        config_before,
+        "用户 Git 配置字节必须完全不变"
+    );
+    assert_eq!(
+        f.git(&["config", "--get-all", "filter.demo.clean"]),
+        b"cat\n",
+        "filter 不得重复追加"
+    );
+    assert_eq!(
+        f.git(&["config", "--get-all", "filter.demo.smudge"]),
+        b"cat\n"
+    );
+    assert_eq!(
+        f.git(&["config", "--get", "core.attributesFile"])
+            .trim_ascii(),
         attrs.display().to_string().as_bytes(),
         "core.attributesFile 不得被改指向临时预览路径"
     );
@@ -976,8 +1433,18 @@ fn linked_worktree_uses_shared_info_attributes_for_discard() {
     fs::write(linked.join("whole.txt"), b"alpha\nbeta\n").unwrap();
     fs::write(linked.join("part.txt"), b"one\ntwo\nthree\nfour\nfive\n").unwrap();
     let linked_git = |args: &[&str]| {
-        let output = Command::new("git").current_dir(&linked).env_clear().envs(&f.vars).args(args).output().unwrap();
-        assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+        let output = Command::new("git")
+            .current_dir(&linked)
+            .env_clear()
+            .envs(&f.vars)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         output.stdout
     };
     linked_git(&["add", "--all"]);
@@ -985,18 +1452,35 @@ fn linked_worktree_uses_shared_info_attributes_for_discard() {
     for name in ["whole.txt", "part.txt"] {
         fs::remove_file(linked.join(name)).unwrap();
         linked_git(&["checkout", "--", name]);
-        assert_eq!(fs::read(linked.join(name)).unwrap().windows(2).filter(|w| w == b"\r\n").count() > 0, true);
+        assert_eq!(
+            fs::read(linked.join(name))
+                .unwrap()
+                .windows(2)
+                .filter(|w| w == b"\r\n")
+                .count()
+                > 0,
+            true
+        );
     }
     let whole_committed = fs::read(linked.join("whole.txt")).unwrap();
     let part_committed = fs::read(linked.join("part.txt")).unwrap();
     fs::write(linked.join("whole.txt"), b"alpha\r\nBETA\r\n").unwrap();
-    fs::write(linked.join("part.txt"), b"one\r\ntwo\r\nTHREE\r\nfour\r\nfive\r\n").unwrap();
+    fs::write(
+        linked.join("part.txt"),
+        b"one\r\ntwo\r\nTHREE\r\nfour\r\nfive\r\n",
+    )
+    .unwrap();
 
     let session = f.session_at(&linked);
     let store = f.store();
     let index_before = {
-        let output = Command::new("git").current_dir(&linked).env_clear().envs(&f.vars)
-            .args(["ls-files", "--stage", "-z"]).output().unwrap();
+        let output = Command::new("git")
+            .current_dir(&linked)
+            .env_clear()
+            .envs(&f.vars)
+            .args(["ls-files", "--stage", "-z"])
+            .output()
+            .unwrap();
         output.stdout
     };
 
@@ -1006,17 +1490,36 @@ fn linked_worktree_uses_shared_info_attributes_for_discard() {
 
     let part = entry(&session, "part.txt");
     session.refresh().unwrap();
-    let rows = session.rows("part.txt", ChangesKind::Unstaged, ViewMode::Split, 0, 200).unwrap();
-    let action = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).expect("应有 hunk").clone();
+    let rows = session
+        .rows("part.txt", ChangesKind::Unstaged, ViewMode::Split, 0, 200)
+        .unwrap();
+    let action = rows
+        .rows
+        .iter()
+        .find_map(|row| row.hunk_action.as_ref())
+        .expect("应有 hunk")
+        .clone();
     session
-        .discard_hunk("part.txt", &action.fingerprint, &action.snapshot_revision, &action.hunk_id, &store)
+        .discard_hunk(
+            "part.txt",
+            &action.fingerprint,
+            &action.snapshot_revision,
+            &action.hunk_id,
+            &store,
+        )
         .expect("linked hunk 丢弃必须成功");
     let after = fs::read(linked.join("part.txt")).unwrap();
     assert_eq!(after, part_committed, "未选中的 hunk 必须保持提交内容");
 
     // index 不变，记录归属 linked 而不是 main。
-    let index_after = Command::new("git").current_dir(&linked).env_clear().envs(&f.vars)
-        .args(["ls-files", "--stage", "-z"]).output().unwrap().stdout;
+    let index_after = Command::new("git")
+        .current_dir(&linked)
+        .env_clear()
+        .envs(&f.vars)
+        .args(["ls-files", "--stage", "-z"])
+        .output()
+        .unwrap()
+        .stdout;
     assert_eq!(index_after, index_before, "丢弃不得改变 linked 的暂存区");
     let linked_identity = WorktreeIdentity::capture(&session.git).unwrap();
     let records = store.list(Some(&linked_identity)).unwrap();
@@ -1024,12 +1527,20 @@ fn linked_worktree_uses_shared_info_attributes_for_discard() {
     assert!(records.iter().all(|record| record.identity_confirmed));
     let linked_canonical = fs::canonicalize(&linked).unwrap().display().to_string();
     assert!(
-        records.iter().all(|record| record.worktree_path == linked_canonical),
+        records
+            .iter()
+            .all(|record| record.worktree_path == linked_canonical),
         "记录必须归属 linked worktree：{records:?}"
     );
     let main_session = f.session();
     let main_identity = WorktreeIdentity::capture(&main_session.git).unwrap();
-    assert!(store.list(Some(&main_identity)).unwrap().iter().all(|record| !record.identity_confirmed));
+    assert!(
+        store
+            .list(Some(&main_identity))
+            .unwrap()
+            .iter()
+            .all(|record| !record.identity_confirmed)
+    );
 }
 
 /// R04-R2-SP2：配置值可以合法包含换行（`smudge = ":\\ncat"`）。
@@ -1066,11 +1577,15 @@ fn git_rename_unstaged_side_rejects_hunk_discard_but_keeps_whole_file() {
 
     let session = f.session();
     let snapshot = session.refresh().unwrap();
-    let staged = snapshot.entries.iter()
+    let staged = snapshot
+        .entries
+        .iter()
         .find(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Staged)
         .expect("应有已暂存改名");
     assert_eq!(staged.status, revia_lib::git::status::FileStatus::Renamed);
-    let unstaged = snapshot.entries.iter()
+    let unstaged = snapshot
+        .entries
+        .iter()
         .find(|entry| entry.path == "new.txt" && entry.changes == ChangesKind::Unstaged)
         .expect("应有未暂存修改");
     assert_eq!(unstaged.original_path.as_deref(), Some("old.txt"));
@@ -1081,7 +1596,13 @@ fn git_rename_unstaged_side_rejects_hunk_discard_but_keeps_whole_file() {
 
     // 后端拒绝 hunk 丢弃，且不产生任何回收记录。
     let rejected = session
-        .discard_hunk("new.txt", &unstaged.fingerprint, &unstaged.snapshot_revision, "forged-hunk", &store)
+        .discard_hunk(
+            "new.txt",
+            &unstaged.fingerprint,
+            &unstaged.snapshot_revision,
+            "forged-hunk",
+            &store,
+        )
         .expect_err("rename 的未暂存条目不得接受 hunk 丢弃");
     assert_eq!(
         rejected.to_string(),
@@ -1125,8 +1646,13 @@ fn restore_returns_full_worktree_state_without_touching_index() {
         assert_eq!(f.read("script.sh"), b"#!/bin/sh\necho v1\n");
 
         let index = f.index();
-        let inspection = session.inspect_record(&store.list(None).unwrap()[0].id, &store).unwrap();
-        assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::Ready));
+        let inspection = session
+            .inspect_record(&store.list(None).unwrap()[0].id, &store)
+            .unwrap();
+        assert!(matches!(
+            inspection.state,
+            revia_lib::recovery::RecoveryState::Ready
+        ));
         session
             .restore_record(&inspection.id, &expectation_of(&inspection), &store)
             .expect("无后续变化时应可直接恢复");
@@ -1151,10 +1677,24 @@ fn restore_refuses_after_later_changes_and_keeps_current_content() {
 
     f.write("target.ts", b"later work\n");
     let inspection = session.inspect_record(&record_id, &store).unwrap();
-    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::LaterChanges));
+    assert!(matches!(
+        inspection.state,
+        revia_lib::recovery::RecoveryState::LaterChanges
+    ));
     assert_eq!(inspection.files.len(), 1);
-    assert!(inspection.files[0].saved.text.is_some(), "文本应提供只读对比内容");
-    assert_eq!(inspection.files[0].current.as_ref().unwrap().text.as_deref(), Some("later work\n"));
+    assert!(
+        inspection.files[0].saved.text.is_some(),
+        "文本应提供只读对比内容"
+    );
+    assert_eq!(
+        inspection.files[0]
+            .current
+            .as_ref()
+            .unwrap()
+            .text
+            .as_deref(),
+        Some("later work\n")
+    );
 
     let error = session
         .restore_record(&record_id, &expectation_of(&inspection), &store)
@@ -1171,13 +1711,25 @@ fn restore_refuses_without_trusted_post_discard_baseline() {
     let target = entry(&session, "target.ts");
     let store = f.store();
     // 在完成记录阶段中断：记录保留但无 outcome。
-    let _ = session.discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-        if phase == DiscardPhase::BeforeComplete { return Err(AppError::internal("controlled")); }
-        Ok(())
-    });
+    let _ = session.discard_with_hook(
+        "target.ts",
+        &target.fingerprint,
+        &target.snapshot_revision,
+        None,
+        &store,
+        |phase| {
+            if phase == DiscardPhase::BeforeComplete {
+                return Err(AppError::internal("controlled"));
+            }
+            Ok(())
+        },
+    );
     let record_id = store.list(None).unwrap()[0].id.clone();
     let inspection = session.inspect_record(&record_id, &store).unwrap();
-    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::NoBaseline));
+    assert!(matches!(
+        inspection.state,
+        revia_lib::recovery::RecoveryState::NoBaseline
+    ));
     let error = session
         .restore_record(&record_id, &expectation_of(&inspection), &store)
         .unwrap_err();
@@ -1199,7 +1751,10 @@ fn restore_refuses_when_identity_does_not_match() {
     f.git(&["worktree", "add", "-b", "linked", linked.to_str().unwrap()]);
     let linked_session = f.session_at(&linked);
     let inspection = linked_session.inspect_record(&record_id, &store).unwrap();
-    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
+    assert!(matches!(
+        inspection.state,
+        revia_lib::recovery::RecoveryState::IdentityMismatch
+    ));
     let error = linked_session
         .restore_record(&record_id, &expectation_of(&inspection), &store)
         .unwrap_err();
@@ -1214,12 +1769,25 @@ fn hunk_record_restores_the_whole_file() {
     let f = Fixture::new();
     let session = f.changed();
     session.refresh().unwrap();
-    let rows = session.rows("target.ts", ChangesKind::Unstaged, ViewMode::Split, 0, 400).unwrap();
-    let action = rows.rows.iter().find_map(|row| row.hunk_action.as_ref()).expect("应有 hunk").clone();
+    let rows = session
+        .rows("target.ts", ChangesKind::Unstaged, ViewMode::Split, 0, 400)
+        .unwrap();
+    let action = rows
+        .rows
+        .iter()
+        .find_map(|row| row.hunk_action.as_ref())
+        .expect("应有 hunk")
+        .clone();
     let store = f.store();
     let before = f.read("target.ts");
     session
-        .discard_hunk("target.ts", &action.fingerprint, &action.snapshot_revision, &action.hunk_id, &store)
+        .discard_hunk(
+            "target.ts",
+            &action.fingerprint,
+            &action.snapshot_revision,
+            &action.hunk_id,
+            &store,
+        )
         .unwrap();
     let after_hunk = f.read("target.ts");
     assert_ne!(after_hunk, before);
@@ -1253,7 +1821,11 @@ fn save_as_refuses_existing_targets_and_keeps_original_untouched() {
     let occupied = f.root().join("occupied.bin");
     fs::write(&occupied, b"keep me").unwrap();
     assert!(store.save_as(&record_id, "blob.bin", &occupied).is_err());
-    assert_eq!(fs::read(&occupied).unwrap(), b"keep me", "已存在目标不得被截断");
+    assert_eq!(
+        fs::read(&occupied).unwrap(),
+        b"keep me",
+        "已存在目标不得被截断"
+    );
 
     // 已存在的符号链接（指向真实文件）。
     let link = f.root().join("link.bin");
@@ -1263,7 +1835,9 @@ fn save_as_refuses_existing_targets_and_keeps_original_untouched() {
 
     // 未占用的新路径：成功写入保存版本。
     let fresh = f.root().join("saved.bin");
-    let bytes = store.save_as(&record_id, "blob.bin", &fresh).expect("新路径应可另存");
+    let bytes = store
+        .save_as(&record_id, "blob.bin", &fresh)
+        .expect("新路径应可另存");
     assert_eq!(bytes, 4);
     // 保存的是「丢弃前」的工作区内容，也就是被丢弃掉的那一版。
     assert_eq!(fs::read(&fresh).unwrap(), b"\0new");
@@ -1279,17 +1853,26 @@ fn purge_expired_uses_controlled_clock_and_clear_keeps_in_use_records() {
     let target = entry(&session, "target.ts");
     let now = Arc::new(std::sync::atomic::AtomicU64::new(1_792_742_400_123));
     let clock = now.clone();
-    let store = RecoveryStore::with_clock(f.temp.path().join("data"), Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)));
+    let store = RecoveryStore::with_clock(
+        f.temp.path().join("data"),
+        Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)),
+    );
     discard(&session, &target, &store).unwrap();
     let id = store.list(None).unwrap()[0].id.clone();
 
     // 未到期：不删。
-    now.store(1_792_742_400_123 + revia_lib::recovery::RETENTION_MS - 1, std::sync::atomic::Ordering::SeqCst);
+    now.store(
+        1_792_742_400_123 + revia_lib::recovery::RETENTION_MS - 1,
+        std::sync::atomic::Ordering::SeqCst,
+    );
     assert_eq!(store.purge_expired().unwrap(), 0);
     assert_eq!(store.list(None).unwrap().len(), 1);
 
     // 在途记录即使过期也跳过。
-    now.store(1_792_742_400_123 + revia_lib::recovery::RETENTION_MS + 1, std::sync::atomic::Ordering::SeqCst);
+    now.store(
+        1_792_742_400_123 + revia_lib::recovery::RETENTION_MS + 1,
+        std::sync::atomic::Ordering::SeqCst,
+    );
     {
         let _in_use = store.use_record(&id);
         assert_eq!(store.purge_expired().unwrap(), 0, "在途记录不得被清理");
@@ -1316,7 +1899,10 @@ fn clear_only_removes_this_applications_records() {
     assert_eq!(store.clear().unwrap(), 1);
     assert!(store.list(None).unwrap().is_empty());
     assert!(data.join("settings.json").is_file(), "其他应用数据不得被删");
-    assert!(data.join("recovery").join("preview-leftover").is_dir(), "非记录目录不得被删");
+    assert!(
+        data.join("recovery").join("preview-leftover").is_dir(),
+        "非记录目录不得被删"
+    );
 }
 
 // ---------------- 任务 05 返修回归（R05-R1） ----------------
@@ -1342,7 +1928,11 @@ fn restore_never_deletes_preexisting_lookalike_files() {
     session
         .restore_record(&id, &expectation_of(&inspection), &store)
         .expect("恢复应成功");
-    assert_eq!(fs::read(&decoy).unwrap(), b"unrelated valuable bytes\n", "无关文件必须保留");
+    assert_eq!(
+        fs::read(&decoy).unwrap(),
+        b"unrelated valuable bytes\n",
+        "无关文件必须保留"
+    );
     assert_eq!(f.read("a.txt"), b"saved change\n");
 }
 
@@ -1355,13 +1945,20 @@ fn production_discard_holds_record_through_clear_during_after_save() {
     let store = f.store();
     let mut cleared = 0u64;
     session
-        .discard_with_hook("target.ts", &target.fingerprint, &target.snapshot_revision, None, &store, |phase| {
-            if phase == DiscardPhase::AfterSave {
-                // 真实生产入口的占用必须已生效：这里清空不能删掉唯一记录。
-                cleared = store.clear()?;
-            }
-            Ok(())
-        })
+        .discard_with_hook(
+            "target.ts",
+            &target.fingerprint,
+            &target.snapshot_revision,
+            None,
+            &store,
+            |phase| {
+                if phase == DiscardPhase::AfterSave {
+                    // 真实生产入口的占用必须已生效：这里清空不能删掉唯一记录。
+                    cleared = store.clear()?;
+                }
+                Ok(())
+            },
+        )
         .expect("丢弃应完成");
     assert_eq!(cleared, 0, "在途记录不得被清空");
     let records = store.list(None).unwrap();
@@ -1369,7 +1966,10 @@ fn production_discard_holds_record_through_clear_during_after_save() {
     assert!(matches!(records[0].status, RecoveryStatus::Completed));
     // 备份内容仍是丢弃前的完整文件。
     let (record, _) = store.read(&records[0].id).unwrap();
-    assert_eq!(record.before[0].content.as_ref().unwrap(), &text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    assert_eq!(
+        record.before[0].content.as_ref().unwrap(),
+        &text(&[(10, 1010), (80, 1080), (140, 1140)])
+    );
 }
 
 /// ST2：占用登记是引用计数，多个持有者时任一释放都不解除保护。
@@ -1442,18 +2042,31 @@ fn restore_interruption_is_pending_verification_and_never_resumes() {
             Ok(())
         })
         .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::NeedsVerification, "可能已写入部分路径必须标待核对");
+    assert_eq!(
+        error.kind,
+        ErrorKind::NeedsVerification,
+        "可能已写入部分路径必须标待核对"
+    );
     // 写入确实发生了，但记录仍在且留证为待核对（不是丢弃的 Completed）。
-    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    assert_eq!(
+        f.read("target.ts"),
+        text(&[(10, 1010), (80, 1080), (140, 1140)])
+    );
     let attempt = store.latest_attempt(&id).unwrap().expect("必须有恢复留证");
-    assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
+    assert!(matches!(
+        attempt.state,
+        revia_lib::recovery::RestoreAttemptState::NeedsVerification
+    ));
     assert_eq!(store.list(None).unwrap().len(), 1, "记录保留");
 
     // 重新打开会话：不自动重跑（文件不再被改写）。
     drop(session);
     let reopened = f.session();
     reopened.refresh().unwrap();
-    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    assert_eq!(
+        f.read("target.ts"),
+        text(&[(10, 1010), (80, 1080), (140, 1140)])
+    );
     assert!(matches!(
         store.latest_attempt(&id).unwrap().unwrap().state,
         revia_lib::recovery::RestoreAttemptState::NeedsVerification
@@ -1479,7 +2092,9 @@ fn save_as_rejects_symlinked_ancestors_and_git_metadata() {
     let linked_dir = f.root().join("linked-dir");
     std::os::unix::fs::symlink(&real_dir, &linked_dir).unwrap();
     assert!(
-        store.save_as(&id, "target.txt", &linked_dir.join("out.txt")).is_err(),
+        store
+            .save_as(&id, "target.txt", &linked_dir.join("out.txt"))
+            .is_err(),
         "祖先为符号链接时必须拒绝"
     );
     assert!(!real_dir.join("out.txt").exists(), "不得穿透链接写入");
@@ -1488,19 +2103,35 @@ fn save_as_rejects_symlinked_ancestors_and_git_metadata() {
     let deep = linked_dir.join("inner");
     fs::create_dir_all(&deep).unwrap();
     assert!(
-        store.save_as(&id, "target.txt", &deep.join("new.txt")).is_err(),
+        store
+            .save_as(&id, "target.txt", &deep.join("new.txt"))
+            .is_err(),
         "祖先链中任一级是符号链接都必须拒绝"
     );
-    assert!(!real_dir.join("inner").join("new.txt").exists(), "不得穿透链接写入深层路径");
+    assert!(
+        !real_dir.join("inner").join("new.txt").exists(),
+        "不得穿透链接写入深层路径"
+    );
 
     // 未占用的真实外部目录：正常另存成功。
     let external = f.root().join("external");
     fs::create_dir_all(&external).unwrap();
-    assert_eq!(store.save_as(&id, "target.txt", &external.join("new.txt")).unwrap(), 13);
-    assert_eq!(fs::read(external.join("new.txt")).unwrap(), b"saved change\n");
+    assert_eq!(
+        store
+            .save_as(&id, "target.txt", &external.join("new.txt"))
+            .unwrap(),
+        13
+    );
+    assert_eq!(
+        fs::read(external.join("new.txt")).unwrap(),
+        b"saved change\n"
+    );
 
     let inside_git = f.repo.join(".git").join("out.txt");
-    assert!(store.save_as(&id, "target.txt", &inside_git).is_err(), "不得写入 Git 元数据目录");
+    assert!(
+        store.save_as(&id, "target.txt", &inside_git).is_err(),
+        "不得写入 Git 元数据目录"
+    );
     assert!(!inside_git.exists());
 }
 
@@ -1516,13 +2147,24 @@ fn inspection_remains_viewable_when_worktree_is_gone() {
     drop(session);
     fs::remove_dir_all(&f.repo).unwrap();
 
-    let inspection = store.inspect(&id, None, None).expect("worktree 不存在时仍应可查看");
+    let inspection = store
+        .inspect(&id, None, None)
+        .expect("worktree 不存在时仍应可查看");
     assert_eq!(inspection.paths, vec!["target.ts".to_string()]);
     assert!(inspection.files[0].saved.exists);
     assert!(inspection.files[0].saved.text.is_some(), "保存内容必须可读");
-    assert!(inspection.files[0].current_unavailable, "当前侧必须如实标为不可用");
-    assert!(inspection.files[0].current.is_none(), "不得用保存内容冒充当前内容");
-    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
+    assert!(
+        inspection.files[0].current_unavailable,
+        "当前侧必须如实标为不可用"
+    );
+    assert!(
+        inspection.files[0].current.is_none(),
+        "不得用保存内容冒充当前内容"
+    );
+    assert!(matches!(
+        inspection.state,
+        revia_lib::recovery::RecoveryState::IdentityMismatch
+    ));
 }
 
 /// SP6：文本对比由 Rust 侧真实 Git 生成只读 diff。
@@ -1539,7 +2181,9 @@ fn text_diff_is_generated_by_real_git() {
     let id = store.list(None).unwrap()[0].id.clone();
     f.write("target.txt", b"alpha\nBETA\nlater\n");
 
-    let diff = session.recovery_text_diff(&id, "target.txt", &store).expect("应生成只读 diff");
+    let diff = session
+        .recovery_text_diff(&id, "target.txt", &store)
+        .expect("应生成只读 diff");
     assert!(diff.contains("@@ "), "必须是 Git 生成的 hunk：{diff}");
     assert!(diff.contains("+later"), "应显示后续新增的内容：{diff}");
     // 不得在用户仓库里留下临时对比文件。
@@ -1593,12 +2237,23 @@ fn publish_rechecks_real_state_after_prepare_and_does_not_overwrite() {
             Ok(())
         })
         .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::Rejected, "外部改动必须拒绝恢复：{error:?}");
-    assert_eq!(f.read("target.ts"), b"external edit during restore\n", "不得覆盖外部改动");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Rejected,
+        "外部改动必须拒绝恢复：{error:?}"
+    );
+    assert_eq!(
+        f.read("target.ts"),
+        b"external edit during restore\n",
+        "不得覆盖外部改动"
+    );
     assert_ne!(f.read("target.ts"), before_restore);
     // 记录保留，并留下这次尝试（未执行）。
     let attempt = store.latest_attempt(&id).unwrap().expect("必须留下尝试");
-    assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::Rejected));
+    assert!(matches!(
+        attempt.state,
+        revia_lib::recovery::RestoreAttemptState::Rejected
+    ));
     assert!(attempt.written.is_empty());
     assert_eq!(store.list(None).unwrap().len(), 1);
 }
@@ -1638,7 +2293,10 @@ fn publish_refuses_real_unmerged_conflict_target() {
     let session = f.session();
     let status = revia_lib::git::status::read(&session.git).unwrap();
     assert!(
-        status.entries.iter().any(|entry| entry.path == "conflict.txt" && entry.unmerged),
+        status
+            .entries
+            .iter()
+            .any(|entry| entry.path == "conflict.txt" && entry.unmerged),
         "构造失败：目标必须是真实 unmerged"
     );
     let inspection = session.inspect_record(&id, &store).unwrap();
@@ -1672,7 +2330,10 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
     // 丢弃完成后的基线：重建身份后必须保持它不变，否则内容检查会先拒绝。
     let baseline_after_discard = f.read("target.ts");
     let before_discard = text(&[(10, 1010), (80, 1080), (140, 1140)]);
-    assert_ne!(baseline_after_discard, before_discard, "夹具应保留可恢复的丢弃前内容");
+    assert_ne!(
+        baseline_after_discard, before_discard,
+        "夹具应保留可恢复的丢弃前内容"
+    );
 
     let old_identity = WorktreeIdentity::capture(&session.git).unwrap();
     let new_identity = Arc::new(std::sync::Mutex::new(None::<WorktreeIdentity>));
@@ -1703,25 +2364,43 @@ fn publish_rechecks_identity_instead_of_reusing_captured_one() {
         .unwrap_err();
 
     // 1) 身份确实变了，且新旧身份不能 `confirmed_match`。
-    let new_identity = new_identity.lock().unwrap().clone().expect("必须捕获到新身份");
-    assert!(!old_identity.confirmed_match(&new_identity), "重建后新旧身份必须不匹配");
+    let new_identity = new_identity
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("必须捕获到新身份");
+    assert!(
+        !old_identity.confirmed_match(&new_identity),
+        "重建后新旧身份必须不匹配"
+    );
     assert_ne!(
         old_identity.filesystem_ids, new_identity.filesystem_ids,
         "重建 `.git` 必须改变文件系统标识"
     );
 
     // 2) 拒绝来自身份核对，而不是字节/路径/冲突。
-    assert_eq!(error.kind, ErrorKind::Rejected, "身份改变必须拒绝：{error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Rejected,
+        "身份改变必须拒绝：{error:?}"
+    );
     assert!(
         error.message.contains("身份"),
         "拒绝原因必须是身份，不能是内容保护兜底：{error:?}"
     );
 
     // 3) 拒绝前后数据未被恢复写入：仍是丢弃后基线，不是丢弃前内容。
-    assert_eq!(f.read("target.ts"), baseline_after_discard, "拒绝时不得写入恢复内容");
+    assert_eq!(
+        f.read("target.ts"),
+        baseline_after_discard,
+        "拒绝时不得写入恢复内容"
+    );
     assert_ne!(f.read("target.ts"), before_discard, "不得写入丢弃前内容");
     let attempt = store.latest_attempt(&id).unwrap().expect("必须留下尝试");
-    assert!(attempt.written.is_empty(), "身份拒绝时不得写入任何路径：{attempt:?}");
+    assert!(
+        attempt.written.is_empty(),
+        "身份拒绝时不得写入任何路径：{attempt:?}"
+    );
 }
 
 /// R05-R2-ST2/SP3：恢复历史进入生产查看（列表 + 详情），重启后仍显示待核对。
@@ -1744,15 +2423,29 @@ fn restore_history_is_visible_through_list_and_inspect_after_reopen() {
             Ok(())
         })
         .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::NeedsVerification, "写后失败必须待核对：{error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::NeedsVerification,
+        "写后失败必须待核对：{error:?}"
+    );
 
     // 列表（生产查看入口）显示恢复待核对，而不是丢弃的 Completed。
     let summaries = store.list(None).unwrap();
     assert_eq!(summaries.len(), 1);
-    assert!(matches!(summaries[0].status, RecoveryStatus::Completed), "丢弃回执本身仍是 Completed");
+    assert!(
+        matches!(summaries[0].status, RecoveryStatus::Completed),
+        "丢弃回执本身仍是 Completed"
+    );
     let attempt = summaries[0].restore.as_ref().expect("列表必须展示恢复尝试");
-    assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
-    assert_eq!(attempt.written, vec!["target.ts".to_string()], "应如实列出已写入路径");
+    assert!(matches!(
+        attempt.state,
+        revia_lib::recovery::RestoreAttemptState::NeedsVerification
+    ));
+    assert_eq!(
+        attempt.written,
+        vec!["target.ts".to_string()],
+        "应如实列出已写入路径"
+    );
 
     // 重启（重新打开会话 + 重新读取列表/详情）后仍是待核对。
     drop(session);
@@ -1768,7 +2461,10 @@ fn restore_history_is_visible_through_list_and_inspect_after_reopen() {
         revia_lib::recovery::RestoreAttemptState::NeedsVerification
     ));
     // 工作区已写回保存内容，因此相对丢弃后的基线属于「有后续变化」：不能自动覆盖。
-    assert_eq!(inspection.state, revia_lib::recovery::RecoveryState::LaterChanges);
+    assert_eq!(
+        inspection.state,
+        revia_lib::recovery::RecoveryState::LaterChanges
+    );
 }
 
 /// R05-R2-ST2/SP4：写后失败后，重新核对仍 Ready 时可以再次显式恢复（不是一次性记录）。
@@ -1803,18 +2499,30 @@ fn restore_can_be_explicitly_retried_after_rechecking() {
         outcome.attempt.as_ref().unwrap().state,
         revia_lib::recovery::RestoreAttemptState::Completed
     ));
-    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    assert_eq!(
+        f.read("target.ts"),
+        text(&[(10, 1010), (80, 1080), (140, 1140)])
+    );
     // 历史保留两次尝试，旧的一次不被覆盖。
     let attempts = store.attempts(&id).unwrap();
     assert_eq!(attempts.len(), 2, "恢复历史必须追加保留：{attempts:?}");
-    assert!(matches!(attempts[0].state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
-    assert!(matches!(attempts[1].state, revia_lib::recovery::RestoreAttemptState::Completed));
+    assert!(matches!(
+        attempts[0].state,
+        revia_lib::recovery::RestoreAttemptState::NeedsVerification
+    ));
+    assert!(matches!(
+        attempts[1].state,
+        revia_lib::recovery::RestoreAttemptState::Completed
+    ));
 }
 
 /// R05-R2-ST3/SP2：写后任何阶段失败统一待核对，且真实重读（不伪造完成）。
 #[test]
 fn every_post_write_failure_is_pending_verification_and_rereads_truth() {
-    for phase in [revia_lib::recovery::RestorePhase::AfterWrite, revia_lib::recovery::RestorePhase::BeforeComplete] {
+    for phase in [
+        revia_lib::recovery::RestorePhase::AfterWrite,
+        revia_lib::recovery::RestorePhase::BeforeComplete,
+    ] {
         let f = Fixture::new();
         let session = f.changed();
         let target = entry(&session, "target.ts");
@@ -1824,15 +2532,27 @@ fn every_post_write_failure_is_pending_verification_and_rereads_truth() {
         let inspection = session.inspect_record(&id, &store).unwrap();
         let error = session
             .restore_record_with_hook(&id, &expectation_of(&inspection), &store, |current| {
-                if current == phase { return Err(AppError::internal("controlled failure")); }
+                if current == phase {
+                    return Err(AppError::internal("controlled failure"));
+                }
                 Ok(())
             })
             .unwrap_err();
-        assert_eq!(error.kind, ErrorKind::NeedsVerification, "{phase:?} 必须待核对");
+        assert_eq!(
+            error.kind,
+            ErrorKind::NeedsVerification,
+            "{phase:?} 必须待核对"
+        );
         // 工作区确实是真实重读的结果：文件已写回保存内容。
-        assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+        assert_eq!(
+            f.read("target.ts"),
+            text(&[(10, 1010), (80, 1080), (140, 1140)])
+        );
         let attempt = store.latest_attempt(&id).unwrap().unwrap();
-        assert!(matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification));
+        assert!(matches!(
+            attempt.state,
+            revia_lib::recovery::RestoreAttemptState::NeedsVerification
+        ));
         assert_eq!(attempt.written, vec!["target.ts".to_string()]);
     }
 }
@@ -1853,12 +2573,17 @@ fn stale_confirmation_version_is_rejected() {
     expected.version = "0".repeat(64);
     let error = session.restore_record(&id, &expected, &store).unwrap_err();
     assert_eq!(error.kind, ErrorKind::Rejected);
-    assert!(error.message.contains("已变化"), "应提示重新确认：{error:?}");
+    assert!(
+        error.message.contains("已变化"),
+        "应提示重新确认：{error:?}"
+    );
     // 没有写入任何路径：仍是丢弃后的基线内容。
     assert_eq!(f.read("target.ts"), text(&[]));
 
     // 版本正确时正常通过。
-    session.restore_record(&id, &expectation_of(&inspection), &store).expect("正确版本应可恢复");
+    session
+        .restore_record(&id, &expectation_of(&inspection), &store)
+        .expect("正确版本应可恢复");
 }
 
 /// R05-R2-SP9：保存时不存在（删除）或之后被删除，也能生成只读 Git diff。
@@ -1881,7 +2606,10 @@ fn text_diff_handles_missing_saved_or_current_side() {
     assert!(diff.contains("@@ "), "必须是 Git hunk：{diff}");
     // 保存的是丢弃前的完整内容（含被丢弃掉的 LINE 改动）。
     assert!(diff.contains("-line TWO"), "保存的是丢弃前内容：{diff}");
-    assert!(diff.contains("+++ /dev/null"), "当前侧缺失应表现为删除：{diff}");
+    assert!(
+        diff.contains("+++ /dev/null"),
+        "当前侧缺失应表现为删除：{diff}"
+    );
 
     // 情形二：保存侧不存在（丢弃一次真实删除）、之后当前侧存在。
     let g = Fixture::new();
@@ -1899,7 +2627,10 @@ fn text_diff_handles_missing_saved_or_current_side() {
         .expect("保存侧缺失也应能对比");
     assert!(diff.contains("@@ "), "必须是 Git hunk：{diff}");
     assert!(diff.contains("+original line"), "应显示当前内容：{diff}");
-    assert!(diff.contains("--- /dev/null"), "保存侧缺失应表现为新增：{diff}");
+    assert!(
+        diff.contains("--- /dev/null"),
+        "保存侧缺失应表现为新增：{diff}"
+    );
 }
 
 /// R05-R2-SP10：没有当前 worktree 时仍能查看保存版本（生产命令路径）。
@@ -1917,10 +2648,15 @@ fn saved_version_is_viewable_without_current_worktree() {
 
     let summaries = store.list(None).expect("没有当前 worktree 时也要能列出");
     assert_eq!(summaries.len(), 1);
-    let inspection = store.inspect(&id, None, None).expect("没有当前 worktree 时也要能看详情");
+    let inspection = store
+        .inspect(&id, None, None)
+        .expect("没有当前 worktree 时也要能看详情");
     assert!(inspection.files[0].saved.text.is_some(), "保存内容必须可读");
     assert!(inspection.files[0].current_unavailable);
-    assert!(matches!(inspection.state, revia_lib::recovery::RecoveryState::IdentityMismatch));
+    assert!(matches!(
+        inspection.state,
+        revia_lib::recovery::RecoveryState::IdentityMismatch
+    ));
 }
 
 /// R05-R2-ST4/SP7：另存目标落在另一个已登记 worktree 时，必须归属那个 worktree 并受其写锁约束。
@@ -1943,7 +2679,13 @@ fn save_as_belongs_to_the_target_worktree_and_respects_its_lock() {
     let linked = f.root().join("linked");
     // Git for Windows 不接受 verbatim 路径（`\\?\C:\...`），传给外部进程前转换。
     let linked_arg = platform::external_path(&linked);
-    f.git(&["worktree", "add", "-b", "other", linked_arg.to_str().unwrap()]);
+    f.git(&[
+        "worktree",
+        "add",
+        "-b",
+        "other",
+        linked_arg.to_str().unwrap(),
+    ]);
     let linked_session = f.session_at(&linked);
     let destination = linked.join("restored.txt");
 
@@ -1980,9 +2722,15 @@ fn auto_purge_failure_is_queryable_in_normal_mode() {
     let now = Arc::new(std::sync::atomic::AtomicU64::new(1_792_742_400_123));
     let clock = now.clone();
     let data = f.root().join("data");
-    let store = RecoveryStore::with_clock(data.clone(), Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)));
+    let store = RecoveryStore::with_clock(
+        data.clone(),
+        Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)),
+    );
     discard(&session, &target, &store).unwrap();
-    now.fetch_add(revia_lib::recovery::RETENTION_MS + 1, std::sync::atomic::Ordering::SeqCst);
+    now.fetch_add(
+        revia_lib::recovery::RETENTION_MS + 1,
+        std::sync::atomic::Ordering::SeqCst,
+    );
 
     // 让删除真实失败：回收区目录不可写。
     let recovery_dir = data.join("recovery");
@@ -1994,11 +2742,17 @@ fn auto_purge_failure_is_queryable_in_normal_mode() {
 
     // 普通模式（无 REVIA_MEASURE_LOG）也能查询到失败原因，且重启后仍可见。
     let maintenance = store.maintenance();
-    assert!(maintenance.error.is_some(), "失败必须可查询：{maintenance:?}");
+    assert!(
+        maintenance.error.is_some(),
+        "失败必须可查询：{maintenance:?}"
+    );
     assert!(maintenance.last_purge_at_ms.is_some());
     let reopened = RecoveryStore::with_clock(data, Arc::new(|| 1_792_742_400_123));
     let persisted = reopened.maintenance();
-    assert!(persisted.error.is_some(), "失败状态必须持久化：{persisted:?}");
+    assert!(
+        persisted.error.is_some(),
+        "失败状态必须持久化：{persisted:?}"
+    );
     // 记录没有被误删。
     assert_eq!(reopened.list(None).unwrap().len(), 1);
 
@@ -2028,9 +2782,17 @@ impl AppFixture {
             let mut registry = state.registry.lock().unwrap();
             registry.add(fixture.repo.to_str().unwrap()).unwrap()
         };
-        let worktree_id = entry.worktrees.first().map(|worktree| worktree.id.clone())
+        let worktree_id = entry
+            .worktrees
+            .first()
+            .map(|worktree| worktree.id.clone())
             .unwrap_or_else(|| entry.id.clone());
-        Self { fixture, data, state, worktree_id }
+        Self {
+            fixture,
+            data,
+            state,
+            worktree_id,
+        }
     }
 
     /// 在同一个 AppState 里再登记一个仓库（用于嵌套/跨仓库场景）。
@@ -2039,7 +2801,11 @@ impl AppFixture {
             let mut registry = self.state.registry.lock().unwrap();
             registry.add(path.to_str().unwrap()).unwrap()
         };
-        entry.worktrees.first().map(|worktree| worktree.id.clone()).unwrap_or(entry.id.clone())
+        entry
+            .worktrees
+            .first()
+            .map(|worktree| worktree.id.clone())
+            .unwrap_or(entry.id.clone())
     }
 
     fn store(&self) -> &RecoveryStore {
@@ -2072,9 +2838,22 @@ fn every_related_path_is_checked_before_publishing_any() {
     discard(&session, &target, &store).unwrap();
     let id = store.list(None).unwrap()[0].id.clone();
     let inspection = session.inspect_record(&id, &store).unwrap();
-    assert!(inspection.paths.len() >= 2, "重命名记录应包含两条相关路径：{:?}", inspection.paths);
-    let after_discard = inspection.files.iter()
-        .map(|file| (file.path.clone(), file.current.as_ref().and_then(|current| current.text.clone())))
+    assert!(
+        inspection.paths.len() >= 2,
+        "重命名记录应包含两条相关路径：{:?}",
+        inspection.paths
+    );
+    let after_discard = inspection
+        .files
+        .iter()
+        .map(|file| {
+            (
+                file.path.clone(),
+                file.current
+                    .as_ref()
+                    .and_then(|current| current.text.clone()),
+            )
+        })
         .collect::<Vec<_>>();
 
     let error = session
@@ -2092,12 +2871,26 @@ fn every_related_path_is_checked_before_publishing_any() {
             Ok(())
         })
         .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::Rejected, "相关路径变化必须拒绝：{error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Rejected,
+        "相关路径变化必须拒绝：{error:?}"
+    );
     // 第一路径也不得被写入：仍保留外部改动或丢弃后状态，不能变成 saved 内容。
     let attempt = store.latest_attempt(&id).unwrap().unwrap();
-    assert!(attempt.written.is_empty(), "拒绝时不得写入任何路径：{attempt:?}");
-    assert!(!attempt.message.as_deref().unwrap_or("").contains("未写入任何路径")
-        || attempt.written.is_empty(), "陈述必须与实际一致");
+    assert!(
+        attempt.written.is_empty(),
+        "拒绝时不得写入任何路径：{attempt:?}"
+    );
+    assert!(
+        !attempt
+            .message
+            .as_deref()
+            .unwrap_or("")
+            .contains("未写入任何路径")
+            || attempt.written.is_empty(),
+        "陈述必须与实际一致"
+    );
 }
 
 /// R05-R3-SP3：身份不匹配时，连目标目录里的准备动作都不能发生。
@@ -2130,8 +2923,15 @@ fn identity_mismatch_creates_nothing_in_the_target() {
     let error = other_session
         .restore_record(&id, &expectation_of(&inspection), &store)
         .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::Rejected, "身份不匹配必须拒绝：{error:?}");
-    assert!(!other.join("dir").exists(), "拒绝时不得在新 worktree 里创建目录");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Rejected,
+        "身份不匹配必须拒绝：{error:?}"
+    );
+    assert!(
+        !other.join("dir").exists(),
+        "拒绝时不得在新 worktree 里创建目录"
+    );
 }
 
 /// R05-R3-ST2/SP4：完成留证之后的尾部失败必须把留证改回待核对。
@@ -2156,10 +2956,17 @@ fn tail_failure_after_completion_downgrades_the_attempt() {
             Ok(())
         })
         .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::NeedsVerification, "尾部失败必须待核对：{error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::NeedsVerification,
+        "尾部失败必须待核对：{error:?}"
+    );
     let attempt = store.latest_attempt(&id).unwrap().unwrap();
     assert!(
-        matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification),
+        matches!(
+            attempt.state,
+            revia_lib::recovery::RestoreAttemptState::NeedsVerification
+        ),
         "留证不能停留在 Completed：{attempt:?}"
     );
     assert_eq!(attempt.written, vec!["target.ts".to_string()]);
@@ -2205,12 +3012,21 @@ fn save_as_protects_the_target_repository_metadata() {
     let output = Command::new("git")
         .env_clear()
         .envs(&f.vars)
-        .args(["init", "-b", "main", "--separate-git-dir", metadata.to_str().unwrap(), separate.to_str().unwrap()])
+        .args([
+            "init",
+            "-b",
+            "main",
+            "--separate-git-dir",
+            metadata.to_str().unwrap(),
+            separate.to_str().unwrap(),
+        ])
         .output()
         .unwrap();
     assert!(output.status.success());
     let inside_separate = metadata.join("restored.txt");
-    let error = store.save_as(&id, "target.txt", &inside_separate).unwrap_err();
+    let error = store
+        .save_as(&id, "target.txt", &inside_separate)
+        .unwrap_err();
     assert!(
         error.message.contains("Git 元数据"),
         "必须因 Git 元数据被拒（separate-git-dir），实际：{error:?}"
@@ -2218,7 +3034,10 @@ fn save_as_protects_the_target_repository_metadata() {
     assert!(!inside_separate.exists());
     // 该仓库里的普通工作区路径仍可另存（合法外部新路径）。
     let ok = separate.join("restored.txt");
-    assert!(store.save_as(&id, "target.txt", &ok).is_ok(), "工作区内的新路径应当允许");
+    assert!(
+        store.save_as(&id, "target.txt", &ok).is_ok(),
+        "工作区内的新路径应当允许"
+    );
 }
 
 /// R05-R3-ST6/SP8：嵌套登记时另存归属最具体的那个 worktree。
@@ -2240,11 +3059,24 @@ fn save_as_owner_picks_the_most_specific_registered_worktree() {
     assert_ne!(nested_id, app.worktree_id);
 
     let registry = app.state.registry.lock().unwrap();
-    let target = app.fixture.root().join("repo").join("nested").join("restored.txt");
+    let target = app
+        .fixture
+        .root()
+        .join("repo")
+        .join("nested")
+        .join("restored.txt");
     let owner = revia_lib::commands::save_as_owner(&registry, &target);
-    assert_eq!(owner.as_deref(), Some(nested_id.as_str()), "嵌套仓库内的路径必须归属内层");
+    assert_eq!(
+        owner.as_deref(),
+        Some(nested_id.as_str()),
+        "嵌套仓库内的路径必须归属内层"
+    );
     let outside = app.fixture.root().join("outside.txt");
-    assert_eq!(revia_lib::commands::save_as_owner(&registry, &outside), None, "外部路径无归属");
+    assert_eq!(
+        revia_lib::commands::save_as_owner(&registry, &outside),
+        None,
+        "外部路径无归属"
+    );
 }
 
 /// R05-R3-ST5/SP7：另存命令本身（`save_recovery_as_impl`）取的是目标 worktree 的锁。
@@ -2277,7 +3109,11 @@ fn save_recovery_command_locks_the_target_worktree() {
             },
         )
         .unwrap_err();
-        assert_eq!(error.kind, ErrorKind::Rejected, "命令必须命中目标 worktree 的写锁：{error:?}");
+        assert_eq!(
+            error.kind,
+            ErrorKind::Rejected,
+            "命令必须命中目标 worktree 的写锁：{error:?}"
+        );
         assert!(!destination.exists());
     }
     // 释放后命令成功，并写入目标 worktree。
@@ -2351,15 +3187,21 @@ fn text_diff_never_disguises_read_failure_as_deletion() {
     fs::set_permissions(&full, original).unwrap();
     let error = result.expect_err("读取失败不能返回删除 diff");
     assert!(
-        !error.message.is_empty() && !matches!(error.kind, ErrorKind::Rejected if error.message.contains("不存在")),
+        !error.message.is_empty()
+            && !matches!(error.kind, ErrorKind::Rejected if error.message.contains("不存在")),
         "必须如实报读取失败：{error:?}"
     );
 
     // 目标换成目录（类型不对）：同样不能画成删除。
     fs::remove_file(&full).unwrap();
     fs::create_dir_all(&full).unwrap();
-    let error = session.recovery_text_diff(&id, "target.txt", &store).unwrap_err();
-    assert!(error.message.contains("不是普通文件"), "类型错误必须如实报告：{error:?}");
+    let error = session
+        .recovery_text_diff(&id, "target.txt", &store)
+        .unwrap_err();
+    assert!(
+        error.message.contains("不是普通文件"),
+        "类型错误必须如实报告：{error:?}"
+    );
 }
 
 /// R05-R3-ST9/SP11：trash 残留可重试清理，且失败可见。
@@ -2374,9 +3216,15 @@ fn trash_leftovers_are_retried_and_visible() {
     let now = Arc::new(std::sync::atomic::AtomicU64::new(1_792_742_400_123));
     let clock = now.clone();
     let data = f.root().join("data-trash");
-    let store = RecoveryStore::with_clock(data.clone(), Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)));
+    let store = RecoveryStore::with_clock(
+        data.clone(),
+        Arc::new(move || clock.load(std::sync::atomic::Ordering::SeqCst)),
+    );
     discard(&session, &target, &store).unwrap();
-    now.fetch_add(revia_lib::recovery::RETENTION_MS + 1, std::sync::atomic::Ordering::SeqCst);
+    now.fetch_add(
+        revia_lib::recovery::RETENTION_MS + 1,
+        std::sync::atomic::Ordering::SeqCst,
+    );
 
     // 手工放一个残留目录，模拟「改名成功但删除中断」。
     let recovery_dir = data.join("recovery");
@@ -2432,7 +3280,11 @@ fn completion_journal_sync_failure_persists_needs_verification() {
         .unwrap_err();
     // 无论失败点落在完成留证还是尾部核对，都必须报待核对。
     fs::set_permissions(&record_dir, original).unwrap();
-    assert_eq!(error.kind, ErrorKind::NeedsVerification, "完成留证失败必须待核对：{error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::NeedsVerification,
+        "完成留证失败必须待核对：{error:?}"
+    );
     assert!(
         error.message.contains("待核对"),
         "错误信息必须明确待核对：{error:?}"
@@ -2441,13 +3293,23 @@ fn completion_journal_sync_failure_persists_needs_verification() {
     // 真实重开：用同一数据目录新建 store，读磁盘上的留证。
     let reopened = RecoveryStore::with_clock(data.clone(), Arc::new(|| 1_792_742_400_123));
     let summaries = reopened.list(None).unwrap();
-    let summary = summaries.iter().find(|summary| summary.id == id).expect("记录仍在");
+    let summary = summaries
+        .iter()
+        .find(|summary| summary.id == id)
+        .expect("记录仍在");
     let attempt = summary.restore.as_ref().expect("必须有恢复尝试");
     assert!(
-        matches!(attempt.state, revia_lib::recovery::RestoreAttemptState::NeedsVerification),
+        matches!(
+            attempt.state,
+            revia_lib::recovery::RestoreAttemptState::NeedsVerification
+        ),
         "重开后列表不能显示已完成：{attempt:?}"
     );
-    assert_eq!(attempt.written, vec!["target.ts".to_string()], "已写入路径必须如实保留");
+    assert_eq!(
+        attempt.written,
+        vec!["target.ts".to_string()],
+        "已写入路径必须如实保留"
+    );
 
     let reopened_session = f.session();
     let detail = reopened_session.inspect_record(&id, &reopened).unwrap();
@@ -2460,7 +3322,10 @@ fn completion_journal_sync_failure_persists_needs_verification() {
         detail.restore
     );
     // 工作区确实写回了保存内容（不自动重跑，但事实要如实）。
-    assert_eq!(f.read("target.ts"), text(&[(10, 1010), (80, 1080), (140, 1140)]));
+    assert_eq!(
+        f.read("target.ts"),
+        text(&[(10, 1010), (80, 1080), (140, 1140)])
+    );
 }
 
 /// R05-R4-ST1/SP1：前端解析到的归属与后端重新解析不一致时必须拒绝（不信任界面 ID）。
@@ -2489,7 +3354,11 @@ fn save_as_rejects_stale_expected_owner() {
         },
     )
     .unwrap_err();
-    assert_eq!(error.kind, ErrorKind::Rejected, "归属不一致必须拒绝：{error:?}");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Rejected,
+        "归属不一致必须拒绝：{error:?}"
+    );
     assert!(
         error.message.contains("归属已变化"),
         "必须因归属变化被拒，而不是路径检查出错：{error:?}"
@@ -2526,7 +3395,11 @@ fn standard_sha256(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(bytes);
-    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 // ---------------- 桌面验收数据准备入口（默认 ignored） ----------------
@@ -2598,10 +3471,20 @@ fn prepare_task05_desktop_fixture() {
         let rows = session
             .rows(hunk_path, ChangesKind::Unstaged, ViewMode::Unified, 0, 400)
             .unwrap();
-        let actions: Vec<_> = rows.rows.iter().filter_map(|row| row.hunk_action.as_ref()).collect();
+        let actions: Vec<_> = rows
+            .rows
+            .iter()
+            .filter_map(|row| row.hunk_action.as_ref())
+            .collect();
         assert_eq!(actions.len(), 3, "hunk 夹具应有 3 段改动");
         session
-            .discard_hunk(hunk_path, &entry.fingerprint, &entry.snapshot_revision, &actions[1].hunk_id, &store)
+            .discard_hunk(
+                hunk_path,
+                &entry.fingerprint,
+                &entry.snapshot_revision,
+                &actions[1].hunk_id,
+                &store,
+            )
             .expect("单 hunk 丢弃应成功");
         records.push(serde_json::json!({ "kind": "hunk", "target": hunk_path }));
     }
@@ -2644,7 +3527,10 @@ fn prepare_task05_desktop_fixture() {
             Some(DiscardOutcome::Completed { after }) => after.clone(),
             other => panic!("记录 {} 缺少可信完成回执：{other:?}", summary.id),
         };
-        assert!(summary.identity_confirmed, "记录身份必须与当前 worktree 匹配");
+        assert!(
+            summary.identity_confirmed,
+            "记录身份必须与当前 worktree 匹配"
+        );
         let describe = |files: &[revia_lib::recovery::SavedFile]| -> Vec<serde_json::Value> {
             files
                 .iter()
@@ -2661,15 +3547,7 @@ fn prepare_task05_desktop_fixture() {
         record_index.push(serde_json::json!({
             "recordId": summary.id,
             "target": record.target,
-            "source": match record.source {
-                RecoverySource::DiscardFile => "discardFile",
-                RecoverySource::DiscardHunk => "discardHunk",
-                RecoverySource::CommitSnapshot => "commitSnapshot",
-                RecoverySource::MergeApply => "mergeApply",
-                RecoverySource::CheckoutSmart => "checkoutSmart",
-                RecoverySource::CheckoutForce => "checkoutForce",
-                RecoverySource::UpdateAutostash => "updateAutostash",
-            },
+            "source": record.source.label(),
             "createdAtMs": record.created_at_ms,
             "paths": summary.paths,
             "before": describe(&record.before),
@@ -2680,11 +3558,11 @@ fn prepare_task05_desktop_fixture() {
 
     // 只登记本次 fixture 的仓库。
     {
-        let mut registry = revia_lib::settings::Registry::load(
-            data_dir.clone(),
-            Arc::new(CommandLog::default()),
-        );
-        let entry = registry.add(f.repo.to_str().unwrap()).expect("应能登记本次 fixture");
+        let mut registry =
+            revia_lib::settings::Registry::load(data_dir.clone(), Arc::new(CommandLog::default()));
+        let entry = registry
+            .add(f.repo.to_str().unwrap())
+            .expect("应能登记本次 fixture");
         assert_eq!(entry.path, identity.worktree_path.display().to_string());
         let listed = registry.list();
         assert_eq!(listed.len(), 1, "settings 只登记本次 fixture");
@@ -2692,25 +3570,34 @@ fn prepare_task05_desktop_fixture() {
     }
 
     // 初始工作区与 index 的可还原清单。
-    let worktree_files: Vec<serde_json::Value> = ["src/hunk.ts", "src/partial.ts", "assets/blob.bin", "docs/removed.txt", "scripts/run.sh"]
-        .iter()
-        .map(|path| {
-            let full = f.repo.join(path);
-            let meta = fs::symlink_metadata(&full).expect("工作区文件应存在");
-            let bytes = fs::read(&full).expect("工作区文件应可读");
-            serde_json::json!({
-                "path": path,
-                "exists": true,
-                "bytes": bytes.len(),
-                // 文件**原始字节**的标准 SHA-256（与 `shasum -a 256` 一致），
-                // 不是带长度前缀的 Revia 指纹，便于用标准工具逐文件核对。
-                "sha256": standard_sha256(&bytes),
-                "executable": platform::executable(&meta),
-            })
+    let worktree_files: Vec<serde_json::Value> = [
+        "src/hunk.ts",
+        "src/partial.ts",
+        "assets/blob.bin",
+        "docs/removed.txt",
+        "scripts/run.sh",
+    ]
+    .iter()
+    .map(|path| {
+        let full = f.repo.join(path);
+        let meta = fs::symlink_metadata(&full).expect("工作区文件应存在");
+        let bytes = fs::read(&full).expect("工作区文件应可读");
+        serde_json::json!({
+            "path": path,
+            "exists": true,
+            "bytes": bytes.len(),
+            // 文件**原始字节**的标准 SHA-256（与 `shasum -a 256` 一致），
+            // 不是带长度前缀的 Revia 指纹，便于用标准工具逐文件核对。
+            "sha256": standard_sha256(&bytes),
+            "executable": platform::executable(&meta),
         })
-        .collect();
+    })
+    .collect();
     let index_listing = String::from_utf8(f.git(&["ls-files", "--stage"])).unwrap();
-    let head_commit = String::from_utf8(f.git(&["rev-parse", "HEAD"])).unwrap().trim().to_string();
+    let head_commit = String::from_utf8(f.git(&["rev-parse", "HEAD"]))
+        .unwrap()
+        .trim()
+        .to_string();
     let status_now = String::from_utf8(f.git(&["status", "--porcelain=v2"])).unwrap();
 
     // 保留本次自建 fixture（TempDir::keep），之后所有路径都是真实存在的外部路径。
@@ -2748,7 +3635,10 @@ fn prepare_task05_desktop_fixture() {
         ],
         "boundary": "只证明记录由生产入口生成且身份匹配；未验证桌面行为、未做 D06/CI/长测，不构成任务验收。",
     });
-    println!("REVIA_TASK05_DESKTOP_FIXTURE {}", serde_json::to_string_pretty(&manifest).unwrap());
+    println!(
+        "REVIA_TASK05_DESKTOP_FIXTURE {}",
+        serde_json::to_string_pretty(&manifest).unwrap()
+    );
 }
 
 /// R05-CI01-SP1：另存路径检查必须接受合法父目录，并仍然逐级拒绝符号链接。

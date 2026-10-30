@@ -14,13 +14,13 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
+use crate::git::Git;
+use crate::git::diff::LineKind;
 use crate::git::highlight::{HighlightRequest, HighlightResult, Highlighter};
 use crate::git::history::{self as gh, ChangeStatus, RawChange};
 use crate::git::rows::{self, RenderRow, ViewMode};
 use crate::git::segments::{self, ChangeSegment, FoldRange, IgnoreWhitespace};
-use crate::git::diff::LineKind;
-use crate::git::Git;
 use crate::session::{self, FileVersion, WorktreeSession};
 
 /// 同时保留的历史目标数（工程限额）。
@@ -287,6 +287,21 @@ pub enum HistoryReadonlyReason {
 }
 
 impl HistoryReadonlyReason {
+    /// 不可打开原因对应的结构化错误。
+    pub fn error(self) -> AppError {
+        let (code, template) = match self {
+            Self::NonUtf8Path => (
+                "errors.history.readonlyNonUtf8Path",
+                "路径含非 UTF-8 字节，无法无损打开该提交中的文件",
+            ),
+            Self::Submodule => (
+                "errors.history.readonlySubmodule",
+                "子模块的内容在另一个仓库里，历史 diff 中不展开",
+            ),
+        };
+        AppError::coded(ErrorKind::Rejected, code, template, &[])
+    }
+
     pub fn description(self) -> &'static str {
         match self {
             Self::NonUtf8Path => "路径含非 UTF-8 字节，无法无损打开该提交中的文件",
@@ -425,7 +440,7 @@ pub struct HistoryMergeView {
     pub sides: Vec<HistoryMergeSide>,
     pub result: HistoryMergeText,
     /// 父提交不是两个（超过两个父提交或未指认父提交）时不能显示三栏。
-    pub unavailable: Option<String>,
+    pub unavailable: Option<crate::error::AppErrorPayload>,
 }
 
 /// 历史 diff 的固定目标身份：由改动文件列表签发，请求时原样带回。
@@ -571,20 +586,38 @@ pub struct HistoryTarget {
 
 impl HistoryTarget {
     fn with_inner<T>(&self, f: impl FnOnce(&mut TargetInner) -> Result<T>) -> Result<T> {
-        let mut inner = self.inner.lock().map_err(|_| AppError::internal("历史目标锁失败"))?;
+        let mut inner = self.inner.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.historyTargetLockFailed",
+                "历史目标锁失败",
+                &[],
+            )
+        })?;
         if inner.closed {
-            return Err(AppError::rejected("历史目标已关闭，请重新打开提交历史"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.theHistoryTargetClosedReopenCommit",
+                "历史目标已关闭，请重新打开提交历史",
+                &[],
+            ));
         }
         f(&mut inner)
     }
 
     /// 当前缓存的 diff 份数（回归测试检查有界性用）。
     pub fn cache_len(&self) -> usize {
-        self.inner.lock().map(|inner| inner.content.len()).unwrap_or(0)
+        self.inner
+            .lock()
+            .map(|inner| inner.content.len())
+            .unwrap_or(0)
     }
 
     pub fn layout_cache_len(&self) -> usize {
-        self.inner.lock().map(|inner| inner.layouts.len()).unwrap_or(0)
+        self.inner
+            .lock()
+            .map(|inner| inner.layouts.len())
+            .unwrap_or(0)
     }
 
     /// 重新读取本地引用（新查询与标签使用最新引用）。
@@ -602,7 +635,13 @@ impl HistoryTarget {
         limit: u32,
         cursor: Option<String>,
     ) -> Result<HistoryPage> {
-        self.log_page_filtered(start, first_parent, limit, cursor, &HistoryFilter::default())
+        self.log_page_filtered(
+            start,
+            first_parent,
+            limit,
+            cursor,
+            &HistoryFilter::default(),
+        )
     }
 
     /// 带筛选的分页读取（M5 第二批 L04）。
@@ -618,13 +657,20 @@ impl HistoryTarget {
         filter: &HistoryFilter,
     ) -> Result<HistoryPage> {
         if limit == 0 {
-            return Err(AppError::rejected("limit 必须在 1 到 200 之间"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.limitMustBetween1200",
+                "limit 必须在 1 到 200 之间",
+                &[],
+            ));
         }
         if limit > gh::MAX_PAGE_LIMIT {
-            return Err(AppError::rejected(format!(
-                "limit 不能超过 {}",
-                gh::MAX_PAGE_LIMIT
-            )));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.limitExceed",
+                "limit 不能超过 {0}",
+                &[("0", format!("{:}", gh::MAX_PAGE_LIMIT))],
+            ));
         }
         let resolved = self.resolve_filter(filter)?;
         let filter_key = resolved.key.clone();
@@ -635,21 +681,48 @@ impl HistoryTarget {
                     // 查询编号在每个目标内从 `q1` 起，光看 `qN:skip` 会让另一个目标的
                     // 同名查询被当成合法续页；游标必须带上签发它的目标。
                     if cursor_target != self.id {
-                        return Err(AppError::rejected("分页游标属于另一个历史目标，请重新开始查询"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.thePageCursorBelongsAnotherHistory",
+                            "分页游标属于另一个历史目标，请重新开始查询",
+                            &[],
+                        ));
                     }
                     let query = inner
                         .queries
                         .iter()
                         .find(|query| query.id == query_id)
-                        .ok_or_else(|| AppError::rejected("分页游标已过期，请重新开始查询"))?;
+                        .ok_or_else(|| {
+                            AppError::coded(
+                                ErrorKind::Rejected,
+                                "errors.history.thePageCursorExpiredRestartQuery",
+                                "分页游标已过期，请重新开始查询",
+                                &[],
+                            )
+                        })?;
                     if query.next_skip != skip {
-                        return Err(AppError::rejected("分页游标与查询进度不一致，请重新开始查询"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.thePageCursorDoesMatchQuery",
+                            "分页游标与查询进度不一致，请重新开始查询",
+                            &[],
+                        ));
                     }
                     if query.first_parent != first_parent {
-                        return Err(AppError::rejected("分页游标与本次查询的遍历方式不一致"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.thePageCursorDoesMatchQuery2",
+                            "分页游标与本次查询的遍历方式不一致",
+                            &[],
+                        ));
                     }
                     if query.filter_key != filter_key {
-                        return Err(AppError::rejected("分页游标与本次筛选条件不一致，请重新开始查询"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.thePageCursorDoesMatchThese",
+                            "分页游标与本次筛选条件不一致，请重新开始查询",
+                            &[],
+                        ));
                     }
                     (
                         query.id.clone(),
@@ -659,7 +732,14 @@ impl HistoryTarget {
                     )
                 }
                 None => {
-                    let start = start.ok_or_else(|| AppError::rejected("首次查询必须指定起点"))?;
+                    let start = start.ok_or_else(|| {
+                        AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.theFirstQueryMustSpecifyStart",
+                            "首次查询必须指定起点",
+                            &[],
+                        )
+                    })?;
                     let starts = self.resolve_starts(&start, filter)?;
                     let refs = read_refs(&self.git)?;
                     inner.query_counter += 1;
@@ -686,13 +766,24 @@ impl HistoryTarget {
 
             let end = skip.saturating_add(limit);
             if end > gh::MAX_QUERY_SPAN {
-                return Err(AppError::rejected(format!(
-                    "历史分页超过本次查询上限（{} 条），请从更近的起点重新查询",
-                    gh::MAX_QUERY_SPAN
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.historyPagingExceededQuerySLimit",
+                    "历史分页超过本次查询上限（{0} 条），请从更近的起点重新查询",
+                    &[("0", format!("{:}", gh::MAX_QUERY_SPAN))],
+                ));
             }
             let (page_commits, exhausted) = match &resolved.text_match {
-                Some(match_mode) => self.scan_page(inner, &query_id, &starts, first_parent, skip, limit, &resolved, match_mode)?,
+                Some(match_mode) => self.scan_page(
+                    inner,
+                    &query_id,
+                    &starts,
+                    first_parent,
+                    skip,
+                    limit,
+                    &resolved,
+                    match_mode,
+                )?,
                 None => {
                     let commits = gh::read_page_filtered(
                         &self.git,
@@ -751,11 +842,22 @@ impl HistoryTarget {
                     .queries
                     .iter()
                     .find(|query| query.id == query_id)
-                    .ok_or_else(|| AppError::rejected("分页游标已过期，请重新开始查询"))?;
-                let scan = query
-                    .scan
-                    .as_ref()
-                    .ok_or_else(|| AppError::internal("扫描式查询缺少进度"))?;
+                    .ok_or_else(|| {
+                        AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.thePageCursorExpiredRestartQuery2",
+                            "分页游标已过期，请重新开始查询",
+                            &[],
+                        )
+                    })?;
+                let scan = query.scan.as_ref().ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.history.theScanningQueryMissingProgress",
+                        "扫描式查询缺少进度",
+                        &[],
+                    )
+                })?;
                 (scan.matched.len() as u32, scan.scanned, scan.exhausted)
             };
             if skip.saturating_add(limit) <= have || exhausted {
@@ -767,16 +869,24 @@ impl HistoryTarget {
                 let scan = query.scan.as_ref().expect("扫描式查询缺少进度");
                 let from = skip as usize;
                 let to = (from + limit as usize).min(scan.matched.len());
-                let page = if from < to { scan.matched[from..to].to_vec() } else { Vec::new() };
+                let page = if from < to {
+                    scan.matched[from..to].to_vec()
+                } else {
+                    Vec::new()
+                };
                 let ended = exhausted && to == scan.matched.len();
                 return Ok((page, ended));
             }
             if scanned >= gh::MAX_QUERY_SPAN {
-                return Err(AppError::rejected(format!(
-                    "已扫描 {} 条提交仍未取满本次查询上限（{} 条），请从更近的起点或更具体的筛选重新查询",
-                    scanned,
-                    gh::MAX_QUERY_SPAN
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.scannedCommitsWithoutFillingQueryS",
+                    "已扫描 {0} 条提交仍未取满本次查询上限（{1} 条），请从更近的起点或更具体的筛选重新查询",
+                    &[
+                        ("0", format!("{:}", scanned)),
+                        ("1", format!("{:}", gh::MAX_QUERY_SPAN)),
+                    ],
+                ));
             }
             let batch = gh::read_page_scanned(
                 &self.git,
@@ -797,11 +907,22 @@ impl HistoryTarget {
                 .queries
                 .iter_mut()
                 .find(|query| query.id == query_id)
-                .ok_or_else(|| AppError::rejected("分页游标已过期，请重新开始查询"))?;
-            let scan = query
-                .scan
-                .as_mut()
-                .ok_or_else(|| AppError::internal("扫描式查询缺少进度"))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.history.thePageCursorExpiredRestartQuery3",
+                        "分页游标已过期，请重新开始查询",
+                        &[],
+                    )
+                })?;
+            let scan = query.scan.as_mut().ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.history.theScanningQueryMissingProgress2",
+                    "扫描式查询缺少进度",
+                    &[],
+                )
+            })?;
             for item in &batch {
                 if match_mode.matches(item) {
                     scan.matched.push(describe_commit(&item.entry, &page_refs));
@@ -822,24 +943,44 @@ impl HistoryTarget {
     fn resolve_starts(&self, start: &HistoryStart, filter: &HistoryFilter) -> Result<Vec<String>> {
         if !filter.branches.is_empty() {
             return self.resolve_starts(
-                &HistoryStart::Refs { full_names: filter.branches.clone() },
+                &HistoryStart::Refs {
+                    full_names: filter.branches.clone(),
+                },
                 &HistoryFilter::default(),
             );
         }
         match start {
             HistoryStart::Ref { full_name } => {
                 if full_name.is_empty() {
-                    return Err(AppError::rejected("引用名不能为空"));
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.history.theReferenceNameEmpty",
+                        "引用名不能为空",
+                        &[],
+                    ));
                 }
                 let refs = read_refs(&self.git)?;
                 refs.iter()
                     .find(|item| &item.full_name == full_name)
                     .map(|item| vec![item.commit.clone()])
-                    .ok_or_else(|| AppError::rejected(format!("引用不存在或不是提交：{full_name}")))
+                    .ok_or_else(|| {
+                        AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.theReferenceDoesExistCommit",
+                            "引用不存在或不是提交：{full_name}",
+                            &[("full_name", format!("{}", full_name))],
+                        )
+                    })
             }
             HistoryStart::Commit { oid } => Ok(vec![gh::verify_commit_oid(&self.git, oid)?]),
-            HistoryStart::Head => Ok(vec![gh::head_commit(&self.git)?
-                .ok_or_else(|| AppError::rejected("仓库还没有提交，无法读取历史"))?]),
+            HistoryStart::Head => Ok(vec![gh::head_commit(&self.git)?.ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theRepositoryNoCommitsYetRead",
+                    "仓库还没有提交，无法读取历史",
+                    &[],
+                )
+            })?]),
             HistoryStart::Refs { full_names } => {
                 let refs = read_refs(&self.git)?;
                 let mut starts: Vec<String> = Vec::new();
@@ -856,7 +997,12 @@ impl HistoryTarget {
                         }
                     }
                     if starts.is_empty() {
-                        return Err(AppError::rejected("仓库还没有提交，无法读取历史"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.theRepositoryNoCommitsYetRead2",
+                            "仓库还没有提交，无法读取历史",
+                            &[],
+                        ));
                     }
                     return Ok(starts);
                 }
@@ -864,7 +1010,14 @@ impl HistoryTarget {
                     let item = refs
                         .iter()
                         .find(|item| &item.full_name == name)
-                        .ok_or_else(|| AppError::rejected(format!("引用不存在或不是提交：{name}")))?;
+                        .ok_or_else(|| {
+                            AppError::coded(
+                                ErrorKind::Rejected,
+                                "errors.history.theReferenceDoesExistCommit2",
+                                "引用不存在或不是提交：{name}",
+                                &[("name", format!("{}", name))],
+                            )
+                        })?;
                     if !starts.contains(&item.commit) {
                         starts.push(item.commit.clone());
                     }
@@ -908,26 +1061,45 @@ impl HistoryTarget {
             if value.is_empty() {
                 continue;
             }
-            let pattern = if author_uses_regex { regex_escape(value) } else { value.to_string() };
+            let pattern = if author_uses_regex {
+                regex_escape(value)
+            } else {
+                value.to_string()
+            };
             git_filter.authors.push(pattern);
             key.push_str(&format!("au:{value};"));
         }
         for path in &filter.paths {
             let value = path.trim();
             if value.is_empty() {
-                return Err(AppError::rejected("路径筛选不能包含空路径"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.thePathFilterContainEmptyPath",
+                    "路径筛选不能包含空路径",
+                    &[],
+                ));
             }
             // 路径按字面匹配（`--literal-pathspecs`），并由 `--` 与选项隔开，
             // 因此以 `-` 开头或含 `*`、`[`、`:()` 的路径都不会被当成选项或魔改模式。
             if value.contains('\n') {
-                return Err(AppError::rejected(format!("无法按字面匹配含换行的路径：{value}")));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.cannotMatchPathContainingNewlineLiterally",
+                    "无法按字面匹配含换行的路径：{value}",
+                    &[("value", format!("{}", value))],
+                ));
             }
             git_filter.paths.push(value.to_string());
             key.push_str(&format!("pa:{value};"));
         }
         for branch in &filter.branches {
             if branch.trim().is_empty() {
-                return Err(AppError::rejected("分支筛选不能包含空引用名"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theBranchFilterContainEmptyReference",
+                    "分支筛选不能包含空引用名",
+                    &[],
+                ));
             }
             key.push_str(&format!("br:{branch};"));
         }
@@ -935,7 +1107,12 @@ impl HistoryTarget {
             match date {
                 HistoryDateFilter::LastDays { days } => {
                     if *days == 0 || *days > 3650 {
-                        return Err(AppError::rejected("最近天数必须在 1 到 3650 之间"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.recentDaysMustBetween13650",
+                            "最近天数必须在 1 到 3650 之间",
+                            &[],
+                        ));
                     }
                     let seconds = now_unix().saturating_sub(i64::from(*days) * 86_400);
                     git_filter.since = Some(seconds.to_string());
@@ -945,7 +1122,12 @@ impl HistoryTarget {
                     validate_date(since)?;
                     validate_date(until)?;
                     if since > until {
-                        return Err(AppError::rejected("起始日期不能晚于结束日期"));
+                        return Err(AppError::coded(
+                            ErrorKind::Rejected,
+                            "errors.history.theStartDateLaterThanEnd",
+                            "起始日期不能晚于结束日期",
+                            &[],
+                        ));
                     }
                     git_filter.since = Some(format!("{since} 00:00:00"));
                     git_filter.until = Some(format!("{until} 23:59:59"));
@@ -953,7 +1135,11 @@ impl HistoryTarget {
                 }
             }
         }
-        Ok(ResolvedFilter { git_filter, text_match, key })
+        Ok(ResolvedFilter {
+            git_filter,
+            text_match,
+            key,
+        })
     }
 
     // ---------- H02：详情与改动文件 ----------
@@ -1008,7 +1194,12 @@ impl HistoryTarget {
         let commit = gh::verify_commit_oid(&self.git, commit)?;
         let detail = gh::read_commit(&self.git, &commit)?;
         if detail.parents.len() < 2 {
-            return Err(AppError::rejected("这个提交不是 merge 提交，没有多个父提交"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.thisCommitMergeCommitNoMultiple",
+                "这个提交不是 merge 提交，没有多个父提交",
+                &[],
+            ));
         }
         let mut per_parent: Vec<Vec<RawChange>> = Vec::new();
         for parent in &detail.parents {
@@ -1077,7 +1268,12 @@ impl HistoryTarget {
         let commit = gh::verify_commit_oid(&self.git, commit)?;
         let detail = gh::read_commit(&self.git, &commit)?;
         if path.is_empty() {
-            return Err(AppError::rejected("路径不能为空"));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.thePathEmpty",
+                "路径不能为空",
+                &[],
+            ));
         }
         // 路径身份：必须来自该提交相对某个父提交的改动文件。
         let mut known = false;
@@ -1095,12 +1291,18 @@ impl HistoryTarget {
             }
         }
         if !known {
-            return Err(AppError::rejected(format!(
-                "该提交的这个文件没有改动，不能作为三栏比较目标：{path}"
-            )));
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.thisFileDidChangeCommitThree",
+                "该提交的这个文件没有改动，不能作为三栏比较目标：{path}",
+                &[("path", format!("{}", path))],
+            ));
         }
-        let unavailable = (detail.parents.len() != 2)
-            .then(|| format!("该提交有 {} 个父提交，三栏只读视图只支持两个父提交", detail.parents.len()));
+        let unavailable = (detail.parents.len() != 2).then(|| {
+            AppError::coded(ErrorKind::Rejected, "errors.history.threePaneParentCount",
+                "该提交有 {count} 个父提交，三栏只读视图只支持两个父提交",
+                &[("count", detail.parents.len().to_string())]).payload()
+        });
         let result = self.read_tree_text(&commit, path)?;
         let mut sides = Vec::new();
         if unavailable.is_none() {
@@ -1134,22 +1336,27 @@ impl HistoryTarget {
         };
         match gh::object_type(&self.git, &oid)?.as_deref() {
             Some("blob") => {}
-            Some(other) => {
+            Some(_other) => {
                 return Ok(HistoryMergeText {
-                    text: format!("（{other}，不能在文本视图中显示）"),
+                    text: String::new(),
                     missing: false,
                     binary: true,
                     lossy: false,
                 });
             }
             None => {
-                return Err(AppError::git(format!("缺少对象：{oid}")));
+                return Err(AppError::coded(
+                    ErrorKind::Git,
+                    "errors.history.missingObject",
+                    "缺少对象：{oid}",
+                    &[("oid", format!("{}", oid))],
+                ));
             }
         }
         let bytes = gh::blob(&self.git, &oid)?;
         if bytes.len() as u64 > gh::MAX_BLOB_BYTES {
             return Ok(HistoryMergeText {
-                text: format!("（文件超过 {} MB，不能在三栏视图中显示）", gh::MAX_BLOB_BYTES / (1024 * 1024)),
+                text: String::new(),
                 missing: false,
                 binary: true,
                 lossy: false,
@@ -1165,7 +1372,12 @@ impl HistoryTarget {
         }
         let lossy = std::str::from_utf8(&bytes).is_err();
         let text = String::from_utf8_lossy(&bytes).replace("\r\n", "\n");
-        Ok(HistoryMergeText { text, missing: false, binary: false, lossy })
+        Ok(HistoryMergeText {
+            text,
+            missing: false,
+            binary: false,
+            lossy,
+        })
     }
 
     /// 比较基线：显式父提交必须是该提交的真实父提交；根提交明确使用空 tree。
@@ -1173,16 +1385,22 @@ impl HistoryTarget {
         match parent {
             Some(parent) => {
                 if !parents.iter().any(|candidate| candidate == parent) {
-                    return Err(AppError::rejected(format!(
-                        "指定的父提交不是该提交的父提交：{parent}"
-                    )));
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.history.theGivenParentParentCommit",
+                        "指定的父提交不是该提交的父提交：{parent}",
+                        &[("parent", format!("{}", parent))],
+                    ));
                 }
                 Ok((parent.to_string(), false))
             }
             None => {
                 if !parents.is_empty() {
-                    return Err(AppError::rejected(
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.history.thisCommitParentsReadingChangedFiles",
                         "该提交有父提交，读取改动文件时必须显式指定一个父提交",
+                        &[],
                     ));
                 }
                 Ok((gh::empty_tree(&self.git)?, true))
@@ -1263,7 +1481,14 @@ impl HistoryTarget {
             let cached = inner
                 .content
                 .get(&diff_key(&diff_id, ignore))
-                .ok_or_else(|| AppError::internal("提交 diff 缓存丢失"))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.history.commitDiffCacheLost",
+                        "提交 diff 缓存丢失",
+                        &[],
+                    )
+                })?;
             let key = format!("{diff_id}/{}/{view:?}", ignore.as_str());
             if !inner.layouts.contains_key(&key) {
                 if inner.layouts.len() >= MAX_CACHED_LAYOUTS {
@@ -1276,14 +1501,20 @@ impl HistoryTarget {
                     },
                 );
             }
-            let layout = inner
-                .layouts
-                .get(&key)
-                .ok_or_else(|| AppError::internal("提交 diff 排版缓存丢失"))?;
+            let layout = inner.layouts.get(&key).ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.history.commitDiffLayoutCacheLost",
+                    "提交 diff 排版缓存丢失",
+                    &[],
+                )
+            })?;
             let row_count = layout.layout.len() as u32;
             let start = from.min(row_count);
             let end = to.min(row_count).max(start);
-            let rendered = layout.layout.render_range(&cached.model, start as usize..end as usize);
+            let rendered = layout
+                .layout
+                .render_range(&cached.model, start as usize..end as usize);
             let empty_reason = empty_reason(cached);
             Ok(HistoryRowSlice {
                 target_id: self.id.clone(),
@@ -1313,7 +1544,14 @@ impl HistoryTarget {
                 let cached = inner
                     .content
                     .get(&diff_key(&diff_id, ignore))
-                    .ok_or_else(|| AppError::internal("提交 diff 缓存丢失"))?;
+                    .ok_or_else(|| {
+                        AppError::coded(
+                            ErrorKind::Internal,
+                            "errors.history.commitDiffCacheLost2",
+                            "提交 diff 缓存丢失",
+                            &[],
+                        )
+                    })?;
                 (
                     cached.binary,
                     cached.mode_only,
@@ -1346,35 +1584,59 @@ impl HistoryTarget {
             let left_count = segments::text_line_count(&texts.old);
             let right_count = segments::text_line_count(&texts.new);
             if left_count > MAX_SIDE_LINES || right_count > MAX_SIDE_LINES {
-                return Err(AppError::rejected(format!(
-                    "文件超过历史左右对照上限（{MAX_SIDE_LINES} 行）"
-                )));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theFileExceedsHistorySideSide",
+                    "文件超过历史左右对照上限（{MAX_SIDE_LINES} 行）",
+                    &[("MAX_SIDE_LINES", format!("{}", MAX_SIDE_LINES))],
+                ));
             }
             let cached = inner
                 .content
                 .get(&diff_key(&diff_id, ignore))
-                .ok_or_else(|| AppError::internal("提交 diff 缓存丢失"))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.history.commitDiffCacheLost3",
+                        "提交 diff 缓存丢失",
+                        &[],
+                    )
+                })?;
             let side_key = format!("{diff_id}/{}/{context_lines}", ignore.as_str());
             if !inner.sides.contains_key(&side_key) {
                 if !segments::texts_match_diff(&cached.model, &texts.old, &texts.new) {
-                    return Err(AppError::internal(
+                    return Err(AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.history.theCommitContentDoesMatchDiff",
                         "提交内容与 Git 给出的差异不一致，已拒绝显示",
+                        &[],
                     ));
                 }
                 let mut all: Vec<ChangeSegment> = Vec::new();
                 for (index, hunk) in cached.model.hunks.iter().enumerate() {
                     all.extend(segments::segments_of_hunk(hunk, index as u32));
                 }
-                let folds = segments::compute_folds(&cached.model, left_count, right_count, context_lines);
+                let folds =
+                    segments::compute_folds(&cached.model, left_count, right_count, context_lines);
                 if inner.sides.len() >= MAX_CACHED_SIDES {
                     inner.sides.clear();
                 }
-                inner.sides.insert(side_key.clone(), SideCache { segments: all, folds });
+                inner.sides.insert(
+                    side_key.clone(),
+                    SideCache {
+                        segments: all,
+                        folds,
+                    },
+                );
             }
-            let side = inner
-                .sides
-                .get(&side_key)
-                .ok_or_else(|| AppError::internal("提交左右对照缓存丢失"))?;
+            let side = inner.sides.get(&side_key).ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.history.commitSideSideCacheLost",
+                    "提交左右对照缓存丢失",
+                    &[],
+                )
+            })?;
             Ok(HistorySideLayout {
                 target_id: self.id.clone(),
                 diff_id,
@@ -1411,9 +1673,21 @@ impl HistoryTarget {
             let cached = inner
                 .content
                 .get(&diff_key(&diff_id, ignore))
-                .ok_or_else(|| AppError::internal("提交 diff 缓存丢失"))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.history.commitDiffCacheLost4",
+                        "提交 diff 缓存丢失",
+                        &[],
+                    )
+                })?;
             if cached.binary {
-                return Err(AppError::rejected("二进制文件没有可显示的历史文本行"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.aBinaryFileNoHistoricalText",
+                    "二进制文件没有可显示的历史文本行",
+                    &[],
+                ));
             }
             let side_key = format!("{diff_id}/{}/{context_lines}", ignore.as_str());
             let segment_list = match inner.sides.get(&side_key) {
@@ -1434,7 +1708,8 @@ impl HistoryTarget {
             };
             let from = from.max(1);
             let to = to.max(from);
-            let mut changed_lines: std::collections::HashSet<u32> = std::collections::HashSet::new();
+            let mut changed_lines: std::collections::HashSet<u32> =
+                std::collections::HashSet::new();
             let mut word_ranges: HashMap<u32, Vec<(u32, u32)>> = HashMap::new();
             for segment in &segment_list {
                 let (start, end) = match version {
@@ -1454,7 +1729,13 @@ impl HistoryTarget {
                     FileVersion::New => right_map,
                 });
             }
-            Ok(segments::side_lines_from_text(lines, from, to, &changed_lines, &word_ranges))
+            Ok(segments::side_lines_from_text(
+                lines,
+                from,
+                to,
+                &changed_lines,
+                &word_ranges,
+            ))
         })
     }
 
@@ -1472,9 +1753,21 @@ impl HistoryTarget {
             let cached = inner
                 .content
                 .get(&diff_key(&diff_id, ignore))
-                .ok_or_else(|| AppError::internal("提交 diff 缓存丢失"))?;
+                .ok_or_else(|| {
+                    AppError::coded(
+                        ErrorKind::Internal,
+                        "errors.history.commitDiffCacheLost5",
+                        "提交 diff 缓存丢失",
+                        &[],
+                    )
+                })?;
             if cached.binary {
-                return Err(AppError::rejected("二进制文件不支持语法高亮"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.binaryFilesDoSupportSyntaxHighlighting",
+                    "二进制文件不支持语法高亮",
+                    &[],
+                ));
             }
             let text = match version {
                 FileVersion::Old => texts.old.clone(),
@@ -1514,8 +1807,11 @@ impl HistoryTarget {
             file.new_oid.as_deref(),
         );
         if recomputed != file.diff_id {
-            return Err(AppError::rejected(
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.theCommitDiffTargetIdentityDoes",
                 "提交 diff 的目标身份与后端记录不一致，请重新打开该文件",
+                &[],
             ));
         }
         // 快速路径：同一个目标下已经解析过这份固定目标。`diff_id` 里含目标实例身份，
@@ -1546,8 +1842,11 @@ impl HistoryTarget {
             change.new_oid.as_deref(),
         );
         if diff_id != file.diff_id {
-            return Err(AppError::rejected(
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.history.theCommitDiffTargetIdentityDoes2",
                 "提交 diff 的目标身份与后端记录不一致，请重新打开该文件",
+                &[],
             ));
         }
         let key = diff_key(&diff_id, ignore);
@@ -1572,12 +1871,22 @@ impl HistoryTarget {
     ) -> Result<RawChange> {
         if let Some(oid) = &file.old_oid {
             if !gh::is_full_oid(oid) {
-                return Err(AppError::rejected("旧对象 ID 不合法"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theOldObjectIdInvalid",
+                    "旧对象 ID 不合法",
+                    &[],
+                ));
             }
         }
         if let Some(oid) = &file.new_oid {
             if !gh::is_full_oid(oid) {
-                return Err(AppError::rejected("新对象 ID 不合法"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theNewObjectIdInvalid",
+                    "新对象 ID 不合法",
+                    &[],
+                ));
             }
         }
         let changes = gh::read_changes(&self.git, base, commit)?;
@@ -1592,10 +1901,12 @@ impl HistoryTarget {
                     && HistoryFileStatus::from_change(change.status) == file.status
             })
             .ok_or_else(|| {
-                AppError::rejected(format!(
-                    "文件不属于该提交与父提交的改动范围，或内容身份已变化：{}",
-                    file.path
-                ))
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theFilePartChangeBetweenCommit",
+                    "文件不属于该提交与父提交的改动范围，或内容身份已变化：{0}",
+                    &[("0", format!("{:}", file.path))],
+                )
             })
     }
 
@@ -1608,12 +1919,12 @@ impl HistoryTarget {
         ignore: IgnoreWhitespace,
     ) -> Result<CachedDiff> {
         let primary = std::str::from_utf8(change.primary_path())
-            .map_err(|_| AppError::rejected(HistoryReadonlyReason::NonUtf8Path.description()))?
+            .map_err(|_| HistoryReadonlyReason::NonUtf8Path.error())?
             .to_string();
         let mut paths: Vec<&str> = Vec::new();
         if let Some(original) = change.original_path() {
             let original = std::str::from_utf8(original)
-                .map_err(|_| AppError::rejected(HistoryReadonlyReason::NonUtf8Path.description()))?;
+                .map_err(|_| HistoryReadonlyReason::NonUtf8Path.error())?;
             paths.push(original);
         }
         paths.push(&primary);
@@ -1634,9 +1945,12 @@ impl HistoryTarget {
             && change.old_oid != change.new_oid
             && !ignore_allows_empty(ignore)
         {
-            return Err(AppError::git(format!(
-                "Git 没有返回该文件的差异，但对象 ID 不同：{primary}"
-            )));
+            return Err(AppError::coded(
+                ErrorKind::Git,
+                "errors.history.gitReturnedNoDiffFileBut",
+                "Git 没有返回该文件的差异，但对象 ID 不同：{primary}",
+                &[("primary", format!("{}", primary))],
+            ));
         }
         Ok(CachedDiff {
             diff_id: diff_id.to_string(),
@@ -1661,15 +1975,29 @@ impl HistoryTarget {
             .map(|(key, _)| key.clone())
             .collect();
         let Some(key) = keys.first().cloned() else {
-            return Err(AppError::internal("提交 diff 缓存丢失"));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.commitDiffCacheLost6",
+                "提交 diff 缓存丢失",
+                &[],
+            ));
         };
-        let cached = inner
-            .content
-            .get_mut(&key)
-            .ok_or_else(|| AppError::internal("提交 diff 缓存丢失"))?;
+        let cached = inner.content.get_mut(&key).ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.commitDiffCacheLost7",
+                "提交 diff 缓存丢失",
+                &[],
+            )
+        })?;
         if cached.texts.is_none() {
             if cached.binary {
-                return Err(AppError::rejected("二进制文件没有可显示的文本内容"));
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.aBinaryFileNoTextContent",
+                    "二进制文件没有可显示的文本内容",
+                    &[],
+                ));
             }
             let old = self.read_blob_text(cached.old_missing, cached.old_oid.as_deref())?;
             let new = self.read_blob_text(cached.new_missing, cached.new_oid.as_deref())?;
@@ -1680,17 +2008,28 @@ impl HistoryTarget {
                 new_lossy: new.1,
             }));
         }
-        cached
-            .texts
-            .clone()
-            .ok_or_else(|| AppError::internal("提交 diff 文本缓存丢失"))
+        cached.texts.clone().ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.commitDiffTextCacheLost",
+                "提交 diff 文本缓存丢失",
+                &[],
+            )
+        })
     }
 
     fn read_blob_text(&self, missing: bool, oid: Option<&str>) -> Result<(String, bool)> {
         if missing {
             return Ok((String::new(), false));
         }
-        let oid = oid.ok_or_else(|| AppError::internal("提交 diff 缺少对象 ID"))?;
+        let oid = oid.ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.theCommitDiffMissingObjectIds",
+                "提交 diff 缺少对象 ID",
+                &[],
+            )
+        })?;
         let bytes = gh::blob(&self.git, oid)?;
         Ok(match String::from_utf8(bytes.clone()) {
             Ok(text) => (text, false),
@@ -1714,18 +2053,38 @@ fn display_path(bytes: &[u8]) -> String {
 
 fn parse_cursor(cursor: &str) -> Result<(&str, &str, u32)> {
     // 形如 `<target_id>/<query_id>:<skip>`。
-    let (target_id, rest) = cursor
-        .split_once('/')
-        .ok_or_else(|| AppError::rejected("分页游标格式不正确"))?;
-    let (query_id, skip) = rest
-        .split_once(':')
-        .ok_or_else(|| AppError::rejected("分页游标格式不正确"))?;
+    let (target_id, rest) = cursor.split_once('/').ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.thePageCursorFormatInvalid",
+            "分页游标格式不正确",
+            &[],
+        )
+    })?;
+    let (query_id, skip) = rest.split_once(':').ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.thePageCursorFormatInvalid2",
+            "分页游标格式不正确",
+            &[],
+        )
+    })?;
     if target_id.is_empty() || query_id.is_empty() {
-        return Err(AppError::rejected("分页游标格式不正确"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.thePageCursorFormatInvalid3",
+            "分页游标格式不正确",
+            &[],
+        ));
     }
-    let skip = skip
-        .parse::<u32>()
-        .map_err(|_| AppError::rejected("分页游标格式不正确"))?;
+    let skip = skip.parse::<u32>().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.thePageCursorFormatInvalid4",
+            "分页游标格式不正确",
+            &[],
+        )
+    })?;
     Ok((target_id, query_id, skip))
 }
 
@@ -1793,13 +2152,20 @@ struct TextMatch {
 
 impl TextMatch {
     fn matches(&self, item: &gh::ScannedCommit) -> bool {
-        if self.hash_prefix && item.entry.oid.starts_with(&self.pattern.to_ascii_lowercase()) {
+        if self.hash_prefix
+            && item
+                .entry
+                .oid
+                .starts_with(&self.pattern.to_ascii_lowercase())
+        {
             return true;
         }
         if self.case_sensitive {
             item.message.contains(&self.pattern)
         } else {
-            item.message.to_lowercase().contains(&self.pattern.to_lowercase())
+            item.message
+                .to_lowercase()
+                .contains(&self.pattern.to_lowercase())
         }
     }
 }
@@ -1832,12 +2198,22 @@ fn validate_date(text: &str) -> Result<()> {
             .enumerate()
             .all(|(index, byte)| index == 4 || index == 7 || byte.is_ascii_digit());
     if !shaped {
-        return Err(AppError::rejected(format!("日期必须形如 2026-10-27：{text}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.datesMustLookLike202610",
+            "日期必须形如 2026-10-27：{text}",
+            &[("text", format!("{}", text))],
+        ));
     }
     let month: u32 = text[5..7].parse().unwrap_or(0);
     let day: u32 = text[8..10].parse().unwrap_or(0);
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
-        return Err(AppError::rejected(format!("日期不合法：{text}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.invalidDate",
+            "日期不合法：{text}",
+            &[("text", format!("{}", text))],
+        ));
     }
     Ok(())
 }
@@ -1916,10 +2292,12 @@ fn select_patch_file(
         .map(|(index, _)| index)
         .collect();
     if matches.len() != 1 {
-        return Err(AppError::git(format!(
-            "Git 返回的差异无法与改动对象对上（匹配 {} 个），已拒绝显示",
-            matches.len()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.history.gitSDiffCouldMatchedChanged",
+            "Git 返回的差异无法与改动对象对上（匹配 {0} 个），已拒绝显示",
+            &[("0", format!("{:}", matches.len()))],
+        ));
     }
     let mut file = files.swap_remove(matches[0]);
     override_identity(&mut file, change);
@@ -2071,13 +2449,23 @@ impl HistoryStore {
         let head_ref = gh::head_ref(&git);
         let refs = read_refs(&git)?;
         let empty_repository = head.is_none() && refs.is_empty();
-        let mut inner = self.inner.lock().map_err(|_| AppError::internal("历史目标表锁失败"))?;
+        let mut inner = self.inner.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.historyTargetTableLockFailed",
+                "历史目标表锁失败",
+                &[],
+            )
+        })?;
         // 读 Git 期间会话可能已被释放 / 环境重载：失效的实例不能再登记目标。
         // 检查放在目标表锁内、登记之前，因此不会与 release / clear 交错成功。
         if let Some(invalidated) = inner.invalidated_sessions.get(&session.id) {
             if session.instance_id() <= *invalidated {
-                return Err(AppError::rejected(
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.thisWorktreeSSessionNoLonger",
                     "该 worktree 的会话已失效（已释放或环境已重载），请重新打开提交历史",
+                    &[],
                 ));
             }
         }
@@ -2123,13 +2511,27 @@ impl HistoryStore {
 
     /// 取得一个仍然打开的历史目标；已关闭或已淘汰时明确拒绝。
     pub fn target(&self, target_id: &str) -> Result<std::sync::Arc<HistoryTarget>> {
-        let inner = self.inner.lock().map_err(|_| AppError::internal("历史目标表锁失败"))?;
+        let inner = self.inner.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.historyTargetTableLockFailed2",
+                "历史目标表锁失败",
+                &[],
+            )
+        })?;
         inner
             .targets
             .iter()
             .find(|(id, _)| id == target_id)
             .map(|(_, target)| target.clone())
-            .ok_or_else(|| AppError::rejected("历史目标已关闭，请重新打开提交历史"))
+            .ok_or_else(|| {
+                AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.history.theHistoryTargetClosedReopenCommit2",
+                    "历史目标已关闭，请重新打开提交历史",
+                    &[],
+                )
+            })
     }
 
     /// 关闭一个历史目标（幂等）。关闭后该目标的请求与游标立即失效。
@@ -2202,7 +2604,10 @@ impl HistoryStore {
     }
 
     pub fn open_count(&self) -> usize {
-        self.inner.lock().map(|inner| inner.targets.len()).unwrap_or(0)
+        self.inner
+            .lock()
+            .map(|inner| inner.targets.len())
+            .unwrap_or(0)
     }
 }
 
@@ -2221,7 +2626,11 @@ mod tests {
             "新增文件的旧对象是全零缩写"
         );
         assert!(!index_line_matches(b"", "a", "b"));
-        assert!(!index_line_matches(b"index 1111111..2222222\n", "", "2222222"));
+        assert!(!index_line_matches(
+            b"index 1111111..2222222\n",
+            "",
+            "2222222"
+        ));
     }
 
     #[test]
@@ -2250,19 +2659,103 @@ mod tests {
             )
         );
         for other in [
-            diff_identity("other", "commit", Some("parent"), HistoryFileStatus::Modified, "a.txt", None, Some("old"), Some("new")),
-            diff_identity("target", "other", Some("parent"), HistoryFileStatus::Modified, "a.txt", None, Some("old"), Some("new")),
-            diff_identity("target", "commit", Some("other"), HistoryFileStatus::Modified, "a.txt", None, Some("old"), Some("new")),
-            diff_identity("target", "commit", None, HistoryFileStatus::Modified, "a.txt", None, Some("old"), Some("new")),
-            diff_identity("target", "commit", Some("parent"), HistoryFileStatus::Added, "a.txt", None, Some("old"), Some("new")),
-            diff_identity("target", "commit", Some("parent"), HistoryFileStatus::Modified, "b.txt", None, Some("old"), Some("new")),
-            diff_identity("target", "commit", Some("parent"), HistoryFileStatus::Modified, "a.txt", Some("o.txt"), Some("old"), Some("new")),
-            diff_identity("target", "commit", Some("parent"), HistoryFileStatus::Modified, "a.txt", None, None, Some("new")),
-            diff_identity("target", "commit", Some("parent"), HistoryFileStatus::Modified, "a.txt", None, Some("old"), None),
+            diff_identity(
+                "other",
+                "commit",
+                Some("parent"),
+                HistoryFileStatus::Modified,
+                "a.txt",
+                None,
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "other",
+                Some("parent"),
+                HistoryFileStatus::Modified,
+                "a.txt",
+                None,
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                Some("other"),
+                HistoryFileStatus::Modified,
+                "a.txt",
+                None,
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                None,
+                HistoryFileStatus::Modified,
+                "a.txt",
+                None,
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                Some("parent"),
+                HistoryFileStatus::Added,
+                "a.txt",
+                None,
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                Some("parent"),
+                HistoryFileStatus::Modified,
+                "b.txt",
+                None,
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                Some("parent"),
+                HistoryFileStatus::Modified,
+                "a.txt",
+                Some("o.txt"),
+                Some("old"),
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                Some("parent"),
+                HistoryFileStatus::Modified,
+                "a.txt",
+                None,
+                None,
+                Some("new"),
+            ),
+            diff_identity(
+                "target",
+                "commit",
+                Some("parent"),
+                HistoryFileStatus::Modified,
+                "a.txt",
+                None,
+                Some("old"),
+                None,
+            ),
         ] {
             assert_ne!(base, other);
         }
         // 空白档位不进 diff 身份，但进缓存键，不同档位不共享缓存。
-        assert_ne!(diff_key(&base, IgnoreWhitespace::Off), diff_key(&base, IgnoreWhitespace::All));
+        assert_ne!(
+            diff_key(&base, IgnoreWhitespace::Off),
+            diff_key(&base, IgnoreWhitespace::All)
+        );
     }
 }

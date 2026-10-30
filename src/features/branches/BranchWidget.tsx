@@ -1,3 +1,5 @@
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { formatAppError } from "@/lib/error";
 /**
  * 顶栏分支组件与“更新 / 推送”按钮（M5 B02、B04、B05）。
  *
@@ -12,7 +14,7 @@ import type { LocalBranch } from "@/types/bindings/LocalBranch";
 import type { RemoteBranch } from "@/types/bindings/RemoteBranch";
 import type { CheckoutTarget } from "@/types/bindings/CheckoutTarget";
 import type { BranchStart } from "@/types/bindings/BranchStart";
-import { messages } from "@/lib/i18n/zh-CN";
+import { messages } from "@/lib/i18n/index";
 import { MOD_SYMBOLS } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
@@ -20,7 +22,7 @@ import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
 export interface BranchWidgetProps {
   overview: BranchOverview | null;
   loading: boolean;
-  error: string | null;
+  error: AppErrorPayload | null;
   incoming: boolean;
   busy: boolean;
   onRefresh: () => void;
@@ -72,7 +74,7 @@ export function BranchWidget(props: BranchWidgetProps) {
               type="button"
               className="toolbar-widget min-w-0"
               disabled={busy}
-              title={error ?? messages.branches.open}
+              title={error ? formatAppError(error) : messages.branches.open}
             >
               <Codicon name="git-branch" size={14} />
               <span className="max-w-[220px] truncate">{label ?? messages.changes.detachedHead}</span>
@@ -126,7 +128,7 @@ export function BranchWidget(props: BranchWidgetProps) {
           {loading && !overview ? (
             <p className="px-2 py-1.5 text-[11.5px] text-descriptionforeground">{messages.branches.loading}</p>
           ) : null}
-          {error ? <p className="px-2 py-1.5 text-[11.5px] text-destructive">{error}</p> : null}
+          {error ? <p className="px-2 py-1.5 text-[11.5px] text-destructive">{formatAppError(error)}</p> : null}
           <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.local}</p>
           {local.length === 0 ? (
             <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noLocal}</p>

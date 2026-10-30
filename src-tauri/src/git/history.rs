@@ -12,9 +12,9 @@
 
 use std::collections::HashMap;
 
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ErrorKind, Result};
 use crate::git::segments::IgnoreWhitespace;
-use crate::git::{Git, DIFF_FLAGS};
+use crate::git::{DIFF_FLAGS, Git};
 
 /// 单页最多返回多少条提交（工程限额，写入报告）。
 pub const MAX_PAGE_LIMIT: u32 = 200;
@@ -113,7 +113,11 @@ impl RawChange {
     pub fn primary_path(&self) -> &[u8] {
         match self.status {
             ChangeStatus::Deleted => self.old_path.as_deref().unwrap_or_default(),
-            _ => self.new_path.as_deref().or(self.old_path.as_deref()).unwrap_or_default(),
+            _ => self
+                .new_path
+                .as_deref()
+                .or(self.old_path.as_deref())
+                .unwrap_or_default(),
         }
     }
 
@@ -125,11 +129,13 @@ impl RawChange {
     }
 
     pub fn is_symlink(&self) -> bool {
-        matches!(self.old_mode.as_deref(), Some("120000")) || matches!(self.new_mode.as_deref(), Some("120000"))
+        matches!(self.old_mode.as_deref(), Some("120000"))
+            || matches!(self.new_mode.as_deref(), Some("120000"))
     }
 
     pub fn is_submodule(&self) -> bool {
-        matches!(self.old_mode.as_deref(), Some("160000")) || matches!(self.new_mode.as_deref(), Some("160000"))
+        matches!(self.old_mode.as_deref(), Some("160000"))
+            || matches!(self.new_mode.as_deref(), Some("160000"))
     }
 
     pub fn mode_only(&self) -> bool {
@@ -222,7 +228,13 @@ pub fn list_refs(git: &Git) -> Result<Vec<(String, String, String)>> {
 
 /// 当前 HEAD 指向的完整提交 ID；还没有提交时为 None。
 pub fn head_commit(git: &Git) -> Result<Option<String>> {
-    let output = git.run(&["--no-optional-locks", "rev-parse", "--verify", "--quiet", "HEAD^{commit}"])?;
+    let output = git.run(&[
+        "--no-optional-locks",
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        "HEAD^{commit}",
+    ])?;
     if output.exit_code != 0 {
         return Ok(None);
     }
@@ -232,7 +244,9 @@ pub fn head_commit(git: &Git) -> Result<Option<String>> {
 
 /// HEAD 指向的引用名（分离 HEAD 时为 None）。
 pub fn head_ref(git: &Git) -> Option<String> {
-    let output = git.run(&["--no-optional-locks", "symbolic-ref", "--quiet", "HEAD"]).ok()?;
+    let output = git
+        .run(&["--no-optional-locks", "symbolic-ref", "--quiet", "HEAD"])
+        .ok()?;
     if output.exit_code != 0 {
         return None;
     }
@@ -246,7 +260,12 @@ pub fn empty_tree(git: &Git) -> Result<String> {
     let output = output.into_success("计算空 tree")?;
     let oid = output.stdout_lossy().trim().to_string();
     if !is_full_oid(&oid) {
-        return Err(AppError::git(format!("Git 返回的空 tree 对象 ID 不合法：{oid}")));
+        return Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.history.gitReturnedInvalidEmptyTreeObject",
+            "Git 返回的空 tree 对象 ID 不合法：{oid}",
+            &[("oid", format!("{}", oid))],
+        ));
     }
     Ok(oid)
 }
@@ -254,7 +273,12 @@ pub fn empty_tree(git: &Git) -> Result<String> {
 /// 对象类型（commit / tree / blob / tag）；对象不存在时返回 None。
 pub fn object_type(git: &Git, oid: &str) -> Result<Option<String>> {
     if !is_full_oid(oid) {
-        return Err(AppError::rejected(format!("不是完整的对象 ID：{oid}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.notFullObjectId",
+            "不是完整的对象 ID：{oid}",
+            &[("oid", format!("{}", oid))],
+        ));
     }
     let output = git.run(&["--no-optional-locks", "cat-file", "-t", oid])?;
     if output.exit_code != 0 {
@@ -268,10 +292,21 @@ pub fn object_type(git: &Git, oid: &str) -> Result<Option<String>> {
 /// 用 `<commit>:<path>` 形式，路径按字面解释（不做 glob、不读工作区）。
 pub fn object_at_path(git: &Git, commit: &str, path: &str) -> Result<Option<String>> {
     if !is_full_oid(commit) {
-        return Err(AppError::rejected("读取提交内容时必须给出完整提交 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.readingCommitContentRequiresFullCommit",
+            "读取提交内容时必须给出完整提交 ID",
+            &[],
+        ));
     }
     let spec = format!("{commit}:{path}");
-    let output = git.run(&["--no-optional-locks", "rev-parse", "--verify", "--quiet", &spec])?;
+    let output = git.run(&[
+        "--no-optional-locks",
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        &spec,
+    ])?;
     if output.exit_code != 0 {
         return Ok(None);
     }
@@ -283,17 +318,33 @@ pub fn object_at_path(git: &Git, commit: &str, path: &str) -> Result<Option<Stri
 pub fn verify_commit_oid(git: &Git, oid: &str) -> Result<String> {
     let oid = oid.trim();
     if !is_full_oid(oid) {
-        return Err(AppError::rejected(format!("起点必须是完整的提交对象 ID：{oid}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.theStartPointMustFullCommit",
+            "起点必须是完整的提交对象 ID：{oid}",
+            &[("oid", format!("{}", oid))],
+        ));
     }
     let oid = oid.to_ascii_lowercase();
     match object_type(git, &oid)?.as_deref() {
         Some("commit") => Ok(oid),
-        Some(other) => Err(AppError::rejected(format!("对象不是提交（{other}）：{oid}"))),
-        None => Err(AppError::rejected(format!("对象不存在：{oid}"))),
+        Some(other) => Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.theObjectCommit",
+            "对象不是提交（{other}）：{oid}",
+            &[("other", format!("{}", other)), ("oid", format!("{}", oid))],
+        )),
+        None => Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.theObjectDoesExist",
+            "对象不存在：{oid}",
+            &[("oid", format!("{}", oid))],
+        )),
     }
 }
 
-const LOG_FORMAT: &str = "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%ai%x00%cn%x00%ce%x00%ct%x00%ci%x00%s";
+const LOG_FORMAT: &str =
+    "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%ai%x00%cn%x00%ce%x00%ct%x00%ci%x00%s";
 
 /// 读取一页提交（从 `start` 可达，按拓扑顺序）。`skip` 由上层游标控制。
 pub fn read_page(
@@ -315,7 +366,12 @@ pub fn read_page_from(
     limit: u32,
 ) -> Result<Vec<CommitEntry>> {
     if starts.is_empty() || starts.iter().any(|start| !is_full_oid(start)) {
-        return Err(AppError::internal("分页起点不是完整提交 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.thePagingStartFullCommitId",
+            "分页起点不是完整提交 ID",
+            &[],
+        ));
     }
     let skip_arg = format!("--skip={skip}");
     let count_arg = format!("--max-count={limit}");
@@ -374,7 +430,12 @@ pub fn head_files(git: &Git) -> Result<Vec<String>> {
 /// 某个本地分支配置的上游完整引用名（没有上游时为 None）。
 pub fn upstream_of(git: &Git, branch: &str) -> Result<Option<String>> {
     if branch.trim().is_empty() || branch.contains("@{") {
-        return Err(AppError::rejected("分支名不能为空，也不能包含 @{"));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.theBranchNameEmptyContain",
+            "分支名不能为空，也不能包含 @{{",
+            &[],
+        ));
     }
     let spec = format!("{branch}@{{upstream}}");
     let output = git.run(&[
@@ -400,7 +461,12 @@ pub fn read_range(
     limit: u32,
 ) -> Result<Vec<CommitEntry>> {
     if exclude.is_some_and(|value| !is_full_oid(value)) || !is_full_oid(include) {
-        return Err(AppError::internal("读取提交范围时缺少完整对象 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.readingCommitRangeRequiresFullObject",
+            "读取提交范围时缺少完整对象 ID",
+            &[],
+        ));
     }
     let range = match exclude {
         Some(exclude) => format!("{exclude}..{include}"),
@@ -525,7 +591,12 @@ pub fn read_page_filtered(
     filter: &LogFilter,
 ) -> Result<Vec<CommitEntry>> {
     if starts.is_empty() || starts.iter().any(|start| !is_full_oid(start)) {
-        return Err(AppError::internal("分页起点不是完整提交 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.thePagingStartFullCommitId2",
+            "分页起点不是完整提交 ID",
+            &[],
+        ));
     }
     let mut args: Vec<String> = Vec::new();
     log_args(&mut args, filter, first_parent, LOG_FORMAT);
@@ -558,7 +629,12 @@ pub fn read_page_scanned(
     filter: &LogFilter,
 ) -> Result<Vec<ScannedCommit>> {
     if starts.is_empty() || starts.iter().any(|start| !is_full_oid(start)) {
-        return Err(AppError::internal("分页起点不是完整提交 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.thePagingStartFullCommitId3",
+            "分页起点不是完整提交 ID",
+            &[],
+        ));
     }
     let mut args: Vec<String> = Vec::new();
     let format = scan_format();
@@ -588,15 +664,25 @@ pub fn parse_scanned_page(bytes: &[u8]) -> Result<Vec<ScannedCommit>> {
         fields.pop();
     }
     if fields.len() % FIELDS != 0 {
-        return Err(AppError::internal(format!(
-            "提交扫描字段数不是 {FIELDS} 的整数倍：{}",
-            fields.len()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.theCommitScanFieldCountMultiple",
+            "提交扫描字段数不是 {FIELDS} 的整数倍：{0}",
+            &[
+                ("0", format!("{:}", fields.len())),
+                ("FIELDS", format!("{}", FIELDS)),
+            ],
+        ));
     }
     for chunk in fields.chunks(FIELDS) {
         let oid = String::from_utf8_lossy(chunk[0]).into_owned();
         if !is_full_oid(&oid) {
-            return Err(AppError::internal(format!("提交扫描里的对象 ID 不合法：{oid}")));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.invalidObjectIdCommitScan",
+                "提交扫描里的对象 ID 不合法：{oid}",
+                &[("oid", format!("{}", oid))],
+            ));
         }
         let parents = String::from_utf8_lossy(chunk[1])
             .split_whitespace()
@@ -628,15 +714,25 @@ pub fn parse_log_page(bytes: &[u8]) -> Result<Vec<CommitEntry>> {
         fields.pop();
     }
     if fields.len() % FIELDS != 0 {
-        return Err(AppError::internal(format!(
-            "提交日志字段数不是 {FIELDS} 的整数倍：{}",
-            fields.len()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.theCommitLogFieldCountMultiple",
+            "提交日志字段数不是 {FIELDS} 的整数倍：{0}",
+            &[
+                ("0", format!("{:}", fields.len())),
+                ("FIELDS", format!("{}", FIELDS)),
+            ],
+        ));
     }
     for chunk in fields.chunks(FIELDS) {
         let oid = String::from_utf8_lossy(chunk[0]).into_owned();
         if !is_full_oid(&oid) {
-            return Err(AppError::internal(format!("提交日志里的对象 ID 不合法：{oid}")));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.invalidObjectIdCommitLog",
+                "提交日志里的对象 ID 不合法：{oid}",
+                &[("oid", format!("{}", oid))],
+            ));
         }
         let parents = String::from_utf8_lossy(chunk[1])
             .split_whitespace()
@@ -654,7 +750,10 @@ pub fn parse_log_page(bytes: &[u8]) -> Result<Vec<CommitEntry>> {
 }
 
 fn signature_from_fields(name: &[u8], email: &[u8], time: &[u8], iso: &[u8]) -> Signature {
-    let time = String::from_utf8_lossy(time).trim().parse::<i64>().unwrap_or(0);
+    let time = String::from_utf8_lossy(time)
+        .trim()
+        .parse::<i64>()
+        .unwrap_or(0);
     let iso = String::from_utf8_lossy(iso).into_owned();
     // `%ai` / `%ci` 形如 `2026-10-27 14:22:08 +0800`，最后一截是时区。
     let timezone = iso.split_whitespace().last().unwrap_or("").to_string();
@@ -669,7 +768,10 @@ fn signature_from_fields(name: &[u8], email: &[u8], time: &[u8], iso: &[u8]) -> 
 /// 读取一个提交对象的完整内容（正文不截断）。
 pub fn read_commit(git: &Git, oid: &str) -> Result<CommitDetail> {
     let oid = verify_commit_oid(git, oid)?;
-    let output = git.run_ok(&["--no-optional-locks", "cat-file", "commit", &oid], "读取提交对象")?;
+    let output = git.run_ok(
+        &["--no-optional-locks", "cat-file", "commit", &oid],
+        "读取提交对象",
+    )?;
     parse_commit(&oid, &output.stdout)
 }
 
@@ -703,9 +805,30 @@ pub fn parse_commit(oid: &str, bytes: &[u8]) -> Result<CommitDetail> {
             _ => {}
         }
     }
-    let tree = tree.ok_or_else(|| AppError::git(format!("提交对象缺少 tree 头：{oid}")))?;
-    let author = author.ok_or_else(|| AppError::git(format!("提交对象缺少 author 头：{oid}")))?;
-    let committer = committer.ok_or_else(|| AppError::git(format!("提交对象缺少 committer 头：{oid}")))?;
+    let tree = tree.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Git,
+            "errors.history.theCommitObjectMissingTreeHeader",
+            "提交对象缺少 tree 头：{oid}",
+            &[("oid", format!("{}", oid))],
+        )
+    })?;
+    let author = author.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Git,
+            "errors.history.theCommitObjectMissingAuthorHeader",
+            "提交对象缺少 author 头：{oid}",
+            &[("oid", format!("{}", oid))],
+        )
+    })?;
+    let committer = committer.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Git,
+            "errors.history.theCommitObjectMissingCommitterHeader",
+            "提交对象缺少 committer 头：{oid}",
+            &[("oid", format!("{}", oid))],
+        )
+    })?;
     let (message, message_lossy) = decode_message(message, encoding.as_deref());
     Ok(CommitDetail {
         oid: oid.to_string(),
@@ -739,9 +862,17 @@ fn parse_signature_line(value: &[u8]) -> Signature {
         None => (head.trim().to_string(), String::new()),
     };
     let mut parts = tail.split_whitespace();
-    let time = parts.next().and_then(|value| value.parse::<i64>().ok()).unwrap_or(0);
+    let time = parts
+        .next()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0);
     let timezone = parts.next().unwrap_or("").to_string();
-    Signature { name, email, time, timezone }
+    Signature {
+        name,
+        email,
+        time,
+        timezone,
+    }
 }
 
 fn decode_message(bytes: &[u8], encoding: Option<&str>) -> (String, bool) {
@@ -759,7 +890,12 @@ fn decode_message(bytes: &[u8], encoding: Option<&str>) -> (String, bool) {
 /// 不能改变已打开提交的“文本 / 二进制”判断。
 pub fn read_changes(git: &Git, base: &str, commit: &str) -> Result<Vec<RawChange>> {
     if !is_full_oid(base) || !is_full_oid(commit) {
-        return Err(AppError::internal("读取改动文件时缺少完整对象 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.readingChangedFilesRequiresFullObject",
+            "读取改动文件时缺少完整对象 ID",
+            &[],
+        ));
     }
     let git = git.with_env_vars(&[("GIT_ATTR_SOURCE", commit)]);
     let output = git.run_ok(
@@ -805,11 +941,22 @@ pub fn parse_changes(bytes: &[u8]) -> Result<Vec<RawChange>> {
         let header = String::from_utf8_lossy(field);
         let parts: Vec<&str> = header[1..].split(' ').collect();
         if parts.len() < 5 {
-            return Err(AppError::internal(format!("改动记录格式不对：{header}")));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.malformedChangeRecord",
+                "改动记录格式不对：{header}",
+                &[("header", format!("{}", header))],
+            ));
         }
         let status_letter = parts[4].bytes().next().unwrap_or(b'M');
-        let status = ChangeStatus::from_letter(status_letter)
-            .ok_or_else(|| AppError::internal(format!("未知的改动状态：{}", parts[4])))?;
+        let status = ChangeStatus::from_letter(status_letter).ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.unknownChangeStatus",
+                "未知的改动状态：{0}",
+                &[("0", format!("{:}", parts[4]))],
+            )
+        })?;
         let old_mode = mode_option(parts[0]);
         let new_mode = mode_option(parts[1]);
         let old_oid = oid_option(parts[2]);
@@ -818,7 +965,12 @@ pub fn parse_changes(bytes: &[u8]) -> Result<Vec<RawChange>> {
         let pair = matches!(status, ChangeStatus::Renamed | ChangeStatus::Copied);
         let path_count = if pair { 2 } else { 1 };
         if index + path_count > fields.len() {
-            return Err(AppError::internal("改动记录缺少路径字段"));
+            return Err(AppError::coded(
+                ErrorKind::Internal,
+                "errors.history.theChangeRecordMissingPathField",
+                "改动记录缺少路径字段",
+                &[],
+            ));
         }
         let (old_path, new_path) = if pair {
             let old = fields[index].to_vec();
@@ -882,7 +1034,12 @@ pub fn parse_changes(bytes: &[u8]) -> Result<Vec<RawChange>> {
         counts.insert(key, (added_count, deleted_count, binary));
     }
     for change in &mut raw {
-        let key = change.new_path.as_ref().or(change.old_path.as_ref()).cloned().unwrap_or_default();
+        let key = change
+            .new_path
+            .as_ref()
+            .or(change.old_path.as_ref())
+            .cloned()
+            .unwrap_or_default();
         if let Some((added, deleted, binary)) = counts.get(&key) {
             change.added = *added;
             change.deleted = *deleted;
@@ -901,10 +1058,20 @@ pub fn file_patch(
     ignore: IgnoreWhitespace,
 ) -> Result<Vec<u8>> {
     if !is_full_oid(base) || !is_full_oid(commit) {
-        return Err(AppError::internal("读取提交 diff 时缺少完整对象 ID"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.readingCommitDiffRequiresFullObject",
+            "读取提交 diff 时缺少完整对象 ID",
+            &[],
+        ));
     }
     if paths.is_empty() {
-        return Err(AppError::internal("读取提交 diff 时缺少路径"));
+        return Err(AppError::coded(
+            ErrorKind::Internal,
+            "errors.history.readingCommitDiffRequiresPath",
+            "读取提交 diff 时缺少路径",
+            &[],
+        ));
     }
     // 与改动文件列表一致：属性取自这个提交自己的树，工作区的 `.gitattributes`
     // 不能把已打开的提交 diff 从文本变成二进制。
@@ -926,10 +1093,12 @@ pub fn file_patch(
     args.extend_from_slice(paths);
     let output = git.run_ok(&args, "读取提交 diff")?;
     if output.stdout.len() > MAX_DIFF_BYTES {
-        return Err(AppError::rejected(format!(
-            "文件差异超过 {} MiB，暂不支持在历史中显示",
-            MAX_DIFF_BYTES / (1024 * 1024)
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.theFileDiffExceedsMibShown",
+            "文件差异超过 {0} MiB，暂不支持在历史中显示",
+            &[("0", format!("{:}", MAX_DIFF_BYTES / (1024 * 1024)))],
+        ));
     }
     Ok(output.stdout)
 }
@@ -937,23 +1106,45 @@ pub fn file_patch(
 /// 读取一个 blob 的原始字节；缺失对象或超过上限都明确报错。
 pub fn blob(git: &Git, oid: &str) -> Result<Vec<u8>> {
     if !is_full_oid(oid) {
-        return Err(AppError::rejected(format!("不是完整的对象 ID：{oid}")));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.notFullObjectId2",
+            "不是完整的对象 ID：{oid}",
+            &[("oid", format!("{}", oid))],
+        ));
     }
     let size_output = git.run(&["--no-optional-locks", "cat-file", "-s", oid])?;
     if size_output.exit_code != 0 {
-        return Err(AppError::git(format!(
-            "读取对象大小失败（对象可能缺失）：{oid}：{}",
-            size_output.stderr.trim()
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Git,
+            "errors.history.failedReadObjectSizeObjectMay",
+            "读取对象大小失败（对象可能缺失）：{oid}：{0}",
+            &[
+                ("0", format!("{:}", size_output.stderr.trim())),
+                ("oid", format!("{}", oid)),
+            ],
+        ));
     }
-    let size = size_output.stdout_lossy().trim().parse::<u64>().unwrap_or(0);
+    let size = size_output
+        .stdout_lossy()
+        .trim()
+        .parse::<u64>()
+        .unwrap_or(0);
     if size > MAX_BLOB_BYTES {
-        return Err(AppError::rejected(format!(
-            "文件大小 {size} 字节超过历史查看上限 {} MiB",
-            MAX_BLOB_BYTES / (1024 * 1024)
-        )));
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.history.theFileSizeBytesExceedsHistory",
+            "文件大小 {size} 字节超过历史查看上限 {0} MiB",
+            &[
+                ("0", format!("{:}", MAX_BLOB_BYTES / (1024 * 1024))),
+                ("size", format!("{}", size)),
+            ],
+        ));
     }
-    let output = git.run_ok(&["--no-optional-locks", "cat-file", "blob", oid], "读取文件内容")?;
+    let output = git.run_ok(
+        &["--no-optional-locks", "cat-file", "blob", oid],
+        "读取文件内容",
+    )?;
     Ok(output.stdout)
 }
 
@@ -989,7 +1180,10 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].status, ChangeStatus::Renamed);
         assert_eq!(changes[0].old_path.as_deref(), Some(b"a.txt".as_slice()));
-        assert_eq!(changes[0].new_path.as_deref(), Some(b"renamed.txt".as_slice()));
+        assert_eq!(
+            changes[0].new_path.as_deref(),
+            Some(b"renamed.txt".as_slice())
+        );
         assert_eq!(changes[0].old_mode.as_deref(), Some("100644"));
         assert_eq!(changes[0].new_mode.as_deref(), Some("100755"));
         assert_eq!(changes[0].added, 1);

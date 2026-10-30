@@ -12,7 +12,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BranchOverview } from "@/types/bindings/BranchOverview";
 import { ipc } from "@/lib/ipc";
-import { getErrorMessage } from "@/lib/error";
+import { messages } from "@/lib/i18n/index";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { toAppError } from "@/lib/error";
 import { IncomingState, type IncomingToken } from "./incomingState";
 
 /** 自动 fetch / 检查远端的间隔（Q152）。 */
@@ -21,7 +23,7 @@ export const AUTO_FETCH_INTERVAL_MS = 10 * 60 * 1000;
 export interface BranchesState {
   overview: BranchOverview | null;
   loading: boolean;
-  error: string | null;
+  error: AppErrorPayload | null;
   /** 远端有新提交（检查远端的结果）。 */
   incoming: boolean;
 }
@@ -79,7 +81,7 @@ export function useBranches(
       .catch((caught: unknown) => {
         if (request !== requestRef.current) return;
         if (!token || incomingRef.current.capture(worktreeId)?.activation !== token.activation) return;
-        setState((previous) => ({ ...previous, loading: false, error: getErrorMessage(caught) }));
+        setState((previous) => ({ ...previous, loading: false, error: toAppError(caught) }));
       });
   }, [worktreeId]);
 
@@ -149,11 +151,11 @@ export function useBranches(
 /** 分支名字校验的前端提示（真正的规则在 Rust 的 `check-ref-format`）。 */
 export function quickBranchNameProblem(name: string): string | null {
   const value = name.trim();
-  if (!value) return "分支名不能为空";
-  if (value.startsWith("-")) return "分支名不能以 - 开头";
-  if (value.endsWith(".lock")) return "分支名不能以 .lock 结尾";
-  if (/[\s~^:?*[\\]/.test(value)) return "分支名不能包含空格或 ~ ^ : ? * [ \\";
-  if (value.includes("..") || value.includes("@{") || value.includes("//")) return "分支名不能包含 .. 、@{ 或连续的 /";
-  if (value.startsWith("/") || value.endsWith("/") || value.endsWith(".")) return "分支名的 / 与 . 位置不合法";
+  if (!value) return messages.branches.validation.nameEmpty;
+  if (value.startsWith("-")) return messages.branches.validation.leadingDash;
+  if (value.endsWith(".lock")) return messages.branches.validation.lockSuffix;
+  if (/[\s~^:?*[\\]/.test(value)) return messages.branches.validation.invalidChars;
+  if (value.includes("..") || value.includes("@{") || value.includes("//")) return messages.branches.validation.invalidSequence;
+  if (value.startsWith("/") || value.endsWith("/") || value.endsWith(".")) return messages.branches.validation.slashDot;
   return null;
 }

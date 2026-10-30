@@ -349,6 +349,35 @@ fn persistence_failure_is_reported_not_faked() {
     assert_eq!(session.refresh().unwrap().review.reviewed_count, 0);
 }
 
+/// M6 L03: a directory sync error keeps its IO cause across the real session
+/// boundary, so the same payload can be presented in either language.
+#[cfg(unix)]
+#[test]
+fn review_sync_failure_keeps_a_structured_io_cause() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    f.write("a.txt", b"base\n"); f.commit(); f.write("a.txt", b"changed\n");
+    let session = f.session(); f.entry(&session, "a.txt");
+    let original = fs::metadata(&f.data).unwrap().permissions();
+    // Traversal and publishing work; opening the directory to sync it fails.
+    fs::set_permissions(&f.data, fs::Permissions::from_mode(0o300)).unwrap();
+    let result = session.set_review_mark("a.txt", true, None);
+    fs::set_permissions(&f.data, original).unwrap();
+    let payload = result.expect_err("directory sync must report EACCES").payload();
+    assert_eq!(payload.code.as_deref(), Some("errors.review.failedSyncReviewMarksCause"));
+    assert!(payload.params.as_ref().is_none_or(|params| params.is_empty()));
+    let cause = payload.cause.as_ref().expect("preserve the structured cause");
+    assert_eq!(cause.code.as_deref(), Some("errors.error.io"));
+    assert!(cause.params.as_ref().unwrap()["error"].contains("Permission denied"));
+    if let Ok(output) = std::env::var("REVIA_M6_ERROR_FIXTURE") {
+        fs::write(format!("{output}.review-sync.json"), serde_json::to_vec_pretty(&payload).unwrap()).unwrap();
+        let records = session.git.log.snapshot(); let fixture = f.temp.keep();
+        fs::write(format!("{output}.review-sync-fixture.json"), serde_json::to_vec_pretty(&serde_json::json!({
+            "fixture": fixture, "git": records,
+        })).unwrap()).unwrap();
+    }
+}
+
 /// ST07-1 / SP07-7：不同 worktree 并发保存不能互相覆盖（存储级事务 + 独占临时文件）。
 #[test]
 fn concurrent_marks_from_two_worktrees_are_all_kept() {
