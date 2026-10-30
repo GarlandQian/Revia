@@ -15,6 +15,7 @@ import { COMMIT_SHORTCUT_LABEL, isCommitShortcut } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import type { NoticeText } from "./Notifications";
 import { Popover } from "@/components/ui/popover";
+import { GlassButton } from "@/features/m7/glass/GlassButton";
 
 /** 首行字符数建议上限（按字符计数，不按 UTF-8 字节，F02.2）。 */
 export const FIRST_LINE_LIMIT = 72;
@@ -278,17 +279,21 @@ export function CommitArea({
       ) : null}
 
       <div className="mt-2 flex items-center gap-1.5">
-        <button
-          type="button"
-          className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-[4px] bg-primary text-[12.5px] font-medium text-primary-foreground outline-none hover:bg-primary/90 focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-[var(--focusborder)] disabled:cursor-default disabled:opacity-40"
+        {/* 主提交按钮：GlassButton 统一到第四版低饱和透明配色与状态（M7 任务 01）。 */}
+        <GlassButton
+          variant="primary"
+          specular
+          className="m7-commit-button"
+          radius={5}
           disabled={disabled}
           title={messages.commit.submitHint}
+          aria-label={messages.commit.submitHint}
           onClick={onSubmit}
         >
           {submitting ? <Codicon name="loading" size={14} spin /> : <Codicon name="check" size={14} />}
           {submitting ? messages.commit.submitting : messages.commit.submit}
           {!submitting ? <span className="text-[11px] opacity-70">{COMMIT_SHORTCUT_LABEL}</span> : null}
-        </button>
+        </GlassButton>
         <button
           type="button"
           className="icon-action size-7"

@@ -5,27 +5,27 @@ import type { HistoryCommit } from "./HistoryCommit";
 /**
  * 推送对话框要显示的预览（B05）。
  */
-export type PushPreview = { branch: string, hasUpstream: boolean,
+export type PushPreview = { branch: string, hasUpstream: boolean, 
 /**
  * 目标远端（没有上游时默认 origin，只有单个远端时就是它）。
  */
-remote: string,
+remote: string, 
 /**
  * 目标远端分支名。
  */
-targetBranch: string,
+targetBranch: string, 
 /**
  * 可选的远端列表（没有上游且存在多个远端时让用户选）。
  */
-remotes: Array<string>,
+remotes: Array<string>, 
 /**
  * 将要推送的提交（新到旧），最多 `MAX_PUSH_PREVIEW` 条。
  */
-commits: Array<HistoryCommit>, commitCount: number, truncated: boolean,
+commits: Array<HistoryCommit>, commitCount: number, truncated: boolean, 
 /**
  * 是否允许强制推送；不允许时给出原因。
  */
-forceAllowed: boolean, forceReason: AppErrorPayload | null,
+forceAllowed: boolean, forceReason: AppErrorPayload | null, 
 /**
  * 当前分支是否是受保护分支。
  */

@@ -3,27 +3,27 @@ import type { AppErrorPayload } from "./AppErrorPayload";
 import type { AutostashRestoreOutcome } from "./AutostashRestoreOutcome";
 import type { OperationState } from "./OperationState";
 
-export type RewriteOutcome = { action: string,
+export type RewriteOutcome = { action: string, 
 /**
  * True when the command completed and no operation remains.
  */
-completed: boolean, state: OperationState | null, createdOid: string | null, autostash: AutostashRestoreOutcome | null,
+completed: boolean, state: OperationState | null, createdOid: string | null, autostash: AutostashRestoreOutcome | null, 
 /**
  * Cherry-pick only: commits skipped because they were empty.
  */
-skippedEmpty: Array<string>, skipped: Array<string>,
+skippedEmpty: Array<string>, skipped: Array<string>, 
 /**
  * Requested commits that Git finished successfully, in execution order.
  */
-applied: Array<string>,
+applied: Array<string>, 
 /**
  * The commit Git stopped on, when the sequence did not finish.
  */
-failedOid: string | null,
+failedOid: string | null, 
 /**
  * Requested commits not attempted because the sequence stopped first.
  */
-pending: Array<string>,
+pending: Array<string>, 
 /**
  * A conflict/failure or uncertain write result. Partial progress remains
  * in the other fields even when no native operation exists to continue.

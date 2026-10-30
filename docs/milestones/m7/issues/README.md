@@ -1,23 +1,23 @@
 # M7 任务图
 
-Status: ready-for-agent
+Status: ready-for-review
 
 全部交给同一个 Paseo / Pi 实施会话，按依赖推进；整包固定源码后由 Codex 审查。任务 13 的事实门槛未满足，任务 14 整包验收保持阻塞。
 
 | 任务 | 交付 | Blocked by | 初始状态 |
 | --- | --- | --- | --- |
-| [01](./01-liquid-glass.md) | 采用第四版玻璃外观 | None | ready-for-agent |
-| [02](./02-theme-shortcuts.md) | 导入颜色主题并自定义快捷键 | None | ready-for-agent |
-| [03](./03-workspace-editing.md) | 编辑工作区 diff 并恢复草稿 | None | ready-for-agent |
-| [04](./04-terminal.md) | 运行归属 worktree 的内置终端 | None | ready-for-agent |
-| [05](./05-clone.md) | 克隆并打开仓库 | None | ready-for-agent |
-| [06](./06-github-auth.md) | 登录并管理多个 GitHub 账号 | None | ready-for-agent |
-| [07](./07-pr-read-checkout.md) | 查看 PR 并检出来源分支 | 06 | ready-for-agent |
-| [08](./08-pr-write.md) | 创建 PR、提交审阅与确认合并 | 07 | ready-for-agent |
-| [09](./09-branch-protection.md) | 同步现有 GitHub 受保护分支 | 06 | ready-for-agent |
-| [10](./10-diagnostics.md) | 预览并导出脱敏诊断 | None | ready-for-agent |
-| [11](./11-app-update.md) | 确认下载并安装应用更新 | 03, 04 | ready-for-agent |
-| [12](./12-actions-package.md) | 标签打包至 Release 草稿 | None | ready-for-agent |
+| [01](./01-liquid-glass.md) | 采用第四版玻璃外观 | None | done |
+| [02](./02-theme-shortcuts.md) | 导入颜色主题并自定义快捷键 | None | done |
+| [03](./03-workspace-editing.md) | 编辑工作区 diff 并恢复草稿 | None | done |
+| [04](./04-terminal.md) | 运行归属 worktree 的内置终端 | None | done |
+| [05](./05-clone.md) | 克隆并打开仓库 | None | done |
+| [06](./06-github-auth.md) | 登录并管理多个 GitHub 账号 | None | done |
+| [07](./07-pr-read-checkout.md) | 查看 PR 并检出来源分支 | 06 | done |
+| [08](./08-pr-write.md) | 创建 PR、提交审阅与确认合并 | 07 | done |
+| [09](./09-branch-protection.md) | 同步现有 GitHub 受保护分支 | 06 | done |
+| [10](./10-diagnostics.md) | 预览并导出脱敏诊断 | None | done |
+| [11](./11-app-update.md) | 确认下载并安装应用更新 | 03, 04 | done |
+| [12](./12-actions-package.md) | 标签打包至 Release 草稿 | None | done |
 | [13](./13-changelists.md) | 按更改列表选择并提交 | None | needs-info |
 | [14](./14-integrate-acceptance.md) | 整包审查与固定 Release 桌面验收 | 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13 | needs-info |
 

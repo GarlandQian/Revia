@@ -181,16 +181,19 @@
     border-bottom: 1px solid var(--titlebar-border);
   }
 
+  /* 工具按钮：第四版的低饱和透明填充（M7 任务 01），状态与 GlassButton 一致。 */
   .toolbar-widget,
   .icon-action {
     display: inline-flex;
     align-items: center;
+    border: 1px solid transparent;
     border-radius: 5px;
     color: inherit;
     white-space: nowrap;
     outline: none;
+    background: transparent;
     /* 返修 B11：与 VS Code 相当的短过渡（悬停、按下）。 */
-    transition: background-color 120ms ease, color 120ms ease;
+    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
   }
 
   .toolbar-widget {
@@ -207,24 +210,38 @@
     color: var(--icon-foreground);
   }
 
+  .toolbar-widget:not(:disabled),
+  .icon-action:not(:disabled) {
+    background: color-mix(in srgb, var(--glass-edge) 7%, transparent);
+  }
+
   .toolbar-widget:hover:not(:disabled),
   .icon-action:hover:not(:disabled) {
-    background: var(--toolbar-hoverbackground);
+    background: var(--glass-button-hover);
+    box-shadow: inset 0 1px #ffffff14, 0 2px 4px #00000015;
+  }
+
+  .toolbar-widget:active:not(:disabled),
+  .icon-action:active:not(:disabled) {
+    background: var(--glass-button-press);
   }
 
   .toolbar-widget:focus-visible,
   .icon-action:focus-visible {
-    outline: 1px solid var(--focusborder);
-    outline-offset: -1px;
+    outline: 2px solid var(--focusborder);
+    outline-offset: 2px;
   }
 
   .icon-action:disabled {
     color: color-mix(in srgb, var(--descriptionforeground) 55%, var(--editor-background));
+    background: transparent;
+    box-shadow: none;
     cursor: default;
   }
 
+  .toolbar-widget[aria-pressed="true"],
   .icon-action[aria-pressed="true"] {
-    background: var(--toolbar-hoverbackground);
+    background: var(--glass-button-press);
     color: var(--foreground);
   }
 
@@ -314,6 +331,10 @@
 
   .side-tab:hover {
     opacity: 1;
+  }
+
+  .side-tab[aria-selected="true"] {
+    border-bottom-color: var(--accent, var(--focusborder));
   }
 
   .section-header {
@@ -1643,27 +1664,405 @@
 .dialog-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   height: 24px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--icon-foreground) 24%, transparent);
-  border-radius: 3px;
-  background: transparent;
+  border: 1px solid var(--glass-button-edge);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--glass-edge) 8%, transparent);
   color: var(--foreground);
   font: 12px/22px var(--font-sans);
+  outline: none;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .dialog-button:hover:not(:disabled) {
-  background: var(--toolbar-hoverbackground);
+  background: var(--glass-button-hover);
+  box-shadow: inset 0 1px #ffffff14, 0 2px 4px #00000015;
+}
+
+.dialog-button:active:not(:disabled) {
+  background: var(--glass-button-press);
+}
+
+.dialog-button:focus-visible {
+  outline: 2px solid var(--focusborder);
+  outline-offset: 2px;
 }
 
 .dialog-button.primary {
-  border-color: var(--focusborder);
-  background: var(--focusborder);
-  color: var(--editor-background);
+  border-color: var(--glass-button-edge);
+  background: color-mix(in srgb, var(--glass-edge) 22%, transparent);
+  color: var(--foreground);
   font-weight: 600;
 }
 
 .dialog-button:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+/* ---------- 玻璃材质（M7 任务 01、Q189–Q191） ----------
+   三个 React Bits 组件（GlassSurface / GlassIcons / SpecularButton）自带样式；
+   这里只补它们与真实布局的接缝：玻璃层压在内容下面、工具入口的间距、
+   以及减少透明度 / 高对比度 / 减少动态效果下的退化方式。
+   代码、行号与 diff 背景始终不透明（玻璃层不进入编辑器区域）。 */
+/* ---------- Liquid Glass 材质（M7 任务 01，Q189–Q199） ----------
+ *
+ * 第四版把材质连成一整窗：窗口外壳一层玻璃，顶栏 / 工具条 / 侧栏 / 状态栏
+ * 都是这层玻璃上的半透明层，浮层与对话框单独悬起。这里的变量从当前颜色主题
+ * 推导，代码与 diff 区域始终用不透明的 --editor-background。
+ */
+
+html[data-kind="dark"] {
+  --glass-window-tint: #0c1219;
+  --glass-window-accent: #a1c9ee;
+  --glass-window-accent-opacity: 0.1;
+  --glass-titlebar-tint: #ffffff0f;
+  --glass-side-tint: #ffffff08;
+  --glass-rail-tint: #0000001f;
+  --glass-status-tint: #ffffff08;
+  --glass-line: #ffffff1f;
+  --glass-edge: #d2e1e958;
+  --glass-shine: #f2faff56;
+  --glass-button-hover: #b9cedb36;
+  --glass-button-press: #b9cedb22;
+  --glass-button-edge: #afc6d037;
+  --glass-popover-tint: #10161ded;
+  --glass-shell-solid: var(--editor-background);
+}
+
+html[data-kind="light"] {
+  --glass-window-tint: #ffffff;
+  --glass-window-accent: #245c8e;
+  --glass-window-accent-opacity: 0.08;
+  --glass-titlebar-tint: #ffffffa8;
+  --glass-side-tint: #ffffff70;
+  --glass-rail-tint: #ffffff52;
+  --glass-status-tint: #ffffff70;
+  --glass-line: #354d6426;
+  --glass-edge: #ffffffe6;
+  --glass-shine: #ffffffed;
+  --glass-button-hover: #405b712b;
+  --glass-button-press: #405b7138;
+  --glass-button-edge: #5d788b50;
+  --glass-popover-tint: #f5f8fbef;
+  --glass-shell-solid: var(--editor-background);
+}
+
+@layer components {
+  /* 材质宿主：隔离层叠上下文，内容统一抬到材质之上。 */
+  .glass-host {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(120% 90% at 12% -10%, color-mix(in srgb, var(--glass-window-accent) calc(var(--glass-window-accent-opacity) * 100%), transparent), transparent 62%),
+      radial-gradient(110% 80% at 88% 110%, color-mix(in srgb, var(--glass-window-accent) calc(var(--glass-window-accent-opacity) * 70%), transparent), transparent 58%),
+      var(--editor-background);
+  }
+
+  .glass-host > *:not(.glass-layer) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 浮层 / 对话框 / 通知的材质宿主：同样把内容抬到材质之上。 */
+  .glass-isolate {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .glass-isolate > *:not(.glass-layer) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 材质层本身不参与命中测试，也不进入无障碍树。
+   * absolute 脱离文档流：放在 grid / flex 容器里不能占一个轨道
+   * （smoke 布局核对发现它曾把顶栏挤下去一行）。
+   * vendor 的 .glass-surface{position:relative} 是非 layered 样式，
+   * 必须用 !important 才能稳定覆盖（grid/flex 宿主都依赖这一点）。 */
+  .glass-layer.glass-surface {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 0;
+    pointer-events: none;
+    contain: layout style;
+  }
+
+  .glass-layer .glass-surface__content {
+    padding: 0;
+  }
+
+  .glass-layer--flat .glass-surface {
+    background: var(--glass-shell-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .glass-layer--flat .glass-surface__sheen,
+  .glass-layer--flat .glass-surface__rim,
+  .glass-layer--flat .glass-surface__line,
+  .glass-layer--flat .glass-surface__glow {
+    display: none;
+  }
+
+  /* 外壳各区域：玻璃上的半透明层，而不是各自一块实色。 */
+  .titlebar {
+    background: linear-gradient(180deg, var(--glass-titlebar-tint), transparent), transparent;
+    border-bottom: 1px solid var(--glass-line);
+  }
+
+  .activity-bar {
+    background: var(--glass-rail-tint);
+    border-right: 1px solid var(--glass-line);
+    padding-top: 6px;
+  }
+
+  .changes-sidebar {
+    background: var(--glass-side-tint);
+    border-right: 1px solid var(--glass-line);
+  }
+
+  .window-status {
+    background: var(--glass-status-tint);
+    border-top: 1px solid var(--glass-line);
+  }
+
+  /* 编辑器页签行：代码底色与外壳材质的衔接带（第四版 editor-tabs）。 */
+  .editor-tabs {
+    background: color-mix(in srgb, var(--editor-background) 72%, var(--glass-side-tint));
+    border-bottom: 1px solid var(--glass-line);
+  }
+
+  /* 浮层与对话框：单独一层玻璃，圆角与阴影照第四版。 */
+  .revia-popper {
+    position: relative;
+    background: transparent;
+    border-color: var(--glass-line);
+    box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
+  }
+
+  .app-dialog {
+    position: relative;
+    background: transparent;
+    border-color: var(--glass-edge);
+    box-shadow: 0 20px 60px rgb(0 0 0 / 32%);
+  }
+
+  .notification {
+    position: relative;
+    background: transparent;
+    border-color: var(--glass-edge);
+  }
+
+  .glass-layer--popover {
+    border-radius: inherit;
+  }
+
+  /* ---------- 按钮材质：一套状态覆盖工具按钮与操作按钮 ---------- */
+
+  .glass-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--glass-button-edge);
+    color: var(--gb-text, var(--foreground));
+    background: color-mix(in srgb, var(--gb-tint, transparent) calc(var(--gb-opacity, 0.045) * 100%), transparent);
+    box-shadow: inset 0 1px #ffffff0d, 0 1px 2px #00000012;
+    transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+    outline: none;
+    white-space: nowrap;
+  }
+
+  .glass-button:hover:not(:disabled) {
+    background: var(--glass-button-hover);
+    box-shadow: inset 0 1px #ffffff14, 0 2px 4px #00000015;
+  }
+
+  .glass-button:active:not(:disabled) {
+    background: var(--glass-button-press);
+  }
+
+  .glass-button:focus-visible {
+    outline: 2px solid var(--focusborder);
+    outline-offset: 2px;
+  }
+
+  .glass-button:disabled {
+    /* 禁用靠 disabled 属性与降饱和，不用 pointer-events 假禁用。 */
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
+  }
+
+  .glass-button--primary {
+    border-color: var(--glass-button-edge);
+    font-weight: 500;
+  }
+
+  .glass-button--flat {
+    background: var(--glass-shell-solid);
+    box-shadow: none;
+  }
+
+  /* 工具按钮沿用既有尺寸，只替换材质。 */
+  .toolbar-widget.glass-button {
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 5px;
+    color: inherit;
+  }
+
+  .icon-action.glass-button {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 5px;
+    color: var(--icon-foreground);
+  }
+
+  .toolbar-widget:disabled,
+  .icon-action:disabled {
+    color: color-mix(in srgb, var(--descriptionforeground) 55%, var(--editor-background));
+  }
+
+  .toolbar-widget[aria-pressed="true"],
+  .icon-action[aria-pressed="true"] {
+    background: var(--glass-button-press);
+    color: var(--foreground);
+  }
+
+  /* 工具图标条（GlassIcons）在标题栏与活动栏里的统一排布。 */
+  .m7-tool-cluster {
+    display: flex;
+    align-items: center;
+    margin-inline-start: 4px;
+    overflow: visible;
+  }
+
+  .m7-tool-cluster .glass-icons {
+    margin: 0;
+    flex-wrap: nowrap;
+  }
+
+  .m7-tool-cluster .glass-icon.is-active .glass-icon-plate {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--focusborder) 70%, transparent);
+  }
+
+  .m7-tool-cluster .glass-icon.is-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .m7-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    width: 100%;
+  }
+
+  /* 主提交按钮：第四版尺寸与权重。 */
+  .glass-button.m7-commit-button {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 29px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 550;
+  }
+}
+
+/* 减少透明度：材质层退回主题实色，隐藏高光与折射装饰。 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-layer {
+    display: none;
+  }
+
+  .titlebar,
+  .changes-sidebar,
+  .activity-bar,
+  .window-status,
+  .editor-tabs {
+    background: var(--glass-shell-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .revia-popper,
+  .app-dialog,
+  .notification {
+    background: var(--editorwidget-background);
+  }
+
+  .glass-button,
+  .glass-button:hover:not(:disabled) {
+    background: var(--glass-shell-solid);
+    box-shadow: none;
+  }
+
+  .glass-surface__sheen,
+  .glass-surface__rim,
+  .glass-icon-shine,
+  .glass-icon-shade,
+  .specular-button__light,
+  .glass-icons-canvas {
+    display: none;
+  }
+}
+
+/* 高对比度：实色底 + 描边，不依赖半透明与高光。 */
+@media (forced-colors: active) {
+  .glass-layer {
+    display: none;
+  }
+
+  .titlebar,
+  .changes-sidebar,
+  .activity-bar,
+  .window-status,
+  .revia-popper,
+  .app-dialog,
+  .notification {
+    background: Canvas;
+    color: CanvasText;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    border: 1px solid CanvasText;
+  }
+
+  .glass-button {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-button:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* 减少动态效果：玻璃组件的过渡与入场动画全部关掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .glass-icon,
+  .glass-icon-plate,
+  .glass-icon-glass,
+  .glass-icon-face,
+  .glass-surface,
+  .specular-button {
+    transition: none !important;
+    animation: none !important;
+  }
 }

@@ -10,7 +10,7 @@ import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeStatusEntry } from "@/types/bindings/WorktreeStatusEntry";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { messages } from "@/lib/i18n/index";
+import { messages, t } from "@/lib/i18n/index";
 import { formatAppError } from "@/lib/error";
 import { MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
@@ -245,7 +245,7 @@ export function StatusBar({
   autoFetchError: string | null;
 }) {
   return (
-    <footer className="flex h-[var(--statusbar-height)] shrink-0 items-center gap-0.5 overflow-hidden bg-[var(--statusbar-background)] px-1.5 text-[12px] whitespace-nowrap text-[var(--statusbar-foreground)]">
+    <footer className="window-status flex h-[var(--statusbar-height)] shrink-0 items-center gap-0.5 overflow-hidden px-1.5 text-[12px] whitespace-nowrap text-[var(--statusbar-foreground)]">
       <span className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5">
         <Codicon name="git-branch" size={14} />
         <span className="max-w-[260px] truncate">{branch ?? messages.changes.detachedHead}</span>
@@ -302,12 +302,14 @@ export function WelcomeScreen({
   busy,
   onChooseRepo,
   onSelectRepo,
+  onCloneRepo,
   error,
 }: {
   repos: RepoEntry[];
   busy: boolean;
   onChooseRepo: () => void;
   onSelectRepo: (repo: RepoEntry) => void;
+  onCloneRepo: () => void;
   error: React.ReactNode;
 }) {
   return (
@@ -315,7 +317,7 @@ export function WelcomeScreen({
       <div className="w-full max-w-lg">
         <h1 className="text-center text-[18px] font-semibold">{messages.firstRun.title}</h1>
         <p className="mt-2 text-center text-[12.5px] text-descriptionforeground">{messages.firstRun.description}</p>
-        <div className="mt-5 flex justify-center">
+        <div className="mt-5 flex justify-center gap-2">
           <button
             type="button"
             className="rounded-[4px] bg-primary px-4 py-1.5 text-primary-foreground disabled:opacity-50"
@@ -323,6 +325,14 @@ export function WelcomeScreen({
             onClick={onChooseRepo}
           >
             {messages.firstRun.addButton}
+          </button>
+          <button
+            type="button"
+            className="rounded-[4px] border border-panel-border px-4 py-1.5 hover:bg-toolbar-hoverbackground disabled:opacity-50"
+            disabled={busy}
+            onClick={onCloneRepo}
+          >
+            {t("toolbar.clone")}
           </button>
         </div>
         {repos.length > 0 ? (

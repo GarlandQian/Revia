@@ -17,7 +17,7 @@ import type {
   UpdateMode,
 } from "@/lib/ipc";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { messages } from "@/lib/i18n/index";
+import { messages, t } from "@/lib/i18n/index";
 import { highlightLevelText, notifyKindText } from "@/lib/i18n/text";
 
 /** 搜索关键词在资源里以 `|` 分隔，避免运行期拼接翻译键（Q171）。 */
@@ -26,6 +26,10 @@ function keywordList(value: string): string[] {
 }
 import { themesOfKind } from "@/lib/theme";
 import { Codicon } from "@/components/ui/codicon";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { M7GithubSettings, M7ShortcutSettings, M7ThemeSettings, M7UpdateSettings } from "@/features/m7/settings";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
+import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
 
 export interface SettingsValues {
   themeLight: string;
@@ -76,6 +80,8 @@ export interface SettingsValues {
   protectedBranches: string;
   /** 当前会话实际使用的 Git 程序（只读展示）。 */
   detectedGitPath: string | null;
+  appUpdateMode: AppUpdateMode;
+  shortcuts: Record<string, string>;
 }
 
 export interface SettingsPatch {
@@ -125,9 +131,11 @@ export interface SettingsPatch {
   pushDialogOnCommit?: boolean;
   pushDialogProtectedOnly?: boolean;
   protectedBranches?: string[];
+  appUpdateMode?: AppUpdateMode;
+  shortcuts?: Record<string, string>;
 }
 
-type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "about";
+type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "extensions" | "about";
 type Page =
   | "theme"
   | "language"
@@ -140,6 +148,10 @@ type Page =
   | "notifications"
   | "gitTools"
   | "updatePush"
+  | "themeColors"
+  | "shortcuts"
+  | "githubAccounts"
+  | "appUpdate"
   | "about";
 
 interface PageDef {
@@ -225,6 +237,32 @@ function buildCategories(): CategoryDef[] {
     ],
   },
   {
+    id: "extensions",
+    title: t("settings.m7.title"),
+    pages: [
+      {
+        id: "themeColors",
+        title: t("settings.m7.theme.title"),
+        keywords: keywordList(t("settings.m7.theme.keywords")),
+      },
+      {
+        id: "shortcuts",
+        title: t("settings.m7.shortcuts.title"),
+        keywords: keywordList(t("settings.m7.shortcuts.keywords")),
+      },
+      {
+        id: "githubAccounts",
+        title: t("settings.m7.github.title"),
+        keywords: keywordList(t("settings.m7.github.keywords")),
+      },
+      {
+        id: "appUpdate",
+        title: t("settings.m7.update.title"),
+        keywords: keywordList(t("settings.m7.update.keywords")),
+      },
+    ],
+  },
+  {
     id: "about",
     title: messages.settings.about,
     pages: [{ id: "about", title: messages.settings.about, keywords: keywordList(messages.settings.keywords.about) }],
@@ -244,6 +282,10 @@ const CATEGORY_OF_PAGE: Record<Page, Category> = {
   notifications: "notifications",
   gitTools: "git",
   updatePush: "git",
+  themeColors: "extensions",
+  shortcuts: "extensions",
+  githubAccounts: "extensions",
+  appUpdate: "extensions",
   about: "about",
 };
 
@@ -253,12 +295,23 @@ export function SettingsDialog({
   onClose,
   onChange,
   onReloadEnvironment,
+  worktreeId = null,
+  updateStatus = null,
+  onUpdateStatus,
+  onThemesChanged,
+  onAccountChanged,
 }: {
   open: boolean;
   values: SettingsValues;
   onClose: () => void;
   onChange: (patch: SettingsPatch) => Promise<AppErrorPayload | null>;
   onReloadEnvironment: () => Promise<AppErrorPayload | null>;
+  /** M7：GitHub 账号页要按当前仓库读取绑定关系。 */
+  worktreeId?: string | null;
+  updateStatus?: AppUpdateStatus | null;
+  onUpdateStatus?: (status: AppUpdateStatus) => void;
+  onThemesChanged?: () => Promise<void> | void;
+  onAccountChanged?: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [page, setPage] = useState<Page>("theme");
@@ -364,12 +417,13 @@ export function SettingsDialog({
     <dialog
       ref={ref}
       aria-label={messages.settings.title}
-      className="app-dialog w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
+      className="app-dialog glass-isolate w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
+      <GlassLayer variant="popover" />
       <div className="flex items-center gap-2 border-b border-panel-border px-4 py-2.5">
         <h2 className="flex-1 text-[14px] font-semibold">{messages.settings.title}</h2>
         <button type="button" className="icon-action" aria-label={messages.recovery.close} title={messages.recovery.close} onClick={onClose}>
@@ -377,7 +431,7 @@ export function SettingsDialog({
         </button>
       </div>
       <div className="flex h-[min(560px,calc(100vh-140px))]">
-        <nav className="flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--sidebar-background)]" aria-label={messages.settings.title}>
+        <nav className="flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--glass-side-tint)]" aria-label={messages.settings.title}>
           <div className="relative px-2 py-2">
             <Codicon name="search" size={13} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-descriptionforeground" />
             <input
@@ -1019,6 +1073,35 @@ export function SettingsDialog({
               </div>
             ) : null}
 
+            {page === "themeColors" ? (
+              <M7ThemeSettings
+                themeLight={values.themeLight}
+                themeDark={values.themeDark}
+                onChange={(patch) => commit(patch)}
+                onThemesChanged={() => onThemesChanged?.()}
+              />
+            ) : null}
+
+            {page === "shortcuts" ? (
+              <M7ShortcutSettings
+                shortcuts={values.shortcuts ?? {}}
+                onChange={(next) => commit({ shortcuts: next })}
+              />
+            ) : null}
+
+            {page === "githubAccounts" ? (
+              <M7GithubSettings worktreeId={worktreeId} onChangeAccount={() => onAccountChanged?.()} />
+            ) : null}
+
+            {page === "appUpdate" ? (
+              <M7UpdateSettings
+                mode={values.appUpdateMode ?? "notify"}
+                onChangeMode={(mode) => commit({ appUpdateMode: mode })}
+                status={updateStatus}
+                onStatusChange={(status) => onUpdateStatus?.(status)}
+              />
+            ) : null}
+
             {page === "about" ? (
               <div className="space-y-3 text-[12.5px] leading-relaxed">
                 <p className="text-[15px] font-semibold">Revia</p>
@@ -1029,6 +1112,7 @@ export function SettingsDialog({
                     <li>{messages.settings.licenseCodicons}</li>
                     <li>{messages.settings.licenseMaterial}</li>
                     <li>{messages.settings.licenseThemes}</li>
+                    <li>{messages.settings.licenseReactBits}</li>
                   </ul>
                 </div>
               </div>

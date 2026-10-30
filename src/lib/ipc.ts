@@ -7,6 +7,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
@@ -166,6 +167,10 @@ export interface SettingsPayload {
   pushDialogOnCommit: boolean;
   pushDialogProtectedOnly: boolean;
   protectedBranches: string[];
+  /** 应用更新方式（M7、Q199）。 */
+  appUpdateMode: AppUpdateMode;
+  /** 用户自定义快捷键（动作 id → 加速键）。 */
+  shortcuts: Record<string, string>;
 }
 
 /** 日志表格显示列（F06）。 */
@@ -227,6 +232,8 @@ export interface SettingsPatchPayload {
   pushDialogOnCommit?: boolean;
   pushDialogProtectedOnly?: boolean;
   protectedBranches?: string[];
+  appUpdateMode?: AppUpdateMode;
+  shortcuts?: Record<string, string>;
 }
 
 /** 与 Rust 侧 `CommandRecord` 对应（B07：时间、worktree、参数、退出码、耗时、输出）。 */

@@ -2,11 +2,11 @@
 import type { AutostashRestoration } from "./AutostashRestoration";
 import type { WorktreeIdentity } from "./WorktreeIdentity";
 
-export type AutostashLink = { id: string, worktreePath: string, commonDir: string, stashOid: string, operation: string, message: string, createdAtMs: number, recoveryId: string | null,
+export type AutostashLink = { id: string, worktreePath: string, commonDir: string, stashOid: string, operation: string, message: string, createdAtMs: number, recoveryId: string | null, 
 /**
  * Older path-only links remain readable, but cannot authorize a restore.
  */
-identity: WorktreeIdentity | null, restoration: AutostashRestoration,
+identity: WorktreeIdentity | null, restoration: AutostashRestoration, 
 /**
  * Branch identity at save time. Automatic cleanup restores only there.
  */

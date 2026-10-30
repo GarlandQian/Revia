@@ -5,11 +5,11 @@ import type { ChangesKind } from "./ChangesKind";
 /**
  * 一个文件的执行结果。
  */
-export type BatchFileResult = { path: string, changes: ChangesKind, ok: boolean,
+export type BatchFileResult = { path: string, changes: ChangesKind, ok: boolean, 
 /**
  * 只读文件未执行时的结构化原因（符号链接、子模块、冲突等）。
  */
-skipped: AppErrorPayload | null,
+skipped: AppErrorPayload | null, 
 /**
  * 失败原因；成功与跳过时为 None。
  */

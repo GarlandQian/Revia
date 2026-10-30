@@ -103,9 +103,9 @@ import { soakScroller } from "@/lib/soakScroller";
 import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus, type WatchStatusPayload } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
-import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, type LanguagePreference } from "@/lib/i18n/index";
+import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, t, type LanguagePreference } from "@/lib/i18n/index";
 import { operationKindText, readonlyReasonText } from "@/lib/i18n/text";
-import { isButtonTarget, isCommitMessageTarget, isCommitShortcut, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { isButtonTarget, isCommitMessageTarget, isPrimaryModifier, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
@@ -116,6 +116,20 @@ import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { formatAppError, resultNeedsVerification, getErrorMessage, toAppError } from "@/lib/error";
 import { useAppearance } from "@/hooks/useAppearance";
+import { matchShortcut, setShortcutOverrides as applyShortcutOverrides } from "@/lib/shortcuts";
+import { GlassIcons } from "@/components/m7/glass";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { useReducedMotion, useThemeKind } from "@/hooks/useGlassPrefs";
+import { flushM7State } from "@/lib/m7/flush";
+import { m7, onM7Events } from "@/lib/m7/api";
+import { EditableWorkspace } from "@/features/m7/EditableWorkspace";
+import { TerminalPanel } from "@/features/m7/TerminalPanel";
+import { CloneDialog } from "@/features/m7/CloneDialog";
+import { GithubPanel } from "@/features/m7/GithubPanel";
+import { DiagnosticsDialog } from "@/features/m7/DiagnosticsDialog";
+import { UpdateBanner, UpdatePanel } from "@/features/m7/UpdatePanel";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
+import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
 import { useNotifications, type NoticeInput } from "@/hooks/useNotifications";
 import { useTreeSelection } from "@/hooks/useTreeSelection";
 import { useEditorTabs } from "@/hooks/useEditorTabs";
@@ -350,7 +364,7 @@ export function App() {
 
   const {
     themeLight, setThemeLight, themeDark, setThemeDark, codeFontFamily, setCodeFontFamily,
-    fontSize, setFontSize, changeFontSize, uiZoom, setUiZoom, uiZoomRef,
+    fontSize, setFontSize, changeFontSize, uiZoom, setUiZoom, uiZoomRef, reloadImportedThemes,
   } = useAppearance();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -362,6 +376,22 @@ export function App() {
   const [localeRevision, setLocaleRevision] = useState(0);
   useEffect(() => subscribeLocale(() => setLocaleRevision((value) => value + 1)), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // ---------- M7 扩展状态（终端、编辑、克隆、PR、诊断、更新） ----------
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(240);
+  /** 正在编辑的文件（同一时刻只编辑一个，切换文件前先处理未保存改动）。 */
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editDirty, setEditDirty] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [appUpdateMode, setAppUpdateMode] = useState<AppUpdateMode>("notify");
+  const [shortcutsSnapshot, setShortcutsSnapshot] = useState<Record<string, string>>({});
+  const themeKind = useThemeKind();
+  const reducedMotion = useReducedMotion();
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
+  const [updateBannerVersion, setUpdateBannerVersion] = useState<string | null>(null);
   /** 冲突对话框（返修 F10）。 */
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   // 列表和页签共享导航入口；实际取数仍由 openEntry 的选择门校验。
@@ -1310,6 +1340,9 @@ export function App() {
           pushDialogProtectedOnly: settings.pushDialogProtectedOnly,
           protectedBranches: settings.protectedBranches,
         });
+        setShortcutsSnapshot(settings.shortcuts ?? {});
+        applyShortcutOverrides(settings.shortcuts ?? {});
+        setAppUpdateMode(settings.appUpdateMode ?? "notify");
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
@@ -1605,6 +1638,8 @@ export function App() {
   const closeAfterDraftFlush = useCallback(
     async (action: () => Promise<void>): Promise<void> => {
       await flushCommitDraftRef.current();
+      // 编辑草稿与终端页签先落盘，再执行不可撤销的原生动作（M7 任务 03、04）。
+      await flushM7State();
       await action();
     },
     [],
@@ -2924,13 +2959,14 @@ export function App() {
     );
   }, []);
 
-  // 快捷键（Q19、Q93、审查意见 6）：
+  // 快捷键（Q19、Q93、Q199）：默认加速键与自定义覆盖都在 lib/shortcuts.ts 里，
+  // 这里只按“命中的动作”分派，避免平台判断散落在 App 里（Q55）。
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // 提交快捷键（⌘K / Ctrl+K，M3 F06.5）：
-      // - 在提交信息框里由信息框自己处理，这里不再重复触发；
-      // - 其它输入控件与任何弹窗内不穿透（Q93）。
-      if (isCommitShortcut(event) && !isCommitMessageTarget(event.target)) {
+      const action = matchShortcut(event);
+
+      // 提交：在提交信息框里由信息框自己处理，其它输入控件与弹窗内不穿透（Q93）。
+      if (action === "commit" && !isCommitMessageTarget(event.target)) {
         if (isTextInputOrDialog(event.target) || document.querySelector("[role='dialog'], dialog[open]")) return;
         event.preventDefault();
         void performCommit();
@@ -2939,91 +2975,102 @@ export function App() {
 
       // 只对文本输入控件和弹窗内的按键放行，不穿透到后台文件操作（Q93、审查意见 6）
       if (isTextInputOrDialog(event.target)) return;
+      if (!action) return;
 
-      if (isDiscardFileShortcut(event)) {
-        event.preventDefault();
-        if (isWriting) return;
-        const targets = treeSelectedEntries();
-        requestDiscardEntries(targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : []);
-        return;
-      }
-
-      if (isReviewShortcut(event)) {
-        // 必须在 ⌘R 刷新分支之前处理，否则会被刷新吞掉（Q93、D04）。
-        // 焦点在按钮/勾选框上时不穿透：那类控件用自己的键盘行为（spec 决策 7）。
-        if (isButtonTarget(event.target)) return;
-        event.preventDefault();
-        void reviewNextFile();
-        return;
-      }
-
-      if (isStageFileShortcut(event)) {
-        event.preventDefault();
-        if (isWriting) return;
-        const targets = treeSelectedEntries();
-        const entries = targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : [];
-        // 不过滤只读条目：批量入口会让后端逐个返回跳过原因（返修 C6，F03.5）。
-        const staged = entries.filter((entry) => entry.changes === "staged");
-        const unstaged = entries.filter((entry) => entry.changes !== "staged");
-        // 选中项混有两组时串行执行：同一 worktree 的写门只放一个，并发发两笔
-        // 第二笔会被静默丢掉（返修 C5）。逐组等待前一组完成再发。
-        const runSequentially = async () => {
-          if (unstaged.length > 0) await performBatchWrite("stage", unstaged);
-          if (staged.length > 0) await performBatchWrite("unstage", staged);
-          if (unstaged.length === 0 && staged.length === 0 && entries.length > 0) {
-            notify({ tone: "warning", title: () => (messages.changes.batchNothing), persistent: true });
-          }
-        };
-        void runSequentially();
-        return;
-      }
-
-      // 界面缩放（返修 E.2，Q139）：快捷键照 JetBrains（⌃⌥= / ⌃⌥- / ⌃⌥0）。
-      if (event.altKey && event.ctrlKey && !event.metaKey) {
-        const nextZoom =
-          event.key === "=" || event.key === "+"
-            ? Math.min(150, Math.round(uiZoomRef.current / 10) * 10 + 10)
-            : event.key === "-"
-              ? Math.max(80, Math.round(uiZoomRef.current / 10) * 10 - 10)
-              : event.key === "0"
-                ? 100
-                : null;
-        if (nextZoom !== null) {
+      switch (action) {
+        case "discardFile": {
           event.preventDefault();
+          if (isWriting) return;
+          const targets = treeSelectedEntries();
+          requestDiscardEntries(targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : []);
+          return;
+        }
+        case "reviewNextFile": {
+          // 焦点在按钮/勾选框上时不穿透：那类控件用自己的键盘行为（spec 决策 7）。
+          if (isButtonTarget(event.target)) return;
+          event.preventDefault();
+          void reviewNextFile();
+          return;
+        }
+        case "stageFile": {
+          event.preventDefault();
+          if (isWriting) return;
+          const targets = treeSelectedEntries();
+          const entries = targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : [];
+          // 不过滤只读条目：批量入口会让后端逐个返回跳过原因（返修 C6，F03.5）。
+          const staged = entries.filter((entry) => entry.changes === "staged");
+          const unstaged = entries.filter((entry) => entry.changes !== "staged");
+          // 选中项混有两组时串行执行：同一 worktree 的写门只放一个（返修 C5）。
+          const runSequentially = async () => {
+            if (unstaged.length > 0) await performBatchWrite("stage", unstaged);
+            if (staged.length > 0) await performBatchWrite("unstage", staged);
+            if (unstaged.length === 0 && staged.length === 0 && entries.length > 0) {
+              notify({ tone: "warning", title: () => (messages.changes.batchNothing), persistent: true });
+            }
+          };
+          void runSequentially();
+          return;
+        }
+        case "zoomIn":
+        case "zoomOut":
+        case "zoomReset": {
+          event.preventDefault();
+          const nextZoom =
+            action === "zoomReset" ? 100 : Math.min(150, Math.max(80, Math.round(uiZoomRef.current / 10) * 10 + (action === "zoomIn" ? 10 : -10)));
           setUiZoom(nextZoom);
           void ipc.updateSettings({ uiZoom: nextZoom }).catch(() => {});
           return;
         }
-      }
-
-      const primary = isPrimaryModifier(event);
-      if (primary && event.key.toLowerCase() === "o") {
-        event.preventDefault();
-        void chooseRepo();
-      } else if (primary && event.key.toLowerCase() === "r") {
-        event.preventDefault();
-        void refresh();
-      } else if (primary && event.key === "+") {
-        event.preventDefault();
-        void changeFontSize(1);
-      } else if (primary && event.key === "-") {
-        event.preventDefault();
-        void changeFontSize(-1);
-      } else if (event.key === "F7" && !mergeTabPathRef.current) {
-        // 合并页签里的 F7 由合并页签自己处理（上一处、下一处冲突）。
-        event.preventDefault();
-        jumpToHunk(event.shiftKey ? -1 : 1);
-      } else if (event.key === "ArrowDown" && primary) {
-        event.preventDefault();
-        focusNextFile(1);
-      } else if (event.key === "ArrowUp" && primary) {
-        event.preventDefault();
-        focusNextFile(-1);
+        case "openRepo":
+          event.preventDefault();
+          void chooseRepo();
+          return;
+        case "cloneRepo":
+          event.preventDefault();
+          if (!busy) setCloneOpen(true);
+          return;
+        case "pullRequests":
+          event.preventDefault();
+          if (!busy && worktreeId) setGithubOpen(true);
+          return;
+        case "refresh":
+          event.preventDefault();
+          void refresh();
+          return;
+        case "fontUp":
+          event.preventDefault();
+          void changeFontSize(1);
+          return;
+        case "fontDown":
+          event.preventDefault();
+          void changeFontSize(-1);
+          return;
+        case "nextHunk":
+        case "prevHunk":
+          // 合并页签里的 F7 由合并页签自己处理（上一处、下一处冲突）。
+          if (mergeTabPathRef.current) return;
+          event.preventDefault();
+          jumpToHunk(action === "nextHunk" ? 1 : -1);
+          return;
+        case "nextFile":
+          event.preventDefault();
+          focusNextFile(1);
+          return;
+        case "prevFile":
+          event.preventDefault();
+          focusNextFile(-1);
+          return;
+        case "toggleTerminal":
+          event.preventDefault();
+          if (worktreeId) setTerminalOpen((value) => !value);
+          return;
+        default:
+          return;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, notify, performBatchWrite, performCommit, refresh, requestDiscardEntries, reviewNextFile, selectedEntry, treeSelectedEntries]);
+  }, [busy, changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, notify, performBatchWrite, performCommit, refresh, requestDiscardEntries, reviewNextFile, selectedEntry, treeSelectedEntries, worktreeId]);
 
   // ---------------- 测量 ----------------
 
@@ -3436,7 +3483,18 @@ export function App() {
         if (splitTarget) {
           debugLog(`冒烟：并排视图检查开始 ${splitTarget.path}`);
           await openEntry(splitTarget, { view: "split", worktreeId: worktree.id, expand: true });
-          await nextPaint();
+          // 色带在两栏量高、布局提交之后才画：等到画布出现非透明像素，而不是固定等几次 RAF。
+          await waitUntil(() => {
+            const element = document.querySelector<HTMLCanvasElement>(".sbs-bands");
+            if (!element) return false;
+            const context = element.getContext("2d");
+            if (!context) return false;
+            const data = context.getImageData(0, 0, Math.max(1, element.width), Math.max(1, element.height)).data;
+            for (let index = 3; index < data.length; index += 4) {
+              if (data[index] !== 0) return true;
+            }
+            return false;
+          }, 4000);
           const columns = document.querySelectorAll(".sbs-column").length;
           const canvas = document.querySelector<HTMLCanvasElement>(".sbs-bands");
           let canvasPainted = false;
@@ -3498,6 +3556,25 @@ export function App() {
           commitArea: !!document.querySelector("[data-commit-composer]"),
           commitMessage: !!document.querySelector("[data-commit-message]"),
           activityBadge: document.querySelector(".activity-badge")?.textContent ?? null,
+          // 玻璃材质（M7 任务 01）：确认三个组件真的挂载，而不是只写了 CSS。
+          glass: {
+            rootChildren: document.getElementById("root")?.childElementCount ?? -1,
+            bodyText: document.body.innerText.replace(/\s+/g, " ").slice(0, 120),
+            windowLayer: !!document.querySelector(".glass-host > .glass-layer--window"),
+            popoverLayer: document.querySelectorAll(".glass-layer--popover").length,
+            panelLayers: {
+              sidebar: !!document.querySelector(".changes-sidebar"),
+              status: !!document.querySelector(".window-status"),
+              toolbar: !!document.querySelector(".titlebar"),
+            },
+            glassButtons: document.querySelectorAll(".glass-button").length,
+            specularButtons: document.querySelectorAll(".specular-button").length,
+            refractionEnabled: Array.from(document.querySelectorAll(".glass-surface")).filter(
+              (node) => !node.classList.contains("glass-surface--fallback") && !node.classList.contains("glass-layer--flat"),
+            ).length,
+            tools: document.querySelectorAll(".m7-tool-cluster .glass-icon").length,
+            commitButton: !!document.querySelector(".m7-commit-button"),
+          },
           statusBar: document.querySelector("footer")?.textContent?.slice(0, 120) ?? null,
         };
         if (firstRow) {
@@ -3514,6 +3591,14 @@ export function App() {
           if (!element) return null;
           const box = element.getBoundingClientRect();
           return { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.width), h: Math.round(box.height) };
+        };
+        ui.viewport = {
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          zoom: getComputedStyle(document.documentElement).zoom,
+          uiZoomVar: getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom").trim(),
+          dpr: window.devicePixelRatio,
+          docScrollHeight: document.documentElement.scrollHeight,
         };
         ui.layout = {
           titlebar: rect(".titlebar"),
@@ -3540,6 +3625,41 @@ export function App() {
         });
         if (previousTheme) document.documentElement.dataset.theme = previousTheme;
         if (previousKind) document.documentElement.dataset.kind = previousKind;
+        // M7 命令通路（任务 02–04、09、11）：走真实 IPC，确认 Rust 侧能返回而不 panic。
+        const m7Probe: Record<string, unknown> = {};
+        const attempt = async (name: string, work: () => Promise<unknown>) => {
+          try {
+            m7Probe[name] = await work();
+          } catch (error) {
+            m7Probe[name] = { error: String(error) };
+          }
+        };
+        await attempt("importedThemes", async () => (await m7.listImportedThemes()).length);
+        await attempt("updateStatus", async () => {
+          const status = await m7.updateStatus();
+          return { mode: status.mode, configured: status.configured, reason: status.unconfiguredReason };
+        });
+        await attempt("terminalTabs", async () => (await m7.terminalTabs()).length);
+        await attempt("diagnostics", async () => {
+          const preview = await m7.previewDiagnostics({ destination: "", worktreeId: worktree.id });
+          return { chars: preview.text.length, redactions: preview.redactions };
+        });
+        await attempt("editable", async () => {
+          const entry = snapshot.entries.find((candidate) => !candidate.binary && candidate.status !== "deleted");
+          if (!entry) return null;
+          const file = await m7.openEditable(worktree.id, entry.path);
+          return { path: entry.path, readonlyReason: file.readonlyReason ?? null, bytes: file.text?.length ?? 0 };
+        });
+        // 内置终端（任务 04）：真实开一个 PTY、等首屏输出、再关闭；不向 shell 发任何命令。
+        await attempt("terminal", async () => {
+          const session = await m7.terminalOpen({ worktreeId: worktree.id, cwd: null, cols: 80, rows: 24 });
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          const snapshot = await m7.terminalSnapshot(session.sessionId);
+          const running = (await m7.terminalList()).some((item) => item.sessionId === session.sessionId);
+          await m7.terminalClose(session.sessionId);
+          return { id: session.sessionId, shell: session.shell, running, bytes: snapshot.length };
+        });
+        report.m7 = m7Probe;
         report.ui = ui;
         report.ok = true;
       } catch (caught) {
@@ -4180,7 +4300,14 @@ export function App() {
         pushDialogOnCommit: patch.pushDialogOnCommit,
         pushDialogProtectedOnly: patch.pushDialogProtectedOnly,
         protectedBranches: patch.protectedBranches,
+        appUpdateMode: patch.appUpdateMode,
+        shortcuts: patch.shortcuts,
       });
+      if (patch.shortcuts) {
+        setShortcutsSnapshot(patch.shortcuts);
+        applyShortcutOverrides(patch.shortcuts);
+      }
+      if (patch.appUpdateMode) setAppUpdateMode(patch.appUpdateMode);
       setThemeLight(next.themeLight);
       setThemeDark(next.themeDark);
       setCodeFontFamily(next.codeFontFamily);
@@ -5045,6 +5172,40 @@ export function App() {
     );
   }, [diffArea, selectedEntry]);
 
+  // 应用更新状态：启动读一次；有新版本事件时刷新（手动模式不主动查询，由 Rust 侧决定）。
+  useEffect(() => {
+    let cancelled = false;
+    void m7
+      .updateStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setUpdateStatus(status);
+        setAppUpdateMode(status.mode);
+        if (status.available) setUpdateBannerVersion(status.available.version);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(
+    () =>
+      onM7Events({
+        onUpdateAvailable: (event) => {
+          setUpdateBannerVersion(event.version);
+          void m7.updateStatus().then(setUpdateStatus).catch(() => undefined);
+        },
+      }),
+    [],
+  );
+
+  /** 终端输出静默后核对工作区：命令可能改了文件（任务 04）。 */
+  const onTerminalActivity = useCallback(() => {
+    if (!worktreeId) return;
+    void refresh();
+  }, [refresh, worktreeId]);
+
   if (!bootstrapDone) {
     return <div className="flex h-full items-center justify-center text-descriptionforeground">{messages.app.loading}</div>;
   }
@@ -5137,6 +5298,8 @@ export function App() {
     pushDialogProtectedOnly: pushSettings.pushDialogProtectedOnly,
     protectedBranches: pushSettings.protectedBranches.join("\n"),
     detectedGitPath: info?.gitPath ?? null,
+    appUpdateMode,
+    shortcuts: shortcutsSnapshot,
   };
 
   if (!activeRepo) {
@@ -5147,7 +5310,17 @@ export function App() {
           busy={busy}
           onChooseRepo={() => void chooseRepo()}
           onSelectRepo={(repo) => void openRepo(repo)}
+          onCloneRepo={() => setCloneOpen(true)}
           error={error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+        />
+        <CloneDialog
+          open={cloneOpen}
+          onClose={() => setCloneOpen(false)}
+          onRegistered={(repo) => {
+            setCloneOpen(false);
+            setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
+            void openRepo(repo);
+          }}
         />
         <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
         {settingsOpen ? (
@@ -5157,8 +5330,40 @@ export function App() {
             onClose={() => setSettingsOpen(false)}
             onChange={updateSettings}
             onReloadEnvironment={reloadEnvironment}
+            worktreeId={worktreeId}
+            updateStatus={updateStatus}
+            onUpdateStatus={setUpdateStatus}
+            onThemesChanged={reloadImportedThemes}
           />
         ) : null}
+        <CloneDialog
+          open={cloneOpen}
+          onClose={() => setCloneOpen(false)}
+          onRegistered={(repo) => {
+            setCloneOpen(false);
+            setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
+            void openRepo(repo);
+          }}
+        />
+        <DiagnosticsDialog open={diagnosticsOpen} worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} />
+        <UpdatePanel
+          open={updateOpen}
+          status={updateStatus}
+          mode={appUpdateMode}
+          onModeChange={(mode) => {
+            setAppUpdateMode(mode);
+            void ipc.updateSettings({ appUpdateMode: mode }).catch(() => undefined);
+          }}
+          onStatusChange={(status) => {
+            setUpdateStatus(status);
+            if (!status.available) setUpdateBannerVersion(null);
+          }}
+          onBeforeInstall={async () => {
+            await flushM7State();
+            return true;
+          }}
+          onClose={() => setUpdateOpen(false)}
+        />
         {closeRequest && closeRequest.action !== "proceed" ? (
           <CloseRequestDialog
             intent={closeIntentRef.current}
@@ -5174,7 +5379,8 @@ export function App() {
   }
 
   return (
-    <div className="grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden bg-[var(--editor-background)]">
+    <div className="glass-host grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden">
+      <GlassLayer variant="window" />
       <TitleBar
         repo={activeRepo}
         repos={repos}
@@ -5188,6 +5394,7 @@ export function App() {
         onSettings={() => setSettingsOpen(true)}
         onRefreshWorktrees={() => void refreshWorktreeStatuses()}
         extra={worktreeId ? (
+          <>
           <BranchWidget
             overview={branches.overview}
             loading={branches.loading}
@@ -5201,6 +5408,67 @@ export function App() {
             onUpdate={() => void runUpdate(worktreeId)}
             onPush={() => void openPushDialog()}
           />
+          <div className="m7-tool-cluster">
+            <GlassIcons
+              items={[
+                {
+                  id: "terminal",
+                  icon: <Codicon name="terminal" size={14} />,
+                  label: t("toolbar.terminal"),
+                  color: terminalOpen ? "green" : "graphite",
+                  className: terminalOpen ? "is-active" : undefined,
+                  onClick: () => setTerminalOpen((value) => !value),
+                },
+                {
+                  id: "clone",
+                  icon: <Codicon name="repo-clone" size={14} />,
+                  label: t("toolbar.clone"),
+                  color: "graphite",
+                  className: busy ? "is-disabled" : undefined,
+                  onClick: () => {
+                    if (!busy) setCloneOpen(true);
+                  },
+                },
+                {
+                  id: "github",
+                  icon: <Codicon name="git-pull-request" size={14} />,
+                  label: t("toolbar.pullRequests"),
+                  color: githubOpen ? "purple" : "graphite",
+                  className: busy ? "is-disabled" : githubOpen ? "is-active" : undefined,
+                  onClick: () => {
+                    if (!busy) setGithubOpen(true);
+                  },
+                },
+                {
+                  id: "diagnostics",
+                  icon: <Codicon name="debug-alt" size={14} />,
+                  label: t("toolbar.diagnostics"),
+                  color: "graphite",
+                  onClick: () => setDiagnosticsOpen(true),
+                },
+                {
+                  id: "update",
+                  icon: <Codicon name="cloud-download" size={14} />,
+                  label: t("toolbar.update"),
+                  color: updateBannerVersion ? "blue" : "graphite",
+                  className: updateBannerVersion ? "is-active" : undefined,
+                  onClick: () => setUpdateOpen(true),
+                },
+              ]}
+              size={24}
+              gap={4}
+              columns={5}
+              plate="circle"
+              hover={reducedMotion ? "none" : "lift"}
+              labels="hover"
+              refraction={0.5}
+              frost={0.5}
+              intro={false}
+              theme={themeKind}
+              iconColor="var(--titlebar-activeforeground)"
+            />
+          </div>
+          </>
         ) : null}
       />
 
@@ -5211,7 +5479,7 @@ export function App() {
           onToggle={() => setSidebarVisible((value) => !value)}
         />
         {sidebarVisible ? (
-          <aside className="changes-sidebar relative flex min-h-0 shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-background)]" style={{ width: sidebarWidth }}>
+          <aside className="changes-sidebar relative flex min-h-0 shrink-0 flex-col border-r border-[var(--sidebar-border)]" style={{ width: sidebarWidth }}>
             <div
               className="sidebar-resizer"
               role="separator"
@@ -5459,7 +5727,10 @@ export function App() {
           </aside>
         ) : null}
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+          {updateBannerVersion ? (
+            <UpdateBanner version={updateBannerVersion} onOpen={() => setUpdateOpen(true)} onDismiss={() => setUpdateBannerVersion(null)} />
+          ) : null}
           <OperationBanner
             origin={captureRemoteTarget(gateRef.current.token(), worktreeId)}
             state={operationState}
@@ -5513,11 +5784,27 @@ export function App() {
             onCloseCommit={(tab) => commitTabs.close(tab.key)}
           />
           {mainView === "diff" && selectedEntry && !mergeEntry ? (
-            <Breadcrumbs
-              entry={selectedEntry}
-              view={view}
-              changeCount={displayChangeCount}
-            />
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <Breadcrumbs
+                  entry={selectedEntry}
+                  view={view}
+                  changeCount={displayChangeCount}
+                />
+              </div>
+              {!selectedEntry.unmerged && !selectedEntry.binary ? (
+                <button
+                  type="button"
+                  className="toolbar-widget mr-1 shrink-0"
+                  aria-pressed={editingPath === selectedEntry.path}
+                  title={editDirty ? t("workspace.editDirty") : t("workspace.edit")}
+                  onClick={() => setEditingPath(editingPath === selectedEntry.path ? null : selectedEntry.path)}
+                >
+                  <Codicon name={editingPath === selectedEntry.path ? "close" : "edit"} size={13} />
+                  <span>{editingPath === selectedEntry.path ? t("common.close") : t("workspace.edit")}</span>
+                </button>
+              ) : null}
+            </div>
           ) : null}
           {mainView === "diff" && error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
           {mainView === "diff" && allReviewed && !mergeEntry ? (
@@ -5564,7 +5851,18 @@ export function App() {
           ) : null}
 
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {mainView === "diff" ? (mergeEntry ? (
+            {mainView === "diff" ? (editingPath && selectedEntry && editingPath === selectedEntry.path ? (
+              <EditableWorkspace
+                key={`${worktreeId}/${editingPath}`}
+                worktreeId={worktreeId ?? ""}
+                entry={selectedEntry}
+                fontSize={fontSize}
+                fontFamily={codeFontFamily}
+                onDirtyChange={setEditDirty}
+                onSaved={() => void refresh()}
+                onClose={() => setEditingPath(null)}
+              />
+            ) : mergeEntry ? (
               <MergeView
                 key={`${worktreeId}/${mergeEntry.path}`}
                 worktreeId={worktreeId ?? ""}
@@ -5719,6 +6017,30 @@ export function App() {
               )
             ) : null}
           </div>
+
+          {terminalOpen && worktreeId ? (
+            <TerminalPanel
+              worktreeId={worktreeId}
+              worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
+              fontSize={fontSize}
+              fontFamily={codeFontFamily}
+              height={terminalHeight}
+              onHeightChange={setTerminalHeight}
+              onActivity={onTerminalActivity}
+              onClose={() => setTerminalOpen(false)}
+            />
+          ) : null}
+
+          {githubOpen && worktreeId ? (
+            <GithubPanel
+              worktreeId={worktreeId}
+              worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
+              currentBranch={snapshot?.branch ?? null}
+              onClose={() => setGithubOpen(false)}
+              onCheckedOut={() => void refresh()}
+              onWorkspaceTouched={() => void refresh()}
+            />
+          ) : null}
 
           {/* Git 命令日志（B07）：底部面板，默认隐藏。 */}
           {commandLogOpen ? (

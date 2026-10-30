@@ -1,6 +1,6 @@
 # 10：预览并导出脱敏诊断
 
-Status: ready-for-agent
+Status: done
 Blocked by: None
 
 ## What to build
@@ -11,10 +11,10 @@ Blocked by: None
 
 ## Acceptance criteria
 
-- [ ] 持久化 / 导出采用明确字段白名单；路径、邮箱、远端、凭据脱敏
-- [ ] 始终排除正文、diff、草稿、终端输入输出和 Token，不直接持久化原 stderr / HTTP 响应
-- [ ] 预览和实际导出内容一致，无遥测；7 天过期、清空和故障保持其他应用数据
-- [ ] 独占标记 fixture 验证所有排除项及脱敏，真实命令错误仍保留可用的结构化类别
+- [x] 持久化 / 导出采用明确字段白名单；路径、邮箱、远端、凭据脱敏
+- [x] 始终排除正文、diff、草稿、终端输入输出和 Token，不直接持久化原 stderr / HTTP 响应
+- [x] 预览和实际导出内容一致，无遥测；7 天过期、清空和故障保持其他应用数据
+- [x] 独占标记 fixture 验证所有排除项及脱敏，真实命令错误仍保留可用的结构化类别
 
 ## Validation
 

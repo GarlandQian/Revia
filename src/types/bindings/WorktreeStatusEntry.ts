@@ -5,35 +5,35 @@ import type { OperationKind } from "./OperationKind";
 /**
  * 一个 worktree 在下拉里显示的状态。
  */
-export type WorktreeStatusEntry = { id: string, path: string, branch: string | null, detached: boolean, isMain: boolean,
+export type WorktreeStatusEntry = { id: string, path: string, branch: string | null, detached: boolean, isMain: boolean, 
 /**
  * 路径当前是否可访问（被移动或删除时仍列出，但标记不可用）。
  */
-accessible: boolean,
+accessible: boolean, 
 /**
  * 读取状态失败的原因。
  */
-error: AppErrorPayload | null,
+error: AppErrorPayload | null, 
 /**
  * 是否有未提交改动（含未跟踪文件）。
  */
-dirty: boolean,
+dirty: boolean, 
 /**
  * 进行中的操作；没有时为 None。
  */
-operation: OperationKind | null,
+operation: OperationKind | null, 
 /**
  * 进行中的操作名称（与 OperationKind 的 label 一致）。
  */
-operationLabel: string | null,
+operationLabel: string | null, 
 /**
  * 领先上游的提交数（按本地记录）。
  */
-ahead: number,
+ahead: number, 
 /**
  * 落后上游的提交数（按本地记录）。
  */
-behind: number,
+behind: number, 
 /**
  * 上游分支名；没有配置或本地缺少引用时为 None。
  */

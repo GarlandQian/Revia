@@ -5,15 +5,15 @@ import type { OperationKind } from "./OperationKind";
 import type { OperationState } from "./OperationState";
 import type { RewriteOutcome } from "./RewriteOutcome";
 
-export type OperationOutcome = { kind: OperationKind, action: OperationAction,
+export type OperationOutcome = { kind: OperationKind, action: OperationAction, 
 /**
  * No operation remains after the command.
  */
-completed: boolean,
+completed: boolean, 
 /**
  * New state when Git stopped at the next step.
  */
-state: OperationState | null, recoveryId: string | null,
+state: OperationState | null, recoveryId: string | null, 
 /**
  * Present when an automatic stash was saved before this operation.
  */

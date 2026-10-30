@@ -9,6 +9,7 @@ import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { messages } from "@/lib/i18n/index";
 import { commitWarningText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { FileTypeIcon } from "./FileTypeIcon";
 
 export function Modal({
@@ -32,13 +33,14 @@ export function Modal({
     <dialog
       ref={ref}
       aria-label={title}
-      className="app-dialog overflow-auto p-0 text-[13px]"
+      className="app-dialog glass-isolate overflow-auto p-0 text-[13px]"
       style={{ width: `min(${width ?? 520}px, calc(100vw - 40px))`, maxHeight: "calc(100vh - 40px)" }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
+      <GlassLayer variant="popover" />
       <div className="flex items-center gap-2 border-b border-panel-border px-4 py-2.5">
         <h2 className="flex-1 text-[13.5px] font-semibold">{title}</h2>
         <button type="button" className="icon-action" aria-label={messages.recovery.close} onClick={onClose}>

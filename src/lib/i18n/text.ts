@@ -299,3 +299,17 @@ export function checkoutNoteText(note: import("@/types/bindings/CheckoutNote").C
     case "stashRestoreConflicted": return t("remote.notes.stashRestoreConflicted");
   }
 }
+
+/** 更新通道未配置的原因（后端只给稳定的翻译键，Q168）。 */
+export function updateReasonText(reason: string): string {
+  switch (reason) {
+    case "errors.m7.updateReasonNoPlugin":
+      return t("errors.m7.updateReasonNoPlugin");
+    case "errors.m7.updateReasonNoPubkey":
+      return t("errors.m7.updateReasonNoPubkey");
+    case "errors.m7.updateReasonNoEndpoints":
+      return t("errors.m7.updateReasonNoEndpoints");
+    default:
+      return t("update.unconfigured");
+  }
+}

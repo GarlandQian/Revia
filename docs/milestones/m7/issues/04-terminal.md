@@ -1,6 +1,6 @@
 # 04：运行归属 worktree 的内置终端
 
-Status: ready-for-agent
+Status: done
 Blocked by: None
 
 ## What to build
@@ -11,11 +11,11 @@ Blocked by: None
 
 ## Acceptance criteria
 
-- [ ] Rust 创建 PTY，前端输入字节 / resize；正常 shell、UTF-8 / 中文、交互和退出状态可观察
-- [ ] 多个 worktree / 会话相互独立，运行中关闭可取消，应用关闭协调保留仍运行的会话
-- [ ] 重启恢复页签 / 起始目录并新开 shell；不恢复旧进程、不重放输入、不持久保存输出
-- [ ] 写入期间显示所属 worktree 忙碌，终端变化触发外部核对；Git 命令日志仍可查看
-- [ ] 真实安全子进程验证读写 / resize / 取消 / 退出，故障不清理用户进程
+- [x] Rust 创建 PTY，前端输入字节 / resize；正常 shell、UTF-8 / 中文、交互和退出状态可观察
+- [x] 多个 worktree / 会话相互独立，运行中关闭可取消，应用关闭协调保留仍运行的会话
+- [x] 重启恢复页签 / 起始目录并新开 shell；不恢复旧进程、不重放输入、不持久保存输出
+- [x] 写入期间显示所属 worktree 忙碌，终端变化触发外部核对；Git 命令日志仍可查看
+- [x] 真实安全子进程验证读写 / resize / 取消 / 退出，故障不清理用户进程
 
 ## Validation
 

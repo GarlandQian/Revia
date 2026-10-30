@@ -6,6 +6,9 @@ on:
       - main
       - m2
       - m3
+    # 版本标签也跑一遍：Windows 编译检查不依赖 Release 工作流。
+    tags:
+      - "v*"
   workflow_dispatch:
 
 concurrency:

@@ -10,6 +10,7 @@
 import { useState, type ReactNode, type ReactElement } from "react";
 
 import { Popover as PopoverParts } from "@base-ui/react/popover";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 
 export function Popover({
   open,
@@ -43,10 +44,12 @@ export function Popover({
       <PopoverParts.Portal className="revia-popover-host">
         <PopoverParts.Positioner className="pointer-events-auto" align={align === "right" ? "end" : "start"} side="bottom" sideOffset={4}>
           <PopoverParts.Popup
-            className="revia-popper overflow-y-auto p-1 text-[12.5px]"
+            className="revia-popper glass-isolate overflow-y-auto p-1 text-[12.5px]"
             style={width ? { width } : { minWidth: 240 }}
             role="menu"
           >
+            {/* 浮层材质（M7 任务 01）：第四版统一参数，玻璃层压在文字下面，不改弹层的尺寸与滚动。 */}
+            <GlassLayer variant="popover" />
             {children}
           </PopoverParts.Popup>
         </PopoverParts.Positioner>

@@ -1,6 +1,44 @@
 # yaml-language-server: $schema=https://x18n.antfu.dev/schema/reviews.json
 x18n: 1
 sources:
+  clone.advanced:
+    en: 8bd39d98eefb9
+  clone.branch:
+    en: 12042629079a74
+  clone.branchPlaceholder:
+    en: 670628f9e6922
+  clone.cancel:
+    en: ac7950f3a317e
+  clone.cancelled:
+    en: 11d6d8db783027
+  clone.depth:
+    en: 6f2cda6c55357
+  clone.failed:
+    en: 9cc27a45dd55f
+  clone.finished:
+    en: 432372e4a06a6
+  clone.pickTarget:
+    en: 80b8f4f670ae7
+  clone.running:
+    en: 16997e1754ef41
+  clone.shallow:
+    en: 143ef979b7e935
+  clone.start:
+    en: 26ab56f31fee3
+  clone.submodules:
+    en: 1ade1a28ccb04c
+  clone.target:
+    en: 9f5fae2a12755
+  clone.targetHint:
+    en: 116521b10518fe
+  clone.targetPlaceholder:
+    en: 15888e94b2e4f8
+  clone.title:
+    en: 1998d17a3c3de9
+  clone.url:
+    en: 1cfe0f849c6e2e
+  clone.urlPlaceholder:
+    en: 97e15eb02be0d
   commit.operationCherryPick:
     en: 7ac76241d749c
   commit.operationHintSentence:
@@ -11,8 +49,98 @@ sources:
     en: fc71620a63b15
   commit.operationTerminal:
     en: 4332b3a6f35d4
+  common.close:
+    en: 1a1d699a24749c
+  common.delete:
+    en: f3e8d32cae6d9
+  common.dismiss:
+    en: "4e46429359852"
+  common.loading:
+    en: 4c1d4ed5a8494
+  common.refresh:
+    en: 12071186b7b43f
+  diagnostics.copy:
+    en: 1b771529ca2fea
+  diagnostics.export:
+    en: 542c937d11197
+  diagnostics.exported:
+    en: 197773527eae29
+  diagnostics.hint:
+    en: 4468335efeda
+  diagnostics.redactions:
+    en: 1e719b363d5123
+  diagnostics.refresh:
+    en: 1423eff6db8112
+  diagnostics.saveTitle:
+    en: 3fb364ab0b8e8
+  diagnostics.title:
+    en: 16d3e9b71a9bcd
   diff.foldLines:
     en: 1efa5f6dda2ac7
+  edit.baseline:
+    en: "1027081264e93"
+  edit.baselineHint:
+    en: 13da726b0362
+  edit.close:
+    en: 2792ca546d961
+  edit.closeCancel:
+    en: ac7950f3a317e
+  edit.closeConfirm:
+    en: d34b8bffa1894
+  edit.closeDiscard:
+    en: 10410500f3e6f9
+  edit.closeSave:
+    en: b105ab441567c
+  edit.conflict:
+    en: 145bafa8e4d1dc
+  edit.conflictKeepMine:
+    en: 3ebd57c065efe
+  edit.conflictReload:
+    en: e5087bd0fd464
+  edit.draftDiscard:
+    en: 268a33ccc60de
+  edit.draftRestored:
+    en: 12ebfef6bfbaeb
+  edit.editor:
+    en: 16d59411550747
+  edit.executable:
+    en: 1484a8466a20fa
+  edit.loading:
+    en: 15d4bb1b364531
+  edit.meta:
+    en: b3724b7b30611
+  edit.readonly.binary:
+    en: 19c9bce868cb03
+  edit.readonly.encoding:
+    en: 16709612fd690d
+  edit.readonly.missing:
+    en: 258ef436f4901
+  edit.readonly.notInWorktree:
+    en: 112fb5a4e08456
+  edit.readonly.notRegularFile:
+    en: 1bc7fe5b623a4
+  edit.readonly.submodule:
+    en: f5c967b47da71
+  edit.readonly.symlink:
+    en: b28725fdeb398
+  edit.readonly.tooLarge:
+    en: 175de33f8e8a93
+  edit.readonly.unknown:
+    en: 8785e248357e3
+  edit.readonly.unmerged:
+    en: ff15a18d9a5ab
+  edit.readonlyTitle:
+    en: 1c01123d78a6bb
+  edit.save:
+    en: 578805382d6b9
+  edit.saved:
+    en: 1c658545e897aa
+  edit.saving:
+    en: 140c1ea2b0455f
+  edit.truncated:
+    en: 15d8867d68ab2c
+  edit.unsaved:
+    en: 8156086bbc9a1
   errors.autostash.restoreTargetChanged:
     en: 6f613417e2307
   errors.closeGuard.exitListener:
@@ -25,12 +153,350 @@ sources:
     en: 1d6f3d30060efd
   errors.commitOutput.listenerFailed:
     en: 6e0952918824e
+  errors.m7.cloneBranchInvalid:
+    en: 101b90e8ff4d8
+  errors.m7.cloneDepthInvalid:
+    en: 108c253f98265b
+  errors.m7.cloneJobUnknown:
+    en: 6595f160fad88
+  errors.m7.cloneTargetEmpty:
+    en: 12d1a4b4e2b573
+  errors.m7.cloneTargetNotAbsolute:
+    en: 1ea9c533f2c1ed
+  errors.m7.cloneTargetNotDirectory:
+    en: 1f365fa805edc6
+  errors.m7.cloneTargetNotEmpty:
+    en: 18ede34399dcd2
+  errors.m7.cloneTargetParentMissing:
+    en: 121ebefa94dcaf
+  errors.m7.cloneUrlEmpty:
+    en: 11009de328867a
+  errors.m7.cloneUrlInvalid:
+    en: 1cb326c81f4568
+  errors.m7.cloneUrlTooLong:
+    en: dbf4e0dd13a79
+  errors.m7.diagnosticsPathEmpty:
+    en: 173f8484ea16b1
+  errors.m7.diagnosticsPathInvalid:
+    en: a38ed1d6c92ce
+  errors.m7.diagnosticsPathIsDirectory:
+    en: a81212f3c67ab
+  errors.m7.diagnosticsPathNotAbsolute:
+    en: 14cad811441e92
+  errors.m7.editBinaryReadonly:
+    en: 18de50b413c89a
+  errors.m7.editEncodingReadonly:
+    en: f306ee2d95df2
+  errors.m7.editFileChangedOnDisk:
+    en: 199f603bf69ca0
+  errors.m7.editFileMissing:
+    en: b3a43cf41b01c
+  errors.m7.editNotRegularFile:
+    en: 1ef08934925dc0
+  errors.m7.editPathOutsideWorktree:
+    en: d1c9bf5fce505
+  errors.m7.editSubmoduleReadonly:
+    en: 304db846eca51
+  errors.m7.editSymlinkReadonly:
+    en: 1432c16e544c8f
+  errors.m7.editTooLargeReadonly:
+    en: 6ac8f993b6e53
+  errors.m7.editUnmergedReadonly:
+    en: 8b88efad0a43a
+  errors.m7.editWriteFailedKeepDraft:
+    en: 83afe550a08e1
+  errors.m7.editWriteUnverified:
+    en: 1fd7e614d821d5
+  errors.m7.editWriteUnverifiedCause:
+    en: 613fb6a0e4ccb
+  errors.m7.githubBadResponse:
+    en: 16b822d7e1e7a
+  errors.m7.githubBranchNameInvalid:
+    en: 1576bd6adda45c
+  errors.m7.githubClientFailed:
+    en: 75ea8200910a7
+  errors.m7.githubCommentAnchorInvalid:
+    en: 12677d8f30bbd5
+  errors.m7.githubCommentEmpty:
+    en: 18e95746b992db
+  errors.m7.githubCommentTooLong:
+    en: 18c8076d0a44b8
+  errors.m7.githubDeviceFlowFailed:
+    en: ea11923435be0
+  errors.m7.githubDeviceFlowUnconfigured:
+    en: 96c9d83dc7060
+  errors.m7.githubDeviceFlowUnknown:
+    en: 99ce0385169f2
+  errors.m7.githubFetchPrFailed:
+    en: 1a2e80c898cff8
+  errors.m7.githubHeadChanged:
+    en: 5154460f3805c
+  errors.m7.githubKeychainFailed:
+    en: c4ba79c3bf069
+  errors.m7.githubMergeBlocked:
+    en: 1456658b86fa0c
+  errors.m7.githubMergeNeedsConfirm:
+    en: 1f25621c77efa
+  errors.m7.githubNetwork:
+    en: fb6a4b71092a4
+  errors.m7.githubNoAccount:
+    en: e322fb4ee85bc
+  errors.m7.githubNoRemote:
+    en: 190174c686862c
+  errors.m7.githubNotFound:
+    en: 19d8b38944b76f
+  errors.m7.githubNotLoggedIn:
+    en: 76e9fc9456caa
+  errors.m7.githubPrBodyTooLong:
+    en: 1a59c51a6545e4
+  errors.m7.githubPrBranchCheckedOut:
+    en: 6db705070ea58
+  errors.m7.githubPrBranchFailed:
+    en: 12947e51c081d2
+  errors.m7.githubPrTitleEmpty:
+    en: 18e9400b8ac526
+  errors.m7.githubPrTitleTooLong:
+    en: 1186a2fdd4b536
+  errors.m7.githubProtectedBranchConfirm:
+    en: 154a43ee46f752
+  errors.m7.githubRateLimited:
+    en: 18a1d23fddb909
+  errors.m7.githubRemoteNotGithub:
+    en: 6e50d62044b23
+  errors.m7.githubRepoUnbound:
+    en: f5822d00bf535
+  errors.m7.githubRequestFailed:
+    en: 17101df1edf57b
+  errors.m7.githubReviewBodyRequired:
+    en: 152fb704101ad4
+  errors.m7.githubTaskFailed:
+    en: 2956cb2e465d8
+  errors.m7.githubTokenEmpty:
+    en: ac3e39d273c73
+  errors.m7.githubTokenInvalid:
+    en: 1b8bfb9f025130
+  errors.m7.githubUnauthorized:
+    en: 8769485b6bdb8
+  errors.m7.githubValidationFailed:
+    en: 145de6e9b174f0
+  errors.m7.taskFailed:
+    en: 2956cb2e465d8
+  errors.m7.terminalCwdMissing:
+    en: 1b25c18005a0db
+  errors.m7.terminalCwdOutsideWorktree:
+    en: 14c9c78b13e567
+  errors.m7.terminalExited:
+    en: 11f88739b0bf98
+  errors.m7.terminalInputTooLarge:
+    en: 1d665513663de5
+  errors.m7.terminalOpenFailed:
+    en: 191c631413eb70
+  errors.m7.terminalResizeFailed:
+    en: 17e11285cdcf76
+  errors.m7.terminalSessionUnknown:
+    en: b26a0a0c3d982
+  errors.m7.terminalSpawnFailed:
+    en: 15c2393888bbe5
+  errors.m7.terminalStreamFailed:
+    en: c640823eb8362
+  errors.m7.terminalWriteFailed:
+    en: 6d44cffa2dbbf
+  errors.m7.themeFileMissing:
+    en: 1503ff14f01bfd
+  errors.m7.themeFileTooLarge:
+    en: 18ea61d301e039
+  errors.m7.themeFileUnreadable:
+    en: 1ae1effaf34fc8
+  errors.m7.themeHasNoColors:
+    en: 1056019d13da9b
+  errors.m7.themeIncludeOutsideDirectory:
+    en: 1dc6ee8305ce59
+  errors.m7.themeIncludeTooDeep:
+    en: 1a151072d83891
+  errors.m7.themeJsonInvalid:
+    en: cde82f260ade8
+  errors.m7.themeNotObject:
+    en: 14918d523fe4d3
+  errors.m7.themePathFile:
+    en: 132eca839b4a64
+  errors.m7.unknownImportedTheme:
+    en: 11bd44f5a13770
+  errors.m7.updateBusy:
+    en: 1c4d9c258b8ae5
+  errors.m7.updateCheckFailed:
+    en: 58c3c5145185a
+  errors.m7.updateInstallFailed:
+    en: 1c1b3b17b5849
+  errors.m7.updateNotConfigured:
+    en: 17091cc0e1cbe4
+  errors.m7.updateNothingToInstall:
+    en: a1a680551b3e8
+  errors.m7.updateReasonNoEndpoints:
+    en: 1e56796a62c882
+  errors.m7.updateReasonNoPlugin:
+    en: 176dbf09a7b8cc
+  errors.m7.updateReasonNoPubkey:
+    en: ce5828c316391
+  errors.m7.writeTargetDirectory:
+    en: 14024a8970d78b
   errors.nativeMenu.unavailable:
     en: ce9301a54a131
   errors.review.failedSyncReviewMarksCause:
     en: 54a65c435fbdb
   errors.rewrite.rootCommitNotSupported:
     en: fb2eb7ae5afc3
+  github.account:
+    en: 10910fba2d05e1
+  github.checkout:
+    en: 1d1b1c32652bb2
+  github.checkoutDone:
+    en: 165f49e944bc8a
+  github.checksNone:
+    en: 12469b41bb8ff4
+  github.commentPlaceholder:
+    en: 1754d4b2b283e7
+  github.commentSend:
+    en: 148cb805706931
+  github.comments:
+    en: 448003ee47c77
+  github.createBase:
+    en: 365c22f8708f
+  github.createBody:
+    en: 1c65271dd72f12
+  github.createDraft:
+    en: 1265d9e4da232
+  github.createHead:
+    en: 5993cb58b91af
+  github.createSubmit:
+    en: 1a2fbcb8014e75
+  github.createTitle:
+    en: 1052fe84a6d426
+  github.createTitleField:
+    en: c93ab776dbc40
+  github.created:
+    en: 93a4949977af2
+  github.detailMeta:
+    en: 1a2113ca3dd0e2
+  github.deviceCode:
+    en: 1c777584cda62d
+  github.deviceCopy:
+    en: d1506d4687058
+  github.deviceDenied:
+    en: 79f048df065a1
+  github.deviceExpired:
+    en: 184e9fcea100f6
+  github.deviceStart:
+    en: 155a1dfeae83a3
+  github.deviceTitle:
+    en: 14867678e6bef9
+  github.deviceUnconfigured:
+    en: 1deede7abe6e1a
+  github.draftAdd:
+    en: 134af4b1748c92
+  github.draftBadge:
+    en: 13cf83479bd2c
+  github.draftBody:
+    en: 1cee1b29899c32
+  github.draftLine:
+    en: 100a492c54912e
+  github.draftOnFile:
+    en: f21ef5859444c
+  github.draftPath:
+    en: 1bbe71d1afaec3
+  github.empty:
+    en: 65a85c0bbf117
+  github.files:
+    en: 457cd4661ddeb
+  github.filterAll:
+    en: 15ac3bbf255910
+  github.filterClosed:
+    en: 1a8ba99748f5ba
+  github.filterOpen:
+    en: 12f81acf1815e
+  github.loggedIn:
+    en: bf649b78a8df3
+  github.loginHint:
+    en: 20fba334a2f64
+  github.loginTitle:
+    en: 153eb21649c900
+  github.mergeConfirm:
+    en: 3c90f11e2bebb
+  github.mergeDone:
+    en: 16a2e54cd685c7
+  github.mergeMethod.merge:
+    en: 1ab183619afb35
+  github.mergeMethod.rebase:
+    en: 9b5f37c291bdf
+  github.mergeMethod.squash:
+    en: 19d2f4d4b115b3
+  github.mergeNeedConfirm:
+    en: 222329d3c1f61
+  github.mergeNotDone:
+    en: 1ba0b6545af282
+  github.mergeSubmit:
+    en: e53f74bbff641
+  github.mergeTitle:
+    en: e53f74bbff641
+  github.mergeable:
+    en: 1f98b4e5594edd
+  github.nextPage:
+    en: 8bce294c1783
+  github.noComments:
+    en: 1722f1de390015
+  github.noDrafts:
+    en: 13c45ca387566b
+  github.noReceipts:
+    en: 658ab047a35c0
+  github.notProtected:
+    en: 1472012c5003ae
+  github.page:
+    en: 1d7281383f1d93
+  github.patchTooLarge:
+    en: f114224e923ec
+  github.pickOne:
+    en: 1c9052189731d1
+  github.prevPage:
+    en: 2b8e46e3d8333
+  github.protected:
+    en: c0a9e80cf9785
+  github.protectedShort:
+    en: 11e631fa901722
+  github.rateLimit:
+    en: 4efa703e340d9
+  github.receiptsTitle:
+    en: b48dba55c7cc2
+  github.reviewBody:
+    en: 6e54b6c1beea2
+  github.reviewEmpty:
+    en: efbea6d45dbb3
+  github.reviewEvent.approve:
+    en: 543cd5bc2c63a
+  github.reviewEvent.comment:
+    en: ec36ed828dbf
+  github.reviewEvent.requestChanges:
+    en: d0a4eb3865819
+  github.reviewHint:
+    en: 16694bf001ec75
+  github.reviewSubmit:
+    en: 2b2a98a5fcf5d
+  github.reviewSubmitted:
+    en: dc28c8b0eac6f
+  github.reviewTitle:
+    en: 1ef27f5c71794a
+  github.tabCreate:
+    en: 32f970c82ab21
+  github.tabPulls:
+    en: 336b93f80a3aa
+  github.tabReceipts:
+    en: 14d08d276f728f
+  github.title:
+    en: 500c50df7064d
+  github.tokenLogin:
+    en: 8fa86bec0409b
+  github.tokenPlaceholder:
+    en: 78cd118da1b06
+  github.tokenTitle:
+    en: c657c12531460
   historyActions.cherryPickHintMany:
     en: f4d51d451eebe
   historyActions.publishedWarning:
@@ -89,6 +555,144 @@ sources:
     en: 1f700c27694201
   settings.keywords.commitMessage:
     en: 838d5b3afb2c6
+  settings.licenseReactBits:
+    en: 1e24cec01ddb52
+  settings.m7.github.bind:
+    en: 67e79ee45ef6e
+  settings.m7.github.bound:
+    en: 1744f482ffb065
+  settings.m7.github.deviceUnconfigured:
+    en: 1ef93b797eddd7
+  settings.m7.github.hint:
+    en: 2902bc5bb2b62
+  settings.m7.github.keywords:
+    en: 1b05cc8af2060
+  settings.m7.github.login:
+    en: 8fa86bec0409b
+  settings.m7.github.logout:
+    en: c3bd2edbebcfa
+  settings.m7.github.none:
+    en: 1c1006aa7496e0
+  settings.m7.github.title:
+    en: 11c3d77e0903b4
+  settings.m7.github.token:
+    en: c657c12531460
+  settings.m7.github.tokenHint:
+    en: db8314acd269a
+  settings.m7.github.tokenPlaceholder:
+    en: 78cd118da1b06
+  settings.m7.shortcuts.conflict:
+    en: 22c0f3d2ac366
+  settings.m7.shortcuts.current:
+    en: dbf6590b8828c
+  settings.m7.shortcuts.diffOnly:
+    en: 195e0e65bbcce0
+  settings.m7.shortcuts.hint:
+    en: 1e7128327d6732
+  settings.m7.shortcuts.keywords:
+    en: 1e220570697bb0
+  settings.m7.shortcuts.press:
+    en: 9d78010e30d5f
+  settings.m7.shortcuts.reset:
+    en: 14c57040cbbc8c
+  settings.m7.shortcuts.resetAll:
+    en: dd5e1ecf44724
+  settings.m7.shortcuts.title:
+    en: 85a2495fc4d0c
+  settings.m7.theme.dark:
+    en: 66d71f83becd7
+  settings.m7.theme.filter:
+    en: 3fd05cdc11b3
+  settings.m7.theme.hint:
+    en: 59647a5548802
+  settings.m7.theme.import:
+    en: c09a8e4f0212e
+  settings.m7.theme.imported:
+    en: 66162c6a572f1
+  settings.m7.theme.importedActive:
+    en: 1edbaab92b634c
+  settings.m7.theme.keywords:
+    en: d5fb47a89a333
+  settings.m7.theme.kindDark:
+    en: d44ad43cc28a4
+  settings.m7.theme.kindLight:
+    en: 156ad127625eb4
+  settings.m7.theme.light:
+    en: fccf0c6711566
+  settings.m7.theme.none:
+    en: a353f7c3607cb
+  settings.m7.theme.title:
+    en: 179f083a3464e
+  settings.m7.title:
+    en: 1d38447014cb32
+  settings.m7.update.available:
+    en: 1a27281b400b84
+  settings.m7.update.check:
+    en: 46b1653ac4c33
+  settings.m7.update.checking:
+    en: f31d3ba73a150
+  settings.m7.update.hint:
+    en: 85b144b6a71a3
+  settings.m7.update.keywords:
+    en: "1e025289128159"
+  settings.m7.update.lastChecked:
+    en: 1701ce665257c
+  settings.m7.update.mode:
+    en: 1dd370af4985
+  settings.m7.update.modeAutomatic:
+    en: 1dada9964203c5
+  settings.m7.update.modeManual:
+    en: 11610af25e9b6b
+  settings.m7.update.modeNotify:
+    en: 494fef822c930
+  settings.m7.update.receipt:
+    en: 140762b4478af0
+  settings.m7.update.receiptValue:
+    en: f4b346d8b4673
+  settings.m7.update.title:
+    en: 14357cb3dda283
+  settings.m7.update.unconfigured:
+    en: 10dc14fbf166da
+  settings.m7.update.version:
+    en: 1fe7cd9832d7c9
+  shortcuts.actions.cloneRepo:
+    en: 1fcf7ca8580073
+  shortcuts.actions.commit:
+    en: 1c27a2bcb3a9fc
+  shortcuts.actions.discardFile:
+    en: 1ade1f3b310858
+  shortcuts.actions.fontDown:
+    en: 32ef48018a2dc
+  shortcuts.actions.fontUp:
+    en: 2b4fc4cb8ce55
+  shortcuts.actions.nextFile:
+    en: 938b92ae781a2
+  shortcuts.actions.nextHunk:
+    en: 148f10b33a8aac
+  shortcuts.actions.openRepo:
+    en: 165a915a95398a
+  shortcuts.actions.prevFile:
+    en: e9f768ca0e802
+  shortcuts.actions.prevHunk:
+    en: abfd0d3113da0
+  shortcuts.actions.pullRequests:
+    en: 500c50df7064d
+  shortcuts.actions.refresh:
+    en: 12071186b7b43f
+  shortcuts.actions.reviewNextFile:
+    en: 52429fa633490
+  shortcuts.actions.stageFile:
+    en: fffb1624fe84e
+  shortcuts.actions.toggleTerminal:
+    en: 1ee8895c9a64a9
+  shortcuts.actions.zoomIn:
+    en: 682c4b0a94d6
+  shortcuts.actions.zoomOut:
+    en: d026e283cd8f5
+  shortcuts.actions.zoomReset:
+    en: 5a6cf02630e69
+  shortcuts.unassigned:
+    en: a200ea4502761
   stash.applyConflictHint:
     en: 1cbc99aab2d08b
   stash.archives:
@@ -97,3 +701,65 @@ sources:
     en: e0e8ecd497b0f
   stash.otherArchives:
     en: e8b9f10217ce4
+  terminal.closePanel:
+    en: ee9c6e43198b
+  terminal.closeTab:
+    en: 1ad199da1e31de
+  terminal.empty:
+    en: 5039e19f91a31
+  terminal.ended:
+    en: 151b16ab5d65d2
+  terminal.exited:
+    en: 70dc794989038
+  terminal.new:
+    en: 15931516c53a12
+  terminal.title:
+    en: 8988b0ee84e2b
+  toolbar.clone:
+    en: 1fcf7ca8580073
+  toolbar.diagnostics:
+    en: 14851e26629b41
+  toolbar.pullRequests:
+    en: 500c50df7064d
+  toolbar.terminal:
+    en: 8988b0ee84e2b
+  toolbar.update:
+    en: 14357cb3dda283
+  update.available:
+    en: 131601bcf391c1
+  update.banner:
+    en: 117f6cb343f323
+  update.bannerOpen:
+    en: 269baef7546e0
+  update.check:
+    en: 46b1653ac4c33
+  update.checking:
+    en: f31d3ba73a150
+  update.current:
+    en: 13e26c66d979c9
+  update.install:
+    en: 1cf3950ba6371f
+  update.installed:
+    en: 136e936b41f521
+  update.lastChecked:
+    en: 1701ce665257c
+  update.modeAutomatic:
+    en: 1dada9964203c5
+  update.modeManual:
+    en: 11610af25e9b6b
+  update.modeNotify:
+    en: 494fef822c930
+  update.published:
+    en: 100d0d0beeb4c2
+  update.restart:
+    en: 100c7179482c39
+  update.title:
+    en: 14357cb3dda283
+  update.unconfigured:
+    en: 10dc14fbf166da
+  update.upToDate:
+    en: 1ae7652b9554ac
+  workspace.edit:
+    en: 3f60d96ed3c09
+  workspace.editDirty:
+    en: 16ae31817f28bb

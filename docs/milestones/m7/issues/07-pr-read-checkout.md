@@ -1,6 +1,6 @@
 # 07：查看 PR 并检出来源分支
 
-Status: ready-for-agent
+Status: done
 Blocked by: 06
 
 ## What to build
@@ -11,10 +11,10 @@ Blocked by: 06
 
 ## Acceptance criteria
 
-- [ ] 分页、草稿 / 状态、权限与离线失败呈现正确；文本内容不执行脚本或不可信 HTML
-- [ ] 检出前明确仓库 / worktree / remote / 分支 / head，沿既有未提交改动保护、回收及写前核验
-- [ ] 支持已有 fork，不自动创建 fork、添加 remote 或推送；无法映射时说明缺失条件
-- [ ] 真实自建 Git 与受控 HTTP 一起验证 head 变化、脏工作区、切目标与失败结果
+- [x] 分页、草稿 / 状态、权限与离线失败呈现正确；文本内容不执行脚本或不可信 HTML
+- [x] 检出前明确仓库 / worktree / remote / 分支 / head，沿既有未提交改动保护、回收及写前核验
+- [x] 支持已有 fork，不自动创建 fork、添加 remote 或推送；无法映射时说明缺失条件
+- [x] 真实自建 Git 与受控 HTTP 一起验证 head 变化、脏工作区、切目标与失败结果
 
 ## Validation
 

@@ -7,19 +7,19 @@ import type { ViewMode } from "./ViewMode";
 /**
  * 一段显示行。
  */
-export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number,
+export type RowSlice = { worktreeId: string, path: string, changes: ChangesKind, view: ViewMode, from: number, rowCount: number, 
 /**
  * 当前过滤后统一视图的全部段首行（0 基）；分页不截断，并排视图为空。
  */
-navigationRows: Array<number>, rows: Array<RenderRow>, fingerprint: string,
+navigationRows: Array<number>, rows: Array<RenderRow>, fingerprint: string, 
 /**
  * 生成这段行的快照版本；前端据此拒绝晚到的旧行（Q88、T05）。
  */
-revision: number,
+revision: number, 
 /**
  * 该文件最新的列表元数据（未跟踪文件在此时才补全）。
  */
-entry: ChangeEntry,
+entry: ChangeEntry, 
 /**
  * 这次读取**实际观察到**的审阅水位：`entry.reviewed` 对应的真实提交序号。
  *

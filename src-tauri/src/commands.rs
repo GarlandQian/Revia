@@ -126,6 +126,20 @@ pub struct AppState {
     pub drafts: DraftStore,
     /// Revia 数据目录（跳过 hooks 的临时空目录放在这里，F04.2）。
     pub data_dir: PathBuf,
+    /// M7：导入的颜色主题。
+    pub m7_themes: Arc<crate::m7::theme::ThemeStore>,
+    /// M7：工作区编辑草稿。
+    pub m7_edit_drafts: Arc<crate::m7::edit::EditDraftStore>,
+    /// M7：内置终端（PTY 进程）。
+    pub m7_terminal: Arc<crate::m7::terminal::TerminalManager>,
+    /// M7：终端 tab 列表（跨重启保留）。
+    pub m7_terminal_tabs: Arc<crate::m7::terminal::TerminalTabStore>,
+    /// M7：克隆任务。
+    pub m7_clone: Arc<crate::m7::clone::CloneManager>,
+    /// M7：GitHub 账号、草稿、回执与设备码流程。
+    pub m7_github: Arc<crate::m7::github::GithubState>,
+    /// M7：应用更新状态。
+    pub m7_update: Arc<crate::m7::update::UpdateState>,
     /// 提交操作 ID 计数器（实时输出事件归属用）。
     commit_ops: std::sync::atomic::AtomicU64,
 }
@@ -147,6 +161,13 @@ impl AppState {
             acceptance: None,
             exit_guard: Arc::new(ExitGuard::default()),
             drafts: DraftStore::new(data_dir.clone()),
+            m7_themes: Arc::new(crate::m7::theme::ThemeStore::new(&data_dir)),
+            m7_edit_drafts: Arc::new(crate::m7::edit::EditDraftStore::new(&data_dir)),
+            m7_terminal: Arc::new(crate::m7::terminal::TerminalManager::new()),
+            m7_terminal_tabs: Arc::new(crate::m7::terminal::TerminalTabStore::new(&data_dir)),
+            m7_clone: Arc::new(crate::m7::clone::CloneManager::new()),
+            m7_github: Arc::new(crate::m7::github::GithubState::new(&data_dir)),
+            m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir)),
             data_dir,
             commit_ops: std::sync::atomic::AtomicU64::new(1),
         }
@@ -2115,7 +2136,7 @@ pub struct PushBranchPayload {
 }
 
 /// 读一份设置快照（命令参数与网络选项都从这里取，前端不传设置值）。
-fn settings_snapshot(state: &State<'_, AppState>) -> Result<Settings> {
+pub(crate) fn settings_snapshot(state: &State<'_, AppState>) -> Result<Settings> {
     let registry = state.registry.lock().map_err(|_| {
         AppError::coded(
             ErrorKind::Internal,

@@ -3,6 +3,8 @@ node_modules/
 dist/
 src-tauri/target/
 src-tauri/gen/
+# 发布构建时由 tools/write-updater-config.mjs 生成，含 CI 注入的公钥与地址
+src-tauri/tauri.release.conf.json
 
 # 本地环境与工具
 .DS_Store

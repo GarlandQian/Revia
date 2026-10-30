@@ -24,13 +24,42 @@ export const THEMES: readonly ThemeInfo[] = [
 export const DEFAULT_LIGHT_THEME = "one-light";
 export const DEFAULT_DARK_THEME = "one-dark-pro";
 
-export function themeById(id: string | null | undefined): ThemeInfo | null {
-  return THEMES.find((theme) => theme.id === id) ?? null;
+/** 导入的 VS Code 主题（M7 任务 02）：颜色以 CSS 变量内联写入，不改内置主题块。 */
+interface ImportedThemeInfo extends ThemeInfo {
+  colors: Record<string, string>;
 }
 
-/** 浅色主题候选（设置里的“浅色”下拉）。 */
+let importedThemes: ImportedThemeInfo[] = [];
+/** 上一次写入的内联变量，切换主题时先清掉，避免残留。 */
+const appliedImportedVars = new Set<string>();
+
+/** 更新导入主题列表；由 App 在启动与导入/删除后调用。 */
+export function setImportedThemes(list: readonly { id: string; label: string; kind: ThemeKind; colors: Record<string, string> }[]): void {
+  importedThemes = list.map((theme) => ({
+    id: theme.id,
+    label: theme.label,
+    kind: theme.kind,
+    colors: theme.colors,
+  }));
+}
+
+export function importedThemeIds(): string[] {
+  return importedThemes.map((theme) => theme.id);
+}
+
+export function themeById(id: string | null | undefined): ThemeInfo | null {
+  const builtin = THEMES.find((theme) => theme.id === id);
+  if (builtin) return builtin;
+  const imported = importedThemes.find((theme) => theme.id === id);
+  return imported ? { id: imported.id, label: imported.label, kind: imported.kind } : null;
+}
+
+/** 浅色主题候选（设置里的“浅色”下拉）：内置 + 导入。 */
 export function themesOfKind(kind: ThemeKind): ThemeInfo[] {
-  return THEMES.filter((theme) => theme.kind === kind);
+  return [
+    ...THEMES.filter((theme) => theme.kind === kind),
+    ...importedThemes.filter((theme) => theme.kind === kind).map(({ id, label, kind: themeKind }) => ({ id, label, kind: themeKind })),
+  ];
 }
 
 /** 当前系统是否偏好深色。 */
@@ -51,8 +80,18 @@ export function resolveTheme(lightId: string, darkId: string, prefersDark: boole
  */
 export function applyTheme(theme: ThemeInfo): void {
   const root = document.documentElement;
-  root.dataset.theme = theme.id;
+  for (const name of appliedImportedVars) root.style.removeProperty(`--${name}`);
+  appliedImportedVars.clear();
+  const imported = importedThemes.find((candidate) => candidate.id === theme.id);
+  // 导入主题没有内置 CSS 块：先落到同外观的基础块，再覆盖它自己的变量。
+  root.dataset.theme = imported ? (theme.kind === "dark" ? "dark-2026" : "light-2026") : theme.id;
   root.dataset.kind = theme.kind;
+  if (imported) {
+    for (const [name, value] of Object.entries(imported.colors)) {
+      root.style.setProperty(`--${name}`, value);
+      appliedImportedVars.add(name);
+    }
+  }
 }
 
 export function codeFontStack(family: string | null): string {

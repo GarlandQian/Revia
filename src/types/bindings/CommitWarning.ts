@@ -2,7 +2,7 @@
 import type { CommitWarningDetail } from "./CommitWarningDetail";
 import type { CommitWarningKind } from "./CommitWarningKind";
 
-export type CommitWarning = { kind: CommitWarningKind,
+export type CommitWarning = { kind: CommitWarningKind, 
 /**
  * 相关文件路径；与操作整体有关的警告（游离 HEAD、rebase）为 None。
  */

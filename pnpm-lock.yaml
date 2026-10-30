@@ -35,6 +35,12 @@ importers:
       '@vscode/codicons':
         specifier: 0.0.46-24
         version: 0.0.46-24
+      '@xterm/addon-fit':
+        specifier: ~0.10.0
+        version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/xterm':
+        specifier: ^5.5.0
+        version: 5.5.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -989,6 +995,14 @@ packages:
   '@x18n/ui@0.1.0':
     resolution: {integrity: sha512-GXopAJZCte3kKEyPLkbc5PslyEpa7loBHEGTDtLLN5XcYfs8IpQVbSJQ3zhcVF2dhBYhhe2M1Fe7uxkCxam2+Q==}
     engines: {node: '>=22'}
+
+  '@xterm/addon-fit@0.10.0':
+    resolution: {integrity: sha512-UFYkDm4HUahf2lnEyHvio51TNGiLK66mqP2JoATy7hRZeXaGMRDr00JiSF7m63vR5WKATF605yEggJKsw0JpMQ==}
+    peerDependencies:
+      '@xterm/xterm': ^5.0.0
+
+  '@xterm/xterm@5.5.0':
+    resolution: {integrity: sha512-hqJHYaQb5OptNunnyAnkHyM8aCjZ1MEIDTQu1iIbbTD/xops91NB5yq1ZK/dC2JDbVWtF23zUtl9JE2NqwT87A==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -3269,6 +3283,12 @@ snapshots:
       - ocache
       - srvx
       - typescript
+
+  '@xterm/addon-fit@0.10.0(@xterm/xterm@5.5.0)':
+    dependencies:
+      '@xterm/xterm': 5.5.0
+
+  '@xterm/xterm@5.5.0': {}
 
   accepts@2.0.0:
     dependencies:

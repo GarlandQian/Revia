@@ -1,0 +1,143 @@
+name: Release Draft
+
+# 版本标签触发：构建 macOS Apple Silicon 安装包与 updater 产物，进入 Release 草稿。
+# 只有公开草稿后，用户才会在所选渠道里收到更新（规格 H、Q182、Q188）。
+# 本工作流不推送、不打标签、不公开 Release；这些动作由维护者手动完成。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  # 标签与源码版本必须一致：应用版本、标签、产物名、更新 URL 才对得上。
+  verify-version:
+    name: Verify tag matches app version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
+      endpoint: ${{ steps.version.outputs.endpoint }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check version consistency
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: node tools/check-release-version.mjs
+
+  build-macos:
+    name: macOS Apple Silicon (arm64) package
+    needs: verify-version
+    runs-on: macos-14
+    env:
+      # 公钥与检查地址在构建时注入，不写进源码；缺失时构建失败，避免产出无法更新的包。
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      REVIA_UPDATE_PUBKEY: ${{ vars.REVIA_UPDATE_PUBKEY }}
+      REVIA_UPDATE_ENDPOINT: ${{ needs.verify-version.outputs.endpoint }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_VERSION: ${{ needs.verify-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Setup Rust stable (aarch64-apple-darwin)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-
+            ${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Require signing key and update config
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set; refusing to build an unverifiable package."
+            exit 1
+          fi
+          if [ -z "${REVIA_UPDATE_PUBKEY}" ]; then
+            echo "::error::REVIA_UPDATE_PUBKEY (repository variable) is not set."
+            exit 1
+          fi
+          if [ -z "${REVIA_UPDATE_ENDPOINT}" ]; then
+            echo "::error::Update endpoint could not be derived from the tag."
+            exit 1
+          fi
+
+      - name: Write updater config overlay
+        run: node tools/write-updater-config.mjs
+
+      - name: Build macOS bundle with updater artifacts
+        run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
+
+      - name: Collect artifacts
+        id: artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          find src-tauri/target/aarch64-apple-darwin/release/bundle -maxdepth 3 -type f \
+            \( -name '*.dmg' -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) \
+            -exec cp {} artifacts/ \;
+          ls -l artifacts
+          if ! ls artifacts/*.dmg >/dev/null 2>&1; then
+            echo "::error::No .dmg produced."
+            exit 1
+          fi
+          if ! ls artifacts/*.app.tar.gz.sig >/dev/null 2>&1; then
+            echo "::error::No updater signature produced."
+            exit 1
+          fi
+
+      - name: Upload draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Revia ${{ needs.verify-version.outputs.version }}
+          draft: true
+          prerelease: ${{ needs.verify-version.outputs.channel == 'prerelease' }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*.dmg
+            artifacts/*.app.tar.gz
+            artifacts/*.app.tar.gz.sig

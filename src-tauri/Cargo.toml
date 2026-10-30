@@ -26,6 +26,11 @@ notify = "8"
 ts-rs = { version = "12", features = ["serde-compat", "no-serde-warnings"] }
 # ADR-0014: refs/stash deletion only; transport features stay disabled.
 git2 = { version = "=0.21.0", default-features = false, features = ["vendored-libgit2"] }
+portable-pty = "0.9"
+keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "crypto-rust"] }
+minisign-verify = "0.2"
+tauri-plugin-updater = "2"
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "json", "rustls"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"
@@ -38,3 +43,8 @@ opt-level = 3
 codegen-units = 1
 lto = true
 strip = true
+
+[dev-dependencies]
+minisign = "0.7"
+# 只在测试目标启用 mock app（任务 04 的真实 PTY 读写验证），不影响 release 构建。
+tauri = { version = "2", features = ["test"] }
