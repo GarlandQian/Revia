@@ -1,6 +1,6 @@
 # 10：预览并导出脱敏诊断
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -67,3 +67,54 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 - **F12**：render 按 request.worktree_id 过滤命令日志（其它仓库不进入导出）；字段白名单——program 只留文件名、args 脱敏、失败命令不再拷贝 output/stderr_excerpt，改为 error_class + 单行摘要（多行/diff 形态/超长行排除）；redact 增加 email 脱敏；scope 字段写入清单。
 - **F21**：DiagnosticsSummaryStore（diagnostics-summary.json）持久化脱敏摘要 7 天（500 条上限）；预览/导出共用同一份 command_log 快照并在调用时并入摘要；新增 m7_diagnostics_summary / m7_diagnostics_clear 命令与界面“清空摘要”按钮。
 - 新增单元测试：邮箱/URL/Token 脱敏、diff 形态摘要排除、按仓库过滤渲染、摘要 store 范围与清除。
+
+### Codex / review02 Spec / F12 — 2026-10-31
+
+| F12 P1 | S116“排除…正文”：原输出首行仍导出/持久化，外部路径及远端未脱敏 | diagnostics.rs:476,528 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F12 [P1] “单行摘要”仍来自不受控原输出，路径/远端未脱敏
+
+S116“明确字段白名单…始终排除文件正文、diff”；S117“宁可省略…不把不受控stderr…直接持久化”。新 `diagnostics.rs:476–491`取record.output第一条非空行，若长度≤240且非几个diff前缀就原样经通用redact保存为summary；并非从安全字段提取。真实Git hook、过滤器、外部diff工具可输出任意短单行正文，这一行会进入preview/export，及persist_summaries:251–252→store.record:168–190。`looks_like_body:485`还将+++与---用&&相连，永不命中；`+正文`/普通正文均放行。
+
+redact:528–533只替换HOME、URL凭据、Token、邮箱；HOME以外绝对路径和无凭据remote URL完整保留。scope:297–300也仅套该redact，外置盘仓库路径仍泄漏。仓库worktree过滤确已修；没有读取真实日志，本轮未启动带hook的生产入口实验，因此这是可观察字段的静态数据流结论，未冒称动态标记实验通过。
+
+同一新增脱敏实现另有确定Unicode边界风险：`redact_email:500–512`用chars().count()结果直接参与字节切片。包含中文的地址localpart如`张三@example.com`令`at-before`落入UTF-8中间，生成诊断可panic。此细节与F12脱敏实现一并修正，未单列扩大编号。
+
+</details>
+
+### Codex / review02 Spec / F21 — 2026-10-31
+
+| F21 P2 | S115“跨重启”“相同”：仅预览才存摘要、未消费历史；导出另取快照 | m7/commands.rs:645；diagnostics.rs:230,266 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F21 [P2] 7天历史与相同预览仍未接入生产数据流
+
+S115“跨重启只保留脱敏操作摘要和错误…7天，可清空…与实际产物相同的预览”。新store虽能list/clear，但persist_summaries唯一生产调用是m7/commands:645的preview；没有预览过的会话结束后摘要不会持久化。前端diagnosticsSummary只有api定义，无消费者；后端preview/export均只使用当前内存CommandLog而不读summary store，重启后的历史仍不可见。clear按钮只清store，原内存日志未清，下次preview会把它重新持久化。
+
+此外preview `diagnostics.rs:229–230`各自snapshot/render，export:266–267另snapshot/render，render:284每次now_ms；请求字段仍只有worktreeId/destination，前端DiagnosticsDialog:70未传已预览快照。触发预览后有任意新Git命令再导出：内容与预览不同；即使无命令时间字段也重建。新注释“同一份快照”只是同一个渲染函数，不是同一个用户确认过的数据快照。静态事实，未读取用户诊断历史。
+
+</details>
+
+### Codex / review02 Standards / R01 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H6 / R01：诊断内容与脱敏边界仍失效（P1）
+
+规则原文：`docs/technical-direction.md:160`：“路径、远端地址、作者邮箱等默认脱敏”“排除文件正文、diff、终端输入输出”“不能仅凭既有凭据打码就原样持久化或导出；错误信息的提取同样遵守这些排除规则”。
+
+改动点：`src-tauri/src/m7/diagnostics.rs:476–491` 的 failure_summary 从 **record.output** 取第一行非空字符串，除超过240字符、diff --git、@@ 等少数形状外原样交给 redact；并没有生成安全白名单语义。485行的 `starts_with("+++") && starts_with("---")` 不可能同时为真，+++ / --- 行也漏过。
+
+生产链：失败 hook 输出 → `git/mod.rs:529,543` 的 command_output → 诊断 `render:329` 的 failure_summary → failures.summary；另在 `m7/commands.rs:647` 预览前调用 persist_summaries → `diagnostics.rs:251–252,174–182` 将同一字符串写入 diagnostics-summary.json。hook 输出的普通短文件正文（如一个短源码行或配置值）不匹配排除形状，会同时进入本机持久化和导出。改成第一行不等于排除了正文。
+
+此外 `diagnostics.rs:299,313,360` 对路径/参数调用 redact，但 `528–533` 仅 HOME、URL userinfo、token、email 四步。仓库在 `/Volumes/...`、其他非HOME绝对路径、无凭据的完整 remote URL 均不被替换。`scope` 字段直接暴露外置仓库绝对路径。新的过滤在 Some(worktree) 场景确实排除了其他worktree；None分支293仍取全部，并非注释所称 detection-only。以上结论未用真实用户日志验证，例子只是输入类别，未执行网络或fixture。
+
+建议：从固定安全字段生成分类摘要，完全排除不受控正文；统一解析、替换任意仓库位置及远端标识。原输出不能通过截短变成白名单。
+
+</details>

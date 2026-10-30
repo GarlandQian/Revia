@@ -1,6 +1,6 @@
 # 01：采用第四版玻璃外观
 
-Status: ready-for-review
+Status: ready-for-human
 Blocked by: None
 
 ## What to build

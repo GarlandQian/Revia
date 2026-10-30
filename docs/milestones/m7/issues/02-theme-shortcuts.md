@@ -1,6 +1,6 @@
 # 02：导入颜色主题并自定义快捷键
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -54,3 +54,18 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 
 - **F17**：冲突不再直接拒绝——记录待确认替换，UI 提供“替换 / 取消”；替换时冲突动作回落默认。提交框（CommitComposer）改用 `matchesAccelerator(event, acceleratorOf("commit"))`，快捷键提示同步 `formatAccelerator(acceleratorOf("commit"))`，跟随用户绑定。
 - **H11**：`shortcuts.actions.nextHunk/prevHunk` 中文改“下一个块/上一个块”（经 x18n apply，不直接改 JSON）。
+
+### Codex / review02 Spec / F17 — 2026-10-31
+
+| F17 P2 | S76“确认替换”：确认后旧动作回默认，默认键冲突原样保留 | settings.tsx:235 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F17 [P2] 确认替换默认快捷键后冲突仍存在
+
+S76“按实际作用范围检测冲突，确认替换后才保存”。`settings.tsx:235`对冲突动作withoutShortcut意味着恢复默认；`shortcuts.ts:81–82,103–106`未覆盖时必用default。如果用户将cloneRepo改成commit默认mod+k，确认后只是保存{cloneRepo:mod+k}，commit仍默认mod+k。实际全局分派会先匹配commit，使clone动作不可达，提示“替换”失实。
+
+动态：`shortcut-probe.cjs`通过TypeScript AST提取实际生产确认onClick处理器，内存转译执行，withShortcut/withoutShortcut/conflictFor/acceleratorOf均为真实shortcuts模块；只替换平台isMac与i18n。`shortcut-probe.stdout`显示commitKey=cloneKey=mod+k、remainingConflict=commit，exit0。没有DOM/真实键盘、未宣称WebView验收。提交框改用acceleratorOf/matchesAccelerator已核实，原旧绑定问题不再重复报。
+
+</details>

@@ -1,6 +1,6 @@
 # 12：标签打包至 Release 草稿
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -65,3 +65,33 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 - **F15**：write-updater-config.mjs 接受 minisign 全文或纯 base64，统一转为插件要求的 base64 编码（真实格式 fixture 实测：全文 0、base64 0、坏输入 exit 1，原件 repair/f15-*.log）。
 - **H10**（P3 顺带，自然消除）：产物重命名为 Revia-<版本>-macos-arm64.dmg 并生成 macos-SHA256SUMS.txt（shasum -a 256 --tag）。
 - 真实 CI 运行仍属最终验收，未执行。
+
+### Codex / review02 Spec / F14 — 2026-10-31
+
+| F14 P1 | S126“签名…对应”：清单将已编码.sig再次编码，合法包验签失败 | generate-latest-json.mjs:40 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F14 [P1] 新清单生成器把签名重复编码
+
+S126“版本、平台、架构、URL、签名与产物必须对应”。新 `tools/generate-latest-json.mjs:40–41`读取`.sig`后再base64，54把其作为manifest.signature。Tauri生成的.sig已是插件所需内容；[Tauri官方更新文档](https://v2.tauri.app/plugin/updater/#static-json-file)要求signature直接使用生成.sig内容。锁定本地 `tauri-plugin-updater-2.14.1/src/updater.rs:1903–1904`只base64解码一次，然后Signature::decode需要minisign全文；重复编码后得到的仍是base64串，decode失败。
+
+动态证据：用`tempfile.mkdtemp`独占 `spec-probes-pgo9x6xd`，取本地minisign-verify-0.3.0公开测试数据`test`/公开签名，写入标准Tauri编码形态.sig；真实生产generate-latest-json脚本exit0，但manifest_signature_equals_input_sig=false，解码一次不以untrusted comment开头，见`signature-comparison.json`、`manifest.stdout/.stderr`。它验证生成器编码错误，未执行插件安装或真实CI。官方原件`tauri-updater-official.txt`，锁定源码及散列另见`upstream-source.txt/json`。
+
+</details>
+
+### Codex / review02 Spec / F15 — 2026-10-31
+
+| F15 P1 | S124“签名校验”：按发布说明输入正常公钥全文仍exit1 | write-updater-config.mjs:39 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F15 [P1] 发布说明要求的正常公钥全文仍不接受
+
+S124强制验签，任务12“补准确的…更新签名…说明”。`docs/release.md:39–46,56`要求`minisign -G`的.pub全文含untrusted comment。新normalizePubkey `write-updater-config.mjs:39–45`却把第二行密钥体base64解码后要求其仍以untrusted comment开头；正常第二行解码是原始密钥字节，必失败。正确的base64包裹全文输入:49–55可以通过，但文档与兼容分支依然错误。
+
+动态：将生产脚本逐字复制到自建fixture/tools（SHA与生产相同），配置/输出仅在fixture/src-tauri。使用minisign-verify公开的合法公钥全文，`pubkey-raw` exit1、stderr明确second line does not decode；同一公钥全文外包base64后`pubkey-base64` exit0，见各stdout/stderr及commands.json。没有生成生产签名身份，没有写产品tauri.release.conf。实施旧f15-full.log也保存同类失败，报告“真实格式exit0”并不能证明raw全文兼容。
+
+</details>

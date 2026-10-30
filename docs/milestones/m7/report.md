@@ -1,10 +1,16 @@
 # M7 实施与验收报告
 
-Status: ready-for-review
+Status: ready-for-agent
 
 实施方：Paseo / Pi（同一会话；含 2026-10-31 首轮正式返修）。规划方 / 验收方：Codex。
 分支 `m7`（worktree `/Volumes/T7 Shield/project/Revia-m7`），规划基点 `581d1527651e981018f2b0830d994bca49580254`。
 独占证据根：`/private/tmp/revia-m7-batch-g5scyw0r`（首轮交付原件、review-01 审查目录、返修日志全部保留，不覆盖）。
+
+## Codex 当前结论 — 2026-10-31 review02
+
+候选 `384360c4ea7b30b04f0114a60156107c9fa6c501` 返修增量审查未通过。Standards：9项硬违反（其中1项P3非阻断）、3项判断建议；Spec：18项。两轴原文与证据分别追加对应任务Comments，完整报告在任务14；P3已记backlog15。唯一正式Pi返修已使用，明确遗留由Codex直接接管。
+
+原始末轮Rust日志确为772通过/0失败/1忽略、记录exit0，其它末轮检查即时exit0，但多数输出合流且无逐轮输入hash；证据限制见review02/delivery-evidence-audit.md。原实现报告保留在下方作为历史，不代表本候选通过，不能以构建/冒烟代替真实桌面。任务13/14事实门槛仍未满足。
 
 ## 版本历史
 

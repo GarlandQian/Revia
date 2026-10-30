@@ -9,3 +9,24 @@ Status: needs-triage
 - Spec非阻断观察：删除重建相同路径/相同内容时编辑草稿的旧身份继承，尚未动态复现。保留旧草稿，后续按实际风险验证。
 
 PR网络写后不确定结果的查询核对不作为新增独立已复现数据损坏计数，但本轮PR写入/身份返修须核对该原规格流程，禁止自动重放远端写入。
+
+## review02 非阻断补充 — 2026-10-31
+
+<details>
+<summary>Standards P3 与判断建议原文</summary>
+
+## N2 / R09：任务Status引入未约定值（P3，非阻断）
+
+规则原文：`docs/agents/issue-tracker.md:18`：“状态：needs-triage、needs-info、ready-for-agent、ready-for-human、wontfix、done”。
+
+12个任务 `docs/milestones/m7/issues/01-liquid-glass.md` 至 `12-actions-package.md` 的第3行以及任务图README新改成ready-for-review；文档规范、状态集合没有同步变更。没有从实现交付推导done，也没有要求降低真实桌面验收。仅建议使用已约定状态并在Comments表达待审，或在获得决策后统一扩充状态模型。按Q174留backlog，不阻断。
+
+## Smell基线完整筛查与建议
+
+判断建议3项，全部P3非阻断；不自动计为硬违反、不要求本轮扩大重构：
+
+1. **可能Duplicated Code**（原smell未消除且增多）：`src/App.tsx:5376–5384` 与 `5387–5397` 都挂CloneDialog；Diagnostics `5398/5429`、UpdatePanel `5399–5415/5430–5444` 也重复。摘录：`<CloneDialog open={cloneOpen} ... />` 与 `{cloneOpen ? <CloneDialog open ... /> : null}`。三对同源state/回调，可保留每种一个实例。实施自述说已删除重复Clone，实际是删除一处又加入一处。没有把重复JSX冒称明文禁止。
+2. **可能Duplicated Code**：`diagnostics.rs:306–318,353–365` 两处完整构造DiagnosticsCommand，其中 `args: record.args.iter().map(|arg| redact(arg, &mut redactions)).collect()` 等字段相同。可抽取一个安全投影，减少后续脱敏规则漂移。
+3. **可能Duplicated Code**：`github/pr.rs:560–577` 与同文件 `fetch_all_pages:1101–1109` 有相同“get_json / extend / next_page循环”；files可调用已新增的泛型helper后map，避免维护两套分页。
+
+</details>

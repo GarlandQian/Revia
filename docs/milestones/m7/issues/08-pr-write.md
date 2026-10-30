@@ -1,6 +1,6 @@
 # 08：创建 PR、提交审阅与确认合并
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: 07
 
 ## What to build
@@ -58,3 +58,16 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 - **F09**：ReviewDraft 增加 head_sha（ts-rs 绑定重新生成）；草稿列表按后端 repoKey（新增 m7_github_repo_key 命令）+ head 过滤，保存绑定 head；前端不再伪造 repoKey（原 `${login}/${headRef}` 键永不匹配的缺陷消除）；reviewBody/commentBody 切 PR 清空。
 - **H7**：PrMergeOutcome 增加 `error: Option<AppErrorPayload>`；API 错误不再把中文 message 塞进 outcome，前端按结构化载荷走生产 formatAppError。
 - **F18**：创建 PR 支持 `owner:branch` head（validate_pr_head 新增测试）；创建表单可选来源远端（fork 场景 owner 前缀自动拼接）。
+
+### Codex / review02 Spec / F09 — 2026-10-31
+
+| F09 P1 | S109“绑定…版本”：新增草稿后不传head重载，旧版可混发；正文切PR直接清空 | GithubPanel.tsx:346,372,212 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F09 [P1] 草稿重载/提交仍能混入旧版本，正文切换直接丢失
+
+S109“草稿…绑定PR与提交版本；发布前重新核对版本…head变化时保留…不自动改用新版本发送”。后端repoKey修正且ReviewDraft增加head。打开详情请求202带summary.headSha并在221用于草稿过滤，但添加后 `346 reviewDrafts({worktreeId,remote,number})`省略head，后端 `pr.rs:654–659 None=>all`立即把旧head草稿重新混进列表；提交:372把所有drafts仅映射path/line/body，丢弃head，并只用当前detail.headSha。后端681–729只核当前PR与request.expected_head_sha，无法识别旧草稿版本。触发：PR在H1有草稿，更新到H2后新增一条草稿，旧H1草稿随重载一起按H2发布。成功还 `pr.rs:742–746 clear(repo_key,number)`清掉所有head草稿。repo_key仍只有本地worktree路径，未包含账号/remote/真实owner/repo，两个remote同号PR会共用草稿。新 `openDetail:212–213 setReviewBody/setCommentBody("")`不是“按PR保留”，是切PR即丢未提交正文。上述具体错误不依赖真实App配置。
+
+</details>

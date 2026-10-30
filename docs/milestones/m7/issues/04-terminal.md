@@ -1,6 +1,6 @@
 # 04：运行归属 worktree 的内置终端
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -66,3 +66,42 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 - **F05**：重挂载先 `terminalList` 认领本 worktree 仍在运行的会话（不新建不可达进程）；切 worktree 清空 tabs 并销毁前端视图（后端进程保留待认领）；`resolve_cwd` 接受 worktree 内的绝对 cwd（持久化恢复），外部/逃逸路径仍拒绝（新增回归测试 `terminal::cwd_tests`）。
 - **F06/H9**：关闭运行中页签先内联确认（终止并关闭 / 取消），确认才调用 terminalClose。
 - **busy 提示**：面板会话运行态经 `onRunningChange` 同步给 App（terminalRunningRef），参与更新安装门禁与关闭协调；Git 写锁仍然互斥。
+
+### Codex / review02 Spec / F05 — 2026-10-31
+
+| F05 P1 | S91“独立”：A的在途认领/打开晚回仍加入B页签 | TerminalPanel.tsx:136,149 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F05 [P1] 在途终端认领/打开跨worktree污染页签
+
+S91“每个worktree…独立…切换保留进程”。`TerminalPanel.tsx:157–188`的cancelled只在terminalTabs后和循环前检查；新 `claimOrOpen:136–153`等待terminalList后，及 `openSession:106–121`等待terminalOpen后均无代际/目标检查，直接setTabs/setActive。触发：A发起认领或打开未返回，切到B，B effect清空页签后A请求才返回；A的Tab被加入B列表，active也指A。输入:268–269只按该sessionId写终端，所以可在B标题下向A工作区shell输入。绝对cwd的后端修正确实可接受worktree内部路径，未重复报旧的绝对路径问题。无真实PTY启动；这是异步结果所有权的静态事实。
+
+</details>
+
+### Codex / review02 Spec / F06 — 2026-10-31
+
+| F06 P1 | S92“退出…协调器”：页签有确认，应用退出仍不问运行进程 | App.tsx:1667,1717 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F06 [P1] 应用退出仍不确认运行中的终端
+
+S92“关闭运行中进程前确认…退出应用/安装更新同样纳入关闭协调器”；S93“Revia写入期间显示对应worktree忙碌”。页签确认 `TerminalPanel.tsx:308–326,395–406`已加。新增 `terminalRunningRef`只由当前面板anyRunning同步(App6125–6127)，仅在beforeUpdateInstall:1655消费；正常closeAfterDraftFlush:1667、CloseDriver:1683、reconcileClose:1717均不消费终端状态。触发：shell中长任务时直接退出；仍无进程确认/取消，页签flush不等于运行进程协调。切换到无运行会话的B还会用false覆盖A的运行状态，更新门禁也无法覆盖全局终端。TerminalPanel:200只有busy注释，props/渲染没有写入状态，原busy要求仍未实现。静态链，未结束任何用户进程。
+
+</details>
+
+### Codex / review02 Standards / R08 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H9 / R08：正常退出没有运行终端确认（P2）
+
+规则原文：`docs/ui-direction.md:157`：“关闭运行中进程前先确认”。
+
+本轮页签关闭 `TerminalPanel.tsx:308–322,395–404` 有明确终止/取消选择，原“直接点页签×杀进程”的分支已修。新增运行态只通过 `App.tsx:6125–6127` 写terminalRunningRef，唯一读取点为更新前检查 `1655`。普通窗口关闭/退出 `1667–1684` 不读它，CloseCoordinator只接登记的写入/pending。故终端运行任务时正常关闭窗口或退出仍无确认/取消机会。报告将“参与关闭协调”写为已实现，与实际接线不一致。没有启动用户shell或真实PTY。
+
+</details>

@@ -1,6 +1,6 @@
 # 06：登录并管理多个 GitHub 账号
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -40,3 +40,16 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 ### Pi 正式返修处理 — 2026-10-31
 
 - **F16**：TokenResponse 接收 refresh_token / expires_in / refresh_token_expires_in；TokenStore 新增 save_refresh/load_refresh/delete_refresh（独立 keyring 服务 "Revia GitHub Refresh"，验收模式同文件 0600）；设备码与 Token 登录都持久化刷新令牌，登出同时清除；新增 `m7_github_device_cancel` 命令与面板“取消授权”按钮（本地取消，不访问网络）。
+
+### Codex / review02 Spec / F16 — 2026-10-31
+
+| F16 P2 | S105“刷新轮换”：只存refresh_token，无刷新请求或到期处理 | github/auth.rs:402；github/mod.rs:386 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F16 [P2] 刷新仅存储，没有到期或轮换路径
+
+S105“按服务器节流和刷新轮换结果持久保存”。auth:69–75新接expires_in等字段，285–291只把refresh_token传入，402–407保存；`GithubState::client_for:386–387`仍直接load access_token。load_refresh在mod:228只是定义，生产全树没有调用；grant_type只有device_code，无refresh_token请求，也不保存到期时间或换新access/refresh。触发GitHub App用户令牌到期：仍只能重新登录，本地取消可用不等于刷新已实现。`consumers.stdout`保存搜索证据；未触碰钥匙串或登录。设备码取消中的在途成功仍可能返回authorized，未额外以竞态扩大本项。
+
+</details>

@@ -141,3 +141,101 @@ Spec：22项，P1×15、P2×7。固定 `581d152…4657407`，完整152路径；�
 ```
 
 父代理已逐条回查关键生产链，并核对152源码与128原日志散列，无变化。所有正式P1/P2需本次返修；任务05/07/08等原规格明确要求的真实Git/local remote、受控HTTP及外部边界验证同样不得省略。任务13/14既有桌面事实门槛不变；禁止借更改任务条款消除未实现需求。完整报告中的P3、两项smell与构造边界登记 backlog 15，不阻断本轮。
+
+### Codex / review02 Standards — 2026-10-31
+
+固定范围 `f9247194eeb544de688ebbb27ac3d0ddd3847902...384360c4ea7b30b04f0114a60156107c9fa6c501`，52 路径 / 3 提交。正式报告原文如下，完整静态证据在批次 review02 的 standards-evidence/analysis.md。
+
+<details>
+<summary>Standards 正式报告（原文）</summary>
+
+Standards：仅审 `f924719…384360c` 的 52 路径、3 提交；结论均为固定源码静态证据，未运行产品或宣告桌面通过。详见[附录](standards-evidence/analysis.md)。
+
+硬违反（9 项）：
+
+1. **[P1，H6] 诊断仍泄露正文**：`src-tauri/src/m7/diagnostics.rs:476` 原样取输出首行后持久化/导出；短 hook 正文仍通过，外置路径和普通 remote 也未脱敏。违反 `docs/technical-direction.md:160`“排除文件正文、diff”。
+2. **[P1，H1] 恢复草稿会被覆盖**：`src/features/m7/EditableWorkspace.tsx:142` 基线变化时只载入磁盘文本；“保留我的版本”无法取回旧草稿，下次输入覆盖它。违反 `docs/ui-direction.md:92`“保留两版供对比”。
+3. **[P1，H3] 隐藏编辑绕过提交门禁**：`src/App.tsx:1906,2407,5894` 外层关闭直接清 editingPath；保留草稿但守卫随 path=null 放行，暂存/提交旧内容。违反 `docs/ui-direction.md:92`“暂存或提交前处理相关未保存编辑”。
+4. **[P1，新增] 克隆凭据进入日志**：`src-tauri/src/m7/clone.rs:358,384` 直接记录 URL/输出；CommandLog 不负责打码。违反 `docs/milestones/m5/spec.md:170`“凭据…都不显示”。
+5. **[P2，H2] 保存仍未登记关闭生命周期**：`EditableWorkspace.tsx:226` 直接 IPC，关闭仅 flush 草稿；可中断 `edit.rs:418` 截断写。违反 `docs/technical-direction.md:64`“正常关闭或退出请求不得直接打断写操作”。
+6. **[P2，H7] cause 未接翻译参数**：`src-tauri/src/m7/edit.rs:426,448` 改传 cause，locale 仍用 `{error}`；formatter 丢掉实际原因。违反 ADR-0013:3,7 的结构化展示契约。
+7. **[P2，H8] 克隆仍使用过期 Git 路径**：`src-tauri/src/commands.rs:153` 只启动时读取设置，重新加载环境也不更新 CloneManager。违反 `docs/technical-direction.md:83` 的手动路径约定。
+8. **[P2，H9] 退出仍无终端确认**：`src/App.tsx:1655,1667` 运行态只用于更新，关闭直接执行原生动作。违反 `docs/ui-direction.md:157`“关闭运行中进程前先确认”。
+9. **[P3，非阻断] 状态值越出约定**：`docs/milestones/m7/issues/01-liquid-glass.md:3` 等 12 个任务改为 ready-for-review，未在 `docs/agents/issue-tracker.md:18` 状态集合中。
+
+判断建议（3 项，均可能 Duplicated Code，P3 非阻断）：`src/App.tsx:5387` 与 5376/5429/5430 重复挂载对话框；`diagnostics.rs:306,353` 重复命令脱敏投影；`github/pr.rs:558,1097` 重复分页循环。
+
+H4/H5/H10/H11 原问题在本次源码中已处理。最严重项：H6 仍把不受控正文持久化并导出。
+
+</details>
+
+### Codex / review02 Spec — 2026-10-31
+
+同一固定增量，正式报告原文如下，逐项附录在批次 review02 的 spec-evidence/findings.md。两轴独立，不混加或重排发现。
+
+<details>
+<summary>Spec 正式报告（原文）</summary>
+
+Spec：18项（P1×13，P2×5）。仅审固定 `f924719…384360c` 的52路径、3提交增量。S为原规格行号，源码根 `/Volumes/T7 Shield/project/Revia-m7`；[逐项证据](spec-evidence/findings.md)。
+
+| 发现 | 规格、触发与后果 | 生产位置 |
+|---|---|---|
+| F02 P1 | S98“打开”：开仓库后克隆/诊断/更新仍不挂载 | App.tsx:5365,5387,5459 |
+| F03 P1 | S84“两版”：磁盘变化后恢复只装入磁盘，旧草稿不可比较/取回 | EditableWorkspace.tsx:142 |
+| F04 P1 | S85“保存、放弃、取消”：退出仍直接冲刷关闭；保存未登记生命周期 | App.tsx:1667；EditableWorkspace.tsx:226 |
+| F05 P1 | S91“独立”：A的在途认领/打开晚回仍加入B页签 | TerminalPanel.tsx:136,149 |
+| F06 P1 | S92“退出…协调器”：页签有确认，应用退出仍不问运行进程 | App.tsx:1667,1717 |
+| F08 P1 | S105“迟到…不得覆盖”：旧评论/审阅/fullDiff响应仍污染新PR | GithubPanel.tsx:313,375,697 |
+| F09 P1 | S109“绑定…版本”：新增草稿后不传head重载，旧版可混发；正文切PR直接清空 | GithubPanel.tsx:346,372,212 |
+| F10 P1 | S111“完整分页”：仍只查单分支；失败不标陈旧，404覆盖旧保护 | github/pr.rs:1057,1070 |
+| F11 P1 | S107“保护与回收”：操作状态拒绝前仍已fetch/改本地引用 | github/pr.rs:819,890；remote_ops.rs:640 |
+| F12 P1 | S116“排除…正文”：原输出首行仍导出/持久化，外部路径及远端未脱敏 | diagnostics.rs:476,528 |
+| F13 P1 | S122–123“分开”“协调”：丢下载包、重下；旧回执遮新版本；重启绕协调 | update.rs:370,407；UpdatePanel.tsx:55,112,154 |
+| F14 P1 | S126“签名…对应”：清单将已编码.sig再次编码，合法包验签失败 | generate-latest-json.mjs:40 |
+| F15 P1 | S124“签名校验”：按发布说明输入正常公钥全文仍exit1 | write-updater-config.mjs:39 |
+| F16 P2 | S105“刷新轮换”：只存refresh_token，无刷新请求或到期处理 | github/auth.rs:402；github/mod.rs:386 |
+| F17 P2 | S76“确认替换”：确认后旧动作回默认，默认键冲突原样保留 | settings.tsx:235 |
+| F20 P2 | S81“并排…只读”：仍独立全文编辑，打开后切统一/暂存仍可写 | App.tsx:5948 |
+| F21 P2 | S115“跨重启”“相同”：仅预览才存摘要、未消费历史；导出另取快照 | m7/commands.rs:645；diagnostics.rs:230,266 |
+| F22 P2 | S122“预发布”：两个清单同指latest稳定资产；保存开关未更新界面 | release.yml:158,168；App.tsx:4369 |
+
+F01/F07/F18/F19的首轮具体缺口在源码层面已修正。最严重F09：旧版本审阅可能误发到新版本；F12仍有隐私泄漏。脚本/纯处理器证据与静态事实已区分；桌面、账号、Actions和实际更新未验，13/14既有阻塞未重复计入。
+
+</details>
+
+### Codex / review02 Spec / F02 — 2026-10-31
+
+| F02 P1 | S98“打开”：开仓库后克隆/诊断/更新仍不挂载 | App.tsx:5365,5387,5459 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F02 [P1] 仓库打开后的三个入口仍未挂载
+
+规格 S98“成功后登记并打开真实仓库”，S115预览/导出，S122确认下载/安装。增量把新Clone/Diagnostics/Update挂在 `App.tsx:5387–5415`，但它们仍处于 `5365 if (!activeRepo)`，该return在5456结束；真实主仓库return从5459开始。全文 JSX 引用均位于welcome分支，主工具入口5507等仅setOpen。触发：正常打开任一仓库后点克隆、诊断、更新；结果仍没有对应dialog，F02主体未修。welcome原有CloneDialog:5376、Diagnostics:5429、UpdatePanel:5430也仍存在，新增条件挂载反而重复；不将重复代码单列smell。Settings主分支6383–6386所缺四props确已补齐。
+
+</details>
+
+### Codex / review02 Codex 原件核对与接管 — 2026-10-31
+
+<details>
+<summary>交付证据核对（原文）</summary>
+
+# 返修交付原始证据核对（Codex）
+
+固定候选 `384360c4ea7b30b04f0114a60156107c9fa6c501`，产品提交 `70c59ac9672d89357f2a064f4813900b98213029`；后续两提交只改 docs，交付工作树干净。
+
+- 原 Pi session JSONL 已逐字复制；精确工具命令与原结果在 `final-checks-original-tool-records.json`。
+- 末轮完整 cargo 日志合计 **772 passed / 0 failed / 1 ignored**，17 个结果组均 ok；紧随命令记录 `cargo-test=0`，不拼接其它轮次。
+- tsc、lint、x18n、前端构建、release 构建、隔离冒烟各自即时 `.exit` 均记录 0。原日志路径与 SHA 在 `delivery-evidence-audit.json`。多数日志合并 stdout/stderr，不能事后伪分流。
+- 末轮检查前已提交产品；后续提交只有 docs。实施未记录每个检查输入的独立源码散列，当前 HEAD/source-hashes 和原工具日志可核查，不能冒称逐轮受控源码证明。后续 Codex 最终验证须按约定独立记录。
+- 当前二进制 SHA256 `1e6d3f1c83164a07c25a77591b630eddfd2e5f63492c5a8f80c8bdbda64951fb` 与报告一致；尚不是 Codex 固定 Release 或真实桌面验收通过。
+- `cargo-test-repair2.log` 的超时失败与 exit101 原件保留；末轮完整测试确实成功。“负载抖动”根因尚无证明，不能当确认结论。
+- x18n 69 警告可观察，全部为预存警告的说法未单独证实。lint exit0 有警告，未称零警告。
+- 原报告承认缺受控 GitHub HTTP fixture、真实账号/钥匙串、真实 CI/更新以及任务13/14桌面事实。实施冒烟不替代这些验收。
+
+这是原件核对，不是重跑通过。审查期间产品冻结，先收齐本轮两轴，再由 Codex 直接修明确遗留并集中验证。
+
+</details>
+
+Standards 硬违反 9 项（P1×4/P2×4/P3×1），判断建议 3 项；Spec 18 项（P1×13/P2×5），存在重叠，不能合称 27 个产品缺陷。P3/smell 记 backlog15；本轮阻断问题由 Codex 直接修，正式 Pi 返修已用尽，不再派发。任务13/14真实桌面前提保持未完成。

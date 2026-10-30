@@ -1,6 +1,6 @@
 # 07：查看 PR 并检出来源分支
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: 06
 
 ## What to build
@@ -83,3 +83,29 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 - **F11/H4**：PR checkout 先 `acquire_write_lock` + `require_identity`，再 fetch/写引用（H5 写门过晚修复）；已有同名分支时先 `merge-base --is-ancestor` 判定快进——非快进必须 `overwrite_confirmed`，前端分叉时弹确认对话框（覆盖本地分支 / 取消）；不再无条件 `branch -f`。
 - **F08**：列表与详情请求带代际 + 目标身份核对，迟到响应静默丢弃；切 worktree/remote 清空选中与详情。
 - **F19**：files/comments 按 Link header 翻完整页（ApiMeta.next_page）；patch 不再裁 400 行；新增“查看完整 diff”入口（GitHub diff 媒体类型，prDiff 已接线）。
+
+### Codex / review02 Spec / F08 — 2026-10-31
+
+| F08 P1 | S105“迟到…不得覆盖”：旧评论/审阅/fullDiff响应仍污染新PR | GithubPanel.tsx:313,375,697 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F08 [P1] 迟到保护只覆盖部分读取
+
+S105“切账号/仓库后迟到结果不得覆盖新目标；失败保留原目标与草稿”。详情/list代际有改善；但 `GithubPanel.tsx:313–320`旧评论请求完成后直接setCommentBody/setComments；375–383旧审阅完成直接setDrafts([])/setReviewBody("")；697完整diff `.then(setFullDiff)`不核对当前PR。PR列表按钮:617在busy时仍可选，remote选择:587也可切。触发A发评论/审阅/读全diff，未完成前选B、输入B草稿，A随后完成：A评论/diff出现在B，B草稿被清。loadStatus:136–150和backendRepoKey:133也无代际，账号未在详情代际键内；旧身份信息仍可覆盖新目标。新增保护没有覆盖整个生产请求链。
+
+</details>
+
+### Codex / review02 Spec / F11 — 2026-10-31
+
+| F11 P1 | S107“保护与回收”：操作状态拒绝前仍已fetch/改本地引用 | github/pr.rs:819,890；remote_ops.rs:640 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F11 [P1] 检出前引用仍先写，后续拒绝不回收/回滚
+
+S107“沿已有…保护与回收策略”；任务07“检出前…沿既有…保护、回收及写前核验”。新checkout:797–798提前取锁/require_identity，873加入分叉确认，确有改善。但819先fetch写`refs/revia/pr/N`，890先branch/branch-f，903主动drop锁，再904调用remote_ops::checkout；现有操作状态拒绝在remote_ops:640才发生。触发：仓库正在merge/rebase，用户检出PR；本地PR引用/分支已创建或更新，随后才报操作中不可检出，既无失败回滚也无回收记录。分叉确认的true也仅是布尔，不绑定原tip/目标；收到新PR详情后复用确认仍有风险，此处不另报构造竞态。没有执行真实Git复现，结论来自确定命令先后和可触发的既有操作状态门禁。
+
+</details>

@@ -1,6 +1,6 @@
 # 09：同步现有 GitHub 受保护分支
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: 06
 
 ## What to build
@@ -40,3 +40,16 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 
 - **F10**：`protection_state` 刷新失败（403/网络）不再覆盖缓存——旧结果保留（source 标 unknown，界面按“可能过期”呈现）；仅 404 才写“未受保护”。推送预览与实际推送使用本地配置与 GitHub 保护缓存的并集（ReceiptStore::protected_branches 新增）；历史写保护同链路由 remote_ops 的保护判断消费并集列表。
 - 说明：GitHub 单分支 protection API 无分页；规格“完整分页”按现有 API 语义实现为“请求成功才替换缓存”。如审查口径为分支列表分页请指出，返修窗口已结束则留 Codex 处置。
+
+### Codex / review02 Spec / F10 — 2026-10-31
+
+| F10 P1 | S111“完整分页”：仍只查单分支；失败不标陈旧，404覆盖旧保护 | github/pr.rs:1057,1070 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F10 [P1] 保护同步仍缺完整集合和失败陈旧语义
+
+S111“与本地…取并集；完整分页成功才替换缓存；失败保留旧结果并标注可能过期”。push_preview/push确已调用commands:2304–2358的并集，但 `pr.rs:1057`仍仅访问一个 `/branches/{branch}/protection`，未获取分页完整分支集合；没打开某受保护分支PR就没有该缓存，实际push并集仍缺它。失败:1082直接返回原ProtectionInfo，原source仍为api/旧时间，并没有标陈旧；404:1070–1077仍把旧true写成false，权限/安装范围不可见也可能404。`protected_with_github`仅两处push消费者，任务09明确要求的历史操作保护没有接入。缓存键也没有所选remote/账号，切目标不隔离。这是F10同一同步/消费链的未完成部分；没有执行远端强推。
+
+</details>

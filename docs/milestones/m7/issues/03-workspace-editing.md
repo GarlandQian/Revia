@@ -1,6 +1,6 @@
 # 03：编辑工作区 diff 并恢复草稿
 
-Status: ready-for-review
+Status: ready-for-agent
 Blocked by: None
 
 ## What to build
@@ -98,3 +98,106 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 - **H2**：保存继续走生产写入口（m7_save_editable 内部持会话写锁）；更新安装门禁（beforeUpdateInstall）阻止脏编辑，参见任务 11。
 - **H7**：edit.rs 写失败/回读失败保留结构化 cause（AppError::cause），不再把中文诊断句塞进参数。
 - **F20**：编辑入口只在 split 视图 + unstaged 侧出现；统一视图点击先切到同文件 split 再开编辑；历史/暂存侧不出现入口。
+
+### Codex / review02 Spec / F03 — 2026-10-31
+
+| F03 P1 | S84“两版”：磁盘变化后恢复只装入磁盘，旧草稿不可比较/取回 | EditableWorkspace.tsx:142 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F03 [P1] 外部基线变化后旧草稿仍不可取回或比较
+
+S83“切换…保留内容”；S84“外部变化时保留草稿与磁盘两版…用户核对后”。`EditableWorkspace.tsx:130–145`把baseline、savedText、text全部设为opened.text；基线不相同时只setConflict，既不保存draft.text到state/ref，也不交给对比UI。`reload(true):249–271`只保留当前text，该text就是磁盘版，因此“保留我的版本”保留的也是磁盘。旧草稿虽暂时在存储中，界面不能取回；任意再编辑触发saveDraft后用新磁盘基线/新内容覆盖同key旧稿。触发为已存草稿后外部改文件，再打开/重启；用户看到“草稿已恢复”但实际只有磁盘版。新增cleanup:189–200能发保存调用，但`.catch(()=>undefined)`仍使持久化失败静默，不能称切换草稿安全闭环。没有动态写用户文件。
+
+</details>
+
+### Codex / review02 Spec / F04 — 2026-10-31
+
+| F04 P1 | S85“保存、放弃、取消”：退出仍直接冲刷关闭；保存未登记生命周期 | App.tsx:1667；EditableWorkspace.tsx:226 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F04 [P1] 保存、关闭与草稿处理仍未接完整写生命周期
+
+S85“关闭时提供保存、放弃、取消…未完成保存时不继续写操作”；S86“结果待核对”。增量App:1907–1925/2404确有当前dirty拒绝，但保存仍在 `EditableWorkspace.tsx:226`直接m7.saveEditable，无既有WriteGuardOrchestrator begin/end、NeedsVerification登记；Rust会话锁:edit.rs384只防并发，不登记前端退出保护。正常关闭仍是 `App.tsx:1667–1672`冲刷草稿即destroy/exit，`reconcileClose:1717–1722`只读既有coordinator，不询问编辑草稿。触发：有未保存编辑时关闭，或保存IPC在途/返回NeedsVerification后关闭；仍没有三选项，写入/待核对也不被关闭器看见。
+
+局部“放弃”新增 `EditableWorkspace.tsx:477–480 clearEditDraft(...).finally(onClose)`，但未把dirty/text复位；随即卸载执行新增cleanup:190–199，以仍dirty的latest又saveEditDraft，因此放弃清除的草稿被重新建回。局部保存关闭使用dirtyRef等待React状态提交，代码仍无save成功结果返回；未将其冒称已真机验证。
+
+</details>
+
+### Codex / review02 Spec / F20 — 2026-10-31
+
+| F20 P2 | S81“并排…只读”：仍独立全文编辑，打开后切统一/暂存仍可写 | App.tsx:5948 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F20 [P2] 改入口没有把编辑接入diff，也没约束活动编辑视图
+
+S80历史/暂存只读；S81“并排视图…工作区一侧…统一视图保留只读…不增加…独立文件编辑器”。增量App:5875按钮加unstaged且统一点击先switchView(split)，但真正渲染:5948仍仅检查editingPath==selectedEntry.path，无view或changes判断；switchView:1432–1458不退出编辑，selectedEntry同path的staged行也会复用该编辑器。触发先编辑后切统一视图/暂存同路径：仍可编辑磁盘。`EditableWorkspace:130,393–438`仍以磁盘全文为左baseline、全文textarea为右侧，替掉现有Git diff而没有编辑工作区一侧的Git diff、块/增删上下文。此为F20明确未完成的规格，不是要求扩建通用编辑器。
+
+</details>
+
+### Codex / review02 Standards / R02 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H1 / R02：磁盘基线变化后恢复草稿无法取回（P1）
+
+规则原文：`docs/ui-direction.md:92`：“重启或崩溃后提供恢复；磁盘文件已变化时保留两版供对比，不自动覆盖”；`docs/technical-direction.md:164` 同义。
+
+触发：保存了一份未保存编辑草稿，外部编辑器改磁盘，随后重新进入编辑或重启恢复。新分支 `EditableWorkspace.tsx:142–147` 只将 **opened.text** 放进 text/savedText，设置 conflict；draft.text 没有进入任何状态或ref。整个组件除134行初始化load外没有再次加载旧草稿。`reload(true):253–271` 只重读磁盘并保留当前text；此时text本来就是磁盘版，因此“保留我的版本”无法恢复旧文本，左/右两侧也都是磁盘版。继续输入后 `saveDraft:166–173` 用新文本覆盖同一worktree/path草稿，旧未保存编辑被实际替换。这不是完整的两版恢复。
+
+同项修复的另一静态分支：`473–480`“放弃”先clear草稿再finally(onClose)，但dirty/text未重置；卸载cleanup `189–200` 又save相同草稿，“放弃”后可再恢复。另 `App.tsx:5894` 外层关闭完全不经 requestClose 的保存/放弃/取消。卸载新增flush是未等待的Promise，失败被吞，不宜称“同步落草稿”。这些均属于原H1涉及的编辑保留/关闭链，不另加重复finding。
+
+</details>
+
+### Codex / review02 Standards / R03 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H3 / R03：编辑面板隐藏后暂存/提交漏处理草稿（P1）
+
+规则原文：`docs/ui-direction.md:92`：“暂存或提交前处理相关未保存编辑”；ADR-0004同样重申该规则。
+
+触发：在已有未暂存改动的A文件继续输入，点击外层编辑按钮的“关闭”（`App.tsx:5894`），随后暂存A、提交。关闭设 editingPath=null，同时卸载cleanup把文本作为草稿保留，既没有保存磁盘，也没有放弃确认。新增 `blockOnDirtyEdit:1904–1908` 在path为空时直接返回false，新增提交检查 `2405–2410` 同样要求 dirty && path；因此即使editDirty仍是true，守卫也放行，磁盘旧内容继续进入暂存/提交。切换到B并打开干净编辑器也会将全局dirty变false，无法代表仍在A的草稿。
+
+不是要求所有仓库存在草稿时一律禁用，而是必须按写入目标处理相关未保存编辑，不能仅看当前挂载组件。当前保护只解决了编辑面板保持打开的分支。
+
+</details>
+
+### Codex / review02 Standards / R05 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H2 / R05：保存仍绕过正常关闭与结果待核对（P2）
+
+规则原文：`docs/technical-direction.md:64`：“正常关闭或退出请求不得直接打断写操作；等待操作完成并记录结果后再执行用户的原请求……结果待核对时先展示，不静默退出”。
+
+本轮H2处理自述仅援引既有会话写锁。固定源码仍由 `EditableWorkspace.tsx:220–247` 直接调用m7.saveEditable，局部saving不登记到App写编排、CloseCoordinator或ExitGuard。组件Props `29–40` 也没有写生命周期接口。关闭flusher `205–218` 仅保存编辑草稿；App `1667–1684` flushM7State后执行destroy/requestExit，并不等待saveEditable。
+
+Rust `edit.rs:384` 的会话锁只能拒绝其他仓库写入，不阻止进程退出；`418–420` 仍是truncate + write_all + sync_all，正常退出可在中途结束进程。NeedsVerification在组件 `238–245` 只保存局部error，没有进入App pending。因此本轮改变error.cause/更新前dirty检查均未解决原H2。没有构造中断时序、没有声称已实际观察到截断损坏。
+
+</details>
+
+### Codex / review02 Standards / R06 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H7 / R06：结构化cause与locale占位符不一致（P2）
+
+规则原文：`ADR-0013:3,7`：“Rust 返回稳定错误类型和结构化参数，前端按当前语言生成文案”“详细原因也必须是可识别类型与参数”。`docs/technical-direction.md:75–76` 同时要求错误语义与结果说明不能遗漏。
+
+新 `edit.rs:426–432,448–454` 改用空params + cause，正确消除了把已翻译AppError塞进error参数的旧问题。但对应既有词条 `locales/zh-CN.json:1222,1224` 与 `locales/en.json:845,847` 仍为 `{error}`。生产 `src/lib/error.ts:12–16` 递归结果只放params.cause；`src/lib/i18n/format.ts:7–10` 对缺失参数原样保留占位符，formatter也不在末尾追加cause。
+
+故发生写失败/写后回读失败时，中英文最终文本包含字面 `{error}`，实际IO原因不可见。此为Rust载荷到生产formatter的参数契约静态证明，不是x18n现有check已检查的“两个locale占位符互相匹配”问题；没有用模拟payload冒充真实Git双语验收。PrMergeOutcome.error改动在静态层面正确保留了结构，未重复报其原中文混入问题。
+
+建议：经x18n将这两个词条的参数契约迁移到cause，再验证真实失败生产入口及英文formatter。
+
+</details>
