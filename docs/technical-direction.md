@@ -1,6 +1,6 @@
 # 技术方向
 
-更新日期：2026-10-20。状态：总体技术方向与 M2 访谈已确认；M0 与 M1 已完成，M2 已补充 Q78–Q97 中的技术约束。
+更新日期：2026-10-30。状态：M6 已合入 main；M7 第 1 步访谈中，本轮核对 GitHub Actions 打包、更新包签名与 Apple 证书的区别，尚未实施发布工作流。
 
 ## 已确认的选择
 
@@ -29,7 +29,7 @@ Git 执行：Rust 层调用系统 Git CLI
 - 复用基础组件，不直接套用网站后台模板。布局密度、行高、焦点反馈和快捷键提示应服务 Git 审阅场景，视觉要求见 [UI 方向](./ui-direction.md)。
 - diff、提交列表、文件树和长列表的性能不会因为采用 shadcn/ui 而自动获得，需要分别设计或选型。
 - 系统菜单栏和右键菜单使用 Tauri 提供的 macOS 原生菜单，不使用 shadcn/ui 的 Menubar 和 Context Menu（Q38）。
-- 界面文案集中管理，不写死在组件中；首版只提供简体中文（Q40）。
+- 界面文案集中管理，不写死在组件中；M6 起提供简体中文 / English，通过 x18n 维护和校验（Q163、Q164、Q171，取代 Q40）。
 - 基座选用 Base UI，与 shadcn/ui 当前的官方默认一致，不与 Radix 混用（Q51）。
 - 颜色一律定义为 CSS 变量，从 M1 起跟随系统浅色 / 深色（Q50）。语法高亮按语法类别返回，由前端映射到两套配色，切换深浅色时不重新高亮。
 - 组件源码进入项目后需要自行维护；升级依赖不等于自动同步所有本地组件源码的上游修复。
@@ -131,6 +131,7 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 - 应用标识（Tauri `identifier`）为 `io.github.garlandqian.revia`，数据目录随之为 `~/Library/Application Support/io.github.garlandqian.revia/`（Q49）。签名、公证和自动更新都使用这个标识，更改需要迁移用户数据。
 - 目标平台：macOS Apple Silicon（arm64）与 Windows x64；不做 Intel Mac、ARM 版 Windows 和 Linux，见 [ADR-0007](./adr/0007-target-platforms.md)。首版只发布 macOS，Windows 在 M8（Q55、Q126）。
 - **构建**：GitHub Actions 分别在 macOS（Apple Silicon）与 Windows 机器上构建，不在 Mac 上交叉编译 Windows 版。推送到 main 时只做编译检查（从 M2 起包括 Windows）；打版本标签才生成安装包和便携包（Q62）。本机开发仍可用 Homebrew 安装的 Rust 构建 macOS 版。
+- **M7 打包**：Q182 重申使用 GitHub Actions；M7 的发布产物只覆盖 macOS Apple Silicon，Windows 发布仍在 M8，现有 Windows 编译检查保留。当前只有 [compile-check.yml](../.github/workflows/compile-check.yml)，没有分发包上传或应用更新发布链路。是否先生成 Release 草稿仍待访谈，本轮只记录设计。
 - **M2 验收授权**：允许给 `m2` 增加仅编译、不发布的 CI 入口，并在 M2 验收期间按需将 `m2` 正常推送到现有 `origin`，取得真实 Windows x64 编译结果；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包（Q97）。工作流文件存在不等于已经编译通过。
 - **Windows 安装版**：NSIS 生成的 `.exe` 安装程序，默认只为当前用户安装、不需要管理员权限；不做 MSI（Q57）。
 - **Windows 便携版**：同时提供单个 exe 和 zip，zip 内是一个 `Revia` 文件夹（Q66）；解压即用；设置、回收区、审阅标记等数据放在 exe 旁边的 `data` 文件夹，不写用户目录和注册表；目录不可写时提示用户把程序移到可写的位置；依赖系统自带的 WebView2；不自动更新，只提示新版本（Q58）。
@@ -145,9 +146,10 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 
   GitHub 发布页的标签为 `v<版本>`，标题为 `Revia <版本>`。自动更新所需文件（Tauri 使用 `.app.tar.gz` 等格式）的命名到 M7 实现自动更新时再定（Q126）。应用标识保持 `io.github.garlandqian.revia`（Q49、Q67）。
 - **平台相关代码**：从 M2 起集中放在少数模块中（例如登录 shell 的环境解析、窗口外观、快捷键修饰键），其他代码不写死 macOS 假设（Q55）。
-- **签名**：暂不做任何代码签名，首版完成几个月后再根据情况决定（Q63）。在此之前：Mac 版在别人的电脑上首次打开时，需要在“系统设置 → 隐私与安全性”中点“仍要打开”；Windows 版会出现 SmartScreen 提示，点“更多信息 → 仍要运行”。到时可考虑的方案：Mac 只能通过 Apple 开发者计划（个人每年 99 美元）签名和公证；Windows 可以申请 SignPath 基金会为开源项目提供的免费签名。
-- 自用阶段不做自动更新。试用阶段使用 Tauri 的更新插件，从 GitHub Releases 获取新版本；启动时检查，提示后由用户确认安装，不静默更新（Q41）。更新插件需要另外生成一对更新包签名密钥，它是自己生成的，与代码签名证书无关。
-- 不收集遥测，不联网上报。诊断信息由用户通过“帮助 → 导出诊断信息”手动导出，导出内容不包含文件内容和 diff（Q42）。
+- **Apple 代码签名与公证**：用户没有 Apple 证书，沿 Q63 暂不做 Apple 开发者代码签名和公证，不以购买证书作为 M7 打包前提（Q182）。这种试用分发仍可能触发 macOS 首次打开的安全提示；保留首次打开说明与真实下载后的启动验收。Windows 暂不签名的原决定也不变，正式签名在首版完成后再评估。
+- **应用更新**：试用阶段使用 Tauri updater，从 GitHub Releases 获取新版本，启动时检查。默认稳定版，预发布版由用户主动开启；确认后下载与安装，安装前处理未保存编辑、Git 写入和终端会话，再确认重启（Q41、Q181）。不静默更新。
+- **更新包签名**：Tauri updater 要求校验签名，不能关闭；用 Tauri CLI 自行生成公私钥，公钥随应用分发，私钥供打包端签署更新包。它不需要 Apple 证书，也不代替 Apple 代码签名和公证（Q182）。CI 中使用 GitHub Actions 的 secret 注入更新签名密钥，私钥不进源码、安装包或日志；具体接线在 M7 实施。官方核对与来源见 [M7 分发事实](./milestones/m7/distribution-facts.md)。
+- **诊断导出**：不收集遥测，不联网上报。用户通过“帮助 → 导出诊断信息”手动导出，默认只含当前仓库相关日志与环境信息；路径、远端地址、作者邮箱等默认脱敏，导出前预览，始终排除文件正文和 diff（Q42、Q180）。现有 Git 命令日志的 stdout/stderr 可能含文件内容或 diff，不能仅凭既有凭据打码就原样导出；日志持久化与保留期限仍待访谈。
 
 ## 尚未确认的配套
 
@@ -170,4 +172,6 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 - [git mergetool](https://git-scm.com/docs/git-mergetool)：外部合并工具的调用方式。
 - [husky：版本管理器与图形界面](https://typicode.github.io/husky/how-to.html)：图形界面中 hooks 找不到 `node` 的问题。
 - [Tauri 更新插件](https://v2.tauri.app/plugin/updater/)：自动更新与更新包签名。
+- [Tauri GitHub Actions 分发](https://v2.tauri.app/distribute/pipelines/github/)：构建、上传与 GitHub Release 集成；2026-10-30 核对。
+- [Tauri macOS 代码签名](https://v2.tauri.app/distribute/sign/macos/)：Apple 代码签名、公证与分发限制；2026-10-30 核对。
 - [Tauri 菜单](https://v2.tauri.app/learn/window-menu/)：原生菜单栏与右键菜单。
