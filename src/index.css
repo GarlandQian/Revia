@@ -1469,7 +1469,6 @@
   font-family: var(--font-sans);
   font-size: 12px;
   cursor: default;
-  border-left: 2px solid transparent;
   contain: layout paint style;
 }
 
@@ -1479,7 +1478,7 @@
 
 .log-row.selected {
   background: var(--list-activeSelectionbackground, var(--toolbar-hoverbackground));
-  border-left-color: var(--focusborder);
+  box-shadow: inset 2px 0 var(--focusborder);
 }
 
 .log-graph-col {
@@ -1566,7 +1565,6 @@ html[data-kind="dark"] {
   align-items: center;
   gap: 3px;
   flex: none;
-  max-width: 180px;
   padding: 0 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ref) 18%, transparent);
@@ -1575,8 +1573,27 @@ html[data-kind="dark"] {
   font-weight: 500;
   line-height: 16px;
   white-space: nowrap;
+}
+
+.log-ref-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+}
+
+/* 所有已加载引用的自然宽度决定整列宽度，不压缩、不裁掉胶囊。 */
+.log-ref-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  height: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+  font-family: var(--font-sans);
 }
 
 .log-ref-chip.remoteBranch {
