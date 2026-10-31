@@ -342,3 +342,8 @@ Standards 0硬违反、2项P3判断；Spec 0新增发现。原文分别入对应
 ### 2026-10-31：真实D06时序已归属，首屏仍未达标
 
 已审日志完整性修复后的固定Release `fixed-release-d06-zxligxrm` 构建exit0；真实可见split诊断exit0。首屏224ms，refresh95ms、同线程Git89.5ms（其中命令记录26.0ms），并排布局worker28.4ms、段/折叠派生仅0.53ms、首批取行worker约0.5–3.3ms；前端响应/提交/绘制仍需定位。189+14条结构化时序无损坏，四原生截图直接查看。并排首跳缓存false已补齐、原边界总50ms，返回cached总39ms；未采独立split文字DOM/首帧，不能据此标整条跳转或D06通过。旧正式Release及所有首屏失败原件保留，GitHub/更新正式接线继续按用户要求未验。详见native-acceptance.md与task14-d06-timing-audit.json。
+
+
+### 2026-10-31：并排布局与可见文字发布修复
+
+产品`c6e3d76648c1d5fbc59c5b920fff00d98fa1e362`根据实测前端发布等待，及时提交异步布局和新补齐的当前可见行；纯离屏预取继续合批，过期响应拒绝与既有缓存引用保留。82项相关Node回归、build/lint真实exit0；review15两轴均0发现，原文分别入任务14 Comments。无Git、身份安全、诊断持久化、locale或门槛修改。新固定Release实际收益待验；旧首屏失败不覆盖。

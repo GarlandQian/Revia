@@ -689,3 +689,30 @@ Codex核对：两个生产日志入口共用同一Mutex与含换行完整缓冲�
 ### Codex：固定观测Release真实D06归属结果 — 2026-10-31
 
 产品6021058、ReleaseSource5d89202，固定 `fixed-release-d06-zxligxrm`，构建exit0。原D06 fixture真实可见运行 `task14-d06-timing-split-01` exit0，前台/聚焦/rAF有效，四截图已直接查看，源码7,887项散列未变。189条Rust/14条前端时序完整无拼行。首屏224ms仍失败：refresh95.020ms，同线程Git89.503ms，含命令记录26.035ms；并排layout worker28.353ms，实际段布局派生0.528ms，首批行worker约0.5–3.3ms。响应到前端状态发布/后续绘制仍有等待，继续据此定位。并排首跳缓存false/总50ms，返回缓存true/总39ms，只补缓存来源，不冒称独立文字DOM/首帧已验。原252/220/176失败不覆盖，整项不done。详情和原件见[原生验收记录](../native-acceptance.md)最新诊断；进程44971已退出，不复用旧PID。
+
+
+### review15：可见行发布修复的独立双轴审查 — 2026-10-31
+
+固定范围 `441c901c5564ce98629008fff46798e1f37caa9a...c6e3d76648c1d5fbc59c5b920fff00d98fa1e362`，仅三路径；以下两轴正式报告分别原文追加。
+
+#### Standards（原文）
+
+硬违反：0 项。三路径增量未改变 Git 调用、hunk 来源、快照拒绝门、程序滚动、安全或诊断持久化边界；符合根 AGENTS、ADR-0002/0004/0008/0014 及技术方向的相关约束。
+
+判断项：0 项。按仓库规范优先核对全部 smell 基线，未发现值得报告的命名、重复、职责或过度抽象问题；visibleChanged 明确表达发布优先级，React 同步提交留在视图层。
+
+证据：现有 Node 原件 82/82 通过，build、lint 均 exit 0；三条检查的源码清单与固定 HEAD 三路径 SHA-256 一致。仅复核原件，未运行应用或检查。新 Release 真实前台 D06 尚未验收；Node 不证明实际 React 提交时机或 150/100 ms、1 帧通过（docs/technical-direction.md:114–118；docs/agents/local-validation.md:16）。详见 standards-evidence.md。
+
+#### Spec（原文）
+
+Spec：固定 `441c901…c6e3d76`，仅 Q174 的布局／当前可见行发布增量，3 路径、1 提交。**P1=0，P2=0，P3=0。**
+
+(a) 缺漏／部分：未见本增量实现遗漏。`native-acceptance.md:84,88` 指向“前端状态发布／布局挂载等待”。`SideBySideView.tsx:170–181` 在 Promise 交付且未取消后，以 `flushSync` 同步设置布局；两栏既有 `:733–744,840–845` 的 layout effect 完成视口测量和可见取行请求。实际收益仍待桌面验证。
+
+(b) 范围扩张：未见。`spec.md:154` 的“首屏≤150ms／未缓存100ms／缓存1帧”及 `technical-direction.md:114–118` 的真实 Release 口径未改；仅3路径，无Git、身份门、命令摘要同步持久化、测量或locale改动。
+
+(c) 看似实现但错误：未见。`sideLineWindow.ts:95,113` 在接收与发布前仍查同一缓存身份；`:99–105` 只对新增行按当前 `windows[side].visible` 判优先级，`:113` 无新增不发布。`SideBySideView.tsx:247–253` 仅可见行变化调用 `flushSync`，离屏仍合批；滚动入口 `:698–705` 和视口 effect `:840–845` 更新范围。新增回归 `test-side-line-window.mjs:161–186` 覆盖旧位置迟到、预取变可见及重叠无进展。
+
+已复核三份原始argv／exit／stdout／stderr、各7,887项源码散列与固定HEAD文件对象：Node82/82，build/lint exit0；本轴未重跑检查、启动应用或联系Pi。Node不能证明React实际时序。新固定Release真实桌面未做；224ms及原252/220/176ms首屏失败保留，不将其算本次遗漏或通过。细证据见 `spec-evidence.md`。
+
+Codex直接核对三路径源码、两轴证据及三份检查原件：82/82 Node、build/lint真实exit0，每份7,887项源码散列均匹配。lint有既有mockup等警告，未冒称零警告。两轴均完成结束；Standards 0硬违反/0判断、Spec 0项。旧224ms及252/220/176ms失败继续保留，新Release真实桌面仍待验证；不把缓存契约检查当React或D06通过。
