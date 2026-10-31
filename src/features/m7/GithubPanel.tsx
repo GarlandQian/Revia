@@ -26,7 +26,7 @@ import type { ReviewEvent } from "@/types/bindings/ReviewEvent";
 import { Codicon } from "@/components/ui/codicon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
-import { m7 } from "@/lib/m7/api";
+import { m7, type PrCheckoutPayload } from "@/lib/m7/api";
 
 type Tab = "pulls" | "create" | "receipts";
 
@@ -37,6 +37,8 @@ export interface GithubPanelProps {
   onClose: () => void;
   /** 检出成功后让工作区刷新。 */
   onCheckedOut: (outcome: PrCheckoutOutcome) => void;
+  /** 复用App全局写门、关闭协调与原目标待核对通道。 */
+  onCheckout: (request: PrCheckoutPayload) => Promise<PrCheckoutOutcome>;
   /** 面板里做过的写操作（合并、评论等）也可能改变工作区状态。 */
   onWorkspaceTouched: () => void;
 }
@@ -78,6 +80,7 @@ export function GithubPanel({
   currentBranch,
   onClose,
   onCheckedOut,
+  onCheckout,
   onWorkspaceTouched,
 }: GithubPanelProps) {
   const [status, setStatus] = useState<GithubStatus | null>(null);
@@ -389,7 +392,7 @@ export function GithubPanel({
     setBusy("checkout");
     setError(null);
     try {
-      const outcome = await m7.prCheckout({
+      const outcome = await onCheckout({
         worktreeId,
         remote,
         number: selected.number,
@@ -410,7 +413,7 @@ export function GithubPanel({
     } finally {
       setBusy(null);
     }
-  }, [detail, onCheckedOut, remote, selected, worktreeId]);
+  }, [detail, onCheckedOut, onCheckout, remote, selected, worktreeId]);
 
   const merge = useCallback(async () => {
     if (!selected || !detail) return;

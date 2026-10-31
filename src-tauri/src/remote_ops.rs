@@ -635,16 +635,33 @@ pub fn checkout(
     strategy: CheckoutStrategy,
     archive_store: &crate::stash_archive::StashArchiveStore,
 ) -> Result<CheckoutResult> {
-    let _write = session.acquire_write_lock()?;
-    let git = &session.git;
-    if operation_state(git).is_some() {
-        return Err(AppError::coded(
-            ErrorKind::Rejected,
+    let write = session.acquire_write_lock()?;
+    checkout_while_locked(session, store, target, strategy, archive_store, &write)
+}
+
+/// 任何检出写入之前核对真实身份和进行中的操作；读取失败不能当成“没有操作”。
+pub(crate) fn require_checkout_ready(session: &WorktreeSession) -> Result<()> {
+    session.require_identity()?;
+    if crate::operation::detect(&session.git, 0)?.is_some() {
+        return Err(AppError::coded(ErrorKind::Rejected,
             "errors.remoteOps.anOperationProgressFinishAbortBefore",
-            "有进行中的操作，请先完成或中止后再检出",
-            &[],
-        ));
+            "有进行中的操作，请先完成或中止后再检出", &[]));
     }
+    Ok(())
+}
+
+/// PR取引用与工作区检出共用已取得的同目标写锁，不释放后重新抢锁。
+pub(crate) fn checkout_while_locked(
+    session: &WorktreeSession, store: &RecoveryStore, target: &CheckoutTarget,
+    strategy: CheckoutStrategy, archive_store: &crate::stash_archive::StashArchiveStore,
+    write: &crate::session::WriteGuard<'_>,
+) -> Result<CheckoutResult> {
+    if !write.holds(session) {
+        return Err(AppError::coded(ErrorKind::Internal, "errors.m7.githubCheckoutWriteGuard",
+            "PR 检出写入保护不可用，请重试", &[]));
+    }
+    require_checkout_ready(session)?;
+    let git = &session.git;
     let plan = plan_checkout(git, target)?;
     let entries = dirty_paths(git)?;
     let files = overwrite_targets(git, &plan, &entries)?;

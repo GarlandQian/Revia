@@ -1307,7 +1307,9 @@
       "githubCredentialDeleteFailed": "无法删除 GitHub 凭据：{error}",
       "editDraftsUnresolved": "文件 {path} 仍有编辑草稿，请先保存或放弃",
       "terminalWorktreeBusy": "此 worktree 正在执行写操作或准备关闭，请稍后再输入终端",
-      "terminalCloseFailed": "结束终端进程失败：{cause}"
+      "terminalCloseFailed": "结束终端进程失败：{cause}",
+      "githubCheckoutWriteGuard": "PR 检出写入保护不可用，请重试",
+      "githubPrCheckoutUnverified": "PR 检出未完成，请核对分支与工作区；不会自动重试"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",

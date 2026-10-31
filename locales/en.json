@@ -915,7 +915,9 @@
       "githubCredentialDeleteFailed": "Could not delete GitHub credentials: {error}",
       "editDraftsUnresolved": "File {path} still has an edit draft. Save or discard it first.",
       "terminalWorktreeBusy": "This worktree is writing or preparing to close. Wait before entering terminal input.",
-      "terminalCloseFailed": "The terminal process could not be ended: {cause}"
+      "terminalCloseFailed": "The terminal process could not be ended: {cause}",
+      "githubCheckoutWriteGuard": "The PR checkout write guard is unavailable. Try again.",
+      "githubPrCheckoutUnverified": "PR checkout did not complete. Check the branch and working tree; it will not be retried automatically."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",

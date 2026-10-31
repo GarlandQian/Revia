@@ -229,6 +229,8 @@ sources:
     en: 16b822d7e1e7a
   errors.m7.githubBranchNameInvalid:
     en: 1576bd6adda45c
+  errors.m7.githubCheckoutWriteGuard:
+    en: 1b162ea4d245ca
   errors.m7.githubClientFailed:
     en: 75ea8200910a7
   errors.m7.githubCommentAnchorInvalid:
@@ -271,6 +273,8 @@ sources:
     en: 6db705070ea58
   errors.m7.githubPrBranchFailed:
     en: 12947e51c081d2
+  errors.m7.githubPrCheckoutUnverified:
+    en: 1fc3b1286e99c1
   errors.m7.githubPrTitleEmpty:
     en: 18e9400b8ac526
   errors.m7.githubPrTitleTooLong:

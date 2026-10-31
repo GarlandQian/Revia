@@ -6256,6 +6256,7 @@ export function App() {
               worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
               currentBranch={snapshot?.branch ?? null}
               onClose={() => setGithubOpen(false)}
+              onCheckout={(request) => performM6Write(request.worktreeId, () => m7.prCheckout(request))}
               onCheckedOut={() => void refresh()}
               onWorkspaceTouched={() => void refresh()}
             />

@@ -305,6 +305,11 @@ struct HighlightStamp {
 /// 写操作互斥 RAII Guard，离开作用域自动释放写锁。
 #[derive(Debug)]
 pub struct WriteGuard<'a>(&'a Mutex<bool>);
+impl WriteGuard<'_> {
+    pub(crate) fn holds(&self, session: &WorktreeSession) -> bool {
+        std::ptr::eq(self.0, &session.writing)
+    }
+}
 impl<'a> Drop for WriteGuard<'a> {
     fn drop(&mut self) {
         if let Ok(mut writing) = self.0.lock() {

@@ -793,17 +793,28 @@ pub fn checkout(
     recovery: &crate::recovery::RecoveryStore,
     archive: &crate::stash_archive::StashArchiveStore,
 ) -> Result<PrCheckoutOutcome> {
-    // F11/H5：写门最早进入。同一 worktree 的其它写操作持锁时这里直接被拒绝。
-    let _write = context.session.acquire_write_lock()?;
-    context.session.require_identity()?;
-
-    let (pull, _): (ApiPull, _) = context
-        .client
-        .get_json(&format!("{}/pulls/{}", context.repo_path(), request.number))?;
-    let head_sha = pull.head.as_ref().map(|head| head.sha.clone()).unwrap_or_default();
-    if head_sha != request.expected_head_sha {
-        return Err(head_changed(&request.expected_head_sha, &head_sha));
+    let write = context.session.acquire_write_lock()?;
+    // 操作状态必须在网络fetch、引用和分支等任何写入之前核对；整个流程保留同一写锁。
+    remote_ops::require_checkout_ready(context.session)?;
+    // Git 2.29新增--no-write-fetch-head；只为此可选操作检查能力，不改变其它功能的最低版本。
+    let version = context.session.git.version()?;
+    if crate::git::parse_version(&version).unwrap_or((0, 0)) < (2, 29) {
+        return Err(AppError::coded(
+            ErrorKind::Environment,
+            "errors.environment.gitVersion",
+            "{path}（{version}）；需要 Git {minimum} 或更高版本",
+            &[
+                ("path", context.session.git.program.display().to_string()),
+                ("version", version),
+                ("minimum", "2.29".into()),
+            ],
+        ));
     }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary_ref = format!("refs/revia/pr-checkout/{}-{nonce}", std::process::id());
     let branch = request
         .local_branch
         .as_deref()
@@ -812,107 +823,208 @@ pub fn checkout(
         .map(str::to_string)
         .unwrap_or_else(|| format!("pr/{}", request.number));
     validate_branch(&branch)?;
-
-    // 取到独立命名空间，避免直接写 heads 时与已检出分支冲突。
-    let tracking_ref = format!("refs/revia/pr/{}", request.number);
-    let refspec = format!("+refs/pull/{}/head:{tracking_ref}", request.number);
-    let fetched = context.session.git.run_network(
-        &["fetch", &request.remote, &refspec],
-        NETWORK_TIMEOUT,
-    )?;
-    if fetched.exit_code != 0 {
-        return Err(AppError::coded(
-            ErrorKind::Git,
-            "errors.m7.githubFetchPrFailed",
-            "取 PR 失败：{error}",
-            &[("error", fetched.stderr.trim().to_string())],
-        ));
-    }
-    let resolved = context
-        .session
-        .git
-        .run_ok(&["rev-parse", &tracking_ref], "核对 PR 提交")?;
-    let resolved_sha = String::from_utf8_lossy(&resolved.stdout).trim().to_string();
-    if resolved_sha != request.expected_head_sha {
-        return Err(head_changed(&request.expected_head_sha, &resolved_sha));
-    }
-
-    let current = context
-        .session
-        .git
-        .run_ok(&["rev-parse", "--abbrev-ref", "HEAD"], "读取当前分支")?;
-    let current_branch = String::from_utf8_lossy(&current.stdout).trim().to_string();
-    let exists = context
-        .session
-        .git
-        .run_ok(
-            &["rev-parse", "--verify", "--quiet", &format!("refs/heads/{branch}")],
-            "检查本地分支",
-        )
-        .map(|output| !output.stdout.is_empty())
-        .unwrap_or(false);
-    if exists && current_branch == branch {
-        return Err(AppError::coded(
-            ErrorKind::Rejected,
-            "errors.m7.githubPrBranchCheckedOut",
-            "本地分支 {branch} 已检出，请先切换到其他分支再检出 PR",
-            &[("branch", branch)],
-        ));
-    }
-    if exists {
-        // H4：快进（旧 tip 是远端 head 的祖先）可以直接更新；否则必须有确认。
-        let fast_forward = context
+    let branch_ref = format!("refs/heads/{branch}");
+    let mut previous_tip = None;
+    let mut attempted_branch = false;
+    let mut resolved_sha = String::new();
+    let mut result = (|| -> Result<CheckoutResult> {
+        let (pull, _): (ApiPull, _) = context.client.get_json(&format!(
+            "{}/pulls/{}",
+            context.repo_path(),
+            request.number
+        ))?;
+        let head = pull
+            .head
+            .as_ref()
+            .map(|head| head.sha.clone())
+            .unwrap_or_default();
+        if head != request.expected_head_sha {
+            return Err(head_changed(&request.expected_head_sha, &head));
+        }
+        remote_ops::require_checkout_ready(context.session)?;
+        let refspec = format!("+refs/pull/{}/head:{temporary_ref}", request.number);
+        context
             .session
             .git
-            .run_ok(
-                &["merge-base", "--is-ancestor", &branch, &resolved_sha],
-                "检查本地分支是否可快进",
-            )
-            .map(|output| output.exit_code == 0)
-            .unwrap_or(false);
-        if !fast_forward && !request.overwrite_confirmed {
+            .run_network(
+                &[
+                    "fetch",
+                    "--no-write-fetch-head",
+                    "--no-tags",
+                    "--no-recurse-submodules",
+                    &request.remote,
+                    &refspec,
+                ],
+                NETWORK_TIMEOUT,
+            )?
+            .into_success("取PR到本次独占引用")?;
+        resolved_sha = pr_ref_tip(context.session, &temporary_ref)?
+            .ok_or_else(|| head_changed(&request.expected_head_sha, ""))?;
+        if resolved_sha != request.expected_head_sha {
+            return Err(head_changed(&request.expected_head_sha, &resolved_sha));
+        }
+        remote_ops::require_checkout_ready(context.session)?;
+        if pr_head_ref(context.session)?.as_deref() == Some(branch_ref.as_str()) {
             return Err(AppError::coded(
                 ErrorKind::Rejected,
-                "errors.m7.githubPrBranchDiverged",
-                "本地分支 {branch} 有远端没有的提交；覆盖会丢失这些提交。确认覆盖才能继续",
-                &[("branch", branch)],
+                "errors.m7.githubPrBranchCheckedOut",
+                "本地分支 {branch} 已检出，请先切换到其他分支再检出 PR",
+                &[("branch", branch.clone())],
             ));
         }
+        previous_tip = pr_ref_tip(context.session, &branch_ref)?;
+        if let Some(tip) = &previous_tip {
+            let ancestor =
+                context
+                    .session
+                    .git
+                    .run(&["merge-base", "--is-ancestor", tip, &resolved_sha])?;
+            let fast_forward = match ancestor.exit_code {
+                0 => true,
+                1 => false,
+                _ => {
+                    ancestor.into_success("检查本地分支是否可快进")?;
+                    unreachable!()
+                }
+            };
+            if !fast_forward && !request.overwrite_confirmed {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.m7.githubPrBranchDiverged",
+                    "本地分支 {branch} 有远端没有的提交；覆盖会丢失这些提交。确认覆盖才能继续",
+                    &[("branch", branch.clone())],
+                ));
+            }
+        }
+        // 保留git branch自身对其它worktree正在检出该分支的保护；不以update-ref绕过它。
+        let args = if previous_tip.is_some() {
+            vec!["branch", "-f", &branch, &resolved_sha]
+        } else {
+            vec!["branch", &branch, &resolved_sha]
+        };
+        attempted_branch = true;
+        context
+            .session
+            .git
+            .run_write(&args)?
+            .into_success("创建PR本地分支")?;
+        remote_ops::checkout_while_locked(
+            context.session,
+            recovery,
+            &CheckoutTarget::Local {
+                name: branch.clone(),
+            },
+            request.strategy,
+            archive,
+            &write,
+        )
+    })();
+
+    let mut cleanup_errors = Vec::new();
+    if attempted_branch && !matches!(&result, Ok(CheckoutResult::Done(_))) {
+        let rollback = (|| -> Result<()> {
+            if pr_head_ref(context.session)?.as_deref() == Some(branch_ref.as_str()) {
+                // 检出可能已完成部分写入；不能把当前HEAD强行退回而造成磁盘/index错配。
+                return Err(AppError::coded(
+                    ErrorKind::NeedsVerification,
+                    "errors.m7.githubPrCheckoutUnverified",
+                    "PR 检出未完成，请核对分支与工作区；不会自动重试",
+                    &[],
+                ));
+            }
+            let current = pr_ref_tip(context.session, &branch_ref)?;
+            if current == previous_tip {
+                return Ok(());
+            }
+            if current.as_deref() != Some(resolved_sha.as_str()) {
+                return Err(crate::write_guard::stale());
+            }
+            let args = match &previous_tip {
+                Some(tip) => vec![
+                    "update-ref",
+                    "-m",
+                    "Revia PR checkout rollback",
+                    &branch_ref,
+                    tip,
+                    &resolved_sha,
+                ],
+                None => vec!["update-ref", "-d", &branch_ref, &resolved_sha],
+            };
+            context
+                .session
+                .git
+                .run_write(&args)?
+                .into_success("回退本次未完成的PR引用")?;
+            Ok(())
+        })();
+        if let Err(error) = rollback {
+            cleanup_errors.push(error);
+        }
     }
-    // 快进或新建：普通 branch 创建/更新即可，不需要 -f。
-    let branch_args: Vec<String> = if exists {
-        // 已确认覆盖或快进：-f 只在确认后到达这里。
-        vec!["branch".into(), "-f".into(), branch.clone(), resolved_sha.clone()]
-    } else {
-        vec!["branch".into(), branch.clone(), resolved_sha.clone()]
-    };
-    let refs: Vec<&str> = branch_args.iter().map(String::as_str).collect();
-    let created = context.session.git.run_write(&refs)?;
-    if created.exit_code != 0 {
-        return Err(AppError::coded(
-            ErrorKind::Git,
-            "errors.m7.githubPrBranchFailed",
-            "创建本地分支失败：{error}",
-            &[("error", created.stderr.trim().to_string())],
-        ));
+    // 独占临时引用按实际旧OID删除；失败保留事实并转为待核对，不吞掉清理错误。
+    let cleanup = (|| -> Result<()> {
+        if let Some(tip) = pr_ref_tip(context.session, &temporary_ref)? {
+            context
+                .session
+                .git
+                .run_write(&["update-ref", "-d", &temporary_ref, &tip])?
+                .into_success("清理本次PR临时引用")?;
+        }
+        Ok(())
+    })();
+    if let Err(error) = cleanup {
+        cleanup_errors.push(error);
     }
-    // F11：检出复用既有流程；写门由上面的 acquire_write_lock 持有，checkout 内部再次
-    // 取锁会自锁——改用不取锁的内部路径。为保证单一入口，这里仍调用 checkout 并让它
-    // 拿锁：Mutex<bool> 不可重入，所以先释放我们的锁（drop 在此作用域末尾），由
-    // remote_ops::checkout 统一取锁执行真正的工作区切换。
-    drop(_write);
-    let result = remote_ops::checkout(
-        context.session,
-        recovery,
-        &CheckoutTarget::Local { name: branch.clone() },
-        request.strategy,
-        archive,
-    )?;
+    if !cleanup_errors.is_empty() {
+        let mut failure = AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.m7.githubPrCheckoutUnverified",
+            "PR 检出未完成，请核对分支与工作区；不会自动重试",
+            &[],
+        );
+        if let Err(error) = result {
+            failure = failure.cause(error);
+        }
+        for error in cleanup_errors {
+            failure = failure.related(&error);
+        }
+        result = Err(failure);
+    }
     Ok(PrCheckoutOutcome {
         branch,
         head_sha: resolved_sha,
-        result,
+        result: result?,
     })
+}
+
+fn pr_ref_tip(session: &WorktreeSession, reference: &str) -> Result<Option<String>> {
+    let output = session
+        .git
+        .run(&["rev-parse", "--verify", "--quiet", reference])?;
+    if output.exit_code == 1 {
+        return Ok(None);
+    }
+    Ok(Some(
+        output
+            .into_success("读取PR引用")?
+            .stdout_lossy()
+            .trim()
+            .to_string(),
+    ))
+}
+
+fn pr_head_ref(session: &WorktreeSession) -> Result<Option<String>> {
+    let output = session.git.run(&["symbolic-ref", "--quiet", "HEAD"])?;
+    if output.exit_code == 1 {
+        return Ok(None);
+    }
+    Ok(Some(
+        output
+            .into_success("读取检出分支")?
+            .stdout_lossy()
+            .trim()
+            .to_string(),
+    ))
 }
 
 /// 合并 PR：核对 head、保护状态与合并状态，写回执。
