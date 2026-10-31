@@ -95,6 +95,10 @@ export async function startNativeGlass(): Promise<boolean> {
     attributes: true,
     attributeFilter: ["data-kind", "data-theme", "style"],
   });
+  // 媒体查询变化不会修改 html 属性：辅助功能切换后也要立即撤掉原生透明层。
+  for (const query of ["(prefers-reduced-transparency: reduce)", "(forced-colors: active)"]) {
+    window.matchMedia(query).addEventListener("change", () => schedule());
+  }
   void document.fonts?.ready.then(() => schedule());
   schedule();
   return true;
@@ -166,7 +170,7 @@ function measure(): GlassLayout | null {
     background = { glass: { radius: Number.parseFloat(root.getPropertyValue("--window-radius")) || 0 } };
   }
   // Mica 只铺整窗，没有按区域的玻璃。
-  if (!regionGlass) return { background, regions: [] };
+  if (!regionGlass || mode === "solid") return { background, regions: [] };
   const top = dialogs.at(-1);
   if (top) {
     // 模态对话框盖住整个外壳：只留对话框自己那块玻璃（整窗的设置页连这块也不要）。

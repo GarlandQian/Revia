@@ -2569,7 +2569,7 @@ html.window-material .settings-dialog::backdrop {
 }
 
 html.window-material:has(.settings-dialog[open]) :is(
-  :is(.glass-host, .welcome-shell) > :not(.settings-dialog, .shell-body),
+  :is(.glass-host, .welcome-shell) > :not(dialog, .shell-body),
   .shell-body > *
 ) {
   visibility: hidden;
@@ -2683,4 +2683,48 @@ html.window-material .github-panel [role="dialog"] {
   background: color-mix(in srgb, var(--editor-background) 72%, transparent);
   backdrop-filter: blur(30px) saturate(1.4);
   -webkit-backdrop-filter: blur(30px) saturate(1.4);
+}
+
+/* 设置页上再打开退出确认时，确认框仍须可见，设置内容退到玻璃面板之后。 */
+html.window-material:has(.app-dialog[open]:not(.settings-dialog)) .settings-dialog[open] {
+  opacity: 0.35;
+  filter: blur(12px);
+}
+
+/* 系统材质的辅助功能回退最后应用，避免原生模式的高优先级规则重新开启透明和模糊。
+ * solid 同步给 Rust 后会移除整窗玻璃 / Mica 与所有区域玻璃。 */
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  html.window-material {
+    --glass-window: solid;
+    --glass-window-background: var(--editor-background);
+    --code-veil: var(--editor-background);
+  }
+
+  html.window-material :is(.revia-popper, .app-dialog, .notification, .github-panel [role="dialog"]) {
+    background: var(--editorwidget-background) !important;
+    border: 1px solid var(--panel-border) !important;
+    box-shadow: none !important;
+  }
+
+  html.window-material :is(
+    .glass-host > *, .shell-body > *, .settings-dialog[open],
+    .revia-popper, .app-dialog, .notification, .log-table-head, .github-panel [role="dialog"]
+  ) {
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  html.window-material {
+    --glass-window-background: Canvas;
+    --code-veil: Canvas;
+  }
+
+  html.window-material :is(.revia-popper, .app-dialog, .notification, .github-panel [role="dialog"]) {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+  }
 }
