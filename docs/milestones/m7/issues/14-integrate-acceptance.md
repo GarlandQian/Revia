@@ -466,3 +466,33 @@ Spec：固定 `ee8f662…37c1f44`，仅 review07 修复增量，9 路径、1 提
 
 已复核 7,886 项源码、1,288 项原证据散列和固定 diff；原记录 Rust156、Node16、frontend02／lint02 exit0，x18n 0错误／76警告。Rust／Node受测生产源未再变；最终 App 异步门禁已纳入 frontend02。未重跑检查、未启动桌面；Windows与本候选原生行为仍待验收。详见 `spec-evidence.md`。
 
+
+
+### Codex / review09 Standards（2026-10-31）
+
+固定增量`b5ddf9f…0dc11c0`；独立正式报告原文，详情原件位于`/private/tmp/revia-m7-batch-g5scyw0r/review-09-udxx1qjo`。
+
+Standards：固定 `b5ddf9f…0dc11c0`，仅真实桌面归组修复增量，4 路径、1 提交。**0 项硬违反；0 项新增判断。**
+
+已按 AGENTS、CLAUDE、GLOSSARY、local-validation、issue-tracker、决策表、产品/UI/技术方向及相关 ADR 核对。`changelists.rs:403–415` 只记录本次所选路径的未提交块；`:438–453` 唯一匹配后只迁移原列表归属。关联键使用路径、工作区位置和 Git 原始改动字节（`:570–589`），条目 ID、完整文件指纹与写前复核保留，新的条目不继承旧勾选（`:473–489、529、590–601`）。未发现突破 ADR-0004/0005/0009 或 Q197。
+
+固定 12 项 smell 全部检查，均按启发式判断；无新增可报告项。跳过工具强制规则，未扩大旧范围或要求边界返修。
+
+已核固定 diff、28 项相关源码/规范散列、174 项原证据散列及本轮受测 Rust 来源。`task13-native-group-rust-01` 原始 exit0：更改列表24项、共享提交12项通过。未重跑测试或启动桌面；旧原生证据只说明触发缺陷，新 Release 的真实桌面复验仍待完成。详见 `standards-evidence.md`。
+
+
+
+### Codex / review09 Spec（2026-10-31）
+
+固定增量`b5ddf9f…0dc11c0`；独立正式报告原文，详情原件位于`/private/tmp/revia-m7-batch-g5scyw0r/review-09-udxx1qjo`。
+
+Spec：固定 `b5ddf9f…0dc11c0`，仅真实桌面归组修复增量，4路径、1提交。0项P1/P2，1项P3构造边界。
+
+(a) 遗漏／部分实现：未发现独立遗漏。原组迁移限定本次所选路径的未提交块，不继承勾选；完整写前指纹与失败保护保留。
+
+(b) 范围外行为：未发现 scope creep。
+
+(c) **[P3，S09-B01，仅backlog] EOF换行上下文可能阻断归组关联。** 规格 `docs/milestones/m7/spec.md:133`：“提交后只移除已提交部分”。新 `src-tauri/src/m7/changelists.rs:573–588` 将切块补丁中所有反斜杠行计入关联payload；既有切块器会保留转为上下文行的无末尾换行标记（`segments.rs:591–600`）。同hunk有未提交块及被提交的EOF补换行块时，后者提交后该上下文标记消失，前者可能无法关联，留下失配原件并落默认组。应仅纳入目标块所属标记。静态推导，未动态复现；按规格`:151`／Q174记backlog，不阻断本轮。
+
+已核对固定diff、相关源码及270项原证据散列；原记录m7_changelists24＋commit_flow12全部通过、真实exit0，受测生产源码一致。旧版原生Git结果正确，失败点是归组。本轮未重跑测试或桌面；新候选原生复验、Windows仍未验证。详见 `spec-evidence.md`。
+

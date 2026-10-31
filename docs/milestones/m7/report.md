@@ -287,3 +287,8 @@ S07-03：外部diff显式验证Changelist路径的HEAD→工作区模型，仍�
 
 
 归组修复集中验证：`task13-native-group-rust-01`真实exit0，共36项通过（m7_changelists24、共享commit_flow12），含原生同文件分组选不同默认组的场景、同hunk剩余块和前方插入导致旧侧行号移动的回归。原始argv/源码hash/分流输出保留。仅改Rust私有收尾与相关回归，无locale/绑定/前端生产源码变更；下一步仅此增量独立两轴，再重新固定Release并实际复验，不沿用旧桌面作为新版本通过。
+
+
+### review09结束，原生归组修复转Release复验
+
+产品`0dc11c07e6926b5eef1f756fe2bcff9f0901b29d`，仅四路径新增量。Standards0硬违反/0判断、Spec0P1/P2和1P3构造边界；原文分别入任务13/14 Comments，S09-B01仅backlog15。36项Rust原记录已核对，未改前端和locale。下一步从新候选重新构建固定Release，用新的独占fixture复验原生归组收尾及继续14；此前fixed-release-native-7d8tke5w只作为历史证据。

@@ -67,3 +67,10 @@ Standards可能Duplicated Code：多处重复查找changelist/untracked读源；
 - **[P3，S08-B01，仅 backlog，静态] 空预览的冲突路径可能打不开内置合并。** M6 规格 `docs/milestones/m6/spec.md:146` 要求“保留内置合并”。新增 `src/App.tsx:6472` 将冲突对话框也限定为 `changelistEntryForPath`；该函数只接受 changelist／untracked（`src/lib/m7/visibleChangelistSelection.ts:41–42`）。当 index 仍 unmerged、工作区已恢复为 HEAD 内容时，HEAD→工作区补丁为空，`src-tauri/src/session.rs:572–584` 不生成 changelist 条目，已有 unmerged 条目又被排除；点“合并”只关闭对话框。未动态复现，按 Q174 作为边界 backlog，不要求本轮扩修。
 
 来源：/private/tmp/revia-m7-batch-g5scyw0r/review-08-qlvudspl/spec.md。静态判断，未动态复现；不扩大本轮任务13修复或阻断真实桌面验收。
+
+
+### review09 Spec S09-B01（P3，仅backlog）
+
+**[P3，S09-B01，仅backlog] EOF换行上下文可能阻断归组关联。** 规格 `docs/milestones/m7/spec.md:133`：“提交后只移除已提交部分”。新 `src-tauri/src/m7/changelists.rs:573–588` 将切块补丁中所有反斜杠行计入关联payload；既有切块器会保留转为上下文行的无末尾换行标记（`segments.rs:591–600`）。同hunk有未提交块及被提交的EOF补换行块时，后者提交后该上下文标记消失，前者可能无法关联，留下失配原件并落默认组。应仅纳入目标块所属标记。静态推导，未动态复现；按规格`:151`／Q174记backlog，不阻断本轮。
+
+来源：/private/tmp/revia-m7-batch-g5scyw0r/review-09-udxx1qjo/spec.md；未动态复现，不扩大本轮修复范围。
