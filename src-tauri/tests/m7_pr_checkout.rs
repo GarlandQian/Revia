@@ -1,5 +1,8 @@
 //! F11：受控loopback HTTP、真实Git/本地remote、自建HOME与appdata。
 //! 不接触真实账号、系统钥匙串或用户仓库；不属于桌面验收。
+#[path = "support/git_environment.rs"]
+mod git_environment;
+
 use revia_lib::{
     git::CommandLog,
     m7::github::{
@@ -9,11 +12,9 @@ use revia_lib::{
     recovery::RecoveryStore,
     remote_ops::{CheckoutResult, CheckoutStrategy},
     session::WorktreeSession,
-    shell::{EnvCaptureInfo, ShellEnv},
     stash_archive::StashArchiveStore,
 };
 use std::{
-    collections::HashMap,
     fs,
     io::{Read, Write},
     net::TcpListener,
@@ -76,29 +77,7 @@ impl Fixture {
             ],
         );
         git(&["remote", "add", "origin", remote.to_str().unwrap()]);
-        let vars = HashMap::from([
-            ("HOME".into(), home.display().to_string()),
-            (
-                "GIT_CONFIG_GLOBAL".into(),
-                home.join("gitconfig").display().to_string(),
-            ),
-            ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
-        ]);
-        let paths = vec!["/usr/bin".into(), "/bin".into(), "/opt/homebrew/bin".into()];
-        let env = ShellEnv {
-            path: paths.clone(),
-            vars,
-            info: EnvCaptureInfo {
-                worktree: repo.display().to_string(),
-                shell: "/bin/sh".into(),
-                elapsed_ms: 1,
-                timed_out: false,
-                used_fallback: true,
-                var_count: 3,
-                path_entries: paths,
-                diagnostics: None,
-            },
-        };
+        let env = git_environment::shell_env(&home, &repo, &home.join("gitconfig"));
         let session =
             WorktreeSession::open("fixture-pr", &repo, env, Arc::new(CommandLog::default()))
                 .unwrap();

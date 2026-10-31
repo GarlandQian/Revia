@@ -28,6 +28,7 @@ function fixture() {
   const disks = new Map(), drafts = new Map(), reports = [], requests = [];
   const file = (t) => disks.get(key(t)) ?? { ...t, worktreeIdentity: `identity-${t.worktreeId}`, text: "disk\n", baseSha256: "sha-disk", readonlyReason: null, executable: false, newline: "lf", hasBom: false, sizeBytes: 5 };
   let persist = async (draft) => { drafts.set(key(draft), { ...draft }); };
+  let clear = async (t) => { drafts.delete(key(t)); };
   let list = async (id) => [...drafts.values()].filter((d) => d.worktreeId === id);
   let save = async (request) => {
     requests.push(request);
@@ -38,11 +39,11 @@ function fixture() {
     return { path: request.path, sha256, bytes: request.text.length, executable: false, newline: "lf" };
   };
   const registry = new EditSessions({ open: async (t) => file(t), loadDraft: async (t) => drafts.get(key(t)) ?? null,
-    listDrafts: (id) => list(id), persist: (d) => persist(d), clear: async (t) => { drafts.delete(key(t)); },
+    listDrafts: (id) => list(id), persist: (d) => persist(d), clear: (t) => clear(t),
     save: (r) => save(r), blocked: () => false, report: (t, error) => reports.push({ target: t, error }) });
   return { registry, drafts, reports, requests,
     setDisk(t, text, sha, identity) { disks.set(key(t), { ...file(t), text, baseSha256: sha, ...(identity ? { worktreeIdentity: identity } : {}) }); },
-    setPersist(fn) { persist = fn; }, setList(fn) { list = fn; }, setSave(fn) { save = fn; } };
+    setClear(fn) { clear = fn; }, setPersist(fn) { persist = fn; }, setList(fn) { list = fn; }, setSave(fn) { save = fn; } };
 }
 test("恢复外部变化前的真草稿，保留旧基线与两版；磁盘二次变化必须再次核对", async () => {
   const f = fixture(), t = target();
@@ -188,4 +189,38 @@ test("真实Rust保存权限失败载荷经生产formatter中英均包含内层�
     assert.notEqual(actual, payload.code); assert.ok(cause.length > 0);
   }
   setLocale("zh-CN");
+});
+
+// review03 S03-01：真实生产会话须保留最后一次撤销结果，包含在途草稿和清理失败。
+test("撤销回磁盘原文后清除旧持久草稿，重开不复活已撤销内容", async () => {
+  const f = fixture(), t = target(), session = f.registry.get(t); await session.open();
+  session.change("obsolete draft\n"); await session.flushDraft();
+  session.change("disk\n"); await session.flushDraft();
+  assert.equal(f.drafts.size, 0); assert.equal(session.hasWork, false);
+  await session.open(); assert.equal(session.snapshot().text, "disk\n"); assert.equal(session.hasWork, false);
+});
+test("旧草稿持久化在途时撤销并立即重新打开，仍保留撤销后的正文", async () => {
+  const f = fixture(), t = target(), session = f.registry.get(t); await session.open();
+  const gate = deferred(); f.setPersist(async draft => { await gate.promise; f.drafts.set(key(draft), draft); });
+  session.change("obsolete draft\n"); const pending = session.flushDraft(); await tick();
+  session.change("disk\n"); const opening = session.open(); gate.resolve(); await pending; await opening;
+  assert.equal(session.snapshot().text, "disk\n"); assert.equal(f.drafts.size, 0); assert.equal(session.hasWork, false);
+});
+test("撤销后的草稿清理失败不覆盖最新内存，修复后可明确冲刷清除", async () => {
+  const f = fixture(), t = target(), session = f.registry.get(t); await session.open();
+  session.change("obsolete draft\n"); await session.flushDraft(); session.change("disk\n");
+  f.setClear(async () => { throw Error("fixture clear unavailable"); });
+  await assert.rejects(session.flushDraft()); await session.open();
+  assert.equal(session.snapshot().text, "disk\n"); assert.equal(session.hasWork, true);
+  f.setClear(async value => { f.drafts.delete(key(value)); }); await session.flushDraft();
+  assert.equal(f.drafts.size, 0); assert.equal(session.hasWork, false);
+});
+test("等待旧写后清理期间的新输入仍有自己的草稿，不被撤销清理删除", async () => {
+  const f = fixture(), t = target(), session = f.registry.get(t); await session.open();
+  const gate = deferred(); f.setPersist(async draft => { await gate.promise; f.drafts.set(key(draft), draft); });
+  session.change("old draft\n"); const old = session.flushDraft(); await tick();
+  session.change("disk\n"); const clearing = session.flushDraft();
+  session.change("new draft\n"); const fresh = session.flushDraft(); gate.resolve();
+  await Promise.all([old, clearing, fresh]);
+  assert.equal(session.snapshot().text, "new draft\n"); assert.equal(f.drafts.get(key(t)).text, "new draft\n");
 });

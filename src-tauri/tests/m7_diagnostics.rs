@@ -1,11 +1,14 @@
 //! 生产 Git 完成入口 → 七天摘要 → 预览/导出；只用独占 fixture、HOME 和 appdata。
+#[path = "support/git_environment.rs"]
+mod git_environment;
+
 use revia_lib::{
     git::{CommandLog, Git},
     m7::diagnostics::{self, DiagnosticsRequest, DiagnosticsSummaryStore},
     settings::Settings,
-    shell::{EnvCaptureInfo, ShellEnv},
+    shell::ShellEnv,
 };
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 
 struct Fixture {
     _root: tempfile::TempDir,
@@ -26,28 +29,7 @@ impl Fixture {
         }
         let config = home.join("empty.gitconfig");
         fs::write(&config, "").unwrap();
-        let path = vec!["/usr/bin".into(), "/bin".into()];
-        let vars = HashMap::from([
-            ("HOME".into(), home.display().to_string()),
-            ("GIT_CONFIG_GLOBAL".into(), config.display().to_string()),
-            ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
-            ("GIT_TERMINAL_PROMPT".into(), "0".into()),
-            ("PATH".into(), "/usr/bin:/bin".into()),
-        ]);
-        let env = ShellEnv {
-            vars,
-            path: path.clone(),
-            info: EnvCaptureInfo {
-                worktree: repo.display().to_string(),
-                shell: "/bin/sh".into(),
-                elapsed_ms: 0,
-                timed_out: false,
-                used_fallback: false,
-                var_count: 5,
-                path_entries: path,
-                diagnostics: None,
-            },
-        };
+        let env = git_environment::shell_env(&home, &repo, &config);
         Self {
             _root: root,
             repo,
@@ -100,11 +82,10 @@ fn real_hook_output_never_enters_summary_and_export_is_exact_preview() {
             .exit_code,
         0
     );
-    assert!(
-        log.snapshot()
-            .iter()
-            .any(|record| record.output.contains(body))
-    );
+    assert!(log
+        .snapshot()
+        .iter()
+        .any(|record| record.output.contains(body)));
     // 未打开诊断界面，摘要已经写出。
     let stored = fs::read_to_string(f.data.join("diagnostics-summary.json")).unwrap();
     let mut settings = Settings::default();

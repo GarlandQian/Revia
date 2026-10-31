@@ -85,8 +85,11 @@ export class EditSession {
           this.publish({ identityValid: false });
           throw localizedError("rejected", "errors.session.worktreeIdentityChanged");
         }
+        // 先等原目标已发草稿写结束；最新内存也可能是用户撤销回基线的正文。
+        await this.draftTail;
         const draft = await this.deps.loadDraft(this.target);
-        const keepMemory = this.dirty && this.state.identity === opened.worktreeIdentity;
+        const keepMemory = this.state.file !== null && this.state.identity === opened.worktreeIdentity
+          && (this.dirty || this.state.storedDraft || this.state.draftError !== null);
         const mine = keepMemory ? this.state.text : draft?.text ?? opened.text ?? "";
         const base = keepMemory ? this.state.baseSha : draft?.baseSha256 ?? opened.baseSha256;
         const dirty = normalized(mine) !== normalized(opened.text ?? "");
@@ -117,7 +120,12 @@ export class EditSession {
     if (this.discarding) { await this.draftTail; return; }
     const current = this.state;
     if (!current.identity || !current.baseSha) { await this.draftTail; return; }
-    if (!this.dirty) { await this.draftTail; return; }
+    if (!this.dirty) {
+      await this.draftTail;
+      // 撤销回基线也必须排在旧持久化之后清理；期间有新输入则留给它的冲刷。
+      if (!this.dirty && (this.state.storedDraft || this.state.draftError !== null)) await this.clearStored();
+      return;
+    }
     const draft: EditDraft = { ...this.target, worktreeIdentity: current.identity,
       baseSha256: current.baseSha, text: current.text, updatedAtMs: Date.now() };
     try {

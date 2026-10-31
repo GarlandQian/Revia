@@ -79,10 +79,10 @@ export function EditableWorkspace({ session, fontSize, fontFamily, blocked, onCl
     return () => { void session.flushDraft().catch(() => { /* 原目标会话及App已收到结构化失败。 */ }); };
   }, [session]);
   useEffect(() => {
-    if (!session.dirty || state.saving || state.loading) return;
+    if (!session.hasWork || state.saving || state.loading) return;
     const timer = window.setTimeout(() => void session.flushDraft().catch(() => { /* 会话保留失败与内容。 */ }), DRAFT_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [session, state.text, state.saving, state.loading]);
+  }, [session, state.text, state.saving, state.loading, state.storedDraft]);
   const editable = state.file?.text != null && state.file.readonlyReason === null && state.identityValid;
   const lineCount = Math.min(20_000, state.text.split("\n").length);
   const editor = <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--editor-background)]">

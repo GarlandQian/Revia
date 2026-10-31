@@ -1,4 +1,7 @@
 //! F09：本地草稿身份/正文/发布检查；只用自建仓库、独占appdata和虚构HTTP。
+#[path = "support/git_environment.rs"]
+mod git_environment;
+
 use revia_lib::{
     git::CommandLog,
     m7::github::{
@@ -8,10 +11,9 @@ use revia_lib::{
         GithubAccount, GithubAuthMethod, GithubClient, GithubState,
     },
     session::WorktreeSession,
-    shell::{EnvCaptureInfo, ShellEnv},
 };
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     fs,
     io::{Read, Write},
     net::TcpListener,
@@ -64,29 +66,7 @@ impl Fixture {
                 "https://github.com/fixture/project.git",
             ],
         );
-        let vars = HashMap::from([
-            ("HOME".into(), home.display().to_string()),
-            (
-                "GIT_CONFIG_GLOBAL".into(),
-                home.join("gitconfig").display().to_string(),
-            ),
-            ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
-        ]);
-        let path = vec!["/usr/bin".into(), "/bin".into(), "/opt/homebrew/bin".into()];
-        let env = ShellEnv {
-            vars,
-            path: path.clone(),
-            info: EnvCaptureInfo {
-                worktree: repo.display().to_string(),
-                shell: "/bin/sh".into(),
-                elapsed_ms: 1,
-                timed_out: false,
-                used_fallback: true,
-                var_count: 3,
-                path_entries: path,
-                diagnostics: None,
-            },
-        };
+        let env = git_environment::shell_env(&home, &repo, &home.join("gitconfig"));
         let session = WorktreeSession::open(
             "protection-fixture",
             &repo,
