@@ -721,3 +721,32 @@ Codex直接核对三路径源码、两轴证据及三份检查原件：82/82 Nod
 ### 2026-10-31：可见行发布修复的真实复验仍失败
 
 产品`c6e3d76648c1d5fbc59c5b920fff00d98fa1e362`，Release源码`965657e7fcf65fc59eee17e9387d0139cf736319`，固定`fixed-release-d06-khcl7wto`（二进制SHA256 `80c999563fc8965b8ef4e1bdf775d9e65a8eca90beaa6dbc3e066b1821db7bff`）。构建及真实可见`task14-d06-visible-publication-split-01`均exit0，四截图直接查看，7,887项源码散列未变。首屏236ms（list92ms、取行/绘制144ms）仍超过150ms，不能声称修复成功或收益。refresh89.851ms，记录阶段合计21.064ms，layout worker34.149ms；layout前端37ms后约15ms才发首批行，Rust行IPC2.166/4.424ms但JS28/34ms。继续定位前端同步提交/布局/绘制成本，不降低门槛或削弱保护。自动60帧及缓存来源单独保留，不作独立DOM/首帧证明。原件及散列见`task14-d06-visible-publication-audit.json`与`task14-d06-visible-publication-original-hashes.json`；旧224/252/220/176失败不覆盖，进程已正常退出。
+
+
+### review16：首屏同步阶段观测的独立双轴审查 — 2026-10-31
+
+固定范围 `94e53c6c0a79f2ecc8c8cb8c84d745a1ee519a5d...26fc4c53aa6c3e682392971f76fde5ac8eb62656`，仅三路径；以下两轴分别原文追加。
+
+#### Standards（原文）
+
+本轮 Standards：硬违反 0，smell 判断项 0，新增 P1/P2 0；无新增 P3/backlog 项。
+
+按 Q174 仅审 `94e53c6...26fc4c5` 的 1 提交、3 路径。`App.tsx:830–853,3469` 在 coverage/paint 等待后集中写出；`SideBySideView.tsx:172,245,250,262,736,747` 只包裹既有发布、量测与绘制，行日志新增值仅为 side/from/to；`log.ts:57–77` 关闭时不计时、不写日志，启用时最多保留 512 条，溢出计数，flush 后清空。未见 Git/hunk/写前校验、程序接管滚动、语言或诊断正文边界被改变。全部 smell 基线已逐项判断，没有需要扩展重构的新增问题。
+
+原件 `d06-sync-observation-{build,lint}-01` 的 argv、退出码、stdout/stderr 已核对；`pnpm build`、`pnpm lint` 均 exit 0。3 个变更文件的源码散列与固定 head 一致，diff/manifest 散列匹配；lint 原件保留 997 条 warning，均不在本次 3 路径，工具规则不重复报告。
+
+本代理未重跑 Node/Rust 检查、Release/native 或真实桌面；本轮是观测增量，不能据此宣称性能修复或 D06 通过。既有 236 ms > 150 ms 与旧失败继续保留。详见同目录 `standards-evidence.md`。
+
+#### Spec（原文）
+
+Spec：固定 `94e53c6…26fc4c5`，仅 Q174 的首屏同步阶段观测增量，3 路径、1 提交。**P1=0，P2=0，P3=0。**
+
+(a) 缺漏／部分：未见。`native-acceptance.md:93` 要求“继续定位前端同步提交/布局/绘制成本”。`SideBySideView.tsx:172,250,262,736,747` 覆盖 layout／可见缓存发布、bands、视口和 geometry；`App.tsx:830–853` 记录 coverage 与 nextPaint 等待，绘制等待结束后统一写出。`log.ts:57–77` 最多保留512条、累计 dropped，关闭日志清空缓冲。
+
+(b) 范围扩张：未见。对照 `spec.md:154` 的首屏150ms／未缓存100ms／缓存1帧及 `native-acceptance.md:93`“不降低门槛或削弱保护”，仅包裹既有操作与增加观测。正常模式没有新增日志IPC；新增载荷只有固定阶段、时间、side/from/to，未记录路径或正文，未改Git、持久化、locale或安全门。
+
+(c) 看似实现但错误：未见。同步包装保留回调返回值和异常传播；既有 flushSync、ResizeObserver、coverage判断与nextPaint调用顺序不变。同步记录在内存收集，统一经已有日志入口写出；side.lines的范围来自实际请求实参。
+
+已直接复核两份原始argv、exit、stdout/stderr、diff及各7,887项源码散列：build/lint均exit0；lint有既有警告，无本增量三路径诊断。本轴未重跑检查、运行应用或联系Pi。新Release与真实采样未验，不列为本增量缺陷或通过；236ms及旧失败保留，不能把诊断或构建通过当作D06修复。详见 `spec-evidence.md`。
+
+Codex直接核对源码、两份检查原件及每份7,887项源码散列，均匹配，build/lint真实exit0；997条既有lint警告保留。两轴完成结束，新增硬违反/判断/P1/P2/P3均0。此次仅缓冲阶段观测，不是性能修复；236ms及旧失败保留，下一步固定Release真实采样。
