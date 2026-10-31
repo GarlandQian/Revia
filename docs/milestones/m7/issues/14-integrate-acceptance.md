@@ -716,3 +716,8 @@ Spec：固定 `441c901…c6e3d76`，仅 Q174 的布局／当前可见行发布�
 已复核三份原始argv／exit／stdout／stderr、各7,887项源码散列与固定HEAD文件对象：Node82/82，build/lint exit0；本轴未重跑检查、启动应用或联系Pi。Node不能证明React实际时序。新固定Release真实桌面未做；224ms及原252/220/176ms首屏失败保留，不将其算本次遗漏或通过。细证据见 `spec-evidence.md`。
 
 Codex直接核对三路径源码、两轴证据及三份检查原件：82/82 Node、build/lint真实exit0，每份7,887项源码散列均匹配。lint有既有mockup等警告，未冒称零警告。两轴均完成结束；Standards 0硬违反/0判断、Spec 0项。旧224ms及252/220/176ms失败继续保留，新Release真实桌面仍待验证；不把缓存契约检查当React或D06通过。
+
+
+### 2026-10-31：可见行发布修复的真实复验仍失败
+
+产品`c6e3d76648c1d5fbc59c5b920fff00d98fa1e362`，Release源码`965657e7fcf65fc59eee17e9387d0139cf736319`，固定`fixed-release-d06-khcl7wto`（二进制SHA256 `80c999563fc8965b8ef4e1bdf775d9e65a8eca90beaa6dbc3e066b1821db7bff`）。构建及真实可见`task14-d06-visible-publication-split-01`均exit0，四截图直接查看，7,887项源码散列未变。首屏236ms（list92ms、取行/绘制144ms）仍超过150ms，不能声称修复成功或收益。refresh89.851ms，记录阶段合计21.064ms，layout worker34.149ms；layout前端37ms后约15ms才发首批行，Rust行IPC2.166/4.424ms但JS28/34ms。继续定位前端同步提交/布局/绘制成本，不降低门槛或削弱保护。自动60帧及缓存来源单独保留，不作独立DOM/首帧证明。原件及散列见`task14-d06-visible-publication-audit.json`与`task14-d06-visible-publication-original-hashes.json`；旧224/252/220/176失败不覆盖，进程已正常退出。
