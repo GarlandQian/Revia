@@ -105,3 +105,13 @@ S92“关闭运行中进程前确认…退出应用/安装更新同样纳入关�
 本轮页签关闭 `TerminalPanel.tsx:308–322,395–404` 有明确终止/取消选择，原“直接点页签×杀进程”的分支已修。新增运行态只通过 `App.tsx:6125–6127` 写terminalRunningRef，唯一读取点为更新前检查 `1655`。普通窗口关闭/退出 `1667–1684` 不读它，CloseCoordinator只接登记的写入/pending。故终端运行任务时正常关闭窗口或退出仍无确认/取消机会。报告将“参与关闭协调”写为已实现，与实际接线不一致。没有启动用户shell或真实PTY。
 
 </details>
+
+## Codex 直接修复终端所有权与关闭（F05/F06/H9）
+
+终端改由App级TerminalSessions持有；异步打开/恢复、运行态、错误与输出活动都绑定原worktree，A晚回不会追加到B，隐藏面板不丢进程或解除退出保护。首次完整读取持久页签后再写入；按cwd认领已有PTY，其余页签新开shell。全局串行保存保留其它worktree记录；失败不以初始空列表覆盖旧页签，最后页签持久化也保留原生退出保护。
+
+页签关闭必须显式确认运行中的进程。应用关闭/退出先冻结新终端，等已发打开结束，列出全局仍运行的进程供确认；取消不结束进程，确认也只准备，仍由既有CloseDriver等待Git写入/待核对并在实际关闭时终止已确认进程。最终草稿冲刷、终端页签落盘与关闭成功后才解除原生退出保护。Rust关闭失败保留原句柄并回传结构化cause；终端输入和忙碌提示核对实际会话所属worktree。
+
+`terminal-session-node-03` 33项通过（终端12项、编辑13项、既有合并写门8项），直接调用生产TerminalSessions/EditSessions/CloseDriver/WriteGuard，含在途A→B、隐藏运行态、取消/等待Git写、持久化错误和最终关闭顺序；所用可控API依赖用于并发回归，不是桌面验收。`terminal-cargo-02` 3项通过：真实自建PTY读写/中文/resize/退出、两worktree隔离，以及损坏页签原件保留。Tauri mock仅承载事件。`terminal-frontend-build-03`、`terminal-lint-01`与`terminal-x18n-02`均exit0；翻译0错误/76个unused-key警告，lint新增一条no-useless-spread提示留backlog。
+
+首轮前端类型检查`terminal-frontend-build-01`真实exit2（占位回调推断为false字面量），修正返回类型后检查通过，失败原件保留。每轮源码hash/argv/exit/原stdout/stderr在批次codex-checks目录。以上为本组检查点，不代表整包或真实桌面通过；更新安装的终端确认/重启全局协调仍随F13继续，当前安装门禁已读取全局运行态，不会因面板隐藏而放行。

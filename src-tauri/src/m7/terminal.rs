@@ -101,7 +101,7 @@ impl TerminalTabStore {
 
     pub fn load(&self) -> Result<Vec<TerminalTabRecord>> {
         match std::fs::read(&self.path) {
-            Ok(bytes) => Ok(serde_json::from_slice(&bytes).unwrap_or_default()),
+            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
             Err(error) => Err(error.into()),
         }
@@ -315,6 +315,12 @@ impl TerminalManager {
         Ok(info)
     }
 
+    /// 输入/错误/忙碌提示按真实会话归属，不根据当前显示面板猜worktree。
+    pub fn owner(&self, session_id: u64) -> Result<String> {
+        let sessions = self.sessions.lock().unwrap_or_else(|error| error.into_inner());
+        Ok(sessions.get(&session_id).ok_or_else(unknown_session)?.info.worktree_id.clone())
+    }
+
     pub fn write_input(&self, session_id: u64, data: &str) -> Result<()> {
         if data.is_empty() {
             return Ok(());
@@ -386,11 +392,15 @@ impl TerminalManager {
     /// 关闭终端：结束进程并丢弃会话（调用前由界面确认）。
     pub fn close(&self, session_id: u64) -> Result<()> {
         let mut sessions = self.sessions.lock().unwrap_or_else(|error| error.into_inner());
-        let mut handle = sessions.remove(&session_id).ok_or_else(unknown_session)?;
-        // 关闭 PTY 主端会让子进程收到 SIGHUP；再显式 kill 一次兜底（不等待，避免阻塞命令线程）。
+        let handle = sessions.get_mut(&session_id).ok_or_else(unknown_session)?;
+        // kill失败时保留原句柄与页签，由用户核对/重试，不能返回假成功。
         if !handle.exited.load(Ordering::Relaxed) {
-            let _ = handle.killer.kill();
+            handle.killer.kill().map_err(|error| AppError::coded(
+                ErrorKind::Environment, "errors.m7.terminalCloseFailed",
+                "结束终端进程失败：{cause}", &[],
+            ).cause(error.into()))?;
         }
+        let handle = sessions.remove(&session_id).ok_or_else(unknown_session)?;
         drop(handle.master);
         handle.exited.store(true, Ordering::Relaxed);
         Ok(())

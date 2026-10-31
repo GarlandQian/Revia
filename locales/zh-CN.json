@@ -1305,7 +1305,9 @@
       "diagnosticsStoreFailed": "诊断摘要读写失败；请清空摘要后重试",
       "diagnosticsSnapshotExpired": "诊断预览已失效，请刷新后再导出",
       "githubCredentialDeleteFailed": "无法删除 GitHub 凭据：{error}",
-      "editDraftsUnresolved": "文件 {path} 仍有编辑草稿，请先保存或放弃"
+      "editDraftsUnresolved": "文件 {path} 仍有编辑草稿，请先保存或放弃",
+      "terminalWorktreeBusy": "此 worktree 正在执行写操作或准备关闭，请稍后再输入终端",
+      "terminalCloseFailed": "结束终端进程失败：{cause}"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
@@ -2129,7 +2131,10 @@
     "closePanel": "关闭终端面板",
     "empty": "还没有终端页签",
     "closeRunningConfirm": "进程仍在运行，关闭会终止它。",
-    "closeRunningYes": "终止并关闭"
+    "closeRunningYes": "终止并关闭",
+    "shutdownTitle": "确认结束运行中的终端",
+    "shutdownConfirm": "仍有 {count} 个终端进程运行。继续后会在关闭或退出时结束这些进程；取消将保留它们。",
+    "shutdownYes": "结束进程并继续"
   },
   "clone": {
     "title": "克隆仓库",

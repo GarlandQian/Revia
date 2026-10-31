@@ -90,6 +90,7 @@ fn pty_round_trip_resize_and_close() {
         .expect("打开终端失败");
     assert!(info.running, "新开的终端应在运行");
     assert_eq!(info.worktree_id, "wt-1");
+    assert_eq!(manager.owner(info.session_id).unwrap(), "wt-1");
     assert_eq!((info.rows, info.cols), (24, 80));
 
     // 写入 + 读回：PTY 双向可用，中文与 UTF-8 不被截断。
@@ -127,6 +128,7 @@ fn pty_round_trip_resize_and_close() {
         .expect_err("关闭后写入必须被拒绝");
     assert_eq!(write_error.code, Some("errors.m7.terminalSessionUnknown"));
     assert!(manager.snapshot(info.session_id).is_err());
+    assert!(manager.owner(info.session_id).is_err());
     assert!(!manager.has_running("wt-1"), "关闭后该 worktree 不应有运行中的终端");
 }
 
@@ -169,4 +171,16 @@ fn sessions_are_independent_per_worktree() {
 
     manager.close_worktree("wt-b");
     assert!(manager.list().is_empty(), "两个会话都应被关闭");
+}
+
+/// 损坏的页签记录必须报错并保留原件，不能被当成空列表覆盖。
+#[test]
+fn corrupt_terminal_tab_record_is_not_an_empty_restore() {
+    use revia_lib::m7::terminal::TerminalTabStore;
+    let temp = tempfile::tempdir().unwrap();
+    let store = TerminalTabStore::new(temp.path());
+    let path = temp.path().join("terminal-tabs.json");
+    fs::write(&path, b"{fixture-incomplete-json").unwrap();
+    assert!(store.load().is_err());
+    assert_eq!(fs::read(&path).unwrap(), b"{fixture-incomplete-json");
 }

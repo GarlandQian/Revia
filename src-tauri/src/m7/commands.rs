@@ -221,6 +221,7 @@ pub async fn m7_terminal_open(
     let manager = Arc::clone(&state.m7_terminal);
     let cwd = request.cwd.clone();
     blocking(move || {
+        session.require_identity()?;
         manager.open(
             &app,
             &session.id,
@@ -244,6 +245,12 @@ pub async fn m7_terminal_write(
     session_id: u64,
     data: String,
 ) -> Result<()> {
+    let owner = state.m7_terminal.owner(session_id)?;
+    let session = session_for(&state, &owner)?;
+    if *session.writing.lock().unwrap_or_else(|error| error.into_inner()) {
+        return Err(AppError::coded(ErrorKind::Rejected, "errors.m7.terminalWorktreeBusy",
+            "此 worktree 正在执行写操作，请完成后再输入终端", &[]));
+    }
     state.m7_terminal.write_input(session_id, &data)
 }
 

@@ -299,6 +299,8 @@ sources:
     en: 145de6e9b174f0
   errors.m7.taskFailed:
     en: 2956cb2e465d8
+  errors.m7.terminalCloseFailed:
+    en: a3252517924c6
   errors.m7.terminalCwdMissing:
     en: 1b25c18005a0db
   errors.m7.terminalCwdOutsideWorktree:
@@ -317,6 +319,8 @@ sources:
     en: 15c2393888bbe5
   errors.m7.terminalStreamFailed:
     en: c640823eb8362
+  errors.m7.terminalWorktreeBusy:
+    en: 141f9ea30691d1
   errors.m7.terminalWriteFailed:
     en: 6d44cffa2dbbf
   errors.m7.themeFileMissing:
@@ -759,6 +763,12 @@ sources:
     en: 70dc794989038
   terminal.new:
     en: 15931516c53a12
+  terminal.shutdownConfirm:
+    en: 138070b3350aad
+  terminal.shutdownTitle:
+    en: c08655bce52dc
+  terminal.shutdownYes:
+    en: 17c4ff953542a9
   terminal.title:
     en: 8988b0ee84e2b
   toolbar.clone:

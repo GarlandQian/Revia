@@ -913,7 +913,9 @@
       "diagnosticsStoreFailed": "Could not read or write diagnostic summaries. Clear the summaries and try again.",
       "diagnosticsSnapshotExpired": "The diagnostic preview has expired. Refresh it before exporting.",
       "githubCredentialDeleteFailed": "Could not delete GitHub credentials: {error}",
-      "editDraftsUnresolved": "File {path} still has an edit draft. Save or discard it first."
+      "editDraftsUnresolved": "File {path} still has an edit draft. Save or discard it first.",
+      "terminalWorktreeBusy": "This worktree is writing or preparing to close. Wait before entering terminal input.",
+      "terminalCloseFailed": "The terminal process could not be ended: {cause}"
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
@@ -2129,7 +2131,10 @@
     "closePanel": "Close terminal panel",
     "empty": "No terminal tabs yet",
     "closeRunningConfirm": "Process still running — closing terminates it.",
-    "closeRunningYes": "Terminate & close"
+    "closeRunningYes": "Terminate & close",
+    "shutdownTitle": "Confirm closing running terminals",
+    "shutdownConfirm": "There are {count} terminal processes running. Continuing will end them when the app closes or exits; cancelling keeps them running.",
+    "shutdownYes": "End processes and continue"
   },
   "clone": {
     "title": "Clone repository",

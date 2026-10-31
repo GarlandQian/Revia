@@ -232,6 +232,7 @@ export const m7 = {
 export function onM7Events(handlers: {
   onTerminalOutput?: (event: TerminalOutput) => void;
   onTerminalExit?: (event: TerminalExit) => void;
+  onListenError?: (caught: unknown) => void;
   onCloneProgress?: (event: CloneProgress) => void;
   onCloneFinished?: (event: CloneFinished) => void;
   onUpdateProgress?: (event: UpdateProgress) => void;
@@ -240,7 +241,9 @@ export function onM7Events(handlers: {
   const pending: Promise<UnlistenFn>[] = [];
   const add = <T,>(name: string, handler: ((payload: T) => void) | undefined) => {
     if (!handler) return;
-    pending.push(listen<T>(name, (event) => handler(event.payload)));
+    const subscription = listen<T>(name, (event) => handler(event.payload));
+    void subscription.catch((caught) => handlers.onListenError?.(caught));
+    pending.push(subscription);
   };
   add<TerminalOutput>("revia://terminal-output", handlers.onTerminalOutput);
   add<TerminalExit>("revia://terminal-exit", handlers.onTerminalExit);
@@ -249,6 +252,6 @@ export function onM7Events(handlers: {
   add<UpdateProgress>("revia://update-progress", handlers.onUpdateProgress);
   add<{ version: string }>("revia://update-available", handlers.onUpdateAvailable);
   return () => {
-    for (const promise of pending) void promise.then((unlisten) => unlisten());
+    for (const promise of pending) void promise.then((unlisten) => unlisten()).catch(() => { /* 安装失败已报告。 */ });
   };
 }

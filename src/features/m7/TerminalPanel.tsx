@@ -6,28 +6,16 @@
  * 不在前端拼命令、不保存输出；重启只恢复页签与起始目录并新开 shell。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import type { TerminalSessionInfo } from "@/types/bindings/TerminalSessionInfo";
-import type { TerminalTabRecord } from "@/types/bindings/TerminalTabRecord";
 import { Codicon } from "@/components/ui/codicon";
-import { formatAppError, toAppError } from "@/lib/error";
+import { formatAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
-import { m7, onM7Events } from "@/lib/m7/api";
-import { registerM7Flusher } from "@/lib/m7/flush";
+import { m7 } from "@/lib/m7/api";
 import { codeFontStack } from "@/lib/theme";
-import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-
-interface Tab {
-  sessionId: number;
-  worktreeId: string;
-  title: string;
-  cwd: string;
-  running: boolean;
-  exitCode: number | null;
-}
+import { TerminalSessions } from "@/lib/m7/terminalSessions";
 
 interface Instance {
   terminal: Terminal;
@@ -43,10 +31,8 @@ export interface TerminalPanelProps {
   fontFamily: string | null;
   height: number;
   onHeightChange: (height: number) => void;
-  /** 终端输出静默后触发外部核对（工作区可能被命令改过）。 */
-  onActivity: () => void;
-  /** F05/F13：本面板管理的会话中是否存在运行中的进程（更新安装 / 关闭协调用）。 */
-  onRunningChange?: (running: boolean) => void;
+  registry: TerminalSessions;
+  busy: boolean;
   onClose: () => void;
 }
 
@@ -71,165 +57,39 @@ export function TerminalPanel({
   fontFamily,
   height,
   onHeightChange,
-  onActivity,
-  onRunningChange,
+  registry,
+  busy,
   onClose,
 }: TerminalPanelProps) {
-  const [tabs, setTabs] = useState<Tab[]>([]);
+  const revision = useSyncExternalStore(registry.subscribe, registry.snapshot);
+  const tabs = registry.list(worktreeId);
+  const error = registry.errorFor(worktreeId);
+  const starting = registry.isStarting(worktreeId);
   const [active, setActive] = useState<number | null>(null);
-  const [error, setError] = useState<AppErrorPayload | null>(null);
-  const [starting, setStarting] = useState(false);
   const instances = useRef(new Map<number, Instance>());
-  const tabsRef = useRef<Tab[]>([]);
-  tabsRef.current = tabs;
-  const otherTabs = useRef<TerminalTabRecord[]>([]);
-  const activityTimer = useRef<number | null>(null);
+  const ownerRef = useRef<string | null>(worktreeId); ownerRef.current = worktreeId;
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
-
-  const persistTabs = useCallback(async () => {
-    const records: TerminalTabRecord[] = [
-      ...otherTabs.current,
-      ...tabsRef.current.map((tab, index) => ({
-        worktreeId: tab.worktreeId,
-        cwd: tab.cwd,
-        title: tab.title,
-        order: index,
-      })),
-    ];
-    await m7.terminalSaveTabs(records).catch(() => undefined);
-  }, []);
-
-  const openSession = useCallback(
-    async (cwd: string | null) => {
-      setStarting(true);
-      try {
-        const info: TerminalSessionInfo = await m7.terminalOpen({
-          worktreeId,
-          cwd,
-          rows: 24,
-          cols: 80,
-        });
-        const tab: Tab = {
-          sessionId: info.sessionId,
-          worktreeId: info.worktreeId,
-          title: info.title,
-          cwd: info.cwd,
-          running: info.running,
-          exitCode: info.exitCode ?? null,
-        };
-        setTabs((current) => [...current, tab]);
-        setActive(info.sessionId);
-        setError(null);
-        return tab;
-      } catch (caught) {
-        setError(toAppError(caught));
-        return null;
-      } finally {
-        setStarting(false);
-      }
-    },
-    [worktreeId],
-  );
-
-  // F05：挂载 / 切 worktree 时，先认领后端仍在运行的属于本 worktree 的会话，
-  // 再按持久化页签补新 shell。不重复 openSession 造成不可达进程。
-  const claimOrOpen = useCallback(async (recordCwd: string | null) => {
-    const live = await m7.terminalList().catch(() => [] as TerminalSessionInfo[]);
-    const mine = live.filter((info) => info.worktreeId === worktreeId);
-    const claimed = mine.find((info) => !tabsRef.current.some((tab) => tab.sessionId === info.sessionId));
-    if (claimed) {
-      const tab: Tab = {
-        sessionId: claimed.sessionId,
-        worktreeId: claimed.worktreeId,
-        title: claimed.title,
-        cwd: claimed.cwd,
-        running: claimed.running,
-        exitCode: claimed.exitCode ?? null,
-      };
-      setTabs((current) => [...current, tab]);
-      setActive(tab.sessionId);
-      return tab;
-    }
-    return openSession(recordCwd);
-  }, [openSession, worktreeId]);
-
-  // 首次打开：恢复本 worktree 的页签（新 shell，不恢复旧进程）；运行中的进程被重新认领。
   useEffect(() => {
-    let cancelled = false;
-    // F05：换 worktree 先清掉旧页签状态，避免 A 的页签显示在 B 的标题下。
-    // 只销毁前端 xterm 视图，后端 PTY 会话保留（重新打开时由 claimOrOpen 认领）。
-    setTabs([]);
+    ownerRef.current = worktreeId;
     setActive(null);
-    instances.current.forEach((instance) => {
-      instance.observer?.disconnect();
-      instance.terminal.dispose();
-    });
-    instances.current.clear();
-    void (async () => {
-      const stored = await m7.terminalTabs().catch(() => [] as TerminalTabRecord[]);
-      if (cancelled) return;
-      otherTabs.current = stored.filter((record) => record.worktreeId !== worktreeId);
-      const mine = stored
-        .filter((record) => record.worktreeId === worktreeId)
-        .sort((left, right) => left.order - right.order);
-      if (mine.length === 0) {
-        await claimOrOpen(null);
-        return;
-      }
-      for (const record of mine.slice(0, 6)) {
-        if (cancelled) return;
-        await claimOrOpen(record.cwd);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // 只按 worktree 恢复一次；页签变化由后续操作保存。
-  }, [worktreeId, claimOrOpen]);
-
+    void registry.restore(worktreeId).catch(() => { /* 原目标错误已由全局registry展示。 */ });
+    return () => { if (ownerRef.current === worktreeId) ownerRef.current = null; };
+  }, [registry, worktreeId]);
   useEffect(() => {
-    void persistTabs();
-  }, [tabs, persistTabs]);
-
-  // F05/F13：把“是否有运行中的会话”同步给外层（更新安装 / 关闭协调读取）。
-  const anyRunning = tabs.some((tab) => tab.running);
-  useEffect(() => {
-    onRunningChange?.(anyRunning);
-  }, [anyRunning, onRunningChange]);
-
-  // F05：写入期间显示所属 worktree 忙碌（写锁被 Git 写操作持有时禁用输入）。
-
-  // 关闭前保存页签（不保存输出，也不恢复进程）。
-  useEffect(() => registerM7Flusher(persistTabs), [persistTabs]);
-
-  // 后端输出与退出事件。
-  useEffect(() => {
-    return onM7Events({
-      onTerminalOutput: (event) => {
-        const instance = instances.current.get(event.sessionId);
-        if (instance) instance.terminal.write(event.data);
-        if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
-        activityTimer.current = window.setTimeout(() => {
-          activityTimer.current = null;
-          onActivity();
-        }, 900);
-      },
-      onTerminalExit: (event) => {
-        setTabs((current) =>
-          current.map((tab) =>
-            tab.sessionId === event.sessionId
-              ? { ...tab, running: false, exitCode: event.exitCode ?? null }
-              : tab,
-          ),
-        );
-        const instance = instances.current.get(event.sessionId);
-        instance?.terminal.write(
-          `\r\n\u001b[90m[${t("terminal.exited", { code: event.exitCode ?? 0 })}]\u001b[0m\r\n`,
-        );
-        onActivity();
-      },
-    });
-  }, [onActivity]);
+    if (!tabs.some((tab) => tab.sessionId === active)) setActive(tabs[0]?.sessionId ?? null);
+  }, [active, tabs]);
+  const openSession = useCallback(async (cwd: string | null) => {
+    const info = await registry.open(worktreeId, cwd);
+    if (info && ownerRef.current === worktreeId) setActive(info.sessionId);
+  }, [registry, worktreeId]);
+  useEffect(() => registry.onOutput((event) => {
+    instances.current.get(event.sessionId)?.terminal.write(event.data);
+  }), [registry]);
+  useEffect(() => registry.onExit((event) => {
+    instances.current.get(event.sessionId)?.terminal.write(
+      `\r\n\u001b[90m[${t("terminal.exited", { code: event.exitCode ?? 0 })}]\u001b[0m\r\n`,
+    );
+  }), [registry]);
 
   const attach = useCallback(
     (sessionId: number, container: HTMLDivElement | null) => {
@@ -257,8 +117,8 @@ export function TerminalPanel({
       const observer = new ResizeObserver(() => {
         try {
           fit.fit();
-          void m7
-            .terminalResize(sessionId, terminal.rows, terminal.cols)
+          void registry
+            .resize(sessionId, terminal.rows, terminal.cols)
             .catch(() => undefined);
         } catch {
           // 容器尚未布局完成时忽略。
@@ -266,31 +126,32 @@ export function TerminalPanel({
       });
       observer.observe(container);
       terminal.onData((data) => {
-        void m7.terminalWrite(sessionId, data).catch(() => undefined);
+        void registry.input(sessionId, data).catch(() => { /* 原目标已有错误。 */ });
       });
       void m7
         .terminalSnapshot(sessionId)
         .then((snapshot) => {
-          if (snapshot.length > 0) terminal.write(snapshot);
+          if (instances.current.get(sessionId)?.terminal === terminal && snapshot.length > 0) terminal.write(snapshot);
         })
-        .catch(() => undefined);
+        .catch((caught) => registry.reportSessionFailure(sessionId, caught));
       instances.current.set(sessionId, { terminal, fit, container, observer });
       requestAnimationFrame(() => {
         try {
           fit.fit();
-          void m7.terminalResize(sessionId, terminal.rows, terminal.cols).catch(() => undefined);
+          void registry.resize(sessionId, terminal.rows, terminal.cols).catch(() => { /* 原目标已有错误。 */ });
           terminal.focus();
         } catch {
           // 忽略布局竞态。
         }
       });
     },
-    [fontFamily, fontSize],
+    [fontFamily, fontSize, registry],
   );
 
   // 字号或主题变化时更新所有实例。
   useEffect(() => {
     for (const instance of instances.current.values()) {
+      instance.terminal.options.disableStdin = busy || registry.isClosing;
       instance.terminal.options.fontSize = fontSize;
       instance.terminal.options.fontFamily = codeFontStack(fontFamily);
       instance.terminal.options.theme = terminalTheme();
@@ -300,34 +161,19 @@ export function TerminalPanel({
         // 忽略。
       }
     }
-  }, [fontSize, fontFamily]);
+  }, [fontSize, fontFamily, busy, registry, revision]);
 
   // F06/H9：关闭运行中进程前先确认；确认后由用户动作触发真正关闭。
   const [confirmCloseSession, setConfirmCloseSession] = useState<number | null>(null);
 
-  const closeTab = useCallback(
-    async (sessionId: number) => {
-      const tab = tabsRef.current.find((item) => item.sessionId === sessionId);
-      if (tab?.running && confirmCloseSession !== sessionId) {
-        setConfirmCloseSession(sessionId);
-        return;
-      }
-      setConfirmCloseSession(null);
-      const instance = instances.current.get(sessionId);
-      if (instance) {
-        instance.observer?.disconnect();
-        instance.terminal.dispose();
-        instances.current.delete(sessionId);
-      }
-      await m7.terminalClose(sessionId).catch(() => undefined);
-      setTabs((current) => {
-        const next = current.filter((tab) => tab.sessionId !== sessionId);
-        if (active === sessionId) setActive(next.length > 0 ? next[next.length - 1].sessionId : null);
-        return next;
-      });
-    },
-    [active, confirmCloseSession],
-  );
+  const closeTab = useCallback(async (sessionId: number, confirmed = false) => {
+    const tab = registry.list(worktreeId).find((item) => item.sessionId === sessionId);
+    if (!tab) return;
+    if (tab.running && !confirmed) { setConfirmCloseSession(sessionId); return; }
+    setConfirmCloseSession(null);
+    // 后端确实关闭后才移除页签和视图；失败保留原进程与错误。
+    await registry.close(sessionId, confirmed).catch(() => { /* 原目标已有错误。 */ });
+  }, [registry, worktreeId]);
 
   const startDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -395,7 +241,7 @@ export function TerminalPanel({
               {confirmCloseSession === tab.sessionId ? (
                 <span className="ml-1 flex items-center gap-1 text-[10.5px] text-[var(--editorwarning-foreground)]">
                   {t("terminal.closeRunningConfirm")}
-                  <button type="button" className="toolbar-widget h-4 px-1" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId); }}>
+                  <button type="button" className="toolbar-widget h-4 px-1" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId, true); }}>
                     {t("terminal.closeRunningYes")}
                   </button>
                   <button type="button" className="toolbar-widget h-4 px-1" onClick={() => setConfirmCloseSession(null)}>
@@ -411,7 +257,7 @@ export function TerminalPanel({
           className="icon-action size-[22px]"
           title={t("terminal.new")}
           aria-label={t("terminal.new")}
-          disabled={starting}
+          disabled={starting || busy || registry.isClosing}
           onClick={() => void openSession(activeTab?.cwd ?? null)}
         >
           <Codicon name="add" size={14} />
@@ -426,6 +272,7 @@ export function TerminalPanel({
           <Codicon name="close" size={14} />
         </button>
       </div>
+      {busy ? <p role="status" className="px-3 py-1 text-[12px] text-descriptionforeground">{t("errors.m7.terminalWorktreeBusy")}</p> : null}
       {error ? (
         <div role="alert" className="mx-2 mt-1 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1 text-[12px]">
           {formatAppError(error)}
@@ -442,7 +289,7 @@ export function TerminalPanel({
         {tabs.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-[12px] text-descriptionforeground">
             <span>{t("terminal.empty")}</span>
-            <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void openSession(null)}>
+            <button type="button" className="toolbar-widget h-6 px-2" disabled={starting || busy || registry.isClosing} onClick={() => void openSession(null)}>
               {t("terminal.new")}
             </button>
           </div>

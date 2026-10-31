@@ -128,6 +128,8 @@ import { runEditWrite } from "@/lib/m7/editWrite";
 import type { EditSavePayload } from "@/lib/m7/api";
 import type { EditSaved } from "@/types/bindings/EditSaved";
 import { TerminalPanel } from "@/features/m7/TerminalPanel";
+import { TerminalSessions } from "@/lib/m7/terminalSessions";
+import type { TerminalSessionInfo } from "@/types/bindings/TerminalSessionInfo";
 import { CloneDialog } from "@/features/m7/CloneDialog";
 import { GithubPanel } from "@/features/m7/GithubPanel";
 import { DiagnosticsDialog } from "@/features/m7/DiagnosticsDialog";
@@ -383,6 +385,27 @@ export function App() {
   // ---------- M7 扩展状态（终端、编辑、克隆、PR、诊断、更新） ----------
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(240);
+  const terminalCallbacksRef = useRef({ report: (_id: string | null, _error: AppErrorPayload) => {}, blocked: (_id: string): boolean => false, activity: (_id: string) => {} });
+  const [terminalSessions] = useState(() => new TerminalSessions({
+    list: () => m7.terminalList(), loadTabs: () => m7.terminalTabs(), saveTabs: (tabs) => m7.terminalSaveTabs(tabs),
+    open: (id, cwd) => m7.terminalOpen({ worktreeId: id, cwd, rows: 24, cols: 80 }),
+    close: (id) => m7.terminalClose(id), write: (id, data) => m7.terminalWrite(id, data),
+    resize: (id, rows, cols) => m7.terminalResize(id, rows, cols),
+    report: (id, error) => terminalCallbacksRef.current.report(id, error),
+    blocked: (id) => terminalCallbacksRef.current.blocked(id), activity: (id) => terminalCallbacksRef.current.activity(id),
+  }));
+  useSyncExternalStore(terminalSessions.subscribe, terminalSessions.snapshot);
+  const [terminalConfirmation, setTerminalConfirmation] = useState<TerminalSessionInfo[] | null>(null);
+  const terminalConfirmationRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const askTerminalShutdown = useCallback((sessions: TerminalSessionInfo[]): Promise<boolean> => new Promise((resolve) => {
+    terminalConfirmationRef.current = resolve; setTerminalConfirmation(sessions);
+  }), []);
+  const finishTerminalConfirmation = useCallback((confirmed: boolean) => {
+    const resolve = terminalConfirmationRef.current; terminalConfirmationRef.current = null;
+    setTerminalConfirmation(null); resolve?.(confirmed);
+  }, []);
+  const terminalActivityTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
   /** 正在编辑的文件（同一时刻只编辑一个，切换文件前先处理未保存改动）。 */
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editingWorktreeId, setEditingWorktreeId] = useState<string | null>(null);
@@ -1613,7 +1636,7 @@ export function App() {
    */
   const closeCoordinatorRef = useRef(new CloseCoordinator());
   /** 终端是否有运行中的会话（任务 04 / F13）：关闭协调与更新安装都要用它。 */
-  const terminalRunningRef = useRef(false);
+  // 运行态由App级TerminalSessions持有，隐藏面板不解除退出保护。
   /** 当前需要用户选择的关闭/退出请求（`null` 表示没有）。 */
   const [closeRequest, setCloseRequest] = useState<CloseDecision | null>(null);
   /** 当前询问对应的原动作（close / exit）：由 reconcile 从被保留的原请求写入。 */
@@ -1684,7 +1707,7 @@ export function App() {
       setAppError(localizedError("rejected", "errors.update.installBlockedBusy"), null);
       return false;
     }
-    if (terminalRunningRef.current) {
+    if (terminalSessions.needsExitGuard) {
       setAppError(localizedError("rejected", "errors.update.installBlockedTerminal"), null);
       return false;
     }
@@ -1702,9 +1725,11 @@ export function App() {
       await editSessions.flush();
       await flushM7State();
       if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
+      await terminalSessions.finishShutdown();
+      await syncExitBlocked(false);
       await action();
     },
-    [editSessions],
+    [editSessions, terminalSessions, syncExitBlocked],
   );
 
   const closeDriverRef = useRef<CloseDriver | null>(null);
@@ -1713,12 +1738,12 @@ export function App() {
       coordinator: closeCoordinatorRef.current,
       releaseExitGuard: async () => {
         if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
-        await syncExitBlocked(false);
+        // 真正解除原生保护留到最终草稿冲刷和已确认终端关闭之后。
       },
       // 关闭/退出前必须先把草稿落盘并等待完成：落盘失败时不得静默销毁窗口（F02.5）。
       closeWindow: () => closeAfterDraftFlush(() => getCurrentWindow().destroy()),
       exitApp: () => closeAfterDraftFlush(() => ipc.requestExit()),
-      onError: (caught) => { editSessions.setClosing(false); setAppError(toAppError(caught), null); },
+      onError: (caught) => { editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null); },
       onAsk: (intent, writing, pending) => {
         closeIntentRef.current = intent;
         setCloseRequest(
@@ -1727,7 +1752,7 @@ export function App() {
       },
       onSettled: () => {
         setCloseRequest(null);
-        if (closeDriverRef.current?.currentPhase() === "idle") editSessions.setClosing(false);
+        if (closeDriverRef.current?.currentPhase() === "idle") { editSessions.setClosing(false); terminalSessions.cancelShutdown(); }
       },
     });
   }
@@ -1755,20 +1780,22 @@ export function App() {
    */
   const reconcileClose = useCallback(() => {
     const coordinator = closeCoordinatorRef.current;
-    void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork).catch((caught) => {
+    if (closeDriver.currentPhase() !== "closing") void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard).catch((caught) => {
       setAppError(toAppError(caught), null);
     });
     applyEffect(closeDriver.notifyStateChanged());
-  }, [applyEffect, closeDriver, editSessions, syncExitBlocked]);
+  }, [applyEffect, closeDriver, editSessions, terminalSessions, syncExitBlocked]);
 
   useEffect(() => {
     const sync = () => {
-      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork)
+      if (closeDriver.currentPhase() === "closing") return;
+      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard)
         .catch((caught) => setAppError(toAppError(caught), null));
     };
     sync();
-    return editSessions.subscribe(sync);
-  }, [editSessions, setAppError, syncExitBlocked]);
+    const stopEdit = editSessions.subscribe(sync), stopTerminal = terminalSessions.subscribe(sync);
+    return () => { stopEdit(); stopTerminal(); };
+  }, [closeDriver, editSessions, terminalSessions, setAppError, syncExitBlocked]);
   // 存在磁盘草稿但尚未打开编辑器时，原生Quit也必须进入同一决策入口。
   useEffect(() => {
     let cancelled = false;
@@ -1776,12 +1803,23 @@ export function App() {
       try {
         await syncExitBlocked(true);
         await editSessions.discover(editWorktreesRef.current);
-        if (!cancelled) await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork);
+        if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard);
       } catch (caught) { if (!cancelled) setAppError(toAppError(caught), null); }
     })();
     return () => { cancelled = true; };
-  }, [repos, editSessions, setAppError, syncExitBlocked]);
+  }, [repos, closeDriver, editSessions, terminalSessions, setAppError, syncExitBlocked]);
   useEffect(() => registerM7Flusher(() => editSessions.flush()), [editSessions]);
+  useEffect(() => registerM7Flusher(() => terminalSessions.flush()), [terminalSessions]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await syncExitBlocked(true);
+      await terminalSessions.initialize();
+      if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard);
+    })().catch((caught) => { if (!cancelled) setAppError(toAppError(caught), null); });
+    return () => { cancelled = true; };
+  }, [closeDriver, terminalSessions, editSessions, setAppError, syncExitBlocked]);
+
 
   lifecycleRequestRef.current = async (intent) => {
     if (lifecyclePreparingRef.current || closeDriver.currentPhase() === "closing") return;
@@ -1791,8 +1829,9 @@ export function App() {
       const edits = await editSessions.resolve(editWorktreesRef.current, null, askEdit);
       if (!edits.ok) return;
       editSessions.setClosing(true);
+      if (!(await terminalSessions.prepareShutdown(askTerminalShutdown))) { editSessions.setClosing(false); return; }
       applyEffect(closeDriver.handleRequest(intent));
-    } catch (caught) { setAppError(toAppError(caught), null); }
+    } catch (caught) { editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null); }
     finally { lifecyclePreparingRef.current = false; }
   };
 
@@ -1866,6 +1905,13 @@ export function App() {
   const writeOrchestrator = writeOrchestratorRef.current;
 
   editBlockedRef.current = (id) => writingWorktreesRef.current.has(id) || closeDriver.currentPhase() === "closing";
+  terminalCallbacksRef.current.report = (id, error) => setAppError(error, id);
+  terminalCallbacksRef.current.blocked = (id) => writingWorktreesRef.current.has(id) || closeDriver.currentPhase() === "closing";
+  terminalCallbacksRef.current.activity = (id) => {
+    const timers = terminalActivityTimersRef.current;
+    const previous = timers.get(id); if (previous !== undefined) clearTimeout(previous);
+    timers.set(id, setTimeout(() => { timers.delete(id); void refreshTarget(id); }, 900));
+  };
   editWriteRef.current = (request) => runEditWrite<OperationContext>({
     writing: writingWorktreesRef.current,
     publishWriting: () => setWritingWorktrees(new Set(writingWorktreesRef.current)),
@@ -5342,6 +5388,9 @@ export function App() {
   useEffect(
     () =>
       onM7Events({
+        onTerminalOutput: (event) => terminalSessions.output(event),
+        onTerminalExit: (event) => terminalSessions.exitedSession(event),
+        onListenError: (caught) => setAppError(toAppError(caught), null),
         onUpdateAvailable: (event) => {
           setUpdateBannerVersion(event.version);
           void m7.updateStatus().then(setUpdateStatus).catch(() => undefined);
@@ -5350,11 +5399,10 @@ export function App() {
     [],
   );
 
-  /** 终端输出静默后核对工作区：命令可能改了文件（任务 04）。 */
-  const onTerminalActivity = useCallback(() => {
-    if (!worktreeId) return;
-    void refresh();
-  }, [refresh, worktreeId]);
+  useEffect(() => () => {
+    for (const timer of terminalActivityTimersRef.current.values()) clearTimeout(timer);
+    terminalActivityTimersRef.current.clear();
+  }, []);
 
   if (!bootstrapDone) {
     return <div className="flex h-full items-center justify-center text-descriptionforeground">{messages.app.loading}</div>;
@@ -5456,6 +5504,14 @@ export function App() {
   const m7Dialogs = (
     <>
       {editDecision ? <EditDecisionDialog session={editDecision} onDone={finishEditDecision} /> : null}
+      {terminalConfirmation ? <Modal title={t("terminal.shutdownTitle")} onClose={() => finishTerminalConfirmation(false)} width={560}>
+        <p>{t("terminal.shutdownConfirm", { count: terminalConfirmation.length })}</p>
+        <ul className="my-3 max-h-48 overflow-auto text-[12px]">{terminalConfirmation.map((session) => <li key={session.sessionId} className="truncate" title={session.cwd}>{session.worktreePath} · {session.title}</li>)}</ul>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => finishTerminalConfirmation(false)}>{t("common.cancel")}</button>
+          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => finishTerminalConfirmation(true)}>{t("terminal.shutdownYes")}</button>
+        </div>
+      </Modal> : null}
       <CloneDialog
         open={cloneOpen}
         onClose={() => setCloneOpen(false)}
@@ -6188,11 +6244,8 @@ export function App() {
               fontFamily={codeFontFamily}
               height={terminalHeight}
               onHeightChange={setTerminalHeight}
-              onActivity={onTerminalActivity}
-              // F13：运行中的终端阻止更新安装；面板随隐藏/关闭同步这个 ref。
-              onRunningChange={(running) => {
-                terminalRunningRef.current = running;
-              }}
+              registry={terminalSessions}
+              busy={isWriting}
               onClose={() => setTerminalOpen(false)}
             />
           ) : null}

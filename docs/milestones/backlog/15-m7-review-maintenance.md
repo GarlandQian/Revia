@@ -34,3 +34,7 @@ PR网络写后不确定结果的查询核对不作为新增独立已复现数据
 ## 编辑组翻译维护观察
 
 `edit-x18n-01`检查0错误/76个unused-key警告，原完整诊断在批次codex-checks中。编辑器替换使部分旧元信息文案不再直接引用，仍保留旧键，不扩大本组为删除翻译键或重组命名。
+
+## 终端组维护观察
+
+`terminal-lint-01`新增1条`unicorn(no-useless-spread)`提示：退出准备对当前pending集合取数组快照后Promise.allSettled。未产生检查错误；不扩大本组为样式/抽象重构。完整诊断和源码hash在本轮codex-checks。
