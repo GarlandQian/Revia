@@ -394,3 +394,295 @@ fn replaced_repository_identity_does_not_inherit_changelists() {
     assert!(f.store.view(&f.session).is_err());
     assert!(f.commit(&view).is_err());
 }
+
+#[test]
+fn adjacent_segments_share_hunk_but_can_move_and_commit_independently() {
+    let f = Fixture::new();
+    let base = fs::read_to_string(f.repo.join("mixed.txt")).unwrap();
+    let staged = base.replace("line04: base", "line04: already staged");
+    fs::write(f.repo.join("mixed.txt"), &staged).unwrap();
+    f.git(&["add", "mixed.txt"]);
+    let both = staged.replace("line08: base", "line08: selected second segment");
+    fs::write(f.repo.join("mixed.txt"), &both).unwrap();
+    let view = f.view();
+    let parts: Vec<_> = view
+        .items
+        .iter()
+        .filter(|i| i.path == "mixed.txt")
+        .collect();
+    assert_eq!(parts.len(), 2);
+    assert!(parts.iter().all(|i| i.hunk == Some(0)));
+    let second = parts
+        .iter()
+        .find(|i| i.segment == Some(1))
+        .unwrap()
+        .id
+        .clone();
+    let view = f.change(
+        &view,
+        ChangeAction::Create {
+            name: "second".into(),
+        },
+    );
+    let group = view.groups.last().unwrap().id.clone();
+    let view = f.change(
+        &view,
+        ChangeAction::Move {
+            items: vec![second.clone()],
+            group,
+        },
+    );
+    let view = f.change(
+        &view,
+        ChangeAction::Select {
+            items: vec![second],
+            selected: true,
+        },
+    );
+    assert!(f.commit(&view).unwrap().success);
+    let head = f.git(&["show", "HEAD:mixed.txt"]);
+    assert!(head.contains("line04: base"));
+    assert!(head.contains("line08: selected second segment"));
+    assert!(f.git(&["diff", "--cached"]).is_empty());
+    assert!(f.git(&["diff"]).contains("line04: already staged"));
+    assert_eq!(fs::read_to_string(f.repo.join("mixed.txt")).unwrap(), both);
+}
+#[test]
+fn two_of_three_segments_in_one_hunk_apply_together() {
+    let f = Fixture::new();
+    let text = fs::read_to_string(f.repo.join("mixed.txt"))
+        .unwrap()
+        .replace("line04: base", "line04: selected")
+        .replace("line08: base", "line08: leave")
+        .replace("line12: base", "line12: selected");
+    fs::write(f.repo.join("mixed.txt"), text).unwrap();
+    let view = f.view();
+    let ids = view
+        .items
+        .iter()
+        .filter(|i| i.path == "mixed.txt" && matches!(i.segment, Some(0) | Some(2)))
+        .map(|i| i.id.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(ids.len(), 2);
+    let view = f.change(
+        &view,
+        ChangeAction::Select {
+            items: ids,
+            selected: true,
+        },
+    );
+    assert!(f.commit(&view).unwrap().success);
+    let head = f.git(&["show", "HEAD:mixed.txt"]);
+    assert!(head.contains("line04: selected"));
+    assert!(head.contains("line12: selected"));
+    assert!(head.contains("line08: base"));
+    assert!(f.git(&["diff"]).contains("line08: leave"));
+}
+#[test]
+fn view_transmits_compact_summaries_instead_of_patch_bodies() {
+    let f = Fixture::new();
+    fs::write(
+        f.repo.join("mixed.txt"),
+        (0..2000)
+            .map(|n| format!("replacement line {n}\n"))
+            .collect::<String>(),
+    )
+    .unwrap();
+    let view = f.view();
+    assert!(view.items.iter().all(|i| i.summary.chars().count() <= 200));
+    assert!(serde_json::to_vec(&view).unwrap().len() < 3000);
+}
+#[cfg(unix)]
+#[test]
+fn tracked_and_untracked_symlinks_are_readonly_before_any_index_write() {
+    use std::os::unix::fs::symlink;
+    let f = Fixture::new();
+    symlink("keep.txt", f.repo.join("link")).unwrap();
+    let view = f.view();
+    let link = view.items.iter().find(|i| i.path == "link").unwrap();
+    assert_eq!(
+        link.readonly_reason,
+        Some(revia_lib::git::status::ReadonlyReason::Symlink)
+    );
+    assert!(f
+        .store
+        .change(
+            &f.session,
+            &token(&view),
+            ChangeAction::Select {
+                items: vec![link.id.clone()],
+                selected: true
+            }
+        )
+        .is_err());
+    f.git(&["add", "link"]);
+    f.git(&["commit", "-m", "fixture symlink"]);
+    fs::remove_file(f.repo.join("link")).unwrap();
+    symlink("other.txt", f.repo.join("link")).unwrap();
+    let view = f.view();
+    let link = view
+        .items
+        .iter()
+        .find(|i| i.path == "link" && !i.stale)
+        .unwrap();
+    assert!(link.readonly_reason.is_some());
+    assert!(!link.selected);
+}
+impl Fixture {
+    fn amend_message_only(&self, view: &ChangelistView) -> revia_lib::error::Result<CommitOutcome> {
+        use revia_lib::commit_flow::AmendConfirmation;
+        let drafts = DraftStore::new(self.data.clone());
+        let context = self.session.commit_context(&drafts)?;
+        let options = CommitOptions {
+            message: "message only".into(),
+            amend: true,
+            skip_hooks: false,
+            amend_confirmation: Some(AmendConfirmation {
+                upstream_version: context.upstream_version,
+                expectation_fingerprint: context.expectation.fingerprint.clone(),
+                message: "message only".into(),
+                amend: true,
+                skip_hooks: false,
+            }),
+            expected: context.expectation,
+            client_nonce: "amend-fixture".into(),
+            draft_revision: String::new(),
+        };
+        self.session.execute_changelist_commit_flow(
+            &self.store,
+            &token(view),
+            &drafts,
+            &RecoveryStore::new(self.data.clone()),
+            self.data.clone(),
+            options,
+            "fixture-amend".into(),
+            Arc::new(|_| {}),
+        )
+    }
+}
+#[test]
+fn amend_message_only_does_not_include_or_reset_unselected_staged_paths() {
+    let f = Fixture::new();
+    f.staged_other();
+    let tree = f.git(&["rev-parse", "HEAD^{tree}"]);
+    let entries = f.git(&["ls-files", "--stage"]);
+    let view = f.view();
+    assert!(f.amend_message_only(&view).unwrap().success);
+    assert_eq!(f.git(&["rev-parse", "HEAD^{tree}"]), tree);
+    assert_eq!(f.git(&["ls-files", "--stage"]), entries);
+    assert_eq!(f.git(&["log", "-1", "--format=%B"]).trim(), "message only");
+}
+#[test]
+fn empty_diff_merge_finalization_remains_available() {
+    let f = Fixture::new();
+    f.git(&["checkout", "-b", "side"]);
+    f.git(&["commit", "--allow-empty", "-m", "fixture empty side"]);
+    f.git(&["checkout", "main"]);
+    f.git(&["merge", "--no-ff", "--no-commit", "side"]);
+    let view = f.view();
+    assert!(view.items.is_empty());
+    let result = f.commit(&view).unwrap();
+    assert!(result.success);
+    assert_eq!(
+        f.git(&["rev-list", "--parents", "-1", "HEAD"])
+            .split_whitespace()
+            .count(),
+        3
+    );
+}
+#[cfg(unix)]
+#[test]
+fn actual_rebase_edit_stop_allows_selection_and_message_amend() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    fs::write(f.repo.join("other.txt"), "second commit\n").unwrap();
+    f.git(&["add", "other.txt"]);
+    f.git(&["commit", "-m", "second"]);
+    let editor = f._temp.path().join("owned-sequence-editor.sh");
+    fs::write(
+        &editor,
+        "#!/bin/sh\nsed 's/^pick /edit /' \"$1\" >\"$1.tmp\"\ncat \"$1.tmp\" >\"$1\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&editor, fs::Permissions::from_mode(0o755)).unwrap();
+    f.git(&[
+        "-c",
+        &format!("sequence.editor={}", editor.display()),
+        "rebase",
+        "-i",
+        "HEAD~1",
+    ]);
+    let view = f.view();
+    assert!(f.amend_message_only(&view).unwrap().success);
+    fs::write(f.repo.join("keep.txt"), "split at actual edit stop\n").unwrap();
+    let view = f.select(&f.view(), "keep.txt", None);
+    assert!(f.commit(&view).unwrap().success);
+    f.git(&["rebase", "--continue"]);
+    assert!(f.repo.join(".git/rebase-merge").exists() == false);
+}
+
+#[test]
+fn real_local_submodule_is_readonly_in_changelists() {
+    let f = Fixture::new();
+    let module = f._temp.path().join("owned-module");
+    fs::create_dir(&module).unwrap();
+    git(&module, &f.home, &["init", "-b", "main"]);
+    git(&module, &f.home, &["config", "user.name", "fixture"]);
+    git(
+        &module,
+        &f.home,
+        &["config", "user.email", "fixture@example.invalid"],
+    );
+    git(&module, &f.home, &["config", "commit.gpgsign", "false"]);
+    fs::write(module.join("module.txt"), "base\n").unwrap();
+    git(&module, &f.home, &["add", "."]);
+    git(&module, &f.home, &["commit", "-m", "base"]);
+    f.git(&[
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        module.to_str().unwrap(),
+        "module",
+    ]);
+    f.git(&["commit", "-m", "owned submodule"]);
+    fs::write(f.repo.join("module/module.txt"), "dirty local submodule\n").unwrap();
+    let before = f.git(&["ls-files", "--stage"]);
+    let view = f.view();
+    let item = view.items.iter().find(|i| i.path == "module").unwrap();
+    assert_eq!(
+        item.readonly_reason,
+        Some(revia_lib::git::status::ReadonlyReason::Submodule)
+    );
+    assert!(f
+        .store
+        .change(
+            &f.session,
+            &token(&view),
+            ChangeAction::Select {
+                items: vec![item.id.clone()],
+                selected: true
+            }
+        )
+        .is_err());
+    assert_eq!(f.git(&["ls-files", "--stage"]), before);
+}
+
+// macOS APFS拒绝创建非法UTF-8文件名；原始EILSEQ失败已保留，本例只在支持原字节路径的平台实跑。
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn non_utf8_untracked_path_is_readonly_without_hiding_valid_files() {
+    use std::os::unix::ffi::OsStringExt;
+    let f = Fixture::new();
+    f.staged_other();
+    let name = std::ffi::OsString::from_vec(vec![b'b', 0xff, b'd']);
+    fs::write(f.repo.join(name), b"owned invalid path").unwrap();
+    let view = f.view();
+    assert!(view
+        .items
+        .iter()
+        .any(|item| item.readonly_reason
+            == Some(revia_lib::git::status::ReadonlyReason::NonUtf8Path)));
+    let selected = f.select(&view, "other.txt", None);
+    assert!(f.commit(&selected).unwrap().success);
+}

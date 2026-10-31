@@ -100,3 +100,17 @@ Spec：仅审固定 `b5caf5a…ffaa343` 的任务13增量。6项P2、1项P3；�
 
 原件核对：7884项源码、1113项证据散列及diff一致；末轮Rust42通过，frontend/lint/x18n均exit0。未启动Revia、未实跑Windows、未宣称桌面通过。详见`spec-evidence.md`。
 
+
+### Codex：review05明确问题处理与验证（2026-10-31）
+
+- 两轴只读能力问题：更改列表复用status能力表并补工作区符号链接/嵌套仓库检查；返回结构化只读原因，前端禁勾选，后端写前再次拒绝。真实本地子模块、已跟踪/未跟踪符号链接回归通过。非UTF8路径仅生成只读行，不隐藏其他有效文件。
+- Standards全量diff传输：移除每项整份patch正文与原生滚动pre；列表只传至多200字符的摘要，点击交给既有按范围读取/自绘滚动的diff与编辑器。
+- Standards语言：错误保存AppErrorPayload，渲染时按当前语言格式化。
+- S05-01：从同一次系统Git hunk按既有segment划分独立块；同hunk多个已选块合成一次原始上下文补丁，支持分别归组/选择。近邻两块独立提交、三块选其中两块的真实Git断言通过。
+- S05-02/03：接回文件预览/固定页签、鼠标与键盘多选、现有丢弃确认和逐文件回收入口；不在新模式禁用批量丢弃。
+- S05-05/06：沿用现有operation.commit_allowed门禁，允许真实rebase编辑停点amend/新建提交与无冲突merge收尾；空选择amend只改信息且保留其他原暂存，空paths绝不执行全index reset。
+- 在相同行内接线中同时恢复Codicons/Git状态色；保存无关设置不再清空父勾选凭据。两项先前P3已按实际修复记录，名称校验重复的smell仍留backlog，不做扩展重构。
+
+原件：`task13-review05-rust-01` 50通过（新18+既有commit12/文件暂存20）；`task13-review05-segments-01` 49通过（hunk24/segment25）；`task13-review05-node-01` 8通过。最后新增非UTF8只读分支后，`task13-review05-rust-03` 本机18通过；其他生产相关源码未再变化。新增非法字节文件名用例在02轮创建fixture时被macOS APFS以EILSEQ拒绝（18通过/1失败），保留全部stdout/stderr/源码散列；该文件名用例现仅在支持它的非macOS Unix编译，本机不能冒称实跑。总相关Rust回归99项跨上述轮次核实，不称单一全套执行。
+
+前端首轮因鼠标事件使用键盘修饰键类型报TS2345，原失败保留；改用ChangesTree既有isPrimaryClick。最后`task13-review05-frontend-03`与`task13-review05-lint-03`均exit0。locale键集/译文未改，既有task13-x18n-01为0错误/76警告，所有新增UI使用已查询键。生成绑定原件task13-review05-bindings-01。Windows和本修复的真实Revia桌面尚未运行。下一步仅新增修复范围独立两轴，审修后重新构建Release；不复用旧二进制验收。

@@ -47,7 +47,14 @@ pub struct ChangeItem {
     pub fingerprint: String,
     pub selected: bool,
     pub stale: bool,
-    pub preview: String,
+    #[serde(default, alias = "preview")]
+    pub summary: String,
+    #[serde(default)]
+    pub segment: Option<u32>,
+    #[serde(default)]
+    pub readonly_reason: Option<git::status::ReadonlyReason>,
+    #[serde(default)]
+    pub source: Option<git::status::ChangesKind>,
     /// None 表示整文件条目；Some 是系统 Git 的原始 hunk 序号。
     pub hunk: Option<usize>,
 }
@@ -142,6 +149,7 @@ impl ChangelistStore {
             if let Some(previous) = old.remove(&fresh.id) {
                 next.group = previous.group;
                 next.selected = previous.selected
+                    && fresh.readonly_reason.is_none()
                     && !previous.stale
                     && previous.fingerprint == fresh.fingerprint;
             } else {
@@ -151,6 +159,7 @@ impl ChangelistStore {
         }
         // 无法对应的块保留原组、预览供人工核对，但不能继续提交。
         for mut previous in old.into_values() {
+            previous.summary = previous.summary.chars().take(200).collect();
             previous.selected = false;
             previous.stale = true;
             items.push(previous);
@@ -266,10 +275,12 @@ impl ChangelistStore {
                 }
             }
             ChangeAction::Select { items, selected } => {
-                if items
-                    .iter()
-                    .any(|id| !saved.items.iter().any(|i| &i.id == id && !i.stale))
-                {
+                if items.iter().any(|id| {
+                    !saved
+                        .items
+                        .iter()
+                        .any(|i| &i.id == id && !i.stale && i.readonly_reason.is_none())
+                }) {
                     return Err(rejected());
                 }
                 for item in &mut saved.items {
@@ -287,6 +298,7 @@ impl ChangelistStore {
         session: &WorktreeSession,
         selection: &ChangelistSelection,
         expected: &CommitExpectation,
+        amend: bool,
     ) -> Result<Prepared<'a>> {
         let _lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
         let (key, saved, scan) = self.refreshed(session)?;
@@ -298,7 +310,10 @@ impl ChangelistStore {
         let actual = commit::capture(git)?;
         if !commit::expectations_match(&actual, expected)
             || actual.has_unmerged()
-            || actual.operation.is_some()
+            || actual
+                .operation
+                .as_ref()
+                .is_some_and(|operation| !operation.commit_allowed())
         {
             return Err(rejected());
         }
@@ -308,8 +323,13 @@ impl ChangelistStore {
             .filter(|i| i.selected && !i.stale)
             .cloned()
             .collect();
-        if selected.is_empty() {
+        if selected.is_empty() && !amend && !actual.allows_empty_diff_commit() {
             return Err(invalid());
+        }
+        for item in &selected {
+            if let Some(reason) = item.readonly_reason {
+                return Err(reason.error());
+            }
         }
         std::fs::create_dir_all(self.directory.join("commit-evidence"))?;
         // 保留全部失败与不确定结果的 index 和选项原件；只用 Git CLI 创建/改写 index。
@@ -355,10 +375,17 @@ impl ChangelistStore {
                     .into_success("写入所选文件")?;
             } else {
                 let file = scan.files.get(path).ok_or_else(rejected)?;
+                let mut hunks: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
                 for item in chosen {
-                    let patch = file
-                        .hunk_patch(item.hunk.ok_or_else(rejected)?)
-                        .ok_or_else(rejected)?;
+                    hunks
+                        .entry(item.hunk.ok_or_else(rejected)?)
+                        .or_default()
+                        .push(item.segment.ok_or_else(rejected)?);
+                }
+                for (hunk, segments) in hunks {
+                    let patch =
+                        git::segments::rewrite_hunk_for_selection(file, hunk, &segments, true)
+                            .ok_or_else(rejected)?;
                     alternate
                         .apply_index_patch(patch, false, false)?
                         .into_success("写入所选 Git 块")?;
@@ -438,6 +465,10 @@ impl Prepared<'_> {
         {
             return Err(rejected());
         }
+        if self.paths.is_empty() {
+            std::fs::write(self.directory.join("reconciled-head"), new_head)?;
+            return self.store.finish(session, &self.selection, &self.ids);
+        }
         let mut args = vec!["--literal-pathspecs", "reset", "-q", new_head, "--"];
         args.extend(self.paths.iter().map(String::as_str));
         git.run(&args)?.into_success("提交后更新所选路径暂存区")?;
@@ -461,12 +492,30 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
     args.extend_from_slice(&["--no-renames", "--binary", head, "--"]);
     let raw = git.run_ok(&args, "读取更改列表 Git diff")?.stdout;
     let parsed = git::diff::parse_bytes(&raw);
+    let status = git::status::read(git)?;
     let mut items = Vec::new();
     let mut files = BTreeMap::new();
     let mut whole = Vec::new();
     for file in parsed.files {
         let fingerprint = super::sha256_hex(&file.raw_patch);
-        if file.hunks.is_empty() || file.binary || file.status != git::status::FileStatus::Modified
+        let readonly_reason = readonly_for(git, &status, &file.path);
+        let source = if status.entries.iter().any(|entry| {
+            entry.path == file.path && entry.changes == git::status::ChangesKind::Unstaged
+        }) {
+            git::status::ChangesKind::Unstaged
+        } else {
+            git::status::ChangesKind::Staged
+        };
+        let staged = git::diff::parse_bytes(&git.diff_index(Some(&file.path))?);
+        let staged_signatures: Vec<_> = staged
+            .files
+            .iter()
+            .flat_map(git::segments::segment_signatures)
+            .collect();
+        if file.hunks.is_empty()
+            || file.binary
+            || file.status != git::status::FileStatus::Modified
+            || readonly_reason.is_some()
         {
             items.push(ChangeItem {
                 id: super::sha256_hex(format!("{}:{fingerprint}", file.path).as_bytes()),
@@ -475,25 +524,60 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
                 fingerprint,
                 selected: false,
                 stale: false,
-                preview: String::from_utf8_lossy(&file.raw_patch).into_owned(),
+                summary: String::new(),
                 hunk: None,
+                segment: None,
+                readonly_reason,
+                source: Some(source),
             });
         } else {
             for (i, hunk) in file.hunks.iter().enumerate() {
-                let patch = file
-                    .raw_patch
-                    .get(hunk.raw_range.clone())
+                for segment in git::segments::segments_of_hunk(hunk, i as u32) {
+                    let patch = git::segments::rewrite_hunk_for_segment(
+                        &file,
+                        i,
+                        segment.segment_index,
+                        true,
+                    )
                     .ok_or_else(rejected)?;
-                items.push(ChangeItem {
-                    id: super::sha256_hex(&[file.path.as_bytes(), patch].concat()),
-                    path: file.path.clone(),
-                    group: String::new(),
-                    fingerprint: fingerprint.clone(),
-                    selected: false,
-                    stale: false,
-                    preview: String::from_utf8_lossy(patch).into_owned(),
-                    hunk: Some(i),
-                });
+                    let selected_file = git::diff::parse_bytes(&patch);
+                    let signatures: Vec<_> = selected_file
+                        .files
+                        .iter()
+                        .flat_map(git::segments::segment_signatures)
+                        .collect();
+                    let source = if signatures
+                        .iter()
+                        .all(|signature| staged_signatures.contains(signature))
+                    {
+                        git::status::ChangesKind::Staged
+                    } else {
+                        source
+                    };
+                    let owners = git::segments::line_owners(hunk);
+                    let summary = hunk
+                        .lines
+                        .iter()
+                        .zip(owners)
+                        .filter(|(_, owner)| *owner == Some(segment.segment_index))
+                        .take(2)
+                        .map(|(line, _)| line.text.chars().take(80).collect::<String>())
+                        .collect::<Vec<_>>()
+                        .join(" → ");
+                    items.push(ChangeItem {
+                        id: super::sha256_hex(&[file.path.as_bytes(), &patch].concat()),
+                        path: file.path.clone(),
+                        group: String::new(),
+                        fingerprint: fingerprint.clone(),
+                        selected: false,
+                        stale: false,
+                        summary,
+                        hunk: Some(i),
+                        segment: Some(segment.segment_index),
+                        readonly_reason: None,
+                        source: Some(source),
+                    });
+                }
             }
         }
         files.insert(file.path.clone(), file);
@@ -505,11 +589,30 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
         )?
         .stdout;
     for bytes in untracked.split(|b| *b == 0).filter(|b| !b.is_empty()) {
-        let path = std::str::from_utf8(bytes)
-            .map_err(|_| invalid())?
-            .to_string();
+        let path = match std::str::from_utf8(bytes) {
+            Ok(path) => path.to_string(),
+            Err(_) => {
+                let fingerprint = super::sha256_hex(bytes);
+                whole.extend_from_slice(bytes);
+                items.push(ChangeItem {
+                    id: fingerprint.clone(),
+                    path: String::from_utf8_lossy(bytes).into_owned(),
+                    group: String::new(),
+                    fingerprint,
+                    selected: false,
+                    stale: false,
+                    summary: String::new(),
+                    hunk: None,
+                    segment: None,
+                    readonly_reason: Some(git::status::ReadonlyReason::NonUtf8Path),
+                    source: Some(git::status::ChangesKind::Untracked),
+                });
+                continue;
+            }
+        };
         let full = git.directory.join(&path);
         let metadata = std::fs::symlink_metadata(&full)?;
+        let readonly_reason = readonly_for(git, &status, &path);
         let content = if metadata.file_type().is_symlink() {
             std::fs::read_link(&full)?
                 .to_string_lossy()
@@ -518,7 +621,7 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
         } else if metadata.is_file() {
             std::fs::read(&full)?
         } else {
-            continue;
+            Vec::new()
         };
         #[cfg(unix)]
         let mode = {
@@ -538,13 +641,14 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
             fingerprint,
             selected: false,
             stale: false,
-            preview: String::from_utf8_lossy(&content)
-                .chars()
-                .take(16000)
-                .collect(),
+            summary: String::new(),
             hunk: None,
+            segment: None,
+            readonly_reason,
+            source: Some(git::status::ChangesKind::Untracked),
         });
     }
+
     let fingerprint = super::sha256_hex(&[expected.fingerprint.as_bytes(), &raw, &whole].concat());
     Ok(Scan {
         items,
@@ -567,7 +671,7 @@ impl WorktreeSession {
         emit: std::sync::Arc<dyn Fn(crate::commit_flow::CommitOutputEvent) + Send + Sync>,
     ) -> Result<crate::commit_flow::CommitOutcome> {
         let _write = self.acquire_write_lock()?;
-        let prepared = store.prepare(self, selection, &options.expected)?;
+        let prepared = store.prepare(self, selection, &options.expected, options.amend)?;
         // amend 二次确认先对真实原预期校验，再转成这次独立 index 的凭据。
         if let Some(confirmation) = &mut options.amend_confirmation {
             if confirmation.expectation_fingerprint != options.expected.fingerprint
@@ -591,4 +695,27 @@ impl WorktreeSession {
         )?;
         Ok(outcome)
     }
+}
+
+fn readonly_for(
+    git: &Git,
+    status: &git::status::WorktreeStatus,
+    path: &str,
+) -> Option<git::status::ReadonlyReason> {
+    if let Some(reason) = status
+        .entries
+        .iter()
+        .filter(|entry| entry.path == path)
+        .find_map(|entry| entry.readonly_reason)
+    {
+        return Some(reason);
+    }
+    let full = git.directory.join(path);
+    if full.is_symlink() {
+        return Some(git::status::ReadonlyReason::Symlink);
+    }
+    if full.is_dir() || full.join(".git").exists() {
+        return Some(git::status::ReadonlyReason::NestedRepo);
+    }
+    None
 }

@@ -2569,7 +2569,7 @@ export function App() {
     const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
     const listView = changelistMode ? changelistRef.current : null;
-    if (changelistMode && (!listView || listView.worktreeId !== target || !listView.items.some((item) => item.selected && !item.stale))) {
+    if (changelistMode && (!listView || listView.worktreeId !== target || (!listView.items.some((item) => item.selected && !item.stale && !item.readonlyReason) && !commitInputRef.current.amend && !commitContextRef.current?.gates.allowsEmptyDiffCommit))) {
       setAppError(localizedError("rejected", "errors.m7.changelistChanged"), target); return;
     }
     const listSelection = listView ? selectionOf(listView) : null;
@@ -2608,7 +2608,7 @@ export function App() {
       let warnings: CommitWarning[] = [];
       try {
         warnings = listSelection
-          ? await invoke<CommitWarning[]>("m7_changelist_warnings", { request: { worktreeId: target, selection: listSelection } })
+          ? await invoke<CommitWarning[]>("m7_changelist_warnings", { request: { worktreeId: target, selection: listSelection, amend: input.amend } })
           : await ipc.commitWarnings(target);
       } catch (caught) {
         if (listSelection) { setAppError(toAppError(caught), target); return; }
@@ -4575,7 +4575,7 @@ export function App() {
         ignoreWhitespace: next.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
       });
       setChangelistMode(next.changelistMode);
-      acceptChangelistView(null);
+      if (patch.changelistMode !== undefined) acceptChangelistView(null);
       setCommitChecks({
         subjectLimit: next.commitSubjectLimit,
         blankLineRequired: next.commitBlankLineRequired,
@@ -5814,7 +5814,7 @@ export function App() {
                     className="icon-action size-[22px]"
                     title={messages.changes.discardSelected}
                     aria-label={messages.changes.discardSelected}
-                    disabled={changelistMode || isWriting || discardableSelected.length === 0}
+                    disabled={isWriting || discardableSelected.length === 0}
                     onClick={() => requestDiscardEntries(discardableSelected)}
                   >
                     <Codicon name="discard" size={15} />
@@ -5855,7 +5855,7 @@ export function App() {
             {sideTab === "commit" ? (
               <>
                 {changelistMode && worktreeId && snapshot ? (
-                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} />
+                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} onSelectAll={selectAllEntries} onMove={moveTreeSelection} snapshot={snapshot} selectedKeys={treeSelection} onActivate={activateTreeEntry} onPin={pinEntry} onDiscard={(entry) => requestDiscardEntries(expandToSelection(entry))} />
                 ) : snapshot ? (
                   <ChangesTree
                     snapshot={snapshot}

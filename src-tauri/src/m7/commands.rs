@@ -789,12 +789,12 @@ pub async fn m7_changelist_change(state:State<'_,AppState>,request:ChangelistCha
 }
 #[derive(Debug,serde::Deserialize)]
 #[serde(rename_all="camelCase")]
-pub struct ChangelistWarningsRequest {pub worktree_id:String,pub selection:super::changelists::ChangelistSelection}
+pub struct ChangelistWarningsRequest {pub worktree_id:String,pub selection:super::changelists::ChangelistSelection,#[serde(default)]pub amend:bool}
 #[tauri::command]
 pub async fn m7_changelist_warnings(state:State<'_,AppState>,request:ChangelistWarningsRequest)->Result<Vec<crate::commit_warnings::CommitWarning>> {
     let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
     let settings=state.registry.lock().map_err(|_|internal("settings lock"))?.settings().clone();
-    blocking(move||{let _write=session.acquire_write_lock()?;let prepared=store.prepare(&session,&request.selection,&crate::commit::capture(session.git())?)?;
+    blocking(move||{let _write=session.acquire_write_lock()?;let prepared=store.prepare(&session,&request.selection,&crate::commit::capture(session.git())?,request.amend)?;
         crate::commit_warnings::collect(&prepared.git,&crate::commit_warnings::WarningOptions{crlf:settings.commit_warn_crlf,detached:settings.commit_warn_detached,large_file_bytes:settings.commit_warn_large_file_bytes,invalid_filename:settings.commit_warn_invalid_filename})
     }).await
 }
