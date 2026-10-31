@@ -1,6 +1,6 @@
 # 13：按更改列表选择并提交
 
-Status: ready-for-human
+Status: done
 Blocked by: None
 
 ## What to build
@@ -13,9 +13,9 @@ Blocked by: None
 
 - [x] 先取得 Rebased 1.1.22 在独占 fixture 中的实际观察：预先暂存、同文件部分暂存、切模式、只选其他块提交、完成后 index / 工作区；保存原 argv / exit / 输出与截图
 - [x] 规划方把实测语义补入规格和 Comments 后才能写 index / 提交路径；不能从静态实现、推测或 mock 补全
-- [ ] 按 Q197 实现默认列表、单一归属、文件 / Git 块移动、删组回默认与提交后保留未提交部分
-- [ ] 块失配保留分组信息、取消失效勾选，切模式保留列表；写前校验和数据保护门槛不变
-- [ ] 真实 Git 断言提交树、index 与剩余工作区完全对应；实现细节另经审查
+- [x] 按 Q197 实现默认列表、单一归属、文件 / Git 块移动、删组回默认与提交后保留未提交部分
+- [x] 块失配保留分组信息、取消失效勾选，切模式保留列表；写前校验和数据保护门槛不变
+- [x] 真实 Git 断言提交树、index 与剩余工作区完全对应；实现细节另经审查
 
 ## Validation
 
@@ -321,3 +321,8 @@ Spec：固定 `5ca9178…039fd1a`，仅原生场景修复增量，10路径、1�
 
 已核38项相关源码／规范、106项本轮原件及固定diff；Rust44、Node20、build／lint／x18n真实exit0，翻译0错误／76既有警告，受测Rust与最终前端源码对应。未重跑检查、未改产品或启动桌面；新Release原生复验、D06及Windows仍未验证。详见 `spec-evidence.md`。
 
+
+
+### Codex：最终固定Release真实验收完成 — 2026-10-31
+
+任务13五项验收均已对应原始证据，Status改为done。最终产品8eccde51、Release源码dfcdfe56；新fixture真实提交e9000d4f16ea977c5729018847a9486f2a39da91只含line30，mixed.txt index=新HEAD、line4留工作区，另一existing.txt原暂存保留；工作区字节不变。line4仍原Default组，Pick为默认时也未误归组，无失配副本；列表自动恢复，未手动Refresh。既有原生创建/改名/整文件与块移动/删组/切模式/重启保持及Rebased三组事实原件均保留。详见[原生验收最新记录](../native-acceptance.md)及task13-final-native-proof.json。P3构造边界仍backlog，不扩返修。任务14 D06首屏失败与正式接线未验不等于任务13未完成。

@@ -1,7 +1,7 @@
 # 14：整包审查与固定 Release 桌面验收
 
-Status: needs-info
-Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13
+Status: ready-for-agent
+Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12
 
 ## What to build
 
@@ -608,3 +608,10 @@ Spec：固定 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4
 (c) **[S12-SP01，P3，仅 backlog] 重挂载的首 fit 恰好为 80×24 时可能漏对齐。** 仍对照规格 `:90`“前端发送…尺寸”。事实：移除初始化显式发送（新 `TerminalPanel.tsx:150–156`）；新 xterm 默认 80×24（`OptionsService.ts:13–14`），`FitAddon.ts:44–46` 只在尺寸变化时 resize。推断：若已存活 PTY 保留其他行列，关闭面板再重开（`App.tsx:6316–6328`），且新布局正好 80×24，就没有事件把后台改回该尺寸。仅构造边界，登记 backlog；不要求本轮返修。
 
 已核对 build/lint 原件 exit 0 及产品散列；未重跑检查或启动应用。新 Release 的持续输入、其他控件焦点、字体后真实 PTY 尺寸及 D06 仍待桌面复验；旧 Node / 旧桌面不能证明本修复通过。详见 `spec-evidence.md`。
+
+
+### Codex：最终Release原生验收与D06失败 — 2026-10-31
+
+任务13已按真实事实与最终新fixture验收done。最终产品8eccde51、Release源码dfcdfe56，binary SHA256 3a61084ad2538562d4bc840913454013c3ae70fcea38de6c2e98946c40869fcc。终端连续163字符输入、输出时70字符提交说明焦点保持、字号16→20的真实PTY 92×9→74×7及全局两worktree关闭确认已核实；launch05真实exit0。
+
+D06三轮可见性有效、exit0，但首屏并排252/220ms、统一176ms均超过150ms；不能以测量JSON的ok=true冒称门槛通过。统一首跳命中缓存，并排未记录缓存来源，未缓存100ms门槛仍缺证明；自动滚动60帧缺行0和截图抽样另记，不替代整体通过。诊断采样只用于定位，尚不能确认具体瓶颈，不据猜测修改产品。用户明确“尚未准备，保留这两项未验”，GitHub和更新正式接线分别保留未验；不再索取真实凭据。详见[原生验收最新记录](../native-acceptance.md)。Status为ready-for-agent，表示Codex继续D06定位，未通过整包，不合并或删除worktree/监控。
