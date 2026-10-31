@@ -113,6 +113,7 @@ struct Scan {
     items: Vec<ChangeItem>,
     files: BTreeMap<String, git::diff::FileChange>,
     fingerprint: String,
+    segment_positions: BTreeMap<String, String>,
 }
 impl ChangelistStore {
     pub fn new(data: &Path) -> Self {
@@ -397,8 +398,21 @@ impl ChangelistStore {
             directory,
             original: actual,
             original_index,
-            paths: paths.into_iter().collect(),
+            paths: paths.iter().cloned().collect(),
             fingerprint: scan.fingerprint,
+            remaining: scan
+                .items
+                .iter()
+                .filter(|item| {
+                    paths.contains(&item.path)
+                        && !selected.iter().any(|chosen| chosen.id == item.id)
+                })
+                .filter_map(|item| {
+                    scan.segment_positions
+                        .get(&item.id)
+                        .map(|position| (item.id.clone(), position.clone()))
+                })
+                .collect(),
             ids: selected.iter().map(|i| i.id.clone()).collect(),
             store: self,
             selection: selection.clone(),
@@ -411,6 +425,7 @@ impl ChangelistStore {
         session: &WorktreeSession,
         selection: &ChangelistSelection,
         ids: &[String],
+        remaining: &BTreeMap<String, String>,
     ) -> Result<()> {
         let _lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
         let key = super::edit::identity_key(session)?;
@@ -420,6 +435,25 @@ impl ChangelistStore {
         let mut saved = self.read(&key)?;
         // 只移除本次仍被选择的条目；未提交分组与失配记录保留。
         saved.items.retain(|i| !ids.contains(&i.id));
+        if !remaining.is_empty() {
+            let current = scan(session)?;
+            for item in &mut saved.items {
+                let Some(position) = remaining.get(&item.id) else {
+                    continue;
+                };
+                let mut matches = current
+                    .items
+                    .iter()
+                    .filter(|fresh| current.segment_positions.get(&fresh.id) == Some(position));
+                if let Some(fresh) = matches.next().filter(|_| matches.next().is_none()) {
+                    // 自己的局部提交只改变旧侧基线；按未变工作区位置与原始改动字节迁移归组。
+                    // 这不是写凭据：不沿用勾选，后续写仍核对新模型的完整文件指纹。
+                    let mut next = fresh.clone();
+                    next.group = item.group.clone();
+                    *item = next;
+                }
+            }
+        }
         self.write(&key, &saved)
     }
 }
@@ -433,6 +467,7 @@ pub(crate) struct Prepared<'a> {
     paths: Vec<String>,
     fingerprint: String,
     ids: Vec<String>,
+    remaining: BTreeMap<String, String>,
 }
 impl Prepared<'_> {
     pub fn recheck(&self, session: &WorktreeSession) -> Result<()> {
@@ -467,13 +502,16 @@ impl Prepared<'_> {
         }
         if self.paths.is_empty() {
             std::fs::write(self.directory.join("reconciled-head"), new_head)?;
-            return self.store.finish(session, &self.selection, &self.ids);
+            return self
+                .store
+                .finish(session, &self.selection, &self.ids, &self.remaining);
         }
         let mut args = vec!["--literal-pathspecs", "reset", "-q", new_head, "--"];
         args.extend(self.paths.iter().map(String::as_str));
         git.run(&args)?.into_success("提交后更新所选路径暂存区")?;
         std::fs::write(self.directory.join("reconciled-head"), new_head)?;
-        self.store.finish(session, &self.selection, &self.ids)
+        self.store
+            .finish(session, &self.selection, &self.ids, &self.remaining)
     }
 }
 fn scan(session: &WorktreeSession) -> Result<Scan> {
@@ -486,6 +524,7 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
     let mut items = Vec::new();
     let mut files = BTreeMap::new();
     let mut whole = Vec::new();
+    let mut segment_positions = BTreeMap::new();
     for file in parsed.files {
         let fingerprint = super::sha256_hex(&file.raw_patch);
         let readonly_reason = readonly_for(git, &status, &file.path);
@@ -528,8 +567,28 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
                         .map(|(line, _)| line.text.chars().take(80).collect::<String>())
                         .collect::<Vec<_>>()
                         .join(" → ");
+                    let id = super::sha256_hex(&[file.path.as_bytes(), &patch].concat());
+                    // 只用于本次提交收尾的归组关联：排除文件头/blob OID和旧侧行号，
+                    // 保留工作区侧位置以区分重复正文，及Git签发的原始改动字节。
+                    let payload: Vec<u8> = patch
+                        .split_inclusive(|byte| *byte == b'\n')
+                        .skip_while(|line| !line.starts_with(b"@@ "))
+                        .skip(1)
+                        .filter(|line| {
+                            matches!(line.first(), Some(b'+') | Some(b'-') | Some(b'\\'))
+                        })
+                        .flatten()
+                        .copied()
+                        .collect();
+                    let position = super::sha256_hex(&serde_json::to_vec(&(
+                        &file.path,
+                        segment.right_start,
+                        segment.right_end,
+                        payload,
+                    ))?);
+                    segment_positions.insert(id.clone(), position);
                     items.push(ChangeItem {
-                        id: super::sha256_hex(&[file.path.as_bytes(), &patch].concat()),
+                        id,
                         path: file.path.clone(),
                         group: String::new(),
                         fingerprint: fingerprint.clone(),
@@ -618,6 +677,7 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
         items,
         files,
         fingerprint,
+        segment_positions,
     })
 }
 

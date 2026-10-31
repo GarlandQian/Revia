@@ -178,8 +178,42 @@ fn partial_same_path_matches_observed_rebased_index() {
     fs::write(f.repo.join("mixed.txt"), &both).unwrap();
     let v = f.view();
     assert_eq!(v.items.iter().filter(|i| i.path == "mixed.txt").count(), 2);
+    let v = f.change(
+        &v,
+        ChangeAction::Create {
+            name: "different default".into(),
+        },
+    );
+    let default = v
+        .groups
+        .iter()
+        .find(|group| group.name == "different default")
+        .unwrap()
+        .id
+        .clone();
+    let v = f.change(&v, ChangeAction::Default { group: default });
+    let remaining = v
+        .items
+        .iter()
+        .find(|item| item.path == "mixed.txt" && item.hunk == Some(0))
+        .unwrap()
+        .clone();
     let v = f.select(&v, "mixed.txt", Some(1));
     assert!(f.commit(&v).unwrap().success);
+    let restored = ChangelistStore::new(&f.data).view(&f.session).unwrap();
+    let items: Vec<_> = restored
+        .items
+        .iter()
+        .filter(|item| item.path == "mixed.txt")
+        .collect();
+    assert_eq!(
+        items.len(),
+        1,
+        "own partial commit must not create a stale duplicate"
+    );
+    assert_eq!(items[0].group, remaining.group);
+    assert!(!items[0].stale);
+    assert!(!items[0].selected);
     assert!(f.git(&["show", "HEAD:mixed.txt"]).contains("line04: base"));
     assert!(f
         .git(&["show", "HEAD:mixed.txt"])
@@ -446,6 +480,15 @@ fn adjacent_segments_share_hunk_but_can_move_and_commit_independently() {
     assert!(f.git(&["diff", "--cached"]).is_empty());
     assert!(f.git(&["diff"]).contains("line04: already staged"));
     assert_eq!(fs::read_to_string(f.repo.join("mixed.txt")).unwrap(), both);
+    let current = f.view();
+    let remaining: Vec<_> = current
+        .items
+        .iter()
+        .filter(|item| item.path == "mixed.txt")
+        .collect();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].group, "default");
+    assert!(!remaining[0].stale);
 }
 #[test]
 fn two_of_three_segments_in_one_hunk_apply_together() {
@@ -968,4 +1011,57 @@ fn stale_external_changelist_diff_is_rejected_before_tool_launch() {
         .snapshot()
         .iter()
         .all(|record| !record.args.iter().any(|arg| arg == "difftool")));
+}
+
+#[test]
+fn partial_commit_keeps_remaining_group_when_old_line_numbers_shift() {
+    let f = Fixture::new();
+    let base = fs::read_to_string(f.repo.join("mixed.txt")).unwrap();
+    let changed = base
+        .replace("line04: base\n", "line04: selected\nnew selected line\n")
+        .replace("line30: base", "line30: remains");
+    fs::write(f.repo.join("mixed.txt"), &changed).unwrap();
+    let view = f.change(
+        &f.view(),
+        ChangeAction::Create {
+            name: "remaining".into(),
+        },
+    );
+    let group = view
+        .groups
+        .iter()
+        .find(|group| group.name == "remaining")
+        .unwrap()
+        .id
+        .clone();
+    let item = view
+        .items
+        .iter()
+        .find(|item| item.path == "mixed.txt" && item.hunk == Some(1))
+        .unwrap()
+        .id
+        .clone();
+    let view = f.change(
+        &view,
+        ChangeAction::Move {
+            items: vec![item],
+            group: group.clone(),
+        },
+    );
+    let view = f.select(&view, "mixed.txt", Some(0));
+    assert!(f.commit(&view).unwrap().success);
+    let current = f.view();
+    let residual: Vec<_> = current
+        .items
+        .iter()
+        .filter(|item| item.path == "mixed.txt")
+        .collect();
+    assert_eq!(residual.len(), 1);
+    assert_eq!(residual[0].group, group);
+    assert!(!residual[0].stale);
+    assert!(!residual[0].selected);
+    assert_eq!(
+        fs::read_to_string(f.repo.join("mixed.txt")).unwrap(),
+        changed
+    );
 }

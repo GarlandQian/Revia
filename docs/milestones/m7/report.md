@@ -279,3 +279,11 @@ S07-03：外部diff显式验证Changelist路径的HEAD→工作区模型，仍�
 ### review08收齐与新版Release准备（2026-10-31）
 
 产品`37c1f441d77d08c874dee930281d961bfbec4bae`，只审`ee8f662…37c1f44`九路径新增量。Standards 0硬违反/0新增判断，Spec 0项P1/P2、1项P3边界；独立原文分别入13/14 Comments，S08-B01入backlog15。Codex直接核对diff和检查原件，156Rust/16Node及最后frontend02/lint02/x18n01有真实exit0；App晚加异步模式一致性门经过最终前端检查，Rust和生产选择模型未再改。任务13转ready-for-human，尚未声称Revia桌面通过。下一步从本次完整源码构建并固定新Release，再真实13/14桌面；旧Release不能复用。
+
+
+### Codex：真实桌面局部提交后的归组收尾（2026-10-31）
+
+固定Release `b5ddf9f` 的真实提交 `5f75fdcb` 只含line30，HEAD/index/剩余工作区均核对正确；分组/默认组/选择重启保持。但line4未提交块因整文件patch头OID改变而被标失配，新的line4落入不同默认组。原件 `desktop-acceptance-myntirt_/evidence/revia-native/post-commit-group-loss` 及Git快照保留。Codex直接修：仅在本次提交收尾，对所选路径中未提交块按工作区位置和Git原始改动字节迁移原分组；重复正文仍按位置区分，不继承旧勾选，不放松完整文件写前指纹。相关修改完成后集中回归、固定新候选和Release再真实复验；当前不标任务13 done。
+
+
+归组修复集中验证：`task13-native-group-rust-01`真实exit0，共36项通过（m7_changelists24、共享commit_flow12），含原生同文件分组选不同默认组的场景、同hunk剩余块和前方插入导致旧侧行号移动的回归。原始argv/源码hash/分流输出保留。仅改Rust私有收尾与相关回归，无locale/绑定/前端生产源码变更；下一步仅此增量独立两轴，再重新固定Release并实际复验，不沿用旧桌面作为新版本通过。

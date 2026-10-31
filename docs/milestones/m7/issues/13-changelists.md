@@ -243,3 +243,11 @@ Spec：固定 `ee8f662…37c1f44`，仅 review07 修复增量，9 路径、1 提
 
 已复核 7,886 项源码、1,288 项原证据散列和固定 diff；原记录 Rust156、Node16、frontend02／lint02 exit0，x18n 0错误／76警告。Rust／Node受测生产源未再变；最终 App 异步门禁已纳入 frontend02。未重跑检查、未启动桌面；Windows与本候选原生行为仍待验收。详见 `spec-evidence.md`。
 
+
+
+### Codex：真实桌面局部提交后的归组收尾（2026-10-31）
+
+固定Release `b5ddf9f` 的真实提交 `5f75fdcb` 只含line30，HEAD/index/剩余工作区均核对正确；分组/默认组/选择重启保持。但line4未提交块因整文件patch头OID改变而被标失配，新的line4落入不同默认组。原件 `desktop-acceptance-myntirt_/evidence/revia-native/post-commit-group-loss` 及Git快照保留。Codex直接修：仅在本次提交收尾，对所选路径中未提交块按工作区位置和Git原始改动字节迁移原分组；重复正文仍按位置区分，不继承旧勾选，不放松完整文件写前指纹。相关修改完成后集中回归、固定新候选和Release再真实复验；当前不标任务13 done。
+
+
+归组修复集中验证：`task13-native-group-rust-01`真实exit0，共36项通过（m7_changelists24、共享commit_flow12），含原生同文件分组选不同默认组的场景、同hunk剩余块和前方插入导致旧侧行号移动的回归。原始argv/源码hash/分流输出保留。仅改Rust私有收尾与相关回归，无locale/绑定/前端生产源码变更；下一步仅此增量独立两轴，再重新固定Release并实际复验，不沿用旧桌面作为新版本通过。
