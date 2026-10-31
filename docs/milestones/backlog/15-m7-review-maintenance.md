@@ -74,3 +74,20 @@ Standards可能Duplicated Code：多处重复查找changelist/untracked读源；
 **[P3，S09-B01，仅backlog] EOF换行上下文可能阻断归组关联。** 规格 `docs/milestones/m7/spec.md:133`：“提交后只移除已提交部分”。新 `src-tauri/src/m7/changelists.rs:573–588` 将切块补丁中所有反斜杠行计入关联payload；既有切块器会保留转为上下文行的无末尾换行标记（`segments.rs:591–600`）。同hunk有未提交块及被提交的EOF补换行块时，后者提交后该上下文标记消失，前者可能无法关联，留下失配原件并落默认组。应仅纳入目标块所属标记。静态推导，未动态复现；按规格`:151`／Q174记backlog，不阻断本轮。
 
 来源：/private/tmp/revia-m7-batch-g5scyw0r/review-09-udxx1qjo/spec.md；未动态复现，不扩大本轮修复范围。
+
+
+### review10 Standards P3
+
+Standards：固定 `5ca917889efa5141442d0b73d6e48931828acf93...039fd1a3dbea7cf7e0c7bac91cd648509943dd41`，仅本轮10路径新增量，未读Spec。
+
+硬违反0项；判断2项，均P3、仅backlog：
+
+- S10-ST01，证据口径不一致：`docs/milestones/m7/report.md:303`及任务01:88、04:126、13:292、14:507称“持锁区不运行Git”，实际新增`session.rs:1624–1628`持有writing Mutex调用require_identity，经recovery.rs:188、160、122执行git rev-parse。按`docs/agents/local-validation.md:16`“每项结论都能对应固定源码、生产入口和实际可观察结果”，建议修正文档；没有另立“锁内禁Git”硬规范，未复现新输入丢失或输入延迟，不能据此升格P2。
+- S10-ST02，possible Duplicated Code：`src/index.css:1848–1850`、1857–1859、1866–1868重复同一tint与两条blur声明，可合并选择器共用材质规则；无功能失败证据。
+
+其余11项固定smell已逐项判断，无新增发现；仓库规则优先，工具强制项跳过。
+
+已核固定diff、33项源码/规则快照、106项相关原件散列。原记录Rust44、node20通过，build/lint/x18n exit0，翻译0错误/76警告。Rust受测源码一致（CSS之后另改，最终前端快照一致）。未重跑、未启动桌面；新Release原生PTY/Busy/浮层/默认名、D06、Windows仍待规划方验证。两项P3按Q174不阻断验收。
+
+
+S10-ST01: documentation wording clarified before native replay; no product expansion. S10-ST02 remains backlog only.

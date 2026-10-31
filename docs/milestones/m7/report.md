@@ -300,6 +300,11 @@ S07-03：外部diff显式验证Changelist路径的HEAD→工作区模型，仍�
 
 原生发现并集中修复：更改列表view把元数据读取记成仓库写入，导致PTY逐字输入被拒及提交后Busy不能自动恢复；默认组未命名input冻结旧语言；设置玻璃透底文字干扰阅读。原始截图/AX/文件在`desktop-acceptance-myntirt_`，终端命令实际残缺并parse error，不能称PTY命令通过。
 
-修复后元数据观察不再设置writing标志；真实写入开始/结束递增代际，只在同一空闲代际内发布元数据，持锁区不运行Git，跨写入结果拒绝。原写互斥与终端真实写入暂停保持。前端仅对明确Busy读取作三次有界重读，绑定原worktree/epoch且卸载取消；失败不继续显示可操作旧凭据。默认名用真实空name和即时翻译placeholder，避免翻译持久化成用户名称。统一浮层保留玻璃装饰/折射路径并增加主题tint与blur遮蔽透底，减少透明度/高对比度仍无滤镜降级。
+修复后元数据观察不再设置writing标志；真实写入开始/结束递增代际，只在同一空闲代际内发布元数据，读取不把仓库标为writing；最终发布的Mutex区仍包含身份重验证及其系统Git调用，可能短暂等待输入IPC，新版真实输入结果另行验证，跨写入结果拒绝。原写互斥与终端真实写入暂停保持。前端仅对明确Busy读取作三次有界重读，绑定原worktree/epoch且卸载取消；失败不继续显示可操作旧凭据。默认名用真实空name和即时翻译placeholder，避免翻译持久化成用户名称。统一浮层保留玻璃装饰/折射路径并增加主题tint与blur遮蔽透底，减少透明度/高对比度仍无滤镜降级。
 
 `task14-native-scene-rust-01`真实exit0，共44通过（更改列表26、PTY3、会话3、共享提交12），含实际会话写代际与Barrier并发发布拒绝。`task14-native-scene-node-01`20通过，前端build/lint/x18n均exit0，翻译0错误/76既有unused警告。源码hash、argv、真实exit、分流原输出与失败原件保留；只改复用既有键，未改locale/绑定。下一步只审本新增量、固定新Release，再真实复验PTY/浮层/默认名与D06；当前不标任务14 done。
+
+
+### review10完成与最终原生复验准备（2026-10-31）
+
+Standards 0硬违反、2项P3判断；Spec 0新增发现。原文分别入对应任务Comments，S10-ST01证据口径已澄清，S10-ST02仅backlog不扩重构。当前产品`039fd1a3dbea7cf7e0c7bac91cd648509943dd41`保持冻结。另补`task14-native-write-guard-regression-01`文件20/块24/段25共69项真实通过；加先前44项，113项相关Rust跨两轮核实，不能写成一次全套。Node20与最终前端build/lint/x18n通过，无后续产品修改。下一步以新Comments提交构建task14-native-release-build-03，固定新Release再真实PTY输入/列表恢复/默认名/浮层和D06；Windows、正式GitHub账号/保护与更新公钥接线未验，整包不done、不合并或删除worktree/监控。

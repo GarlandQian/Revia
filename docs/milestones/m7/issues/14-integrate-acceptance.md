@@ -504,6 +504,35 @@ Spec：固定 `b5ddf9f…0dc11c0`，仅真实桌面归组修复增量，4路径�
 
 原生发现并集中修复：更改列表view把元数据读取记成仓库写入，导致PTY逐字输入被拒及提交后Busy不能自动恢复；默认组未命名input冻结旧语言；设置玻璃透底文字干扰阅读。原始截图/AX/文件在`desktop-acceptance-myntirt_`，终端命令实际残缺并parse error，不能称PTY命令通过。
 
-修复后元数据观察不再设置writing标志；真实写入开始/结束递增代际，只在同一空闲代际内发布元数据，持锁区不运行Git，跨写入结果拒绝。原写互斥与终端真实写入暂停保持。前端仅对明确Busy读取作三次有界重读，绑定原worktree/epoch且卸载取消；失败不继续显示可操作旧凭据。默认名用真实空name和即时翻译placeholder，避免翻译持久化成用户名称。统一浮层保留玻璃装饰/折射路径并增加主题tint与blur遮蔽透底，减少透明度/高对比度仍无滤镜降级。
+修复后元数据观察不再设置writing标志；真实写入开始/结束递增代际，只在同一空闲代际内发布元数据，读取不把仓库标为writing；最终发布的Mutex区仍包含身份重验证及其系统Git调用，可能短暂等待输入IPC，新版真实输入结果另行验证，跨写入结果拒绝。原写互斥与终端真实写入暂停保持。前端仅对明确Busy读取作三次有界重读，绑定原worktree/epoch且卸载取消；失败不继续显示可操作旧凭据。默认名用真实空name和即时翻译placeholder，避免翻译持久化成用户名称。统一浮层保留玻璃装饰/折射路径并增加主题tint与blur遮蔽透底，减少透明度/高对比度仍无滤镜降级。
 
 `task14-native-scene-rust-01`真实exit0，共44通过（更改列表26、PTY3、会话3、共享提交12），含实际会话写代际与Barrier并发发布拒绝。`task14-native-scene-node-01`20通过，前端build/lint/x18n均exit0，翻译0错误/76既有unused警告。源码hash、argv、真实exit、分流原输出与失败原件保留；只改复用既有键，未改locale/绑定。下一步只审本新增量、固定新Release，再真实复验PTY/浮层/默认名与D06；当前不标任务14 done。
+
+
+### Codex / review10 Standards (2026-10-31)
+
+Standards：固定 `5ca917889efa5141442d0b73d6e48931828acf93...039fd1a3dbea7cf7e0c7bac91cd648509943dd41`，仅本轮10路径新增量，未读Spec。
+
+硬违反0项；判断2项，均P3、仅backlog：
+
+- S10-ST01，证据口径不一致：`docs/milestones/m7/report.md:303`及任务01:88、04:126、13:292、14:507称“持锁区不运行Git”，实际新增`session.rs:1624–1628`持有writing Mutex调用require_identity，经recovery.rs:188、160、122执行git rev-parse。按`docs/agents/local-validation.md:16`“每项结论都能对应固定源码、生产入口和实际可观察结果”，建议修正文档；没有另立“锁内禁Git”硬规范，未复现新输入丢失或输入延迟，不能据此升格P2。
+- S10-ST02，possible Duplicated Code：`src/index.css:1848–1850`、1857–1859、1866–1868重复同一tint与两条blur声明，可合并选择器共用材质规则；无功能失败证据。
+
+其余11项固定smell已逐项判断，无新增发现；仓库规则优先，工具强制项跳过。
+
+已核固定diff、33项源码/规则快照、106项相关原件散列。原记录Rust44、node20通过，build/lint/x18n exit0，翻译0错误/76警告。Rust受测源码一致（CSS之后另改，最终前端快照一致）。未重跑、未启动桌面；新Release原生PTY/Busy/浮层/默认名、D06、Windows仍待规划方验证。两项P3按Q174不阻断验收。
+
+
+
+### Codex / review10 Spec (2026-10-31)
+
+Spec：固定 `5ca9178…039fd1a`，仅原生场景修复增量，10路径、1提交（Q174）。**新增发现0：P1/P2=0，P3=0。**
+
+(a) 遗漏／部分实现：未发现。列表观察不再占用仓库写标志，真实写入前后代际校验阻止跨写发布；真实PTY输入仍按所属worktree的写门暂停。Busy读取最多重试三次，原epoch与卸载门禁保留，终态失败清掉列表凭据。
+
+(b) 范围外行为：未发现scope creep。
+
+(c) 实现错误：未发现。默认名称以空name保存，翻译只作即时placeholder；浮层增加主题tint／blur，减少透明度与高对比度仍移除滤镜。对应规格 `spec.md:68,90–93,133,138`、`ui-direction.md:191`；生产接线见 `changelists.rs:177–204`、`session.rs:1617–1653`、`Changelists.tsx:58–80,113`、`index.css:1846–1868,2010–2015,2035–2051`。
+
+已核38项相关源码／规范、106项本轮原件及固定diff；Rust44、Node20、build／lint／x18n真实exit0，翻译0错误／76既有警告，受测Rust与最终前端源码对应。未重跑检查、未改产品或启动桌面；新Release原生复验、D06及Windows仍未验证。详见 `spec-evidence.md`。
+
