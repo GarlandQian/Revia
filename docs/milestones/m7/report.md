@@ -274,3 +274,8 @@ H07-02/S07-02：实际focusNextFile工具条/F7过尾与reviewNextFile都接同�
 S07-03：外部diff显式验证Changelist路径的HEAD→工作区模型，仍执行原身份/确认上下文/指纹/保护快照门禁；Git difftool用同一固定HEAD（unborn时empty tree），不使用--cached。Git::changelist_base给内外diff共用。真实Git/difftool fixture捕获LOCAL为HEAD原文、REMOTE为工作区C，确认未把index中间B当作左侧；原index与工作区内容保留。过期请求在工具启动前拒绝，命令日志没有difftool启动。
 
 `task13-review07-rust-01`共156通过（m6_flows133、更改列表23）；`task13-review07-node-01`16通过（可见顺序/路由8、既有提交8）。最后仅增加前端异步模式一致性检查，Rust与生产选择模型未再改，未重复已过项；最终`task13-review07-frontend-02`、`task13-review07-lint-02`均exit0，`task13-review07-x18n-01`0错误/76既有unused警告。argv/源码hash/真实exit/分流原件位于codex-checks。Windows、非macOS非法字节路径与本候选原生Revia尚未实跑，不冒称桌面通过。下一步固定本增量、全新两轴，仅审新增修复，完成后再构建固定Release。
+
+
+### review08收齐与新版Release准备（2026-10-31）
+
+产品`37c1f441d77d08c874dee930281d961bfbec4bae`，只审`ee8f662…37c1f44`九路径新增量。Standards 0硬违反/0新增判断，Spec 0项P1/P2、1项P3边界；独立原文分别入13/14 Comments，S08-B01入backlog15。Codex直接核对diff和检查原件，156Rust/16Node及最后frontend02/lint02/x18n01有真实exit0；App晚加异步模式一致性门经过最终前端检查，Rust和生产选择模型未再改。任务13转ready-for-human，尚未声称Revia桌面通过。下一步从本次完整源码构建并固定新Release，再真实13/14桌面；旧Release不能复用。

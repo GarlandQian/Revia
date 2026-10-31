@@ -60,3 +60,10 @@ PR网络写后不确定结果的查询核对不作为新增独立已复现数据
 ### review07非阻断判断
 
 Standards可能Duplicated Code：多处重复查找changelist/untracked读源；P3，优先在修当前明确刷新/导航路由时复用同一查询，不为判断扩大重构。原文在review-07-wx8l6b6k及任务13/14。
+
+
+### review08 Spec：S08-B01（P3，仅backlog）
+
+- **[P3，S08-B01，仅 backlog，静态] 空预览的冲突路径可能打不开内置合并。** M6 规格 `docs/milestones/m6/spec.md:146` 要求“保留内置合并”。新增 `src/App.tsx:6472` 将冲突对话框也限定为 `changelistEntryForPath`；该函数只接受 changelist／untracked（`src/lib/m7/visibleChangelistSelection.ts:41–42`）。当 index 仍 unmerged、工作区已恢复为 HEAD 内容时，HEAD→工作区补丁为空，`src-tauri/src/session.rs:572–584` 不生成 changelist 条目，已有 unmerged 条目又被排除；点“合并”只关闭对话框。未动态复现，按 Q174 作为边界 backlog，不要求本轮扩修。
+
+来源：/private/tmp/revia-m7-batch-g5scyw0r/review-08-qlvudspl/spec.md。静态判断，未动态复现；不扩大本轮任务13修复或阻断真实桌面验收。

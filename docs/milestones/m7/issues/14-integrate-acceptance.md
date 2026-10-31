@@ -432,3 +432,37 @@ Spec：固定 `5f70d9c…150b274`，仅 review06 修复增量，18 路径、1 �
 
 已核对7,886项源码、1,253项原证据散列及diff；Rust152相关通过，末轮Node13通过，frontend04／lint03 exit0；失败原件保留。未重跑产品检查、未启动桌面或Windows。详见spec-evidence.md。
 
+
+
+### Codex / review08 Standards（2026-10-31）
+
+固定增量`ee8f662…37c1f44`；以下独立正式报告原文，详细原证据位于`/private/tmp/revia-m7-batch-g5scyw0r/review-08-qlvudspl`。
+
+# Standards
+
+固定 `ee8f6623…37c1f441`，仅 review07 修复增量，9 路径、1 提交（Q174）。
+
+**文档标准违反：0。Smell 判断项：0。**
+
+新增读源查询集中于 `visibleChangelistSelection.ts`，刷新、工具条和审阅导航复用；外部 diff 共用 HEAD／空树基线，保留身份、确认上下文、指纹及回收保护。未发现新增前端 Git 拼参、独立 hunk 计算、用户 Git 配置修改或未结构化报错。12 项固定 smell baseline 已逐项核对；工具强制规则跳过。
+
+7,886 项源码、1,288 项原件哈希及 Git diff 全部一致。原始记录 Rust 156、Node 16 通过；最终 frontend02／lint02 exit0，x18n01 为 0 错误／76 警告。Rust／Node 后 `App.tsx` 有变化，后续前端检查与最终产品源码匹配；详见 `standards-evidence.md`。本轴未重跑检查、启动桌面或修改产品；真实桌面、Windows 与非 macOS 非法字节路径未验证。
+
+
+
+### Codex / review08 Spec（2026-10-31）
+
+固定增量`ee8f662…37c1f44`；以下独立正式报告原文，详细原证据位于`/private/tmp/revia-m7-batch-g5scyw0r/review-08-qlvudspl`。
+
+Spec：固定 `ee8f662…37c1f44`，仅 review07 修复增量，9 路径、1 提交。**0 项 P1/P2；1 项 P3，仅 backlog，不阻断。**
+
+(a) 规格遗漏／部分实现：未发现本增量新增的独立遗漏。S07-01 的初始／刷新／重开／按路径定位均转向当前模式源；S07-02 的工具条、F7 过尾与审阅导航共用可见顺序，异步审阅增加模式／列表 revision 门禁；S07-03 支持更改列表外部 diff 的 HEAD→工作区比较，原身份、确认、指纹与回收门禁保留。
+
+(b) 范围外行为：0。
+
+(c) 实现边界：
+
+- **[P3，S08-B01，仅 backlog，静态] 空预览的冲突路径可能打不开内置合并。** M6 规格 `docs/milestones/m6/spec.md:146` 要求“保留内置合并”。新增 `src/App.tsx:6472` 将冲突对话框也限定为 `changelistEntryForPath`；该函数只接受 changelist／untracked（`src/lib/m7/visibleChangelistSelection.ts:41–42`）。当 index 仍 unmerged、工作区已恢复为 HEAD 内容时，HEAD→工作区补丁为空，`src-tauri/src/session.rs:572–584` 不生成 changelist 条目，已有 unmerged 条目又被排除；点“合并”只关闭对话框。未动态复现，按 Q174 作为边界 backlog，不要求本轮扩修。
+
+已复核 7,886 项源码、1,288 项原证据散列和固定 diff；原记录 Rust156、Node16、frontend02／lint02 exit0，x18n 0错误／76警告。Rust／Node受测生产源未再变；最终 App 异步门禁已纳入 frontend02。未重跑检查、未启动桌面；Windows与本候选原生行为仍待验收。详见 `spec-evidence.md`。
+
