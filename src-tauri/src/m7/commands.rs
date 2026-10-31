@@ -769,3 +769,32 @@ pub async fn m7_update_restart(app: tauri::AppHandle) -> Result<()> {
     super::update::restart(&app);
     Ok(())
 }
+
+// ---------- 更改列表（任务13） ----------
+#[derive(Debug,serde::Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ChangelistRequest { pub worktree_id:String }
+#[derive(Debug,serde::Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ChangelistChangeRequest { pub worktree_id:String, pub expected:super::changelists::ChangelistSelection, pub action:super::changelists::ChangeAction }
+#[tauri::command]
+pub async fn m7_changelist_view(state:State<'_,AppState>,request:ChangelistRequest)->Result<super::changelists::ChangelistView> {
+    let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
+    blocking(move||store.view(&session)).await
+}
+#[tauri::command]
+pub async fn m7_changelist_change(state:State<'_,AppState>,request:ChangelistChangeRequest)->Result<super::changelists::ChangelistView> {
+    let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
+    blocking(move||{let _write=session.acquire_write_lock()?;store.change(&session,&request.expected,request.action)}).await
+}
+#[derive(Debug,serde::Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ChangelistWarningsRequest {pub worktree_id:String,pub selection:super::changelists::ChangelistSelection}
+#[tauri::command]
+pub async fn m7_changelist_warnings(state:State<'_,AppState>,request:ChangelistWarningsRequest)->Result<Vec<crate::commit_warnings::CommitWarning>> {
+    let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
+    let settings=state.registry.lock().map_err(|_|internal("settings lock"))?.settings().clone();
+    blocking(move||{let _write=session.acquire_write_lock()?;let prepared=store.prepare(&session,&request.selection,&crate::commit::capture(session.git())?)?;
+        crate::commit_warnings::collect(&prepared.git,&crate::commit_warnings::WarningOptions{crlf:settings.commit_warn_crlf,detached:settings.commit_warn_detached,large_file_bytes:settings.commit_warn_large_file_bytes,invalid_filename:settings.commit_warn_invalid_filename})
+    }).await
+}

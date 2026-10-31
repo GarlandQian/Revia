@@ -1,6 +1,32 @@
 # yaml-language-server: $schema=https://x18n.antfu.dev/schema/reviews.json
 x18n: 1
 sources:
+  changelists.create:
+    en: 32f970c82ab21
+  changelists.default:
+    en: 19c30330b39b5c
+  changelists.delete:
+    en: 51f36875e9b9b
+  changelists.makeDefault:
+    en: 3dd7ce78b183e
+  changelists.mode:
+    en: 916a4cc3e2a28
+  changelists.moveBlock:
+    en: 1649e6dc5d7e48
+  changelists.moveFile:
+    en: 16c30d347c2c6a
+  changelists.name:
+    en: 46daa2005f0ad
+  changelists.rename:
+    en: e0a9242c5b6dc
+  changelists.selectBlock:
+    en: 427469605eac6
+  changelists.stale:
+    en: 15cfa35c3d7ca1
+  changelists.title:
+    en: 1795cd4b49629d
+  changelists.wholeFile:
+    en: dc5e5222b98a3
   clone.advanced:
     en: 8bd39d98eefb9
   clone.branch:
@@ -163,6 +189,12 @@ sources:
     en: 1d6f3d30060efd
   errors.commitOutput.listenerFailed:
     en: 6e0952918824e
+  errors.m7.changelistChanged:
+    en: 12c80e7abd1f3
+  errors.m7.changelistInvalid:
+    en: e87cf8bebcf74
+  errors.m7.changelistReconcile:
+    en: 1b0463d2c69d57
   errors.m7.cloneBranchInvalid:
     en: 101b90e8ff4d8
   errors.m7.cloneDepthInvalid:

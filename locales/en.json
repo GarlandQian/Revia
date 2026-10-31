@@ -924,7 +924,10 @@
       "updatePackageInvalid": "The downloaded package is incomplete, has a different version, or has an invalid signature. Download it again.",
       "updateInstallNeedsVerification": "The update installation did not complete. Verify the application state before taking another action: {error}",
       "updateReleaseIncomplete": "The release information is incomplete or has changed. Check for updates again; the previous state was kept.",
-      "updateInstallRecordFailed": "The update was installed, but the local receipt could not be written. Verify the application state first."
+      "updateInstallRecordFailed": "The update was installed, but the local receipt could not be written. Verify the application state first.",
+      "changelistChanged": "The changelist or files changed. Refresh and select again.",
+      "changelistInvalid": "Invalid changelist action. Check the name and selection.",
+      "changelistReconcile": "The commit needs index verification. Original evidence has been kept."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
@@ -2328,5 +2331,20 @@
     "editDirty": "Unsaved changes",
     "editUnsavedBlock": "Unsaved edits — save or discard before continuing",
     "editSwitchToSplit": "Switch to split view to edit the working-tree side"
+  },
+  "changelists": {
+    "mode": "Changelist mode (off: staging area)",
+    "title": "Changelists",
+    "name": "Changelist name",
+    "create": "Create",
+    "default": "Default",
+    "rename": "Rename changelist",
+    "makeDefault": "Make default",
+    "delete": "Delete",
+    "moveFile": "Move entire file",
+    "moveBlock": "Move this block",
+    "selectBlock": "Select this Git block",
+    "stale": "Block changed. Check its previous group and select again.",
+    "wholeFile": "Entire file"
   }
 }

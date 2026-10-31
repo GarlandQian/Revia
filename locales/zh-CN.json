@@ -1316,7 +1316,10 @@
       "updatePackageInvalid": "已下载更新包不完整、版本不匹配或签名无效。请重新下载。",
       "updateInstallNeedsVerification": "安装更新未完成，请核对应用状态后再操作：{error}",
       "updateReleaseIncomplete": "更新发布信息不完整或已变化。请重新检查更新，上次状态已保留。",
-      "updateInstallRecordFailed": "更新已安装，但本地回执写入失败。请先核对应用状态。"
+      "updateInstallRecordFailed": "更新已安装，但本地回执写入失败。请先核对应用状态。",
+      "changelistChanged": "更改列表或文件已变化，请刷新并重新选择",
+      "changelistInvalid": "更改列表操作无效，请核对名称和选择",
+      "changelistReconcile": "提交后暂存区需要核对，已保留原件"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
@@ -2328,5 +2331,20 @@
     "editDirty": "有未保存改动",
     "editUnsavedBlock": "有未保存的编辑，请先保存或放弃再继续",
     "editSwitchToSplit": "切到并排视图后编辑工作区一侧"
+  },
+  "changelists": {
+    "mode": "更改列表模式（关闭时使用暂存区）",
+    "title": "更改列表",
+    "name": "更改列表名称",
+    "create": "新建",
+    "default": "默认列表",
+    "rename": "重命名列表",
+    "makeDefault": "设为默认列表",
+    "delete": "删除列表",
+    "moveFile": "移动整个文件",
+    "moveBlock": "移动此块",
+    "selectBlock": "选择此 Git 块",
+    "stale": "块已失配，请核对原分组并重新选择",
+    "wholeFile": "整文件"
   }
 }

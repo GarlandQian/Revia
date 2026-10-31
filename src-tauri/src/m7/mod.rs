@@ -6,6 +6,7 @@
 //! - 网络、钥匙串、PTY、更新只在外部边界做受控适配，生产入口真实执行；
 //! - 诊断与草稿只写 Revia 自己的数据目录，不改用户 Git 配置，不碰用户凭据。
 
+pub mod changelists;
 pub mod clone;
 pub mod commands;
 pub mod diagnostics;

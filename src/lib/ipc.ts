@@ -140,6 +140,7 @@ export interface SettingsPayload {
   diffSoftWrap: boolean;
   diffJumpToNextFile: boolean;
   diffIgnoreWhitespace: number;
+  changelistMode: boolean;
   commitSubjectLimit: number;
   commitBlankLineRequired: boolean;
   commitBodyLineLimit: number;
@@ -210,6 +211,7 @@ export interface SettingsPatchPayload {
   diffSoftWrap?: boolean;
   diffJumpToNextFile?: boolean;
   diffIgnoreWhitespace?: number;
+  changelistMode?: boolean;
   commitSubjectLimit?: number;
   commitBlankLineRequired?: boolean;
   commitBodyLineLimit?: number;
@@ -524,7 +526,7 @@ export const ipc = {
    * 执行提交。只传登记 worktree ID、信息、amend/skip 与用户所见预期；
    * 不传任何 Git 参数。实时输出走 `revia://commit-output` 事件。
    */
-  executeCommit: (request: { worktreeId: string; options: CommitExecuteOptions }) =>
+  executeCommit: (request: { worktreeId: string; options: CommitExecuteOptions; selection?: import("@/types/bindings/ChangelistSelection").ChangelistSelection | null }) =>
     invoke<CommitOutcome>("execute_commit", { request }),
 
   // ---------- 只读提交历史（M5 任务 01） ----------

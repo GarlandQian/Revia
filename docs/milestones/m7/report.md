@@ -218,3 +218,13 @@ F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍�
 前端首轮`review-drafts-frontend-build-01`真实exit2，空表单headSha:null不符合已有可选string绑定，修正为空缺字段后重跑通过。最早Node轮缺既有Rust错误证据环境变量而跳过1项，补齐后最终49项无跳过。所有中间轮和原stdout/stderr、精确argv、源码hash、真实exit均保留；不把中间轮算作最终候选通过。测试HTTP helper两项未用函数产生非阻断dead_code提示，未清理后谎称复用旧通过。
 
 [GitHub官方review接口](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)已核对commit_id省略时默认最新提交；本组显式固定原head。Grok连接失败后用可用官方网页读取渠道，原件`impl/review-api-official.json`。这是中间检查点，F13/F22更新包/渠道/安装重启协调仍未完成；任务13/14真实桌面与真实账号/钥匙串仍未验。
+
+### Codex：任务13实现与集中检查（2026-10-31）
+
+基于上方三组真实 Rebased 事实实现更改列表；设置默认仍为暂存区。应用数据按 worktree 身份保存默认列表、创建/重命名/删除、整文件/原始 Git 块单一归属与勾选；切换不删组。失配块保留原组和预览，取消勾选。文件与块均可移动，提交成功只移除本次已提交条目。
+
+选择提交使用系统 Git 生成的 HEAD→工作区原始块建立独立 index，执行前再次核对真实 HEAD/index/操作状态/文件版本及 worktree 身份；沿用现有提交输出、快照、hooks、草稿和退出保护。成功后只用 Git reset 更新所选路径的真实 index，未触及路径的原暂存不混入提交且保留，工作区不被写入。原 index entries/binary patch、选项及独立 index 原件保存在应用数据 changelists/commit-evidence；失败不自动续跑、不删 index.lock。收尾失败不清草稿，报告待核对。所选文件的编辑草稿经现有入口处理；不要求处理未选文件的草稿。
+
+`task13-rust-03`：42通过（新更改列表10、既有commit_flow12、file_staging20），覆盖不同路径已有暂存、同文件部分暂存、二进制/未跟踪/删除、归组持久化与默认组、外部修改失配、锁保留、hook失败、初始提交和仓库身份替换。此前task13-rust-01为40通过，02为42通过；所有轮次保留。`task13-frontend-01`、`task13-lint-01`、`task13-x18n-01`均exit0，x18n 0错误/76既有unused-key警告；lint有既有非阻断提示。x18n首次沙箱缓存写入EPERM的原件在task13-locale-query-01，提升后查询/维护通过。绑定生成task13-bindings-01通过。
+
+后两次产品变化仅Rust收尾与命令相关编辑范围，已重跑上述Rust组；前端与locale检查后无对应源码变化。不把这些CLI检查称作桌面通过，Windows未实跑。下一步固定本增量、按Q174新两轴审查，再重建Release和任务14真实桌面；旧Release不适用于本次新源码。

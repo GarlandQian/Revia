@@ -66,6 +66,8 @@ pub struct Settings {
     pub diff_ignore_whitespace: u32,
     /// 提交信息检查：首行长度上限（0 表示不检查）。
     pub commit_subject_limit: u32,
+    #[serde(default)]
+    pub changelist_mode: bool,
     /// 提交信息检查：首行与正文之间要求空行。
     pub commit_blank_line_required: bool,
     /// 提交信息检查：正文每行长度上限（0 表示不检查）。
@@ -385,6 +387,7 @@ impl Default for Settings {
             diff_jump_to_next_file: true,
             diff_ignore_whitespace: 0,
             commit_subject_limit: 72,
+            changelist_mode: false,
             commit_blank_line_required: false,
             commit_body_line_limit: 0,
             commit_show_ruler: false,
@@ -451,6 +454,7 @@ pub struct SettingsPatch {
     pub diff_jump_to_next_file: Option<bool>,
     pub diff_ignore_whitespace: Option<u32>,
     pub commit_subject_limit: Option<u32>,
+    pub changelist_mode: Option<bool>,
     pub commit_blank_line_required: Option<bool>,
     pub commit_body_line_limit: Option<u32>,
     pub commit_show_ruler: Option<bool>,
@@ -756,6 +760,7 @@ impl Registry {
         if let Some(value) = patch.diff_ignore_whitespace {
             next.diff_ignore_whitespace = value.clamp(0, 3);
         }
+        if let Some(value) = patch.changelist_mode { next.changelist_mode = value; }
         if let Some(value) = patch.commit_subject_limit {
             next.commit_subject_limit = value.clamp(0, 200);
         }

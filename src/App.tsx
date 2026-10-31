@@ -35,6 +35,9 @@ import { CommitArea, messageSubmittable, type CommitResultView } from "@/compone
 import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitOutputStore } from "@/lib/commitOutput";
+import { Changelists, selectionOf } from "@/features/m7/Changelists";
+import type { ChangelistView } from "@/types/bindings/ChangelistView";
+import { invoke } from "@tauri-apps/api/core";
 import { ChangesTree, entryKey, treeOrder } from "@/components/app/ChangesTree";
 import { Breadcrumbs, EditorTabs, mergeTabKey, tabKey, type DiffToolbarOptions } from "@/components/app/EditorTabs";
 import { MergeView } from "@/features/diff/MergeView";
@@ -279,6 +282,10 @@ export function App() {
     ignoreWhitespace: 0 as 0 | 1 | 2 | 3,
   });
   /** 提交信息检查与提交时警告（Q139）。 */
+  const [changelistMode, setChangelistMode] = useState(false);
+  const [changelistView, setChangelistView] = useState<ChangelistView | null>(null);
+  const changelistRef = useRef<ChangelistView | null>(null);
+  const acceptChangelistView = useCallback((view: ChangelistView | null) => { changelistRef.current = view; setChangelistView(view); setAmendConfirm(null); setCommitWarningConfirm(null); }, []);
   const [commitChecks, setCommitChecks] = useState({
     subjectLimit: 72,
     blankLineRequired: false,
@@ -1375,6 +1382,7 @@ export function App() {
           jumpToNextFile: settings.diffJumpToNextFile,
           ignoreWhitespace: settings.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
         });
+        setChangelistMode(settings.changelistMode);
         setCommitChecks({
           subjectLimit: settings.commitSubjectLimit,
           blankLineRequired: settings.commitBlankLineRequired,
@@ -2560,7 +2568,12 @@ export function App() {
     }
     const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
-    const related = commitContextRef.current?.expectation.index.filter((entry) => entry.status !== "F")
+    const listView = changelistMode ? changelistRef.current : null;
+    if (changelistMode && (!listView || listView.worktreeId !== target || !listView.items.some((item) => item.selected && !item.stale))) {
+      setAppError(localizedError("rejected", "errors.m7.changelistChanged"), target); return;
+    }
+    const listSelection = listView ? selectionOf(listView) : null;
+    const related = listView ? listView.items.filter((item) => item.selected && !item.stale).map((item) => item.path) : commitContextRef.current?.expectation.index.filter((entry) => entry.status !== "F")
       .flatMap((entry) => [entry.path, ...(entry.originalPath ? [entry.originalPath] : [])]) ?? [];
     if (!(await prepareEditTargets(target, related))) return;
     if (worktreeIdRef.current !== target || gateRef.current.token().activation !== origin.activation) return;
@@ -2594,8 +2607,11 @@ export function App() {
     if (!options.skipWarnings) {
       let warnings: CommitWarning[] = [];
       try {
-        warnings = await ipc.commitWarnings(target);
-      } catch {
+        warnings = listSelection
+          ? await invoke<CommitWarning[]>("m7_changelist_warnings", { request: { worktreeId: target, selection: listSelection } })
+          : await ipc.commitWarnings(target);
+      } catch (caught) {
+        if (listSelection) { setAppError(toAppError(caught), target); return; }
         warnings = [];
       }
       if (!remoteTargetIsCurrent(origin, gateRef.current.token())) return;
@@ -2684,6 +2700,7 @@ export function App() {
     try {
       const outcome = await ipc.executeCommit({
         worktreeId: target,
+        selection: listSelection,
         options: {
           message: submitted.message,
           amend: submitted.amend,
@@ -2792,7 +2809,7 @@ export function App() {
         writeOrchestrator.end(target, needsVerification || pushNeedsVerification);
       }, (original, lease) => commitAndPushRef.current?.(original, lease) ?? Promise.resolve());
     }
-  }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, prepareEditTargets, refreshTarget, setAppError, writeOrchestrator]);
+  }, [changelistMode, closeDriver, commitOutputs, draftPersistence, loadCommitContext, prepareEditTargets, refreshTarget, setAppError, writeOrchestrator]);
 
   /** 确认 amend 的二次警告：只对**当前**上下文成立时生效（F06.2）。 */
   const confirmAmend = useCallback(() => {
@@ -4489,6 +4506,7 @@ export function App() {
         diffSoftWrap: patch.diffSoftWrap,
         diffJumpToNextFile: patch.diffJumpToNextFile,
         diffIgnoreWhitespace: patch.diffIgnoreWhitespace,
+        changelistMode: patch.changelistMode,
         commitSubjectLimit: patch.commitSubjectLimit,
         commitBlankLineRequired: patch.commitBlankLineRequired,
         commitBodyLineLimit: patch.commitBodyLineLimit,
@@ -4556,6 +4574,8 @@ export function App() {
         jumpToNextFile: next.diffJumpToNextFile,
         ignoreWhitespace: next.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
       });
+      setChangelistMode(next.changelistMode);
+      acceptChangelistView(null);
       setCommitChecks({
         subjectLimit: next.commitSubjectLimit,
         blankLineRequired: next.commitBlankLineRequired,
@@ -5497,6 +5517,7 @@ export function App() {
     diffSoftWrap: diffOptions.softWrap,
     diffJumpToNextFile: diffOptions.jumpToNextFile,
     diffIgnoreWhitespace: diffOptions.ignoreWhitespace,
+    changelistMode,
     commitSubjectLimit: commitChecks.subjectLimit,
     commitBlankLineRequired: commitChecks.blankLineRequired,
     commitBodyLineLimit: commitChecks.bodyLineLimit,
@@ -5793,7 +5814,7 @@ export function App() {
                     className="icon-action size-[22px]"
                     title={messages.changes.discardSelected}
                     aria-label={messages.changes.discardSelected}
-                    disabled={isWriting || discardableSelected.length === 0}
+                    disabled={changelistMode || isWriting || discardableSelected.length === 0}
                     onClick={() => requestDiscardEntries(discardableSelected)}
                   >
                     <Codicon name="discard" size={15} />
@@ -5833,7 +5854,9 @@ export function App() {
 
             {sideTab === "commit" ? (
               <>
-                {snapshot ? (
+                {changelistMode && worktreeId && snapshot ? (
+                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} />
+                ) : snapshot ? (
                   <ChangesTree
                     snapshot={snapshot}
                     active={selected}
@@ -5860,7 +5883,7 @@ export function App() {
                 )}
                 {worktreeId ? (
                   <CommitArea
-                    context={commitContext}
+                    context={changelistMode && commitContext ? { ...commitContext, gates: { ...commitContext.gates, hasStagedChanges: changelistView?.worktreeId === worktreeId && changelistView.items.some((item) => item.selected && !item.stale) === true } } : commitContext}
                     message={commitInput.message}
                     amend={commitInput.amend}
                     skipHooks={commitInput.skipHooks}

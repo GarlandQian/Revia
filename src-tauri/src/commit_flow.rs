@@ -371,12 +371,13 @@ impl WorktreeSession {
             options,
             operation_id,
             emit,
+            None,
         )
     }
 
     /// 写门内的实际流程（`execute_commit_flow` 已持有写锁）。
     #[allow(clippy::too_many_lines)]
-    fn run_commit_flow(
+    pub(crate) fn run_commit_flow(
         &self,
         drafts: &DraftStore,
         recovery_store: &RecoveryStore,
@@ -384,8 +385,9 @@ impl WorktreeSession {
         options: CommitOptions,
         operation_id: String,
         emit: Arc<dyn Fn(CommitOutputEvent) + Send + Sync>,
+        prepared: Option<&crate::m7::changelists::Prepared>,
     ) -> Result<CommitOutcome> {
-        let git = &self.git;
+        let git = prepared.map(|p| &p.git).unwrap_or(&self.git);
         // nonce 是前端发起时生成的归属凭据：只校验形状，不参与语义判断。
         if options.client_nonce.is_empty()
             || options.client_nonce.len() > MAX_NONCE_LEN
@@ -539,6 +541,7 @@ impl WorktreeSession {
 
         // 已保存快照后的所有启动前错误，统一记为「未执行」，不伪装成 Git 已启动。
         let preflight = (|| -> Result<(HookBaseline, Option<PathBuf>)> {
+            if let Some(prepared) = prepared { prepared.recheck(self)?; }
             let baseline = commit_snapshot::capture_hook_baseline(git, &current)?;
             let recheck = commit::capture(git)?;
             if !commit::expectations_match(&recheck, &current)
@@ -566,6 +569,7 @@ impl WorktreeSession {
             } else {
                 None
             };
+            if let Some(prepared) = prepared { prepared.recheck(self)?; }
             Ok((baseline, hooks_off_dir))
         })();
         let (baseline, hooks_off_dir) = match preflight {
@@ -647,6 +651,12 @@ impl WorktreeSession {
             ));
         }
 
+        if success {
+            if let Some(prepared) = prepared {
+                let head = observed_head.as_deref().ok_or_else(|| AppError::coded(ErrorKind::NeedsVerification,"errors.m7.changelistReconcile","提交后暂存区需要核对，已保留原件",&[]))?;
+                prepared.reconcile(self, head).map_err(|error| AppError::coded(ErrorKind::NeedsVerification,"errors.m7.changelistReconcile","提交后暂存区需要核对，已保留原件",&[]).cause(error))?;
+            }
+        }
         // 8. 收尾：先落真实快照基准，再汇总结果。
         //
         // F05.3：**已确认的失败也要保存真实 after 基准**。hook 可能已经改过工作区，
@@ -734,7 +744,7 @@ impl WorktreeSession {
                 None
             }
         };
-        let expectation_after = match commit::capture(git) {
+        let expectation_after = match commit::capture(&self.git) {
             Ok(after) => Some(after),
             Err(error) => {
                 needs_verification = true;

@@ -126,6 +126,7 @@ pub struct AppState {
     pub drafts: DraftStore,
     /// Revia 数据目录（跳过 hooks 的临时空目录放在这里，F04.2）。
     pub data_dir: PathBuf,
+    pub changelists: Arc<crate::m7::changelists::ChangelistStore>,
     /// M7：导入的颜色主题。
     pub m7_themes: Arc<crate::m7::theme::ThemeStore>,
     /// M7：工作区编辑草稿。
@@ -167,6 +168,7 @@ impl AppState {
             exit_guard: Arc::new(ExitGuard::default()),
             drafts: DraftStore::new(data_dir.clone()),
             m7_themes: Arc::new(crate::m7::theme::ThemeStore::new(&data_dir)),
+            changelists: Arc::new(crate::m7::changelists::ChangelistStore::new(&data_dir)),
             m7_edit_drafts: Arc::new(crate::m7::edit::EditDraftStore::new(&data_dir)),
             m7_terminal: Arc::new(crate::m7::terminal::TerminalManager::new()),
             m7_terminal_tabs: Arc::new(crate::m7::terminal::TerminalTabStore::new(&data_dir)),
@@ -3190,6 +3192,8 @@ pub async fn clear_commit_draft(
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecuteCommitRequest {
+    #[serde(default)]
+    pub selection: Option<crate::m7::changelists::ChangelistSelection>,
     /// 登记的 worktree ID（前端不传任何路径或 Git 参数，F03.1）。
     pub worktree_id: String,
     pub options: CommitOptions,
@@ -3218,6 +3222,8 @@ pub async fn execute_commit(
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     );
     let options = request.options;
+    let selection = request.selection;
+    let changelists = Arc::clone(&state.changelists);
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     tauri::async_runtime::spawn_blocking(move || {
         let emit_app = app.clone();
@@ -3227,7 +3233,7 @@ pub async fn execute_commit(
                 // 事件发送失败（窗口已关）不影响提交本身；输出仍留在返回值里。
                 let _ = emit_app.emit("revia://commit-output", &event);
             });
-        let paths: Vec<String> = options
+        let mut paths: Vec<String> = options
             .expected
             .index
             .iter()
@@ -3236,7 +3242,17 @@ pub async fn execute_commit(
                 std::iter::once(entry.path.clone()).chain(entry.original_path.clone())
             })
             .collect();
+        if let Some(selection) = &selection {
+            let view = changelists.view(&session)?;
+            if view.identity != selection.identity || view.revision != selection.revision {
+                return Err(AppError::coded(ErrorKind::Rejected,"errors.m7.changelistChanged","更改列表或文件已变化，请刷新并重新选择",&[]));
+            }
+            paths = view.items.iter().filter(|i|i.selected&&!i.stale).map(|i|i.path.clone()).collect();
+        }
         edit_drafts.with_resolved(&session, &paths, || {
+            if let Some(selection) = selection {
+                return session.execute_changelist_commit_flow(&changelists, &selection, &drafts, &recovery, hooks_off_root, options, operation_id, emit);
+            }
             session.execute_commit_flow(
                 &drafts,
                 &recovery,

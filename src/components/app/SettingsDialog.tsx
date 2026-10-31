@@ -53,6 +53,7 @@ export interface SettingsValues {
   diffSoftWrap: boolean;
   diffJumpToNextFile: boolean;
   diffIgnoreWhitespace: number;
+  changelistMode: boolean;
   commitSubjectLimit: number;
   commitBlankLineRequired: boolean;
   commitBodyLineLimit: number;
@@ -108,6 +109,7 @@ export interface SettingsPatch {
   diffSoftWrap?: boolean;
   diffJumpToNextFile?: boolean;
   diffIgnoreWhitespace?: number;
+  changelistMode?: boolean;
   commitSubjectLimit?: number;
   commitBlankLineRequired?: boolean;
   commitBodyLineLimit?: number;
@@ -634,6 +636,7 @@ export function SettingsDialog({
                   checked={values.cherryPickIncludeSource}
                   onChange={(value) => void commit({ cherryPickIncludeSource: value })}
                 />
+                <Toggle label={t("changelists.mode")} checked={values.changelistMode} onChange={(value) => void commit({ changelistMode: value })} />
                 <Field label={messages.settings.commitSubjectLimit} hint={messages.settings.commitSubjectLimitHint}>
                   <input
                     className="settings-input w-24"
