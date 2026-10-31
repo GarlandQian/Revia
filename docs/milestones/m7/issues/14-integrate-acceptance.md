@@ -649,3 +649,38 @@ Spec：固定 `9ba06db…edb72cb`，仅本次 D06 时序／split 缓存来源增
 
 
 Codex核对：旧measure.log确有并发拼行；收齐报告后直接修共享日志写入口，新增独占临时文件并发回归。修复前不构建/启动诊断版，不把80Node/10Rust或build/lint当D06通过。原正式Release及首屏252/220/176ms失败原件保留。
+
+
+### Codex：测量日志完整性P2修复 review14 — 2026-10-31
+
+固定增量 `2b79a2cce9660f003f59c75422808a3346f95e3f…6021058deb8eb30b23c72907739a2e3177df0fd7`，只审共享日志写入口及其并发回归。收齐两轴正式报告，分别原文如下。
+
+# Standards（review14）
+
+范围：`2b79a2c...6021058`，仅 `src-tauri/src/commands.rs`；未重审旧范围。
+
+## 文档规范违反
+
+**S14-ST01 · P3 / backlog：并发回归未按要求放在集成测试中。** 新增 `commands.rs:4137–4182` 是 `#[cfg(test)]` 单元测试，直接调用私有 `append_measure_line`。`docs/agents/local-validation.md:8` 明确要求“并发和时序问题也写成 `src-tauri/tests/` 下的集成测试”，同条优先通过生产入口验证。后续将此回归组织为集成测试并覆盖两个实际日志入口；无需加入无关 Git 操作。现有测试已实际使用生产写函数、独占临时文件、8 线程与 512 条记录，且两处调用关系可静态确认，因此这属于 P3 的测试组织差异，按 Q174 记 backlog，不阻断本次日志修复。
+
+未发现 P1/P2 规范违反。
+
+## 判断项
+
+未发现新增、可行动的 smell。提取共享写函数消除了两处追加代码重复；其互斥与完整缓冲写入均服务本次修复。
+
+已核对既有 Rust 原件的命令、源码/清单散列、stdout/stderr 和 exit：1 项通过、exit 0。本审查未运行测试、应用或 Release；不证明 D06 性能、时序或真实桌面验收通过。
+
+
+Spec：固定 `2b79a2c…6021058`，仅 `commands.rs` 日志完整性修复。**P1=0，P2=0，P3=0；原 S13-SP01 在本增量范围内关闭。**
+
+(a) 缺漏／部分：未见。原要求是“这两个入口共同串行写入含换行的完整记录”（`issues/14-integrate-acceptance.md:646`）。`commands.rs:975,3102` 均调用 `append_measure_line`；`:979–985` 的同一静态 Mutex 覆盖打开和完整字节 `write_all`，避免两入口格式化写入交错。`:4143–4182` 用独占 tempfile、Barrier 与 8 线程验证 256 条 JSON＋256 条前端文本完整、唯一且末尾换行，已有 Rust 原件 1/1、exit0。
+
+(b) 范围扩张：未见。对照 `native-acceptance.md:71`“补生产IPC边界的测量时序，而非据猜测改性能或安全门”，增量仅共享日志写入及对应回归；未改150/100/1帧门槛、身份重验、Git、hunk或业务行为。
+
+(c) 看似实现但错误：未见。`log_measure:966–975` 保留 env／minimal 开关和 Rust 时间戳，`debug_log:3096–3103` 保留原 env 判断；打开／写入失败仍静默，poisoned Mutex 取回 guard，未新增 panic。
+
+已复核 argv、exit、stdout/stderr、7,887 项源码散列及固定 HEAD 文件对象；本轴未运行应用或测试，无 TS／locale 改动，未重复 build/lint。按 `local-validation.md:16` 的固定源码与真实观察要求，本结论只证明共享写入口及回归，不证明新 TIMING、性能根因或 D06。未跑新 Release；旧正式 Release 和首屏252/220/176ms失败保留。详见 `spec-evidence.md`。
+
+
+Codex核对：两个生产日志入口共用同一Mutex与含换行完整缓冲；独占临时文件8线程共512条真实写入无缺失/拼行，Rust原件1/1 exit0。S14-ST01测试位置P3只记backlog，不扩大重构。下一步固定带观测的Release，在原D06独占fixture真实可见窗口定位；仍不是性能修复或D06通过。

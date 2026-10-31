@@ -111,3 +111,8 @@ Spec：固定 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4
 ### review13：日志完整性观测判断
 
 Standards P3记录测量日志可能拼行；同轮Spec以真实旧原件列S13-SP01 P2，进入Codex局部修复。这里只追踪该判断，不扩大重构；正式修复和原文见任务14Comments。
+
+
+### review14：S14-ST01 测量日志回归位置（P3）
+
+Standards列1项P3：并发日志回归位于commands.rs源文件单元测试，local-validation要求src-tauri/tests集成测试位置。现有回归实际使用生产写函数/独占临时文件/8线程512条完整记录，Spec无P1/P2/P3；此流程/组织差异不阻断本次局部修复。按Q174留后续维护，不扩大重构。
