@@ -983,6 +983,44 @@ pub fn log_measure(message: &str) {
     }
 }
 
+/// 测量模式的阶段观测；退出时一次写日志，阶段之间不插入磁盘 I/O。
+/// 只记录固定名称、线程和时间，不记录参数、正文或凭据。不是验收通过判定。
+pub(crate) struct MeasureSpan {
+    name: &'static str,
+    started: Option<(std::time::Instant, u128)>,
+    marks: Vec<(&'static str, u128)>,
+}
+
+impl MeasureSpan {
+    pub(crate) fn new(name: &'static str) -> Self {
+        let started = (std::env::var_os("REVIA_MEASURE_LOG").is_some()
+            && !minimal_soak_logging()).then(|| (
+                std::time::Instant::now(),
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .map(|value| value.as_micros()).unwrap_or_default(),
+            ));
+        Self { name, started, marks: Vec::new() }
+    }
+
+    pub(crate) fn mark(&mut self, name: &'static str) {
+        if let Some((started, _)) = self.started {
+            self.marks.push((name, started.elapsed().as_micros()));
+        }
+    }
+}
+
+impl Drop for MeasureSpan {
+    fn drop(&mut self) {
+        if let Some((started, epoch_us)) = self.started {
+            let elapsed_us = started.elapsed().as_micros();
+            log_measure(&format!("[TIMING] {}", serde_json::json!({
+                "span": self.name, "startedAtUs": epoch_us, "elapsedUs": elapsed_us,
+                "thread": format!("{:?}", std::thread::current().id()), "marksUs": self.marks,
+            })));
+        }
+    }
+}
+
 fn chrono_like_stamp() -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1055,11 +1093,16 @@ pub async fn list_changes(
     request: WorktreeRequest,
 ) -> Result<ChangesSnapshot> {
     log_measure("list_changes 收到");
+    let mut timing = MeasureSpan::new("ipc.list_changes");
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let changelist_mode = state.registry.lock().map_err(|_| AppError::coded(ErrorKind::Internal,"errors.m7.taskFailed","后台任务失败：{error}",&[("error","settings lock".into())]))?.settings().changelist_mode;
     session.set_changelist_mode(changelist_mode);
     log_measure("list_changes 会话就绪，开始读取");
-    let result = tauri::async_runtime::spawn_blocking(move || session.refresh())
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.list_changes");
+        session.refresh()
+    })
         .await
         .map_err(|error| {
             AppError::coded(
@@ -1076,6 +1119,7 @@ pub async fn list_changes(
             inner.elapsed_ms
         ));
     }
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "list_changes",
@@ -1834,13 +1878,16 @@ pub async fn purge_recovery(state: State<'_, AppState>) -> Result<u64> {
 
 #[tauri::command]
 pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Result<RowSlice> {
+    let mut timing = MeasureSpan::new("ipc.get_rows");
     log_measure(&format!(
         "get_rows 收到：{} {}..{}",
         request.path, request.from, request.to
     ));
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.get_rows");
         session.rows_with_ignore(
             &request.path,
             request.changes,
@@ -1859,6 +1906,7 @@ pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Resul
             &[("error", error.to_string())],
         )
     })?;
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "get_rows",
@@ -1875,9 +1923,12 @@ pub async fn side_by_side_layout(
     state: State<'_, AppState>,
     request: SideLayoutRequest,
 ) -> Result<crate::session::SideBySideLayout> {
+    let mut timing = MeasureSpan::new("ipc.side_by_side_layout");
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.side_by_side_layout");
         session.side_layout(
             &request.path,
             request.changes,
@@ -1894,6 +1945,7 @@ pub async fn side_by_side_layout(
             &[("error", error.to_string())],
         )
     })?;
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "side_by_side_layout",
@@ -1910,9 +1962,12 @@ pub async fn side_lines(
     state: State<'_, AppState>,
     request: SideLinesRequest,
 ) -> Result<Vec<crate::git::segments::SideLine>> {
+    let mut timing = MeasureSpan::new("ipc.side_lines");
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.side_lines");
         session.side_lines(
             &request.path,
             request.changes,
@@ -1933,6 +1988,7 @@ pub async fn side_lines(
             &[("error", error.to_string())],
         )
     })?;
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "side_lines",

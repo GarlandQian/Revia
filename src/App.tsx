@@ -3384,14 +3384,19 @@ export function App() {
           });
         };
         const measureJump = async (top: number) => {
+          const cachedBeforeJump = handle?.captureCoverage();
           const started = performance.now();
           handle?.setScrollTop(top);
           // 跳转同步提交行窗口：调用返回时已有内容，就在这一帧画出（口径同统一视图）。
           const withinOneFrame = visibleCovered();
+          const targetWasCached = cachedBeforeJump && handle ? (["left", "right"] as const).every((side) => {
+            const visible = handle.getVisibleRange(side);
+            return cachedBeforeJump(visible.from, visible.to, side);
+          }) : null;
           const covered = await waitUntil(visibleCovered, 4000);
           const dataAt = performance.now();
           await nextPaint();
-          return { appearMs: performance.now() - started, dataAt: dataAt - started, covered, withinOneFrame };
+          return { appearMs: performance.now() - started, dataAt: dataAt - started, covered, withinOneFrame, targetWasCached };
         };
         const cold = await measureJump(Math.floor(contentHeight * 0.6));
         const warm = await measureJump(0);
@@ -3444,6 +3449,8 @@ export function App() {
             contentHeight,
             segments: segmentCount,
             jumpAppearMs: cold.appearMs,
+            jumpTargetWasCached: cold.targetWasCached,
+            warmJumpTargetWasCached: warm.targetWasCached,
             warmJumpAppearMs: warm.appearMs,
             jumpWithinOneFrame: cold.withinOneFrame,
             warmJumpWithinOneFrame: warm.withinOneFrame,

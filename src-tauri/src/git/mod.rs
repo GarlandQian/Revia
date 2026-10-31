@@ -472,6 +472,7 @@ impl Git {
         timeout: Duration,
         output_limit: Option<usize>,
     ) -> Result<GitOutput> {
+        let mut timing = crate::commands::MeasureSpan::new("git.run");
         let started = Instant::now();
         let started_at_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -550,6 +551,7 @@ impl Git {
             .unwrap_or(-1);
         let (output, output_truncated) = command_output(&stdout, &stderr_bytes);
 
+        timing.mark("process_collected");
         self.log.record(CommandRecord {
             sequence,
             worktree_id: self.worktree_id.clone(),
@@ -566,6 +568,7 @@ impl Git {
             output_truncated,
         });
 
+        timing.mark("command_recorded");
         if let Some(error) = waited.err().or_else(|| status.err()) {
             return Err(if has_input {
                 AppError::coded(

@@ -110,6 +110,9 @@ export interface Measurement {
     contentHeight: number;
     segments: number;
     jumpAppearMs: number;
+    /** 跳转前复制的缓存与跳转后的实际两栏可见范围比较；null 表示未取得观测。 */
+    jumpTargetWasCached: boolean | null;
+    warmJumpTargetWasCached: boolean | null;
     warmJumpAppearMs: number;
     /** 跳转调用返回时两栏可见行是否已有内容（同步检查，口径同统一视图的 1 帧判定）。 */
     jumpWithinOneFrame: boolean;

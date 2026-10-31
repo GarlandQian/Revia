@@ -20,6 +20,16 @@ export function logToBackend(message: string): void {
   send(message);
 }
 
+/** 只在已有测量日志开启时观察真实异步调用；不读取参数或响应正文。 */
+export function traceMeasurement<T>(name: string, read: () => Promise<T>): Promise<T> {
+  if (!enabled) return read();
+  const startedAtMs = Date.now();
+  const started = performance.now();
+  return read().finally(() => {
+    logToBackend(`[TIMING_JS] ${JSON.stringify({ name, startedAtMs, elapsedMs: performance.now() - started })}`);
+  });
+}
+
 /**
  * 关键信息（启动、渲染错误）：不管开关状态都上报。
  * 日志开关要等前端拿到配置才生效，早期失败必须能看到。

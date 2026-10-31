@@ -442,9 +442,11 @@ impl WorktreeSession {
     }
 
     fn refresh_locked(&self) -> Result<ChangesSnapshot> {
+        let mut timing = crate::commands::MeasureSpan::new("session.refresh");
         let started = std::time::Instant::now();
         let changelist_mode = self.changelist_mode.load(Ordering::Acquire);
         let status = status::read(&self.git)?;
+        timing.mark("status");
 
         // `git diff` 会分几次读同一个文件（先算 blob 哈希、再取内容）。如果外部正在**直接保存**
         // （先截断再写入），同一次调用可能拿到「index 行的 blob 来自 A 状态、hunk 文本来自 B 状态」
@@ -463,6 +465,7 @@ impl WorktreeSession {
         let staged_patch = self.git.diff_index(None)?;
         let changelist_patch = if changelist_mode { self.git.diff_changelist(None, IgnoreWhitespace::Off)? } else { Vec::new() };
 
+        timing.mark("git_diffs");
         let after = self.worktree_stats(&watched);
         if before != after {
             // 读取期间工作区变了：这次结果可能是混合的，按「读取失败」处理，不发布。
@@ -477,6 +480,7 @@ impl WorktreeSession {
 
         let unstaged = git::diff::parse_bytes(&unstaged_patch);
         let staged = git::diff::parse_bytes(&staged_patch);
+        timing.mark("parse");
 
         let mut models: HashMap<String, FileModelCache> = HashMap::new();
         for file in unstaged.files {
@@ -608,6 +612,7 @@ impl WorktreeSession {
             *counter += 1;
             *counter
         };
+        timing.mark("entries_and_snapshot_lock");
         let revision = generation.to_string();
         for entry in &mut entries {
             entry.snapshot_revision = revision.clone();
@@ -627,6 +632,7 @@ impl WorktreeSession {
                 std::collections::HashSet::new(),
             ),
         };
+        timing.mark("review_identity_and_state");
         let reviewed: std::collections::HashSet<&str> =
             review.reviewed.iter().map(String::as_str).collect();
         for entry in &mut entries {
@@ -1219,8 +1225,10 @@ impl WorktreeSession {
         ignore: IgnoreWhitespace,
         context_lines: u32,
     ) -> Result<String> {
+        let mut timing = crate::commands::MeasureSpan::new("session.side_cache");
         let cache_key = format!("{changes:?}/{path}/{ignore:?}/{context_lines}");
         if snapshot.side_layouts.contains_key(&cache_key) {
+            timing.mark("cache_hit");
             return Ok(cache_key);
         }
         let unmerged = snapshot
@@ -1251,6 +1259,7 @@ impl WorktreeSession {
                     self.git.working_file(path).unwrap_or_default(),
                 ),
             };
+            timing.mark("texts");
             let model = match self.ensure_ignore_model(snapshot, path, changes, ignore)? {
                 None => snapshot.models.get(&key(changes, path)),
                 Some(ignore_key) => snapshot.ignore_models.get(&ignore_key),
@@ -1258,6 +1267,7 @@ impl WorktreeSession {
             .map(|cached| &cached.model);
             Self::build_side_layout(left_text, right_text, model, context_lines)?
         };
+        timing.mark("layout_built");
         // 派生完成后再改缓存，不必复制快照里的整个 diff 模型。
         // 有界缓存：文件与档位来回切换时不无限累积。
         if snapshot.side_layouts.len() >= 16 {
@@ -1274,6 +1284,7 @@ impl WorktreeSession {
         model: Option<&git::diff::FileChange>,
         context_lines: u32,
     ) -> Result<SideLayoutCache> {
+        let mut timing = crate::commands::MeasureSpan::new("session.build_side_layout");
         // 全文与 diff 不是同一次读取：对不上说明期间文件被改过，不缓存，等刷新后重取。
         if let Some(model) = model {
             if !segments::texts_match_diff(model, &left_text, &right_text) {
@@ -1285,6 +1296,7 @@ impl WorktreeSession {
                 ));
             }
         }
+        timing.mark("texts_match_diff");
         let (segments, folds) = match model {
             Some(model) => {
                 let mut segments: Vec<segments::ChangeSegment> = Vec::new();
@@ -1301,6 +1313,7 @@ impl WorktreeSession {
             }
             None => (Vec::new(), Vec::new()),
         };
+        timing.mark("segments_and_folds");
         Ok(SideLayoutCache {
             left_text,
             right_text,

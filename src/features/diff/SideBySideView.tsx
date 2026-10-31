@@ -21,6 +21,7 @@ import type { SegmentAction } from "@/types/bindings/SegmentAction";
 import type { FoldRange } from "@/types/bindings/FoldRange";
 import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import { ipc } from "@/lib/ipc";
+import { traceMeasurement } from "./log";
 import { formatAppError, toAppError } from "@/lib/error";
 import { messages } from "@/lib/i18n/index";
 import { sideLabels } from "@/lib/i18n/text";
@@ -72,6 +73,8 @@ export interface SideBySideHandle {
   getContentHeight(): number;
   getVisibleRange(side?: Side): { from: number; to: number };
   isCovered(from: number, to: number, side?: Side): boolean;
+  /** 跳转前复制缓存身份，随后按真实目标可见范围查询；不触发读取。 */
+  captureCoverage(): ((from: number, to: number, side: Side) => boolean) | null;
   isSettled(): boolean;
   isCompact(): boolean;
   /** 两栏中线的对应误差（行）：测量同步滚动用。 */
@@ -154,14 +157,14 @@ export function SideBySideView(props: SideBySideViewProps) {
   useLayoutEffect(() => {
     let cancelled = false;
     setLayoutError(null);
-    const readLayout = history ? history.layout() : ipc.sideBySideLayout({
+    const readLayout = traceMeasurement<HistorySideLayout | SideBySideLayout>("side.layout", () => history ? history.layout() : ipc.sideBySideLayout({
         worktreeId: worktreeId!,
         path: entry!.path,
         changes: entry!.changes,
         ignoreWhitespace,
         contextLines: options.contextLines,
         highlight,
-      });
+      }));
     void readLayout
       .then((next) => {
         if (cancelled) return;
@@ -226,7 +229,7 @@ export function SideBySideView(props: SideBySideViewProps) {
       const current = cache.current;
       if (current.key !== cacheKey) return;
       current.ensure(side, { visible, buffered, lineCount }, {
-        load: (targetSide, from, to) => history ? history.lines(targetSide, from, to) : ipc.sideLines({
+        load: (targetSide, from, to) => traceMeasurement("side.lines", () => history ? history.lines(targetSide, from, to) : ipc.sideLines({
           worktreeId: worktreeId!,
           path: entry!.path,
           changes: entry!.changes,
@@ -236,7 +239,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           version: targetSide === "left" ? "old" : "new",
           from,
           to,
-        }),
+        })),
         isCurrent: () => cache.current === current,
         publish: () => setCacheVersion((value) => value + 1),
       });
@@ -397,6 +400,21 @@ export function SideBySideView(props: SideBySideViewProps) {
         }
         return true;
       },
+      captureCoverage() {
+        if (!currentLayout || cache.current.key !== cacheKey) return null;
+        const oldLines = new Set(cache.current.old.keys());
+        const newLines = new Set(cache.current.new.keys());
+        return (from, to, side) => {
+          const lines = side === "left" ? oldLines : newLines;
+          const rows = side === "left" ? leftRows : rightRows;
+          for (const range of lineRangesForRows(rows.rows, from, to)) {
+            for (let line = range.from; line <= range.to; line += 1) {
+              if (!lines.has(line)) return false;
+            }
+          }
+          return true;
+        };
+      },
       isSettled() {
         return !!currentLayout && cache.current.key === cacheKey && cache.current.pendingRequests === 0;
       },
@@ -416,7 +434,7 @@ export function SideBySideView(props: SideBySideViewProps) {
       },
     }),
     [segments, leftRows, rightRows, leftHeights, rightHeights, layout, positionSegment,
-      currentLayout, folds, foldUnchanged, expandedFolds, positionFileAnchor],
+      currentLayout, cacheKey, folds, foldUnchanged, expandedFolds, positionFileAnchor],
   );
 
   useEffect(() => {
