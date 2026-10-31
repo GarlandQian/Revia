@@ -1,6 +1,6 @@
 # 12：标签打包至 Release 草稿
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build

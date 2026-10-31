@@ -1,6 +1,6 @@
 # 02：导入颜色主题并自定义快捷键
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build

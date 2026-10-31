@@ -1,6 +1,6 @@
 # 03：编辑工作区 diff 并恢复草稿
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build
@@ -233,3 +233,33 @@ S03-01：撤销回磁盘原文也排在旧草稿持久化之后清理；重新�
 H1：四个新增测试fixture共用平台环境构造，只从当前平台PATH解析Git；HOME/USERPROFILE、Git全局配置均绑定本次独占fixture。Unix专用hook/权限断言继续按平台限定；未通过跳过全部Windows测试来消除问题。
 
 `review03-repair-node-01` 102项通过（含新增4个生产EditSession撤销/在途/失败/新输入回归）、0 skipped；`review03-repair-rust-01` 四个受影响targets共27项通过；`review03-repair-frontend-01`与`review03-repair-lint-01` exit0。源码hash、精确argv、真实exit、分流原件在批次codex-checks。未修改locale键，之前x18n02的0错误/76保留键警告对应键集未变。未运行Windows或真实桌面，不把macOS通过称Windows实测。只修明确P2，三个P3判断继续backlog15。
+
+
+### Codex / review04 Standards 正式原文 — 2026-10-31
+
+固定候选`628fff93cf19ce1f4e61f329857ed165e087b117`，增量基点`5a35ecd4821764da6da16de500942d657bd118cd`。本轴原文分别保留；详细证据在`/private/tmp/revia-m7-batch-g5scyw0r/review-04-lmwadog6/standards-evidence.md`。
+
+```markdown
+Standards：仅审固定 `5a35ecd…628fff93` 的14路径、1提交；新增硬违反0项，新增smell判断0项，未发现新增P1/P2。
+
+H1：`src-tauri/tests/support/git_environment.rs:5`统一从平台PATH构建环境，四个fixture在`m7_diagnostics.rs:32`、`m7_pr_checkout.rs:80`、`m7_protection.rs:66`、`m7_review_drafts.rs:69`实际接入。原先违反`AGENTS.md:72`、`docs/adr/0007-target-platforms.md:7`的Unix固定搜索路径已移除；这是静态确认，未实跑Windows。
+
+S03-01相关增量：`src/lib/m7/editSession.ts:89,91,123`等待在途草稿、保留撤销后的内存并清理旧记录；`src/features/m7/EditableWorkspace.tsx:82,85`接入干净正文的待清理冲刷。新增4项测试导入生产EditSession，覆盖撤销、在途、清理失败与后续输入。未确认此增量违反既定规则。
+
+已直接核验原argv、stdout/stderr、exit及源码来源：Node102通过、0跳过；Rust四target共27通过；frontend/lint均exit0。候选相对这些检查仅6份说明文档变化。7,876项源码与920项原证据散列全部吻合。跳过工具强制检查项；既有P3仍留backlog，13/14桌面前提不重复计数。本轴仅只读审查与散列核验，未重跑产品测试、未启动桌面；本结论不代表Windows或桌面验收通过。详见standards-evidence.md。
+```
+
+
+### Codex / review04 Spec 正式原文 — 2026-10-31
+
+固定候选`628fff93cf19ce1f4e61f329857ed165e087b117`，增量基点`5a35ecd4821764da6da16de500942d657bd118cd`。本轴原文分别保留；详细证据在`/private/tmp/revia-m7-batch-g5scyw0r/review-04-lmwadog6/spec-evidence.md`。
+
+```markdown
+Spec：本增量未发现新增或未解决的 P1/P2；(a) 未确认遗漏／部分需求，(b) 未发现新增 scope creep，(c) 未确认实现错误。仅审 `5a35ecd…628fff9` 的 14 路径、1 提交。
+
+S03-01 已按规格 `docs/milestones/m7/spec.md:83`“切换文件、视图、仓库、语言或主题保留内容”修复：`src/lib/m7/editSession.ts:89–100,123–126` 等待旧写、保留撤销后的内存正文并有序清理；`src/features/m7/EditableWorkspace.tsx:82–85` 自动冲刷也覆盖待清理草稿。清理失败仍保留文本和退出保护，符合规格 :86“保留内容、原目标和已知回执”。这些是生产控制流静态核对，原 Node 回归实际覆盖撤销、在途写、清理失败和等待期间新输入。
+
+H1 的四个 fixture 已通过 `src-tauri/tests/support/git_environment.rs:5–34` 读取平台 PATH、隔离 HOME／USERPROFILE 与 Git 配置，未删除普通 Windows 检查，符合规格 :126“保留现有 Windows 编译检查”。未进行 Windows 实跑。
+
+已核对原件：Node 102 通过、0 skipped；四个 Rust target 共 27 通过；build／lint exit0。检查时源码到候选仅变化 6 份说明文档；7,876 项源码及 920 项原始证据散列吻合。本轴未重跑产品测试、未启动桌面，不据此宣称桌面验收通过；任务 13／14 既有外部阻塞及 P3 backlog 不重复计数。详证见 `spec-evidence.md`。
+```

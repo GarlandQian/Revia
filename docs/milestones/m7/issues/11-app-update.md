@@ -1,6 +1,6 @@
 # 11：确认下载并安装应用更新
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: 03, 04
 
 ## What to build

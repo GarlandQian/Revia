@@ -1,6 +1,6 @@
 # M7 实施与验收报告
 
-Status: ready-for-agent
+Status: ready-for-human
 
 实施方：Paseo / Pi（同一会话；含 2026-10-31 首轮正式返修）。规划方 / 验收方：Codex。
 分支 `m7`（worktree `/Volumes/T7 Shield/project/Revia-m7`），规划基点 `581d1527651e981018f2b0830d994bca49580254`。
@@ -9,6 +9,12 @@ Status: ready-for-agent
 
 
 
+
+## 最新 Codex 审修结论与剩余验收
+
+review03原文已入对应任务：Standards1项P2与Spec1项P2均由Codex修复；三个P3判断留backlog15。产品检查点`628fff93cf19ce1f4e61f329857ed165e087b117`经全新review04两轴只审该次14路径增量，Standards硬违反0/新增判断0，Spec新增或未解决P1/P2为0；原文分别保存在任务Comments与本轮证据目录。此为本次审修通过，不能表述为全部M7已完成。
+
+01–12转ready-for-human表示实现与审修已交付待真实验收，不表示已完成全部勾选项；13仍needs-info，必须先取得Rebased1.1.22既有暂存内容观察。14最终桌面与性能、双语900px、真实账号/钥匙串、正式来源更新与CI/Windows仍未验。当前无原生桌面工具且AXIsProcessTrusted=false；不会用浏览器或模拟IPC替代。下一步在固定候选构建Release并保存散列，继续保留全部失败原件。未push/PR/tag/发布、未合main或删除worktree，监控继续。
 
 ## Codex review03 两项 P2 已修复
 

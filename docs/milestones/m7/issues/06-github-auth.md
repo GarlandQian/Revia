@@ -1,6 +1,6 @@
 # 06：登录并管理多个 GitHub 账号
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build

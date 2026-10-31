@@ -1,6 +1,6 @@
 # 05：克隆并打开仓库
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build

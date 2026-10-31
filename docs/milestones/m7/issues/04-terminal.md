@@ -1,6 +1,6 @@
 # 04：运行归属 worktree 的内置终端
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build
