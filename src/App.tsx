@@ -51,7 +51,7 @@ import { SettingsDialog, type SettingsPatch } from "@/components/app/SettingsDia
 import { ActivityBar, StatusBar, TitleBar, WelcomeScreen } from "@/components/app/Shell";
 import { Codicon } from "@/components/ui/codicon";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/popover";
-import { logToBackend, setLoggingEnabled } from "@/features/diff/log";
+import { beginSynchronousMeasurement, flushSynchronousMeasurements, logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
 import { SideBySideView, type SideBySideHandle, type DiffOptions } from "@/features/diff/SideBySideView";
@@ -827,6 +827,7 @@ export function App() {
       if (target.activate === false && mainViewRef.current !== "diff") {
         return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
       }
+      const finishCoverageMeasurement = beginSynchronousMeasurement("open.entry.coverage.wait");
       const covered = await waitUntil(
         () => {
           // 并排视图的行来自 side_lines（返修 A1），不用 RowWindowStore。
@@ -842,10 +843,14 @@ export function App() {
         },
         4000,
       );
+      finishCoverageMeasurement();
       if (!covered) {
         debugLog(`首屏取行超时：${entry.path}（已加载块 ${rowStore.getSnapshot().loadedChunks}）`);
       }
+      const finishPaintMeasurement = beginSynchronousMeasurement("open.entry.paint.wait");
       const paint = await nextPaint();
+      finishPaintMeasurement();
+      flushSynchronousMeasurements();
       const element = document.querySelector<HTMLElement>(".diff-scroll");
       return {
         covered,
@@ -3461,6 +3466,7 @@ export function App() {
             frameP95Ms: percentile(frames, 0.95),
           },
         };
+        flushSynchronousMeasurements();
         setMeasurements((current) => [splitMeasurement, ...current]);
         return splitMeasurement;
       }
