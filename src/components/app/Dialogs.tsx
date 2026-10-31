@@ -3,7 +3,7 @@
  * 丢弃确认（可含多个文件）、写入期间关闭或退出。
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { messages, t } from "@/lib/i18n/index";
@@ -11,6 +11,7 @@ import { commitWarningText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
 import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { FileTypeIcon } from "./FileTypeIcon";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
 
 export function Modal({
   title,
@@ -24,11 +25,7 @@ export function Modal({
   width?: number;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
+  useModalDialog(ref);
   return (
     <dialog
       ref={ref}

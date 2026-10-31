@@ -1,6 +1,6 @@
 # M7 Liquid Glass：方向与实现核对
 
-更新日期：2026-10-30。这是 M7 第 1 步的设计记录与独立预览，产品源码尚未改动，不是桌面验收报告。
+更新日期：2026-11-01。前半保留 M7 第 1 步的设计与预览记录；当前产品实现以末节 Q200 为准。原生实现已进入合并验证，不是桌面验收通过报告。
 
 ## 用户已确认
 
@@ -69,3 +69,51 @@
 [打开预览说明](./mockups/)；第四版最终候选 HTML 可切 macOS / Windows、浅深色、缩放及降低透明度，并查看浮层。它实际使用 React Bits 组件及示例代码，复用已有 M4 图标资源和工程已有 JetBrains Mono 字体，保留各方许可；没有连接 Git、账号或产品 IPC。代码示例用于呈现颜色和密度，不是 M7 实现片段。前三版文件保持原样，保留此前反馈对应的稿件。最终候选与访谈汇总见 [开始前确认清单](./confirmation.md)。
 
 预览检查与截图记录在说明中；它们只证明独立设计稿的显示与控制，不代替真实 Revia 的布局、性能、折射或桌面验收。
+
+## 原生 Liquid Glass（Q200，2026-10-31 起）
+
+macOS 26 起系统提供公开 API `NSGlassEffectView` / `NSGlassEffectContainerView`（`objc2-app-kit 0.3.2` 已有绑定）。网页里的 CSS 只能模糊网页自己的内容，折射桌面、边缘高光和随系统外观、减少透明度设置的变化都做不到，所以外壳的玻璃交给 AppKit 绘制。
+
+**外观结构**
+
+- 窗口透明，整窗垫一块玻璃折射窗口后面的桌面；外壳、侧栏、日志和 diff 代码都放在这同一块玻璃上，不再有 VS Code 的编辑器底色、标题条底色和分栏实色块。
+- 增删行用主题里本就带透明度的颜色，透出玻璃；语法高亮颜色照旧。代码面（diff、合并、编辑器）整块垫一层中性的半透明底（深色 52% 黑、浅色 62% 白，`--code-veil`），只加在外层容器上一次：直接放在玻璃上时，窗口后面的桌面和别的窗口会在空白栏里透成一层幽灵字（用户 2026-11-01 截图指出），这层底按 Q190 把它压到看不出字形。
+- 工具栏横跨顶部，胶囊紧跟红绿灯靠左：仓库 / worktree / 分支、更新 / 推送、工具各合成一块，设置单独一块。侧栏和编辑区排在工具栏下面。
+- 终端（xterm 开了 `allowTransparency`、主题底色透明）同样放在玻璃上，只用一条细线和编辑区分开。PR 面板里的卡片、代码块与提示条是玻璃上的淡底加细边。
+- 工具栏的下拉弹层（仓库 / worktree / 分支等 Popover）在 macOS 上是一块原生玻璃：弹层登记为区域，网页这层透明，只用网页里的模糊把弹层下方的字糊掉，不淡出整个界面。
+- 克隆、诊断、更新、丢弃确认等模态对话框是一块浮在窗口上的原生玻璃面板（22pt 圆角）：打开时 `useModalDialog()` 把对话框的位置交给原生层，工具栏胶囊的玻璃暂时撤掉；后面的界面由样式淡出并模糊，透过面板看像被玻璃折射（玻璃画在网页下面，后面的内容不让开就会盖住它）。
+- 设置页铺满整窗，同样放在玻璃上：打开时藏起工具栏、主界面和状态栏，标题挨着红绿灯，左侧分类、右侧设置项；隐藏的工具栏不再下发玻璃胶囊（`useModalDialog(ref, open, "page")`）。仍是原来的模态对话框，Esc 与关闭按钮照旧。
+- 52pt 工具栏、36pt 胶囊、侧栏行选中用内缩圆角、编辑区页签是圆角内衬、主提交按钮用系统强调色。
+
+**Windows（Q126、Q191；接线已写，验证在 M8）**
+
+样式分两层：`html.window-material` 是窗口底为系统材质时的共用规则，包括布局、透明外壳、内容放在材质上；`html.native-glass` 只在 macOS，表示胶囊、对话框面板、弹层也由 AppKit 玻璃按区域绘制。Windows 11 只开 `window-material`：
+
+- `support()` 在 Windows 11（build ≥ 22000，`windows-version`）返回 `Mica`；`apply()` 用 Tauri 的 `set_effects(Mica)`，并把 WebView2 背景设为 alpha 0。
+- Tauri 文档要求窗口特效配合透明窗口，所以 `src-tauri/tauri.windows.conf.json` 只在 Windows 上把主窗口设为 `transparent`。这是 JSON 合并补丁，数组整体替换，窗口尺寸要和 `tauri.conf.json` 保持一致。Windows 10 走 CSS 材质，页面自己画不透明底。
+- 胶囊由网页画一层淡底，用 Fluent 的 6px 圆角；对话框和弹层是网页画的 Acrylic 风格面板，8px 圆角。
+- 标题栏仍是系统原生标题栏（Q60），Mica 一并铺上。
+
+本机没有 Windows 工具链：`apply_mica` 用的是 Tauri 跨平台接口，已在 macOS 上编译检查；`windows_version` 那一行只在 Windows 下编译，没有检查过。M8 要在真机上验证 Mica 是否透出、深浅色跟随，以及透明窗口缩放时有没有闪烁。
+
+**代码位置**
+
+- `src-tauri/src/platform/window_glass.rs`：跨平台类型与入口（`GlassLayout`、`GlassBackground`、`GlassRegion`、`support()`、`apply()`）。
+- `src-tauri/src/platform/macos_glass.rs`：在窗口 contentView（wry 的 `WryWebViewParent`）里、WKWebView 下方放一个 `NSGlassEffectContainerView`，胶囊各一块 `NSGlassEffectView`；整窗玻璃放在容器外、垫在容器下面（同一个容器里的玻璃会合成一层，胶囊就看不出来）。关掉 WKWebView 的 `drawsBackground`（与 wry `transparent` 用同一个私有 KVC 键），窗口 `setOpaque(false)`、底色透明。
+- `src/features/m7/glass/nativeGlass.ts`：外壳元素用 `glassPane()` 登记，按元素矩形和 CSS 圆角合成布局交给 Rust（命令 `m7_glass_support` / `m7_glass_layout`）。窗口底用 CSS 变量 `--glass-window`（`glass` / `solid`）选择。窗口缩放时原生层先按贴边规则（autoresizing mask）跟随，前端测到新矩形后再精确对齐。
+- `html.window-material` / `html.native-glass` 下的样式在 `src/index.css` 末尾；中间那一行在这里 `display: contents`，工具栏、侧栏、编辑区和状态栏直接排进外壳网格。
+
+**为什么不用 tauri-plugin-liquid-glass（0.1.6）**
+
+它只能给每个窗口铺一整块玻璃，不能按区域放；工具栏胶囊这类形状又得回到 CSS 去模拟。它还另带 `cocoa` / `objc 0.2` 一套绑定，并通过私有 selector 设置 variant。它的做法（窗口与 webview 透明、玻璃插在 webview 下方）已经照搬。
+
+**实测与限制**
+
+- 调度用定时器而不是 `requestAnimationFrame`：窗口被遮挡时 WebKit 暂停 rAF，玻璃会停在启动时的空布局（实测复现过）。
+- 不设置窗口外观：网页的 `prefers-color-scheme` 跟随窗口外观，颜色主题又跟随系统外观（`resolveTheme`）；钉死外观会让系统切换深浅色时主题不再跟着变。
+- 给玻璃设 `tintColor` 往主题色染，玻璃反而更浅更实（实测侧栏从 (63,67,76) 变成 (72,77,83)），已放弃。
+- 原生模式下提交按钮不渲染 WebGL 高光（`SpecularButton` 在透明 webview 里留下一块偏色矩形）。
+- 玻璃在 webview 下方，网页接收全部输入；系统的交互高光（`effectIsInteractive`）用不上，悬停、按下仍由 CSS 画。
+- 浮层、对话框、通知仍是网页元素，改为系统菜单的圆角、半透明与阴影，模糊的是网页内容。
+- 单窗口截图拿不到窗口后面的桌面，透明窗口在里面显示为黑底；核对玻璃要看全屏截图。
+- `REVIA_GLASS=css` 强制走 CSS 材质，便于对照；macOS 26 以下与 Windows 10 自动走这条路径，Windows 11 使用 Mica。

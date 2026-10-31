@@ -415,6 +415,21 @@ test("分页增量计算与一次性计算结果一致", () => {
   assert.notEqual(laneColor(0), laneColor(1));
 });
 
+test("线性历史里每个提交点上下都连着线（第一行上方没有子提交）", () => {
+  const history = [
+    { oid: "c3", parents: ["c2"] },
+    { oid: "c2", parents: ["c1"] },
+    { oid: "c1", parents: [] },
+  ];
+  const { rows } = appendGraphRows(emptyGraphState(), history);
+  assert.deepEqual(rows.map((row) => row.incoming), [false, true, true], "子提交沿同一条轨道连下来");
+  assert.deepEqual(rows.map((row) => row.railsBelow), [[0], [0], []], "最后一个提交下方没有线");
+  // 分页增量计算时，上一页最后一个提交的父提交在下一页仍算作有子提交连下来。
+  const first = appendGraphRows(emptyGraphState(), history.slice(0, 1));
+  const second = appendGraphRows(first.state, history.slice(1));
+  assert.equal(second.rows[0].incoming, true);
+});
+
 test("只看第一父提交时只画第一父边，但父提交列表不被改写", () => {
   const history = [{ oid: "m", parents: ["a", "b"] }, { oid: "a", parents: [] }];
   const { rows } = appendGraphRows(emptyGraphState(), history, { firstParent: true });

@@ -15,6 +15,7 @@ import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7, onM7Events } from "@/lib/m7/api";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
 
 export interface CloneDialogProps {
   open: boolean;
@@ -42,12 +43,7 @@ export function CloneDialog({ open, onClose, onRegistered }: CloneDialogProps) {
   const jobRef = useRef<number | null>(null);
   jobRef.current = jobId;
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog || !open) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, [open]);
+  useModalDialog(ref, open);
 
   useEffect(() => {
     if (!open) return;

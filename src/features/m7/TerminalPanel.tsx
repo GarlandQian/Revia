@@ -16,6 +16,7 @@ import { t } from "@/lib/i18n/index";
 import { m7 } from "@/lib/m7/api";
 import { codeFontStack } from "@/lib/theme";
 import { TerminalSessions } from "@/lib/m7/terminalSessions";
+import { nativeGlassActive } from "@/features/m7/glass/nativeGlass";
 
 interface Instance {
   terminal: Terminal;
@@ -53,7 +54,8 @@ function terminalTheme(): Record<string, string> {
     return value.length > 0 ? value : fallback;
   };
   return {
-    background: read("--editor-background", "#1e1e1e"),
+    // 系统材质下终端和 diff 一样放在玻璃上：画布不画底色。
+    background: nativeGlassActive() ? "rgba(0, 0, 0, 0)" : read("--editor-background", "#1e1e1e"),
     foreground: read("--ui-foreground", "#dddddd"),
     cursor: read("--ui-foreground", "#dddddd"),
     selectionBackground: read("--editor-selectionbackground", "#264f78"),
@@ -120,6 +122,7 @@ export function TerminalPanel({
         fontSize: fontOptions.current.fontSize,
         cursorBlink: true,
         theme: terminalTheme(),
+        allowTransparency: nativeGlassActive(),
         scrollback: 2000,
         allowProposedApi: false,
       });
@@ -223,7 +226,7 @@ export function TerminalPanel({
   const activeTab = useMemo(() => tabs.find((tab) => tab.sessionId === active) ?? null, [tabs, active]);
 
   return (
-    <div className="flex min-h-0 shrink-0 flex-col border-t border-panel-border bg-[var(--editor-background)]" style={{ height }}>
+    <div className="terminal-panel flex min-h-0 shrink-0 flex-col border-t border-panel-border bg-[var(--editor-background)]" style={{ height }}>
       <div
         className="h-1 shrink-0 cursor-row-resize bg-transparent hover:bg-[var(--focus-border)]"
         onPointerDown={startDrag}

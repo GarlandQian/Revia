@@ -20,6 +20,8 @@ import type { EditSaved } from "@/types/bindings/EditSaved";
 import type { EditableFile } from "@/types/bindings/EditableFile";
 import type { GithubAccount } from "@/types/bindings/GithubAccount";
 import type { GithubStatus } from "@/types/bindings/GithubStatus";
+import type { GlassLayout } from "@/types/bindings/GlassLayout";
+import type { GlassSupport } from "@/types/bindings/GlassSupport";
 import type { ImportedTheme } from "@/types/bindings/ImportedTheme";
 import type { PrMergeOutcome } from "@/types/bindings/PrMergeOutcome";
 import type { MergeReceipt } from "@/types/bindings/MergeReceipt";
@@ -136,6 +138,9 @@ export interface PrRefPayload {
 }
 
 export const m7 = {
+  // 原生玻璃（Liquid Glass）
+  glassSupport: () => invoke<GlassSupport>("m7_glass_support"),
+  glassLayout: (layout: GlassLayout) => invoke<void>("m7_glass_layout", { layout }),
   // 颜色主题
   listImportedThemes: () => invoke<ImportedTheme[]>("m7_list_imported_themes"),
   importTheme: (path: string, kind: ThemeKind | null, label: string | null) =>

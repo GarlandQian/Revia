@@ -15,6 +15,7 @@ import { formatAppError } from "@/lib/error";
 import { MAIN_TOOLBAR_INSET } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
+import { glassPane } from "@/features/m7/glass/nativeGlass";
 
 export function TitleBar({
   repo,
@@ -28,6 +29,7 @@ export function TitleBar({
   onWorktree,
   onSettings,
   onRefreshWorktrees,
+  branchWidget,
   extra,
 }: {
   repo: RepoEntry | null;
@@ -41,7 +43,9 @@ export function TitleBar({
   onWorktree: (worktreeId: string) => void;
   onSettings: () => void;
   onRefreshWorktrees: () => void;
-  /** 分支组件与“更新 / 推送”按钮（M5 B02）。 */
+  /** 分支组件：和仓库、worktree 放在同一块胶囊里。 */
+  branchWidget?: React.ReactNode;
+  /** 胶囊之后的工具按钮（更新 / 推送、工具组，M5 B02、M7）。 */
   extra?: React.ReactNode;
 }) {
   const [repoOpen, setRepoOpen] = useState(false);
@@ -54,144 +58,189 @@ export function TitleBar({
 
   return (
     <header className="titlebar relative" data-tauri-drag-region style={{ paddingLeft: MAIN_TOOLBAR_INSET }}>
-      <div className="relative">
-        <Popover
-          open={repoOpen}
-          onOpen={() => setRepoOpen(true)}
-          onClose={() => setRepoOpen(false)}
-          width={340}
-          trigger={
-            <button
-              type="button"
-              className="toolbar-widget"
-              disabled={busy}
-              title={repo ? `${repo.path}\n${messages.toolbar.chooseRepo}` : messages.toolbar.chooseRepo}
-            >
-              <span aria-hidden className="grid size-[18px] shrink-0 place-items-center rounded-[4px] bg-[var(--badge-background)] text-[11px] font-bold text-[var(--badge-foreground)]">
-                {name.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="max-w-[220px] truncate">{name}</span>
-              <Codicon name="chevron-down" size={12} />
-            </button>
-          }
-        >
-          <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.repositories}</p>
-          {repos.map((entry) => (
-            <MenuItem
-              key={entry.id}
-              selected={entry.id === repo?.id}
-              title={entry.path}
-              onClick={() => {
-                setRepoOpen(false);
-                onSelectRepo(entry);
-              }}
-            >
-              <span className="block truncate">{entry.name}</span>
-              <span className="block truncate text-[11px] text-descriptionforeground">{entry.path}</span>
-            </MenuItem>
-          ))}
-          <MenuSeparator />
-          <MenuItem
-            onClick={() => {
-              setRepoOpen(false);
-              onChooseRepo();
-            }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Codicon name="add" size={14} />
-              {messages.toolbar.addRepository}
-            </span>
-          </MenuItem>
-        </Popover>
-      </div>
-
-      {active ? (
-        <div className="relative min-w-0">
+      {/* 仓库、worktree、分支是同一件事的三层：共用一块胶囊。 */}
+      <div ref={glassPane({ id: "toolbar-context" })} className="toolbar-capsule min-w-0" role="group">
+        <div className="relative">
           <Popover
-            open={worktreeOpen}
-            onOpen={() => setWorktreeOpen(true)}
-            onClose={() => setWorktreeOpen(false)}
-            width={420}
+            open={repoOpen}
+            onOpen={() => setRepoOpen(true)}
+            onClose={() => setRepoOpen(false)}
+            width={340}
             trigger={
               <button
                 type="button"
-                className="toolbar-widget min-w-0"
-                disabled={busy || worktrees.length === 0}
-                title={active.path}
-                onClick={() => {
-                  if (!worktreeOpen) onRefreshWorktrees();
-                }}
+                className="toolbar-widget"
+                disabled={busy}
+                title={repo ? `${repo.path}\n${messages.toolbar.chooseRepo}` : messages.toolbar.chooseRepo}
               >
-                <Codicon name="git-branch" size={14} />
-                <span className="max-w-[260px] truncate">{branch ?? messages.changes.detachedHead}</span>
+                <span aria-hidden className="grid size-[18px] shrink-0 place-items-center rounded-[4px] bg-[var(--badge-background)] text-[11px] font-bold text-[var(--badge-foreground)]">
+                  {name.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="max-w-[220px] truncate">{name}</span>
                 <Codicon name="chevron-down" size={12} />
               </button>
             }
           >
-            <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.worktrees}</p>
-            {worktrees.map((worktree) => {
-              const status = statusById.get(worktree.id);
-              const activeRow = worktree.id === activeWorktreeId;
-              return (
-                <button
-                  key={worktree.id}
-                  type="button"
-                  role="menuitem"
-                  title={worktree.path}
-                  className="flex w-full items-start gap-2 rounded-[3px] px-2 py-1.5 text-left hover:bg-toolbar-hoverbackground"
-                  onClick={() => {
-                    setWorktreeOpen(false);
-                    onWorktree(worktree.id);
-                  }}
-                >
-                  <span className="mt-0.5 flex w-4 shrink-0 justify-center">
-                    {activeRow ? <Codicon name="check" size={13} /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate font-medium">{status?.branch ?? worktree.branch ?? messages.changes.detachedHead}</span>
-                      {worktree.isMain ? (
-                        <span className="shrink-0 rounded bg-[var(--badge-background)] px-1 text-[10px] text-[var(--badge-foreground)]">
-                          {messages.changes.worktreeMain}
-                        </span>
-                      ) : null}
-                      {status?.dirty ? (
-                        <span className="size-1.5 shrink-0 rounded-full bg-[var(--gitdecoration-modifiedresourceforeground)]" title={messages.toolbar.dirty} />
-                      ) : null}
-                    </span>
-                    <span className="block truncate text-[11px] text-descriptionforeground">{worktree.path}</span>
-                    {status ? (
-                      <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-descriptionforeground">
-                        <span>{status.dirty ? messages.toolbar.dirty : messages.toolbar.clean}</span>
-                        {status.operationLabel ? (
-                          <span className="text-[var(--editorwarning-foreground)]">
-                            {messages.toolbar.operation(status.operationLabel)}
-                          </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1 tabular-nums">
-                          <Codicon name="arrow-up" size={11} />
-                          {status.ahead}
-                          <Codicon name="arrow-down" size={11} />
-                          {status.behind}
-                        </span>
-                        {status.error ? <span className="text-destructive">{formatAppError(status.error)}</span> : null}
-                        {!status.accessible ? <span>{messages.toolbar.inaccessible}</span> : null}
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
-              );
-            })}
+            <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.repositories}</p>
+            {repos.map((entry) => (
+              <MenuItem
+                key={entry.id}
+                selected={entry.id === repo?.id}
+                title={entry.path}
+                onClick={() => {
+                  setRepoOpen(false);
+                  onSelectRepo(entry);
+                }}
+              >
+                <span className="block truncate">{entry.name}</span>
+                <span className="block truncate text-[11px] text-descriptionforeground">{entry.path}</span>
+              </MenuItem>
+            ))}
+            <MenuSeparator />
+            <MenuItem
+              onClick={() => {
+                setRepoOpen(false);
+                onChooseRepo();
+              }}
+            >
+              <span className="flex items-center gap-1.5">
+                <Codicon name="add" size={14} />
+                {messages.toolbar.addRepository}
+              </span>
+            </MenuItem>
           </Popover>
         </div>
-      ) : null}
+
+        {active ? (
+          <div className="relative min-w-0">
+            <Popover
+              open={worktreeOpen}
+              onOpen={() => setWorktreeOpen(true)}
+              onClose={() => setWorktreeOpen(false)}
+              width={420}
+              trigger={
+                <button
+                  type="button"
+                  className="toolbar-widget min-w-0"
+                  disabled={busy || worktrees.length === 0}
+                  title={active.path}
+                  onClick={() => {
+                    if (!worktreeOpen) onRefreshWorktrees();
+                  }}
+                >
+                  <Codicon name="git-branch" size={14} />
+                  <span className="max-w-[260px] truncate">{branch ?? messages.changes.detachedHead}</span>
+                  <Codicon name="chevron-down" size={12} />
+                </button>
+              }
+            >
+              <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.worktrees}</p>
+              {worktrees.map((worktree) => {
+                const status = statusById.get(worktree.id);
+                const activeRow = worktree.id === activeWorktreeId;
+                return (
+                  <button
+                    key={worktree.id}
+                    type="button"
+                    role="menuitem"
+                    title={worktree.path}
+                    className="flex w-full items-start gap-2 rounded-[3px] px-2 py-1.5 text-left hover:bg-toolbar-hoverbackground"
+                    onClick={() => {
+                      setWorktreeOpen(false);
+                      onWorktree(worktree.id);
+                    }}
+                  >
+                    <span className="mt-0.5 flex w-4 shrink-0 justify-center">
+                      {activeRow ? <Codicon name="check" size={13} /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate font-medium">{status?.branch ?? worktree.branch ?? messages.changes.detachedHead}</span>
+                        {worktree.isMain ? (
+                          <span className="shrink-0 rounded bg-[var(--badge-background)] px-1 text-[10px] text-[var(--badge-foreground)]">
+                            {messages.changes.worktreeMain}
+                          </span>
+                        ) : null}
+                        {status?.dirty ? (
+                          <span className="size-1.5 shrink-0 rounded-full bg-[var(--gitdecoration-modifiedresourceforeground)]" title={messages.toolbar.dirty} />
+                        ) : null}
+                      </span>
+                      <span className="block truncate text-[11px] text-descriptionforeground">{worktree.path}</span>
+                      {status ? (
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-descriptionforeground">
+                          <span>{status.dirty ? messages.toolbar.dirty : messages.toolbar.clean}</span>
+                          {status.operationLabel ? (
+                            <span className="text-[var(--editorwarning-foreground)]">
+                              {messages.toolbar.operation(status.operationLabel)}
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1 tabular-nums">
+                            <Codicon name="arrow-up" size={11} />
+                            {status.ahead}
+                            <Codicon name="arrow-down" size={11} />
+                            {status.behind}
+                          </span>
+                          {status.error ? <span className="text-destructive">{formatAppError(status.error)}</span> : null}
+                          {!status.accessible ? <span>{messages.toolbar.inaccessible}</span> : null}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </Popover>
+          </div>
+        ) : null}
+        {branchWidget}
+      </div>
 
       {extra}
       <span className="flex-1 self-stretch" data-tauri-drag-region />
-      <button type="button" className="icon-action" title={messages.settings.open} aria-label={messages.settings.open} onClick={onSettings}>
+      <button
+        ref={glassPane({ id: "toolbar-settings", x: "end" })}
+        type="button"
+        className="icon-action"
+        title={messages.settings.open}
+        aria-label={messages.settings.open}
+        onClick={onSettings}
+      >
         <Codicon name="settings-gear" size={16} />
       </button>
     </header>
+  );
+}
+
+export type ToolbarAction = {
+  id: string;
+  icon: string;
+  label: string;
+  pressed?: boolean;
+  disabled?: boolean;
+  /** 有待处理的事（例如有新版本）：图标旁一个强调色圆点。 */
+  attention?: boolean;
+  onClick: () => void;
+};
+
+/** 一组图标按钮共用一块胶囊（macOS 26 工具栏的分组写法）。 */
+export function ToolbarGroup({ id, label, actions }: { id: string; label: string; actions: ToolbarAction[] }) {
+  return (
+    <div ref={glassPane({ id: `toolbar-${id}` })} className="toolbar-group" role="group" aria-label={label}>
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          className="toolbar-group-item"
+          aria-pressed={action.pressed}
+          disabled={action.disabled}
+          title={action.label}
+          aria-label={action.label}
+          onClick={action.onClick}
+        >
+          <Codicon name={action.icon} size={16} />
+          {action.attention ? <span className="toolbar-attention" aria-hidden /> : null}
+        </button>
+      ))}
+    </div>
   );
 }
 

@@ -798,3 +798,18 @@ pub async fn m7_changelist_warnings(state:State<'_,AppState>,request:ChangelistW
         crate::commit_warnings::collect(&prepared.git,&crate::commit_warnings::WarningOptions{crlf:settings.commit_warn_crlf,detached:settings.commit_warn_detached,large_file_bytes:settings.commit_warn_large_file_bytes,invalid_filename:settings.commit_warn_invalid_filename})
     }).await
 }
+
+// ---------- 原生玻璃（Liquid Glass） ----------
+
+#[tauri::command]
+pub fn m7_glass_support() -> crate::platform::window_glass::GlassSupport {
+    crate::platform::window_glass::support()
+}
+
+#[tauri::command]
+pub fn m7_glass_layout(
+    window: tauri::WebviewWindow,
+    layout: crate::platform::window_glass::GlassLayout,
+) -> Result<()> {
+    crate::platform::window_glass::apply(&window, layout).map_err(internal)
+}

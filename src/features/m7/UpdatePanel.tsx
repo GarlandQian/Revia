@@ -16,6 +16,7 @@ import { t } from "@/lib/i18n/index";
 import { updateReasonText } from "@/lib/i18n/text";
 import { updateCandidate } from "@/lib/m7/updateState";
 import { m7, onM7Events } from "@/lib/m7/api";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
 
 export interface UpdatePanelProps {
   open: boolean;
@@ -41,12 +42,7 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog || !open) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, [open]);
+  useModalDialog(ref, open);
 
   useEffect(() => {
     if (!open) return;
