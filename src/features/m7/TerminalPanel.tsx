@@ -24,6 +24,16 @@ interface Instance {
   observer: ResizeObserver | null;
 }
 
+/** 稳定每个页签的ref；父组件刷新不会重建xterm或抢走其他输入的焦点。 */
+function TerminalViewport({ sessionId, active, attach }: {
+  sessionId: number;
+  active: boolean;
+  attach: (sessionId: number, container: HTMLDivElement | null) => void;
+}) {
+  const containerRef = useCallback((node: HTMLDivElement | null) => attach(sessionId, node), [attach, sessionId]);
+  return <div className={`absolute inset-0 px-1 pt-1 ${active ? "" : "hidden"}`} ref={containerRef} />;
+}
+
 export interface TerminalPanelProps {
   worktreeId: string;
   worktreePath: string;
@@ -67,6 +77,8 @@ export function TerminalPanel({
   const starting = registry.isStarting(worktreeId);
   const [active, setActive] = useState<number | null>(null);
   const instances = useRef(new Map<number, Instance>());
+  const fontOptions = useRef({ fontFamily, fontSize });
+  fontOptions.current = { fontFamily, fontSize };
   const ownerRef = useRef<string | null>(worktreeId); ownerRef.current = worktreeId;
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   useEffect(() => {
@@ -104,8 +116,8 @@ export function TerminalPanel({
       }
       if (existing && existing.container === container) return;
       const terminal = new Terminal({
-        fontFamily: codeFontStack(fontFamily),
-        fontSize,
+        fontFamily: codeFontStack(fontOptions.current.fontFamily),
+        fontSize: fontOptions.current.fontSize,
         cursorBlink: true,
         theme: terminalTheme(),
         scrollback: 2000,
@@ -136,17 +148,33 @@ export function TerminalPanel({
         .catch((caught) => registry.reportSessionFailure(sessionId, caught));
       instances.current.set(sessionId, { terminal, fit, container, observer });
       requestAnimationFrame(() => {
+        if (instances.current.get(sessionId)?.terminal !== terminal) return;
         try {
           fit.fit();
           void registry.resize(sessionId, terminal.rows, terminal.cols).catch(() => { /* 原目标已有错误。 */ });
-          terminal.focus();
         } catch {
           // 忽略布局竞态。
         }
       });
     },
-    [fontFamily, fontSize, registry],
+    [registry],
   );
+
+  // 只有真正激活页签才聚焦；输出、刷新及其他输入不会重新夺取焦点。
+  useEffect(() => {
+    if (active === null) return;
+    const frame = requestAnimationFrame(() => {
+      const instance = instances.current.get(active);
+      if (!instance) return;
+      try {
+        instance.fit.fit();
+        instance.terminal.focus();
+      } catch {
+        // 页签在布局前被关闭。
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [active, worktreeId]);
 
   // 字号或主题变化时更新所有实例。
   useEffect(() => {
@@ -280,10 +308,11 @@ export function TerminalPanel({
       ) : null}
       <div className="relative min-h-0 flex-1">
         {tabs.map((tab) => (
-          <div
+          <TerminalViewport
             key={tab.sessionId}
-            className={`absolute inset-0 px-1 pt-1 ${tab.sessionId === active ? "" : "hidden"}`}
-            ref={(node) => attach(tab.sessionId, node)}
+            sessionId={tab.sessionId}
+            active={tab.sessionId === active}
+            attach={attach}
           />
         ))}
         {tabs.length === 0 ? (
