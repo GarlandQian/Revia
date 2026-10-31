@@ -56,3 +56,7 @@ PR网络写后不确定结果的查询核对不作为新增独立已复现数据
 - Spec S05-07：保存无关设置使父勾选凭据清空、子列表仍显示勾选；改动入口修复时核对，不据此扩大重构。
 
 两轴原文在review-05-n9a_z26m及任务13/14 Comments。
+
+### review07非阻断判断
+
+Standards可能Duplicated Code：多处重复查找changelist/untracked读源；P3，优先在修当前明确刷新/导航路由时复用同一查询，不为判断扩大重构。原文在review-07-wx8l6b6k及任务13/14。

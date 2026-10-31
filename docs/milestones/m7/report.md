@@ -260,3 +260,7 @@ S06-01：行身份为group:path，点击范围、Command/Ctrl多选、Shift箭�
 `task13-review06-rust-01` 六targets共134项通过（commit12、文件20、hunk24、更改列表21、审阅32、segment25）；`task13-review06-session-01`会话/刷新隔离18项通过，共152相关Rust检查。新增真实A→B暂存→C预览、相同正文两位置、普通/更改列表模式切换断言，均通过生产WorktreeSession入口读取实际Git内容。`task13-review06-node-02`13通过（可见顺序与导航5、既有提交8），`task13-review06-frontend-04`与`task13-review06-lint-03` exit0。后续前端类型/导航修正未改Rust源码，未重复已过Rust。locale键集/译文不变，复用已查询的HEAD/工作区标签；既有x18n为0错误/76警告。
 
 前端01/02先后暴露新增类型映射遗漏，TS错误与原始源码hash/argv/exit/stdout/stderr全部保留，未算通过。所有原件位于codex-checks/task13-review06-*。非法字节文件名用例仍仅非macOS Unix条件，本机与Windows不冒称实跑。未启动本候选Revia、未构建新版Release；下一步仅此新增量独立两轴，收齐报告后才固定新版Release与真实桌面。
+
+### review07正式结果
+
+Standards2P2/1P3，Spec3P2：新读源尚未接入刷新/实际文件导航/外部diff。原文分别入任务13/14 Comments。Codex将收口当前模式读源与可见顺序路由，补外部diff的HEAD基线与原保护。尚未Release或启动Revia，不能沿用旧候选通过。

@@ -160,3 +160,42 @@ S06-01：行身份为group:path，点击范围、Command/Ctrl多选、Shift箭�
 `task13-review06-rust-01` 六targets共134项通过（commit12、文件20、hunk24、更改列表21、审阅32、segment25）；`task13-review06-session-01`会话/刷新隔离18项通过，共152相关Rust检查。新增真实A→B暂存→C预览、相同正文两位置、普通/更改列表模式切换断言，均通过生产WorktreeSession入口读取实际Git内容。`task13-review06-node-02`13通过（可见顺序与导航5、既有提交8），`task13-review06-frontend-04`与`task13-review06-lint-03` exit0。后续前端类型/导航修正未改Rust源码，未重复已过Rust。locale键集/译文不变，复用已查询的HEAD/工作区标签；既有x18n为0错误/76警告。
 
 前端01/02先后暴露新增类型映射遗漏，TS错误与原始源码hash/argv/exit/stdout/stderr全部保留，未算通过。所有原件位于codex-checks/task13-review06-*。非法字节文件名用例仍仅非macOS Unix条件，本机与Windows不冒称实跑。未启动本候选Revia、未构建新版Release；下一步仅此新增量独立两轴，收齐报告后才固定新版Release与真实桌面。
+
+### Codex / review07 Standards（2026-10-31）
+
+固定增量5f70d9c…150b274；以下正式报告原文，细证据 `/private/tmp/revia-m7-batch-g5scyw0r/review-07-wx8l6b6k/standards-evidence.md`。
+
+范围：仅 `5f70d9c…150b274` 的 review06 修复增量，18 路径；不重审旧轮次。
+
+硬性规则违反：
+
+- **[P2，H07-01] 刷新会撤掉新的预览基线。** 新 `session.rs:569–584` 保留原条目并追加 `changelist`，但 `App.tsx:874–885` 仍经仅含旧三组的 `getDisplayOrderEntries` 选择刷新目标。打开 A→C 后刷新，即回到同路径的 `unstaged` B→C；勾选补丁仍是 A→C。违反 `docs/ui-direction.md:70`：“同文件在原组仍有改动则留在原位置”，及 ADR-0004:3：“保证用户操作的就是看到的、将要暂存的”。应使刷新保留模式对应读源。
+- **[P2，H07-02] 新可见顺序未接入主 diff 导航。** `App.tsx:475–488,5486` 只接树选择和计数；`focusNextFile:1643–1647` 仍遍历含隐藏旧条目的 `snapshot.entries`，`reviewNextFile:3008` 仍只遍历旧三组。可见顺序 b/a/c 时，标记 b 后跳到隐藏顺序中的 c；上一文件还可跳回暂存区读源。违反 `docs/ui-direction.md:81`：“标记后按当前文件列表顺序跳到下一个未审阅文件”。这些入口应共用模式对应的文件顺序。
+
+判断项：**[P3，可能 Duplicated Code]** `App.tsx:480` 与 `Changelists.tsx:36,110` 重复 `find(changelist) ?? find(untracked)`；可共用读源查找。非硬违反，按 Q174 留 backlog。
+
+核对 7,886 项源码、1,253 项证据散列及固定 diff 一致。原件 Rust134＋会话18、Node13 通过，最终 frontend04/lint03 exit0；前端01/02失败保留。locale无新增，既有 x18n 0错误/76警告。本轴仅静态核对，未重跑检查、启动桌面或实跑 Windows/非法字节路径。
+
+合计：2 项 P2 硬违反、1 项 P3 smell；P1=0。明确余项交主 Codex；未改产品。
+
+
+### Codex / review07 Spec（2026-10-31）
+
+固定增量5f70d9c…150b274；以下正式报告原文，细证据 `/private/tmp/revia-m7-batch-g5scyw0r/review-07-wx8l6b6k/spec-evidence.md`。
+
+Spec：固定 `5f70d9c…150b274`，仅 review06 修复增量，18 路径、1 提交；3 项 P2，均为静态结论，未动态／桌面复现。
+
+(a) 遗漏／部分实现：以下三处消费入口未接完整，未确认独立遗漏。
+
+(b) 范围外行为：未发现新增 scope creep。
+
+(c) 实现错误：
+
+- **[P2，S07-01] 刷新后恢复错误预览基线。** ADR-0004:3 要求“保证用户操作的就是看到的、将要暂存的”；`docs/ui-direction.md:70`要求“同文件在原组仍有改动则留在原位置”。本轮新增 `changelist` 源（`src-tauri/src/session.rs:572–584`），但 `src/App.tsx:874–885` 仍经 `:6835–6839` 的旧过滤器选预览，排除所有该源，随后改开同路径 unstaged／staged。HEAD=A、index=B、工作区=C时，点击列表显示A→C，任一监视或手动刷新又变B→C，勾选提交仍是A→C。应让刷新保留当前模式的预览源。
+
+- **[P2，S07-02] 文件导航仍走隐藏顺序／版本。** `docs/ui-direction.md:81`要求“按当前文件列表顺序跳到下一个未审阅文件”；M4规格:135要求“能切到上一个、下一个文件”。新 `entryOrder` 只接树选择和位置计数（`src/App.tsx:475–486,5486`）；实际工具条入口 `:6036–6037` 仍到 `:1640–1647`，直接索引含旧源的原始快照；审阅导航 `:3008` 也仍用旧过滤器。可见b/c/a时，从c点下一文件停住，从a点上一文件可打开隐藏的unstaged:c；审阅导航也会离开HEAD→工作区源。应让这些入口复用实际可见文件顺序。
+
+- **[P2，S07-03] 更改列表内外部diff全部被拒。** M6规格:146保留“外部 diff 与合并为可选设置”。`src/features/m7/Changelists.tsx:110`现固定选择changelist，`src/App.tsx:6042`原样传给外部diff；`src-tauri/src/external_tools.rs:228,247–257`却要求该kind存在于原始Git status，而其解析器不生成changelist。菜单仍启用，所有已跟踪行均在启动前被拒。应支持该比较源及其HEAD基线，并保留既有保护。
+
+已核对7,886项源码、1,253项原证据散列及diff；Rust152相关通过，末轮Node13通过，frontend04／lint03 exit0；失败原件保留。未重跑产品检查、未启动桌面或Windows。详见spec-evidence.md。
+
