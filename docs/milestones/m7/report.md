@@ -4,7 +4,7 @@ Status: ready-for-agent
 
 ## 最新原生验收状态（覆盖下方历史停点）
 
-2026-10-31：任务13已完成并标done；任务14仍未完成。产品8eccde51e3cba87522fca4aa43324c185211435c，固定Release源码dfcdfe5622cf4aff18b9dae9f3bed90f05a040df，产物fixed-release-native-3kjfm1yi。原生终端丢字/抢焦点/字号同步修复已在新Release复验；任务13新fixture真实提交和自动列表恢复通过。D06可见窗口首屏并排252/220ms、统一176ms，均未达150ms；冷跳缓存来源证明仍缺，继续定位。用户确认GitHub与更新正式接线保留未验。完整版本、散列、原件和结论见[原生验收最新记录](native-acceptance.md)。所有旧失败原件保留，不再沿用下方“无桌面权限”等历史文字作为当前状态。
+2026-10-31：任务13已完成并标done；任务14仍未完成。产品8eccde51e3cba87522fca4aa43324c185211435c，固定Release源码dfcdfe5622cf4aff18b9dae9f3bed90f05a040df，产物fixed-release-native-3kjfm1yi。原生终端丢字/抢焦点/字号同步修复已在新Release复验；任务13新fixture真实提交和自动列表恢复通过。D06可见窗口首屏并排252/220ms、统一176ms，均未达150ms；另已补统一视图真实未缓存文字12ms/总24ms与缓存返回4ms证据，但冷加载首个合成回调21ms未在16.7ms内，且并排缓存来源仍缺，继续定位。用户确认GitHub与更新正式接线保留未验。完整版本、散列、原件和结论见[原生验收最新记录](native-acceptance.md)。所有旧失败原件保留，不再沿用下方“无桌面权限”等历史文字作为当前状态。
 
 
 实施方：Paseo / Pi（同一会话；含 2026-10-31 首轮正式返修）。规划方 / 验收方：Codex。

@@ -58,3 +58,14 @@ Rebased 1.1.22 的既有暂存、同文件部分暂存、模式切换三组原�
 2. 更新验签公钥、测试清单端点、实际安装/重启接线。
 
 不读取现有账号凭据、不索取令牌或私钥、不把本地HTTP/验签回归冒称上述正式桌面接线通过。Windows实机、CI/真实长测没有新证据，仍如实未测。任务14保持未完成；未push/PR/tag/发布、合main、删worktree或删除监控。
+
+
+## 后续补证：统一视图真正未缓存目标（2026-10-31）
+
+为避免原13,435显示行的小文件在测量等待期间已全量预取，本轮额外创建独占大文件fixture（原自建D06数据的四倍；53,737显示行）。这仅补冷跳证据，不替换原M0/D06数据与252/220/176ms首屏失败。
+
+同一固定Release的真实前台窗口测得：`targetWasCached=false`，目标原有34行缺口；加载占位在同步DOM中已出现，文字DOM 12ms内补齐，跳转总计24ms。返回目标已缓存，文字DOM 2ms、总计4ms，`warmWithinOneFrame=true`。首次合成回调21ms且`frameReady=false`，因此不将整条“冷加载1帧内”条件一起判通过。自动可见滚动60帧，缺行0；原生截图已直接查看。记录器真实exit0，focused=true、hidden=false、focusLosses=0、rAF约60；应用正常自动退出。
+
+原件：`task14-cold-fixture.json`、`task14-d06-cold-unified-audit.json`、`codex-checks/task14-d06-cold-unified-01`与其四张原生截图。首屏门槛仍失败、并排冷缓存来源仍未证明，任务14不done。产品源码未改，未重复构建、测试或开审查代理。
+
+本轮只读源码核查排除了“仅绑定RowWindowStore就自动全量取行”和“未开启编辑时也挂载编辑器”的假设；未减少身份重验或数据保护。`launchctl procinfo`需要root而未执行成功，未尝试提权或修改全局配置，也未采样归属不明的WebContent。现有Rust/AppKit栈不足以定位前端热点，后续应补生产IPC边界的测量时序，而非据猜测改性能或安全门。
