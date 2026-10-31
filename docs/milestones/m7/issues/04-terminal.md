@@ -191,3 +191,8 @@ Spec：固定 `78c5658e4b1b370266e2044992e5de3787cd86ac…b0dcafe2b5321f6f480cef
 **[P2，S11-SP01] 字体变化保留视图，却没有同步 PTY 新尺寸。** 规格 `docs/milestones/m7/spec.md:90` 要求“前端发送用户的输入字节与尺寸”；`docs/ui-direction.md:12` 明确“代码字体与字号可配置”。新 `src/features/m7/TerminalPanel.tsx:160` 移除字体依赖，稳定 ref（`:33`）使字体变化不再重建终端；但保留的字体更新路径 `:180–192` 只更新选项并 `fit.fit()`，没有 `registry.resize`。本地 `@xterm/addon-fit` 0.10.0 的 `fit()` 仅调用前端 `terminal.resize`（`node_modules/@xterm/addon-fit/src/FitAddon.ts:34–46`）。生产 PTY 尺寸只经显式 IPC 更新（`terminalSessions.ts:159–162`、`src-tauri/src/m7/terminal.rs:358–380`）；容器固定时，字体变化不会触发观察容器尺寸的 `TerminalPanel.tsx:129–139`。以上为静态事实；影响推断：调字号/字体后 shell 仍按旧行列换行，全屏程序可能错位，直到另一次容器 resize。应在字体更新完成 fit 后同步所属 session 的真实 rows/cols，保留稳定实例。
 
 未发现其他本增量缺漏、范围扩张或错误实现。新 Release 的连续输入、其他控件焦点与 D06 仍待真实桌面复验；旧版第二次完整输入成功及 Node 12 项不能证明本次 UI 修复通过。核查范围与限制见 `spec-evidence.md`。
+
+
+### Codex：S11-SP01 尺寸同步修复 — 2026-10-31
+
+保留稳定终端实例，统一监听 xterm 实际 onResize 事件，将 rows/cols 发送给同一 session 的 registry.resize；容器、字体/字号、页签激活的 fit 都走同一链路，移除原两处显式重复发送。错误继续归原会话，不取消真实写保护。`terminal-size-frontend-01` 与 `terminal-size-lint-01` 均真实exit0，原始源码hash/argv/stdout/stderr保留。未改Rust、locale或会话业务层，不重复不受影响的旧回归；字体后真实PTY尺寸仍待新固定Release原生验证。下一步仅此修复增量两轴，完成后重建Release并继续任务13/14。

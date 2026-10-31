@@ -317,3 +317,8 @@ Standards 0硬违反、2项P3判断；Spec 0新增发现。原文分别入对应
 仅修复该生命周期：每个页签使用稳定ref，字号/字体通过现有更新路径同步，不重建视图；只有实际激活页签才请求焦点，布局回调检查实例仍存活。PTY后端、写保护、Git与locale均未改。`terminal-viewport-node-01`现有终端所有权/关闭12项通过；`terminal-viewport-frontend-01`、`terminal-viewport-lint-01`真实exit0。未新增以源码形状为断言的测试，相关UI仍须新固定Release真实复验；不把现有Node检查当作React焦点验证。全部argv/源码hash/分流输出保留。
 
 完整第二次输入曾成功运行独占Python进程，`pty-final-process-proof.json`记录PID14626/parent12952和独占HOME/cwd；首轮连续输入缺陷仍成立。原生页签关闭提供Terminate & close/Cancel，取消后CmdQ显示全局End processes and continue；只终止本批shell，`task14-native-launch-04`真实exit0。下一步仅此增量全新两轴，再构建固定Release、复验持续输入/其他控件焦点和D06；整包14仍未完成。
+
+
+### Codex：S11-SP01 尺寸同步修复 — 2026-10-31
+
+保留稳定终端实例，统一监听 xterm 实际 onResize 事件，将 rows/cols 发送给同一 session 的 registry.resize；容器、字体/字号、页签激活的 fit 都走同一链路，移除原两处显式重复发送。错误继续归原会话，不取消真实写保护。`terminal-size-frontend-01` 与 `terminal-size-lint-01` 均真实exit0，原始源码hash/argv/stdout/stderr保留。未改Rust、locale或会话业务层，不重复不受影响的旧回归；字体后真实PTY尺寸仍待新固定Release原生验证。下一步仅此修复增量两轴，完成后重建Release并继续任务13/14。

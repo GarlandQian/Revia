@@ -126,12 +126,12 @@ export function TerminalPanel({
       const fit = new FitAddon();
       terminal.loadAddon(fit);
       terminal.open(container);
+      terminal.onResize(({ rows, cols }) => {
+        void registry.resize(sessionId, rows, cols).catch(() => { /* 原目标保留结构化错误。 */ });
+      });
       const observer = new ResizeObserver(() => {
         try {
           fit.fit();
-          void registry
-            .resize(sessionId, terminal.rows, terminal.cols)
-            .catch(() => undefined);
         } catch {
           // 容器尚未布局完成时忽略。
         }
@@ -151,7 +151,6 @@ export function TerminalPanel({
         if (instances.current.get(sessionId)?.terminal !== terminal) return;
         try {
           fit.fit();
-          void registry.resize(sessionId, terminal.rows, terminal.cols).catch(() => { /* 原目标已有错误。 */ });
         } catch {
           // 忽略布局竞态。
         }
