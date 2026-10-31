@@ -164,3 +164,30 @@ Spec：固定 `5ca9178…039fd1a`，仅原生场景修复增量，10路径、1�
 仅修复该生命周期：每个页签使用稳定ref，字号/字体通过现有更新路径同步，不重建视图；只有实际激活页签才请求焦点，布局回调检查实例仍存活。PTY后端、写保护、Git与locale均未改。`terminal-viewport-node-01`现有终端所有权/关闭12项通过；`terminal-viewport-frontend-01`、`terminal-viewport-lint-01`真实exit0。未新增以源码形状为断言的测试，相关UI仍须新固定Release真实复验；不把现有Node检查当作React焦点验证。全部argv/源码hash/分流输出保留。
 
 完整第二次输入曾成功运行独占Python进程，`pty-final-process-proof.json`记录PID14626/parent12952和独占HOME/cwd；首轮连续输入缺陷仍成立。原生页签关闭提供Terminate & close/Cancel，取消后CmdQ显示全局End processes and continue；只终止本批shell，`task14-native-launch-04`真实exit0。下一步仅此增量全新两轴，再构建固定Release、复验持续输入/其他控件焦点和D06；整包14仍未完成。
+
+
+### Codex / review11 正式两轴原文 — 2026-10-31
+
+固定增量 `78c5658e4b1b370266e2044992e5de3787cd86ac…b0dcafe2b5321f6f480cefea4895bc72582787e8`。两轴已结束，以下分别原文追加。Standards 0硬违反/0判断；Spec 1项P2（S11-SP01）。Codex直接核对新字体fit后缺PTY resize属实，待修后重新固定增量；原生连续输入/焦点与D06尚未通过。
+
+Standards
+
+Standards：0 项新增硬违反，0 项需报告的 smell 判断。
+
+固定范围 `78c5658…b0dcafe`，2 个提交、4 个文件，仅审增量；工作区与固定 head 一致。未发现 `CODING_STANDARDS` / `CONTRIBUTING` 文件，`CLAUDE.md` 指向 `AGENTS.md`。
+
+`TerminalPanel.tsx:27–35,80–81,118–120,150–177,310–316`：每页签组件使 ref 回调稳定，创建实例读取最新字体参数，已有 effect 同步字体；布局回调核对实例，焦点 effect 随激活页签变化并取消待执行帧。未新增平台假设、Git/shell 拼接、文案或持久化，符合 `AGENTS.md`“不写死 macOS 假设／Git 调用只放 Rust 层”及技术方向的现有分层。
+
+3 份文档新增段落保留失败原件、真实退出码和后续 Release 复验停点，没有把任务标为完成，符合 `docs/agents/local-validation.md` 第 3 条及“完成条件”、`docs/agents/issue-tracker.md` 的 Comments 约定。核实 Node 12 项通过、build/lint exit 0，受测关键源码散列对应固定 head；Node 只覆盖会话归属与关闭，不能证明 React 焦点。
+
+已逐项判断全部 12 种 Fowler 基线，未形成新增发现；`TerminalViewport` 承担必要的 ref 生命周期，不按 Middle Man 报告。工具可管的格式与 lint 项跳过，未扩审旧代码或追加 P3 重构。
+
+本次未重跑检查、运行应用或联系 Pi。新 Release 持续输入与其他控件焦点、D06、Windows 未由本轴验证；按技术方向“完整交互仍需在实际 Tauri WebView 中验证”，桌面复验仍须完成。核查明细见 `standards-evidence.md`。
+
+Spec
+
+Spec：固定 `78c5658e4b1b370266e2044992e5de3787cd86ac…b0dcafe2b5321f6f480cefea4895bc72582787e8`，仅 Q174 终端视图生命周期增量。**新增发现 1：P1=0，P2=1，P3=0。**
+
+**[P2，S11-SP01] 字体变化保留视图，却没有同步 PTY 新尺寸。** 规格 `docs/milestones/m7/spec.md:90` 要求“前端发送用户的输入字节与尺寸”；`docs/ui-direction.md:12` 明确“代码字体与字号可配置”。新 `src/features/m7/TerminalPanel.tsx:160` 移除字体依赖，稳定 ref（`:33`）使字体变化不再重建终端；但保留的字体更新路径 `:180–192` 只更新选项并 `fit.fit()`，没有 `registry.resize`。本地 `@xterm/addon-fit` 0.10.0 的 `fit()` 仅调用前端 `terminal.resize`（`node_modules/@xterm/addon-fit/src/FitAddon.ts:34–46`）。生产 PTY 尺寸只经显式 IPC 更新（`terminalSessions.ts:159–162`、`src-tauri/src/m7/terminal.rs:358–380`）；容器固定时，字体变化不会触发观察容器尺寸的 `TerminalPanel.tsx:129–139`。以上为静态事实；影响推断：调字号/字体后 shell 仍按旧行列换行，全屏程序可能错位，直到另一次容器 resize。应在字体更新完成 fit 后同步所属 session 的真实 rows/cols，保留稳定实例。
+
+未发现其他本增量缺漏、范围扩张或错误实现。新 Release 的连续输入、其他控件焦点与 D06 仍待真实桌面复验；旧版第二次完整输入成功及 Node 12 项不能证明本次 UI 修复通过。核查范围与限制见 `spec-evidence.md`。
