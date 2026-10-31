@@ -480,17 +480,7 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
     session.require_identity()?;
     let git = session.git();
     let expected = commit::capture(git)?;
-    let empty = git
-        .run_with_input(&["hash-object", "-t", "tree", "--stdin"], vec![])?
-        .into_success("读取空树标识")?
-        .stdout_lossy()
-        .trim()
-        .to_string();
-    let head = expected.head.as_deref().unwrap_or(&empty);
-    let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
-    args.extend_from_slice(git::DIFF_FLAGS);
-    args.extend_from_slice(&["--no-renames", "--binary", head, "--"]);
-    let raw = git.run_ok(&args, "读取更改列表 Git diff")?.stdout;
+    let raw = git.diff_changelist(None, git::segments::IgnoreWhitespace::Off)?;
     let parsed = git::diff::parse_bytes(&raw);
     let status = git::status::read(git)?;
     let mut items = Vec::new();
@@ -499,19 +489,7 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
     for file in parsed.files {
         let fingerprint = super::sha256_hex(&file.raw_patch);
         let readonly_reason = readonly_for(git, &status, &file.path);
-        let source = if status.entries.iter().any(|entry| {
-            entry.path == file.path && entry.changes == git::status::ChangesKind::Unstaged
-        }) {
-            git::status::ChangesKind::Unstaged
-        } else {
-            git::status::ChangesKind::Staged
-        };
-        let staged = git::diff::parse_bytes(&git.diff_index(Some(&file.path))?);
-        let staged_signatures: Vec<_> = staged
-            .files
-            .iter()
-            .flat_map(git::segments::segment_signatures)
-            .collect();
+        let source = git::status::ChangesKind::Changelist;
         if file.hunks.is_empty()
             || file.binary
             || file.status != git::status::FileStatus::Modified
@@ -540,20 +518,6 @@ fn scan(session: &WorktreeSession) -> Result<Scan> {
                         true,
                     )
                     .ok_or_else(rejected)?;
-                    let selected_file = git::diff::parse_bytes(&patch);
-                    let signatures: Vec<_> = selected_file
-                        .files
-                        .iter()
-                        .flat_map(git::segments::segment_signatures)
-                        .collect();
-                    let source = if signatures
-                        .iter()
-                        .all(|signature| staged_signatures.contains(signature))
-                    {
-                        git::status::ChangesKind::Staged
-                    } else {
-                        source
-                    };
                     let owners = git::segments::line_owners(hunk);
                     let summary = hunk
                         .lines

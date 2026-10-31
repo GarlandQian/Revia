@@ -277,6 +277,7 @@ pub struct WorktreeSession {
     highlight_generations: Mutex<HashMap<String, HighlightStamp>>,
     generation_counter: Mutex<u64>,
     instance_id: u64,
+    changelist_mode: std::sync::atomic::AtomicBool,
     confirmation_epoch: AtomicU64,
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
     /// 命令层判断“能否重新加载环境”时也要读它（返修 C3）。
@@ -394,6 +395,7 @@ impl WorktreeSession {
             highlighter: Highlighter::start(),
             highlight_generations: Mutex::new(HashMap::new()),
             generation_counter: Mutex::new(0),
+            changelist_mode: std::sync::atomic::AtomicBool::new(false),
             instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             confirmation_epoch: AtomicU64::new(0),
             writing: Mutex::new(false),
@@ -404,6 +406,8 @@ impl WorktreeSession {
     }
 
     /// 会话实例代号：进程内唯一，历史目标据此拒绝旧实例的目标。
+    pub fn set_changelist_mode(&self, enabled: bool) { self.changelist_mode.store(enabled, Ordering::Release); }
+
     pub fn instance_id(&self) -> u64 {
         self.instance_id
     }
@@ -436,6 +440,7 @@ impl WorktreeSession {
 
     fn refresh_locked(&self) -> Result<ChangesSnapshot> {
         let started = std::time::Instant::now();
+        let changelist_mode = self.changelist_mode.load(Ordering::Acquire);
         let status = status::read(&self.git)?;
 
         // `git diff` 会分几次读同一个文件（先算 blob 哈希、再取内容）。如果外部正在**直接保存**
@@ -445,7 +450,7 @@ impl WorktreeSession {
         let watched: Vec<&str> = status
             .entries
             .iter()
-            .filter(|entry| entry.changes != ChangesKind::Staged)
+            .filter(|entry| changelist_mode || entry.changes != ChangesKind::Staged)
             .map(|entry| entry.path.as_str())
             .collect();
         let before = self.worktree_stats(&watched);
@@ -453,6 +458,7 @@ impl WorktreeSession {
         // 一次读取两种 diff：未暂存（工作区 vs 暂存区）与已暂存（暂存区 vs HEAD）。
         let unstaged_patch = self.git.diff_worktree(None)?;
         let staged_patch = self.git.diff_index(None)?;
+        let changelist_patch = if changelist_mode { self.git.diff_changelist(None, IgnoreWhitespace::Off)? } else { Vec::new() };
 
         let after = self.worktree_stats(&watched);
         if before != after {
@@ -464,7 +470,7 @@ impl WorktreeSession {
                 &[],
             ));
         }
-        let fingerprint = git::fingerprint(&[&unstaged_patch, &staged_patch]);
+        let fingerprint = if changelist_mode { git::fingerprint(&[&unstaged_patch, &staged_patch, &changelist_patch]) } else { git::fingerprint(&[&unstaged_patch, &staged_patch]) };
 
         let unstaged = git::diff::parse_bytes(&unstaged_patch);
         let staged = git::diff::parse_bytes(&staged_patch);
@@ -561,6 +567,22 @@ impl WorktreeSession {
                 worktree_version: worktree_version.clone(),
                 worktree_version_confirmed: worktree_version_confirmed,
             });
+        }
+
+        if changelist_mode {
+            for file in git::diff::parse_bytes(&changelist_patch).files {
+                let template = entries.iter().find(|entry| entry.path == file.path || entry.original_path.as_deref() == Some(file.path.as_str())).cloned();
+                let status_entry = status.entries.iter().find(|entry| entry.path == file.path || entry.original_path.as_deref() == Some(file.path.as_str())).cloned();
+                let (Some(mut entry), Some(mut status_entry)) = (template, status_entry) else { continue };
+                entry.path = file.path.clone(); entry.original_path = None; entry.changes = ChangesKind::Changelist; entry.status = file.status;
+                status_entry.path = file.path.clone(); status_entry.original_path = None; status_entry.changes = ChangesKind::Changelist; status_entry.status = file.status;
+                entry.fingerprint = compute_file_fingerprint_from_patch(&status_entry, &file.raw_patch, &self.path)?;
+                entry.worktree_version = review::worktree_version(Some(&self.git), &self.path, &file.path).ok().flatten();
+                entry.worktree_version_confirmed = entry.worktree_version.is_some() || !self.path.join(&file.path).is_dir();
+                fill_entry(&mut entry, Some(&file));
+                models.insert(key(ChangesKind::Changelist, &file.path), FileModelCache {model:file,unfiled:false,hunk_actions:Vec::new()});
+                entries.push(entry);
+            }
         }
 
         let mut guard = self.snapshot.lock().map_err(|_| {
@@ -782,7 +804,7 @@ impl WorktreeSession {
             })?;
         let revision = snapshot.generation;
         // 块（段）操作目标（返修 A1/Q142）：与显示同批签发，前端原样传回。
-        let segment_actions_available = ignore.allows_segment_actions()
+        let segment_actions_available = entry.changes != ChangesKind::Changelist && ignore.allows_segment_actions()
             && entry.readonly_reason.is_none()
             && !entry.unmerged
             && !entry.binary
@@ -991,7 +1013,7 @@ impl WorktreeSession {
             )
         })?;
         let segments = cached.segments.clone();
-        let actions_available = ignore.allows_segment_actions()
+        let actions_available = entry.changes != ChangesKind::Changelist && ignore.allows_segment_actions()
             && entry.readonly_reason.is_none()
             && !entry.unmerged
             && !entry.binary
@@ -1176,6 +1198,7 @@ impl WorktreeSession {
                 .git
                 .diff_index_with_ignore(path, original_path, ignore)?,
             ChangesKind::Untracked => self.git.diff_untracked(path)?,
+            ChangesKind::Changelist => self.git.diff_changelist(Some(path), ignore)?,
         };
         let mut parsed = git::diff::parse_bytes(&patch);
         Ok(parsed
@@ -1219,6 +1242,7 @@ impl WorktreeSession {
                     self.git.file_at("HEAD", path).unwrap_or_default(),
                     self.git.file_at("", path).unwrap_or_default(),
                 ),
+                ChangesKind::Changelist => (self.git.file_at("HEAD", path).unwrap_or_default(), self.git.working_file(path).unwrap_or_default()),
                 ChangesKind::Untracked => (
                     String::new(),
                     self.git.working_file(path).unwrap_or_default(),
@@ -1494,6 +1518,7 @@ impl WorktreeSession {
             ChangesKind::Unstaged => self.git.diff_worktree(Some(path))?,
             ChangesKind::Staged => self.git.diff_index_with_orig(path, orig_path)?,
             ChangesKind::Untracked => self.git.diff_untracked(path)?,
+            ChangesKind::Changelist => self.git.diff_changelist(Some(path), IgnoreWhitespace::Off)?,
         };
         Ok(current == expected_raw)
     }
@@ -1509,8 +1534,8 @@ impl WorktreeSession {
             (ChangesKind::Unstaged, FileVersion::Old) | (ChangesKind::Staged, FileVersion::New) => {
                 "index"
             }
-            (ChangesKind::Staged, FileVersion::Old) => "HEAD",
-            (ChangesKind::Unstaged, FileVersion::New) => "worktree",
+            (ChangesKind::Staged | ChangesKind::Changelist, FileVersion::Old) => "HEAD",
+            (ChangesKind::Unstaged | ChangesKind::Changelist, FileVersion::New) => "worktree",
             // 未跟踪文件没有旧版本
             (ChangesKind::Untracked, FileVersion::Old) => "none",
             (ChangesKind::Untracked, FileVersion::New) => "worktree",
@@ -3397,6 +3422,7 @@ fn supports_hunk_actions(entry: &ChangeEntry, file: &git::diff::FileChange) -> b
     // 既不猜测「删除 + 未跟踪」配对，也不影响真正的普通 M 文件。
     let renamed_by_git = entry.original_path.is_some() || file.old_path.is_some();
     entry.changes != ChangesKind::Untracked
+        && entry.changes != ChangesKind::Changelist
         && !renamed_by_git
         && entry.readonly_reason.is_none()
         && !entry.unmerged
@@ -3551,14 +3577,14 @@ fn compute_file_fingerprint_from_patch(
     // actual worktree bytes too; textual hunks already bind the Git file version.
     let lacks_text_hunks = !diff_bytes.windows(4).any(|bytes| bytes == b"\n@@ ");
     if entry.changes == ChangesKind::Untracked
-        || (entry.changes == ChangesKind::Unstaged && lacks_text_hunks)
+        || (matches!(entry.changes, ChangesKind::Unstaged | ChangesKind::Changelist) && lacks_text_hunks)
     {
         let file_path = worktree_path.join(&entry.path);
         let meta = match std::fs::symlink_metadata(&file_path) {
             Ok(meta) => Some(meta),
             Err(error)
                 if error.kind() == std::io::ErrorKind::NotFound
-                    && entry.changes == ChangesKind::Unstaged =>
+                    && matches!(entry.changes, ChangesKind::Unstaged | ChangesKind::Changelist) =>
             {
                 None
             }

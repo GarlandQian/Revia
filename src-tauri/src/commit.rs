@@ -287,7 +287,7 @@ pub fn read_index_entries(git: &Git) -> Result<Vec<CommitExpectationIndexEntry>>
                     unstaged_added.insert(entry.path.clone());
                 }
             }
-            ChangesKind::Untracked => {}
+            ChangesKind::Untracked | ChangesKind::Changelist => {}
         }
     }
 

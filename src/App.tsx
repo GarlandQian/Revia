@@ -35,7 +35,8 @@ import { CommitArea, messageSubmittable, type CommitResultView } from "@/compone
 import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitOutputStore } from "@/lib/commitOutput";
-import { Changelists, selectionOf } from "@/features/m7/Changelists";
+import { visibleChangelistPaths } from "@/lib/m7/visibleChangelistSelection";
+import { Changelists, selectionOf, type ChangelistControls } from "@/features/m7/Changelists";
 import type { ChangelistView } from "@/types/bindings/ChangelistView";
 import { invoke } from "@tauri-apps/api/core";
 import { ChangesTree, entryKey, treeOrder } from "@/components/app/ChangesTree";
@@ -285,6 +286,11 @@ export function App() {
   const [changelistMode, setChangelistMode] = useState(false);
   const [changelistView, setChangelistView] = useState<ChangelistView | null>(null);
   const changelistRef = useRef<ChangelistView | null>(null);
+  const changelistControls = useRef<ChangelistControls | null>(null);
+  const [changelistSelectedPaths, setChangelistSelectedPaths] = useState<{worktreeId: string; paths: string[]}>({worktreeId:"",paths:[]});
+  const changelistSelectedPathsRef = useRef(changelistSelectedPaths);
+  changelistSelectedPathsRef.current = changelistSelectedPaths;
+  const acceptChangelistSelection = useCallback((worktreeId: string, paths: string[]) => setChangelistSelectedPaths((current) => current.worktreeId === worktreeId && JSON.stringify(current.paths) === JSON.stringify(paths) ? current : {worktreeId,paths}), []);
   const acceptChangelistView = useCallback((view: ChangelistView | null) => { changelistRef.current = view; setChangelistView(view); setAmendConfirm(null); setCommitWarningConfirm(null); }, []);
   const [commitChecks, setCommitChecks] = useState({
     subjectLimit: 72,
@@ -466,11 +472,20 @@ export function App() {
   // 列表和页签共享导航入口；实际取数仍由 openEntry 的选择门校验。
   const entryNavigationRef = useRef<((entry: ChangeEntry) => void) | null>(null);
   const navigateEntry = useCallback((entry: ChangeEntry) => entryNavigationRef.current?.(entry), []);
+  const entryOrder = useCallback((current: ChangesSnapshot): ChangeEntry[] => {
+    if (!changelistMode) return treeOrder(current);
+    const view = changelistRef.current;
+    if (view?.worktreeId !== current.worktreeId) return [];
+    return visibleChangelistPaths(view.groups, view.items).flatMap((path) => {
+      const entry = current.entries.find((candidate) => candidate.path === path && candidate.changes === "changelist") ?? current.entries.find((candidate) => candidate.path === path && candidate.changes === "untracked");
+      return entry ? [entry] : [];
+    });
+  }, [changelistMode]);
   const {
     treeSelection, groupOpen, setGroupOpen, dirOpen, followActiveEntry,
     expandToSelection, treeSelectedEntries, activateTreeEntry, moveTreeSelection,
     selectAllEntries, toggleGroup, toggleDir,
-  } = useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry: navigateEntry });
+  } = useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry: navigateEntry, order: entryOrder });
   /** worktree 下拉的只读状态（F02.1、F09.2）。 */
   const [worktreeStatuses, setWorktreeStatuses] = useState<WorktreeStatusEntry[]>([]);
   /** 丢弃确认（可含多个文件，或一个块）。 */
@@ -3122,7 +3137,11 @@ export function App() {
     const current = snapshotRef.current;
     const activeWorktree = worktreeIdRef.current;
     if (!current || !activeWorktree) return;
-    const candidates = entries.filter(
+    const listSelection = changelistSelectedPathsRef.current;
+    const paths = entries.some((entry) => entry.changes === "changelist") && listSelection.worktreeId === activeWorktree && listSelection.paths.length
+      ? listSelection.paths : entries.map((entry) => entry.path);
+    const sourceEntries = entries.some((entry) => entry.changes === "changelist") ? current.entries.filter((entry) => paths.includes(entry.path)) : entries;
+    const candidates = sourceEntries.filter(
       (entry) => entry.changes === "unstaged" || entry.changes === "untracked",
     );
     const discardable = candidates.filter((entry) => !entry.readonlyReason);
@@ -4575,7 +4594,7 @@ export function App() {
         ignoreWhitespace: next.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
       });
       setChangelistMode(next.changelistMode);
-      if (patch.changelistMode !== undefined) acceptChangelistView(null);
+      if (patch.changelistMode !== undefined) { acceptChangelistView(null); await refresh(); }
       setCommitChecks({
         subjectLimit: next.commitSubjectLimit,
         blankLineRequired: next.commitBlankLineRequired,
@@ -4610,7 +4629,7 @@ export function App() {
     } catch (caught) {
       return toAppError(caught);
     }
-  }, []);
+  }, [refresh, acceptChangelistView]);
 
   /** 重新加载登录 shell 环境与 Git 程序（F08）。 */
   const reloadEnvironment = useCallback(async (): Promise<AppErrorPayload | null> => {
@@ -5464,12 +5483,12 @@ export function App() {
   const activeStatus = worktreeStatuses.find((status) => status.id === worktreeId);
   const selectedTreeEntries = treeSelectedEntries();
   // 工具条上的“第 n / m 个文件”：按改动树顺序（返修 A1/Q138）。
-  const orderedEntries = snapshot ? treeOrder(snapshot) : [];
+  const orderedEntries = snapshot ? entryOrder(snapshot) : [];
   const activeIndex = selected
     ? orderedEntries.findIndex((entry) => entry.path === selected.path && entry.changes === selected.changes)
     : -1;
   const filePosition = { index: activeIndex + 1, total: orderedEntries.length };
-  const discardableSelected = selectedTreeEntries.filter(
+  const discardableSelected = (changelistMode && snapshot && changelistSelectedPaths.worktreeId === worktreeId ? snapshot.entries.filter((entry) => changelistSelectedPaths.paths.includes(entry.path)) : selectedTreeEntries).filter(
     (entry) => entry.changes === "unstaged" || entry.changes === "untracked",
   );
   const allReviewed = !!reviewNotice
@@ -5838,7 +5857,7 @@ export function App() {
                     <Codicon name="collapse-all" size={15} />
                   </button>
                   <SidebarMore
-                    onSelectAll={selectAllEntries}
+                    onSelectAll={() => changelistMode ? changelistControls.current?.selectAll() : selectAllEntries()}
                     onRefresh={() => void refresh()}
                     onCloseAll={closeAllTabs}
                     groupByDirectory={treeGroupByDirectory}
@@ -5855,7 +5874,7 @@ export function App() {
             {sideTab === "commit" ? (
               <>
                 {changelistMode && worktreeId && snapshot ? (
-                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} onSelectAll={selectAllEntries} onMove={moveTreeSelection} snapshot={snapshot} selectedKeys={treeSelection} onActivate={activateTreeEntry} onPin={pinEntry} onDiscard={(entry) => requestDiscardEntries(expandToSelection(entry))} />
+                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} controls={changelistControls} onSelection={acceptChangelistSelection} snapshot={snapshot} onActivate={activateTreeEntry} onPin={pinEntry} onDiscard={(paths) => requestDiscardEntries(snapshot.entries.filter((entry) => paths.includes(entry.path) && (entry.changes === "unstaged" || entry.changes === "untracked")))} />
                 ) : snapshot ? (
                   <ChangesTree
                     snapshot={snapshot}
@@ -6043,7 +6062,7 @@ export function App() {
               </div>
               {/* F20：编辑只作用于 split 视图的工作区侧（unstaged）。
                * 统一视图 / 暂存区 / 历史保持只读；统一视图点编辑先切到同文件的并排视图。 */}
-              {!selectedEntry.unmerged && !selectedEntry.binary && selectedEntry.changes === "unstaged" ? (
+              {!selectedEntry.unmerged && !selectedEntry.binary && (selectedEntry.changes === "unstaged" || selectedEntry.changes === "changelist") ? (
                 <button
                   type="button"
                   className="toolbar-widget mr-1 shrink-0"
@@ -6116,7 +6135,7 @@ export function App() {
           ) : null}
 
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {mainView === "diff" ? (editingPath && worktreeId && editingWorktreeId === worktreeId && view === "split" && selectedEntry?.changes === "unstaged" && !selectedEntry.binary && !selectedEntry.unmerged && editingPath === selectedEntry.path ? (
+            {mainView === "diff" ? (editingPath && worktreeId && editingWorktreeId === worktreeId && view === "split" && (selectedEntry?.changes === "unstaged" || selectedEntry?.changes === "changelist") && !selectedEntry.binary && !selectedEntry.unmerged && editingPath === selectedEntry.path ? (
               <EditableWorkspace
                 key={`${worktreeId}/${editingPath}`}
                 session={editSessions.get({ worktreeId, path: editingPath })}

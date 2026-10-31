@@ -693,6 +693,19 @@ impl Git {
         (!value.is_empty()).then(|| value.to_string())
     }
 
+    /// 更改列表的固定比较基线；所有预览、选择与指纹复用同一组 Git 参数。
+    pub fn diff_changelist(&self, path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
+        let head = crate::commit::read_head(self)?;
+        let empty = self.run_with_input(&["hash-object", "-t", "tree", "--stdin"], Vec::new())?.into_success("读取空树标识")?.stdout_lossy().trim().to_string();
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.extend_from_slice(ignore.diff_args());
+        if ignore.ignore_blank_lines() { args.push("--ignore-blank-lines"); }
+        args.extend_from_slice(&["--no-renames", "--binary", head.as_deref().unwrap_or(&empty), "--"]);
+        if let Some(path) = path { args.push(path); }
+        Ok(self.run_ok(&args, "读取更改列表 Git diff")?.stdout)
+    }
+
     /// 工作区相对 HEAD 的 diff（冲突文件的只读对照，设计 3.2）。
     pub fn diff_head(&self, path: &str) -> Result<Vec<u8>> {
         self.diff(Some("HEAD"), Some(path))

@@ -150,3 +150,13 @@ Spec：固定 `5839e56…2869c81`，仅 review05 修复增量；2项P2，均为�
 
 原件核对：7,884项源码、1,173项证据散列及diff一致。末轮Rust18通过，frontend/lint exit0；其余既有检查及源码映射见`spec-evidence.md`。本修复Revia桌面、Windows和非UTF8路径用例仍未实跑；不重启既有Rebased、不复测已过检查。
 
+
+### Codex：review06预览基线与可见顺序修复（2026-10-31）
+
+H06-01/S06-02：新增明确的 `ChangesKind::Changelist` 只读比较源。启用更改列表的会话额外缓存系统Git HEAD→工作区模型；原staged/unstaged/untracked条目及指纹保留供既有安全写入口。列表、分页行、并排文本与高亮的旧侧均取HEAD、新侧取工作区，选择补丁也调用同一 `Git::diff_changelist`；删除按正文签名猜staged的分支。此源不签发暂存/hunk/segment写凭据，工作区一侧编辑仍复用既有编辑会话。模式切换只改变应用设置与读取模型，不改变真实index。
+
+S06-01：行身份为group:path，点击范围、Command/Ctrl多选、Shift箭头及全选都使用实际可见顺序；文件跨组显示有独立行身份。主diff文件位置/导航按同一可见顺序去重文件。批量/键盘丢弃把实际选中文件投影到原unstaged/untracked条目，继续沿用原确认、指纹和回收流程；不借内部比较源改写Git。
+
+`task13-review06-rust-01` 六targets共134项通过（commit12、文件20、hunk24、更改列表21、审阅32、segment25）；`task13-review06-session-01`会话/刷新隔离18项通过，共152相关Rust检查。新增真实A→B暂存→C预览、相同正文两位置、普通/更改列表模式切换断言，均通过生产WorktreeSession入口读取实际Git内容。`task13-review06-node-02`13通过（可见顺序与导航5、既有提交8），`task13-review06-frontend-04`与`task13-review06-lint-03` exit0。后续前端类型/导航修正未改Rust源码，未重复已过Rust。locale键集/译文不变，复用已查询的HEAD/工作区标签；既有x18n为0错误/76警告。
+
+前端01/02先后暴露新增类型映射遗漏，TS错误与原始源码hash/argv/exit/stdout/stderr全部保留，未算通过。所有原件位于codex-checks/task13-review06-*。非法字节文件名用例仍仅非macOS Unix条件，本机与Windows不冒称实跑。未启动本候选Revia、未构建新版Release；下一步仅此新增量独立两轴，收齐报告后才固定新版Release与真实桌面。

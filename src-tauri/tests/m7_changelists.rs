@@ -686,3 +686,171 @@ fn non_utf8_untracked_path_is_readonly_without_hiding_valid_files() {
     let selected = f.select(&view, "other.txt", None);
     assert!(f.commit(&selected).unwrap().success);
 }
+#[test]
+fn changelist_preview_uses_head_to_worktree_after_index_intermediate_edit() {
+    use revia_lib::{
+        git::{
+            rows::ViewMode,
+            segments::{IgnoreWhitespace, WordGranularity},
+            status::ChangesKind,
+        },
+        session::FileVersion,
+    };
+    let f = Fixture::new();
+    let base = fs::read_to_string(f.repo.join("mixed.txt")).unwrap();
+    fs::write(
+        f.repo.join("mixed.txt"),
+        base.replace("line04: base", "line04: INDEX_INTERMEDIATE_B"),
+    )
+    .unwrap();
+    f.git(&["add", "mixed.txt"]);
+    fs::write(
+        f.repo.join("mixed.txt"),
+        base.replace("line04: base", "line04: WORKTREE_C"),
+    )
+    .unwrap();
+    f.session.set_changelist_mode(true);
+    let snapshot = f.session.refresh().unwrap();
+    assert!(snapshot
+        .entries
+        .iter()
+        .any(|entry| entry.changes == ChangesKind::Staged));
+    assert!(snapshot
+        .entries
+        .iter()
+        .any(|entry| entry.changes == ChangesKind::Unstaged));
+    let entry = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.changes == ChangesKind::Changelist && entry.path == "mixed.txt")
+        .unwrap();
+    let rows = f
+        .session
+        .rows(
+            "mixed.txt",
+            ChangesKind::Changelist,
+            ViewMode::Unified,
+            0,
+            100,
+        )
+        .unwrap();
+    let text = rows
+        .rows
+        .iter()
+        .filter_map(|row| row.text.as_deref())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(text.contains("line04: base"));
+    assert!(text.contains("line04: WORKTREE_C"));
+    assert!(!text.contains("INDEX_INTERMEDIATE_B"));
+    assert_eq!(rows.entry.fingerprint, entry.fingerprint);
+    assert!(rows
+        .rows
+        .iter()
+        .all(|row| row.hunk_action.is_none() && row.segment_action.is_none()));
+    let old = f
+        .session
+        .side_lines(
+            "mixed.txt",
+            ChangesKind::Changelist,
+            IgnoreWhitespace::Off,
+            3,
+            FileVersion::Old,
+            0,
+            40,
+            WordGranularity::Word,
+        )
+        .unwrap();
+    assert!(old.iter().any(|line| line.text == "line04: base"));
+    assert!(!old
+        .iter()
+        .any(|line| line.text.contains("INDEX_INTERMEDIATE_B")));
+    let view = f.select(&f.view(), "mixed.txt", None);
+    assert!(view
+        .items
+        .iter()
+        .filter(|item| !item.stale)
+        .all(|item| item.source == Some(ChangesKind::Changelist)));
+    assert!(f.commit(&view).unwrap().success);
+    assert!(f
+        .git(&["show", "HEAD:mixed.txt"])
+        .contains("line04: WORKTREE_C"));
+}
+#[test]
+fn repeated_segment_content_keeps_both_head_worktree_positions() {
+    use revia_lib::git::{rows::ViewMode, status::ChangesKind};
+    let f = Fixture::new();
+    let base = fs::read_to_string(f.repo.join("mixed.txt"))
+        .unwrap()
+        .replace("line04: base", "same original")
+        .replace("line30: base", "same original");
+    fs::write(f.repo.join("mixed.txt"), &base).unwrap();
+    f.git(&["add", "mixed.txt"]);
+    f.git(&["commit", "-m", "repeated base"]);
+    let staged = base.replacen("same original", "same replacement", 1);
+    fs::write(f.repo.join("mixed.txt"), &staged).unwrap();
+    f.git(&["add", "mixed.txt"]);
+    fs::write(
+        f.repo.join("mixed.txt"),
+        staged.replace("same original", "same replacement"),
+    )
+    .unwrap();
+    f.session.set_changelist_mode(true);
+    f.session.refresh().unwrap();
+    let view = f.view();
+    assert_eq!(
+        view.items
+            .iter()
+            .filter(|item| item.path == "mixed.txt" && !item.stale)
+            .count(),
+        2
+    );
+    assert!(view
+        .items
+        .iter()
+        .all(|item| item.source == Some(ChangesKind::Changelist)));
+    let rows = f
+        .session
+        .rows(
+            "mixed.txt",
+            ChangesKind::Changelist,
+            ViewMode::Unified,
+            0,
+            100,
+        )
+        .unwrap();
+    let positions = rows
+        .rows
+        .iter()
+        .filter(|row| row.text.as_deref() == Some("same original"))
+        .filter_map(|row| row.old_line)
+        .collect::<Vec<_>>();
+    assert_eq!(positions, vec![4, 30]);
+}
+#[test]
+fn ordinary_mode_keeps_original_three_group_snapshot() {
+    use revia_lib::git::status::ChangesKind;
+    let f = Fixture::new();
+    f.staged_other();
+    let before = f.session.refresh().unwrap();
+    assert!(before
+        .entries
+        .iter()
+        .all(|entry| entry.changes != ChangesKind::Changelist));
+    let index = f.git(&["ls-files", "--stage"]);
+    f.session.set_changelist_mode(true);
+    assert!(f
+        .session
+        .refresh()
+        .unwrap()
+        .entries
+        .iter()
+        .any(|entry| entry.changes == ChangesKind::Changelist));
+    f.session.set_changelist_mode(false);
+    let after = f.session.refresh().unwrap();
+    assert!(after
+        .entries
+        .iter()
+        .all(|entry| entry.changes != ChangesKind::Changelist));
+    assert_eq!(f.git(&["ls-files", "--stage"]), index);
+}

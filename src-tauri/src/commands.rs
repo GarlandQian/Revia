@@ -1056,6 +1056,8 @@ pub async fn list_changes(
 ) -> Result<ChangesSnapshot> {
     log_measure("list_changes 收到");
     let session = state.session(&request.worktree_id)?;
+    let changelist_mode = state.registry.lock().map_err(|_| AppError::coded(ErrorKind::Internal,"errors.m7.taskFailed","后台任务失败：{error}",&[("error","settings lock".into())]))?.settings().changelist_mode;
+    session.set_changelist_mode(changelist_mode);
     log_measure("list_changes 会话就绪，开始读取");
     let result = tauri::async_runtime::spawn_blocking(move || session.refresh())
         .await

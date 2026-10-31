@@ -8,9 +8,11 @@ interface TreeSelectionOptions {
   snapshotRef: RefObject<ChangesSnapshot | null>;
   selectedRef: RefObject<Pick<ChangeEntry, "path" | "changes"> | null>;
   openEntry: (entry: ChangeEntry) => void;
+  order?: (snapshot: ChangesSnapshot) => ChangeEntry[];
 }
 
-export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry }: TreeSelectionOptions) {
+export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry, order }: TreeSelectionOptions) {
+  const orderOf = useCallback((current: ChangesSnapshot) => order ? order(current) : treeOrder(current), [order]);
   const [treeSelection, setTreeSelection] = useState<Set<string>>(new Set());
   const treeSelectionRef = useRef(treeSelection);
   treeSelectionRef.current = treeSelection;
@@ -30,7 +32,7 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
       );
       return next.size === current.size ? current : next;
     });
-  }, [snapshot]);
+  }, [orderOf, snapshot]);
 
   const followActiveEntry = useCallback((entry: ChangeEntry, replace: boolean) => {
     const key = entryKey(entry);
@@ -42,22 +44,22 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
       setTreeSelection((current) => (current.has(key) ? current : new Set([key])));
       setSelectionAnchor((current) => current ?? key);
     }
-  }, []);
+  }, [orderOf, ]);
 
   const expandToSelection = useCallback((entry: ChangeEntry): ChangeEntry[] => {
     const selection = treeSelectionRef.current;
     const current = snapshotRef.current;
     if (selection.size <= 1 || !selection.has(entryKey(entry)) || !current) return [entry];
-    return treeOrder(current).filter(
+    return orderOf(current).filter(
       (item) => selection.has(entryKey(item)) && item.changes === entry.changes,
     );
-  }, [snapshotRef]);
+  }, [orderOf, snapshotRef]);
 
   const treeSelectedEntries = useCallback((): ChangeEntry[] => {
     const current = snapshotRef.current;
     if (!current || treeSelectionRef.current.size === 0) return [];
-    return treeOrder(current).filter((entry) => treeSelectionRef.current.has(entryKey(entry)));
-  }, [snapshotRef]);
+    return orderOf(current).filter((entry) => treeSelectionRef.current.has(entryKey(entry)));
+  }, [orderOf, snapshotRef]);
 
   const activateTreeEntry = useCallback((entry: ChangeEntry, modifiers: { toggle: boolean; extend: boolean }) => {
     const key = entryKey(entry);
@@ -65,7 +67,7 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
       if (modifiers.extend) {
         const snapshotNow = snapshotRef.current;
         if (!snapshotNow) return new Set([key]);
-        const order = treeOrder(snapshotNow);
+        const order = orderOf(snapshotNow);
         const anchor = selectionAnchorRef.current ?? key;
         const from = order.findIndex((candidate) => entryKey(candidate) === anchor);
         const to = order.findIndex((candidate) => entryKey(candidate) === key);
@@ -84,12 +86,12 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
     if (!modifiers.extend) setSelectionAnchor(key);
     else setSelectionAnchor((previous) => previous ?? key);
     openEntry(entry);
-  }, [openEntry, snapshotRef]);
+  }, [orderOf, openEntry, snapshotRef]);
 
   const moveTreeSelection = useCallback((direction: 1 | -1, extend: boolean) => {
     const snapshotNow = snapshotRef.current;
     if (!snapshotNow) return;
-    const order = treeOrder(snapshotNow);
+    const order = orderOf(snapshotNow);
     if (order.length === 0) return;
     const currentKey = selectedRef.current ? entryKey(selectedRef.current) : null;
     const index = currentKey ? order.findIndex((entry) => entryKey(entry) === currentKey) : -1;
@@ -97,7 +99,8 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
     const next = order[nextIndex];
     if (!next) return;
     const key = entryKey(next);
-    setGroupOpen((current) => (current[next.changes] ? current : { ...current, [next.changes]: true }));
+    const group = next.changes === "changelist" ? "unstaged" : next.changes;
+    setGroupOpen((current) => (current[group] ? current : { ...current, [group]: true }));
     if (extend) {
       const anchor = selectionAnchorRef.current ?? currentKey ?? key;
       const from = order.findIndex((entry) => entryKey(entry) === anchor);
@@ -110,18 +113,18 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
       setSelectionAnchor(key);
     }
     openEntry(next);
-  }, [openEntry, selectedRef, snapshotRef]);
+  }, [orderOf, openEntry, selectedRef, snapshotRef]);
 
   const selectAllEntries = useCallback(() => {
     const snapshotNow = snapshotRef.current;
     if (!snapshotNow) return;
-    setTreeSelection(new Set(treeOrder(snapshotNow).map(entryKey)));
+    setTreeSelection(new Set(orderOf(snapshotNow).map(entryKey)));
     setGroupOpen({ conflicts: true, staged: true, unstaged: true, untracked: true });
-  }, [snapshotRef]);
+  }, [orderOf, snapshotRef]);
 
   const toggleGroup = useCallback((kind: TreeGroupKey) => {
     setGroupOpen((current) => ({ ...current, [kind]: !current[kind] }));
-  }, []);
+  }, [orderOf, ]);
 
   const toggleDir = useCallback((dir: string) => {
     setDirOpen((current) => {
@@ -130,7 +133,7 @@ export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry
       else next.add(dir);
       return next;
     });
-  }, []);
+  }, [orderOf, ]);
 
   return {
     treeSelection, groupOpen, setGroupOpen, dirOpen, followActiveEntry,
