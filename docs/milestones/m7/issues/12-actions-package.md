@@ -110,3 +110,10 @@ S124强制验签，任务12“补准确的…更新签名…说明”。`docs/re
 最终 codex-final-node-04 的 8 个相关生产模块入口 98 项通过、0 skipped；codex-final-frontend-build-02、codex-final-lint-03、codex-final-x18n-02 exit0，翻译 0 errors / 76 既有 unused-key warnings。原 updater-lifecycle-node-01 发现失败意图仍保留，修正后共享回归通过。另一次 codex-final-node-03 误用通配符，包含需要专用 fixture 参数的旧 M6 脚本，494 通过 / 8 失败、exit1；原件保留，按正确相关入口重跑通过，没有改旧 M6 范围以消除该调用错误。源码散列、精确 argv、真实 exit、分流 stdout/stderr 与全部失败原件均保留；生成绑定只清理本次空白，受影响前端检查在清理后执行。
 
 update package 新 3 项实测下载验签、保存、关闭 fixture HTTP、新 updater 离线恢复并实际安装，只替换独占 fixture .app；另 3 项渠道与 1 项公开旧签名元数据回归通过。含坏包、版本 / 公钥 / 渠道篡改及原子落盘失败。上述均不代表真实 Revia 桌面更新、真实账号 / 钥匙串、发布 CI 或正式签名来源已验。任务13仍缺 Rebased 1.1.22 既有暂存内容真实桌面观察，14最终桌面受阻；不合 main、不删除 worktree、不删除监控。
+
+
+### 2026-10-31：发布包 GitHub App Client ID 接线
+
+按用户提供的发布接线说明，`release.yml` 在 build-macos 整个任务环境注入公开仓库变量 `REVIA_GITHUB_CLIENT_ID`，前置检查在其缺失或为空时直接失败。Rust现有运行时/编译时读取链路已核对，无需写死Client ID或使用client secret。`docs/release.md`同步变量表和缺失处理。只读GitHub元数据确认两个仓库变量均非空、两个签名Secret名称存在；没有读取密钥值或修改远端设置。
+
+`release-client-id-config-01`真实exit0：生产YAML逐字复制到独占fixture解析，确认任务级注入与检查顺序；bash语法通过，正常配置通过，Client ID空/缺失及原有私钥/公钥/地址缺失五个拒绝场景符合预期，原stdout/stderr和各exit保留。全部输入为fixture占位值，未签名、构建安装包、运行Actions或发布；不把仓库变量存在等同于GitHub登录/更新安装验收通过。用户另由Claude处理Liquid Glass，本增量不修改其UI工作。

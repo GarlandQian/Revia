@@ -54,10 +54,11 @@ RELEASE_TAG=v0.1.0 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-ve
 | `TAURI_SIGNING_PRIVATE_KEY` | secret | minisign 私钥文件全文 |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | secret | 私钥口令（生成时留空则填空字符串） |
 | `REVIA_UPDATE_PUBKEY` | **variable** | minisign 公钥全文 |
+| `REVIA_GITHUB_CLIENT_ID` | **variable** | GitHub App 的公开 Client ID（设备码登录） |
 
 公钥是公开信息，用 variable 便于在日志里核对；私钥与口令只用 secret。工作流不会打印私钥内容。
 
-GitHub App（设备码登录）需要单独的 `REVIA_GITHUB_CLIENT_ID`（见 `docs/adr/` 与任务 06）；它不是发布签名的一部分，但发布构建要带上，否则设备码登录在正式包里不可用。
+GitHub App（设备码登录）使用公开的 `REVIA_GITHUB_CLIENT_ID`（见 `docs/adr/` 与任务 06）。`release.yml` 从同名仓库 variable 注入整个构建任务，使 Rust 在编译时读取；它为空时，发布前置检查直接失败，避免生成无法设备码登录的安装包。它不属于发布签名私钥，不使用 client secret。
 
 ## 发布流程
 

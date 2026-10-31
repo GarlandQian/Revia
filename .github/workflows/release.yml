@@ -50,6 +50,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       REVIA_UPDATE_PUBKEY: ${{ vars.REVIA_UPDATE_PUBKEY }}
+      REVIA_GITHUB_CLIENT_ID: ${{ vars.REVIA_GITHUB_CLIENT_ID }}
       REVIA_UPDATE_ENDPOINT: ${{ needs.verify-version.outputs.endpoint }}
       RELEASE_TAG: ${{ github.ref_name }}
       RELEASE_VERSION: ${{ needs.verify-version.outputs.version }}
@@ -101,6 +102,10 @@ jobs:
           fi
           if [ -z "${REVIA_UPDATE_ENDPOINT}" ]; then
             echo "::error::Update endpoint could not be derived from the tag."
+            exit 1
+          fi
+          if [ -z "${REVIA_GITHUB_CLIENT_ID}" ]; then
+            echo "::error::REVIA_GITHUB_CLIENT_ID (repository variable) is not set; refusing to build a package without GitHub device login."
             exit 1
           fi
 
