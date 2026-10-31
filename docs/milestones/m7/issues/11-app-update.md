@@ -82,3 +82,18 @@ S122“默认稳定版；用户主动开启预发布”；S126“公开后才进
 渠道：release.yml:158所有产物URL固定releases/latest/download；168把stable manifest原样复制为latest-prerelease.json。稳定构建开启开关后仅替换文件名(update.rs:250)，仍读latest稳定Release里的同一版本，不能发现后续beta。beta构建endpoint又固定到构建时tag(check-release-version:58)，不能发现后续beta；beta清单的安装URL却仍指latest稳定资产，可能404或下载不相符版本。`fetch_update:327`下载/安装还不应用开关选择。GitHub官方明确draft/prerelease不可作为latest，已从[官方Release API文档](https://docs.github.com/en/rest/releases/releases#create-a-release)核对make_latest；原件github-release-official.txt。Grok读取GitHub页因网络错误失败，web.run open也不支持当前模型，改可用search_service原页读取完成。没有运行Actions或发布。
 
 </details>
+
+
+### Codex 直接修复 F13/F22 — 2026-10-31
+
+已下载的真实包字节、散列和签名清单保存在应用数据目录；安装用锁定 Tauri updater 2.14.1 的 restore_update / verify 恢复并再次验签，直接安装保存的字节，不重新下载。签名必须绑定版本，旧的无版本签名不可恢复。公共状态补 downloadedVersion / restartRequired，历史回执不遮住新版本，重启后的旧回执不重复要求重启。下载回包同步全局状态，重新打开面板的较早读取不能覆盖操作结果。
+
+安装和重启分别进入生产 CloseDriver / WriteGuard / CloseCoordinator，同步处理未保存编辑、Git 写入 / 待核对和全局终端；取消不安装、不重启。合并编辑仍归原 CodeMirror 实例，未应用内容先通过原有应用 / 取消入口处理；生命周期保留窗口与退出保护。安装成功回到应用，重启需要独立明确操作；失败取消本次更新意图，不自动重发。
+
+渠道从构建配置绑定仓库的公开 Releases 完整分页中选取最高合适 semver；默认稳定，主动开启才含预发布，草稿排除。两类客户端使用同一仓库发现入口，再读取所选 tag 的清单；包 URL 固定到自身 tag，beta 客户端不再锁在自身旧标签。发布覆盖配置要求 requireSignedVersion，Tauri CLI 2.12.3 本机帮助确认 build 自动绑定签名版本。未读取真实私钥、未运行 Actions、未发布；docs/release.md 已同步新流程。
+
+最终原件在批次 codex-checks：Rust 全部 23 个 integration targets 及 lib/main 已逐目标完成；首轮 codex-final-rust-01 真实 exit101，故不能称单轮全过。其前半 targets 通过，GitHub auth fixture accept 后读取 WouldBlock 导致失败；仅给隔离 HTTP fixture 的 accepted socket 明确 blocking，未改产品网络实现。codex-final-rust-continuation-01 后被用户中断，command 无真实 exit（保留 null 与 interruption.json），不得补造退出码。continuation-02 的剩余 11 targets exit0；另为 auth / checkout 补独立真实 exit。codex-final-doc-01 exit0、实际无 doc 用例。discard_recovery 保留原 1 ignored；不重复叠加授权子进程内外计数。
+
+最终 codex-final-node-04 的 8 个相关生产模块入口 98 项通过、0 skipped；codex-final-frontend-build-02、codex-final-lint-03、codex-final-x18n-02 exit0，翻译 0 errors / 76 既有 unused-key warnings。原 updater-lifecycle-node-01 发现失败意图仍保留，修正后共享回归通过。另一次 codex-final-node-03 误用通配符，包含需要专用 fixture 参数的旧 M6 脚本，494 通过 / 8 失败、exit1；原件保留，按正确相关入口重跑通过，没有改旧 M6 范围以消除该调用错误。源码散列、精确 argv、真实 exit、分流 stdout/stderr 与全部失败原件均保留；生成绑定只清理本次空白，受影响前端检查在清理后执行。
+
+update package 新 3 项实测下载验签、保存、关闭 fixture HTTP、新 updater 离线恢复并实际安装，只替换独占 fixture .app；另 3 项渠道与 1 项公开旧签名元数据回归通过。含坏包、版本 / 公钥 / 渠道篡改及原子落盘失败。上述均不代表真实 Revia 桌面更新、真实账号 / 钥匙串、发布 CI 或正式签名来源已验。任务13仍缺 Rebased 1.1.22 既有暂存内容真实桌面观察，14最终桌面受阻；不合 main、不删除 worktree、不删除监控。

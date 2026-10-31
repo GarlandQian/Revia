@@ -46,6 +46,7 @@ fn server(manifest: serde_json::Value) -> (String, std::thread::JoinHandle<()>) 
                 }
                 Err(error) => panic!("fixture accept: {error}"),
             };
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
@@ -72,7 +73,7 @@ fn server(manifest: serde_json::Value) -> (String, std::thread::JoinHandle<()>) 
     (address, handle)
 }
 #[test]
-fn generated_metadata_passes_locked_plugin_signature_verification() {
+fn generated_legacy_metadata_is_verified_but_release_policy_requires_signed_version() {
     let root = tempfile::tempdir().unwrap();
     let fixture = fs::canonicalize(root.path()).unwrap();
     eprintln!("updater metadata fixture: {}", fixture.display());
@@ -164,7 +165,10 @@ fn generated_metadata_passes_locked_plugin_signature_verification() {
             .unwrap();
         tauri::async_runtime::block_on(async {
             let update = updater.check().await.unwrap().expect("fixture update");
-            assert_eq!(update.download(|_, _| {}, || {}).await.unwrap(), b"test");
+            assert!(matches!(
+                update.download(|_, _| {}, || {}).await.unwrap_err(),
+                tauri_plugin_updater::Error::MissingSignedVersion
+            ));
         });
         served.join().unwrap();
     }

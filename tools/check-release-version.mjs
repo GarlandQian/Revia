@@ -48,13 +48,10 @@ if (unique.size !== 1) {
 }
 if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(tagVersion)) fail(`Tag ${tag} is not a semver version`);
 
-// F22：两个渠道各有一份清单——stable 用 latest.json，prerelease 用 latest-prerelease.json。
-// 两个文件都在每次发布时生成并上传；客户端按“预发布渠道开关”选择请求哪份。
+// F22：构建始终绑定仓库发现入口；客户端从公开Releases选择渠道与版本，
+// 再请求该版本标签自己的latest.json，beta构建也能发现后续版本。
 const channel = tagVersion.includes("-") ? "prerelease" : "stable";
-const endpoint =
-  channel === "stable"
-    ? `https://github.com/${repository}/releases/latest/download/latest.json`
-    : `https://github.com/${repository}/releases/download/${tag}/latest-prerelease.json`;
+const endpoint = `https://github.com/${repository}/releases/latest/download/latest.json`;
 
 const outputs = { version: tagVersion, channel, endpoint };
 const githubOutput = process.env.GITHUB_OUTPUT;

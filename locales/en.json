@@ -920,11 +920,16 @@
       "githubPrCheckoutUnverified": "PR checkout did not complete. Check the branch and working tree; it will not be retried automatically.",
       "githubProtectionIncomplete": "The branch protection response was incomplete. The previous result was kept.",
       "githubDraftTargetChanged": "The draft account, remote, repository, or commit has changed. The original draft was kept.",
-      "githubReviewCleanupFailed": "The content was sent, but local recording failed. Verify the remote result before taking another action."
+      "githubReviewCleanupFailed": "The content was sent, but local recording failed. Verify the remote result before taking another action.",
+      "updatePackageInvalid": "The downloaded package is incomplete, has a different version, or has an invalid signature. Download it again.",
+      "updateInstallNeedsVerification": "The update installation did not complete. Verify the application state before taking another action: {error}",
+      "updateReleaseIncomplete": "The release information is incomplete or has changed. Check for updates again; the previous state was kept.",
+      "updateInstallRecordFailed": "The update was installed, but the local receipt could not be written. Verify the application state first."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
-      "installBlockedTerminal": "A terminal session is still running — close it before installing the update"
+      "installBlockedTerminal": "A terminal session is still running — close it before installing the update",
+      "mergeEditsPending": "The merge editor has unapplied changes. Apply or cancel the merge edits before installing, restarting, or quitting."
     }
   },
   "app": {
@@ -2288,7 +2293,12 @@
     "bannerOpen": "View",
     "downloadConfirm": "Download update",
     "downloading": "Downloading…",
-    "installNow": "Install (confirm to restart)"
+    "installNow": "Install (confirm to restart)",
+    "lifecycleTitle": "Finish current work before installing or restarting",
+    "lifecycleExplain": "Writes or results awaiting verification remain. Wait for them and verify the results to continue, or stay in the app to cancel this request.",
+    "waitInstall": "Wait, then install the update",
+    "waitRestart": "Wait, then restart",
+    "downloaded": "Downloaded and verified; ready to install"
   },
   "shortcuts": {
     "actions": {

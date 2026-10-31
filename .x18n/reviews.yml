@@ -359,16 +359,24 @@ sources:
     en: 58c3c5145185a
   errors.m7.updateInstallFailed:
     en: 1c1b3b17b5849
+  errors.m7.updateInstallNeedsVerification:
+    en: a3dd9ab008f46
+  errors.m7.updateInstallRecordFailed:
+    en: d263039e36eea
   errors.m7.updateNotConfigured:
     en: 17091cc0e1cbe4
   errors.m7.updateNothingToInstall:
     en: a1a680551b3e8
+  errors.m7.updatePackageInvalid:
+    en: ce179d3a09a27
   errors.m7.updateReasonNoEndpoints:
     en: 1e56796a62c882
   errors.m7.updateReasonNoPlugin:
     en: 176dbf09a7b8cc
   errors.m7.updateReasonNoPubkey:
     en: ce5828c316391
+  errors.m7.updateReleaseIncomplete:
+    en: 1680406ace53ef
   errors.m7.writeTargetDirectory:
     en: 14024a8970d78b
   errors.nativeMenu.unavailable:
@@ -381,6 +389,8 @@ sources:
     en: 68e91373c418e
   errors.update.installBlockedTerminal:
     en: 464d3d8910a8f
+  errors.update.mergeEditsPending:
+    en: 1d86d124f02a21
   github.account:
     en: 10910fba2d05e1
   github.checkout:
@@ -817,6 +827,8 @@ sources:
     en: 13e26c66d979c9
   update.downloadConfirm:
     en: 1f2bc1089753c4
+  update.downloaded:
+    en: 1c183afe57b480
   update.downloading:
     en: 10233493f816b9
   update.install:
@@ -827,6 +839,10 @@ sources:
     en: 136e936b41f521
   update.lastChecked:
     en: 1701ce665257c
+  update.lifecycleExplain:
+    en: 15a0309945c4ba
+  update.lifecycleTitle:
+    en: 1fe863298355af
   update.modeAutomatic:
     en: 1dada9964203c5
   update.modeManual:
@@ -843,6 +859,10 @@ sources:
     en: 10dc14fbf166da
   update.upToDate:
     en: 1ae7652b9554ac
+  update.waitInstall:
+    en: 83916def7d88a
+  update.waitRestart:
+    en: 1d73d7a2d6375d
   workspace.edit:
     en: 3f60d96ed3c09
   workspace.editDirty:

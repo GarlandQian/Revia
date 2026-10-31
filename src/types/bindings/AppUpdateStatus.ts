@@ -6,12 +6,12 @@ import type { UpdateReceipt } from "./UpdateReceipt";
 /**
  * 更新状态。
  */
-export type AppUpdateStatus = { 
+export type AppUpdateStatus = {
 /**
  * 是否配置了更新通道（公钥与接口）。
  */
-configured: boolean, 
+configured: boolean,
 /**
  * 未配置时的原因（界面直接显示）。
  */
-unconfiguredReason: string | null, mode: AppUpdateMode, currentVersion: string, lastCheckedAtMs: number | null, available: AvailableUpdate | null, receipt: UpdateReceipt | null, };
+unconfiguredReason: string | null, mode: AppUpdateMode, currentVersion: string, lastCheckedAtMs: number | null, available: AvailableUpdate | null, receipt: UpdateReceipt | null, downloadedVersion: string | null, restartRequired: boolean, };

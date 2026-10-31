@@ -14,6 +14,7 @@ import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { updateReasonText } from "@/lib/i18n/text";
+import { updateCandidate } from "@/lib/m7/updateState";
 import { m7, onM7Events } from "@/lib/m7/api";
 
 export interface UpdatePanelProps {
@@ -23,19 +24,22 @@ export interface UpdatePanelProps {
   onStatusChange: (status: AppUpdateStatus) => void;
   onModeChange: (mode: AppUpdateMode) => void;
   /** 安装前门禁：落盘草稿、结束终端；返回 false 表示用户取消。 */
-  onBeforeInstall: () => Promise<boolean>;
+  onInstall: () => Promise<AppUpdateStatus | null>;
+  onRestart: () => Promise<AppUpdateStatus | null>;
   onClose: () => void;
 }
 
-export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, onBeforeInstall, onClose }: UpdatePanelProps) {
+export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, onInstall, onRestart, onClose }: UpdatePanelProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [progress, setProgress] = useState<{ downloaded: number; total: number | null } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"check" | "download" | "install" | "restart" | null>(null);
+  const busy = operation !== null;
+  const requestEpoch = useRef(0);
+  const statusCallback = useRef(onStatusChange);
+  statusCallback.current = onStatusChange;
+  const candidate = updateCandidate(status);
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // F13：检查(idle/available) → 确认下载 → 已下载待安装 → 已安装待重启。
-  const [phase, setPhase] = useState<"idle" | "available" | "downloading" | "downloaded" | "installed">("idle");
-  const [installedVersion, setInstalledVersion] = useState<string | null>(null);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -46,16 +50,12 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
 
   useEffect(() => {
     if (!open) return;
-    setProgress(null);
-    setError(null);
-    setNotice(null);
-    void m7.updateStatus().then((next) => {
-      onStatusChange(next);
-      // 已装过的版本在状态里：重启入口直接可达，不再依赖 available 分支。
-      setInstalledVersion(next.receipt?.version ?? null);
-      setPhase(next.available ? "available" : "idle");
-    }).catch(() => undefined);
-  }, [onStatusChange, open]);
+    const epoch = ++requestEpoch.current;
+    setProgress(null); setError(null); setNotice(null);
+    void m7.updateStatus().then((next) => { if (epoch === requestEpoch.current) statusCallback.current(next); })
+      .catch((caught) => { if (epoch === requestEpoch.current) setError(toAppError(caught)); });
+    return () => { requestEpoch.current++; };
+  }, [open]);
 
   useEffect(() => {
     return onM7Events({
@@ -65,65 +65,47 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
 
   if (!open) return null;
 
+  const publishStatus = (next: AppUpdateStatus) => {
+    // 同一个应用的操作完成结果比其间打开面板的旧status读取更新。
+    requestEpoch.current++; statusCallback.current(next);
+  };
   const check = async (force: boolean) => {
-    setBusy(true);
-    try {
-      const next = await m7.updateCheck(force);
-      onStatusChange(next);
-      setError(null);
-    } catch (caught) {
-      setError(toAppError(caught));
-    } finally {
-      setBusy(false);
-    }
+    const epoch = ++requestEpoch.current; setOperation("check");
+    try { const next = await m7.updateCheck(force); publishStatus(next); setError(null); }
+    catch (caught) { if (epoch === requestEpoch.current) setError(toAppError(caught)); }
+    finally { setOperation(null); }
   };
-
-  // F13：检查 → 用户确认下载 → 已下载待安装 → 安装 → 再确认重启，状态分开。
   const install = async () => {
-    setBusy(true);
-    setError(null);
+    const epoch = ++requestEpoch.current; setError(null);
     try {
-      if (!(await onBeforeInstall())) return;
-      if (phase === "available") {
-        // 第一步：用户确认后才下载（不落盘安装）。
-        await m7.updateDownload();
-        setPhase("downloaded");
-        setNotice(null);
-        return;
+      if (!candidate.downloaded) {
+        setOperation("download");
+        const next = await m7.updateDownload();
+        publishStatus(next); setNotice(null);
+      } else {
+        setOperation("install");
+        const next = await onInstall();
+        if (next) { publishStatus(next); setNotice(t("update.installed", { version: next.receipt?.version ?? "" })); }
       }
-      if (phase === "downloaded") {
-        // 第二步：用户再确认安装。
-        const next = await m7.updateInstall();
-        onStatusChange(next);
-        setPhase("installed");
-        setNotice(t("update.installed", { version: next.receipt?.version ?? "" }));
-        return;
-      }
-    } catch (caught) {
-      setError(toAppError(caught));
-      setPhase(status?.available ? "available" : "idle");
-    } finally {
-      setBusy(false);
-    }
+    } catch (caught) { if (epoch === requestEpoch.current) setError(toAppError(caught)); }
+    finally { setOperation(null); }
   };
-
   const restart = async () => {
-    try {
-      await m7.updateRestart();
-    } catch (caught) {
-      setError(toAppError(caught));
-    }
+    const epoch = ++requestEpoch.current; setOperation("restart");
+    try { await onRestart(); }
+    catch (caught) { if (epoch === requestEpoch.current) setError(toAppError(caught)); }
+    finally { setOperation(null); }
   };
 
   const percent = progress && progress.total && progress.total > 0 ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100)) : null;
 
   return (
-    <dialog ref={ref} className="app-dialog glass-isolate w-[min(560px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]" onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    <dialog ref={ref} className="app-dialog glass-isolate w-[min(560px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]" onCancel={(event) => { event.preventDefault(); if (operation !== "install" && operation !== "restart") onClose(); }}>
       <GlassLayer variant="popover" />
       <div className="flex items-center gap-2 border-b border-panel-border px-3 py-2">
         <Codicon name="cloud-download" size={15} />
         <h2 className="flex-1 text-[13.5px] font-semibold">{t("update.title")}</h2>
-        <button type="button" className="icon-action size-[22px]" aria-label={t("common.close")} onClick={onClose}>
+        <button type="button" className="icon-action size-[22px]" aria-label={t("common.close")} disabled={operation === "install" || operation === "restart"} onClick={onClose}>
           <Codicon name="close" size={14} />
         </button>
       </div>
@@ -149,34 +131,25 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
             {busy ? t("update.checking") : t("update.check")}
           </button>
         </div>
-        {installedVersion ? (
-          // F13：安装成功后重启入口可达（不再嵌在 available 分支里）。
+        {candidate.restartVersion ? (
           <div className="space-y-2 rounded border border-panel-border p-2">
-            <p className="font-semibold">{t("update.installed", { version: installedVersion })}</p>
-            <button type="button" className="toolbar-widget h-7 px-3 font-semibold" onClick={() => void restart()}>
-              {t("update.restart")}
-            </button>
+            <p className="font-semibold">{t("update.installed", { version: candidate.restartVersion })}</p>
+            <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy} onClick={() => void restart()}>{t("update.restart")}</button>
           </div>
-        ) : status?.available ? (
+        ) : null}
+        {candidate.version ? (
           <div className="space-y-2 rounded border border-panel-border p-2">
-            <p className="font-semibold">{t("update.available", { version: status.available.version })}</p>
-            {status.available.publishedAt ? <p className="text-descriptionforeground">{t("update.published", { time: status.available.publishedAt })}</p> : null}
-            {status.available.notes ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-[11.5px]">{status.available.notes}</pre> : null}
-            {percent !== null ? (
-              <div className="h-1.5 w-full overflow-hidden rounded bg-[var(--progressbar-background)]">
-                <div className="h-full bg-[var(--progressbar-foreground)]" style={{ width: `${percent}%` }} />
-              </div>
-            ) : null}
+            <p className="font-semibold">{t("update.available", { version: candidate.version })}</p>
+            {status?.available?.publishedAt ? <p className="text-descriptionforeground">{t("update.published", { time: status.available.publishedAt })}</p> : null}
+            {status?.available?.notes ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-[11.5px]">{status.available.notes}</pre> : null}
+            {candidate.downloaded ? <p>{t("update.downloaded")}</p> : null}
+            {percent !== null && operation === "download" ? <div className="h-1.5 w-full overflow-hidden rounded bg-[var(--progressbar-background)]"><div className="h-full bg-[var(--progressbar-foreground)]" style={{ width: `${percent}%` }} /></div> : null}
             <div className="flex items-center gap-2">
-              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy} onClick={() => void install()}>
-                {phase === "downloaded" ? t("update.installNow") : t("update.downloadConfirm")}
-              </button>
-              {phase === "downloading" ? <span className="text-descriptionforeground">{t("update.downloading")}</span> : null}
+              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy || status?.restartRequired || error?.kind === "needsVerification"} onClick={() => void install()}>{candidate.downloaded ? t("update.installNow") : t("update.downloadConfirm")}</button>
+              {operation === "download" ? <span className="text-descriptionforeground">{t("update.downloading")}</span> : null}
             </div>
           </div>
-        ) : (
-          <p className="text-descriptionforeground">{t("update.upToDate")}</p>
-        )}
+        ) : !candidate.restartVersion ? <p className="text-descriptionforeground">{t("update.upToDate")}</p> : null}
         {status?.lastCheckedAtMs ? (
           <p className="text-[11.5px] text-descriptionforeground">{t("update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}</p>
         ) : null}

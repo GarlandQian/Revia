@@ -6,7 +6,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { CommitWarning } from "@/types/bindings/CommitWarning";
-import { messages } from "@/lib/i18n/index";
+import { messages, t } from "@/lib/i18n/index";
 import { commitWarningText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
 import { GlassLayer } from "@/features/m7/glass/GlassLayer";
@@ -145,7 +145,7 @@ export function CloseRequestDialog({
   onStay,
   onPendingReviewed,
 }: {
-  intent: "close" | "exit";
+  intent: "close" | "exit" | "installUpdate" | "restartUpdate";
   writing: string[];
   pending: string[];
   onWait: () => void;
@@ -154,9 +154,9 @@ export function CloseRequestDialog({
 }) {
   const hasPending = pending.length > 0;
   return (
-    <Modal title={hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay} width={460}>
+    <Modal title={intent === "installUpdate" || intent === "restartUpdate" ? t("update.lifecycleTitle") : hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay} width={460}>
       <div className="space-y-3 text-[12.5px]">
-        <p className="leading-relaxed">{hasPending ? messages.close.pendingExplain : messages.close.explain}</p>
+        <p className="leading-relaxed">{intent === "installUpdate" || intent === "restartUpdate" ? t("update.lifecycleExplain") : hasPending ? messages.close.pendingExplain : messages.close.explain}</p>
         {writing.length > 0 ? (
           <p className="break-all text-descriptionforeground">{messages.close.writing(writing.length)}</p>
         ) : null}
@@ -176,7 +176,7 @@ export function CloseRequestDialog({
           </button>
         ) : (
           <button type="button" className="rounded-[4px] bg-primary px-3 py-1 text-primary-foreground" onClick={onWait}>
-            {intent === "exit" ? messages.close.waitExit : messages.close.wait}
+            {intent === "installUpdate" ? t("update.waitInstall") : intent === "restartUpdate" ? t("update.waitRestart") : intent === "exit" ? messages.close.waitExit : messages.close.wait}
           </button>
         )}
       </div>

@@ -1312,11 +1312,16 @@
       "githubPrCheckoutUnverified": "PR 检出未完成，请核对分支与工作区；不会自动重试",
       "githubProtectionIncomplete": "分支保护响应不完整，已保留上次结果",
       "githubDraftTargetChanged": "草稿的账号、远端、仓库或提交版本已变化；已保留原稿。",
-      "githubReviewCleanupFailed": "内容已发送，但本地记录失败。请先核对远端结果，再决定下一步。"
+      "githubReviewCleanupFailed": "内容已发送，但本地记录失败。请先核对远端结果，再决定下一步。",
+      "updatePackageInvalid": "已下载更新包不完整、版本不匹配或签名无效。请重新下载。",
+      "updateInstallNeedsVerification": "安装更新未完成，请核对应用状态后再操作：{error}",
+      "updateReleaseIncomplete": "更新发布信息不完整或已变化。请重新检查更新，上次状态已保留。",
+      "updateInstallRecordFailed": "更新已安装，但本地回执写入失败。请先核对应用状态。"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
-      "installBlockedTerminal": "有运行中的终端会话，请先关闭终端再安装更新"
+      "installBlockedTerminal": "有运行中的终端会话，请先关闭终端再安装更新",
+      "mergeEditsPending": "合并编辑仍有未应用的修改。请先应用或取消合并编辑，再继续安装、重启或退出。"
     }
   },
   "commit": {
@@ -2288,7 +2293,12 @@
     "bannerOpen": "查看",
     "downloadConfirm": "下载更新",
     "downloading": "正在下载…",
-    "installNow": "安装并重启前确认"
+    "installNow": "安装并重启前确认",
+    "lifecycleTitle": "安装或重启前处理当前工作",
+    "lifecycleExplain": "当前仍有写入或待核对结果。可等待完成并核对后继续，或留在应用并取消本次请求。",
+    "waitInstall": "等待完成后安装更新",
+    "waitRestart": "等待完成后重启",
+    "downloaded": "已下载并校验，等待安装"
   },
   "shortcuts": {
     "actions": {

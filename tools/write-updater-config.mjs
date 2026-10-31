@@ -69,6 +69,7 @@ const overlay = {
     updater: {
       pubkey,
       endpoints: [endpoint],
+      requireSignedVersion: true,
       // 稳定版默认；预发布由标签里的后缀决定，用户仍需在设置里主动开启。
       windows: { installMode: "passive" },
     },

@@ -9,7 +9,7 @@
 | `.github/workflows/compile-check.yml` | 推送 `main` / `m2` / `m3` / `v*` 标签、手动 | 类型检查、lint、前端构建、Rust 测试、release 编译；macOS arm64 与 Windows x64 各一份 |
 | `.github/workflows/release.yml` | 推送 `v*` 标签 | 校验版本 → 构建 macOS Apple Silicon 的 `.app` / `.dmg` 与 updater 产物 → 上传到**草稿** Release |
 
-`release.yml` 只做草稿：`draft: true`。公开草稿是维护者的手动动作，之后 `latest.json` 才会被更新检查读到。
+`release.yml` 只做草稿：`draft: true`。公开草稿是维护者的手动动作。客户端读取构建时配置仓库的公开 Releases 完整分页，在用户选择的渠道中选取较新的最高语义版本，再读取该标签自己的 `latest.json`；草稿不参与更新。
 
 ## 版本必须对齐
 
@@ -24,18 +24,18 @@ RELEASE_TAG=v0.1.0 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-ve
 
 渠道由标签后缀决定：
 
-| 标签 | 渠道 | 更新地址 |
+| 标签 | 发布渠道 | 该版本清单与安装包 |
 | --- | --- | --- |
-| `v0.1.0` | stable | `https://github.com/<owner>/<repo>/releases/latest/download/latest.json` |
-| `v0.1.0-beta.1` | prerelease | `https://github.com/<owner>/<repo>/releases/download/v0.1.0-beta.1/latest.json` |
+| `v0.1.0` | stable | `releases/download/v0.1.0/latest.json` 及该标签资产 |
+| `v0.1.0-beta.1` | prerelease | `releases/download/v0.1.0-beta.1/latest.json` 及该标签资产 |
 
-应用默认走稳定版；预发布要在设置里由用户主动开启（规格 H）。
+两种构建都使用上例同一仓库入口，不能把 beta 客户端固定到自身标签。应用默认只选择稳定版；预发布要在设置里由用户主动开启（规格 H）。清单里的安装包 URL 固定到其自身标签，不能使用 `releases/latest/download` 指向另一版本。
 
 ## 更新签名
 
 - 使用 Tauri updater 的强制签名校验（minisign）。公钥随构建注入，私钥只在 CI 里。
 - `src-tauri/tauri.conf.json` **不写**公钥和检查地址：没配置时设置页与更新面板明确显示“更新通道未配置”，不会假装能更新。
-- 发布构建时 `tools/write-updater-config.mjs` 生成 `src-tauri/tauri.release.conf.json`（构建产物，已在 `.gitignore` 里），内容只有公钥、检查地址、`createUpdaterArtifacts`；私钥不写进任何文件。
+- 发布构建时 `tools/write-updater-config.mjs` 生成 `src-tauri/tauri.release.conf.json`（构建产物，已在 `.gitignore` 里），内容包含公钥、检查地址、`requireSignedVersion: true` 与 `createUpdaterArtifacts`；私钥不写进覆盖配置。更新签名必须绑定应用版本；Tauri build 自动将当前版本加入签名，缺少版本的旧签名不能用于恢复安装。
 - 本机生成一对密钥（只需一次，私钥自己保管，不要提交）：
 
   ```bash
@@ -45,7 +45,7 @@ RELEASE_TAG=v0.1.0 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-ve
 
   公钥文本（`revia-updater.pub` 全文，含 `untrusted comment:` 行）填进仓库变量 `REVIA_UPDATE_PUBKEY`；私钥文件内容填进 secret `TAURI_SIGNING_PRIVATE_KEY`。
 
-- 产物：`Revia_<version>_aarch64.dmg`（安装包）、`Revia.app.tar.gz` 与 `Revia.app.tar.gz.sig`（updater 用）。`.sig` 缺失时工作流失败，不会上传无法校验的包。
+- 产物：`Revia-<version>-macos-arm64.dmg`（安装包）、`Revia.app.tar.gz` 与 `Revia.app.tar.gz.sig`（updater 用）。`.sig` 缺失时工作流失败，不会上传无法校验的包。
 
 ## 需要在 GitHub 上配置一次
 
@@ -65,7 +65,7 @@ GitHub App（设备码登录）需要单独的 `REVIA_GITHUB_CLIENT_ID`（见 `d
 2. 打标签并推送：`git tag v0.1.0 && git push origin v0.1.0`（**本轮未执行**，由维护者在确认后操作）。
 3. 等 `Release Draft` 工作流完成，检查草稿里的 `.dmg`、`.app.tar.gz`、`.sig` 与 `latest.json`。
 4. 在真实 macOS Apple Silicon 机器上安装草稿里的 dmg，确认首屏、更新检查与签名校验。
-5. 公开草稿。之后稳定版用户才会收到这个版本。
+5. 核对稳定版 / 预发布标记后公开草稿。之后符合用户所选渠道的客户端才会收到这个版本。
 
 ## 首次打开（无 Apple 开发者证书）
 
@@ -95,3 +95,8 @@ pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg \
 ```
 
 测试密钥与坏签名只用于独占 fixture，不能当生产发布身份。本地跑通不等于 Actions 跑通：真实 CI 与分发证据留给最终验收（任务 14）。
+
+
+## 下载与安装状态
+
+确认下载后，验签通过的原始包字节与签名清单保存在独占应用数据目录。确认安装时重新核对签名、版本与包散列，直接离线安装已保存字节，不再次下载。安装与重启分别进入应用的关闭协调流程；编辑、合并编辑、Git 写入、待核对结果或运行中终端未处理时不安装、不重启。安装后保留回执，重启是独立明确操作；历史回执不会遮住后来发现的新版本。真实生产来源、CI 签名和桌面更新验收仍需部署接线，独占 fixture 检查不能替代。

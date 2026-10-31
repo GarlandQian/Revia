@@ -154,8 +154,8 @@ jobs:
       - name: Generate updater manifests
         env:
           VERSION: ${{ needs.verify-version.outputs.version }}
-          # Release 资产的下载前缀：latest/download 指向最新草稿公开后的资产。
-          DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/latest/download
+          # 清单始终固定到自己的tag，后续版本不会改变已下载包的身份。
+          DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}
         run: |
           set -euo pipefail
           # F14：客户端 updater 请求的清单；没有它配置的 endpoint 404，更新永远不可见。

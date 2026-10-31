@@ -143,7 +143,7 @@ pub fn run() {
                 })
                 .ok();
 
-            crate::m7::update::spawn_auto_check(app.handle().clone(), data_dir_for_update);
+            crate::m7::update::spawn_auto_check(app.handle().clone(), data_dir_for_update, std::sync::Arc::clone(&state.m7_update));
             app.manage(state);
             Ok(())
         })

@@ -245,6 +245,7 @@ impl Server {
             while !done.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
                         let queue = Arc::clone(&queue);
                         let seen = Arc::clone(&seen);
                         let api = api.clone();

@@ -11,8 +11,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 use tauri_plugin_updater::UpdaterExt;
+use ts_rs::TS;
 
 use crate::error::{AppError, ErrorKind, Result};
 use crate::settings::{read_settings, AppUpdateMode};
@@ -58,6 +58,8 @@ pub struct AppUpdateStatus {
     pub last_checked_at_ms: Option<u64>,
     pub available: Option<AvailableUpdate>,
     pub receipt: Option<UpdateReceipt>,
+    pub downloaded_version: Option<String>,
+    pub restart_required: bool,
 }
 
 /// 下载进度事件。
@@ -77,6 +79,8 @@ struct StoredState {
     receipt: Option<UpdateReceipt>,
     /// F13：已下载待安装的版本（None 表示没有待安装包）。
     downloaded_version: Option<String>,
+    downloaded: Option<super::update_package::DownloadedUpdate>,
+    checked_prerelease: bool,
 }
 
 /// 更新状态的本地存储与并发保护。
@@ -142,10 +146,43 @@ impl UpdateState {
             mode,
             current_version: app.package_info().version.to_string(),
             last_checked_at_ms: stored.last_checked_at_ms,
-            available: stored.available,
+            available: stored.available.filter(|available| {
+                semver::Version::parse(&available.version).is_ok_and(|version| {
+                    version > effective_version(app, &stored.receipt)
+                        && (self.allow_prerelease() || version.pre.is_empty())
+                })
+            }),
+            restart_required: stored.receipt.as_ref().is_some_and(|receipt| {
+                match (
+                    semver::Version::parse(&receipt.version),
+                    semver::Version::parse(&app.package_info().version.to_string()),
+                ) {
+                    (Ok(installed), Ok(current)) => installed > current,
+                    _ => false,
+                }
+            }),
+            downloaded_version: stored
+                .downloaded
+                .as_ref()
+                .filter(|package| {
+                    super::update_package::exists(self.path.parent().unwrap(), package)
+                        && semver::Version::parse(&package.version).is_ok_and(|version| {
+                            version > effective_version(app, &stored.receipt)
+                                && (self.allow_prerelease() || version.pre.is_empty())
+                        })
+                })
+                .map(|package| package.version.clone()),
             receipt: stored.receipt,
         }
     }
+}
+
+fn effective_version(app: &tauri::AppHandle, receipt: &Option<UpdateReceipt>) -> semver::Version {
+    let current = app.package_info().version.clone();
+    receipt
+        .as_ref()
+        .and_then(|receipt| semver::Version::parse(&receipt.version).ok())
+        .map_or(current.clone(), |installed| installed.max(current))
 }
 
 /// 读取 updater 配置里的公钥；为空表示这个构建没有更新通道。
@@ -239,23 +276,34 @@ async fn check_inner(
     let now = now_ms();
     if !force {
         if let Some(last) = status.last_checked_at_ms {
-            if now.saturating_sub(last) < CHECK_INTERVAL_MS {
+            if now.saturating_sub(last) < CHECK_INTERVAL_MS
+                && state.load().checked_prerelease == state.allow_prerelease()
+            {
                 return Ok(status);
             }
         }
     }
-    // F22：按“预发布渠道开关”选择清单——两份清单都在每次发布时上传。
-    // 关闭时请求稳定版清单；开启后请求预发布清单（包含预发布版本）。
-    let configured = configured_endpoints(app)?;
     let prerelease_allowed = state.allow_prerelease();
-    let endpoint = if prerelease_allowed {
-        configured.endpoint.replace("latest.json", "latest-prerelease.json")
-    } else {
-        configured.endpoint.clone()
-    };
-    let parsed: url::Url = endpoint
-        .parse()
-        .map_err(|error: url::ParseError| {
+    let found = find_update(app, state).await?;
+    // 未开启预发布渠道时，预发布版本（semver 带预发布段）不作为可用更新。
+    let found = found.filter(|update| prerelease_allowed || !update.version.contains('-'));
+    let mut stored = state.load();
+    stored.last_checked_at_ms = Some(now);
+    stored.checked_prerelease = prerelease_allowed;
+    stored.available = found.as_ref().map(|update| AvailableUpdate {
+        version: update.version.clone().to_string(),
+        current_version: update.current_version.clone(),
+        notes: update.body.clone(),
+        published_at: update.date.map(|date| date.to_string()),
+    });
+    state.store(&stored)?;
+    Ok(state.status(app, mode))
+}
+
+fn channel_updater(app: &tauri::AppHandle) -> Result<tauri_plugin_updater::Updater> {
+    let configured = configured_endpoints(app)?;
+    let endpoint = configured.endpoint.clone();
+    let parsed: url::Url = endpoint.parse().map_err(|error: url::ParseError| {
         AppError::coded(
             ErrorKind::Internal,
             "errors.m7.updateEndpointInvalid",
@@ -269,23 +317,11 @@ async fn check_inner(
         .map_err(update_error)?
         .build()
         .map_err(update_error)?;
-    let found = updater.check().await.map_err(update_error)?;
-    // 未开启预发布渠道时，预发布版本（semver 带预发布段）不作为可用更新。
-    let found = found.filter(|update| prerelease_allowed || !update.version.contains('-'));
-    let mut stored = state.load();
-    stored.last_checked_at_ms = Some(now);
-    stored.available = found.as_ref().map(|update| AvailableUpdate {
-        version: update.version.clone().to_string(),
-        current_version: update.current_version.clone(),
-        notes: update.body.clone(),
-        published_at: update.date.map(|date| date.to_string()),
-    });
-    state.store(&stored)?;
-    Ok(state.status(app, mode))
+    Ok(updater)
 }
 
 /// F13：两段式。第一步只下载（签名在下载时由插件校验），不安装、不落回执；
-/// 已下载的安装包保存在插件的临时目录，用户第二步确认后才真正安装。
+/// 验签后的原字节与清单保存在Revia独占数据目录，第二步确认后才安装。
 pub async fn download_update(
     app: tauri::AppHandle,
     state: &UpdateState,
@@ -324,19 +360,57 @@ async fn fetch_update(
             &[],
         ));
     }
-    let updater = app.updater_builder().build().map_err(update_error)?;
-    updater
-        .check()
-        .await
+    find_update(app, state).await?.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.updateNothingToInstall",
+            "当前已经是最新版本",
+            &[],
+        )
+    })
+}
+
+async fn find_update(
+    app: &tauri::AppHandle,
+    state: &UpdateState,
+) -> Result<Option<tauri_plugin_updater::Update>> {
+    let configured = configured_endpoints(app)?;
+    let allow = state.allow_prerelease();
+    let current = effective_version(app, &state.load().receipt);
+    let selected = if let Some((base, list)) =
+        super::update_channels::github_repository(&configured.endpoint)
+    {
+        super::update_channels::discover(&base, list, allow, &current).await?
+    } else {
+        // 独立受控验收源和显式配置的自托管清单；不猜测另一个渠道URL。
+        let updater = channel_updater(app)?;
+        return Ok(updater.check().await.map_err(update_error)?.filter(|u| {
+            semver::Version::parse(&u.version)
+                .is_ok_and(|version| version > current && (allow || version.pre.is_empty()))
+        }));
+    };
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![selected.endpoint])
         .map_err(update_error)?
-        .ok_or_else(|| {
-            AppError::coded(
-                ErrorKind::Rejected,
-                "errors.m7.updateNothingToInstall",
-                "当前已经是最新版本",
-                &[],
-            )
-        })
+        .build()
+        .map_err(update_error)?;
+    let update = updater.check().await.map_err(update_error)?;
+    if update
+        .as_ref()
+        .is_some_and(|u| u.version != selected.version.to_string())
+    {
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.updateReleaseIncomplete",
+            "更新发布信息不完整，已保留上次状态",
+            &[],
+        ));
+    }
+    Ok(update)
 }
 
 fn progress_emitter(app: &tauri::AppHandle) -> impl FnMut(usize, Option<u64>) + Send + 'static {
@@ -365,22 +439,38 @@ async fn download_inner(
     state: &UpdateState,
     mode: AppUpdateMode,
 ) -> Result<AppUpdateStatus> {
+    let expected = state
+        .load()
+        .available
+        .ok_or_else(|| {
+            AppError::coded(
+                ErrorKind::Rejected,
+                "errors.m7.updateNothingToInstall",
+                "请先检查更新",
+                &[],
+            )
+        })?
+        .version;
     let update = fetch_update(app, state, mode).await?;
-    // F13：只下载不安装。签名由插件按配置公钥在下载时校验。
-    update
+    if update.version != expected {
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.updateReleaseIncomplete",
+            "可用更新已变化，请重新核对",
+            &[],
+        ));
+    }
+    let bytes = update
         .download(progress_emitter(app), || {})
         .await
-        .map_err(|error| {
-            AppError::coded(
-                ErrorKind::Environment,
-                "errors.m7.updateDownloadFailed",
-                "下载更新失败，当前版本保持不变：{error}",
-                &[("error", error.to_string())],
-            )
-        })?;
+        .map_err(update_error)?;
+    let updater = channel_updater(app)?;
+    let package =
+        super::update_package::save(&updater, &update, state.path.parent().unwrap(), &bytes)?;
     // 记录“已下载待安装”，重启后界面也能看到这一状态。
     let mut stored = state.load();
-    stored.downloaded_version = Some(update.version.clone());
+    stored.downloaded_version = None; // 旧版本只有标记、没有真实字节，不能认作缓存。
+    stored.downloaded = Some(package);
     state.store(&stored)?;
     Ok(state.status(app, mode))
 }
@@ -390,42 +480,29 @@ async fn install_inner(
     state: &UpdateState,
     mode: AppUpdateMode,
 ) -> Result<AppUpdateStatus> {
-    let update = fetch_update(app, state, mode).await?;
-    let version = update.version.clone();
-    // F13：必须先走确认下载这一步；直接调安装按未下载拒绝。
-    {
-        let stored = state.load();
-        if stored.downloaded_version.as_deref() != Some(version.as_str()) {
-            return Err(AppError::coded(
-                ErrorKind::Rejected,
-                "errors.m7.updateNotDownloaded",
-                "更新尚未下载，请先下载更新",
-                &[],
-            ));
-        }
-    }
-    // F13：下载阶段已由插件按公钥验签；install(bytes) 安装前再 verify 一次。
-    // 下载保存的安装包在插件下载闭包返回的 bytes 里，这里重新下载一次校验后的字节
-    // （插件不跨调用缓存 bytes；重新下载仍验签，恶意包无法通过）。
-    let bytes = update
-        .download(
-            progress_emitter(app),
-            || {},
+    let stored = state.load();
+    let saved = stored.downloaded.as_ref().ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.updateNotDownloaded",
+            "更新尚未下载，请先下载更新",
+            &[],
         )
-        .await
-        .map_err(|error| {
-            AppError::coded(
-                ErrorKind::Environment,
-                "errors.m7.updateInstallFailed",
-                "安装更新失败，当前版本保持不变：{error}",
-                &[("error", error.to_string())],
-            )
-        })?;
+    })?;
+    // build/restore/verify均不联网；只安装已确认下载的原字节。
+    let updater = channel_updater(app)?;
+    let (update, bytes) = super::update_package::restore(
+        &updater,
+        state.path.parent().unwrap(),
+        saved,
+        state.allow_prerelease(),
+    )?;
+    let version = update.version.clone();
     update.install(bytes).map_err(|error| {
         AppError::coded(
-            ErrorKind::Environment,
-            "errors.m7.updateInstallFailed",
-            "安装更新失败，当前版本保持不变：{error}",
+            ErrorKind::NeedsVerification,
+            "errors.m7.updateInstallNeedsVerification",
+            "安装更新未完成，请核对应用状态后再操作：{error}",
             &[("error", error.to_string())],
         )
     })?;
@@ -436,7 +513,16 @@ async fn install_inner(
     });
     stored.available = None;
     stored.downloaded_version = None;
-    state.store(&stored)?;
+    stored.downloaded = None;
+    state.store(&stored).map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.m7.updateInstallRecordFailed",
+            "更新已安装，但本地回执写入失败，请先核对应用状态",
+            &[],
+        )
+        .cause(error)
+    })?;
     Ok(state.status(app, mode))
 }
 
@@ -448,20 +534,18 @@ pub fn restart(app: &tauri::AppHandle) {
 /// 启动后的自动检查：非手动模式时按间隔检查，发现新版本发事件。
 ///
 /// 只在配置了更新通道时工作；失败不阻塞启动，也不反复弹窗。
-pub fn spawn_auto_check(app: tauri::AppHandle, data_dir: PathBuf) {
+pub fn spawn_auto_check(
+    app: tauri::AppHandle,
+    data_dir: PathBuf,
+    state: std::sync::Arc<UpdateState>,
+) {
     std::thread::spawn(move || loop {
         let mode = read_settings(&data_dir)
             .map(|settings| settings.app_update_mode)
             .unwrap_or_default();
         if mode != AppUpdateMode::Manual && unconfigured_reason(&app).is_none() {
-            let state = UpdateState::new(&data_dir, &data_dir);
             let app_for_check = app.clone();
-            let outcome = tauri::async_runtime::block_on(check(
-                app_for_check,
-                &state,
-                mode,
-                false,
-            ));
+            let outcome = tauri::async_runtime::block_on(check(app_for_check, &state, mode, false));
             if let Ok(status) = outcome {
                 if let Some(available) = status.available {
                     use tauri::Emitter;
@@ -505,6 +589,8 @@ mod tests {
                     installed_at_ms: 9,
                 }),
                 downloaded_version: None,
+                downloaded: None,
+                checked_prerelease: false,
             })
             .unwrap();
         let loaded = state.load();

@@ -121,6 +121,7 @@ import { GlassIcons } from "@/components/m7/glass";
 import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { useReducedMotion, useThemeKind } from "@/hooks/useGlassPrefs";
 import { reviewDraftSessions } from "@/lib/m7/reviewDrafts";
+import { mergeBufferGuards } from "@/lib/m7/mergeBuffers";
 import { flushM7State, registerM7Flusher } from "@/lib/m7/flush";
 import { m7, onM7Events } from "@/lib/m7/api";
 import { EditableWorkspace, EditDecisionDialog } from "@/features/m7/EditableWorkspace";
@@ -439,6 +440,7 @@ export function App() {
   editWorktreesRef.current = [...new Set([...repos.filter((repo) => repo.exists).flatMap((repo) => repo.worktrees.map((worktree) => worktree.id)), ...editSessions.worktreeIds, ...(worktreeId ? [worktreeId] : [])])];
   const lifecycleRequestRef = useRef<(intent: CloseIntent) => Promise<void>>(async () => undefined);
   const lifecyclePreparingRef = useRef(false);
+  const updateLifecycleRef = useRef<{ intent: "installUpdate" | "restartUpdate"; resolve: (status: AppUpdateStatus | null) => void; reject: (error: unknown) => void } | null>(null);
   const [cloneOpen, setCloneOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -446,6 +448,7 @@ export function App() {
   const [appUpdateMode, setAppUpdateMode] = useState<AppUpdateMode>("notify");
   /** F22：预发布渠道开关（设置持久化）。 */
   const [allowPrerelease, setAllowPrerelease] = useState(false);
+  const updateChannelEpoch = useRef(0);
   const [shortcutsSnapshot, setShortcutsSnapshot] = useState<Record<string, string>>({});
   const themeKind = useThemeKind();
   const reducedMotion = useReducedMotion();
@@ -1698,36 +1701,17 @@ export function App() {
     async () => undefined,
   );
 
-  /** 更新安装前的协调入口（任务 11 / F13）：完整走关闭协调，不只是落草稿。 */
-  const beforeUpdateInstallRef = useRef<() => Promise<boolean>>(async () => true);
-  beforeUpdateInstallRef.current = async () => {
-    // F13：安装前完整协调编辑、合并编辑、Git 写、结果待核对与终端运行中。
-    await flushCommitDraftRef.current();
-    if (closeCoordinatorRef.current.hasWriting() || closeCoordinatorRef.current.hasPending()) {
-      // 有在途写或待核对：不能同时进入原生安装；提示与窗口关闭一致。
-      setAppError(localizedError("rejected", "errors.update.installBlockedBusy"), null);
-      return false;
-    }
-    if (terminalSessions.needsExitGuard) {
-      setAppError(localizedError("rejected", "errors.update.installBlockedTerminal"), null);
-      return false;
-    }
-    const edits = await editSessions.resolve(editWorktreesRef.current, null, askEdit);
-    if (!edits.ok || closeCoordinatorRef.current.hasWriting() || closeCoordinatorRef.current.hasPending()) return false;
-    await flushM7State();
-    return !editSessions.hasWork;
-  };
-
   /** 先落草稿再执行不可撤销的原生动作；失败时抛出，绝不静默关闭。 */
   const closeAfterDraftFlush = useCallback(
-    async (action: () => Promise<void>): Promise<void> => {
+    async (action: () => Promise<void>, releaseGuard = true): Promise<void> => {
       await flushCommitDraftRef.current();
       // 编辑草稿与终端页签先落盘，再执行不可撤销的原生动作（M7 任务 03、04）。
       await editSessions.flush();
       await flushM7State();
+      if (mergeBufferGuards.hasWork) throw localizedError("rejected", "errors.update.mergeEditsPending");
       if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
       await terminalSessions.finishShutdown();
-      await syncExitBlocked(false);
+      if (releaseGuard) await syncExitBlocked(false);
       await action();
     },
     [editSessions, terminalSessions, syncExitBlocked],
@@ -1738,13 +1722,26 @@ export function App() {
     closeDriverRef.current = new CloseDriver({
       coordinator: closeCoordinatorRef.current,
       releaseExitGuard: async () => {
+        if (mergeBufferGuards.hasWork) throw localizedError("rejected", "errors.update.mergeEditsPending");
         if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
+        await syncExitBlocked(true);
         // 真正解除原生保护留到最终草稿冲刷和已确认终端关闭之后。
       },
       // 关闭/退出前必须先把草稿落盘并等待完成：落盘失败时不得静默销毁窗口（F02.5）。
       closeWindow: () => closeAfterDraftFlush(() => getCurrentWindow().destroy()),
       exitApp: () => closeAfterDraftFlush(() => ipc.requestExit()),
-      onError: (caught) => { editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null); },
+      installUpdate: () => closeAfterDraftFlush(async () => {
+        const status = await m7.updateInstall();
+        updateLifecycleRef.current?.resolve(status); updateLifecycleRef.current = null;
+      }, false),
+      restartUpdate: () => closeAfterDraftFlush(async () => {
+        await m7.updateRestart();
+        updateLifecycleRef.current?.resolve(null); updateLifecycleRef.current = null;
+      }),
+      onError: (caught) => {
+        updateLifecycleRef.current?.reject(caught); updateLifecycleRef.current = null;
+        editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null);
+      },
       onAsk: (intent, writing, pending) => {
         closeIntentRef.current = intent;
         setCloseRequest(
@@ -1753,7 +1750,10 @@ export function App() {
       },
       onSettled: () => {
         setCloseRequest(null);
-        if (closeDriverRef.current?.currentPhase() === "idle") { editSessions.setClosing(false); terminalSessions.cancelShutdown(); }
+        if (closeDriverRef.current?.currentPhase() === "idle") {
+          editSessions.setClosing(false); terminalSessions.cancelShutdown();
+          updateLifecycleRef.current?.resolve(null); updateLifecycleRef.current = null;
+        }
       },
     });
   }
@@ -1781,7 +1781,7 @@ export function App() {
    */
   const reconcileClose = useCallback(() => {
     const coordinator = closeCoordinatorRef.current;
-    if (closeDriver.currentPhase() !== "closing") void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork).catch((caught) => {
+    if (closeDriver.currentPhase() !== "closing") void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork).catch((caught) => {
       setAppError(toAppError(caught), null);
     });
     applyEffect(closeDriver.notifyStateChanged());
@@ -1790,12 +1790,12 @@ export function App() {
   useEffect(() => {
     const sync = () => {
       if (closeDriver.currentPhase() === "closing") return;
-      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork)
+      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork)
         .catch((caught) => setAppError(toAppError(caught), null));
     };
     sync();
-    const stopEdit = editSessions.subscribe(sync), stopTerminal = terminalSessions.subscribe(sync), stopReview = reviewDraftSessions.subscribe(sync);
-    return () => { stopEdit(); stopTerminal(); stopReview(); };
+    const stopEdit = editSessions.subscribe(sync), stopTerminal = terminalSessions.subscribe(sync), stopReview = reviewDraftSessions.subscribe(sync), stopMerge = mergeBufferGuards.subscribe(sync);
+    return () => { stopEdit(); stopTerminal(); stopReview(); stopMerge(); };
   }, [closeDriver, editSessions, terminalSessions, setAppError, syncExitBlocked]);
   // 存在磁盘草稿但尚未打开编辑器时，原生Quit也必须进入同一决策入口。
   useEffect(() => {
@@ -1804,7 +1804,7 @@ export function App() {
       try {
         await syncExitBlocked(true);
         await editSessions.discover(editWorktreesRef.current);
-        if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork);
+        if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork);
       } catch (caught) { if (!cancelled) setAppError(toAppError(caught), null); }
     })();
     return () => { cancelled = true; };
@@ -1816,13 +1816,18 @@ export function App() {
     void (async () => {
       await syncExitBlocked(true);
       await terminalSessions.initialize();
-      if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork);
+      if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork);
     })().catch((caught) => { if (!cancelled) setAppError(toAppError(caught), null); });
     return () => { cancelled = true; };
   }, [closeDriver, terminalSessions, editSessions, setAppError, syncExitBlocked]);
 
 
   lifecycleRequestRef.current = async (intent) => {
+    if (mergeBufferGuards.hasWork) {
+      const failure = localizedError("rejected", "errors.update.mergeEditsPending");
+      updateLifecycleRef.current?.reject(failure); updateLifecycleRef.current = null;
+      setAppError(failure, null); return;
+    }
     if (lifecyclePreparingRef.current || closeDriver.currentPhase() === "closing") return;
     if (closeDriver.currentPhase() !== "idle") { applyEffect(closeDriver.handleRequest(intent)); return; }
     lifecyclePreparingRef.current = true;
@@ -1833,8 +1838,21 @@ export function App() {
       if (!(await terminalSessions.prepareShutdown(askTerminalShutdown))) { editSessions.setClosing(false); return; }
       applyEffect(closeDriver.handleRequest(intent));
     } catch (caught) { editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null); }
-    finally { lifecyclePreparingRef.current = false; }
+    finally {
+      lifecyclePreparingRef.current = false;
+      if (closeDriver.currentPhase() === "idle") { updateLifecycleRef.current?.resolve(null); updateLifecycleRef.current = null; }
+    }
   };
+
+  const requestUpdateLifecycle = useCallback((intent: "installUpdate" | "restartUpdate"): Promise<AppUpdateStatus | null> => {
+    if (updateLifecycleRef.current || lifecyclePreparingRef.current || closeDriver.currentPhase() !== "idle") {
+      return Promise.reject(localizedError("rejected", "errors.m7.updateBusy"));
+    }
+    return new Promise((resolve, reject) => {
+      updateLifecycleRef.current = { intent, resolve, reject };
+      void lifecycleRequestRef.current(intent);
+    });
+  }, [closeDriver]);
 
   // 监听回调通过 ref 到达同一驱动。
   reconcileCloseRef.current = reconcileClose;
@@ -4505,6 +4523,13 @@ export function App() {
       }
       setAppUpdateMode(next.appUpdateMode);
       setAllowPrerelease(next.allowPrerelease ?? false);
+      if (patch.allowPrerelease !== undefined) {
+        const epoch = ++updateChannelEpoch.current;
+        void m7.updateStatus().then((status) => {
+          if (epoch !== updateChannelEpoch.current) return;
+          setUpdateStatus(status); setUpdateBannerVersion(status.available?.version ?? null);
+        }).catch((caught) => setAppError(toAppError(caught), null));
+      }
       setThemeLight(next.themeLight);
       setThemeDark(next.themeDark);
       setCodeFontFamily(next.codeFontFamily);
@@ -5532,7 +5557,8 @@ export function App() {
           setUpdateStatus(status);
           if (!status.available) setUpdateBannerVersion(null);
         }}
-        onBeforeInstall={() => beforeUpdateInstallRef.current()}
+        onInstall={() => requestUpdateLifecycle("installUpdate")}
+        onRestart={() => requestUpdateLifecycle("restartUpdate")}
         onClose={() => setUpdateOpen(false)}
       />
     </>

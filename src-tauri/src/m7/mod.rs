@@ -14,6 +14,8 @@ pub mod github;
 pub mod terminal;
 pub mod theme;
 pub mod update;
+pub mod update_channels;
+pub mod update_package;
 
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
