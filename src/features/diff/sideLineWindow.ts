@@ -30,7 +30,8 @@ interface WindowRequest {
 interface Loader {
   load: (side: Side, from: number, to: number) => Promise<SideLine[]>;
   isCurrent: () => boolean;
-  publish: () => void;
+  /** Newly filled visible rows need immediate publication; offscreen prefetch can remain batched. */
+  publish: (visibleChanged: boolean) => void;
 }
 
 /** Two visible windows have priority over either column's full-block prefetch. */
@@ -88,6 +89,7 @@ export class SideLineWindow {
       && pending.from <= range.from && pending.to >= range.to)) return;
     this.pending.set(key, { side, ...range, slice });
     let accepted = false;
+    let visibleChanged = false;
     void loader.load(side, range.from, range.to)
       .then((received) => {
         if (!loader.isCurrent()) return;
@@ -97,6 +99,10 @@ export class SideLineWindow {
           if (lines.has(line.line)) continue;
           lines.set(line.line, line);
           accepted = true;
+          // Use the current viewport, including a scroll that happened while this request was in flight.
+          if (this.windows[side]?.visible.some((range) => range.from <= line.line && line.line <= range.to)) {
+            visibleChanged = true;
+          }
         }
       })
       .catch(() => {
@@ -104,7 +110,7 @@ export class SideLineWindow {
       })
       .finally(() => {
         this.pending.delete(key);
-        if (accepted && loader.isCurrent()) loader.publish();
+        if (accepted && loader.isCurrent()) loader.publish(visibleChanged);
       });
   }
 }

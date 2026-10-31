@@ -10,6 +10,7 @@ function fixture() {
   const calls = [];
   let current = true;
   let published = 0;
+  const priorities = [];
   const loader = {
     load(side, from, to) {
       let resolve, reject;
@@ -18,10 +19,10 @@ function fixture() {
       return promise;
     },
     isCurrent: () => current,
-    publish: () => { published += 1; },
+    publish: (visibleChanged) => { published += 1; priorities.push(visibleChanged); },
   };
   const window = { visible: [{ from: 1, to: 32 }], buffered: [{ from: 1, to: 96 }], lineCount: 1000 };
-  return { store, calls, loader, window, retire: () => { current = false; }, publications: () => published };
+  return { store, calls, loader, window, priorities, retire: () => { current = false; }, publications: () => published };
 }
 
 async function complete(call) {
@@ -52,6 +53,7 @@ test("两侧可见小片先到齐，随后仍补完整400行块", async () => {
   assert.equal(f.calls.length, 4);
   assert.equal(f.store.old.size, 400);
   assert.equal(f.store.new.size, 400);
+  assert.deepEqual(f.priorities, [true, true, false, false], "可见小片优先发布，纯预取不强制提交");
 });
 
 test("整块重叠回包保留已有行与词区间引用，补缺行后仍通知", async () => {
@@ -153,4 +155,33 @@ test("空响应没有进展时不发渲染通知", async () => {
   await nextTurn();
   assert.equal(f.calls.length, 1);
   assert.equal(f.publications(), 0);
+});
+
+
+test("迟到小片按当前可见范围发布，旧位置只缓存不抢提交", async () => {
+  const f = fixture();
+  f.store.ensure("left", f.window, f.loader);
+  const moved = { visible: [{ from: 900, to: 932 }], buffered: [], lineCount: 1000 };
+  f.store.ensure("left", moved, f.loader);
+  assert.deepEqual(f.calls.map(({ from, to }) => [from, to]), [[1, 32], [900, 932]]);
+  await complete(f.calls[0]);
+  await complete(f.calls[1]);
+  assert.deepEqual(f.priorities, [false, true]);
+  assert.ok(f.store.old.has(1), "相同快照的旧位置仍保留在缓存");
+});
+
+test("在途预取补到滚动后的可见行时，也优先发布", async () => {
+  const f = fixture();
+  f.store.ensure("right", { visible: [], buffered: [], lineCount: 0 }, f.loader);
+  f.store.ensure("left", f.window, f.loader);
+  await complete(f.calls[0]);
+  f.store.ensure("left", f.window, f.loader);
+  const block = f.calls.find((call) => call.from === 1 && call.to === 400);
+  assert.ok(block);
+  f.store.ensure("left", { visible: [{ from: 200, to: 232 }], buffered: [], lineCount: 1000 }, f.loader);
+  await complete(block);
+  assert.deepEqual(f.priorities, [true, true]);
+  const slice = f.calls.find((call) => call.from === 200);
+  await complete(slice);
+  assert.deepEqual(f.priorities, [true, true], "同快照重叠回包未增加行时不重复提交");
 });

@@ -168,10 +168,13 @@ export function SideBySideView(props: SideBySideViewProps) {
     void readLayout
       .then((next) => {
         if (cancelled) return;
-        setLayout(next);
-        setLayoutKey(cacheKey);
-        if ("worktreeId" in next) onLayout?.(next);
-        setExpandedFolds(new Set());
+        // 异步布局已核对目标；同一任务挂载两栏并发出可见行请求，避免再等一帧。
+        flushSync(() => {
+          setLayout(next);
+          setLayoutKey(cacheKey);
+          if ("worktreeId" in next) onLayout?.(next);
+          setExpandedFolds(new Set());
+        });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -241,7 +244,12 @@ export function SideBySideView(props: SideBySideViewProps) {
           to,
         })),
         isCurrent: () => cache.current === current,
-        publish: () => setCacheVersion((value) => value + 1),
+        publish: (visibleChanged) => {
+          const publish = () => setCacheVersion((value) => value + 1);
+          // 只有当前可见文字刚补齐时立即提交；纯预取仍交给 React 合批。
+          if (visibleChanged) flushSync(publish);
+          else publish();
+        },
       });
     },
     [cacheKey, worktreeId, entry?.path, entry?.changes, history, ignoreWhitespace, options.contextLines, highlight],
