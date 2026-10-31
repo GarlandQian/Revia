@@ -972,14 +972,16 @@ pub fn log_measure(message: &str) {
     if minimal_soak_logging() {
         return;
     }
-    let log = path.with_extension("log");
+    append_measure_line(&path.with_extension("log"), &format!("{} {message}", chrono_like_stamp()));
+}
+
+/// Rust 阶段日志和前端日志共用完整记录写入，避免并发 write_fmt 拼接字段。
+fn append_measure_line(path: &std::path::Path, message: &str) {
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log)
-    {
-        let _ = writeln!(file, "{} {message}", chrono_like_stamp());
+    static WRITER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _writer = WRITER.lock().unwrap_or_else(|error| error.into_inner());
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = file.write_all(format!("{message}\n").as_bytes());
     }
 }
 
@@ -3097,15 +3099,7 @@ pub async fn debug_log(message: String) -> Result<()> {
     else {
         return Ok(());
     };
-    let log = path.with_extension("log");
-    use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log)
-    {
-        let _ = writeln!(file, "{message}");
-    }
+    append_measure_line(&path.with_extension("log"), &message);
     Ok(())
 }
 
@@ -4138,4 +4132,51 @@ pub async fn external_tool_launch(
 #[tauri::command]
 pub async fn system_language() -> Result<String> {
     Ok(crate::settings::system_language())
+}
+
+#[cfg(test)]
+mod measurement_log_tests {
+    use super::append_measure_line;
+    use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn concurrent_measurement_records_remain_complete() {
+        // 仅自建临时日志；不改进程环境，也不打开用户的测量文件。
+        let directory = tempfile::tempdir().unwrap();
+        let path = Arc::new(directory.path().join("measure.log"));
+        let barrier = Arc::new(Barrier::new(8));
+        let threads: Vec<_> = (0..8).map(|worker| {
+            let path = Arc::clone(&path);
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                for index in 0..32 {
+                    let payload = serde_json::json!({"worker": worker, "index": index, "text": "x".repeat(2048)});
+                    append_measure_line(&path, &payload.to_string());
+                    append_measure_line(&path, &format!("frontend-{worker}-{index}"));
+                }
+            })
+        }).collect();
+        for thread in threads { thread.join().unwrap(); }
+        let text = std::fs::read_to_string(&*path).unwrap();
+        let mut records = std::collections::HashSet::new();
+        let mut frontend = std::collections::HashSet::new();
+        for line in text.lines() {
+            if line.starts_with('{') {
+                let value: serde_json::Value = serde_json::from_str(line).unwrap();
+                assert_eq!(value["text"].as_str().unwrap().len(), 2048);
+                assert!(records.insert((value["worker"].as_u64().unwrap(), value["index"].as_u64().unwrap())));
+            } else {
+                assert!(frontend.insert(line.to_owned()));
+            }
+        }
+        assert_eq!(records.len(), 8 * 32);
+        assert_eq!(frontend.len(), 8 * 32);
+        assert!(text.ends_with('\n'));
+        for worker in 0..8 {
+            for index in 0..32 {
+                assert!(frontend.contains(&format!("frontend-{worker}-{index}")));
+            }
+        }
+    }
 }
