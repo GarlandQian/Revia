@@ -27,6 +27,7 @@ import { Codicon } from "@/components/ui/codicon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7, type PrCheckoutPayload } from "@/lib/m7/api";
+import { GithubRequests, githubResponse } from "@/lib/m7/githubRequests";
 
 type Tab = "pulls" | "create" | "receipts";
 
@@ -138,51 +139,68 @@ export function GithubPanel({
   const [fullDiff, setFullDiff] = useState<string | null>(null);
 
   const login = status?.repoAccount ?? status?.accounts[0]?.login ?? null;
-  // F09：后端计算的 repoKey（worktree 规范路径 SHA），保存草稿时使用。
-  const [backendRepoKey, setBackendRepoKey] = useState<string>("");
+  const scopeKey = JSON.stringify([worktreeId, login, remote, remotes.find((entry) => entry.name === remote)?.url]);
+  const scopeRequests = useRef(new GithubRequests()).current;
+  const viewRequests = useRef(new GithubRequests()).current;
+  const statusRequests = useRef(new GithubRequests()).current;
+  scopeRequests.select(scopeKey);
+  viewRequests.select(JSON.stringify([scopeKey, selected?.number ?? null]));
+  statusRequests.select(worktreeId);
+  const [backendRepoKey, setBackendRepoKey] = useState("");
   useEffect(() => {
-    void m7.githubRepoKey(worktreeId).then(setBackendRepoKey).catch(() => setBackendRepoKey(""));
-  }, [worktreeId]);
+    const ticket = statusRequests.begin("repoKey");
+    void githubResponse(ticket, () => m7.githubRepoKey(worktreeId), setBackendRepoKey, () => setBackendRepoKey(""));
+  }, [worktreeId, statusRequests]);
 
   const loadStatus = useCallback(async () => {
-    try {
-      const next = await m7.githubStatus(worktreeId);
-      setStatus(next);
-      const list = await m7.githubRemotes(worktreeId).catch(() => [] as RemoteInfo[]);
-      setRemotes(list);
-      setRemote((current) => current ?? list[0]?.name ?? null);
-    } catch (caught) {
-      setError(toAppError(caught));
-    }
-  }, [worktreeId]);
+    const ticket = statusRequests.begin("status");
+    await githubResponse(ticket, () => Promise.all([m7.githubStatus(worktreeId), m7.githubRemotes(worktreeId)]),
+      ([next, list]) => { setStatus(next); setRemotes(list); setRemote((current) => list.some((entry) => entry.name === current) ? current : list[0]?.name ?? null); },
+      (caught) => setError(toAppError(caught)));
+  }, [worktreeId, statusRequests]);
 
   useEffect(() => {
     void loadStatus();
-    void m7.githubReceipts(worktreeId).then(setReceipts).catch(() => undefined);
-  }, [loadStatus, worktreeId]);
+    const refreshAccount = () => {
+      scopeRequests.invalidate(); viewRequests.invalidate(); setSelected(null); setDetail(null);
+      setBusy(null); setError(null); setNotice(null); void loadStatus();
+    };
+    const onFocus = () => { void loadStatus(); };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("revia-github-account-changed", refreshAccount);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("revia-github-account-changed", refreshAccount);
+      statusRequests.invalidate(); scopeRequests.invalidate(); viewRequests.invalidate();
+    };
+  }, [loadStatus, statusRequests, scopeRequests, viewRequests]);
 
-  const listEpoch = useRef(0);
+  useEffect(() => {
+    const ticket = scopeRequests.begin("receipts");
+    void githubResponse(ticket, () => m7.githubReceipts(worktreeId), setReceipts, (caught) => setError(toAppError(caught)));
+  }, [scopeKey, worktreeId, scopeRequests]);
+
   const loadList = useCallback(
     async (nextPage: number) => {
       if (remote === null) return;
-      const epoch = ++listEpoch.current;
+      const ticket = scopeRequests.begin("list");
       setBusy("list");
       setError(null);
       try {
         const result = await m7.prList(worktreeId, remote, filter, nextPage);
         // F08：只有最新一次列表请求可以落状态。
-        if (epoch !== listEpoch.current) return;
+        if (!ticket.current()) return;
         setItems(result.items);
         setHasMore(result.hasMore);
         setPage(nextPage);
         setRateLimit(result.rateLimit);
       } catch (caught) {
-        if (epoch === listEpoch.current) setError(toAppError(caught));
+        ticket.apply(() => setError(toAppError(caught)));
       } finally {
-        if (epoch === listEpoch.current) setBusy(null);
+        ticket.apply(() => setBusy((current) => current === "list" ? null : current));
       }
     },
-    [filter, remote, worktreeId],
+    [filter, remote, worktreeId, login, scopeRequests],
   );
 
   useEffect(() => {
@@ -198,20 +216,23 @@ export function GithubPanel({
     setDrafts([]);
     setProtection(null);
     setReceipts([]);
-    requestEpoch.current += 1;
-    currentRequest.current = null;
-  }, [remote, worktreeId]);
-
-  // F08：请求代际。切 worktree / 换 remote / 打开另一个 PR 后，晚到的旧响应必须丢弃，
-  // 不能把旧目标的 selected / detail / files 覆盖到新目标上。
-  const requestEpoch = useRef(0);
-  const currentRequest = useRef<{ worktreeId: string; remote: string | null; number: number } | null>(null);
+    setFullDiff(null);
+    setItems([]);
+    setHasMore(false);
+    setBusy(null);
+    setError(null);
+    setNotice(null);
+    setMergeConfirmed(false);
+    setDivergedBranch(false);
+    setExpanded(null);
+  }, [scopeKey]);
 
   const openDetail = useCallback(
     async (summary: PullRequestSummary) => {
-      const epoch = ++requestEpoch.current;
+      viewRequests.select(JSON.stringify([scopeKey, summary.number]));
+      viewRequests.invalidate();
+      const ticket = viewRequests.begin("detail");
       const request = { worktreeId, remote, number: summary.number, headSha: summary.headSha };
-      currentRequest.current = request;
       setSelected(summary);
       setDetail(null);
       setFiles([]);
@@ -232,63 +253,50 @@ export function GithubPanel({
           m7.reviewDrafts(request),
         ]);
         // 身份核对：只有仍然是“这一目标”的请求才能落状态；否则静默丢弃。
-        const current = currentRequest.current;
-        if (epoch !== requestEpoch.current
-          || !current
-          || current.worktreeId !== worktreeId
-          || current.remote !== remote
-          || current.number !== summary.number) {
-          return;
-        }
+        if (!ticket.current()) return;
         setDetail(detailResult);
         setFiles(fileList);
         setComments(commentList);
         setDrafts(draftList);
         setCreateBase(summary.baseRef);
-        void m7
-          .protectionRefresh(worktreeId, remote, summary.baseRef)
-          .then((info) => {
-            const still = currentRequest.current;
-            if (epoch === requestEpoch.current && still && still.number === summary.number) {
-              setProtection(info);
-            }
-          })
-          .catch((caught) => {
-            if (epoch === requestEpoch.current) {
-              setProtection({ branch: summary.baseRef, protected: true, source: "unknown", checkedAtMs: 0 });
-              setError(toAppError(caught));
-            }
+        void githubResponse(ticket, () => m7.protectionRefresh(worktreeId, remote, detailResult.summary.baseRef),
+          setProtection, (caught) => {
+            setProtection({ branch: detailResult.summary.baseRef, protected: true, source: "unknown", checkedAtMs: 0 });
+            setError(toAppError(caught));
           });
       } catch (caught) {
-        if (epoch === requestEpoch.current) setError(toAppError(caught));
+        ticket.apply(() => setError(toAppError(caught)));
       } finally {
-        if (epoch === requestEpoch.current) setBusy(null);
+        ticket.apply(() => setBusy((current) => current === "detail" ? null : current));
       }
     },
-    [remote, worktreeId],
+    [remote, worktreeId, scopeKey, viewRequests],
   );
 
   // 同步完整远端集合不依赖存在或打开某个PR。
   const syncProtection = async () => {
-    const epoch = requestEpoch.current;
+    const ticket = viewRequests.begin("protection");
     const branch = selected?.baseRef ?? createBase;
     try {
       const info = await m7.protectionRefresh(worktreeId, remote, branch);
-      if (epoch === requestEpoch.current) setProtection(info);
+      ticket.apply(() => setProtection(info));
     } catch (caught) {
-      if (epoch === requestEpoch.current) setError(toAppError(caught));
+      ticket.apply(() => setError(toAppError(caught)));
     }
   };
 
   const startDeviceFlow = useCallback(async () => {
+    const ticket = statusRequests.begin("auth");
     setError(null);
     try {
       const started = await m7.githubDeviceStart();
+      if (!ticket.current()) { void m7.githubDeviceCancel(started.flowId).catch(() => undefined); return; }
       setDevice(started);
       const deadline = Date.now() + started.expiresInMs;
       const poll = async () => {
         try {
           const result = await m7.githubDevicePoll(started.flowId);
+          if (!ticket.current()) return;
           if (result.kind === "authorized") {
             setDevice(null);
             setNotice(t("github.loggedIn", { login: result.account.login }));
@@ -306,15 +314,16 @@ export function GithubPanel({
           }
           pollTimer.current = window.setTimeout(() => void poll(), Math.max(result.intervalMs, 1000));
         } catch (caught) {
+          if (!ticket.current()) return;
           setError(toAppError(caught));
           setDevice(null);
         }
       };
       pollTimer.current = window.setTimeout(() => void poll(), Math.max(started.intervalMs, 1000));
     } catch (caught) {
-      setError(toAppError(caught));
+      ticket.apply(() => setError(toAppError(caught)));
     }
-  }, [loadStatus]);
+  }, [loadStatus, statusRequests]);
 
   useEffect(() => {
     return () => {
@@ -323,35 +332,43 @@ export function GithubPanel({
   }, []);
 
   const loginWithToken = useCallback(async () => {
+    const ticket = statusRequests.begin("auth");
     setError(null);
     try {
       const account = await m7.githubLoginToken(token.trim());
+      if (!ticket.current()) return;
       setToken("");
       setNotice(t("github.loggedIn", { login: account.login }));
       await loadStatus();
     } catch (caught) {
-      setError(toAppError(caught));
+      ticket.apply(() => setError(toAppError(caught)));
     }
-  }, [loadStatus, token]);
+  }, [loadStatus, token, statusRequests]);
 
   const submitComment = useCallback(async () => {
     if (!selected || commentBody.trim().length === 0) return;
     setBusy("comment");
+    const ticket = viewRequests.begin("action");
     try {
       await m7.prCommentCreate({ worktreeId, remote, number: selected.number, body: commentBody });
+      if (!ticket.current()) return;
       setCommentBody("");
-      setComments(await m7.prComments({ worktreeId, remote, number: selected.number }));
+      const nextComments = await m7.prComments({ worktreeId, remote, number: selected.number });
+      if (!ticket.current()) return;
+      setComments(nextComments);
       onWorkspaceTouched();
     } catch (caught) {
+      if (!ticket.current()) return;
       setError(toAppError(caught));
     } finally {
-      setBusy(null);
+      ticket.apply(() => setBusy((current) => current === "comment" ? null : current));
     }
-  }, [commentBody, onWorkspaceTouched, remote, selected, worktreeId]);
+  }, [commentBody, onWorkspaceTouched, remote, selected, worktreeId, viewRequests]);
 
   const addDraft = useCallback(async () => {
     if (!selected || !login || draftPath.trim().length === 0) return;
     const line = Math.max(1, Number.parseInt(draftLine, 10) || 1);
+    const ticket = viewRequests.begin("action");
     try {
       // F09：草稿绑定后端 repoKey（worktree 路径 SHA）与当前 head；前端不再伪造 repoKey。
       if (remote === null || detail?.summary.headSha == null) {
@@ -370,12 +387,16 @@ export function GithubPanel({
         createdAtMs: Date.now(),
         updatedAtMs: Date.now(),
       });
+      if (!ticket.current()) return;
       setDraftBody("");
-      setDrafts(await m7.reviewDrafts({ worktreeId, remote, number: selected.number }));
+      const nextDrafts = await m7.reviewDrafts({ worktreeId, remote, number: selected.number, headSha: detail?.summary.headSha });
+      if (!ticket.current()) return;
+      setDrafts(nextDrafts);
     } catch (caught) {
+      if (!ticket.current()) return;
       setError(toAppError(caught));
     }
-  }, [draftBody, draftLine, draftPath, login, remote, selected, worktreeId]);
+  }, [draftBody, draftLine, draftPath, login, remote, selected, worktreeId, viewRequests, detail, backendRepoKey]);
 
   const submitReview = useCallback(async () => {
     if (!selected || !detail) return;
@@ -385,6 +406,7 @@ export function GithubPanel({
     }
     setBusy("review");
     setError(null);
+    const ticket = viewRequests.begin("action");
     try {
       // F07：审阅落在列表 / 详情所选的远端仓库，不回退 origin。
       if (remote === null) {
@@ -400,22 +422,27 @@ export function GithubPanel({
         comments: drafts.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, body: draft.body })),
         expectedHeadSha: detail.summary.headSha,
       });
-      setReceipts(await m7.githubReceipts(worktreeId));
+      if (!ticket.current()) return;
+      const nextReceipts = await m7.githubReceipts(worktreeId);
+      if (!ticket.current()) return;
+      setReceipts(nextReceipts);
       setDrafts([]);
       setReviewBody("");
       setNotice(t("github.reviewSubmitted", { url: receipt.reviewUrl ?? "" }));
       onWorkspaceTouched();
     } catch (caught) {
+      if (!ticket.current()) return;
       setError(toAppError(caught));
     } finally {
-      setBusy(null);
+      ticket.apply(() => setBusy((current) => current === "review" ? null : current));
     }
-  }, [detail, drafts, onWorkspaceTouched, remote, reviewBody, reviewEvent, selected, worktreeId]);
+  }, [detail, drafts, onWorkspaceTouched, remote, reviewBody, reviewEvent, selected, worktreeId, viewRequests]);
 
   const checkout = useCallback(async (overwriteConfirmed = false) => {
     if (!selected || !detail || remote === null) return;
     setBusy("checkout");
     setError(null);
+    const ticket = viewRequests.begin("action");
     try {
       const outcome = await onCheckout({
         worktreeId,
@@ -426,9 +453,11 @@ export function GithubPanel({
         localBranch: null,
         overwriteConfirmed,
       });
+      if (!ticket.current()) return;
       setNotice(t("github.checkoutDone", { branch: outcome.branch }));
       onCheckedOut(outcome);
     } catch (caught) {
+      if (!ticket.current()) return;
       const failure = toAppError(caught);
       // H4：分支分叉时给用户一次明确确认覆盖的机会。
       if (failure.code === "errors.m7.githubPrBranchDiverged" && !overwriteConfirmed) {
@@ -436,14 +465,15 @@ export function GithubPanel({
       }
       setError(failure);
     } finally {
-      setBusy(null);
+      ticket.apply(() => setBusy((current) => current === "checkout" ? null : current));
     }
-  }, [detail, onCheckedOut, onCheckout, remote, selected, worktreeId]);
+  }, [detail, onCheckedOut, onCheckout, remote, selected, worktreeId, viewRequests]);
 
   const merge = useCallback(async () => {
     if (!selected || !detail) return;
     setBusy("merge");
     setError(null);
+    const ticket = viewRequests.begin("action");
     try {
       // F07：合并落在列表 / 详情所选的远端仓库，不回退 origin。
       if (remote === null) {
@@ -460,6 +490,7 @@ export function GithubPanel({
         commitMessage: null,
         confirmed: mergeConfirmed,
       });
+      if (!ticket.current()) return;
       if (outcome.status === "merged") {
         setNotice(t("github.mergeDone", { sha: outcome.sha ?? "" }));
       } else if (outcome.error) {
@@ -468,20 +499,25 @@ export function GithubPanel({
       } else {
         setNotice(t("github.mergeNotDone", { status: outcome.status, message: outcome.message }));
       }
-      setReceipts(await m7.githubReceipts(worktreeId));
+      if (!ticket.current()) return;
+      const nextReceipts = await m7.githubReceipts(worktreeId);
+      if (!ticket.current()) return;
+      setReceipts(nextReceipts);
       setMergeConfirmed(false);
       onWorkspaceTouched();
     } catch (caught) {
+      if (!ticket.current()) return;
       setError(toAppError(caught));
     } finally {
-      setBusy(null);
+      ticket.apply(() => setBusy((current) => current === "merge" ? null : current));
     }
-  }, [detail, mergeConfirmed, mergeMethod, onWorkspaceTouched, selected, worktreeId]);
+  }, [detail, mergeConfirmed, mergeMethod, onWorkspaceTouched, selected, worktreeId, viewRequests, remote]);
 
   const createPr = useCallback(async () => {
     if (remote === null) return;
     setBusy("create");
     setError(null);
+    const ticket = scopeRequests.begin("action");
     try {
       // F18：head 按“来源远端 owner:branch”（同仓库省略 owner）；支持已有 fork。
       const source = remotes.find((entry) => entry.name === createSourceRemote);
@@ -495,15 +531,17 @@ export function GithubPanel({
         body: createBody,
         draft: createDraft,
       });
+      if (!ticket.current()) return;
       setNotice(t("github.created", { number: created.number }));
       setTab("pulls");
       await loadList(1);
     } catch (caught) {
+      if (!ticket.current()) return;
       setError(toAppError(caught));
     } finally {
-      setBusy(null);
+      ticket.apply(() => setBusy((current) => current === "create" ? null : current));
     }
-  }, [createBase, createBody, createDraft, createSourceRemote, createTitle, currentBranch, loadList, remote, remotes, worktreeId]);
+  }, [createBase, createBody, createDraft, createSourceRemote, createTitle, currentBranch, loadList, remote, remotes, worktreeId, scopeRequests]);
 
   const needConfirm = useMemo(() => {
     if (!detail) return false;
@@ -582,6 +620,7 @@ export function GithubPanel({
                     className="toolbar-widget h-6 px-2"
                     onClick={() => {
                       // F16：取消授权——停止轮询并结束本地流程。
+                      statusRequests.begin("auth");
                       if (pollTimer.current !== null) window.clearTimeout(pollTimer.current);
                       void m7.githubDeviceCancel(device.flowId).catch(() => undefined);
                       setDevice(null);
@@ -731,7 +770,7 @@ export function GithubPanel({
                     disabled={busy !== null}
                     onClick={() => {
                       // F19：完整 diff 走 GitHub diff 媒体类型，不受 files 补丁裁剪影响。
-                      void m7.prDiff({ worktreeId, remote, number: selected.number }).then(setFullDiff).catch((caught) => setError(toAppError(caught)));
+                      void githubResponse(viewRequests.begin("diff"), () => m7.prDiff({ worktreeId, remote, number: selected.number }), setFullDiff, (caught) => setError(toAppError(caught)));
                     }}
                   >
                     {t("github.viewFullDiff")}
@@ -826,9 +865,10 @@ export function GithubPanel({
                         className="icon-action size-5"
                         aria-label={t("common.delete")}
                         onClick={() =>
-                          void m7.reviewDraftDelete(draft.id).then(async () => {
-                            setDrafts(await m7.reviewDrafts({ worktreeId, remote, number: selected.number }));
-                          })
+                          void githubResponse(viewRequests.begin("drafts"), async () => {
+                            await m7.reviewDraftDelete(draft.id);
+                            return m7.reviewDrafts({ worktreeId, remote, number: selected.number, headSha: detail.summary.headSha });
+                          }, setDrafts, (caught) => setError(toAppError(caught)))
                         }
                       >
                         <Codicon name="trash" size={12} />

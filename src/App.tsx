@@ -6252,6 +6252,7 @@ export function App() {
 
           {githubOpen && worktreeId ? (
             <GithubPanel
+              key={worktreeId}
               worktreeId={worktreeId}
               worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
               currentBranch={snapshot?.branch ?? null}

@@ -357,6 +357,7 @@ export function M7GithubSettings({
                     void m7
                       .githubBindRepo(worktreeId, account.login)
                       .then(() => {
+                        window.dispatchEvent(new Event("revia-github-account-changed"));
                         onChangeAccount();
                         return reload();
                       })
@@ -373,6 +374,7 @@ export function M7GithubSettings({
                   void m7
                     .githubLogout(account.login)
                     .then(async () => {
+                      window.dispatchEvent(new Event("revia-github-account-changed"));
                       await reload();
                       onChangeAccount();
                     })

@@ -71,3 +71,11 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 S109“草稿…绑定PR与提交版本；发布前重新核对版本…head变化时保留…不自动改用新版本发送”。后端repoKey修正且ReviewDraft增加head。打开详情请求202带summary.headSha并在221用于草稿过滤，但添加后 `346 reviewDrafts({worktreeId,remote,number})`省略head，后端 `pr.rs:654–659 None=>all`立即把旧head草稿重新混进列表；提交:372把所有drafts仅映射path/line/body，丢弃head，并只用当前detail.headSha。后端681–729只核当前PR与request.expected_head_sha，无法识别旧草稿版本。触发：PR在H1有草稿，更新到H2后新增一条草稿，旧H1草稿随重载一起按H2发布。成功还 `pr.rs:742–746 clear(repo_key,number)`清掉所有head草稿。repo_key仍只有本地worktree路径，未包含账号/remote/真实owner/repo，两个remote同号PR会共用草稿。新 `openDetail:212–213 setReviewBody/setCommentBody("")`不是“按PR保留”，是切PR即丢未提交正文。上述具体错误不依赖真实App配置。
 
 </details>
+
+### Codex 直接修复 F08 — 2026-10-31
+
+PR面板的列表、详情、评论提交/重载、审阅回执、完整diff、草稿保存/删除、合并、检出、创建及授权回包均按原目标与请求代际落状态。目标包含worktree、账号、remote及其仓库URL；详情另含PR。切换后旧成功、错误与finally均不能污染新目标或清掉新操作busy；刷新同一PR也使旧显示失效。账号设置完成时发出本地变更通知，面板重新核对；卸载失效全部旧请求。工作区检出仍由原请求进入既有全局写门，迟到的显示不会刷新当前另一worktree。
+
+`github-requests-node-01` 8项生产GithubRequests/githubResponse竞态回归通过，验证账号/worktree/remote/URL/PR切换、A→B→A、同类重复请求、独立通道、错误与卸载；不是桌面验收。`github-requests-frontend-build-01`与`github-requests-lint-01` exit0，原hash/argv/真实exit/stdout/stderr均在批次codex-checks。该组没有新增locale键。
+
+F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍独立待修，不能把本组通过当作F09完成。F13/F22和任务13/14真实桌面也尚未完成。

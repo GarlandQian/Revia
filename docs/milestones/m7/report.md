@@ -160,3 +160,11 @@ Release 二进制 sha256：`1e6d3f1c83164a07c25a77591b630eddfd2e5f63492c5a8f80c8
 原始证据在 `/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`：`protection-cargo-02` 7项通过，真实loopback HTTP及独占Git/HOME/appdata覆盖完整分页、清空替换、失败保留、迟到响应、账号/remote/仓库隔离、重建与权限失败；直接调用生产强推判断验证并集。`protection-cargo-01`既有branch_remote31项与PR检出8项通过，但本组6通过/1失败（测试HTTP服务把无请求空连接的读取超时当失败）；修正服务后仅重跑受影响7项，完整失败原件保留。`protection-lib-01`现有GitHub库32项通过；`protection-bindings-01`导出1项通过。前端`protection-frontend-build-01`、`protection-lint-01`和`protection-x18n-01` exit0，翻译0错误/76个既有unused-key警告，不删除保留键。源码hash、精确argv、真实exit和分流stdout/stderr逐轮保存；x18n首次沙箱缓存EPERM也保留，非产品检查失败。
 
 官方branches文档原件在`impl/protection-official.json`。本组仍是中间检查点；F08/F09与F13/F22尚未完成，任务13/14的真实桌面事实仍缺，不称整体通过或最终候选。
+
+### Codex 直接修复 F08 — 2026-10-31
+
+PR面板的列表、详情、评论提交/重载、审阅回执、完整diff、草稿保存/删除、合并、检出、创建及授权回包均按原目标与请求代际落状态。目标包含worktree、账号、remote及其仓库URL；详情另含PR。切换后旧成功、错误与finally均不能污染新目标或清掉新操作busy；刷新同一PR也使旧显示失效。账号设置完成时发出本地变更通知，面板重新核对；卸载失效全部旧请求。工作区检出仍由原请求进入既有全局写门，迟到的显示不会刷新当前另一worktree。
+
+`github-requests-node-01` 8项生产GithubRequests/githubResponse竞态回归通过，验证账号/worktree/remote/URL/PR切换、A→B→A、同类重复请求、独立通道、错误与卸载；不是桌面验收。`github-requests-frontend-build-01`与`github-requests-lint-01` exit0，原hash/argv/真实exit/stdout/stderr均在批次codex-checks。该组没有新增locale键。
+
+F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍独立待修，不能把本组通过当作F09完成。F13/F22和任务13/14真实桌面也尚未完成。

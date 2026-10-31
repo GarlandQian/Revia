@@ -61,3 +61,11 @@ S105“按服务器节流和刷新轮换结果持久保存”。auth:69–75新�
 独占回归`src-tauri/tests/m7_github_auth.rs`从真实start_device_flow/poll_device_flow/client_for/logout入口运行。`github-auth-cargo-05`顶层1项集成测试，包含rotate/denied/expired/redirect四个独立子进程场景，每个场景同时覆盖文件模式、登出清理失败及旧凭据迁移；不能把嵌套harness计数相加。全部仅用假令牌、独占HOME/appdata/凭据文件和loopback HTTP，不访问系统钥匙串或真实GitHub账号。`github-unit-cargo-01`32项通过（包含类型导出），`command-log-unit-cargo-01`通过；前端构建`codex-frontend-build-03`与`codex-x18n-02`exit0，后者0错误/69警告。
 
 原件均在`/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`；源码hash/精确argv/真实exit/原stdout/stderr逐轮保存。`impl/github-refresh-finalize-failure-observed.json`保留补丁匹配失败与实际执行停点，未覆盖已执行改动。本组未做系统钥匙串/真实桌面验收，任务状态不据此改为完成。formalRepairUsed仍为true，不再派Pi。
+
+### Codex 直接修复 F08 — 2026-10-31
+
+PR面板的列表、详情、评论提交/重载、审阅回执、完整diff、草稿保存/删除、合并、检出、创建及授权回包均按原目标与请求代际落状态。目标包含worktree、账号、remote及其仓库URL；详情另含PR。切换后旧成功、错误与finally均不能污染新目标或清掉新操作busy；刷新同一PR也使旧显示失效。账号设置完成时发出本地变更通知，面板重新核对；卸载失效全部旧请求。工作区检出仍由原请求进入既有全局写门，迟到的显示不会刷新当前另一worktree。
+
+`github-requests-node-01` 8项生产GithubRequests/githubResponse竞态回归通过，验证账号/worktree/remote/URL/PR切换、A→B→A、同类重复请求、独立通道、错误与卸载；不是桌面验收。`github-requests-frontend-build-01`与`github-requests-lint-01` exit0，原hash/argv/真实exit/stdout/stderr均在批次codex-checks。该组没有新增locale键。
+
+F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍独立待修，不能把本组通过当作F09完成。F13/F22和任务13/14真实桌面也尚未完成。

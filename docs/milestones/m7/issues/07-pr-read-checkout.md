@@ -123,3 +123,11 @@ fetch使用每次独占临时引用，不改已有PR引用、不额外取tag或�
 `--no-write-fetch-head`在[官方Git 2.29说明](https://raw.githubusercontent.com/git/git/v2.29.0/Documentation/RelNotes/2.29.0.txt)中加入，当前可选PR检出在任何网络/写之前检查此能力，复用既有双语版本错误；其它功能的全局最低版本未改。回归用独占包装器报告2.28验证门禁，不能冒称运行了真实2.28二进制。官方读取原件保存在impl/pr-checkout-git-official.json；Grok连接失败后用可用官方网页读取渠道取得，不更换实施模型。
 
 本组仍是中间检查点；F08/F09 PR迟到响应与草稿身份、F10完整保护缓存/并集、F13/F22更新协调仍未完成。真实PR账号、原生窗口关闭和桌面检出待任务14验收。
+
+### Codex 直接修复 F08 — 2026-10-31
+
+PR面板的列表、详情、评论提交/重载、审阅回执、完整diff、草稿保存/删除、合并、检出、创建及授权回包均按原目标与请求代际落状态。目标包含worktree、账号、remote及其仓库URL；详情另含PR。切换后旧成功、错误与finally均不能污染新目标或清掉新操作busy；刷新同一PR也使旧显示失效。账号设置完成时发出本地变更通知，面板重新核对；卸载失效全部旧请求。工作区检出仍由原请求进入既有全局写门，迟到的显示不会刷新当前另一worktree。
+
+`github-requests-node-01` 8项生产GithubRequests/githubResponse竞态回归通过，验证账号/worktree/remote/URL/PR切换、A→B→A、同类重复请求、独立通道、错误与卸载；不是桌面验收。`github-requests-frontend-build-01`与`github-requests-lint-01` exit0，原hash/argv/真实exit/stdout/stderr均在批次codex-checks。该组没有新增locale键。
+
+F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍独立待修，不能把本组通过当作F09完成。F13/F22和任务13/14真实桌面也尚未完成。
