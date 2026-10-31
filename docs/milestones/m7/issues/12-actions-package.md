@@ -117,3 +117,28 @@ update package 新 3 项实测下载验签、保存、关闭 fixture HTTP、新 
 按用户提供的发布接线说明，`release.yml` 在 build-macos 整个任务环境注入公开仓库变量 `REVIA_GITHUB_CLIENT_ID`，前置检查在其缺失或为空时直接失败。Rust现有运行时/编译时读取链路已核对，无需写死Client ID或使用client secret。`docs/release.md`同步变量表和缺失处理。只读GitHub元数据确认两个仓库变量均非空、两个签名Secret名称存在；没有读取密钥值或修改远端设置。
 
 `release-client-id-config-01`真实exit0：生产YAML逐字复制到独占fixture解析，确认任务级注入与检查顺序；bash语法通过，正常配置通过，Client ID空/缺失及原有私钥/公钥/地址缺失五个拒绝场景符合预期，原stdout/stderr和各exit保留。全部输入为fixture占位值，未签名、构建安装包、运行Actions或发布；不把仓库变量存在等同于GitHub登录/更新安装验收通过。用户另由Claude处理Liquid Glass，本增量不修改其UI工作。
+
+
+### review17：发布 Client ID 接线独立双轴审查 — 2026-10-31
+
+固定范围 `51db991de514d912e44824479c407c2cd71b0389...88320fa5dc687e53acb7b40b0e2b8c2856c096bb`，只审此次三路径发布接线，不包含此前性能未提交修改或Claude的Liquid Glass工作。以下两轴分别原文追加。
+
+#### Standards（原文）
+
+未发现本增量违反仓库书面规范的硬问题，也未发现值得提出的 Fowler smell；两类发现均为 0，无新增 backlog 候选。
+
+审查固定范围为 `git diff 51db991de514d912e44824479c407c2cd71b0389...88320fa5dc687e53acb7b40b0e2b8c2856c096bb`，仅三条路径。`.github/workflows/release.yml:53,107–110` 从公开仓库 variable 注入 Client ID，在构建前拒绝缺失/空值，不写死身份、不读取 client secret；两处文档同步接线和验证边界，任务仍是 `ready-for-human`。符合 `AGENTS.md` 的增量审查/安全范围、`docs/technical-direction.md:140–159,165` 的分发与认证边界，以及 `docs/agents/issue-tracker.md` 的 Comments 记录约定。
+
+已核对 `release-client-id-config-01` 原始命令、源码清单及独占 fixture 的六组 stdout/stderr/exit：正常配置 exit0，Client ID 空/缺失与三个既有缺失案例均 exit1。fixture 工作流 SHA256 与固定提交相同。本轴没有重跑检查、构建、应用或远端动作；这不是 Actions、GitHub 登录、签名更新或安装验收通过的证据（`docs/agents/local-validation.md:9,16`；`docs/release.md:98,103`）。未审查或改动另六条性能修改及 Claude 的 Liquid Glass 工作。详细规范来源、hunk 判断和证据见 `standards-evidence.md`。
+
+#### Spec（原文）
+
+未发现本增量的规格问题（0 项）。固定范围：`51db991…88320fa`，仅审发布接线。
+
+- **(a) 缺漏或部分实现：无。** 用户说明第二节第 4 步要求在 `build-macos.env` 注入 `REVIA_GITHUB_CLIENT_ID: ${{ vars.REVIA_GITHUB_CLIENT_ID }}`，并在指定前置步骤中“变量为空时直接失败”。工作流第 53 行、第 107–109 行均落实，检查早于第 116 行实际构建；既有 Rust `client_id()` 第 29–37 行包含编译时读取。
+- **(b) 范围扩张：无。** 差异仅涉及工作流、发布配置说明和任务 12 Comments，符合用户说明“只有第二节第 4 步是代码改动”，未触及 Liquid Glass、客户端、版本或发布操作。
+- **(c) 看似满足但实现错误：无。** 任务级环境覆盖 Tauri 构建，空值及缺失均以 exit 1 拒绝，保留原有三项守卫；未写死 Client ID，未引入 client secret。
+
+已核对真实验证原件：工作流副本与固定提交 SHA256 一致，原检查 exit 0，正常配置通过、五项拒绝场景退出符合预期。本轮未重跑检查。按规格 H 第 125 行及任务 12 第 18 行，这仅证明配置与守卫，不代表真实 Actions、GitHub 登录或更新安装验收通过。详见 `spec-evidence.md`。
+
+Codex直接核对固定源码与原始证据：工作流、发布文档字节与检查输入一致，YAML/bash及六场景退出符合预期；任务12 Comments在检查后追加，未冒称完整工作树散列固定通过。Standards硬违反0/判断0，Spec0，两轴完成即结束。接线已完成；真实Actions、GitHub登录、更新签名包安装仍未验。不推送、不打标签、不发布。
