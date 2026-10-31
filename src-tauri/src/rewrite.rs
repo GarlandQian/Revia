@@ -64,6 +64,9 @@ pub struct RewritePreflight {
     /// ref.  Reword / interactive rebase use this to warn before rewriting
     /// already published history; no network request is made.
     pub published: bool,
+    /// 当前分支命中本地与当前账号GitHub缓存的并集；历史确认必须显示该保护提示。
+    #[serde(default)]
+    pub protected_branch: Option<String>,
     pub overwrite_fingerprint: String,
     pub reset_fingerprint: String,
     pub context_version: String,
@@ -370,6 +373,7 @@ pub fn preflight(session: &WorktreeSession, oids: &[String]) -> Result<RewritePr
         has_staged_changes,
         paths,
         published,
+        protected_branch: None,
         overwrite_fingerprint,
         reset_fingerprint,
         context_version: crate::write_guard::context(&session.git)?,

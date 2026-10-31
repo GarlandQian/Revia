@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -60,9 +61,18 @@ pub struct MergeReceipt {
 pub struct ProtectionInfo {
     pub branch: String,
     pub protected: bool,
-    /// `api` 表示来自 GitHub；`unknown` 表示无法确认（按受保护处理）。
+    /// `api` 已完整同步；`stale` 保留的旧结果可能过期；`unknown` 尚未同步。
     pub source: String,
     pub checked_at_ms: u64,
+}
+
+/// 一次完整同步后的集合；失败仅标记stale，保留原时间与集合。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtectionSnapshot {
+    pub branches: Vec<String>,
+    pub checked_at_ms: u64,
+    pub stale: bool,
 }
 
 /// 24 小时后视为过期：过期按“未知”处理，要求用户确认。
@@ -174,6 +184,8 @@ impl ReviewDraftStore {
 pub struct ReceiptStore {
     receipts: PathBuf,
     protection: PathBuf,
+    protection_snapshots: PathBuf,
+    protection_sync: Mutex<BTreeMap<String, u64>>,
 }
 
 impl ReceiptStore {
@@ -181,6 +193,8 @@ impl ReceiptStore {
         Self {
             receipts: data_dir.join("github-receipts.json"),
             protection: data_dir.join("github-protection.json"),
+            protection_snapshots: data_dir.join("github-protection-scoped.json"),
+            protection_sync: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -189,10 +203,7 @@ impl ReceiptStore {
             receipt.id = super::super::sha256_hex(
                 format!(
                     "{}\0{}\0{}\0{}",
-                    receipt.repo_key,
-                    receipt.number,
-                    receipt.action,
-                    receipt.created_at_ms
+                    receipt.repo_key, receipt.number, receipt.action, receipt.created_at_ms
                 )
                 .as_bytes(),
             )[..16]
@@ -243,6 +254,73 @@ impl ReceiptStore {
             .or_default()
             .insert(info.branch.clone(), info.clone());
         super::super::atomic_write(&self.protection, &serde_json::to_vec_pretty(&all)?)
+    }
+
+    /// 完整保护快照和请求代际共用锁；晚到的旧请求不能覆盖较新的结果/失败状态。
+    pub fn protection_snapshot(&self, scope: &str) -> Result<Option<ProtectionSnapshot>> {
+        let _guard = self
+            .protection_sync
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        Ok(self.load_protection_snapshots()?.get(scope).cloned())
+    }
+    pub fn begin_protection_sync(&self, scope: &str) -> u64 {
+        let mut requests = self
+            .protection_sync
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let generation = requests.entry(scope.into()).or_default();
+        *generation += 1;
+        *generation
+    }
+    pub fn finish_protection_sync(
+        &self,
+        scope: &str,
+        generation: u64,
+        branches: Option<Vec<String>>,
+        checked_at_ms: u64,
+    ) -> Result<Option<ProtectionSnapshot>> {
+        let requests = self
+            .protection_sync
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let mut all = self.load_protection_snapshots()?;
+        if requests.get(scope) != Some(&generation) {
+            return Ok(all.get(scope).cloned());
+        }
+        match branches {
+            Some(mut branches) => {
+                branches.sort();
+                branches.dedup();
+                all.insert(
+                    scope.into(),
+                    ProtectionSnapshot {
+                        branches,
+                        checked_at_ms,
+                        stale: false,
+                    },
+                );
+            }
+            None => {
+                if let Some(saved) = all.get_mut(scope) {
+                    saved.stale = true;
+                } else {
+                    return Ok(None);
+                }
+            }
+        }
+        super::super::atomic_write(
+            &self.protection_snapshots,
+            &serde_json::to_vec_pretty(&all)?,
+        )?;
+        Ok(all.get(scope).cloned())
+    }
+    fn load_protection_snapshots(&self) -> Result<BTreeMap<String, ProtectionSnapshot>> {
+        match std::fs::read(&self.protection_snapshots) {
+            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+            Err(error) => Err(error.into()),
+        }
     }
 
     fn load_receipts(&self) -> Vec<MergeReceipt> {

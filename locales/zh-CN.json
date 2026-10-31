@@ -1309,7 +1309,8 @@
       "terminalWorktreeBusy": "此 worktree 正在执行写操作或准备关闭，请稍后再输入终端",
       "terminalCloseFailed": "结束终端进程失败：{cause}",
       "githubCheckoutWriteGuard": "PR 检出写入保护不可用，请重试",
-      "githubPrCheckoutUnverified": "PR 检出未完成，请核对分支与工作区；不会自动重试"
+      "githubPrCheckoutUnverified": "PR 检出未完成，请核对分支与工作区；不会自动重试",
+      "githubProtectionIncomplete": "分支保护响应不完整，已保留上次结果"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
@@ -2010,7 +2011,8 @@
     "cherryPickHintMany": "按顺序把所选提交应用到当前 HEAD。若暂存区或工作区有会被覆盖的改动，需要先选择处理方式。",
     "revertHintMany": "按顺序为所选提交各创建一个反向提交。",
     "singleCommitOnly": "多选时只能 cherry-pick 或 revert",
-    "selectionHasMerge": "所选提交包含合并提交，不能 cherry-pick 或 revert"
+    "selectionHasMerge": "所选提交包含合并提交，不能 cherry-pick 或 revert",
+    "protectedWarning": "分支 {branch} 位于本地配置与当前账号 GitHub 缓存的保护并集中。请确认本次本地历史改写；不会自动推送。"
   },
   "stash": {
     "applied": "已应用 stash",
@@ -2245,7 +2247,11 @@
     "divergedOverwrite": "覆盖本地分支",
     "deviceCancel": "取消授权",
     "viewFullDiff": "查看完整 diff",
-    "createSource": "来源仓库（已有 fork 可选其它远端）"
+    "createSource": "来源仓库（已有 fork 可选其它远端）",
+    "protectionSynced": "已同步",
+    "protectionUnsynced": "保护状态尚未同步",
+    "protectionStale": "可能过期",
+    "syncProtection": "同步分支保护"
   },
   "diagnostics": {
     "title": "诊断信息",

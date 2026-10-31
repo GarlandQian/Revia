@@ -69,6 +69,14 @@ function reviewEventLabel(event: ReviewEvent): string {
   }
 }
 
+function protectionSourceText(source: string): string {
+  switch (source) {
+    case "api": return t("github.protectionSynced");
+    case "stale": return t("github.protectionStale");
+    default: return t("github.protectionUnsynced");
+  }
+}
+
 function patchLines(patch: string) {
   // F19：完整显示 patch 行；视口滚动由 max-h/overflow 控制，不再静默裁剪。
   return patch.split("\n");
@@ -245,7 +253,12 @@ export function GithubPanel({
               setProtection(info);
             }
           })
-          .catch(() => undefined);
+          .catch((caught) => {
+            if (epoch === requestEpoch.current) {
+              setProtection({ branch: summary.baseRef, protected: true, source: "unknown", checkedAtMs: 0 });
+              setError(toAppError(caught));
+            }
+          });
       } catch (caught) {
         if (epoch === requestEpoch.current) setError(toAppError(caught));
       } finally {
@@ -254,6 +267,18 @@ export function GithubPanel({
     },
     [remote, worktreeId],
   );
+
+  // 同步完整远端集合不依赖存在或打开某个PR。
+  const syncProtection = async () => {
+    const epoch = requestEpoch.current;
+    const branch = selected?.baseRef ?? createBase;
+    try {
+      const info = await m7.protectionRefresh(worktreeId, remote, branch);
+      if (epoch === requestEpoch.current) setProtection(info);
+    } catch (caught) {
+      if (epoch === requestEpoch.current) setError(toAppError(caught));
+    }
+  };
 
   const startDeviceFlow = useCallback(async () => {
     setError(null);
@@ -482,7 +507,7 @@ export function GithubPanel({
 
   const needConfirm = useMemo(() => {
     if (!detail) return false;
-    return protection?.protected === true || detail.mergeableState !== "clean";
+    return !protection || protection.source !== "api" || protection.protected || detail.mergeableState !== "clean";
   }, [detail, protection]);
 
   return (
@@ -525,6 +550,15 @@ export function GithubPanel({
           <button type="button" className="icon-action size-5" aria-label={t("common.dismiss")} onClick={() => setNotice(null)}>
             <Codicon name="close" size={12} />
           </button>
+        </div>
+      ) : null}
+
+      {login && remote ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-panel-border px-3 py-1 text-[12px]">
+          <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void syncProtection()}>
+            {t("github.syncProtection")}
+          </button>
+          <span className="text-descriptionforeground">{protectionSourceText(protection?.source ?? "unknown")}</span>
         </div>
       ) : null}
 
@@ -672,9 +706,10 @@ export function GithubPanel({
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     {protection ? (
                       <span className={`rounded px-1.5 py-0.5 ${protection.protected ? "bg-[color-mix(in_srgb,var(--gitdecoration-modifiedresourceforeground)_18%,transparent)]" : "bg-[var(--side-bar-background)]"}`}>
-                        {protection.protected
-                          ? t("github.protected", { branch: protection.branch })
-                          : t("github.notProtected", { branch: protection.branch })}
+                        {protection.source === "unknown" ? protectionSourceText(protection.source) : <>
+                          {protection.protected ? t("github.protected", { branch: protection.branch }) : t("github.notProtected", { branch: protection.branch })}
+                          {protection.source === "stale" ? <span className="ml-1">{protectionSourceText(protection.source)}</span> : null}
+                        </>}
                       </span>
                     ) : null}
                     <span className="text-descriptionforeground">
@@ -907,7 +942,7 @@ export function GithubPanel({
                   {receipt.protectedBranch ? ` · ${t("github.protectedShort")}` : ""}
                 </p>
                 <p className="text-descriptionforeground">
-                  {new Date(receipt.createdAtMs).toLocaleString()} · {receipt.protectionSource}
+                  {new Date(receipt.createdAtMs).toLocaleString()} · {protectionSourceText(receipt.protectionSource)}
                   {receipt.notes.length > 0 ? ` · ${receipt.notes.join("; ")}` : ""}
                 </p>
               </div>

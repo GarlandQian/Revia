@@ -10,6 +10,7 @@
 
 pub mod auth;
 pub mod pr;
+pub mod protection;
 pub mod store;
 
 use std::collections::BTreeMap;

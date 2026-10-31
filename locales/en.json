@@ -917,7 +917,8 @@
       "terminalWorktreeBusy": "This worktree is writing or preparing to close. Wait before entering terminal input.",
       "terminalCloseFailed": "The terminal process could not be ended: {cause}",
       "githubCheckoutWriteGuard": "The PR checkout write guard is unavailable. Try again.",
-      "githubPrCheckoutUnverified": "PR checkout did not complete. Check the branch and working tree; it will not be retried automatically."
+      "githubPrCheckoutUnverified": "PR checkout did not complete. Check the branch and working tree; it will not be retried automatically.",
+      "githubProtectionIncomplete": "The branch protection response was incomplete. The previous result was kept."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
@@ -2010,7 +2011,8 @@
     "cherryPickHintMany": "Apply the selected commits onto the current HEAD in order. If the Staging Area or working tree has changes that would be overwritten, choose how to handle them first.",
     "revertHintMany": "Create a reverse commit for each selected commit, in order.",
     "singleCommitOnly": "With several commits selected, only cherry-pick and revert are available",
-    "selectionHasMerge": "The selection contains a merge commit, so cherry-pick and revert are unavailable"
+    "selectionHasMerge": "The selection contains a merge commit, so cherry-pick and revert are unavailable",
+    "protectedWarning": "Branch {branch} is protected by your local settings or the current account's GitHub cache. Confirm this local history rewrite; it will not push automatically."
   },
   "stash": {
     "applied": "Stash applied",
@@ -2245,7 +2247,11 @@
     "divergedOverwrite": "Overwrite local branch",
     "deviceCancel": "Cancel sign-in",
     "viewFullDiff": "View full diff",
-    "createSource": "Source repository (pick a fork remote if needed)"
+    "createSource": "Source repository (pick a fork remote if needed)",
+    "protectionSynced": "Synced",
+    "protectionUnsynced": "Protection has not been synced",
+    "protectionStale": "May be out of date",
+    "syncProtection": "Sync branch protection"
   },
   "diagnostics": {
     "title": "Diagnostics",

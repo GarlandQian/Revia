@@ -2365,16 +2365,10 @@ pub async fn update_project(
 fn protected_with_github(
     github: &Arc<crate::m7::github::GithubState>,
     session: &crate::session::WorktreeSession,
+    remote: Option<&str>,
     local: &[String],
-) -> Vec<String> {
-    let mut merged: Vec<String> = local.to_vec();
-    let repo_key = crate::m7::github::GithubState::repo_key(&session.path);
-    for branch in github.receipts().protected_branches(&repo_key) {
-        if !merged.contains(&branch) {
-            merged.push(branch);
-        }
-    }
-    merged
+) -> Result<Vec<String>> {
+    crate::m7::github::protection::effective(session, github, remote, local)
 }
 
 #[tauri::command]
@@ -2386,7 +2380,10 @@ pub async fn push_preview(
     let session = state.worktree_session(&request.worktree_id)?;
     let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
-        let protected = protected_with_github(&github, &session, &settings.protected_branches);
+        let preview = crate::remote_ops::push_preview(&session, &settings.protected_branches)?;
+        let protected = protected_with_github(
+            &github, &session, Some(&preview.remote), &settings.protected_branches,
+        )?;
         crate::remote_ops::push_preview(&session, &protected)
     })
     .await
@@ -2411,10 +2408,18 @@ pub async fn push_branch(
     let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
         // F10：实际推送保护使用并集。
-        let protected = protected_with_github(&github, &session, &settings.protected_branches);
+        let remote = match &request.request.remote {
+            Some(remote) => remote.clone(),
+            None => crate::remote_ops::push_preview(&session, &settings.protected_branches)?.remote,
+        };
+        let protected = protected_with_github(
+            &github, &session, Some(&remote), &settings.protected_branches,
+        )?;
+        let mut push_request = request.request;
+        push_request.remote = Some(remote);
         crate::remote_ops::push(
             &session,
-            &request.request,
+            &push_request,
             &protected,
             crate::remote_ops::default_network_timeout(),
         )
@@ -3747,9 +3752,15 @@ pub async fn rewrite_preflight(
     reset_target: Option<String>,
 ) -> Result<crate::rewrite::RewritePreflight> {
     let session = state.session(&worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || match reset_target {
-        Some(target) => crate::rewrite::reset_preflight(&session, &target),
-        None => crate::rewrite::preflight(&session, &oids),
+    let settings = settings_snapshot(&state)?;
+    let github = Arc::clone(&state.m7_github);
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut result = match reset_target {
+            Some(target) => crate::rewrite::reset_preflight(&session, &target)?,
+            None => crate::rewrite::preflight(&session, &oids)?,
+        };
+        result.protected_branch = crate::m7::github::protection::history_branch(&session, &github, &settings.protected_branches)?;
+        Ok(result)
     })
         .await
         .map_err(|error| {

@@ -14,7 +14,7 @@ use crate::git::NETWORK_TIMEOUT;
 use crate::remote_ops::{self, CheckoutResult, CheckoutStrategy, CheckoutTarget};
 use crate::session::WorktreeSession;
 
-use super::store::{self, MergeReceipt, ProtectionInfo, RemoteInfo, ReviewDraft, PROTECTION_TTL_MS};
+use super::store::{self, MergeReceipt, ProtectionInfo, RemoteInfo, ReviewDraft};
 use super::{GithubClient, GithubState, RateLimit};
 
 /// PR 列表每页条数（GitHub 上限 100，这里用 30 便于分页）。
@@ -1052,7 +1052,7 @@ pub fn merge(context: &PrContext, request: &MergeRequest) -> Result<PrMergeOutco
     let protection = protection_state(context, &summary.base_ref, true)?;
     let state = pull.mergeable_state.clone().unwrap_or_else(|| "unknown".into());
     let requires_confirmation =
-        protection.protected || !matches!(state.as_str(), "clean" | "has_hooks");
+        protection.protected || protection.source != "api" || !matches!(state.as_str(), "clean" | "has_hooks");
     if requires_confirmation && !request.confirmed {
         let receipt = context.state.receipts().append(MergeReceipt {
             id: String::new(),
@@ -1147,62 +1147,8 @@ pub fn merge(context: &PrContext, request: &MergeRequest) -> Result<PrMergeOutco
 }
 
 /// 核对分支保护状态：有缓存用缓存，过期则重新取；取不到时按“未知”处理。
-pub fn protection_state(
-    context: &PrContext,
-    branch: &str,
-    refresh_if_stale: bool,
-) -> Result<ProtectionInfo> {
-    if branch.trim().is_empty() {
-        return Ok(ProtectionInfo {
-            branch: branch.to_string(),
-            protected: false,
-            source: "unknown".into(),
-            checked_at_ms: super::super::now_ms(),
-        });
-    }
-    let now = super::super::now_ms();
-    if let Some(cached) = context.state.receipts().protection(&context.repo_key, branch) {
-        if !refresh_if_stale || now.saturating_sub(cached.checked_at_ms) < PROTECTION_TTL_MS {
-            return Ok(cached);
-        }
-    }
-    let path = format!("{}/branches/{branch}/protection", context.repo_path());
-    match context.client.get_json::<serde_json::Value>(&path) {
-        Ok(_) => {
-            let info = ProtectionInfo {
-                branch: branch.to_string(),
-                protected: true,
-                source: "api".into(),
-                checked_at_ms: now,
-            };
-            let _ = context.state.receipts().store_protection(&context.repo_key, &info);
-            Ok(info)
-        }
-        Err(error) => match error.code {
-            Some("errors.m7.githubNotFound") => {
-                let info = ProtectionInfo {
-                    branch: branch.to_string(),
-                    protected: false,
-                    source: "api".into(),
-                    checked_at_ms: now,
-                };
-                let _ = context.state.receipts().store_protection(&context.repo_key, &info);
-                Ok(info)
-            }
-            // F10：权限不足或网络失败时不改写缓存——旧结果保留并按“可能过期”呈现
-            //（source=unknown 的旧缓存满足这个语义）；完全没有缓存时才按“未知受保护”兜底。
-            _ => Ok(context
-                .state
-                .receipts()
-                .protection(&context.repo_key, branch)
-                .unwrap_or(ProtectionInfo {
-                    branch: branch.to_string(),
-                    protected: true,
-                    source: "unknown".into(),
-                    checked_at_ms: now,
-                })),
-        },
-    }
+pub fn protection_state(context: &PrContext, branch: &str, force_refresh: bool) -> Result<ProtectionInfo> {
+    super::protection::state(context, branch, force_refresh)
 }
 
 /// F19：按 ApiMeta.next_page 翻完整页；失败抛错，不把半截结果当完整。
@@ -1275,7 +1221,7 @@ fn rejected(code: &'static str, message: &'static str) -> AppError {
 }
 
 /// 分支名形状校验（不查 Git，只拒绝明显非法或像选项的名字）。
-fn validate_branch(name: &str) -> Result<()> {
+pub(crate) fn validate_branch(name: &str) -> Result<()> {
     if name.is_empty()
         || name.len() > 255
         || name.starts_with('-')

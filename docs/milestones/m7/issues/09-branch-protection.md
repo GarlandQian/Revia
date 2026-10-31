@@ -53,3 +53,13 @@ Codex 核对：以上为固定源码及原证据支持的审查发现；未执�
 S111“与本地…取并集；完整分页成功才替换缓存；失败保留旧结果并标注可能过期”。push_preview/push确已调用commands:2304–2358的并集，但 `pr.rs:1057`仍仅访问一个 `/branches/{branch}/protection`，未获取分页完整分支集合；没打开某受保护分支PR就没有该缓存，实际push并集仍缺它。失败:1082直接返回原ProtectionInfo，原source仍为api/旧时间，并没有标陈旧；404:1070–1077仍把旧true写成false，权限/安装范围不可见也可能404。`protected_with_github`仅两处push消费者，任务09明确要求的历史操作保护没有接入。缓存键也没有所选remote/账号，切目标不隔离。这是F10同一同步/消费链的未完成部分；没有执行远端强推。
 
 </details>
+
+### Codex 直接修复 F10 — 2026-10-31
+
+保护同步改为读取 `branches?protected=true&per_page=100` 的完整分页集合；独立同步入口不依赖存在或打开PR。只有全部页成功才替换；401/403/404/429/网络、坏JSON、字段缺失和中途失败保留旧集合与原时间并标记可能过期。首次无缓存显示尚未同步。缓存绑定真实worktree身份、账号、remote及GitHub仓库，旧无身份缓存保留原件而不自动认领。请求代际与原子落盘共锁，旧请求不能覆盖较新成功或失败。
+
+实际推送按固定的目标remote与本地列表取并集，生产强推入口拒绝保护分支；历史改写确认显示当前账号各GitHub远端与本地保护列表的并集。普通本地历史与推送只读账号资料及缓存，不访问或刷新API凭据。不修改远端保护规则。
+
+原始证据在 `/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`：`protection-cargo-02` 7项通过，真实loopback HTTP及独占Git/HOME/appdata覆盖完整分页、清空替换、失败保留、迟到响应、账号/remote/仓库隔离、重建与权限失败；直接调用生产强推判断验证并集。`protection-cargo-01`既有branch_remote31项与PR检出8项通过，但本组6通过/1失败（测试HTTP服务把无请求空连接的读取超时当失败）；修正服务后仅重跑受影响7项，完整失败原件保留。`protection-lib-01`现有GitHub库32项通过；`protection-bindings-01`导出1项通过。前端`protection-frontend-build-01`、`protection-lint-01`和`protection-x18n-01` exit0，翻译0错误/76个既有unused-key警告，不删除保留键。源码hash、精确argv、真实exit和分流stdout/stderr逐轮保存；x18n首次沙箱缓存EPERM也保留，非产品检查失败。
+
+官方branches文档原件在`impl/protection-official.json`。本组仍是中间检查点；F08/F09与F13/F22尚未完成，任务13/14的真实桌面事实仍缺，不称整体通过或最终候选。

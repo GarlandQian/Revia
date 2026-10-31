@@ -281,6 +281,8 @@ sources:
     en: 1186a2fdd4b536
   errors.m7.githubProtectedBranchConfirm:
     en: 154a43ee46f752
+  errors.m7.githubProtectionIncomplete:
+    en: 19dbbcfca0fa04
   errors.m7.githubRateLimited:
     en: 18a1d23fddb909
   errors.m7.githubRemoteNotGithub:
@@ -499,6 +501,12 @@ sources:
     en: c0a9e80cf9785
   github.protectedShort:
     en: 11e631fa901722
+  github.protectionStale:
+    en: 17c5c93dd08297
+  github.protectionSynced:
+    en: 18a43a4c2ad84a
+  github.protectionUnsynced:
+    en: 4549ecf5089ab
   github.rateLimit:
     en: 4efa703e340d9
   github.receiptsTitle:
@@ -523,6 +531,8 @@ sources:
     en: dc28c8b0eac6f
   github.reviewTitle:
     en: 1ef27f5c71794a
+  github.syncProtection:
+    en: 1c6bb663156989
   github.tabCreate:
     en: 32f970c82ab21
   github.tabPulls:
@@ -541,6 +551,8 @@ sources:
     en: 1e655c4dfb1ba9
   historyActions.cherryPickHintMany:
     en: f4d51d451eebe
+  historyActions.protectedWarning:
+    en: 5d9edae3511da
   historyActions.publishedWarning:
     en: 10e8b6854dadc8
   historyActions.revertHintMany:

@@ -5,6 +5,6 @@
  */
 export type ProtectionInfo = { branch: string, protected: boolean, 
 /**
- * `api` 表示来自 GitHub；`unknown` 表示无法确认（按受保护处理）。
+ * `api` 已完整同步；`stale` 保留的旧结果可能过期；`unknown` 尚未同步。
  */
 source: string, checkedAtMs: number, };
