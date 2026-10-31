@@ -51,6 +51,7 @@ import type { RepoEntry } from "@/types/bindings/RepoEntry";
 /** 编辑保存请求（Rust 侧只作为入参，没有导出绑定）。 */
 export interface EditSavePayload {
   worktreeId: string;
+  worktreeIdentity: string;
   path: string;
   baseSha256: string;
   text: string;
@@ -143,8 +144,8 @@ export const m7 = {
   saveEditDraft: (draft: EditDraft) => invoke<EditDraft>("m7_save_edit_draft", { draft }),
   loadEditDraft: (worktreeId: string, path: string) =>
     invoke<EditDraft | null>("m7_load_edit_draft", { request: { worktreeId, path } }),
-  clearEditDraft: (worktreeId: string, path: string) =>
-    invoke<void>("m7_clear_edit_draft", { request: { worktreeId, path } }),
+  clearEditDraft: (worktreeId: string, path: string, worktreeIdentity: string) =>
+    invoke<void>("m7_clear_edit_draft", { request: { worktreeId, path, worktreeIdentity } }),
   listEditDrafts: (worktreeId: string) => invoke<EditDraft[]>("m7_list_edit_drafts", { worktreeId }),
 
   // 内置终端

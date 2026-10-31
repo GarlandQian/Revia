@@ -8,6 +8,7 @@
 
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -60,6 +61,7 @@ pub enum EditNewline {
 #[ts(export)]
 pub struct EditableFile {
     pub worktree_id: String,
+    pub worktree_identity: String,
     pub path: String,
     pub text: Option<String>,
     /// 基线内容指纹（保存时作为“我改的是这一版”的凭据）。
@@ -76,6 +78,7 @@ pub struct EditableFile {
 #[serde(rename_all = "camelCase")]
 pub struct EditSaveRequest {
     pub worktree_id: String,
+    pub worktree_identity: String,
     pub path: String,
     pub base_sha256: String,
     pub text: String,
@@ -99,6 +102,7 @@ pub struct EditSaved {
 #[ts(export)]
 pub struct EditDraft {
     pub worktree_id: String,
+    pub worktree_identity: String,
     pub path: String,
     pub base_sha256: String,
     pub text: String,
@@ -108,30 +112,47 @@ pub struct EditDraft {
 /// 草稿存储（Revia 数据目录，跨重启保留；按 worktree + 路径唯一）。
 pub struct EditDraftStore {
     directory: PathBuf,
+    write_lock: Mutex<()>,
 }
 
 impl EditDraftStore {
     pub fn new(data_dir: &Path) -> Self {
         Self {
             directory: data_dir.join("edit-drafts"),
+            write_lock: Mutex::new(()),
         }
     }
 
     pub fn save(&self, draft: &EditDraft) -> Result<()> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let bytes = serde_json::to_vec_pretty(draft)?;
-        super::atomic_write(&self.path_for(&draft.worktree_id, &draft.path), &bytes)
+        super::atomic_write(
+            &self.path_for(&draft.worktree_id, &draft.path, &draft.worktree_identity),
+            &bytes,
+        )
     }
 
-    pub fn load(&self, worktree_id: &str, path: &str) -> Result<Option<EditDraft>> {
-        match std::fs::read(self.path_for(worktree_id, path)) {
+    pub fn load(&self, worktree_id: &str, path: &str, identity: &str) -> Result<Option<EditDraft>> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        match std::fs::read(self.path_for(worktree_id, path, identity)) {
             Ok(bytes) => Ok(serde_json::from_slice(&bytes).ok()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(error) => Err(error.into()),
         }
     }
 
-    pub fn clear(&self, worktree_id: &str, path: &str) -> Result<()> {
-        match std::fs::remove_file(self.path_for(worktree_id, path)) {
+    pub fn clear(&self, worktree_id: &str, path: &str, identity: &str) -> Result<()> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        match std::fs::remove_file(self.path_for(worktree_id, path, identity)) {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(error.into()),
@@ -139,7 +160,15 @@ impl EditDraftStore {
     }
 
     /// 某个 worktree 的全部草稿（切换仓库、关闭确认时用）。
-    pub fn list(&self, worktree_id: &str) -> Result<Vec<EditDraft>> {
+    pub fn list(&self, worktree_id: &str, identity: &str) -> Result<Vec<EditDraft>> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.list_inner(worktree_id, identity)
+    }
+
+    fn list_inner(&self, worktree_id: &str, identity: &str) -> Result<Vec<EditDraft>> {
         let mut drafts = Vec::new();
         let entries = match std::fs::read_dir(&self.directory) {
             Ok(entries) => entries,
@@ -151,11 +180,13 @@ impl EditDraftStore {
             if path.extension().and_then(|value| value.to_str()) != Some("json") {
                 continue;
             }
-            let Ok(bytes) = std::fs::read(&path) else { continue };
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
             let Ok(draft) = serde_json::from_slice::<EditDraft>(&bytes) else {
                 continue;
             };
-            if draft.worktree_id == worktree_id {
+            if draft.worktree_id == worktree_id && draft.worktree_identity == identity {
                 drafts.push(draft);
             }
         }
@@ -163,10 +194,44 @@ impl EditDraftStore {
         Ok(drafts)
     }
 
-    fn path_for(&self, worktree_id: &str, path: &str) -> PathBuf {
-        let digest = sha256_hex(format!("{worktree_id}\0{path}").as_bytes());
+    /// 暂存/提交等读取相关文件前，和草稿写入/清除共用一把锁。
+    pub fn with_resolved<T>(
+        &self,
+        session: &WorktreeSession,
+        paths: &[String],
+        action: impl FnOnce() -> Result<T>,
+    ) -> Result<T> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let identity = identity_key(session)?;
+        if let Some(draft) = self
+            .list_inner(&session.id, &identity)?
+            .into_iter()
+            .find(|draft| paths.contains(&draft.path))
+        {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.m7.editDraftsUnresolved",
+                "文件 {path} 仍有编辑草稿，请先保存或放弃",
+                &[("path", draft.path)],
+            ));
+        }
+        action()
+    }
+
+    fn path_for(&self, worktree_id: &str, path: &str, identity: &str) -> PathBuf {
+        let digest = sha256_hex(format!("{worktree_id}\0{identity}\0{path}").as_bytes());
         self.directory.join(format!("{digest}.json"))
     }
+}
+
+/// 不把真实路径/文件系统标识交给前端，只带回用于保存与草稿归属的摘要。
+pub fn identity_key(session: &WorktreeSession) -> Result<String> {
+    Ok(sha256_hex(&serde_json::to_vec(
+        &session.require_identity()?,
+    )?))
 }
 
 /// 解析并校验 worktree 内的相对路径（拒绝绝对路径、`..` 与保留名字）。
@@ -180,6 +245,9 @@ fn resolve_path(session: &WorktreeSession, path: &str) -> Result<PathBuf> {
     }
     for component in candidate.components() {
         match component {
+            Component::Normal(part) if part.to_string_lossy().eq_ignore_ascii_case(".git") => {
+                return Err(readonly(EditReadonlyReason::NotInWorktree))
+            }
             Component::Normal(_) | Component::CurDir => {}
             _ => return Err(readonly(EditReadonlyReason::NotInWorktree)),
         }
@@ -187,11 +255,15 @@ fn resolve_path(session: &WorktreeSession, path: &str) -> Result<PathBuf> {
     let full = session.path.join(candidate);
     // 父目录必须仍在 worktree 内（防止符号链接目录把写入带到别处）。
     let parent = full.parent().unwrap_or(&session.path);
-    let canonical_parent = std::fs::canonicalize(parent)
-        .map_err(|_| readonly(EditReadonlyReason::Missing))?;
-    let canonical_root =
-        std::fs::canonicalize(&session.path).map_err(|_| readonly(EditReadonlyReason::NotInWorktree))?;
-    if !canonical_parent.starts_with(&canonical_root) {
+    let canonical_parent =
+        std::fs::canonicalize(parent).map_err(|_| readonly(EditReadonlyReason::Missing))?;
+    let canonical_root = std::fs::canonicalize(&session.path)
+        .map_err(|_| readonly(EditReadonlyReason::NotInWorktree))?;
+    let identity = session.require_identity()?;
+    if !canonical_parent.starts_with(&canonical_root)
+        || canonical_parent.starts_with(&identity.git_dir)
+        || canonical_parent.starts_with(&identity.common_dir)
+    {
         return Err(readonly(EditReadonlyReason::NotInWorktree));
     }
     Ok(full)
@@ -207,10 +279,9 @@ fn readonly(reason: EditReadonlyReason) -> AppError {
             "errors.m7.editSymlinkReadonly",
             "符号链接只读，不能在这里编辑",
         ),
-        EditReadonlyReason::NotRegularFile => (
-            "errors.m7.editNotRegularFile",
-            "不是普通文件，不能编辑",
-        ),
+        EditReadonlyReason::NotRegularFile => {
+            ("errors.m7.editNotRegularFile", "不是普通文件，不能编辑")
+        }
         EditReadonlyReason::Submodule => (
             "errors.m7.editSubmoduleReadonly",
             "子模块只读，请在其 worktree 中打开",
@@ -291,6 +362,7 @@ pub fn open(session: &WorktreeSession, path: &str) -> Result<EditableFile> {
     session.require_identity()?;
     let mut file = EditableFile {
         worktree_id: session.id.clone(),
+        worktree_identity: identity_key(session)?,
         path: path.to_string(),
         text: None,
         base_sha256: None,
@@ -303,7 +375,8 @@ pub fn open(session: &WorktreeSession, path: &str) -> Result<EditableFile> {
     let full = match resolve_path(session, path) {
         Ok(full) => full,
         Err(error) => {
-            file.readonly_reason = Some(reason_of(&error).unwrap_or(EditReadonlyReason::NotInWorktree));
+            file.readonly_reason =
+                Some(reason_of(&error).unwrap_or(EditReadonlyReason::NotInWorktree));
             return Ok(file);
         }
     };
@@ -382,12 +455,28 @@ fn reason_of(error: &AppError) -> Option<EditReadonlyReason> {
 pub fn save(session: &WorktreeSession, request: &EditSaveRequest) -> Result<EditSaved> {
     // 写锁与身份校验沿用既有写门禁（Q90、ADR-0005）：同一 worktree 不并发写。
     let _write = session.acquire_write_lock()?;
-    session.require_identity()?;
+    if request.worktree_id != session.id || request.worktree_identity != identity_key(session)? {
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.session.worktreeIdentityChanged",
+            "worktree 身份已变化，请重新打开仓库后再操作",
+            &[],
+        ));
+    }
+    let status = crate::git::status::read(&session.git)?;
+    if status
+        .entries
+        .iter()
+        .any(|entry| entry.path == request.path && entry.unmerged)
+    {
+        return Err(readonly(EditReadonlyReason::Unmerged));
+    }
     if request.text.contains('\0') {
         return Err(readonly(EditReadonlyReason::Binary));
     }
     let full = resolve_path(session, &request.path)?;
-    let metadata = std::fs::symlink_metadata(&full).map_err(|_| readonly(EditReadonlyReason::Missing))?;
+    let metadata =
+        std::fs::symlink_metadata(&full).map_err(|_| readonly(EditReadonlyReason::Missing))?;
     if metadata.file_type().is_symlink() {
         return Err(readonly(EditReadonlyReason::Symlink));
     }
@@ -415,7 +504,10 @@ pub fn save(session: &WorktreeSession, request: &EditSaveRequest) -> Result<Edit
         return Err(readonly(EditReadonlyReason::TooLarge));
     }
     let result = (|| -> Result<()> {
-        let mut handle = std::fs::OpenOptions::new().write(true).truncate(true).open(&full)?;
+        let mut handle = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&full)?;
         handle.write_all(&encoded)?;
         handle.sync_all()?;
         Ok(())
@@ -426,7 +518,7 @@ pub fn save(session: &WorktreeSession, request: &EditSaveRequest) -> Result<Edit
         return Err(AppError::coded(
             ErrorKind::NeedsVerification,
             "errors.m7.editWriteFailedKeepDraft",
-            "写入文件失败，草稿已保留；请核对磁盘内容后再试",
+            "写入文件失败，草稿已保留；请核对磁盘内容后再试：{cause}",
             &[],
         )
         .cause(error));
@@ -448,13 +540,21 @@ pub fn save(session: &WorktreeSession, request: &EditSaveRequest) -> Result<Edit
             return Err(AppError::coded(
                 ErrorKind::NeedsVerification,
                 "errors.m7.editWriteUnverifiedCause",
-                "写入后无法回读文件，结果待核对；草稿已保留",
+                "写入后无法回读文件，结果待核对；草稿已保留：{cause}",
                 &[],
             )
             .cause(AppError::from(error)));
         }
     }
-    let metadata = std::fs::metadata(&full)?;
+    let metadata = std::fs::metadata(&full).map_err(|error| {
+        AppError::coded(
+            ErrorKind::NeedsVerification,
+            "errors.m7.editWriteUnverifiedCause",
+            "写入后无法回读文件，结果待核对；草稿已保留：{cause}",
+            &[],
+        )
+        .cause(error.into())
+    })?;
     Ok(EditSaved {
         path: request.path.clone(),
         sha256: sha256_hex(&after),

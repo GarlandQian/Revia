@@ -842,9 +842,9 @@
       "editSymlinkReadonly": "Symlinks are read-only and cannot be edited here",
       "editTooLargeReadonly": "The file is larger than the 2 MB edit limit",
       "editUnmergedReadonly": "The conflict is unresolved; handle it in the merge view first",
-      "editWriteFailedKeepDraft": "Writing the file failed; your draft was kept. Check the disk content and try again: {error}",
+      "editWriteFailedKeepDraft": "Writing the file failed; your draft was kept. Check the disk content and try again: {cause}",
       "editWriteUnverified": "Reading back the file did not match what was written; the result needs checking and your draft was kept",
-      "editWriteUnverifiedCause": "The file could not be read back after writing; the result needs checking and your draft was kept: {error}",
+      "editWriteUnverifiedCause": "The file could not be read back after writing; the result needs checking and your draft was kept: {cause}",
       "githubBadResponse": "GitHub returned data that could not be parsed: {error}",
       "githubBranchNameInvalid": "Invalid branch name: {name}",
       "githubClientFailed": "Could not initialise the GitHub client: {error}",
@@ -912,7 +912,8 @@
       "writeTargetDirectory": "The write target is missing a directory",
       "diagnosticsStoreFailed": "Could not read or write diagnostic summaries. Clear the summaries and try again.",
       "diagnosticsSnapshotExpired": "The diagnostic preview has expired. Refresh it before exporting.",
-      "githubCredentialDeleteFailed": "Could not delete GitHub credentials: {error}"
+      "githubCredentialDeleteFailed": "Could not delete GitHub credentials: {error}",
+      "editDraftsUnresolved": "File {path} still has an edit draft. Save or discard it first."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
@@ -2107,15 +2108,17 @@
       "notInWorktree": "Only files inside the current worktree can be edited.",
       "unknown": "This file cannot be edited right now."
     },
-    "conflict": "The file changed on disk, so saving was rejected. Your draft is kept: load the disk version or overwrite with yours.",
+    "conflict": "The disk content changed and your draft was kept. Compare both versions, then load the disk version or confirm it and continue editing. Save again after confirming.",
     "conflictReload": "Load disk version",
-    "conflictKeepMine": "Overwrite with mine",
+    "conflictKeepMine": "Confirm disk version and continue editing",
     "draftRestored": "Restored your local draft (unsaved).",
     "draftDiscard": "Discard draft",
-    "closeConfirm": "This file has unsaved changes. Save them to disk before closing?",
+    "closeConfirm": "This file has an unresolved edit draft. Save it, discard it, or cancel this action.",
     "closeCancel": "Cancel",
-    "closeDiscard": "Keep draft and close",
-    "closeSave": "Save and close"
+    "closeDiscard": "Discard edits",
+    "closeSave": "Save",
+    "diffDiskVersion": "The Git diff uses the disk content; the right side contains your unsaved edit draft.",
+    "reviewAfterSave": "Edits were saved. Review the refreshed changes, then try this action again."
   },
   "terminal": {
     "title": "Terminal",

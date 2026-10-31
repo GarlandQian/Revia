@@ -17,12 +17,12 @@ use super::diagnostics::{DiagnosticsExport, DiagnosticsPreview, DiagnosticsReque
 use super::edit::{EditDraft, EditSaveRequest, EditSaved, EditableFile};
 use super::github::auth::{DevicePoll, DeviceStart};
 use super::github::pr::{
-    self, PrMergeOutcome, MergeRequest, PrCheckoutOutcome, PrCheckoutRequest, PrCreateRequest,
-    PrCreated, PrContext, PullRequestComment, PullRequestDetail, PullRequestFile,
+    self, MergeRequest, PrCheckoutOutcome, PrCheckoutRequest, PrContext, PrCreateRequest,
+    PrCreated, PrMergeOutcome, PullRequestComment, PullRequestDetail, PullRequestFile,
     PullRequestFilter, PullRequestList, ReviewReceipt, ReviewSubmitRequest,
 };
 use super::github::store::{MergeReceipt, ProtectionInfo, RemoteInfo, ReviewDraft};
-use super::github::{GithubAccount, GithubStatus, GithubState};
+use super::github::{GithubAccount, GithubState, GithubStatus};
 use super::terminal::{TerminalOpenRequest, TerminalSessionInfo, TerminalTabRecord};
 use super::theme::{ImportedTheme, ThemeKind};
 use super::update::{AppUpdateStatus, UpdateState};
@@ -36,7 +36,9 @@ fn internal(error: impl std::fmt::Display) -> AppError {
     )
 }
 
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T> + Send + 'static,
+) -> Result<T> {
     // 命令本身是 async：必须 await，不能在运行时线程上 block_on（会 panic）。
     tauri::async_runtime::spawn_blocking(work).await.map_err(internal)?
 }
@@ -56,9 +58,7 @@ pub struct ImportThemeRequest {
 }
 
 #[tauri::command]
-pub async fn m7_list_imported_themes(
-    state: State<'_, AppState>,
-) -> Result<Vec<ImportedTheme>> {
+pub async fn m7_list_imported_themes(state: State<'_, AppState>) -> Result<Vec<ImportedTheme>> {
     let store = Arc::clone(&state.m7_themes);
     blocking(move || store.list()).await
 }
@@ -80,10 +80,7 @@ pub async fn m7_import_theme(
 
 /// 删除导入主题；如果它正被选中，回退到对应的内置主题。
 #[tauri::command]
-pub async fn m7_remove_imported_theme(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<Settings> {
+pub async fn m7_remove_imported_theme(state: State<'_, AppState>, id: String) -> Result<Settings> {
     let store = Arc::clone(&state.m7_themes);
     let removed = store.load(&id).ok();
     store.remove(&id)?;
@@ -142,15 +139,23 @@ pub async fn m7_save_editable(
 pub struct EditDraftRef {
     pub worktree_id: String,
     pub path: String,
+    #[serde(default)]
+    pub worktree_identity: Option<String>,
 }
 
 #[tauri::command]
-pub async fn m7_save_edit_draft(
-    state: State<'_, AppState>,
-    draft: EditDraft,
-) -> Result<EditDraft> {
+pub async fn m7_save_edit_draft(state: State<'_, AppState>, draft: EditDraft) -> Result<EditDraft> {
     let store = Arc::clone(&state.m7_edit_drafts);
+    let session = session_for(&state, &draft.worktree_id)?;
     blocking(move || {
+        if draft.worktree_identity != super::edit::identity_key(&session)? {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.session.worktreeIdentityChanged",
+                "worktree 身份已变化，请重新打开仓库后再操作",
+                &[],
+            ));
+        }
         store.save(&draft)?;
         Ok(draft)
     }).await
@@ -162,16 +167,29 @@ pub async fn m7_load_edit_draft(
     request: EditDraftRef,
 ) -> Result<Option<EditDraft>> {
     let store = Arc::clone(&state.m7_edit_drafts);
-    blocking(move || store.load(&request.worktree_id, &request.path)).await
+    let session = session_for(&state, &request.worktree_id)?;
+    blocking(move || {
+        store.load(
+            &request.worktree_id,
+            &request.path,
+            &super::edit::identity_key(&session)?,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
-pub async fn m7_clear_edit_draft(
-    state: State<'_, AppState>,
-    request: EditDraftRef,
-) -> Result<()> {
+pub async fn m7_clear_edit_draft(state: State<'_, AppState>, request: EditDraftRef) -> Result<()> {
     let store = Arc::clone(&state.m7_edit_drafts);
-    blocking(move || store.clear(&request.worktree_id, &request.path)).await
+    let identity = request.worktree_identity.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.session.worktreeIdentityChanged",
+            "worktree 身份已变化，请重新打开仓库后再操作",
+            &[],
+        )
+    })?;
+    blocking(move || store.clear(&request.worktree_id, &request.path, &identity)).await
 }
 
 #[tauri::command]
@@ -180,7 +198,15 @@ pub async fn m7_list_edit_drafts(
     worktree_id: String,
 ) -> Result<Vec<EditDraft>> {
     let store = Arc::clone(&state.m7_edit_drafts);
-    blocking(move || store.list(&worktree_id)).await
+    // 不认领已删除/替换仓库的旧草稿；原文件保留，不能自动继承到新身份。
+    let Some(session) = session_for(&state, &worktree_id).ok() else {
+        return Ok(Vec::new());
+    };
+    blocking(move || match super::edit::identity_key(&session) {
+        Ok(identity) => store.list(&worktree_id, &identity),
+        Err(_) => Ok(Vec::new()),
+    })
+    .await
 }
 
 // ---------- 内置终端（任务 04） ----------
@@ -509,7 +535,12 @@ pub async fn m7_github_review_drafts(
     request: PrNumberRequest,
 ) -> Result<Vec<ReviewDraft>> {
     let repo_key = GithubState::repo_key(&session_for(&state, &request.worktree_id)?.path);
-    Ok(pr::list_drafts(&state.m7_github, &repo_key, request.number, request.head_sha.as_deref()))
+    Ok(pr::list_drafts(
+        &state.m7_github,
+        &repo_key,
+        request.number,
+        request.head_sha.as_deref(),
+    ))
 }
 
 #[tauri::command]
@@ -521,10 +552,7 @@ pub async fn m7_github_review_draft_save(
 }
 
 #[tauri::command]
-pub async fn m7_github_review_draft_delete(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<()> {
+pub async fn m7_github_review_draft_delete(state: State<'_, AppState>, id: String) -> Result<()> {
     pr::delete_draft(&state.m7_github, &id)
 }
 
@@ -587,19 +615,13 @@ pub async fn m7_github_pr_merge(
 /// F09：前端保存草稿需要与后端一致的 repoKey（worktree 规范路径 SHA）。
 /// F16：取消进行中的设备码授权。
 #[tauri::command]
-pub async fn m7_github_device_cancel(
-    state: State<'_, AppState>,
-    flow_id: String,
-) -> Result<()> {
+pub async fn m7_github_device_cancel(state: State<'_, AppState>, flow_id: String) -> Result<()> {
     let github = Arc::clone(&state.m7_github);
     blocking(move || super::github::auth::cancel_device_flow(&github, &flow_id)).await
 }
 
 #[tauri::command]
-pub async fn m7_github_repo_key(
-    state: State<'_, AppState>,
-    worktree_id: String,
-) -> Result<String> {
+pub async fn m7_github_repo_key(state: State<'_, AppState>, worktree_id: String) -> Result<String> {
     let session = session_for(&state, &worktree_id)?;
     Ok(GithubState::repo_key(&session.path))
 }
@@ -641,9 +663,16 @@ pub async fn m7_preview_diagnostics(
     };
     let command_log = Arc::clone(&state.command_log);
     let summaries = Arc::clone(&state.m7_diagnostics);
-    blocking(move || super::diagnostics::preview(
-        &request, &settings, &command_log, &summaries, session.as_deref(),
-    )).await
+    blocking(move || {
+        super::diagnostics::preview(
+            &request,
+            &settings,
+            &command_log,
+            &summaries,
+            session.as_deref(),
+        )
+    })
+    .await
 }
 
 /// F21：读取持久化的脱敏摘要（按当前 worktree 过滤，7 天内）。

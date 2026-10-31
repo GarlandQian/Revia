@@ -13,7 +13,9 @@ use std::process::Command;
 use std::sync::Arc;
 
 use revia_lib::git::CommandLog;
-use revia_lib::m7::edit::{self, EditDraft, EditDraftStore, EditNewline, EditReadonlyReason, EditSaveRequest};
+use revia_lib::m7::edit::{
+    self, EditDraft, EditDraftStore, EditNewline, EditReadonlyReason, EditSaveRequest,
+};
 use revia_lib::session::WorktreeSession;
 use revia_lib::shell::ShellEnv;
 
@@ -168,6 +170,7 @@ fn open_and_save_round_trip_on_real_worktree() {
         &session,
         &EditSaveRequest {
             worktree_id: session.id.clone(),
+            worktree_identity: edit::identity_key(&session).unwrap(),
             path: "src/hello.txt".into(),
             base_sha256: base.clone(),
             text: "line one\nline two changed\n".into(),
@@ -175,7 +178,10 @@ fn open_and_save_round_trip_on_real_worktree() {
     )
     .expect("保存失败");
 
-    assert_eq!(ctx.read_file("src/hello.txt"), b"line one\nline two changed\n");
+    assert_eq!(
+        ctx.read_file("src/hello.txt"),
+        b"line one\nline two changed\n"
+    );
     assert_ne!(saved.sha256, base, "保存后指纹必须前进");
     assert_eq!(saved.bytes, 26, "保存后字节数应与新正文一致");
 
@@ -187,6 +193,7 @@ fn open_and_save_round_trip_on_real_worktree() {
         &session,
         &EditSaveRequest {
             worktree_id: session.id.clone(),
+            worktree_identity: edit::identity_key(&session).unwrap(),
             path: "src/hello.txt".into(),
             base_sha256: base,
             text: "overwrite from a stale tab\n".into(),
@@ -218,6 +225,7 @@ fn external_change_rejects_save_and_reports_disk_sha() {
         &session,
         &EditSaveRequest {
             worktree_id: session.id.clone(),
+            worktree_identity: edit::identity_key(&session).unwrap(),
             path: "notes.md".into(),
             base_sha256: base,
             text: "draft text\n".into(),
@@ -237,6 +245,7 @@ fn external_change_rejects_save_and_reports_disk_sha() {
         &session,
         &EditSaveRequest {
             worktree_id: session.id.clone(),
+            worktree_identity: edit::identity_key(&session).unwrap(),
             path: "notes.md".into(),
             base_sha256: refreshed.base_sha256.expect("应有基线指纹"),
             text: "draft text\n".into(),
@@ -263,6 +272,7 @@ fn save_preserves_crlf_bom_and_executable_bit() {
         &session,
         &EditSaveRequest {
             worktree_id: session.id.clone(),
+            worktree_identity: edit::identity_key(&session).unwrap(),
             path: "win/crlf.txt".into(),
             base_sha256: opened.base_sha256.expect("应有基线指纹"),
             text: "alpha\r\ngamma\r\n".into(),
@@ -271,7 +281,10 @@ fn save_preserves_crlf_bom_and_executable_bit() {
     .expect("保存失败");
     assert_eq!(saved.newline, EditNewline::Crlf);
     let raw = ctx.read_file("win/crlf.txt");
-    assert_eq!(raw, b"\xEF\xBB\xBFalpha\r\ngamma\r\n", "BOM 与 CRLF 必须保留");
+    assert_eq!(
+        raw, b"\xEF\xBB\xBFalpha\r\ngamma\r\n",
+        "BOM 与 CRLF 必须保留"
+    );
 
     #[cfg(unix)]
     {
@@ -286,6 +299,7 @@ fn save_preserves_crlf_bom_and_executable_bit() {
             &session,
             &EditSaveRequest {
                 worktree_id: session.id.clone(),
+                worktree_identity: edit::identity_key(&session).unwrap(),
                 path: "run.sh".into(),
                 base_sha256: opened.base_sha256.expect("应有基线指纹"),
                 text: "#!/bin/sh\necho two\n".into(),
@@ -293,7 +307,10 @@ fn save_preserves_crlf_bom_and_executable_bit() {
         )
         .expect("保存脚本失败");
         assert!(saved.executable, "保存后应保留可执行位");
-        let mode = fs::metadata(&script).expect("读取元数据失败").permissions().mode();
+        let mode = fs::metadata(&script)
+            .expect("读取元数据失败")
+            .permissions()
+            .mode();
         assert_eq!(mode & 0o777, 0o755, "权限位不得被保存改写");
     }
 }
@@ -320,7 +337,10 @@ fn readonly_reasons_match_file_kind() {
     assert_eq!(missing.readonly_reason, Some(EditReadonlyReason::Missing));
 
     let outside = edit::open(&session, "../escape.txt").expect("打开越界路径失败");
-    assert_eq!(outside.readonly_reason, Some(EditReadonlyReason::NotInWorktree));
+    assert_eq!(
+        outside.readonly_reason,
+        Some(EditReadonlyReason::NotInWorktree)
+    );
 
     #[cfg(unix)]
     {
@@ -335,6 +355,7 @@ fn readonly_reasons_match_file_kind() {
             &session,
             &EditSaveRequest {
                 worktree_id: session.id.clone(),
+                worktree_identity: edit::identity_key(&session).unwrap(),
                 path: "link.txt".into(),
                 base_sha256: "0".repeat(64),
                 text: "written through symlink\n".into(),
@@ -354,6 +375,7 @@ fn draft_store_survives_restart_and_is_scoped() {
 
     let draft = EditDraft {
         worktree_id: "test-worktree".into(),
+        worktree_identity: "fixture-identity-a".into(),
         path: "src/hello.txt".into(),
         base_sha256: "a".repeat(64),
         text: "unsaved text\n".into(),
@@ -363,6 +385,7 @@ fn draft_store_survives_restart_and_is_scoped() {
 
     let other = EditDraft {
         worktree_id: "other-worktree".into(),
+        worktree_identity: "fixture-identity-b".into(),
         path: "src/hello.txt".into(),
         base_sha256: "b".repeat(64),
         text: "other worktree\n".into(),
@@ -373,31 +396,248 @@ fn draft_store_survives_restart_and_is_scoped() {
     // 模拟重启：新的 store 实例指向同一数据目录。
     let restarted = EditDraftStore::new(&ctx.data_dir);
     let loaded = restarted
-        .load("test-worktree", "src/hello.txt")
+        .load("test-worktree", "src/hello.txt", "fixture-identity-a")
         .expect("读取草稿失败")
         .expect("重启后草稿必须还在");
     assert_eq!(loaded.text, "unsaved text\n");
     assert_eq!(loaded.base_sha256, "a".repeat(64));
 
-    let listed = restarted.list("test-worktree").expect("列出草稿失败");
+    let listed = restarted
+        .list("test-worktree", "fixture-identity-a")
+        .expect("列出草稿失败");
     assert_eq!(listed.len(), 1, "草稿必须按 worktree 隔离");
     assert_eq!(listed[0].path, "src/hello.txt");
 
     restarted
-        .clear("test-worktree", "src/hello.txt")
+        .clear("test-worktree", "src/hello.txt", "fixture-identity-a")
         .expect("清除草稿失败");
     assert!(
         restarted
-            .load("test-worktree", "src/hello.txt")
+            .load("test-worktree", "src/hello.txt", "fixture-identity-a")
             .expect("读取草稿失败")
             .is_none(),
         "清除后不得再取回"
     );
     assert!(
         restarted
-            .load("other-worktree", "src/hello.txt")
+            .load("other-worktree", "src/hello.txt", "fixture-identity-b")
             .expect("读取草稿失败")
             .is_some(),
         "清除只影响同一 worktree 的同一路径"
     );
+}
+
+/// 同一路径重建仓库不继承旧身份草稿，旧会话和旧身份保存均被拒绝；旧草稿原件保留。
+#[test]
+fn replacement_repository_does_not_adopt_old_edit_draft() {
+    let ctx = TestContext::new();
+    ctx.write_file("a.txt", b"original\n");
+    ctx.commit_all("initial");
+    let old = ctx.open_session();
+    let opened = edit::open(&old, "a.txt").unwrap();
+    let identity = edit::identity_key(&old).unwrap();
+    let store = EditDraftStore::new(&ctx.data_dir);
+    store
+        .save(&EditDraft {
+            worktree_id: old.id.clone(),
+            worktree_identity: identity.clone(),
+            path: "a.txt".into(),
+            base_sha256: opened.base_sha256.clone().unwrap(),
+            text: "old draft\n".into(),
+            updated_at_ms: 1,
+        })
+        .unwrap();
+    fs::rename(
+        ctx.repo_path.join(".git"),
+        ctx._temp_dir.path().join("original-git"),
+    )
+    .unwrap();
+    ctx.git(&["init", "-b", "main"]);
+    ctx.git(&["config", "user.name", "Replacement Fixture"]);
+    ctx.git(&["config", "user.email", "replacement@example.invalid"]);
+    ctx.git(&["config", "commit.gpgsign", "false"]);
+    ctx.commit_all("replacement");
+    let new = ctx.open_session();
+    let new_identity = edit::identity_key(&new).unwrap();
+    assert_ne!(identity, new_identity);
+    assert!(store
+        .load(&new.id, "a.txt", &new_identity)
+        .unwrap()
+        .is_none());
+    assert!(store.list(&new.id, &new_identity).unwrap().is_empty());
+    assert!(store.load(&old.id, "a.txt", &identity).unwrap().is_some());
+    let request = EditSaveRequest {
+        worktree_id: old.id.clone(),
+        worktree_identity: identity,
+        path: "a.txt".into(),
+        base_sha256: opened.base_sha256.unwrap(),
+        text: "old draft\n".into(),
+    };
+    assert_eq!(
+        edit::save(&old, &request).unwrap_err().code,
+        Some("errors.session.worktreeIdentityChanged")
+    );
+    assert_eq!(
+        edit::save(&new, &request).unwrap_err().code,
+        Some("errors.session.worktreeIdentityChanged")
+    );
+    assert_eq!(ctx.read_file("a.txt"), b"original\n");
+}
+
+/// Git元数据和指向元数据的目录别名不可编辑；不清理index.lock或修改配置。
+#[test]
+fn editor_rejects_git_metadata_and_directory_aliases() {
+    let ctx = TestContext::new();
+    ctx.write_file("a.txt", b"ordinary\n");
+    ctx.commit_all("initial");
+    let session = ctx.open_session();
+    let config_before = ctx.read_file(".git/config");
+    ctx.write_file(".git/index.lock", b"fixture-owned-lock");
+    let mut paths = vec![".git/config", ".git/HEAD", ".git/index.lock"];
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(
+            ctx.repo_path.join(".git"),
+            ctx.repo_path.join("metadata-alias"),
+        )
+        .unwrap();
+        paths.push("metadata-alias/config");
+    }
+    for path in paths {
+        assert_eq!(
+            edit::open(&session, path).unwrap().readonly_reason,
+            Some(EditReadonlyReason::NotInWorktree)
+        );
+        let request = EditSaveRequest {
+            worktree_id: session.id.clone(),
+            worktree_identity: edit::identity_key(&session).unwrap(),
+            path: path.into(),
+            base_sha256: "0".repeat(64),
+            text: "must not be written".into(),
+        };
+        assert_eq!(
+            edit::save(&session, &request).unwrap_err().code,
+            Some("errors.m7.editPathOutsideWorktree")
+        );
+    }
+    assert_eq!(ctx.read_file(".git/config"), config_before);
+    assert_eq!(ctx.read_file(".git/index.lock"), b"fixture-owned-lock");
+}
+
+/// 打开后另一次真实merge产生冲突，旧的编辑保存不得覆盖冲突内容。
+#[test]
+fn save_rechecks_conflicts_created_after_open() {
+    let ctx = TestContext::new();
+    ctx.write_file("a.txt", b"base\n");
+    ctx.commit_all("base");
+    ctx.git(&["checkout", "-b", "side"]);
+    ctx.write_file("a.txt", b"side\n");
+    ctx.commit_all("side");
+    ctx.git(&["checkout", "main"]);
+    ctx.write_file("a.txt", b"main\n");
+    ctx.commit_all("main");
+    let session = ctx.open_session();
+    let opened = edit::open(&session, "a.txt").unwrap();
+    let output = Command::new("git")
+        .current_dir(&ctx.repo_path)
+        .env("HOME", &ctx.fake_home)
+        .env("GIT_CONFIG_GLOBAL", &ctx.global_config)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .args(["merge", "side"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "fixture merge must conflict");
+    assert!(!ctx.git(&["ls-files", "--unmerged"]).is_empty());
+    let conflict = ctx.read_file("a.txt");
+    let request = EditSaveRequest {
+        worktree_id: session.id.clone(),
+        worktree_identity: edit::identity_key(&session).unwrap(),
+        path: "a.txt".into(),
+        base_sha256: opened.base_sha256.unwrap(),
+        text: "old editor\n".into(),
+    };
+    assert_eq!(
+        edit::save(&session, &request).unwrap_err().code,
+        Some("errors.m7.editUnmergedReadonly")
+    );
+    assert_eq!(ctx.read_file("a.txt"), conflict);
+}
+
+/// 实际草稿写门阻止相关文件暂存，但允许无关路径；明确放弃后沿原指纹暂存。
+#[test]
+fn stored_edit_draft_guards_related_real_git_staging() {
+    use revia_lib::git::status::ChangesKind;
+    let ctx = TestContext::new();
+    ctx.write_file("a.txt", b"base A\n");
+    ctx.write_file("b.txt", b"base B\n");
+    ctx.commit_all("initial");
+    ctx.write_file("a.txt", b"disk A\n");
+    ctx.write_file("b.txt", b"disk B\n");
+    let session = ctx.open_session();
+    let store = EditDraftStore::new(&ctx.data_dir);
+    let snapshot = session.refresh().unwrap();
+    let entry = |path: &str| {
+        snapshot
+            .entries
+            .iter()
+            .find(|e| e.path == path && e.changes == ChangesKind::Unstaged)
+            .unwrap()
+    };
+    let a = entry("a.txt");
+    let b = entry("b.txt");
+    let opened = edit::open(&session, "a.txt").unwrap();
+    let identity = edit::identity_key(&session).unwrap();
+    store
+        .save(&EditDraft {
+            worktree_id: session.id.clone(),
+            worktree_identity: identity.clone(),
+            path: "a.txt".into(),
+            base_sha256: opened.base_sha256.unwrap(),
+            text: "unsaved draft A\n".into(),
+            updated_at_ms: 1,
+        })
+        .unwrap();
+    let error = store
+        .with_resolved(&session, &["a.txt".into()], || {
+            session.stage_file("a.txt", &a.fingerprint)
+        })
+        .unwrap_err();
+    assert_eq!(error.code, Some("errors.m7.editDraftsUnresolved"));
+    assert!(ctx.git(&["diff", "--cached", "--name-only"]).is_empty());
+    store
+        .with_resolved(&session, &["b.txt".into()], || {
+            session.stage_file("b.txt", &b.fingerprint)
+        })
+        .unwrap();
+    assert_eq!(ctx.git(&["show", ":b.txt"]), "disk B\n");
+    store.clear(&session.id, "a.txt", &identity).unwrap();
+    store
+        .with_resolved(&session, &["a.txt".into()], || {
+            session.stage_file("a.txt", &a.fingerprint)
+        })
+        .unwrap();
+    assert_eq!(ctx.git(&["show", ":a.txt"]), "disk A\n");
+}
+
+/// 真实文件权限失败沿保存生产入口返回结构化cause，交给同一formatter做双语验证。
+#[cfg(unix)]
+#[test]
+fn edit_io_failure_retains_structured_cause() {
+    use std::os::unix::fs::PermissionsExt;
+    let ctx = TestContext::new();
+    ctx.write_file("readonly.txt", b"unchanged\n"); ctx.commit_all("initial");
+    let session = ctx.open_session(); let opened = edit::open(&session, "readonly.txt").unwrap();
+    let path = ctx.repo_path.join("readonly.txt");
+    let permissions = fs::metadata(&path).unwrap().permissions();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o444)).unwrap();
+    let result = edit::save(&session, &EditSaveRequest { worktree_id: session.id.clone(), worktree_identity: edit::identity_key(&session).unwrap(),
+        path: "readonly.txt".into(), base_sha256: opened.base_sha256.unwrap(), text: "do not lose draft\n".into() });
+    fs::set_permissions(&path, permissions).unwrap();
+    let error = result.expect_err("ordinary user cannot write fixture readonly file");
+    assert_eq!(error.kind, revia_lib::error::ErrorKind::NeedsVerification);
+    assert_eq!(error.code, Some("errors.m7.editWriteFailedKeepDraft"));
+    let payload = error.payload();
+    assert!(payload.cause.is_some());
+    assert_eq!(ctx.read_file("readonly.txt"), b"unchanged\n");
+    println!("EDIT_IO_PAYLOAD_JSON={}", serde_json::to_string(&payload).unwrap());
 }

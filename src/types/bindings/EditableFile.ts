@@ -5,7 +5,7 @@ import type { EditReadonlyReason } from "./EditReadonlyReason";
 /**
  * 打开编辑的结果：可编辑时带正文与基线指纹，否则只带只读原因。
  */
-export type EditableFile = { worktreeId: string, path: string, text: string | null, 
+export type EditableFile = { worktreeId: string, worktreeIdentity: string, path: string, text: string | null,
 /**
  * 基线内容指纹（保存时作为“我改的是这一版”的凭据）。
  */

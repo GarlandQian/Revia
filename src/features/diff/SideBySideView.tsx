@@ -91,6 +91,7 @@ interface WorktreeSideProps {
   worktreeId: string;
   entry: ChangeEntry;
   history?: never;
+  rightEditor?: React.ReactNode;
   isWriting?: boolean;
   onStageSegment?: (action: SegmentAction) => void;
   onUnstageSegment?: (action: SegmentAction) => void;
@@ -102,6 +103,7 @@ interface HistorySideProps {
   history: HistorySideSource;
   worktreeId?: never;
   entry?: never;
+  rightEditor?: never;
   isWriting?: never;
   onStageSegment?: never;
   onUnstageSegment?: never;
@@ -455,7 +457,7 @@ export function SideBySideView(props: SideBySideViewProps) {
   const rightActions = !workspaceLayout || workspaceLayout.conflict ? "none" : workspaceLayout.changes === "unstaged" ? "stage" : "none";
 
   // 段按钮是否可用：Q140“同时忽略空行”一档下按钮变灰并说明原因。
-  const actionsEnabled = !!workspaceLayout?.segmentActionsAvailable && !isWriting;
+  const actionsEnabled = !!workspaceLayout?.segmentActionsAvailable && !isWriting && !props.rightEditor;
   const actionsDisabled = !actionsEnabled;
   const actionFor = (index: number): SegmentAction | null => workspaceLayout?.segmentActions[index] ?? null;
 
@@ -501,7 +503,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           onExpandFold={(index) => setExpandedFolds((current) => new Set(current).add(index))}
         />
         <div className="sbs-gutter relative shrink-0" style={{ width: gutterWidth }} ref={gutterBoxRef}>
-          <canvas ref={gutterRef} className="sbs-bands" />
+          <canvas ref={gutterRef} className={props.rightEditor ? "sbs-bands hidden" : "sbs-bands"} />
           <GutterNumbers
             side="left"
             rows={leftRows}
@@ -521,6 +523,7 @@ export function SideBySideView(props: SideBySideViewProps) {
             width={GUTTER_NUMBERS}
             align="right"
           />
+          {!props.rightEditor ? (
           <GutterNumbers
             side="right"
             rows={rightRows}
@@ -539,7 +542,9 @@ export function SideBySideView(props: SideBySideViewProps) {
             align="left"
             offset={GUTTER_NUMBERS + GUTTER_BAND}
           />
+          ) : null}
         </div>
+        {props.rightEditor ? <div className="flex min-h-0 min-w-0 flex-1">{props.rightEditor}</div> : (
         <SideColumn
           handleRef={rightRef}
           side="right"
@@ -567,6 +572,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           hovered={hovered}
           onExpandFold={(index) => setExpandedFolds((current) => new Set(current).add(index))}
         />
+        )}
       </div>
     </div>
   );

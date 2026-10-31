@@ -120,9 +120,13 @@ import { matchShortcut, setShortcutOverrides as applyShortcutOverrides } from "@
 import { GlassIcons } from "@/components/m7/glass";
 import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { useReducedMotion, useThemeKind } from "@/hooks/useGlassPrefs";
-import { flushM7State } from "@/lib/m7/flush";
+import { flushM7State, registerM7Flusher } from "@/lib/m7/flush";
 import { m7, onM7Events } from "@/lib/m7/api";
-import { EditableWorkspace } from "@/features/m7/EditableWorkspace";
+import { EditableWorkspace, EditDecisionDialog } from "@/features/m7/EditableWorkspace";
+import { EditSessions, type EditSession, type EditTarget } from "@/lib/m7/editSession";
+import { runEditWrite } from "@/lib/m7/editWrite";
+import type { EditSavePayload } from "@/lib/m7/api";
+import type { EditSaved } from "@/types/bindings/EditSaved";
 import { TerminalPanel } from "@/features/m7/TerminalPanel";
 import { CloneDialog } from "@/features/m7/CloneDialog";
 import { GithubPanel } from "@/features/m7/GithubPanel";
@@ -381,9 +385,36 @@ export function App() {
   const [terminalHeight, setTerminalHeight] = useState(240);
   /** 正在编辑的文件（同一时刻只编辑一个，切换文件前先处理未保存改动）。 */
   const [editingPath, setEditingPath] = useState<string | null>(null);
-  const [editDirty, setEditDirty] = useState(false);
-  const editingRef = useRef<{ path: string | null; dirty: boolean }>({ path: null, dirty: false });
-  editingRef.current = { path: editingPath, dirty: editDirty };
+  const [editingWorktreeId, setEditingWorktreeId] = useState<string | null>(null);
+  const editWriteRef = useRef<((request: EditSavePayload) => Promise<EditSaved>) | null>(null);
+  const editReportRef = useRef<(target: EditTarget, error: AppErrorPayload) => void>(() => undefined);
+  const editBlockedRef = useRef<(id: string) => boolean>(() => false);
+  const [editSessions] = useState(() => new EditSessions({
+    open: ({ worktreeId, path }) => m7.openEditable(worktreeId, path),
+    loadDraft: ({ worktreeId, path }) => m7.loadEditDraft(worktreeId, path),
+    listDrafts: (id) => m7.listEditDrafts(id),
+    persist: (draft) => m7.saveEditDraft(draft),
+    clear: ({ worktreeId, path }, identity) => m7.clearEditDraft(worktreeId, path, identity),
+    save: (request) => editWriteRef.current ? editWriteRef.current(request) : Promise.reject(localizedError("internal", "errors.closeGuard.installing")),
+    blocked: (id) => editBlockedRef.current(id),
+    report: (target, error) => editReportRef.current(target, error),
+  }));
+  useSyncExternalStore(editSessions.subscribe, editSessions.snapshot);
+  const editDirty = editingPath && editingWorktreeId
+    ? editSessions.get({ worktreeId: editingWorktreeId, path: editingPath }).dirty : false;
+  const [editDecision, setEditDecision] = useState<EditSession | null>(null);
+  const editDecisionRef = useRef<((resolved: boolean) => void) | null>(null);
+  const askEdit = useCallback((session: EditSession): Promise<boolean> => new Promise((resolve) => {
+    editDecisionRef.current = resolve; setEditDecision(session);
+  }), []);
+  const finishEditDecision = useCallback((resolved: boolean) => {
+    const resolve = editDecisionRef.current; editDecisionRef.current = null;
+    setEditDecision(null); resolve?.(resolved);
+  }, []);
+  const editWorktreesRef = useRef<string[]>([]);
+  editWorktreesRef.current = [...new Set([...repos.filter((repo) => repo.exists).flatMap((repo) => repo.worktrees.map((worktree) => worktree.id)), ...editSessions.worktreeIds, ...(worktreeId ? [worktreeId] : [])])];
+  const lifecycleRequestRef = useRef<(intent: CloseIntent) => Promise<void>>(async () => undefined);
+  const lifecyclePreparingRef = useRef(false);
   const [cloneOpen, setCloneOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -491,6 +522,8 @@ export function App() {
       setGlobalError(err);
     }
   }, []);
+
+  editReportRef.current = (target, error) => setAppError(error, target.worktreeId);
 
   useEffect(() => {
     let active = true;
@@ -1202,7 +1235,7 @@ export function App() {
           event.preventDefault();
           const driver = closeDriverRef.current;
           if (!driver || disposed) return;
-          applyEffectRef.current?.(driver.handleNativeCloseRequest());
+          void lifecycleRequestRef.current("close");
         });
         if (disposed) stop(); else stops.push(stop);
         windowGuard = true;
@@ -1215,7 +1248,7 @@ export function App() {
           if (disposed) return;
           const driver = closeDriverRef.current;
           if (!driver) return;
-          applyEffectRef.current?.(driver.handleRequest("exit"));
+          void lifecycleRequestRef.current("exit");
         });
         if (disposed) stop(); else stops.push(stop);
         exitGuard = true;
@@ -1646,7 +1679,6 @@ export function App() {
   beforeUpdateInstallRef.current = async () => {
     // F13：安装前完整协调编辑、合并编辑、Git 写、结果待核对与终端运行中。
     await flushCommitDraftRef.current();
-    await flushM7State();
     if (closeCoordinatorRef.current.hasWriting() || closeCoordinatorRef.current.hasPending()) {
       // 有在途写或待核对：不能同时进入原生安装；提示与窗口关闭一致。
       setAppError(localizedError("rejected", "errors.update.installBlockedBusy"), null);
@@ -1656,11 +1688,10 @@ export function App() {
       setAppError(localizedError("rejected", "errors.update.installBlockedTerminal"), null);
       return false;
     }
-    if (editingRef.current.dirty) {
-      setAppError(localizedError("rejected", "workspace.editUnsavedBlock"), null);
-      return false;
-    }
-    return true;
+    const edits = await editSessions.resolve(editWorktreesRef.current, null, askEdit);
+    if (!edits.ok || closeCoordinatorRef.current.hasWriting() || closeCoordinatorRef.current.hasPending()) return false;
+    await flushM7State();
+    return !editSessions.hasWork;
   };
 
   /** 先落草稿再执行不可撤销的原生动作；失败时抛出，绝不静默关闭。 */
@@ -1668,28 +1699,36 @@ export function App() {
     async (action: () => Promise<void>): Promise<void> => {
       await flushCommitDraftRef.current();
       // 编辑草稿与终端页签先落盘，再执行不可撤销的原生动作（M7 任务 03、04）。
+      await editSessions.flush();
       await flushM7State();
+      if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
       await action();
     },
-    [],
+    [editSessions],
   );
 
   const closeDriverRef = useRef<CloseDriver | null>(null);
   if (closeDriverRef.current === null) {
     closeDriverRef.current = new CloseDriver({
       coordinator: closeCoordinatorRef.current,
-      releaseExitGuard: () => syncExitBlocked(false),
+      releaseExitGuard: async () => {
+        if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
+        await syncExitBlocked(false);
+      },
       // 关闭/退出前必须先把草稿落盘并等待完成：落盘失败时不得静默销毁窗口（F02.5）。
       closeWindow: () => closeAfterDraftFlush(() => getCurrentWindow().destroy()),
       exitApp: () => closeAfterDraftFlush(() => ipc.requestExit()),
-      onError: (caught) => setAppError(toAppError(caught), null),
+      onError: (caught) => { editSessions.setClosing(false); setAppError(toAppError(caught), null); },
       onAsk: (intent, writing, pending) => {
         closeIntentRef.current = intent;
         setCloseRequest(
           pending.length > 0 ? { action: "showPending", writing, pending } : { action: "ask", writing },
         );
       },
-      onSettled: () => setCloseRequest(null),
+      onSettled: () => {
+        setCloseRequest(null);
+        if (closeDriverRef.current?.currentPhase() === "idle") editSessions.setClosing(false);
+      },
     });
   }
   const closeDriver = closeDriverRef.current;
@@ -1716,11 +1755,46 @@ export function App() {
    */
   const reconcileClose = useCallback(() => {
     const coordinator = closeCoordinatorRef.current;
-    void syncExitBlocked(coordinator.needsExitGuard()).catch((caught) => {
+    void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork).catch((caught) => {
       setAppError(toAppError(caught), null);
     });
     applyEffect(closeDriver.notifyStateChanged());
-  }, [applyEffect, closeDriver, syncExitBlocked]);
+  }, [applyEffect, closeDriver, editSessions, syncExitBlocked]);
+
+  useEffect(() => {
+    const sync = () => {
+      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork)
+        .catch((caught) => setAppError(toAppError(caught), null));
+    };
+    sync();
+    return editSessions.subscribe(sync);
+  }, [editSessions, setAppError, syncExitBlocked]);
+  // 存在磁盘草稿但尚未打开编辑器时，原生Quit也必须进入同一决策入口。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await syncExitBlocked(true);
+        await editSessions.discover(editWorktreesRef.current);
+        if (!cancelled) await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork);
+      } catch (caught) { if (!cancelled) setAppError(toAppError(caught), null); }
+    })();
+    return () => { cancelled = true; };
+  }, [repos, editSessions, setAppError, syncExitBlocked]);
+  useEffect(() => registerM7Flusher(() => editSessions.flush()), [editSessions]);
+
+  lifecycleRequestRef.current = async (intent) => {
+    if (lifecyclePreparingRef.current || closeDriver.currentPhase() === "closing") return;
+    if (closeDriver.currentPhase() !== "idle") { applyEffect(closeDriver.handleRequest(intent)); return; }
+    lifecyclePreparingRef.current = true;
+    try {
+      const edits = await editSessions.resolve(editWorktreesRef.current, null, askEdit);
+      if (!edits.ok) return;
+      editSessions.setClosing(true);
+      applyEffect(closeDriver.handleRequest(intent));
+    } catch (caught) { setAppError(toAppError(caught), null); }
+    finally { lifecyclePreparingRef.current = false; }
+  };
 
   // 监听回调通过 ref 到达同一驱动。
   reconcileCloseRef.current = reconcileClose;
@@ -1791,9 +1865,49 @@ export function App() {
   }
   const writeOrchestrator = writeOrchestratorRef.current;
 
+  editBlockedRef.current = (id) => writingWorktreesRef.current.has(id) || closeDriver.currentPhase() === "closing";
+  editWriteRef.current = (request) => runEditWrite<OperationContext>({
+    writing: writingWorktreesRef.current,
+    publishWriting: () => setWritingWorktrees(new Set(writingWorktreesRef.current)),
+    begin: (id) => writeOrchestrator.begin(id),
+    end: (id, needsVerification) => writeOrchestrator.end(id, needsVerification),
+    beginOperation: (id) => operationGateRef.current.begin(id),
+    canRecord: (token) => operationGateRef.current.canRecord(token),
+    execute: (write) => m7.saveEditable(write),
+    refreshTarget,
+    reportFailure: (id, error) => setAppError(error, id),
+    toError: toAppError,
+    busyMessage: messages.merge.busy,
+    guardUnavailable: messages.close.guardUnavailable,
+  }, request);
+
+  const prepareEditTargets = useCallback(async (id: string, paths: string[]): Promise<boolean> => {
+    try {
+      const edits = await editSessions.resolve([id], paths, askEdit);
+      if (!edits.ok) return false;
+      if (edits.saved) {
+        await refreshTarget(id);
+        setAppError(localizedError("rejected", "edit.reviewAfterSave"), id);
+        return false;
+      }
+      return true;
+    } catch (caught) { setAppError(toAppError(caught), id); return false; }
+  }, [askEdit, editSessions, refreshTarget, setAppError]);
+
+  const closeEdit = useCallback(async (target: EditTarget) => {
+    try {
+      const edits = await editSessions.resolve([target.worktreeId], [target.path], askEdit);
+      if (edits.ok && worktreeIdRef.current === target.worktreeId) {
+        setEditingPath((path) => path === target.path ? null : path);
+      }
+    } catch (caught) { setAppError(toAppError(caught), target.worktreeId); }
+  }, [askEdit, editSessions, setAppError]);
+
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
     // ref 在同一事件循环内也互斥；按钮禁用和 Rust 写锁共同兜底，不积压点击。
+    if (writingWorktreesRef.current.has(opWorktreeId)) return;
+    if (!(await prepareEditTargets(opWorktreeId, [target.path]))) return;
     if (writingWorktreesRef.current.has(opWorktreeId)) return;
     // 本次写操作的结果是否无法确定（Q91）：决定关闭时是否先展示待核对。
     let needsVerification = false;
@@ -1891,34 +2005,14 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, notify, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
+  }, [acceptSnapshot, notify, prepareEditTargets, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
 
-  const { performBatchWrite: performBatchWriteInner, stageFile: stageFileInner, unstageFile: unstageFileInner } = useBatchWrite({
+  const { performBatchWrite, stageFile, unstageFile } = useBatchWrite({
     worktreeIdRef, writingWorktreesRef, setWritingWorktrees, writeOrchestrator,
     operationGateRef, reviewOverlayRef, acceptSnapshot, scheduleReviewRecovery,
     refreshTarget, setAppError, notify, expandToSelection,
+    beforeWrite: prepareEditTargets,
   });
-
-  // H3/F04：编辑器有未保存内容时，暂存 / 取消暂存 / 丢弃必须先处理该文件的草稿，
-  // 不能拿着旧磁盘内容继续写。门禁只挡编辑器当前打开且脏的那一个文件。
-  const blockOnDirtyEdit = useCallback((): boolean => {
-    const editing = editingRef.current;
-    if (!editing.dirty || !editing.path) return false;
-    setAppError(localizedError("rejected", "workspace.editUnsavedBlock"), worktreeIdRef.current);
-    return true;
-  }, []);
-  const performBatchWrite = useCallback<typeof performBatchWriteInner>((...args) => {
-    if (blockOnDirtyEdit()) return Promise.resolve();
-    return performBatchWriteInner(...args);
-  }, [blockOnDirtyEdit, performBatchWriteInner]);
-  const stageFile = useCallback<typeof stageFileInner>((...args) => {
-    if (blockOnDirtyEdit()) return;
-    return stageFileInner(...args);
-  }, [blockOnDirtyEdit, stageFileInner]);
-  const unstageFile = useCallback<typeof unstageFileInner>((...args) => {
-    if (blockOnDirtyEdit()) return;
-    return unstageFileInner(...args);
-  }, [blockOnDirtyEdit, unstageFileInner]);
 
   /**
    * 从回收记录恢复（任务 05）。复用全局非排队写门禁与操作结果通道：
@@ -2401,14 +2495,10 @@ export function App() {
     }
     const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
-    // H3/F04：有未保存编辑时先保存或放弃，提交磁盘旧内容是数据遗漏。
-    {
-      const editing = editingRef.current;
-      if (editing.dirty && editing.path) {
-        setAppError(localizedError("rejected", "workspace.editUnsavedBlock"), target);
-        return;
-      }
-    }
+    const related = commitContextRef.current?.expectation.index.filter((entry) => entry.status !== "F")
+      .flatMap((entry) => [entry.path, ...(entry.originalPath ? [entry.originalPath] : [])]) ?? [];
+    if (!(await prepareEditTargets(target, related))) return;
+    if (worktreeIdRef.current !== target || gateRef.current.token().activation !== origin.activation) return;
     const context = commitContextRef.current;
     if (!context || context.worktreeId !== target) {
       setAppError(localizedError("rejected", "commit.stale"), target);
@@ -2637,7 +2727,7 @@ export function App() {
         writeOrchestrator.end(target, needsVerification || pushNeedsVerification);
       }, (original, lease) => commitAndPushRef.current?.(original, lease) ?? Promise.resolve());
     }
-  }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, refreshTarget, setAppError, writeOrchestrator]);
+  }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, prepareEditTargets, refreshTarget, setAppError, writeOrchestrator]);
 
   /** 确认 amend 的二次警告：只对**当前**上下文成立时生效（F06.2）。 */
   const confirmAmend = useCallback(() => {
@@ -5365,6 +5455,7 @@ export function App() {
 
   const m7Dialogs = (
     <>
+      {editDecision ? <EditDecisionDialog session={editDecision} onDone={finishEditDecision} /> : null}
       <CloneDialog
         open={cloneOpen}
         onClose={() => setCloneOpen(false)}
@@ -5850,7 +5941,7 @@ export function App() {
                 <button
                   type="button"
                   className="toolbar-widget mr-1 shrink-0"
-                  aria-pressed={editingPath === selectedEntry.path && view === "split"}
+                  aria-pressed={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split"}
                   title={
                     view !== "split"
                       ? t("workspace.editSwitchToSplit")
@@ -5859,17 +5950,17 @@ export function App() {
                         : t("workspace.edit")
                   }
                   onClick={() => {
-                    if (view !== "split") {
-                      // 统一视图提供同文件并排入口：切换后自动进入编辑。
-                      void switchView("split");
-                      setEditingPath(selectedEntry.path);
-                      return;
+                    if (!worktreeId) return;
+                    if (editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split") {
+                      void closeEdit({ worktreeId, path: selectedEntry.path }); return;
                     }
-                    setEditingPath(editingPath === selectedEntry.path ? null : selectedEntry.path);
+                    if (view !== "split") void switchView("split");
+                    setEditingWorktreeId(worktreeId);
+                    setEditingPath(selectedEntry.path);
                   }}
                 >
-                  <Codicon name={editingPath === selectedEntry.path && view === "split" ? "close" : "edit"} size={13} />
-                  <span>{editingPath === selectedEntry.path && view === "split" ? t("common.close") : t("workspace.edit")}</span>
+                  <Codicon name={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? "close" : "edit"} size={13} />
+                  <span>{editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? t("common.close") : t("workspace.edit")}</span>
                 </button>
               ) : null}
             </div>
@@ -5919,16 +6010,19 @@ export function App() {
           ) : null}
 
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {mainView === "diff" ? (editingPath && selectedEntry && editingPath === selectedEntry.path ? (
+            {mainView === "diff" ? (editingPath && worktreeId && editingWorktreeId === worktreeId && view === "split" && selectedEntry?.changes === "unstaged" && !selectedEntry.binary && !selectedEntry.unmerged && editingPath === selectedEntry.path ? (
               <EditableWorkspace
                 key={`${worktreeId}/${editingPath}`}
-                worktreeId={worktreeId ?? ""}
-                entry={selectedEntry}
+                session={editSessions.get({ worktreeId, path: editingPath })}
                 fontSize={fontSize}
                 fontFamily={codeFontFamily}
-                onDirtyChange={setEditDirty}
-                onSaved={() => void refresh()}
-                onClose={() => setEditingPath(null)}
+                blocked={isWriting}
+                onClose={() => void closeEdit({ worktreeId, path: editingPath })}
+                renderDiff={(editor) => <SideBySideView
+                  worktreeId={worktreeId} entry={selectedEntry} fontSize={fontSize} fontFamily={codeFontFamily}
+                  options={{ ...sideBySideOptions, foldUnchanged: false, softWrap: false, syncScroll: false }}
+                  highlights={highlightStore} isWriting={isWriting} rightEditor={editor}
+                />}
               />
             ) : mergeEntry ? (
               <MergeView

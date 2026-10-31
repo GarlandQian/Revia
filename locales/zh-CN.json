@@ -1219,9 +1219,9 @@
       "editUnmergedReadonly": "冲突未解决，先在合并视图处理",
       "editFileMissing": "文件已不存在，请刷新后重新打开",
       "editFileChangedOnDisk": "文件已在磁盘上被修改，保存已拒绝；请先比较草稿与磁盘内容",
-      "editWriteFailedKeepDraft": "写入文件失败，草稿已保留；请核对磁盘内容后再试：{error}",
+      "editWriteFailedKeepDraft": "写入文件失败，草稿已保留；请核对磁盘内容后再试：{cause}",
       "editWriteUnverified": "写入后回读内容不一致，结果待核对；草稿已保留",
-      "editWriteUnverifiedCause": "写入后无法回读文件，结果待核对；草稿已保留：{error}",
+      "editWriteUnverifiedCause": "写入后无法回读文件，结果待核对；草稿已保留：{cause}",
       "diagnosticsPathEmpty": "请选择诊断文件的保存位置",
       "diagnosticsPathNotAbsolute": "诊断文件必须保存到绝对路径",
       "diagnosticsPathInvalid": "诊断文件的目录不存在",
@@ -1304,7 +1304,8 @@
       "updateReasonNoEndpoints": "没有配置更新检查地址",
       "diagnosticsStoreFailed": "诊断摘要读写失败；请清空摘要后重试",
       "diagnosticsSnapshotExpired": "诊断预览已失效，请刷新后再导出",
-      "githubCredentialDeleteFailed": "无法删除 GitHub 凭据：{error}"
+      "githubCredentialDeleteFailed": "无法删除 GitHub 凭据：{error}",
+      "editDraftsUnresolved": "文件 {path} 仍有编辑草稿，请先保存或放弃"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
@@ -2107,15 +2108,17 @@
       "notInWorktree": "只能编辑当前 worktree 里的文件。",
       "unknown": "这个文件当前不可编辑。"
     },
-    "conflict": "文件已在磁盘上被修改，保存被拒绝。草稿仍保留，可以选择载入磁盘版本或用我的版本覆盖。",
+    "conflict": "磁盘内容已变化，草稿已保留。请比较两版后加载磁盘版，或确认当前磁盘版并继续编辑；确认后仍需再次保存。",
     "conflictReload": "载入磁盘版本",
-    "conflictKeepMine": "用我的版本覆盖",
+    "conflictKeepMine": "确认磁盘版并继续编辑",
     "draftRestored": "已恢复本机草稿（未保存）。",
     "draftDiscard": "放弃草稿",
-    "closeConfirm": "这个文件有未保存的改动。关闭前要保存到磁盘吗？",
+    "closeConfirm": "此文件有尚未处理的编辑草稿。请保存、放弃，或取消本次操作。",
     "closeCancel": "取消",
-    "closeDiscard": "保留草稿并关闭",
-    "closeSave": "保存并关闭"
+    "closeDiscard": "放弃编辑",
+    "closeSave": "保存",
+    "diffDiskVersion": "Git diff 基于磁盘内容；右侧为尚未保存的编辑草稿。",
+    "reviewAfterSave": "编辑已保存，请核对刷新后的变更后重试此操作"
   },
   "terminal": {
     "title": "终端",

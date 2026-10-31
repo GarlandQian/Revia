@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::State;
 
-use crate::acceptance::{Acceptance, deliver};
+use crate::acceptance::{deliver, Acceptance};
 use crate::batch::{BatchOutcome, BatchTarget};
 use crate::commit::{CommitDraft, DraftStore};
 use crate::commit_flow::{self, CommitOptions, CommitOutcome, CommitOutputEvent};
@@ -33,7 +33,7 @@ use crate::session::{
     WorktreeSessionInfo,
 };
 use crate::settings::{Registry, Settings};
-use crate::watch::{WatchController, WatchEvents, WatchStatus, resolve_roots};
+use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 use crate::worktree_status::WorktreeStatusEntry;
 
 /// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
@@ -148,7 +148,9 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(data_dir: PathBuf) -> Self {
-        let diagnostics = Arc::new(crate::m7::diagnostics::DiagnosticsSummaryStore::new(&data_dir));
+        let diagnostics = Arc::new(crate::m7::diagnostics::DiagnosticsSummaryStore::new(
+            &data_dir,
+        ));
         let command_log = Arc::new(CommandLog::with_diagnostics(Arc::clone(&diagnostics)));
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
@@ -168,9 +170,9 @@ impl AppState {
             m7_edit_drafts: Arc::new(crate::m7::edit::EditDraftStore::new(&data_dir)),
             m7_terminal: Arc::new(crate::m7::terminal::TerminalManager::new()),
             m7_terminal_tabs: Arc::new(crate::m7::terminal::TerminalTabStore::new(&data_dir)),
-            m7_clone: Arc::new(crate::m7::clone::CloneManager::new(
-                Arc::clone(&command_log),
-            )),
+            m7_clone: Arc::new(crate::m7::clone::CloneManager::new(Arc::clone(
+                &command_log,
+            ))),
             m7_github: Arc::new(crate::m7::github::GithubState::new(&data_dir)),
             m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir, &data_dir)),
             m7_diagnostics: diagnostics,
@@ -1091,8 +1093,12 @@ pub async fn stage_file(
     ));
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.stage_file(&request.path, &request.fingerprint)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.stage_file(&request.path, &request.fingerprint)
+        })
     })
     .await
     .map_err(|error| {
@@ -1124,8 +1130,12 @@ pub async fn unstage_file(
     ));
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.unstage_file(&request.path, &request.fingerprint)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.unstage_file(&request.path, &request.fingerprint)
+        })
     })
     .await
     .map_err(|error| {
@@ -1153,8 +1163,12 @@ pub async fn stage_hunk(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        })
     })
     .await
     .map_err(|error| {
@@ -1182,8 +1196,12 @@ pub async fn unstage_hunk(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        })
     })
     .await
     .map_err(|error| {
@@ -1220,23 +1238,27 @@ async fn execute_discard(
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        if let Some(id) = request.hunk_id {
-            session.discard_hunk(
-                &request.path,
-                &request.fingerprint,
-                &request.snapshot_revision,
-                &id,
-                &store,
-            )
-        } else {
-            session.discard_file(
-                &request.path,
-                &request.fingerprint,
-                &request.snapshot_revision,
-                &store,
-            )
-        }
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            if let Some(id) = request.hunk_id {
+                session.discard_hunk(
+                    &request.path,
+                    &request.fingerprint,
+                    &request.snapshot_revision,
+                    &id,
+                    &store,
+                )
+            } else {
+                session.discard_file(
+                    &request.path,
+                    &request.fingerprint,
+                    &request.snapshot_revision,
+                    &store,
+                )
+            }
+        })
     })
     .await
     .map_err(|error| {
@@ -1264,23 +1286,32 @@ pub async fn stage_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
-    let result =
-        tauri::async_runtime::spawn_blocking(move || session.stage_files(&request.targets, true))
-            .await
-            .map_err(|error| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.batchStagingFailedCause",
-                    "批量暂存失败：{error}",
-                    &[("error", error.to_string())],
-                )
-            })?;
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let paths: Vec<_> = request
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            Ok(session.stage_files(&request.targets, true))
+        })
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.batchStagingFailedCause",
+            "批量暂存失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     deliver(
         state.acceptance.as_ref(),
         "stage_files",
         &context.worktree_id,
         None,
-        Ok(result),
+        result,
     )
     .await
 }
@@ -1292,23 +1323,32 @@ pub async fn unstage_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
-    let result =
-        tauri::async_runtime::spawn_blocking(move || session.stage_files(&request.targets, false))
-            .await
-            .map_err(|error| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.batchUnstagingFailedCause",
-                    "批量取消暂存失败：{error}",
-                    &[("error", error.to_string())],
-                )
-            })?;
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let paths: Vec<_> = request
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            Ok(session.stage_files(&request.targets, false))
+        })
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.batchUnstagingFailedCause",
+            "批量取消暂存失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     deliver(
         state.acceptance.as_ref(),
         "unstage_files",
         &context.worktree_id,
         None,
-        Ok(result),
+        result,
     )
     .await
 }
@@ -1329,8 +1369,16 @@ pub async fn discard_files(
         )
     })?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.discard_files(&request.targets, &revision, &store)
+        let paths: Vec<String> = request
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            Ok(session.discard_files(&request.targets, &revision, &store))
+        })
     })
     .await
     .map_err(|error| {
@@ -1346,7 +1394,7 @@ pub async fn discard_files(
         "discard_files",
         &context.worktree_id,
         None,
-        Ok(result),
+        result,
     )
     .await
 }
@@ -1899,15 +1947,19 @@ pub async fn stage_segment(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.execute_segment_op(
-            &request.path,
-            &request.credential,
-            request.hunk_index,
-            request.segment_index,
-            true,
-            request.ignore_whitespace,
-        )
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.execute_segment_op(
+                &request.path,
+                &request.credential,
+                request.hunk_index,
+                request.segment_index,
+                true,
+                request.ignore_whitespace,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -1936,15 +1988,19 @@ pub async fn unstage_segment(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.execute_segment_op(
-            &request.path,
-            &request.credential,
-            request.hunk_index,
-            request.segment_index,
-            false,
-            request.ignore_whitespace,
-        )
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.execute_segment_op(
+                &request.path,
+                &request.credential,
+                request.hunk_index,
+                request.segment_index,
+                false,
+                request.ignore_whitespace,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -1974,16 +2030,20 @@ pub async fn discard_segment(
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.discard_segment(
-            &request.path,
-            &request.credential,
-            &request.snapshot_revision,
-            request.hunk_index,
-            request.segment_index,
-            request.ignore_whitespace,
-            &store,
-        )
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.discard_segment(
+                &request.path,
+                &request.credential,
+                &request.snapshot_revision,
+                request.hunk_index,
+                request.segment_index,
+                request.ignore_whitespace,
+                &store,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -2205,7 +2265,13 @@ pub async fn checkout_branch(
     let store = state.recovery.clone();
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::remote_ops::checkout(&session, &store, &request.target, request.strategy, &archive)
+        crate::remote_ops::checkout(
+            &session,
+            &store,
+            &request.target,
+            request.strategy,
+            &archive,
+        )
     })
     .await
     .map_err(|error| {
@@ -3147,6 +3213,7 @@ pub async fn execute_commit(
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     );
     let options = request.options;
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     tauri::async_runtime::spawn_blocking(move || {
         let emit_app = app.clone();
         let emit: Arc<dyn Fn(CommitOutputEvent) + Send + Sync> =
@@ -3155,14 +3222,25 @@ pub async fn execute_commit(
                 // 事件发送失败（窗口已关）不影响提交本身；输出仍留在返回值里。
                 let _ = emit_app.emit("revia://commit-output", &event);
             });
-        session.execute_commit_flow(
-            &drafts,
-            &recovery,
-            hooks_off_root,
-            options,
-            operation_id,
-            emit,
-        )
+        let paths: Vec<String> = options
+            .expected
+            .index
+            .iter()
+            .filter(|entry| entry.status != "F")
+            .flat_map(|entry| {
+                std::iter::once(entry.path.clone()).chain(entry.original_path.clone())
+            })
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.execute_commit_flow(
+                &drafts,
+                &recovery,
+                hooks_off_root,
+                options,
+                operation_id,
+                emit,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -3272,7 +3350,12 @@ pub async fn stash_inspect(
 ) -> Result<crate::stash::StashInspection> {
     let session = state.session(&request.worktree_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::stash::inspect_selected(&session.git, &request.oid, Some(&request.entry_key), request.compare_local)
+        crate::stash::inspect_selected(
+            &session.git,
+            &request.oid,
+            Some(&request.entry_key),
+            request.compare_local,
+        )
     })
     .await
     .map_err(|error| {
@@ -3296,13 +3379,31 @@ pub struct StashPreflightCommand {
 }
 
 #[tauri::command]
-pub async fn stash_preflight(state: State<'_, AppState>, request: StashPreflightCommand) -> Result<String> {
+pub async fn stash_preflight(
+    state: State<'_, AppState>,
+    request: StashPreflightCommand,
+) -> Result<String> {
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || if request.collection {
-        crate::stash::collection_preflight(&session)
-    } else { crate::stash::preflight_selected(&session, request.oid.as_deref(), request.entry_key.as_deref()) })
-        .await.map_err(|error| AppError::coded(ErrorKind::Internal,
-            "errors.commands.stashInspectInterrupted", "读取 stash 内容时中断：{error}", &[("error", error.to_string())]))?
+    tauri::async_runtime::spawn_blocking(move || {
+        if request.collection {
+            crate::stash::collection_preflight(&session)
+        } else {
+            crate::stash::preflight_selected(
+                &session,
+                request.oid.as_deref(),
+                request.entry_key.as_deref(),
+            )
+        }
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.stashInspectInterrupted",
+            "读取 stash 内容时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -3392,7 +3493,13 @@ pub async fn stash_drop(
     let session = state.session(&request.worktree_id)?;
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::stash::drop_selected(&session, &archive, &request.oid, &request.entry_key, &request.expected_state)
+        crate::stash::drop_selected(
+            &session,
+            &archive,
+            &request.oid,
+            &request.entry_key,
+            &request.expected_state,
+        )
     })
     .await
     .map_err(|error| {
@@ -3421,7 +3528,12 @@ pub async fn stash_clear(
     let session = state.session(&request.worktree_id)?;
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::stash::clear_confirmed(&session, &archive, &request.expected_oids, &request.expected_state)
+        crate::stash::clear_confirmed(
+            &session,
+            &archive,
+            &request.expected_oids,
+            &request.expected_state,
+        )
     })
     .await
     .map_err(|error| {
@@ -3515,7 +3627,13 @@ pub async fn autostash_restore(
     let store = state.autostash.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _write = session.acquire_write_lock()?;
-        store.restore_confirmed(&session, &recovery, &archive, &request.link, &request.expected_state)
+        store.restore_confirmed(
+            &session,
+            &recovery,
+            &archive,
+            &request.link,
+            &request.expected_state,
+        )
     })
     .await
     .map_err(|error| {
@@ -3537,13 +3655,26 @@ pub struct AutostashRestoreCommand {
 }
 
 #[tauri::command]
-pub async fn autostash_forget(state: State<'_, AppState>, worktree_id: String, id: String) -> Result<()> {
+pub async fn autostash_forget(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    id: String,
+) -> Result<()> {
     let session = state.session(&worktree_id)?;
     let store = state.autostash.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _write = session.acquire_write_lock()?;
         store.forget(&session, &id)
-    }).await.map_err(|error| AppError::coded(ErrorKind::Internal, "errors.commands.autostashForgetInterrupted", "保留自动 stash 时中断：{error}", &[("error", error.to_string())]))?
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.autostashForgetInterrupted",
+            "保留自动 stash 时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[tauri::command]
@@ -3594,9 +3725,18 @@ pub async fn rewrite_range(
     state: State<'_, AppState>, worktree_id: String, target: String, expected_head: String,
 ) -> Result<Vec<crate::history::HistoryCommit>> {
     let session = state.session(&worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || crate::rewrite::range(&session, &target, &expected_head))
-        .await.map_err(|error| AppError::coded(ErrorKind::Internal,
-            "errors.commands.rewritePreflightInterrupted", "检查本地改动时中断：{error}", &[("error", error.to_string())]))?
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::range(&session, &target, &expected_head)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.rewritePreflightInterrupted",
+            "检查本地改动时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[tauri::command]
@@ -3848,15 +3988,19 @@ pub async fn external_tool_choices(
     };
     let configured_diff = settings.diff_tool.clone();
     let configured_merge = settings.merge_tool.clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<crate::external_tools::ExternalToolSetup> {
-        let choices = crate::external_tools::choices(
-            &session.git,
-            configured_diff.as_deref(),
-            configured_merge.as_deref(),
-        );
-        Ok(crate::external_tools::ExternalToolSetup { choices,
-            context: crate::external_tools::confirmation_context(&session)? })
-    })
+    tauri::async_runtime::spawn_blocking(
+        move || -> Result<crate::external_tools::ExternalToolSetup> {
+            let choices = crate::external_tools::choices(
+                &session.git,
+                configured_diff.as_deref(),
+                configured_merge.as_deref(),
+            );
+            Ok(crate::external_tools::ExternalToolSetup {
+                choices,
+                context: crate::external_tools::confirmation_context(&session)?,
+            })
+        },
+    )
     .await
     .map_err(|error| {
         AppError::coded(

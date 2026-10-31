@@ -92,17 +92,19 @@ sources:
   edit.closeCancel:
     en: ac7950f3a317e
   edit.closeConfirm:
-    en: d34b8bffa1894
+    en: 6bf40f032feec
   edit.closeDiscard:
-    en: 10410500f3e6f9
+    en: 174f23ec3a6a0e
   edit.closeSave:
-    en: b105ab441567c
+    en: 578805382d6b9
   edit.conflict:
-    en: 145bafa8e4d1dc
+    en: 15edf8240097c2
   edit.conflictKeepMine:
-    en: 3ebd57c065efe
+    en: 140fe5b0db33e7
   edit.conflictReload:
     en: e5087bd0fd464
+  edit.diffDiskVersion:
+    en: 6502ad78a5998
   edit.draftDiscard:
     en: 268a33ccc60de
   edit.draftRestored:
@@ -137,6 +139,8 @@ sources:
     en: ff15a18d9a5ab
   edit.readonlyTitle:
     en: 1c01123d78a6bb
+  edit.reviewAfterSave:
+    en: 1424be4b109dd9
   edit.save:
     en: 578805382d6b9
   edit.saved:
@@ -195,6 +199,8 @@ sources:
     en: 73512307a8bea
   errors.m7.editBinaryReadonly:
     en: 18de50b413c89a
+  errors.m7.editDraftsUnresolved:
+    en: 4d85708886988
   errors.m7.editEncodingReadonly:
     en: f306ee2d95df2
   errors.m7.editFileChangedOnDisk:
@@ -214,11 +220,11 @@ sources:
   errors.m7.editUnmergedReadonly:
     en: 8b88efad0a43a
   errors.m7.editWriteFailedKeepDraft:
-    en: 83afe550a08e1
+    en: d249b5fd0eaa
   errors.m7.editWriteUnverified:
     en: 1fd7e614d821d5
   errors.m7.editWriteUnverifiedCause:
-    en: 613fb6a0e4ccb
+    en: 1b4267c1fd8fea
   errors.m7.githubBadResponse:
     en: 16b822d7e1e7a
   errors.m7.githubBranchNameInvalid:

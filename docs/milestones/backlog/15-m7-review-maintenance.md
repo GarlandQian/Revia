@@ -30,3 +30,7 @@ PR网络写后不确定结果的查询核对不作为新增独立已复现数据
 3. **可能Duplicated Code**：`github/pr.rs:560–577` 与同文件 `fetch_all_pages:1101–1109` 有相同“get_json / extend / next_page循环”；files可调用已新增的泛型helper后map，避免维护两套分页。
 
 </details>
+
+## 编辑组翻译维护观察
+
+`edit-x18n-01`检查0错误/76个unused-key警告，原完整诊断在批次codex-checks中。编辑器替换使部分旧元信息文案不再直接引用，仍保留旧键，不扩大本组为删除翻译键或重组命名。

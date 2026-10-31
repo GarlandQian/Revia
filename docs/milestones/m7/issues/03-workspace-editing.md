@@ -201,3 +201,13 @@ Rust `edit.rs:384` 的会话锁只能拒绝其他仓库写入，不阻止进程�
 建议：经x18n将这两个词条的参数契约迁移到cause，再验证真实失败生产入口及英文formatter。
 
 </details>
+
+## Codex 直接修复编辑生命周期（F03/F04/F20、H1/H2/H3/H7）
+
+实际编辑会话按worktree与路径持有正文、磁盘版、原基线及身份摘要，不随组件隐藏或切换目标销毁。恢复装入真草稿；磁盘再次变化只更新对比，确认后仍须显式保存。保存复用现有WriteGuardOrchestrator/CloseCoordinator，失败和待核对保留原目标、正文和退出保护，不自动重发。放弃排在已发草稿写后清除，并阻止卸载将它复活；持久化失败可见且可明确放弃。
+
+关闭/退出及相关暂存、段操作和提交先执行保存/放弃/取消；后台和启动发现的草稿也参与。保存改变磁盘时先刷新并停止旧的Git动作，要求重新核对。后台存储以真实worktree身份隔离，同路径替换不继承旧身份；原旧草稿文件保留。生产Rust写门与草稿存储共锁，相关文件有草稿时拒绝暂存/提交。编辑保留在Git并排工作区右侧，统一/历史/暂存/冲突只读；草稿尚未保存时不沿用磁盘行号和Git段操作目标。
+
+本组独占验证原件均在`/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`：`edit-io-cargo-01` 10项真实Git/权限/BOM/CRLF/身份/冲突/元数据/草稿门禁通过；`edit-final-cargo-01`含原9项编辑及152项共享暂存/丢弃/提交通过、1项ignored；`edit-bindings-cargo-01` 7项含ts-rs导出通过；`edit-session-node-03` 13项实际生产状态/写门/关闭协调器回归通过，含将真实Rust权限错误载荷交给实际双语formatter。前端`edit-frontend-build-02`与`edit-lint-02`exit0；`edit-x18n-01`为0错误/76个unused-key警告，保留键不自动删除。
+
+`edit-cargo-01`编译exit101发现批量丢弃Result包裹不匹配，已修复，失败原stdout/stderr保留；后续检查均单独记录源码hash、精确argv、真实exit和分流原件。清理生成绑定只涉及EditDraft/EditableFile，不清理其它绑定。无关rustfmt差异已去除，并重跑受影响Rust检查。上述不是最终候选/全量最终检查/真实桌面验收；并排编辑、双语窄窗与原生退出仍须任务14真机检查。

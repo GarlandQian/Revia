@@ -3,4 +3,4 @@
 /**
  * 本机编辑草稿：绑定 worktree 身份、路径与基线版本。
  */
-export type EditDraft = { worktreeId: string, path: string, baseSha256: string, text: string, updatedAtMs: number, };
+export type EditDraft = { worktreeId: string, worktreeIdentity: string, path: string, baseSha256: string, text: string, updatedAtMs: number, };
