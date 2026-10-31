@@ -536,3 +536,12 @@ Spec：固定 `5ca9178…039fd1a`，仅原生场景修复增量，10路径、1�
 
 已核38项相关源码／规范、106项本轮原件及固定diff；Rust44、Node20、build／lint／x18n真实exit0，翻译0错误／76既有警告，受测Rust与最终前端源码对应。未重跑检查、未改产品或启动桌面；新Release原生复验、D06及Windows仍未验证。详见 `spec-evidence.md`。
 
+
+
+### Codex：终端视图生命周期修复与原生停点 — 2026-10-31
+
+固定 Release source `78c5658e4b1b370266e2044992e5de3787cd86ac` / 产品 `039fd1a` 的原生复验仍发现95字符输入丢字；原件 `final-pty-running-01` 保留，Python因路径残缺未启动。另一次聚焦提交说明后文本进入终端，不能将其当输入框通过。源码每次render产生新的ref回调，React detach时dispose xterm，随后重新读取snapshot并focus。
+
+仅修复该生命周期：每个页签使用稳定ref，字号/字体通过现有更新路径同步，不重建视图；只有实际激活页签才请求焦点，布局回调检查实例仍存活。PTY后端、写保护、Git与locale均未改。`terminal-viewport-node-01`现有终端所有权/关闭12项通过；`terminal-viewport-frontend-01`、`terminal-viewport-lint-01`真实exit0。未新增以源码形状为断言的测试，相关UI仍须新固定Release真实复验；不把现有Node检查当作React焦点验证。全部argv/源码hash/分流输出保留。
+
+完整第二次输入曾成功运行独占Python进程，`pty-final-process-proof.json`记录PID14626/parent12952和独占HOME/cwd；首轮连续输入缺陷仍成立。原生页签关闭提供Terminate & close/Cancel，取消后CmdQ显示全局End processes and continue；只终止本批shell，`task14-native-launch-04`真实exit0。下一步仅此增量全新两轴，再构建固定Release、复验持续输入/其他控件焦点和D06；整包14仍未完成。

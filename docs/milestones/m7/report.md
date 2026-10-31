@@ -308,3 +308,12 @@ S07-03：外部diff显式验证Changelist路径的HEAD→工作区模型，仍�
 ### review10完成与最终原生复验准备（2026-10-31）
 
 Standards 0硬违反、2项P3判断；Spec 0新增发现。原文分别入对应任务Comments，S10-ST01证据口径已澄清，S10-ST02仅backlog不扩重构。当前产品`039fd1a3dbea7cf7e0c7bac91cd648509943dd41`保持冻结。另补`task14-native-write-guard-regression-01`文件20/块24/段25共69项真实通过；加先前44项，113项相关Rust跨两轮核实，不能写成一次全套。Node20与最终前端build/lint/x18n通过，无后续产品修改。下一步以新Comments提交构建task14-native-release-build-03，固定新Release再真实PTY输入/列表恢复/默认名/浮层和D06；Windows、正式GitHub账号/保护与更新公钥接线未验，整包不done、不合并或删除worktree/监控。
+
+
+### Codex：终端视图生命周期修复与原生停点 — 2026-10-31
+
+固定 Release source `78c5658e4b1b370266e2044992e5de3787cd86ac` / 产品 `039fd1a` 的原生复验仍发现95字符输入丢字；原件 `final-pty-running-01` 保留，Python因路径残缺未启动。另一次聚焦提交说明后文本进入终端，不能将其当输入框通过。源码每次render产生新的ref回调，React detach时dispose xterm，随后重新读取snapshot并focus。
+
+仅修复该生命周期：每个页签使用稳定ref，字号/字体通过现有更新路径同步，不重建视图；只有实际激活页签才请求焦点，布局回调检查实例仍存活。PTY后端、写保护、Git与locale均未改。`terminal-viewport-node-01`现有终端所有权/关闭12项通过；`terminal-viewport-frontend-01`、`terminal-viewport-lint-01`真实exit0。未新增以源码形状为断言的测试，相关UI仍须新固定Release真实复验；不把现有Node检查当作React焦点验证。全部argv/源码hash/分流输出保留。
+
+完整第二次输入曾成功运行独占Python进程，`pty-final-process-proof.json`记录PID14626/parent12952和独占HOME/cwd；首轮连续输入缺陷仍成立。原生页签关闭提供Terminate & close/Cancel，取消后CmdQ显示全局End processes and continue；只终止本批shell，`task14-native-launch-04`真实exit0。下一步仅此增量全新两轴，再构建固定Release、复验持续输入/其他控件焦点和D06；整包14仍未完成。
