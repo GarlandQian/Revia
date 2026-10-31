@@ -228,3 +228,7 @@ F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍�
 `task13-rust-03`：42通过（新更改列表10、既有commit_flow12、file_staging20），覆盖不同路径已有暂存、同文件部分暂存、二进制/未跟踪/删除、归组持久化与默认组、外部修改失配、锁保留、hook失败、初始提交和仓库身份替换。此前task13-rust-01为40通过，02为42通过；所有轮次保留。`task13-frontend-01`、`task13-lint-01`、`task13-x18n-01`均exit0，x18n 0错误/76既有unused-key警告；lint有既有非阻断提示。x18n首次沙箱缓存写入EPERM的原件在task13-locale-query-01，提升后查询/维护通过。绑定生成task13-bindings-01通过。
 
 后两次产品变化仅Rust收尾与命令相关编辑范围，已重跑上述Rust组；前端与locale检查后无对应源码变化。不把这些CLI检查称作桌面通过，Windows未实跑。下一步固定本增量、按Q174新两轴审查，再重建Release和任务14真实桌面；旧Release不适用于本次新源码。
+
+### review05：任务13增量正式两轴已收齐
+
+Standards：3项P2、2项P3；Spec：6项P2、1项P3（只读能力边界在两轴各自原文保留，不合并计数）。正式报告分别逐字入任务13/14 Comments。均为静态分析，未把CLI检查当桌面通过。Codex集中修明确P2；P3/smell登记backlog15，不扩大重构。产品待重新检查、固定增量审查及新Release后继续真实桌面。

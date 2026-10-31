@@ -49,3 +49,10 @@ PR网络写后不确定结果的查询核对不作为新增独立已复现数据
 - **J1，可能Duplicated Code**：`src/App.tsx:1784,1793,1807,1819` 四次复制五类退出保护条件；新增保护来源须同步四处，容易漂移，可集中判定。
 - **J2，可能Primitive Obsession**：`github/store.rs:30` 的草稿kind为String，`GithubPanel.tsx:119,125` 又把审阅事件写进原表示新旧行的side；新增表单/事件时须维护字符串分支与强制转换，可用明确领域类型。
 - **J3，可能Duplicated Code（仅测试）**：`m7_protection.rs:24` 与 `m7_review_drafts.rs:27` 复制Fixture及HTTP支架；隔离和服务端时序修正需多处同步，可列共享fixture维护项。
+
+### review05 非阻断登记
+
+- Standards：更改列表Unicode星号/Codicons及Git文件状态色；名称校验重复为可能Duplicated Code判断。
+- Spec S05-07：保存无关设置使父勾选凭据清空、子列表仍显示勾选；改动入口修复时核对，不据此扩大重构。
+
+两轴原文在review-05-n9a_z26m及任务13/14 Comments。

@@ -312,3 +312,48 @@ H1 的四个 fixture 已通过 `src-tauri/tests/support/git_environment.rs:5–3
 未启动产品、未生成正式安装包或接触发布签名。当前仍无原生桌面工具，AXIsProcessTrusted=false，原证据`review-03-zika9m9t/desktop-capability.json`。任务13仍须在独占fixture中真实观察Rebased1.1.22既有暂存、部分暂存及提交后index/工作区，再补规格并实施；不能从Git猜测或模拟IPC决定。任务14的真实四主题/双语900px、D06、编辑终端、GitHub/诊断/更新等仍未验。没有将编译或测试称作桌面验收通过。
 
 进入awaiting-native-desktop；当前可独立完成的源码审修和Release固定已完成，13/14保留阻塞。未push/PR/tag/发布、未合main/删除worktree；formalRepairUsed=true、Pi继续idle，监控保留。源码不变时不重复检查或启动代理；取得真实桌面能力后才续接约定验收。
+
+### Codex / review05 Standards（2026-10-31）
+
+固定增量 b5caf5a…ffaa343；以下为独立正式报告原文，完整附录 `/private/tmp/revia-m7-batch-g5scyw0r/review-05-n9a_z26m/standards-evidence.md`。
+
+范围：仅 `b5caf5a...ffaa343` 的 task13 增量；23 路径，单提交。源码、规则与原始证据散列已核对。
+
+硬性规则违反：
+
+- **[P2] 绕过只读类型限制** — `src-tauri/src/m7/changelists.rs:351–364,513–517`：符号链接被建为可选条目，准备提交直接调用 `stage_file` / `apply_index_patch`，没有既有 `ReadonlyReason` 校验；子模块也未过滤。违反 `docs/product-direction.md:59–62`“符号链接、子模块只读；只读限制优先”。提交前应复用类型限制，并向界面返回原因。
+- **[P2] 重新整份传输、原生滚动 diff** — 同文件 `:478,494` 将全部原始补丁写入每项 `preview`，整体 View 跨 IPC 返回；`src/features/m7/Changelists.tsx:84` 用 `overflow-auto` 的 `<pre>` 全量渲染。折叠不减少传输。违反 `docs/technical-direction.md:112`“按可见范围分批获取”和 `docs/adr/0008-diff-view-owns-scrolling.md:8–9`；应接入既有分批 diff 读取与滚动实现。
+- **[P2] 错误冻结为旧语言** — `src/features/m7/Changelists.tsx:17,29,41,45` 保存 `formatAppError(...)` 字符串；切换语言后已有错误不会重新翻译。违反 `docs/adr/0013-localize-structured-user-errors-at-presentation.md:3` 与 `docs/ui-direction.md:191` 的即时切换要求。应保存结构化错误，在渲染时格式化。
+
+P3 / backlog：
+
+- **文档规则** — `src/features/m7/Changelists.tsx:60,72` 使用 Unicode 星号，文件名统一默认色；不符合 `docs/ui-direction.md:12–14,64` 的 Codicons 与 Git 状态色约定。
+- **判断：可能的 Duplicated Code** — `src-tauri/src/m7/changelists.rs:203–205,217–219` 两次出现 `name.trim()` / `name.is_empty() || name.len() > 256`。可共享名称校验；不是硬性违反，不扩大本轮重构。
+
+已核对 Rust03 的 42 项通过，build/lint/x18n 原件 exit0（x18n 76 警告）。未新增或重跑检查；未验证本增量真实桌面或 Windows。合计：3 项 P2、2 项 P3，无 P1；明确余项由主 Codex 接管。
+
+
+### Codex / review05 Spec（2026-10-31）
+
+固定增量 b5caf5a…ffaa343；以下为独立正式报告原文，完整附录 `/private/tmp/revia-m7-batch-g5scyw0r/review-05-n9a_z26m/spec-evidence.md`。
+
+Spec：仅审固定 `b5caf5a…ffaa343` 的任务13增量。6项P2、1项P3；以下均为静态结论，未动态复现。
+
+(a) 遗漏／部分实现：
+
+- **[P2，S05-01] 块选择粒度错误。** `docs/milestones/m7/spec.md:133`要求“移动整文件与 Git 原始块”，`GLOSSARY.md:64`明确“一个 hunk 可能含几块”。`src-tauri/src/m7/changelists.rs:482–495,359–364`却每个hunk只建一个条目并应用整hunk；相隔少量未改行的两块不能分别归组／勾选。
+- **[P2，S05-02] 新列表无法打开文件diff。** `docs/milestones/m4/spec.md:51`要求“单击文件：选中并在预览页签（标题斜体）中显示 diff”。`src/features/m7/Changelists.tsx:13–15,71,84`只有路径span与原始patch预览；`src/App.tsx:5858`未接文件激活／固定入口。用户无法从新列表切换到所点文件的既有并排diff及编辑器。
+- **[P2，S05-03] 多文件丢弃缺失。** `docs/README.md:155`：“两种模式都支持多选、全部暂存和多个文件一起丢弃”。`src/App.tsx:5817`在更改列表模式显式禁用丢弃；新组件无替代入口，勾选也未接入既有批量丢弃目标。
+
+(b) 越出能力边界：
+
+- **[P2，S05-04] 只读类型可被新路径暂存提交。** `docs/product-direction.md:59`要求符号链接／子模块“无，只读并说明限制原因”。`changelists.rs:513–545`将未跟踪符号链接生成普通可选条目，`:353–355`直接调用Git暂存，绕过`session.rs:3191–3203`的只读门禁；已跟踪子模块也未过滤。
+
+(c) 看似实现但错误：
+
+- **[P2，S05-05] 仅改信息的amend被拒。** `docs/milestones/m3/spec.md:38`：“amend仅修改信息等合法情况按真实Git语义处理”。`src/App.tsx:2572`和`changelists.rs:311`强制至少勾选一项，即使勾选amend也不能只改提交信息。
+- **[P2，S05-06] rebase编辑停点被误封。** `docs/README.md:203`：“在明确的 rebase‘编辑’停点允许 amend 和新建提交”。`changelists.rs:299–303`却拒绝所有`operation.is_some()`，未沿用现有允许停点的门禁；无冲突merge收尾也受影响。
+- **[P3，S05-07，backlog] 保存无关设置后勾选状态脱节。** `docs/README.md:155`：“勾选的内容即提交内容”。`src/App.tsx:4578`每次保存设置都清空父selection；新组件`:21–32`未因该清空重新加载，仍显示勾选，提交却被`:2572/5886`拦住，须手动刷新或重选。
+
+原件核对：7884项源码、1113项证据散列及diff一致；末轮Rust42通过，frontend/lint/x18n均exit0。未启动Revia、未实跑Windows、未宣称桌面通过。详见`spec-evidence.md`。
+
