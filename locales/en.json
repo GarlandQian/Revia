@@ -918,7 +918,9 @@
       "terminalCloseFailed": "The terminal process could not be ended: {cause}",
       "githubCheckoutWriteGuard": "The PR checkout write guard is unavailable. Try again.",
       "githubPrCheckoutUnverified": "PR checkout did not complete. Check the branch and working tree; it will not be retried automatically.",
-      "githubProtectionIncomplete": "The branch protection response was incomplete. The previous result was kept."
+      "githubProtectionIncomplete": "The branch protection response was incomplete. The previous result was kept.",
+      "githubDraftTargetChanged": "The draft account, remote, repository, or commit has changed. The original draft was kept.",
+      "githubReviewCleanupFailed": "The content was sent, but local recording failed. Verify the remote result before taking another action."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
@@ -2251,7 +2253,8 @@
     "protectionSynced": "Synced",
     "protectionUnsynced": "Protection has not been synced",
     "protectionStale": "May be out of date",
-    "syncProtection": "Sync branch protection"
+    "syncProtection": "Sync branch protection",
+    "olderDrafts": "Drafts from older commits (kept for reference; excluded from this submission)"
   },
   "diagnostics": {
     "title": "Diagnostics",

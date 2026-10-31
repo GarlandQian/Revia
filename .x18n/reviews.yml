@@ -247,6 +247,8 @@ sources:
     en: 96c9d83dc7060
   errors.m7.githubDeviceFlowUnknown:
     en: 99ce0385169f2
+  errors.m7.githubDraftTargetChanged:
+    en: 9b8b1c7c6505c
   errors.m7.githubFetchPrFailed:
     en: 1a2e80c898cff8
   errors.m7.githubHeadChanged:
@@ -293,6 +295,8 @@ sources:
     en: 17101df1edf57b
   errors.m7.githubReviewBodyRequired:
     en: 152fb704101ad4
+  errors.m7.githubReviewCleanupFailed:
+    en: 80111d1ddcc05
   errors.m7.githubTaskFailed:
     en: 2956cb2e465d8
   errors.m7.githubTokenEmpty:
@@ -489,6 +493,8 @@ sources:
     en: 658ab047a35c0
   github.notProtected:
     en: 1472012c5003ae
+  github.olderDrafts:
+    en: 18358229d5849e
   github.page:
     en: 1d7281383f1d93
   github.patchTooLarge:

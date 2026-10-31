@@ -22,6 +22,12 @@ pub struct ReviewDraft {
     pub id: String,
     pub repo_key: String,
     pub number: u64,
+    #[serde(default)]
+    pub scope_key: Option<String>,
+    #[serde(default)]
+    pub target_key: Option<String>,
+    #[serde(default = "inline_kind")]
+    pub kind: String,
     /// F09：草稿绑定的 PR head SHA——PR 更新后旧草稿不再被误当当前版本提交。
     #[serde(default)]
     #[ts(optional)]
@@ -33,6 +39,10 @@ pub struct ReviewDraft {
     pub body: String,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
+}
+
+fn inline_kind() -> String {
+    "inline".into()
 }
 
 /// 合并/评审的本地回执：即使网络结果不确定，也能核对做过什么。
@@ -118,12 +128,14 @@ pub fn remotes(session: &WorktreeSession) -> Result<Vec<RemoteInfo>> {
 /// 评审草稿存储。
 pub struct ReviewDraftStore {
     path: PathBuf,
+    lock: Mutex<()>,
 }
 
 impl ReviewDraftStore {
     pub fn new(data_dir: &Path) -> Self {
         Self {
             path: data_dir.join("github-review-drafts.json"),
+            lock: Mutex::new(()),
         }
     }
 
@@ -135,7 +147,8 @@ impl ReviewDraftStore {
     }
 
     pub fn save(&self, mut draft: ReviewDraft) -> Result<ReviewDraft> {
-        let mut all = self.load();
+        let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut all = self.load_checked()?;
         if draft.id.is_empty() {
             draft.id = super::super::sha256_hex(
                 format!(
@@ -147,25 +160,74 @@ impl ReviewDraftStore {
                 .to_string();
             draft.created_at_ms = super::super::now_ms();
         }
+        if draft.created_at_ms == 0 {
+            draft.created_at_ms = super::super::now_ms();
+        }
         draft.updated_at_ms = super::super::now_ms();
         all.retain(|existing| existing.id != draft.id);
         all.push(draft.clone());
         all.sort_by_key(|draft| draft.created_at_ms);
-        all.truncate(2000);
         self.store(&all)?;
         Ok(draft)
     }
 
     pub fn delete(&self, id: &str) -> Result<()> {
-        let mut all = self.load();
+        let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut all = self.load_checked()?;
         all.retain(|draft| draft.id != id);
         self.store(&all)
     }
 
     pub fn clear(&self, repo_key: &str, number: u64) -> Result<()> {
-        let mut all = self.load();
+        let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut all = self.load_checked()?;
         all.retain(|draft| !(draft.repo_key == repo_key && draft.number == number));
         self.store(&all)
+    }
+
+    pub fn list_target(&self, target: &str) -> Result<Vec<ReviewDraft>> {
+        let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        Ok(self
+            .load_checked()?
+            .into_iter()
+            .filter(|d| d.target_key.as_deref() == Some(target))
+            .collect())
+    }
+    pub fn delete_scoped(&self, scope: &str, id: &str) -> Result<()> {
+        let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut all = self.load_checked()?;
+        if all
+            .iter()
+            .any(|d| d.id == id && d.scope_key.as_deref() != Some(scope))
+        {
+            return Err(super::reviews::changed());
+        }
+        all.retain(|d| d.id != id);
+        self.store(&all)
+    }
+    /// 只清理实际已发表且内容仍相同的稿件，不删除旧head或发布期间新输入的正文。
+    pub fn remove_published(&self, scope: &str, sent: &[ReviewDraft]) -> Result<()> {
+        let _guard = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut all = self.load_checked()?;
+        all.retain(|d| {
+            !(d.scope_key.as_deref() == Some(scope)
+                && sent.iter().any(|p| {
+                    p.id == d.id
+                        && p.body == d.body
+                        && p.side == d.side
+                        && p.path == d.path
+                        && p.line == d.line
+                        && p.updated_at_ms == d.updated_at_ms
+                }))
+        });
+        self.store(&all)
+    }
+    fn load_checked(&self) -> Result<Vec<ReviewDraft>> {
+        match std::fs::read(&self.path) {
+            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+            Err(e) => Err(e.into()),
+        }
     }
 
     fn load(&self) -> Vec<ReviewDraft> {
@@ -350,6 +412,9 @@ mod tests {
             id: String::new(),
             repo_key: "repo".into(),
             number: 7,
+            scope_key: None,
+            target_key: None,
+            kind: "inline".into(),
             head_sha: Some("abc123".into()),
             path: "src/a.ts".into(),
             side: "new".into(),

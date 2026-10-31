@@ -22,6 +22,7 @@ use super::github::pr::{
     PullRequestFilter, PullRequestList, ReviewReceipt, ReviewSubmitRequest,
 };
 use super::github::store::{MergeReceipt, ProtectionInfo, RemoteInfo, ReviewDraft};
+use super::github::reviews::{self, ReviewDraftScope, ReviewDraftBundle};
 use super::github::{GithubAccount, GithubState, GithubStatus};
 use super::terminal::{TerminalOpenRequest, TerminalSessionInfo, TerminalTabRecord};
 use super::theme::{ImportedTheme, ThemeKind};
@@ -454,6 +455,8 @@ pub async fn m7_github_pr_list(
 pub struct PrNumberRequest {
     pub worktree_id: String,
     #[serde(default)]
+    pub login: Option<String>,
+    #[serde(default)]
     pub remote: Option<String>,
     pub number: u64,
     /// F09：按此 head 过滤审阅草稿；PR 更新后旧 head 草稿不进入当前列表。
@@ -517,6 +520,7 @@ pub async fn m7_github_pr_comments(
 #[serde(rename_all = "camelCase")]
 pub struct PrCommentRequest {
     pub worktree_id: String,
+    pub draft_scope: ReviewDraftScope,
     #[serde(default)]
     pub remote: Option<String>,
     pub number: u64,
@@ -532,35 +536,30 @@ pub async fn m7_github_pr_comment_create(
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
-        pr::create_comment(&context, request.number, &request.body)
+        pr::create_comment(&context, request.number, &request.body, &request.draft_scope)
     }).await
 }
 
 #[tauri::command]
-pub async fn m7_github_review_drafts(
-    state: State<'_, AppState>,
-    request: PrNumberRequest,
-) -> Result<Vec<ReviewDraft>> {
-    let repo_key = GithubState::repo_key(&session_for(&state, &request.worktree_id)?.path);
-    Ok(pr::list_drafts(
-        &state.m7_github,
-        &repo_key,
-        request.number,
-        request.head_sha.as_deref(),
-    ))
+pub async fn m7_github_review_drafts(state: State<'_, AppState>, request: PrNumberRequest) -> Result<ReviewDraftBundle> {
+    let session = session_for(&state, &request.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
+    blocking(move || reviews::list(&session, &github,
+        request.login.as_deref().ok_or_else(reviews::changed)?,
+        request.remote.as_deref().ok_or_else(reviews::changed)?, request.number,
+        request.head_sha.as_deref().ok_or_else(reviews::changed)?)).await
 }
-
 #[tauri::command]
-pub async fn m7_github_review_draft_save(
-    state: State<'_, AppState>,
-    draft: ReviewDraft,
-) -> Result<ReviewDraft> {
-    pr::save_draft(&state.m7_github, draft)
+pub async fn m7_github_review_draft_save(state: State<'_, AppState>, scope: ReviewDraftScope, draft: ReviewDraft) -> Result<ReviewDraft> {
+    let session = session_for(&state, &scope.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
+    blocking(move || reviews::save(&session, &github, &scope, draft)).await
 }
-
 #[tauri::command]
-pub async fn m7_github_review_draft_delete(state: State<'_, AppState>, id: String) -> Result<()> {
-    pr::delete_draft(&state.m7_github, &id)
+pub async fn m7_github_review_draft_delete(state: State<'_, AppState>, scope: ReviewDraftScope, id: String) -> Result<()> {
+    let session = session_for(&state, &scope.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
+    blocking(move || reviews::delete(&session, &github, &scope, &id)).await
 }
 
 #[tauri::command]

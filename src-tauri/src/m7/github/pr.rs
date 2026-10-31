@@ -14,7 +14,7 @@ use crate::git::NETWORK_TIMEOUT;
 use crate::remote_ops::{self, CheckoutResult, CheckoutStrategy, CheckoutTarget};
 use crate::session::WorktreeSession;
 
-use super::store::{self, MergeReceipt, ProtectionInfo, RemoteInfo, ReviewDraft};
+use super::store::{self, MergeReceipt, ProtectionInfo, RemoteInfo};
 use super::{GithubClient, GithubState, RateLimit};
 
 /// PR 列表每页条数（GitHub 上限 100，这里用 30 便于分页）。
@@ -165,6 +165,8 @@ pub struct ReviewCommentInput {
 #[serde(rename_all = "camelCase")]
 pub struct ReviewSubmitRequest {
     pub worktree_id: String,
+    pub draft_scope: super::reviews::ReviewDraftScope,
+    pub draft_ids: Vec<String>,
     /// F07：审阅目标远端（与列表 / 详情所选一致），不再回退 origin。
     pub remote: Option<String>,
     pub number: u64,
@@ -627,7 +629,12 @@ fn map_comment(comment: ApiComment, kind: CommentKind) -> PullRequestComment {
 }
 
 /// 发表一条普通评论。
-pub fn create_comment(context: &PrContext, number: u64, body: &str) -> Result<()> {
+pub fn create_comment(context: &PrContext, number: u64, body: &str, scope: &super::reviews::ReviewDraftScope) -> Result<()> {
+    scope.verify_publish(context, number, &scope.head_sha)?;
+    let (pull, _): (ApiPull, _) = context.client.get_json(&format!("{}/pulls/{number}", context.repo_path()))?;
+    let actual = pull.head.as_ref().map(|head| head.sha.as_str()).unwrap_or_default();
+    if actual != scope.head_sha { return Err(head_changed(&scope.head_sha, actual)); }
+    let sent: Vec<_> = context.state.drafts().list_target(&scope.target_key)?.into_iter().filter(|d| d.scope_key.as_deref() == Some(&scope.key) && d.kind == "commentBody" && d.body == body).collect();
     let body = body.trim();
     if body.is_empty() {
         return Err(rejected(
@@ -645,40 +652,25 @@ pub fn create_comment(context: &PrContext, number: u64, body: &str) -> Result<()
         &format!("{}/issues/{number}/comments", context.repo_path()),
         &serde_json::json!({ "body": body }),
     )?;
+    context.state.drafts().remove_published(&scope.key, &sent).map_err(review_cleanup_failed)?;
     Ok(())
 }
 
-/// 本地评审草稿：列出。
-/// F09：草稿按 PR + head 版本过滤。PR 更新后旧 head 的草稿保留在存储里但不参与当前提交，
-/// 界面按“版本变化保留草稿”的规格另行提示，不会拿旧内容冒充新版本的审阅。
-pub fn list_drafts(state: &GithubState, repo_key: &str, number: u64, head_sha: Option<&str>) -> Vec<ReviewDraft> {
-    let all = state.drafts().list(repo_key, number);
-    match head_sha {
-        Some(head) => all.into_iter().filter(|draft| draft.head_sha.as_deref() == Some(head)).collect(),
-        None => all,
-    }
-}
-
-/// 本地评审草稿：保存。
-pub fn save_draft(state: &GithubState, draft: ReviewDraft) -> Result<ReviewDraft> {
-    if draft.body.trim().is_empty() {
-        return Err(rejected("errors.m7.githubCommentEmpty", "评论内容不能为空"));
-    }
-    if draft.path.trim().is_empty() || draft.line == 0 {
-        return Err(rejected(
-            "errors.m7.githubCommentAnchorInvalid",
-            "行内评论需要文件与行号",
-        ));
-    }
-    state.drafts().save(draft)
-}
-
-pub fn delete_draft(state: &GithubState, id: &str) -> Result<()> {
-    state.drafts().delete(id)
+fn review_cleanup_failed(error: AppError) -> AppError {
+    AppError::coded(ErrorKind::NeedsVerification, "errors.m7.githubReviewCleanupFailed", "内容已发送，但本地记录失败；请先核对远端结果", &[]).cause(error)
 }
 
 /// 提交评审（附带草稿里的行内评论）。
 pub fn submit_review(context: &PrContext, request: &ReviewSubmitRequest) -> Result<ReviewReceipt> {
+    request.draft_scope.verify_publish(context, request.number, &request.expected_head_sha)?;
+    let saved = context.state.drafts().list_target(&request.draft_scope.target_key)?;
+    let mut sent = Vec::new();
+    for id in &request.draft_ids {
+        let draft = saved.iter().find(|d| &d.id == id && d.kind == "inline" && d.scope_key.as_deref() == Some(&request.draft_scope.key)).ok_or_else(super::reviews::changed)?;
+        sent.push(draft.clone());
+    }
+    if request.comments.len() != sent.len() || request.comments.iter().zip(&sent).any(|(c,d)| c.path != d.path || c.line != d.line || c.side != d.side || c.body != d.body) { return Err(super::reviews::changed()); }
+    sent.extend(saved.iter().filter(|d| d.scope_key.as_deref() == Some(&request.draft_scope.key) && d.kind == "reviewBody" && d.body == request.body).cloned());
     let body = request.body.trim();
     if request.event != ReviewEvent::Comment && body.is_empty() {
         return Err(rejected(
@@ -720,6 +712,7 @@ pub fn submit_review(context: &PrContext, request: &ReviewSubmitRequest) -> Resu
     }
     let payload = serde_json::json!({
         "body": body,
+        "commit_id": request.expected_head_sha,
         "event": request.event.api_value(),
         "comments": comments,
     });
@@ -738,12 +731,9 @@ pub fn submit_review(context: &PrContext, request: &ReviewSubmitRequest) -> Resu
         protection_source: "api".into(),
         notes: vec![format!("account={}", context.login)],
         created_at_ms: super::super::now_ms(),
-    })?;
-    // 提交成功后清掉本 PR 的本地草稿：它们已经变成远端评论。
-    let _ = context
-        .state
-        .drafts()
-        .clear(&context.repo_key, request.number);
+    }).map_err(review_cleanup_failed)?;
+    // 本地清理失败保留原稿并明确待核对；不让调用方把远端成功当成可自动重试的失败。
+    context.state.drafts().remove_published(&request.draft_scope.key, &sent).map_err(review_cleanup_failed)?;
     Ok(ReviewReceipt {
         receipt,
         review_url: review.html_url,

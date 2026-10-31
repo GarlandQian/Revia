@@ -1310,7 +1310,9 @@
       "terminalCloseFailed": "结束终端进程失败：{cause}",
       "githubCheckoutWriteGuard": "PR 检出写入保护不可用，请重试",
       "githubPrCheckoutUnverified": "PR 检出未完成，请核对分支与工作区；不会自动重试",
-      "githubProtectionIncomplete": "分支保护响应不完整，已保留上次结果"
+      "githubProtectionIncomplete": "分支保护响应不完整，已保留上次结果",
+      "githubDraftTargetChanged": "草稿的账号、远端、仓库或提交版本已变化；已保留原稿。",
+      "githubReviewCleanupFailed": "内容已发送，但本地记录失败。请先核对远端结果，再决定下一步。"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
@@ -2251,7 +2253,8 @@
     "protectionSynced": "已同步",
     "protectionUnsynced": "保护状态尚未同步",
     "protectionStale": "可能过期",
-    "syncProtection": "同步分支保护"
+    "syncProtection": "同步分支保护",
+    "olderDrafts": "旧提交版本的草稿（保留供查看，不会随当前版本发送）"
   },
   "diagnostics": {
     "title": "诊断信息",

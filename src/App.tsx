@@ -120,6 +120,7 @@ import { matchShortcut, setShortcutOverrides as applyShortcutOverrides } from "@
 import { GlassIcons } from "@/components/m7/glass";
 import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { useReducedMotion, useThemeKind } from "@/hooks/useGlassPrefs";
+import { reviewDraftSessions } from "@/lib/m7/reviewDrafts";
 import { flushM7State, registerM7Flusher } from "@/lib/m7/flush";
 import { m7, onM7Events } from "@/lib/m7/api";
 import { EditableWorkspace, EditDecisionDialog } from "@/features/m7/EditableWorkspace";
@@ -1780,7 +1781,7 @@ export function App() {
    */
   const reconcileClose = useCallback(() => {
     const coordinator = closeCoordinatorRef.current;
-    if (closeDriver.currentPhase() !== "closing") void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard).catch((caught) => {
+    if (closeDriver.currentPhase() !== "closing") void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork).catch((caught) => {
       setAppError(toAppError(caught), null);
     });
     applyEffect(closeDriver.notifyStateChanged());
@@ -1789,12 +1790,12 @@ export function App() {
   useEffect(() => {
     const sync = () => {
       if (closeDriver.currentPhase() === "closing") return;
-      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard)
+      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork)
         .catch((caught) => setAppError(toAppError(caught), null));
     };
     sync();
-    const stopEdit = editSessions.subscribe(sync), stopTerminal = terminalSessions.subscribe(sync);
-    return () => { stopEdit(); stopTerminal(); };
+    const stopEdit = editSessions.subscribe(sync), stopTerminal = terminalSessions.subscribe(sync), stopReview = reviewDraftSessions.subscribe(sync);
+    return () => { stopEdit(); stopTerminal(); stopReview(); };
   }, [closeDriver, editSessions, terminalSessions, setAppError, syncExitBlocked]);
   // 存在磁盘草稿但尚未打开编辑器时，原生Quit也必须进入同一决策入口。
   useEffect(() => {
@@ -1803,7 +1804,7 @@ export function App() {
       try {
         await syncExitBlocked(true);
         await editSessions.discover(editWorktreesRef.current);
-        if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard);
+        if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork);
       } catch (caught) { if (!cancelled) setAppError(toAppError(caught), null); }
     })();
     return () => { cancelled = true; };
@@ -1815,7 +1816,7 @@ export function App() {
     void (async () => {
       await syncExitBlocked(true);
       await terminalSessions.initialize();
-      if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard);
+      if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork);
     })().catch((caught) => { if (!cancelled) setAppError(toAppError(caught), null); });
     return () => { cancelled = true; };
   }, [closeDriver, terminalSessions, editSessions, setAppError, syncExitBlocked]);

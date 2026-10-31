@@ -6,7 +6,7 @@
  * 所有网络与 Git 动作都由 Rust 执行；这里只收集用户输入与展示结构化结果。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { DeviceStart } from "@/types/bindings/DeviceStart";
 import type { GithubStatus } from "@/types/bindings/GithubStatus";
@@ -21,12 +21,13 @@ import type { PullRequestFilter } from "@/types/bindings/PullRequestFilter";
 import type { PullRequestSummary } from "@/types/bindings/PullRequestSummary";
 import type { RateLimit } from "@/types/bindings/RateLimit";
 import type { RemoteInfo } from "@/types/bindings/RemoteInfo";
-import type { ReviewDraft } from "@/types/bindings/ReviewDraft";
 import type { ReviewEvent } from "@/types/bindings/ReviewEvent";
 import { Codicon } from "@/components/ui/codicon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7, type PrCheckoutPayload } from "@/lib/m7/api";
+import { reviewDraftSessions } from "@/lib/m7/reviewDrafts";
+import type { ReviewDraftSession } from "@/lib/m7/reviewDraftSessions";
 import { GithubRequests, githubResponse } from "@/lib/m7/githubRequests";
 
 type Tab = "pulls" | "create" | "receipts";
@@ -104,7 +105,24 @@ export function GithubPanel({
   const [detail, setDetail] = useState<PullRequestDetail | null>(null);
   const [files, setFiles] = useState<PullRequestFile[]>([]);
   const [comments, setComments] = useState<PullRequestComment[]>([]);
-  const [drafts, setDrafts] = useState<ReviewDraft[]>([]);
+  const [reviewSession, setReviewSession] = useState<ReviewDraftSession | null>(null);
+  const reviewState = useSyncExternalStore(
+    useCallback((listener: () => void) => reviewSession?.subscribe(listener) ?? (() => {}), [reviewSession]),
+    useCallback(() => reviewSession?.snapshot() ?? null, [reviewSession]),
+  );
+  const drafts = reviewState?.inline ?? [];
+  const commentBody = reviewState?.forms.commentBody.body ?? "";
+  const reviewBody = reviewState?.forms.reviewBody.body ?? "";
+  const draftBody = reviewState?.forms.inlineForm.body ?? "";
+  const draftPath = reviewState?.forms.inlineForm.path ?? "";
+  const draftLine = String(reviewState?.forms.inlineForm.line ?? 1);
+  const reviewEvent: ReviewEvent = REVIEW_EVENTS.includes(reviewState?.forms.reviewBody.side as ReviewEvent) ? reviewState!.forms.reviewBody.side as ReviewEvent : "comment";
+  const setCommentBody = (body: string) => reviewSession?.change("commentBody", { body });
+  const setReviewBody = (body: string) => reviewSession?.change("reviewBody", { body });
+  const setDraftBody = (body: string) => reviewSession?.change("inlineForm", { body });
+  const setDraftPath = (path: string) => reviewSession?.change("inlineForm", { path });
+  const setDraftLine = (line: string) => reviewSession?.change("inlineForm", { line: Math.max(1, Number.parseInt(line, 10) || 1) });
+  const setReviewEvent = (side: ReviewEvent) => reviewSession?.change("reviewBody", { side });
   const [receipts, setReceipts] = useState<MergeReceipt[]>([]);
   const [protection, setProtection] = useState<ProtectionInfo | null>(null);
   const [tab, setTab] = useState<Tab>("pulls");
@@ -119,12 +137,6 @@ export function GithubPanel({
   const pollTimer = useRef<number | null>(null);
 
   // 表单
-  const [commentBody, setCommentBody] = useState("");
-  const [reviewBody, setReviewBody] = useState("");
-  const [reviewEvent, setReviewEvent] = useState<ReviewEvent>("comment");
-  const [draftPath, setDraftPath] = useState("");
-  const [draftLine, setDraftLine] = useState("1");
-  const [draftBody, setDraftBody] = useState("");
   const [mergeMethod, setMergeMethod] = useState<MergeMethod>("merge");
   const [mergeConfirmed, setMergeConfirmed] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -146,12 +158,6 @@ export function GithubPanel({
   scopeRequests.select(scopeKey);
   viewRequests.select(JSON.stringify([scopeKey, selected?.number ?? null]));
   statusRequests.select(worktreeId);
-  const [backendRepoKey, setBackendRepoKey] = useState("");
-  useEffect(() => {
-    const ticket = statusRequests.begin("repoKey");
-    void githubResponse(ticket, () => m7.githubRepoKey(worktreeId), setBackendRepoKey, () => setBackendRepoKey(""));
-  }, [worktreeId, statusRequests]);
-
   const loadStatus = useCallback(async () => {
     const ticket = statusRequests.begin("status");
     await githubResponse(ticket, () => Promise.all([m7.githubStatus(worktreeId), m7.githubRemotes(worktreeId)]),
@@ -213,7 +219,7 @@ export function GithubPanel({
     setDetail(null);
     setFiles([]);
     setComments([]);
-    setDrafts([]);
+    setReviewSession(null);
     setProtection(null);
     setReceipts([]);
     setFullDiff(null);
@@ -237,27 +243,27 @@ export function GithubPanel({
       setDetail(null);
       setFiles([]);
       setComments([]);
-      setDrafts([]);
+      setReviewSession(null);
       setProtection(null);
       setFullDiff(null);
-      // F09：正文草稿按 PR 保留——切到另一个 PR 时清空（本地 state 不跨 PR 共享）。
-      setReviewBody("");
-      setCommentBody("");
+      // 原会话保留在App级草稿登记中；新目标仅装入同身份同head的稿件。
       setBusy("detail");
       setError(null);
       try {
-        const [detailResult, fileList, commentList, draftList] = await Promise.all([
+        const [detailResult, fileList, commentList] = await Promise.all([
           m7.prDetail(request),
           m7.prFiles(request),
           m7.prComments(request),
-          m7.reviewDrafts(request),
         ]);
         // 身份核对：只有仍然是“这一目标”的请求才能落状态；否则静默丢弃。
         if (!ticket.current()) return;
-        setDetail(detailResult);
         setFiles(fileList);
         setComments(commentList);
-        setDrafts(draftList);
+        if (!login) return;
+        const bundle = await m7.reviewDrafts({ ...request, login, headSha: detailResult.summary.headSha });
+        if (!ticket.current()) return;
+        setReviewSession(reviewDraftSessions.open(bundle));
+        setDetail(detailResult);
         setCreateBase(summary.baseRef);
         void githubResponse(ticket, () => m7.protectionRefresh(worktreeId, remote, detailResult.summary.baseRef),
           setProtection, (caught) => {
@@ -270,7 +276,7 @@ export function GithubPanel({
         ticket.apply(() => setBusy((current) => current === "detail" ? null : current));
       }
     },
-    [remote, worktreeId, scopeKey, viewRequests],
+    [remote, worktreeId, scopeKey, viewRequests, login],
   );
 
   // 同步完整远端集合不依赖存在或打开某个PR。
@@ -346,97 +352,63 @@ export function GithubPanel({
   }, [loadStatus, token, statusRequests]);
 
   const submitComment = useCallback(async () => {
-    if (!selected || commentBody.trim().length === 0) return;
+    if (!selected || !reviewSession || commentBody.trim().length === 0) return;
+    const ticket = viewRequests.begin("action");
+    const session = reviewSession;
     setBusy("comment");
-    const ticket = viewRequests.begin("action");
     try {
-      await m7.prCommentCreate({ worktreeId, remote, number: selected.number, body: commentBody });
+      await session.flush();
       if (!ticket.current()) return;
-      setCommentBody("");
-      const nextComments = await m7.prComments({ worktreeId, remote, number: selected.number });
+      const sent = session.snapshot().forms.commentBody;
+      await m7.prCommentCreate({ worktreeId, remote, number: selected.number, body: sent.body, draftScope: session.scope });
+      await session.published("commentBody", sent);
       if (!ticket.current()) return;
-      setComments(nextComments);
-      onWorkspaceTouched();
-    } catch (caught) {
-      if (!ticket.current()) return;
-      setError(toAppError(caught));
-    } finally {
-      ticket.apply(() => setBusy((current) => current === "comment" ? null : current));
-    }
-  }, [commentBody, onWorkspaceTouched, remote, selected, worktreeId, viewRequests]);
+      const next = await m7.prComments({ worktreeId, remote, number: selected.number });
+      ticket.apply(() => { setComments(next); onWorkspaceTouched(); });
+    } catch (caught) { ticket.apply(() => setError(toAppError(caught))); }
+    finally { ticket.apply(() => setBusy((current) => current === "comment" ? null : current)); }
+  }, [selected, reviewSession, commentBody, viewRequests, worktreeId, remote, onWorkspaceTouched]);
 
-  const addDraft = useCallback(async () => {
-    if (!selected || !login || draftPath.trim().length === 0) return;
-    const line = Math.max(1, Number.parseInt(draftLine, 10) || 1);
+  const addDraft = async () => {
+    if (!reviewSession || busy !== null) return;
     const ticket = viewRequests.begin("action");
-    try {
-      // F09：草稿绑定后端 repoKey（worktree 路径 SHA）与当前 head；前端不再伪造 repoKey。
-      if (remote === null || detail?.summary.headSha == null) {
-        setError({ kind: "rejected", message: t("github.remoteRequired"), params: {} });
-        return;
-      }
-      await m7.reviewDraftSave({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        repoKey: backendRepoKey,
-        number: selected.number,
-        headSha: detail.summary.headSha,
-        path: draftPath.trim(),
-        side: "new",
-        line,
-        body: draftBody,
-        createdAtMs: Date.now(),
-        updatedAtMs: Date.now(),
-      });
-      if (!ticket.current()) return;
-      setDraftBody("");
-      const nextDrafts = await m7.reviewDrafts({ worktreeId, remote, number: selected.number, headSha: detail?.summary.headSha });
-      if (!ticket.current()) return;
-      setDrafts(nextDrafts);
-    } catch (caught) {
-      if (!ticket.current()) return;
-      setError(toAppError(caught));
-    }
-  }, [draftBody, draftLine, draftPath, login, remote, selected, worktreeId, viewRequests, detail, backendRepoKey]);
+    setBusy("draft");
+    try { await reviewSession.addInline(); }
+    catch (caught) { ticket.apply(() => setError(toAppError(caught))); }
+    finally { ticket.apply(() => setBusy((current) => current === "draft" ? null : current)); }
+  };
+  const deleteDraft = async (id: string) => {
+    if (!reviewSession || busy !== null) return;
+    const ticket = viewRequests.begin("action"); setBusy("draft");
+    try { await reviewSession.removeInline(id); }
+    catch (caught) { ticket.apply(() => setError(toAppError(caught))); }
+    finally { ticket.apply(() => setBusy((current) => current === "draft" ? null : current)); }
+  };
 
   const submitReview = useCallback(async () => {
-    if (!selected || !detail) return;
+    if (!selected || !detail || !reviewSession) return;
     if (drafts.length === 0 && reviewBody.trim().length === 0) {
-      setError({ kind: "rejected", message: t("github.reviewEmpty"), params: {} });
-      return;
+      setError({ kind: "rejected", message: t("github.reviewEmpty"), params: {} }); return;
     }
-    setBusy("review");
-    setError(null);
     const ticket = viewRequests.begin("action");
+    const session = reviewSession;
+    setBusy("review"); setError(null);
     try {
-      // F07：审阅落在列表 / 详情所选的远端仓库，不回退 origin。
-      if (remote === null) {
-        setError({ kind: "rejected", message: t("github.remoteRequired"), params: {} });
-        return;
-      }
-      const receipt = await m7.reviewSubmit({
-        worktreeId,
-        remote,
-        number: selected.number,
-        event: reviewEvent,
-        body: reviewBody,
-        comments: drafts.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, body: draft.body })),
-        expectedHeadSha: detail.summary.headSha,
+      await session.flush();
+      if (!ticket.current()) return;
+      const sent = session.snapshot();
+      const receipt = await m7.reviewSubmit({ worktreeId, remote, number: selected.number,
+        event: reviewEvent, body: sent.forms.reviewBody.body,
+        comments: sent.inline.map((draft) => ({ path: draft.path, line: draft.line, side: draft.side, body: draft.body })),
+        expectedHeadSha: session.scope.headSha, draftScope: session.scope, draftIds: sent.inline.map((draft) => draft.id),
       });
+      await session.published("reviewBody", sent.forms.reviewBody, sent.inline);
       if (!ticket.current()) return;
       const nextReceipts = await m7.githubReceipts(worktreeId);
-      if (!ticket.current()) return;
-      setReceipts(nextReceipts);
-      setDrafts([]);
-      setReviewBody("");
-      setNotice(t("github.reviewSubmitted", { url: receipt.reviewUrl ?? "" }));
-      onWorkspaceTouched();
-    } catch (caught) {
-      if (!ticket.current()) return;
-      setError(toAppError(caught));
-    } finally {
-      ticket.apply(() => setBusy((current) => current === "review" ? null : current));
-    }
-  }, [detail, drafts, onWorkspaceTouched, remote, reviewBody, reviewEvent, selected, worktreeId, viewRequests]);
+      ticket.apply(() => { setReceipts(nextReceipts); setNotice(t("github.reviewSubmitted", { url: receipt.reviewUrl ?? "" })); onWorkspaceTouched(); });
+    } catch (caught) { ticket.apply(() => setError(toAppError(caught))); }
+    finally { ticket.apply(() => setBusy((current) => current === "review" ? null : current)); }
+  }, [detail, drafts, reviewBody, reviewEvent, selected, reviewSession, viewRequests, remote, worktreeId, onWorkspaceTouched]);
 
   const checkout = useCallback(async (overwriteConfirmed = false) => {
     if (!selected || !detail || remote === null) return;
@@ -845,7 +817,7 @@ export function GithubPanel({
                     placeholder={t("github.commentPlaceholder")}
                     onChange={(event) => setCommentBody(event.target.value)}
                   />
-                  <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || commentBody.trim().length === 0} onClick={() => void submitComment()}>
+                  <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || !reviewSession || error?.kind === "needsVerification" || commentBody.trim().length === 0} onClick={() => void submitComment()}>
                     {t("github.commentSend")}
                   </button>
                 </section>
@@ -853,6 +825,14 @@ export function GithubPanel({
                 <section className="space-y-2 rounded border border-panel-border p-2">
                   <h3 className="font-semibold">{t("github.reviewTitle")}</h3>
                   <p className="text-descriptionforeground">{t("github.reviewHint")}</p>
+                  {reviewState?.error ? <p role="alert">{formatAppError(toAppError(reviewState.error))}</p> : null}
+                  {reviewState && reviewState.older.length > 0 ? <details className="rounded border border-panel-border p-2">
+                    <summary>{t("github.olderDrafts")}</summary>
+                    {reviewState.older.filter((draft) => draft.body.length > 0).map((draft) => <div key={draft.id} className="mt-2">
+                      <p className="font-mono text-[11px]">{draft.headSha?.slice(0, 8)} {draft.path}</p>
+                      <pre className="select-text whitespace-pre-wrap">{draft.body}</pre>
+                    </div>)}
+                  </details> : null}
                   {drafts.length === 0 ? <p className="text-descriptionforeground">{t("github.noDrafts")}</p> : null}
                   {drafts.map((draft) => (
                     <div key={draft.id} className="flex items-start gap-2 rounded bg-[var(--side-bar-background)] p-2">
@@ -864,12 +844,8 @@ export function GithubPanel({
                         type="button"
                         className="icon-action size-5"
                         aria-label={t("common.delete")}
-                        onClick={() =>
-                          void githubResponse(viewRequests.begin("drafts"), async () => {
-                            await m7.reviewDraftDelete(draft.id);
-                            return m7.reviewDrafts({ worktreeId, remote, number: selected.number, headSha: detail.summary.headSha });
-                          }, setDrafts, (caught) => setError(toAppError(caught)))
-                        }
+                        disabled={busy !== null}
+                        onClick={() => void deleteDraft(draft.id)}
                       >
                         <Codicon name="trash" size={12} />
                       </button>
@@ -880,7 +856,7 @@ export function GithubPanel({
                     <input className="settings-input" value={draftLine} inputMode="numeric" placeholder={t("github.draftLine")} onChange={(event) => setDraftLine(event.target.value)} />
                   </div>
                   <textarea className="settings-input h-14 w-full resize-y py-1" value={draftBody} placeholder={t("github.draftBody")} onChange={(event) => setDraftBody(event.target.value)} />
-                  <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void addDraft()}>
+                  <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || !reviewSession} onClick={() => void addDraft()}>
                     {t("github.draftAdd")}
                   </button>
                   <div className="flex flex-wrap items-center gap-2 border-t border-panel-border pt-2">
@@ -892,7 +868,7 @@ export function GithubPanel({
                       ))}
                     </select>
                     <input className="settings-input h-6 min-w-0 flex-1" value={reviewBody} placeholder={t("github.reviewBody")} onChange={(event) => setReviewBody(event.target.value)} />
-                    <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null} onClick={() => void submitReview()}>
+                    <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || !reviewSession || error?.kind === "needsVerification"} onClick={() => void submitReview()}>
                       {t("github.reviewSubmit")}
                     </button>
                   </div>

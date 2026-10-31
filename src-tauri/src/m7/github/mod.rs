@@ -11,6 +11,7 @@
 pub mod auth;
 pub mod pr;
 pub mod protection;
+pub mod reviews;
 pub mod store;
 
 use std::collections::BTreeMap;

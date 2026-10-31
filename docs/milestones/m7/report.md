@@ -168,3 +168,15 @@ PR面板的列表、详情、评论提交/重载、审阅回执、完整diff、�
 `github-requests-node-01` 8项生产GithubRequests/githubResponse竞态回归通过，验证账号/worktree/remote/URL/PR切换、A→B→A、同类重复请求、独立通道、错误与卸载；不是桌面验收。`github-requests-frontend-build-01`与`github-requests-lint-01` exit0，原hash/argv/真实exit/stdout/stderr均在批次codex-checks。该组没有新增locale键。
 
 F09持久正文、账号/remote/PR/head草稿身份与发布前版本复核仍独立待修，不能把本组通过当作F09完成。F13/F22和任务13/14真实桌面也尚未完成。
+
+### Codex 直接修复 F09 — 2026-10-31
+
+本地草稿由Rust派生真实worktree身份、账号、remote与GitHub仓库、PR号及head组成的scope，不接受前端repoKey认领。评论正文、审阅正文/事件、行内输入表单和已加入的行内草稿都保存在本机；切PR/账号/remote或隐藏面板仍保留。重新打开按实际详情head装入；旧head稿件单列只读供取回，不混入当前发送集合，旧无身份记录保留而不自动认领。存储读改写共锁，坏文件或写失败不以空集合覆盖；已移除静默截断未发表稿件的上限。
+
+前端生产ReviewDraftSession按scope串行保存并保留失败正文。新成功覆盖旧失败状态；发送期间新输入不被成功回包清掉。App级登记在面板隐藏后仍参加正常退出冲刷与原生退出保护，失败保留窗口。发布前先冲刷本地稿、核对账号/remote/真实仓库/head，Rust再次读取PR head；行内id必须属于同一scope和提交，评审POST显式绑定`commit_id`，不自动改用新head。成功只清理实际发送且内容/锚点/时间仍相同的稿件，旧版本及新输入保留；远端成功而本地回执/清理失败返回结构化NeedsVerification，禁止自动重发。
+
+原件在批次`codex-checks`：最终`review-drafts-cargo-02`新10项+共享保护7项通过，使用独占真实Git/HOME/appdata与loopback假账号HTTP，覆盖旧版本混发拒绝、身份隔离、真实PR版本变化、POST commit_id、发送期间新正文、精确清理、并发写、坏存储、权限失败与远端成功后本地失败。`review-drafts-lib-01`GitHub库34项含新绑定导出通过；最后存储比较细化后`review-drafts-store-01`2项通过。`review-drafts-node-04`49项全部通过（新草稿8、目标请求8、编辑13、终端12、共享关闭写门8）；实际生产模块与协调器，不是桌面替代。`review-drafts-frontend-build-03`、`review-drafts-lint-02`、`review-drafts-x18n-01` exit0；翻译0错误/76个既有unused-key警告。
+
+前端首轮`review-drafts-frontend-build-01`真实exit2，空表单headSha:null不符合已有可选string绑定，修正为空缺字段后重跑通过。最早Node轮缺既有Rust错误证据环境变量而跳过1项，补齐后最终49项无跳过。所有中间轮和原stdout/stderr、精确argv、源码hash、真实exit均保留；不把中间轮算作最终候选通过。测试HTTP helper两项未用函数产生非阻断dead_code提示，未清理后谎称复用旧通过。
+
+[GitHub官方review接口](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)已核对commit_id省略时默认最新提交；本组显式固定原head。Grok连接失败后用可用官方网页读取渠道，原件`impl/review-api-official.json`。这是中间检查点，F13/F22更新包/渠道/安装重启协调仍未完成；任务13/14真实桌面与真实账号/钥匙串仍未验。

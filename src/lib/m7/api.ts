@@ -32,6 +32,8 @@ import type { PullRequestFile } from "@/types/bindings/PullRequestFile";
 import type { PullRequestFilter } from "@/types/bindings/PullRequestFilter";
 import type { PullRequestList } from "@/types/bindings/PullRequestList";
 import type { RemoteInfo } from "@/types/bindings/RemoteInfo";
+import type { ReviewDraftBundle } from "@/types/bindings/ReviewDraftBundle";
+import type { ReviewDraftScope } from "@/types/bindings/ReviewDraftScope";
 import type { ReviewDraft } from "@/types/bindings/ReviewDraft";
 import type { ReviewEvent } from "@/types/bindings/ReviewEvent";
 import type { ReviewReceipt } from "@/types/bindings/ReviewReceipt";
@@ -101,6 +103,8 @@ export interface PrCreatePayload {
 
 export interface ReviewSubmitPayload {
   worktreeId: string;
+  draftScope: ReviewDraftScope;
+  draftIds: string[];
   /** F07：审阅目标远端（与列表 / 详情所选一致）。 */
   remote: string | null;
   number: number;
@@ -124,6 +128,7 @@ export interface MergePayload {
 
 export interface PrRefPayload {
   worktreeId: string;
+  login?: string;
   remote: string | null;
   number: number;
   /** F09：当前 head；草稿列表按它过滤。 */
@@ -190,14 +195,14 @@ export const m7 = {
   prDiff: (request: PrRefPayload) => invoke<string>("m7_github_pr_diff", { request }),
   prComments: (request: PrRefPayload) =>
     invoke<PullRequestComment[]>("m7_github_pr_comments", { request }),
-  prCommentCreate: (request: PrRefPayload & { body: string }) =>
+  prCommentCreate: (request: PrRefPayload & { body: string; draftScope: ReviewDraftScope }) =>
     invoke<void>("m7_github_pr_comment_create", { request }),
   githubRepoKey: (worktreeId: string) => invoke<string>("m7_github_repo_key", { worktreeId }),
   reviewDrafts: (request: PrRefPayload) =>
-    invoke<ReviewDraft[]>("m7_github_review_drafts", { request }),
-  reviewDraftSave: (draft: ReviewDraft) =>
-    invoke<ReviewDraft>("m7_github_review_draft_save", { draft }),
-  reviewDraftDelete: (id: string) => invoke<void>("m7_github_review_draft_delete", { id }),
+    invoke<ReviewDraftBundle>("m7_github_review_drafts", { request }),
+  reviewDraftSave: (scope: ReviewDraftScope, draft: ReviewDraft) =>
+    invoke<ReviewDraft>("m7_github_review_draft_save", { scope, draft }),
+  reviewDraftDelete: (scope: ReviewDraftScope, id: string) => invoke<void>("m7_github_review_draft_delete", { scope, id }),
   reviewSubmit: (request: ReviewSubmitPayload) =>
     invoke<ReviewReceipt>("m7_github_review_submit", { request }),
   prCheckout: (request: PrCheckoutPayload) =>
