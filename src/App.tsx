@@ -48,7 +48,7 @@ import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { NotificationStack } from "@/components/app/Notifications";
 import { RecoveryPanel } from "@/components/app/RecoveryPanel";
 import { SettingsDialog, type SettingsPatch } from "@/components/app/SettingsDialog";
-import { ActivityBar, StatusBar, TitleBar, WelcomeScreen } from "@/components/app/Shell";
+import { ActivityBar, StatusBar, TitleBar, ToolbarGroup, WelcomeScreen } from "@/components/app/Shell";
 import { Codicon } from "@/components/ui/codicon";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/popover";
 import { beginSynchronousMeasurement, flushSynchronousMeasurements, logToBackend, setLoggingEnabled } from "@/features/diff/log";
@@ -83,7 +83,7 @@ import {
   preparePush, remoteShortcutAction, remoteTargetIsCurrent, runPushSequence,
   type BoundPushPreview, type RemoteTarget,
 } from "@/features/branches/remoteContinuation";
-import { BranchWidget } from "@/features/branches/BranchWidget";
+import { BranchWidget, SyncActions } from "@/features/branches/BranchWidget";
 import { CheckoutConflictDialog, NewBranchDialog, PushDialog } from "@/features/branches/BranchDialogs";
 import { useBranches } from "@/features/branches/useBranches";
 import type { IncomingToken } from "@/features/branches/incomingState";
@@ -121,9 +121,7 @@ import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { formatAppError, resultNeedsVerification, getErrorMessage, toAppError } from "@/lib/error";
 import { useAppearance } from "@/hooks/useAppearance";
 import { matchShortcut, setShortcutOverrides as applyShortcutOverrides } from "@/lib/shortcuts";
-import { GlassIcons } from "@/components/m7/glass";
 import { GlassLayer } from "@/features/m7/glass/GlassLayer";
-import { useReducedMotion, useThemeKind } from "@/hooks/useGlassPrefs";
 import { reviewDraftSessions } from "@/lib/m7/reviewDrafts";
 import { mergeBufferGuards } from "@/lib/m7/mergeBuffers";
 import { flushM7State, registerM7Flusher } from "@/lib/m7/flush";
@@ -465,8 +463,6 @@ export function App() {
   const [allowPrerelease, setAllowPrerelease] = useState(false);
   const updateChannelEpoch = useRef(0);
   const [shortcutsSnapshot, setShortcutsSnapshot] = useState<Record<string, string>>({});
-  const themeKind = useThemeKind();
-  const reducedMotion = useReducedMotion();
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
   const [updateBannerVersion, setUpdateBannerVersion] = useState<string | null>(null);
   /** 冲突对话框（返修 F10）。 */
@@ -3841,7 +3837,8 @@ export function App() {
             refractionEnabled: Array.from(document.querySelectorAll(".glass-surface")).filter(
               (node) => !node.classList.contains("glass-surface--fallback") && !node.classList.contains("glass-layer--flat"),
             ).length,
-            tools: document.querySelectorAll(".m7-tool-cluster .glass-icon").length,
+            tools: document.querySelectorAll(".toolbar-group .toolbar-group-item").length,
+            nativeGlass: document.documentElement.classList.contains("native-glass"),
             commitButton: !!document.querySelector(".m7-commit-button"),
           },
           statusBar: document.querySelector("footer")?.textContent?.slice(0, 120) ?? null,
@@ -5627,7 +5624,7 @@ export function App() {
 
   if (!activeRepo) {
     return (
-      <div className="flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
+      <div className="welcome-shell flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
         <WelcomeScreen
           repos={repos}
           busy={busy}
@@ -5680,8 +5677,7 @@ export function App() {
         onWorktree={(id) => void switchWorktree(id)}
         onSettings={() => setSettingsOpen(true)}
         onRefreshWorktrees={() => void refreshWorktreeStatuses()}
-        extra={worktreeId ? (
-          <>
+        branchWidget={worktreeId ? (
           <BranchWidget
             overview={branches.overview}
             loading={branches.loading}
@@ -5692,74 +5688,59 @@ export function App() {
             onCheckout={(target) => void runCheckout(target, "plain")}
             onNewBranch={openNewBranch}
             onFetch={() => void runFetch(worktreeId, "user")}
-            onUpdate={() => void runUpdate(worktreeId)}
-            onPush={() => void openPushDialog()}
           />
-          <div className="m7-tool-cluster">
-            <GlassIcons
-              items={[
-                {
-                  id: "terminal",
-                  icon: <Codicon name="terminal" size={14} />,
-                  label: t("toolbar.terminal"),
-                  color: terminalOpen ? "green" : "graphite",
-                  className: terminalOpen ? "is-active" : undefined,
-                  onClick: () => setTerminalOpen((value) => !value),
-                },
-                {
-                  id: "clone",
-                  icon: <Codicon name="repo-clone" size={14} />,
-                  label: t("toolbar.clone"),
-                  color: "graphite",
-                  className: busy ? "is-disabled" : undefined,
-                  onClick: () => {
-                    if (!busy) setCloneOpen(true);
-                  },
-                },
-                {
-                  id: "github",
-                  icon: <Codicon name="git-pull-request" size={14} />,
-                  label: t("toolbar.pullRequests"),
-                  color: githubOpen ? "purple" : "graphite",
-                  className: busy ? "is-disabled" : githubOpen ? "is-active" : undefined,
-                  onClick: () => {
-                    if (!busy) setGithubOpen(true);
-                  },
-                },
-                {
-                  id: "diagnostics",
-                  icon: <Codicon name="debug-alt" size={14} />,
-                  label: t("toolbar.diagnostics"),
-                  color: "graphite",
-                  onClick: () => setDiagnosticsOpen(true),
-                },
-                {
-                  id: "update",
-                  icon: <Codicon name="cloud-download" size={14} />,
-                  label: t("toolbar.update"),
-                  color: updateBannerVersion ? "blue" : "graphite",
-                  className: updateBannerVersion ? "is-active" : undefined,
-                  onClick: () => setUpdateOpen(true),
-                },
-              ]}
-              size={24}
-              gap={4}
-              columns={5}
-              plate="circle"
-              hover={reducedMotion ? "none" : "lift"}
-              labels="hover"
-              refraction={0.5}
-              frost={0.5}
-              intro={false}
-              theme={themeKind}
-              iconColor="var(--titlebar-activeforeground)"
-            />
-          </div>
+        ) : null}
+        extra={worktreeId ? (
+          <>
+          <SyncActions busy={isWriting} onUpdate={() => void runUpdate(worktreeId)} onPush={() => void openPushDialog()} />
+          <ToolbarGroup
+            id="tools"
+            label={messages.toolbar.toolWindows}
+            actions={[
+              {
+                id: "terminal",
+                icon: "terminal",
+                label: t("toolbar.terminal"),
+                pressed: terminalOpen,
+                onClick: () => setTerminalOpen((value) => !value),
+              },
+              {
+                id: "clone",
+                icon: "repo-clone",
+                label: t("toolbar.clone"),
+                disabled: busy,
+                onClick: () => setCloneOpen(true),
+              },
+              {
+                id: "github",
+                icon: "git-pull-request",
+                label: t("toolbar.pullRequests"),
+                pressed: githubOpen,
+                disabled: busy,
+                onClick: () => setGithubOpen(true),
+              },
+              {
+                id: "diagnostics",
+                icon: "debug-alt",
+                label: t("toolbar.diagnostics"),
+                onClick: () => setDiagnosticsOpen(true),
+              },
+              {
+                id: "update",
+                icon: "cloud-download",
+                label: t("toolbar.update"),
+                attention: !!updateBannerVersion,
+                onClick: () => setUpdateOpen(true),
+              },
+            ]}
+          />
           </>
         ) : null}
       />
 
-      <div className="flex min-h-0 overflow-hidden">
+      <div className="shell-body flex min-h-0 overflow-hidden">
+        {/* 原生玻璃下侧栏占满左列（红绿灯在它顶上），顶部留白可以拖动窗口。 */}
+        <div className="sidebar-pane" data-tauri-drag-region>
         <ActivityBar
           pressed={sidebarVisible}
           count={new Set((snapshot?.entries ?? []).map((entry) => entry.path)).size}
@@ -5774,13 +5755,18 @@ export function App() {
               aria-label={messages.changes.resizeSidebar}
               onPointerDown={(event) => {
                 const sidebar = event.currentTarget.parentElement;
-                if (!sidebar?.offsetWidth || !sidebar.parentElement) return;
+                // 侧栏包在 .sidebar-pane 里，原生玻璃下外层行是 display: contents：按整个窗口外壳算可用宽度。
+                const pane = sidebar?.closest<HTMLElement>(".sidebar-pane");
+                const row = pane?.closest<HTMLElement>(".glass-host");
+                if (!sidebar?.offsetWidth || !pane || !row) return;
                 const activityWidth = sidebar.previousElementSibling?.getBoundingClientRect().width ?? 0;
                 const scale = sidebar.getBoundingClientRect().width / sidebar.offsetWidth;
                 const editorMinWidth = Number.parseFloat(getComputedStyle(sidebar).getPropertyValue("--editor-min-width"));
+                const paneStyle = getComputedStyle(pane);
+                const paneMargins = (Number.parseFloat(paneStyle.marginLeft) || 0) + (Number.parseFloat(paneStyle.marginRight) || 0);
                 sidebarDragRef.current = {
                   pointerId: event.pointerId, clientX: event.clientX, width: sidebar.offsetWidth, scale,
-                  maxWidth: Math.min(720, sidebar.parentElement.clientWidth - activityWidth / scale - editorMinWidth),
+                  maxWidth: Math.min(720, row.clientWidth - paneMargins - activityWidth / scale - editorMinWidth),
                   latestWidth: sidebar.offsetWidth,
                 };
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -6015,6 +6001,7 @@ export function App() {
             )}
           </aside>
         ) : null}
+        </div>
 
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
           {updateBannerVersion ? (
@@ -6155,7 +6142,7 @@ export function App() {
             </EditorBanner>
           ) : null}
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="editor-surface min-h-0 min-w-0 flex-1 overflow-hidden">
             {mainView === "diff" ? (editingPath && worktreeId && editingWorktreeId === worktreeId && view === "split" && (selectedEntry?.changes === "unstaged" || selectedEntry?.changes === "changelist") && !selectedEntry.binary && !selectedEntry.unmerged && editingPath === selectedEntry.path ? (
               <EditableWorkspace
                 key={`${worktreeId}/${editingPath}`}

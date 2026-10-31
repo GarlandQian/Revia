@@ -56,6 +56,11 @@ import { CommitMergeView } from "./CommitMergeView";
 export const LOG_ROW_HEIGHT = 26;
 /** 分支图每条轨道占的宽度（像素）。 */
 export const LOG_LANE_WIDTH = 14;
+
+/** 轨道画在格子中间：第 0 条轨道的提交点不贴着列的左边缘。 */
+function laneX(lane: number): number {
+  return lane * LOG_LANE_WIDTH + LOG_LANE_WIDTH / 2;
+}
 /** 表格在滚动时多渲染的行数，避免快速滚动出现空白。 */
 const ROW_OVERSCAN = 8;
 /**
@@ -127,6 +132,11 @@ interface DetailsState {
 }
 
 const EMPTY_DETAILS: DetailsState = { targetId: null, commit: null, detail: null, files: null, merge: null, error: null, loading: false };
+
+/** 引用标签按类型着色：HEAD、当前分支实心，其余为同色淡底。 */
+function refChipClass(chip: { kind: string; label: string; current: boolean }): string {
+  return ["log-ref-chip", chip.kind, chip.current ? "current" : "", chip.label === "HEAD" ? "head" : ""].filter(Boolean).join(" ");
+}
 
 export function LogView(props: LogViewProps) {
   const {
@@ -845,7 +855,7 @@ export function LogView(props: LogViewProps) {
                           {chips.map((chip) => (
                             <span
                               key={`${chip.fullName}`}
-                              className={`log-ref-chip ${chip.current ? "current" : ""} ${chip.kind === "tag" ? "tag" : ""} ${chip.kind === "remoteBranch" ? "remote" : ""}`}
+                              className={refChipClass(chip)}
                               title={chip.fullName}
                             >
                               <Codicon
@@ -994,7 +1004,7 @@ function GraphCell({
           <span
             key={`rail-${lane}`}
             className={`log-rail${collapsed ? " collapsed" : ""}`}
-            style={{ left: lane * LOG_LANE_WIDTH, background: collapsed ? "transparent" : laneColor(lane) }}
+            style={{ left: laneX(lane), background: collapsed ? "transparent" : laneColor(lane) }}
           />
         );
       })}
@@ -1003,7 +1013,7 @@ function GraphCell({
           <span
             key={`below-${lane}`}
             className="log-rail"
-            style={{ left: lane * LOG_LANE_WIDTH, top: "50%", height: "50%", background: laneColor(lane) }}
+            style={{ left: laneX(lane), top: "50%", height: "50%", background: laneColor(lane) }}
           />
         ),
       )}
@@ -1012,31 +1022,38 @@ function GraphCell({
           <span
             key={`above-${lane}`}
             className="log-rail"
-            style={{ left: lane * LOG_LANE_WIDTH, top: 0, height: "50%", background: laneColor(lane) }}
+            style={{ left: laneX(lane), top: 0, height: "50%", background: laneColor(lane) }}
           />
         ),
       )}
-      {graph.arms.map((arm) => {
-        const left = Math.min(arm.from, arm.to) * LOG_LANE_WIDTH;
-        const widthValue = Math.max(LOG_LANE_WIDTH, Math.abs(arm.to - arm.from) * LOG_LANE_WIDTH);
-        return (
-          <span
-            key={`arm-${arm.from}-${arm.to}`}
-            className="log-arm"
-            style={{ left, width: widthValue, background: laneColor(arm.to) }}
-          />
-        );
-      })}
+      {/* 提交点自己那条轨道：上方的子提交连下来的一段（railsAbove 不含它）。 */}
+      {graph.incoming ? (
+        <span
+          className="log-rail"
+          style={{ left: laneX(graph.lane), top: 0, height: "50%", background: laneColor(graph.lane) }}
+        />
+      ) : null}
+      {graph.arms.map((arm) => (
+        <span
+          key={`arm-${arm.from}-${arm.to}`}
+          className="log-arm"
+          style={{
+            left: laneX(Math.min(arm.from, arm.to)),
+            width: Math.abs(arm.to - arm.from) * LOG_LANE_WIDTH,
+            background: laneColor(arm.to),
+          }}
+        />
+      ))}
       <span
         className="log-node"
-        style={{ left: graph.lane * LOG_LANE_WIDTH, background: laneColor(graph.lane) }}
+        style={{ left: laneX(graph.lane), background: laneColor(graph.lane) }}
       />
       {markers.map((marker) => (
         <button
           key={`marker-${marker.lane}-${marker.direction}`}
           type="button"
           className="log-long-edge"
-          style={{ left: marker.lane * LOG_LANE_WIDTH + (marker.direction === "down" ? 0 : 0) }}
+          style={{ left: laneX(marker.lane) }}
           title={messages.log.longEdgeJump}
           onClick={(event) => {
             event.stopPropagation();
@@ -1205,7 +1222,7 @@ function CommitDetails({
               <dt className="w-[64px] shrink-0">{messages.log.refsLabel}</dt>
               <dd className="flex min-w-0 flex-1 flex-wrap gap-1">
                 {refChips(refLabels, null).map((chip) => (
-                  <span key={chip.fullName} className={`log-ref-chip ${chip.kind}`} title={chip.fullName}>
+                  <span key={chip.fullName} className={refChipClass(chip)} title={chip.fullName}>
                     {chip.label}
                   </span>
                 ))}
@@ -1564,7 +1581,7 @@ function PathFilterMenu({
       {selected.length > 0 ? (
         <div className="flex flex-wrap gap-1 px-2 pb-1">
           {selected.map((path) => (
-            <button key={path} type="button" className="log-ref-chip" onClick={() => toggle(path)} title={messages.log.removePath}>
+            <button key={path} type="button" className="log-ref-chip path" onClick={() => toggle(path)} title={messages.log.removePath}>
               {path}
               <Codicon name="close" size={10} />
             </button>

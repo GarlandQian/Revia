@@ -36,8 +36,12 @@ semver = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSLocale", "NSArray", "NSString"] }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSLocale", "NSArray", "NSString", "NSGeometry", "NSValue", "NSKeyValueCoding", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSView", "NSWindow", "NSColor", "NSGraphics", "NSGlassEffectView", "objc2-core-foundation"] }
+
+[target.'cfg(windows)'.dependencies]
+# 判断 Windows 11（Mica 从 build 22000 起才有）；Tauri 的 window-vibrancy 已经依赖它。
+windows-version = "0.1"
 
 # 只构建 Apple Silicon（Q44）
 [profile.release]

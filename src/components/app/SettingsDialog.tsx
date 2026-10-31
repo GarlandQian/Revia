@@ -30,6 +30,7 @@ import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { M7GithubSettings, M7ShortcutSettings, M7ThemeSettings, M7UpdateSettings } from "@/features/m7/settings";
 import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
 import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
 
 export interface SettingsValues {
   themeLight: string;
@@ -363,12 +364,8 @@ export function SettingsDialog({
     values.protectedBranches,
   ]);
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog || !open) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, [open]);
+  // 系统材质下设置页铺满整窗，放在整窗玻璃上。
+  useModalDialog(ref, open, "page");
 
   const categories = buildCategories();
   const trimmedQuery = query.trim();
@@ -421,21 +418,21 @@ export function SettingsDialog({
     <dialog
       ref={ref}
       aria-label={messages.settings.title}
-      className="app-dialog glass-isolate w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
+      className="settings-dialog app-dialog glass-isolate w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
       <GlassLayer variant="popover" />
-      <div className="flex items-center gap-2 border-b border-panel-border px-4 py-2.5">
-        <h2 className="flex-1 text-[14px] font-semibold">{messages.settings.title}</h2>
+      <div className="settings-header flex items-center gap-2 border-b border-panel-border px-4 py-2.5" data-tauri-drag-region>
+        <h2 className="flex-1 text-[14px] font-semibold" data-tauri-drag-region>{messages.settings.title}</h2>
         <button type="button" className="icon-action" aria-label={messages.recovery.close} title={messages.recovery.close} onClick={onClose}>
           <Codicon name="close" size={16} />
         </button>
       </div>
-      <div className="flex h-[min(560px,calc(100vh-140px))]">
-        <nav className="flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--glass-side-tint)]" aria-label={messages.settings.title}>
+      <div className="settings-body flex h-[min(560px,calc(100vh-140px))]">
+        <nav className="settings-nav flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--glass-side-tint)]" aria-label={messages.settings.title}>
           <div className="relative px-2 py-2">
             <Codicon name="search" size={13} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-descriptionforeground" />
             <input
@@ -495,7 +492,7 @@ export function SettingsDialog({
           </div>
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-panel-border px-4 text-[12px] text-descriptionforeground">
+          <div className="settings-path flex h-8 shrink-0 items-center gap-1.5 border-b border-panel-border px-4 text-[12px] text-descriptionforeground">
             <span>{activeCategoryTitle}</span>
             <Codicon name="chevron-right" size={12} />
             <span className="text-foreground">{activePageTitle}</span>

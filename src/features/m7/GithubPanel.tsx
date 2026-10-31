@@ -521,11 +521,11 @@ export function GithubPanel({
   }, [detail, protection]);
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-[var(--editor-background)]">
+    <div className="github-panel absolute inset-0 z-20 flex flex-col bg-[var(--editor-background)]">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-panel-border px-3 text-[12.5px]">
         <Codicon name="github" size={15} />
-        <span className="font-semibold">{t("github.title")}</span>
-        <span className="truncate text-descriptionforeground" title={worktreePath}>{worktreePath}</span>
+        <span className="shrink-0 font-semibold whitespace-nowrap">{t("github.title")}</span>
+        <span className="min-w-0 truncate text-descriptionforeground" title={worktreePath}>{worktreePath}</span>
         {login ? <span className="shrink-0 text-descriptionforeground">{t("github.account", { login })}</span> : null}
         {rateLimit && rateLimit.remaining !== null ? (
           <span className="shrink-0 text-descriptionforeground">{t("github.rateLimit", { remaining: rateLimit.remaining })}</span>

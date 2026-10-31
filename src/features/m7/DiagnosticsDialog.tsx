@@ -14,6 +14,7 @@ import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7 } from "@/lib/m7/api";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
 
 export interface DiagnosticsDialogProps {
   open: boolean;
@@ -34,12 +35,7 @@ export function DiagnosticsDialog({ open, worktreeId, onClose }: DiagnosticsDial
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog || !open) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, [open]);
+  useModalDialog(ref, open);
 
   const loadPreview = useCallback(async () => {
     const current = ++generation.current;

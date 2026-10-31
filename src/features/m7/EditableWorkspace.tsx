@@ -85,7 +85,7 @@ export function EditableWorkspace({ session, fontSize, fontFamily, blocked, onCl
   }, [session, state.text, state.saving, state.loading, state.storedDraft]);
   const editable = state.file?.text != null && state.file.readonlyReason === null && state.identityValid;
   const lineCount = Math.min(20_000, state.text.split("\n").length);
-  const editor = <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--editor-background)]">
+  const editor = <div className="editable-editor relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--editor-background)]">
     <div ref={gutter} aria-hidden className="absolute inset-y-0 left-0 w-12 select-none overflow-hidden pr-2 text-right text-descriptionforeground" style={{ fontFamily: codeFontStack(fontFamily), fontSize, lineHeight: 1.45 }}>
       <div className="py-1">{Array.from({ length: lineCount }, (_, line) => <div key={line}>{line + 1}</div>)}</div>
     </div>
@@ -103,7 +103,7 @@ export function EditableWorkspace({ session, fontSize, fontFamily, blocked, onCl
         }
       }} />
   </div>;
-  return <div className="flex h-full min-h-0 flex-col bg-[var(--editor-background)]">
+  return <div className="editable-workspace flex h-full min-h-0 flex-col bg-[var(--editor-background)]">
     <div className="flex h-8 shrink-0 items-center gap-2 border-b border-panel-border px-3 text-[12px]">
       <Codicon name="edit" size={14} /><span className="truncate font-semibold">{session.target.path}</span>
       <span className="ml-auto shrink-0 text-descriptionforeground">{session.dirty ? t("edit.unsaved") : t("edit.saved")}</span>
