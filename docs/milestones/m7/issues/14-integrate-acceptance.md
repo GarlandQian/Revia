@@ -577,3 +577,34 @@ Spec：固定 `78c5658e4b1b370266e2044992e5de3787cd86ac…b0dcafe2b5321f6f480cef
 ### Codex：S11-SP01 尺寸同步修复 — 2026-10-31
 
 保留稳定终端实例，统一监听 xterm 实际 onResize 事件，将 rows/cols 发送给同一 session 的 registry.resize；容器、字体/字号、页签激活的 fit 都走同一链路，移除原两处显式重复发送。错误继续归原会话，不取消真实写保护。`terminal-size-frontend-01` 与 `terminal-size-lint-01` 均真实exit0，原始源码hash/argv/stdout/stderr保留。未改Rust、locale或会话业务层，不重复不受影响的旧回归；字体后真实PTY尺寸仍待新固定Release原生验证。下一步仅此修复增量两轴，完成后重建Release并继续任务13/14。
+
+
+### Codex / review12 两轴正式报告 — 2026-10-31
+
+固定增量 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4aa43324c185211435c`。两轴已结束；Standards 0硬违反/0判断，Spec 0项P1/P2、1项P3构造边界（S12-SP01）。以下分别原文追加。Codex核对源码与原始散列，P3仅登记backlog15，不继续扩产品；下一步固定新Release和真实原生复验。
+
+Standards
+
+# Standards
+
+固定 `38d1bb883e6a0db6aa066a474490f7a50396151f...8eccde51e3cba87522fca4aa43324c185211435c`，仅审 S11-SP01 尺寸同步修复增量（Q174）。
+
+**0 项硬违反，0 项 possible 代码异味，0 项新增 backlog 判断。**
+
+`src/features/m7/TerminalPanel.tsx:129–131` 的 `onResize` 回调捕获所属 `sessionId`，通过现有带类型的 `registry.resize` 回传真实行列；错误仍由 registry 归属原 worktree（`src/lib/m7/terminalSessions.ts:159–162`）。符合 `AGENTS.md:73` 的前端调用边界及 ADR-0013 的结构化错误规则。移除容器与初始化两处显式回传，集中同类变化，没有新增无需求抽象。十二项 Fowler 基线仅作判断，未见本增量达到报告门槛的异味。
+
+三份中文交接文档保留真实 Release 待验状态，未把构建或旧 Node 12 项当成本次 UI 通过证明，符合 `docs/agents/local-validation.md:9–10`。工具已覆盖的类型、lint 项不重复报告。
+
+独立核对 diff、7,886 项源码及 1,723 项原始证据哈希全部匹配；已有 `terminal-size-frontend-01` / `terminal-size-lint-01` 均真实 exit 0，检查时产品源码与固定提交一致。本轮未运行应用、构建或测试；字体调整后的真实 PTY、焦点及 D06 仍待新固定 Release 原生验收。
+
+Spec
+
+Spec：固定 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4aa43324c185211435c`，仅 Q174 的 S11-SP01 尺寸修复。**新增阻断发现 0；P3 构造边界 1，仅 backlog。**
+
+(a) 缺漏 / partial：未见新增阻断项。规格 `spec.md:90`“前端发送用户的输入字节与尺寸”、`ui-direction.md:12`“代码字体与字号可配置”。事实：`TerminalPanel.tsx:129–131` 统一监听实际 `onResize`；字体 `:179–191`、容器 `:132–139`、激活 `:163–176` 的 fit 通过同一回调发送原 session 的行列。`terminalSessions.ts:159–162` 保留原归属及结构化错误。推断：S11-SP01 的字体尺寸漏发路径已补齐。
+
+(b) scope creep：未见。7 行产品增量仅统一尺寸发送，3 份文档只记证据与待验收。
+
+(c) **[S12-SP01，P3，仅 backlog] 重挂载的首 fit 恰好为 80×24 时可能漏对齐。** 仍对照规格 `:90`“前端发送…尺寸”。事实：移除初始化显式发送（新 `TerminalPanel.tsx:150–156`）；新 xterm 默认 80×24（`OptionsService.ts:13–14`），`FitAddon.ts:44–46` 只在尺寸变化时 resize。推断：若已存活 PTY 保留其他行列，关闭面板再重开（`App.tsx:6316–6328`），且新布局正好 80×24，就没有事件把后台改回该尺寸。仅构造边界，登记 backlog；不要求本轮返修。
+
+已核对 build/lint 原件 exit 0 及产品散列；未重跑检查或启动应用。新 Release 的持续输入、其他控件焦点、字体后真实 PTY 尺寸及 D06 仍待桌面复验；旧 Node / 旧桌面不能证明本修复通过。详见 `spec-evidence.md`。

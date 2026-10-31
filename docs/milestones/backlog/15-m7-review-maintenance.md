@@ -91,3 +91,18 @@ Standards：固定 `5ca917889efa5141442d0b73d6e48931828acf93...039fd1a3dbea7cf7e
 
 
 S10-ST01: documentation wording clarified before native replay; no product expansion. S10-ST02 remains backlog only.
+
+
+### S12-SP01：重挂载初始布局恰好80×24的PTY尺寸边界
+
+来源：review12 Spec，P3，仅构造边界，不阻断当前验收。原文：
+
+Spec：固定 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4aa43324c185211435c`，仅 Q174 的 S11-SP01 尺寸修复。**新增阻断发现 0；P3 构造边界 1，仅 backlog。**
+
+(a) 缺漏 / partial：未见新增阻断项。规格 `spec.md:90`“前端发送用户的输入字节与尺寸”、`ui-direction.md:12`“代码字体与字号可配置”。事实：`TerminalPanel.tsx:129–131` 统一监听实际 `onResize`；字体 `:179–191`、容器 `:132–139`、激活 `:163–176` 的 fit 通过同一回调发送原 session 的行列。`terminalSessions.ts:159–162` 保留原归属及结构化错误。推断：S11-SP01 的字体尺寸漏发路径已补齐。
+
+(b) scope creep：未见。7 行产品增量仅统一尺寸发送，3 份文档只记证据与待验收。
+
+(c) **[S12-SP01，P3，仅 backlog] 重挂载的首 fit 恰好为 80×24 时可能漏对齐。** 仍对照规格 `:90`“前端发送…尺寸”。事实：移除初始化显式发送（新 `TerminalPanel.tsx:150–156`）；新 xterm 默认 80×24（`OptionsService.ts:13–14`），`FitAddon.ts:44–46` 只在尺寸变化时 resize。推断：若已存活 PTY 保留其他行列，关闭面板再重开（`App.tsx:6316–6328`），且新布局正好 80×24，就没有事件把后台改回该尺寸。仅构造边界，登记 backlog；不要求本轮返修。
+
+已核对 build/lint 原件 exit 0 及产品散列；未重跑检查或启动应用。新 Release 的持续输入、其他控件焦点、字体后真实 PTY 尺寸及 D06 仍待桌面复验；旧 Node / 旧桌面不能证明本修复通过。详见 `spec-evidence.md`。
