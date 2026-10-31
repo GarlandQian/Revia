@@ -327,3 +327,8 @@ Standards 0硬违反、2项P3判断；Spec 0新增发现。原文分别入对应
 ### Codex：S11-SP01 尺寸同步修复 — 2026-10-31
 
 保留稳定终端实例，统一监听 xterm 实际 onResize 事件，将 rows/cols 发送给同一 session 的 registry.resize；容器、字体/字号、页签激活的 fit 都走同一链路，移除原两处显式重复发送。错误继续归原会话，不取消真实写保护。`terminal-size-frontend-01` 与 `terminal-size-lint-01` 均真实exit0，原始源码hash/argv/stdout/stderr保留。未改Rust、locale或会话业务层，不重复不受影响的旧回归；字体后真实PTY尺寸仍待新固定Release原生验证。下一步仅此修复增量两轴，完成后重建Release并继续任务13/14。
+
+
+### 2026-10-31：D06诊断观测增量
+
+固定edb72cb，仅追加已有测量开关下的生产时序与并排跳转缓存来源；Node80/Rust10/build/lint通过。review13 Standards0硬违反/1P3，Spec1P2：旧日志通道并发拼行，先由Codex局部修复再使用新时序。并非性能修复或D06通过，原固定Release与失败数据不覆盖。
