@@ -5,7 +5,7 @@ import { readonlyReasonText } from "@/lib/i18n/text";
 import { isPrimaryClick, isPrimaryModifier, isAltModifier } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import { FileTypeIcon } from "@/components/app/FileTypeIcon";
-import { VisibleChangelistSelection } from "@/lib/m7/visibleChangelistSelection";
+import { VisibleChangelistSelection, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
@@ -33,7 +33,7 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
   const [name, setName] = useState("");
   const selection = useRef(new VisibleChangelistSelection());
   const [, redrawSelection] = useState(0);
-  const visibleRows = useMemo(() => view?.groups.flatMap((group) => [...new Set(view.items.filter((item) => item.group === group.id).map((item) => item.path))].map((path) => ({ id: `${group.id}:${path}`, path, entry: snapshot.entries.find((entry) => entry.path === path && entry.changes === "changelist") ?? snapshot.entries.find((entry) => entry.path === path && entry.changes === "untracked") }))) ?? [], [snapshot, view]);
+  const visibleRows = useMemo(() => view?.groups.flatMap((group) => [...new Set(view.items.filter((item) => item.group === group.id).map((item) => item.path))].map((path) => ({ id: `${group.id}:${path}`, path, entry: changelistEntryForPath(snapshot, path) }))) ?? [], [snapshot, view]);
   const selectedPaths = useCallback(() => [...new Set(selection.current.ids().map((id) => visibleRows.find((row) => row.id === id)?.path).filter((path): path is string => !!path))], [visibleRows]);
   const publishSelection = useCallback(() => { redrawSelection((value) => value + 1); onSelection(worktreeId, selectedPaths()); }, [onSelection, selectedPaths, worktreeId]);
   useEffect(() => { selection.current.setRows(visibleRows.map((row) => row.id)); publishSelection(); }, [visibleRows, publishSelection]);
@@ -107,7 +107,7 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
           const usable = entries.filter((item) => !item.stale && !item.readonlyReason);
           // 整文件移动须涵盖其他组内同一路径的块，保持单一归属。
           const allFileItems = view.items.filter((item) => item.path === path);
-          const entryFor = () => snapshot.entries.find((entry) => entry.path === path && entry.changes === "changelist") ?? snapshot.entries.find((entry) => entry.path === path && entry.changes === "untracked");
+          const entryFor = () => changelistEntryForPath(snapshot, path);
           const rowId = `${group.id}:${path}`;
           const rowSelected = selection.current.ids().includes(rowId);
           const fileEntry = entryFor();

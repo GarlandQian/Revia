@@ -854,3 +854,118 @@ fn ordinary_mode_keeps_original_three_group_snapshot() {
         .all(|entry| entry.changes != ChangesKind::Changelist));
     assert_eq!(f.git(&["ls-files", "--stage"]), index);
 }
+
+#[cfg(unix)]
+#[test]
+fn external_changelist_diff_receives_head_and_worktree_not_intermediate_index() {
+    use revia_lib::{
+        external_tools::{self, ExternalToolKind, ExternalToolRequest},
+        git::status::ChangesKind,
+    };
+    let f = Fixture::new();
+    let base = fs::read_to_string(f.repo.join("mixed.txt")).unwrap();
+    fs::write(
+        f.repo.join("mixed.txt"),
+        base.replace("line04: base", "line04: INDEX_B"),
+    )
+    .unwrap();
+    f.git(&["add", "mixed.txt"]);
+    let worktree = base.replace("line04: base", "line04: WORKTREE_C");
+    fs::write(f.repo.join("mixed.txt"), &worktree).unwrap();
+    let left = f.data.join("captured-left");
+    let right = f.data.join("captured-right");
+    f.git(&[
+        "config",
+        "difftool.capture.cmd",
+        "cat \"$LOCAL\" > \"$REVIA_CAPTURE_LEFT\"; cat \"$REMOTE\" > \"$REVIA_CAPTURE_RIGHT\"",
+    ]);
+    let mut env = git_environment::shell_env(&f.home, &f.repo, &f.home.join("gitconfig"));
+    env.vars.insert(
+        "REVIA_CAPTURE_LEFT".into(),
+        left.to_string_lossy().into_owned(),
+    );
+    env.vars.insert(
+        "REVIA_CAPTURE_RIGHT".into(),
+        right.to_string_lossy().into_owned(),
+    );
+    let session = WorktreeSession::open(
+        "external-changelist",
+        &f.repo,
+        env,
+        Arc::new(CommandLog::default()),
+    )
+    .unwrap();
+    session.set_changelist_mode(true);
+    let snapshot = session.refresh().unwrap();
+    let entry = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == "mixed.txt" && entry.changes == ChangesKind::Changelist)
+        .unwrap();
+    let outcome = external_tools::launch(
+        &session,
+        &RecoveryStore::new(f.data.clone()),
+        &ExternalToolRequest {
+            expected_context: external_tools::confirmation_context(&session).unwrap(),
+            kind: ExternalToolKind::Diff,
+            path: "mixed.txt".into(),
+            tool: Some("capture".into()),
+            revision: None,
+            changes_kind: Some(ChangesKind::Changelist),
+            expected_fingerprint: Some(entry.fingerprint.clone()),
+        },
+        None,
+    )
+    .unwrap();
+    assert_eq!(outcome.exit_code, Some(0));
+    assert_eq!(fs::read_to_string(left).unwrap(), base);
+    assert_eq!(fs::read_to_string(right).unwrap(), worktree);
+    assert!(f.git(&["show", ":mixed.txt"]).contains("line04: INDEX_B"));
+    assert_eq!(
+        fs::read_to_string(f.repo.join("mixed.txt")).unwrap(),
+        worktree
+    );
+}
+#[cfg(unix)]
+#[test]
+fn stale_external_changelist_diff_is_rejected_before_tool_launch() {
+    use revia_lib::{
+        external_tools::{self, ExternalToolKind, ExternalToolRequest},
+        git::status::ChangesKind,
+    };
+    let f = Fixture::new();
+    f.staged_other();
+    f.git(&["config", "difftool.capture.cmd", "echo owned-tool-started"]);
+    f.session.set_changelist_mode(true);
+    let snapshot = f.session.refresh().unwrap();
+    let entry = snapshot
+        .entries
+        .iter()
+        .find(|entry| entry.path == "other.txt" && entry.changes == ChangesKind::Changelist)
+        .unwrap();
+    let context = external_tools::confirmation_context(&f.session).unwrap();
+    fs::write(f.repo.join("other.txt"), "external later version\n").unwrap();
+    let error = external_tools::launch(
+        &f.session,
+        &RecoveryStore::new(f.data.clone()),
+        &ExternalToolRequest {
+            expected_context: context,
+            kind: ExternalToolKind::Diff,
+            path: "other.txt".into(),
+            tool: Some("capture".into()),
+            revision: None,
+            changes_kind: Some(ChangesKind::Changelist),
+            expected_fingerprint: Some(entry.fingerprint.clone()),
+        },
+        None,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, revia_lib::error::ErrorKind::Rejected);
+    assert!(f
+        .session
+        .git
+        .log
+        .snapshot()
+        .iter()
+        .all(|record| !record.args.iter().any(|arg| arg == "difftool")));
+}

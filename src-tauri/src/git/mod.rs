@@ -693,15 +693,19 @@ impl Git {
         (!value.is_empty()).then(|| value.to_string())
     }
 
+    pub fn changelist_base(&self) -> Result<String> {
+        if let Some(head) = crate::commit::read_head(self)? { return Ok(head); }
+        Ok(self.run_with_input(&["hash-object", "-t", "tree", "--stdin"], Vec::new())?.into_success("读取空树标识")?.stdout_lossy().trim().to_string())
+    }
+
     /// 更改列表的固定比较基线；所有预览、选择与指纹复用同一组 Git 参数。
     pub fn diff_changelist(&self, path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
-        let head = crate::commit::read_head(self)?;
-        let empty = self.run_with_input(&["hash-object", "-t", "tree", "--stdin"], Vec::new())?.into_success("读取空树标识")?.stdout_lossy().trim().to_string();
+        let base = self.changelist_base()?;
         let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
         args.extend_from_slice(DIFF_FLAGS);
         args.extend_from_slice(ignore.diff_args());
         if ignore.ignore_blank_lines() { args.push("--ignore-blank-lines"); }
-        args.extend_from_slice(&["--no-renames", "--binary", head.as_deref().unwrap_or(&empty), "--"]);
+        args.extend_from_slice(&["--no-renames", "--binary", base.as_str(), "--"]);
         if let Some(path) = path { args.push(path); }
         Ok(self.run_ok(&args, "读取更改列表 Git diff")?.stdout)
     }

@@ -35,7 +35,7 @@ import { CommitArea, messageSubmittable, type CommitResultView } from "@/compone
 import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitOutputStore } from "@/lib/commitOutput";
-import { visibleChangelistPaths } from "@/lib/m7/visibleChangelistSelection";
+import { changelistEntriesForView, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
 import { Changelists, selectionOf, type ChangelistControls } from "@/features/m7/Changelists";
 import type { ChangelistView } from "@/types/bindings/ChangelistView";
 import { invoke } from "@tauri-apps/api/core";
@@ -284,6 +284,8 @@ export function App() {
   });
   /** 提交信息检查与提交时警告（Q139）。 */
   const [changelistMode, setChangelistMode] = useState(false);
+  const changelistModeRef = useRef(changelistMode);
+  changelistModeRef.current = changelistMode;
   const [changelistView, setChangelistView] = useState<ChangelistView | null>(null);
   const changelistRef = useRef<ChangelistView | null>(null);
   const changelistControls = useRef<ChangelistControls | null>(null);
@@ -473,14 +475,9 @@ export function App() {
   const entryNavigationRef = useRef<((entry: ChangeEntry) => void) | null>(null);
   const navigateEntry = useCallback((entry: ChangeEntry) => entryNavigationRef.current?.(entry), []);
   const entryOrder = useCallback((current: ChangesSnapshot): ChangeEntry[] => {
-    if (!changelistMode) return treeOrder(current);
-    const view = changelistRef.current;
-    if (view?.worktreeId !== current.worktreeId) return [];
-    return visibleChangelistPaths(view.groups, view.items).flatMap((path) => {
-      const entry = current.entries.find((candidate) => candidate.path === path && candidate.changes === "changelist") ?? current.entries.find((candidate) => candidate.path === path && candidate.changes === "untracked");
-      return entry ? [entry] : [];
-    });
-  }, [changelistMode]);
+    return changelistModeRef.current ? changelistEntriesForView(current, changelistRef.current) : treeOrder(current);
+  }, []);
+
   const {
     treeSelection, groupOpen, setGroupOpen, dirOpen, followActiveEntry,
     expandToSelection, treeSelectedEntries, activateTreeEntry, moveTreeSelection,
@@ -700,6 +697,10 @@ export function App() {
   }, []);
 
   const pickFirstEntry = useCallback((next: ChangesSnapshot, preferred?: string | null): ChangeEntry | null => {
+    if (changelistModeRef.current) {
+      const display = changelistEntriesForView(next, changelistRef.current);
+      return display.find((entry) => entry.path === preferred) ?? display.find((entry) => entry.hunkCount > 0) ?? display[0] ?? null;
+    }
     const order = ["unstaged", "staged", "untracked"] as const;
     if (preferred) {
       const match = next.entries.find((entry) => entry.path === preferred);
@@ -871,8 +872,8 @@ export function App() {
     }
     const current = selectedRef.current;
     const previous = snapshotRef.current;
-    const display = getDisplayOrderEntries(next);
-    const oldIndex = current && previous ? getDisplayOrderEntries(previous).findIndex(
+    const display = changelistModeRef.current ? entryOrder(next) : getDisplayOrderEntries(next);
+    const oldIndex = current && previous ? (changelistModeRef.current ? entryOrder(previous) : getDisplayOrderEntries(previous)).findIndex(
       (entry) => entry.path === current.path && entry.changes === current.changes,
     ) : 0;
     const entry = current
@@ -888,7 +889,7 @@ export function App() {
       enterDiff();
       clearEditorSelection();
     }
-  }, [applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
+  }, [entryOrder, applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
 
   const openWorktree = useCallback(
     async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean; activateDiff?: boolean } = {}) => {
@@ -1397,6 +1398,7 @@ export function App() {
           jumpToNextFile: settings.diffJumpToNextFile,
           ignoreWhitespace: settings.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
         });
+        changelistModeRef.current = settings.changelistMode;
         setChangelistMode(settings.changelistMode);
         setCommitChecks({
           subjectLimit: settings.commitSubjectLimit,
@@ -1640,13 +1642,14 @@ export function App() {
   const focusNextFile = useCallback(
     (direction: 1 | -1) => {
       if (!snapshot || !selected) return;
-      const index = snapshot.entries.findIndex(
+      const display = changelistModeRef.current ? entryOrder(snapshot) : snapshot.entries;
+      const index = display.findIndex(
         (entry) => entry.path === selected.path && entry.changes === selected.changes,
       );
-      const next = snapshot.entries[index + direction];
+      const next = display[index + direction];
       if (next && worktreeId) void openEntry(next, { view, worktreeId });
     },
-    [openEntry, selected, snapshot, view, worktreeId],
+    [entryOrder, openEntry, selected, snapshot, view, worktreeId],
   );
   focusNextFileRef.current = focusNextFile;
 
@@ -3005,7 +3008,9 @@ export function App() {
       return unique;
     };
 
-    const unique = uniqueEntries(getDisplayOrderEntries(current));
+    const targetChangelistMode = changelistModeRef.current;
+    const targetChangelistRevision = targetChangelistMode ? changelistRef.current?.revision : null;
+    const unique = uniqueEntries(changelistModeRef.current ? entryOrder(current) : getDisplayOrderEntries(current));
     if (unique.length === 0) return;
     const activeEntry = unique.find((entry) => entry.path === active.path);
 
@@ -3019,6 +3024,8 @@ export function App() {
 
     // 导航必须绑定发起时的上下文：等待期间切换 worktree、刷新或另选文件都作废。
     const stillSameContext = () => worktreeIdRef.current === targetWorktreeId
+      && changelistModeRef.current === targetChangelistMode
+      && (!targetChangelistMode || changelistRef.current?.revision === targetChangelistRevision)
       && gateRef.current.token().activation === targetActivation
       && snapshotRef.current?.revision === targetRevision
       // 选择代际：点击尚未加载指标的 B、或 A→B→A，都会在这里被判为失效。
@@ -3057,7 +3064,7 @@ export function App() {
       total: unique.length,
     });
     debugLog(`审阅：${messages.review.allReviewed}`);
-  }, [openEntry, setReviewMark, worktreeId]);
+  }, [entryOrder, openEntry, setReviewMark, worktreeId]);
 
   const changeHunk = useCallback((action: HunkAction) => {
     const current = selectedRef.current;
@@ -4593,6 +4600,7 @@ export function App() {
         jumpToNextFile: next.diffJumpToNextFile,
         ignoreWhitespace: next.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
       });
+      changelistModeRef.current = next.changelistMode;
       setChangelistMode(next.changelistMode);
       if (patch.changelistMode !== undefined) { acceptChangelistView(null); await refresh(); }
       setCommitChecks({
@@ -6460,7 +6468,8 @@ export function App() {
           worktreeId={worktreeId}
           onClose={() => setConflictDialogOpen(false)}
           onOpenMerge={(path) => {
-            const entry = snapshotRef.current?.entries.find((candidate) => candidate.path === path);
+            const current = snapshotRef.current;
+            const entry = current && (changelistModeRef.current ? changelistEntryForPath(current, path) : current.entries.find((candidate) => candidate.path === path));
             setConflictDialogOpen(false);
             if (entry) openMergeTab(entry);
           }}

@@ -226,7 +226,7 @@ fn validate_current_change(
 ) -> Result<status::ChangesKind> {
     validate_path(path)?;
     let state = status::read(&session.git)?;
-    let Some(entry) = state.entries.iter().find(|entry| entry.path == path) else {
+    let Some(entry) = state.entries.iter().find(|entry| entry.path == path || (requested == Some(status::ChangesKind::Changelist) && entry.original_path.as_deref() == Some(path))) else {
         return Err(AppError::coded(
             ErrorKind::Rejected,
             "errors.externalTools.pathNotInCurrentChanges",
@@ -241,6 +241,13 @@ fn validate_current_change(
             "未跟踪文件没有可比较的 Git 版本",
             &[],
         ));
+    }
+    if requested == Some(status::ChangesKind::Changelist) {
+        let patch = session.git.diff_changelist(Some(path), crate::git::segments::IgnoreWhitespace::Off)?;
+        if crate::git::diff::parse_bytes(&patch).files.iter().any(|file| file.path == path) {
+            return Ok(status::ChangesKind::Changelist);
+        }
+        return Err(AppError::coded(ErrorKind::Rejected, "errors.externalTools.pathNotInCurrentChanges", "该文件不在当前改动中，请刷新后重试", &[]));
     }
     // Route explicitly by the requested view.  When both a staged and an
     // unstaged entry exist for the same path, guessing would hide one of them.
@@ -437,6 +444,8 @@ pub fn launch_with_timeout(
     if request.kind == ExternalToolKind::Diff {
         if changes_kind == Some(status::ChangesKind::Staged) {
             args.push("--cached".into());
+        } else if changes_kind == Some(status::ChangesKind::Changelist) {
+            args.push(session.git.changelist_base()?);
         }
         if let (Some(parent), Some(revision)) = (parent, revision) {
             args.push(parent);

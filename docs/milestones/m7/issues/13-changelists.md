@@ -199,3 +199,13 @@ Spec：固定 `5f70d9c…150b274`，仅 review06 修复增量，18 路径、1 �
 
 已核对7,886项源码、1,253项原证据散列及diff；Rust152相关通过，末轮Node13通过，frontend04／lint03 exit0；失败原件保留。未重跑产品检查、未启动桌面或Windows。详见spec-evidence.md。
 
+
+### Codex：review07消费入口修复与验证（2026-10-31）
+
+H07-01/S07-01：新模式初始打开、刷新保留、重开与按路径定位都走严格Changelist/Untracked读源；待分组元数据加载时也只回退到当前模式源，绝不回到index基线。模式保存在ref供异步回调读取当前值，切换时立即更新；普通模式原规则保留。
+
+H07-02/S07-02：实际focusNextFile工具条/F7过尾与reviewNextFile都接同一entryOrder，不再直接索引隐藏snapshot.entries。审阅异步导航还绑定发起模式和列表revision，换模式/归组后取消旧导航。共同查询提炼至visibleChangelistSelection.ts，组件与主路由复用，顺带消除上轮P3重复查询判断，没有扩展重构。
+
+S07-03：外部diff显式验证Changelist路径的HEAD→工作区模型，仍执行原身份/确认上下文/指纹/保护快照门禁；Git difftool用同一固定HEAD（unborn时empty tree），不使用--cached。Git::changelist_base给内外diff共用。真实Git/difftool fixture捕获LOCAL为HEAD原文、REMOTE为工作区C，确认未把index中间B当作左侧；原index与工作区内容保留。过期请求在工具启动前拒绝，命令日志没有difftool启动。
+
+`task13-review07-rust-01`共156通过（m6_flows133、更改列表23）；`task13-review07-node-01`16通过（可见顺序/路由8、既有提交8）。最后仅增加前端异步模式一致性检查，Rust与生产选择模型未再改，未重复已过项；最终`task13-review07-frontend-02`、`task13-review07-lint-02`均exit0，`task13-review07-x18n-01`0错误/76既有unused警告。argv/源码hash/真实exit/分流原件位于codex-checks。Windows、非macOS非法字节路径与本候选原生Revia尚未实跑，不冒称桌面通过。下一步固定本增量、全新两轴，仅审新增修复，完成后再构建固定Release。
