@@ -1845,21 +1845,27 @@ html[data-kind="light"] {
   /* 浮层与对话框：单独一层玻璃，圆角与阴影照第四版。 */
   .revia-popper {
     position: relative;
-    background: transparent;
+    background: var(--glass-popover-tint);
+    backdrop-filter: blur(20px) saturate(1.05);
+    -webkit-backdrop-filter: blur(20px) saturate(1.05);
     border-color: var(--glass-line);
     box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
   }
 
   .app-dialog {
     position: relative;
-    background: transparent;
+    background: var(--glass-popover-tint);
+    backdrop-filter: blur(20px) saturate(1.05);
+    -webkit-backdrop-filter: blur(20px) saturate(1.05);
     border-color: var(--glass-edge);
     box-shadow: 0 20px 60px rgb(0 0 0 / 32%);
   }
 
   .notification {
     position: relative;
-    background: transparent;
+    background: var(--glass-popover-tint);
+    backdrop-filter: blur(20px) saturate(1.05);
+    -webkit-backdrop-filter: blur(20px) saturate(1.05);
     border-color: var(--glass-edge);
   }
 
@@ -2005,6 +2011,8 @@ html[data-kind="light"] {
   .app-dialog,
   .notification {
     background: var(--editorwidget-background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .glass-button,

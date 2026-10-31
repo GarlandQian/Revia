@@ -1065,3 +1065,64 @@ fn partial_commit_keeps_remaining_group_when_old_line_numbers_shift() {
         changed
     );
 }
+
+#[test]
+fn idle_metadata_observation_does_not_claim_a_repository_write() {
+    let f = Fixture::new();
+    let version = f.session.idle_observation_version().unwrap();
+    // A real write is admitted while the read is in flight; its admission stays nonqueued.
+    let writer = f.session.acquire_write_lock().unwrap();
+    assert!(f.session.acquire_write_lock().is_err());
+    assert!(f.session.idle_observation_version().is_err());
+    drop(writer);
+    let published = std::sync::atomic::AtomicBool::new(false);
+    let result = f.session.publish_idle_observation(Some(version), || {
+        published.store(true, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
+    });
+    assert!(
+        result.is_err(),
+        "a completed intervening write must invalidate publication"
+    );
+    assert!(!published.load(std::sync::atomic::Ordering::Relaxed));
+    let next = f.session.idle_observation_version().unwrap();
+    f.session
+        .publish_idle_observation(Some(next), || {
+            fs::write(f.data.join("observed-metadata"), "valid")?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(f.data.join("observed-metadata")).unwrap(),
+        "valid"
+    );
+}
+
+#[test]
+fn metadata_publication_rejects_a_real_concurrent_writer() {
+    let f = Fixture::new();
+    let version = f.session.idle_observation_version().unwrap();
+    let admitted = Arc::new(std::sync::Barrier::new(2));
+    let release = Arc::new(std::sync::Barrier::new(2));
+    std::thread::scope(|scope| {
+        let session = &f.session;
+        let writer_admitted = Arc::clone(&admitted);
+        let writer_release = Arc::clone(&release);
+        scope.spawn(move || {
+            let _write = session.acquire_write_lock().unwrap();
+            writer_admitted.wait();
+            writer_release.wait();
+        });
+        admitted.wait();
+        assert!(f
+            .session
+            .publish_idle_observation(Some(version), || {
+                fs::write(f.data.join("must-not-publish"), "stale")?;
+                Ok(())
+            })
+            .is_err());
+        release.wait();
+    });
+    assert!(!f.data.join("must-not-publish").exists());
+    assert!(f.view().items.is_empty());
+}

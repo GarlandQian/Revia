@@ -135,7 +135,11 @@ impl ChangelistStore {
     fn write(&self, key: &str, s: &Saved) -> Result<()> {
         super::atomic_write(&self.path(key), &serde_json::to_vec_pretty(s)?)
     }
-    fn refreshed(&self, session: &WorktreeSession) -> Result<(String, Saved, Scan)> {
+    fn refreshed(
+        &self,
+        session: &WorktreeSession,
+        observation: Option<u64>,
+    ) -> Result<(String, Saved, Scan)> {
         let key = super::edit::identity_key(session)?;
         let mut saved = self.read(&key)?;
         let scan = scan(session)?;
@@ -170,7 +174,11 @@ impl ChangelistStore {
         if super::edit::identity_key(session)? != key {
             return Err(rejected());
         }
-        self.write(&key, &saved)?;
+        if let Some(version) = observation {
+            session.publish_idle_observation(Some(version), || self.write(&key, &saved))?;
+        } else {
+            self.write(&key, &saved)?;
+        }
         Ok((key, saved, scan))
     }
     fn to_view(
@@ -190,9 +198,9 @@ impl ChangelistStore {
         })
     }
     pub fn view(&self, session: &WorktreeSession) -> Result<ChangelistView> {
-        let _write = session.acquire_write_lock()?;
         let _lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
-        let (key, saved, scan) = self.refreshed(session)?;
+        let observation = session.idle_observation_version()?;
+        let (key, saved, scan) = self.refreshed(session, Some(observation))?;
         Self::to_view(session, key, saved, &scan)
     }
     pub fn change(
@@ -202,7 +210,7 @@ impl ChangelistStore {
         action: ChangeAction,
     ) -> Result<ChangelistView> {
         let _lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
-        let (key, mut saved, scan) = self.refreshed(session)?;
+        let (key, mut saved, scan) = self.refreshed(session, None)?;
         let before = Self::to_view(session, key.clone(), saved.clone(), &scan)?;
         if before.revision != expected.revision || key != expected.identity {
             return Err(rejected());
@@ -302,7 +310,7 @@ impl ChangelistStore {
         amend: bool,
     ) -> Result<Prepared<'a>> {
         let _lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
-        let (key, saved, scan) = self.refreshed(session)?;
+        let (key, saved, scan) = self.refreshed(session, None)?;
         let view = Self::to_view(session, key, saved, &scan)?;
         if view.identity != selection.identity || view.revision != selection.revision {
             return Err(rejected());

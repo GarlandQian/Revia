@@ -60,12 +60,24 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
     onView(null);
     if (busy) return;
     setPending(true);
-    void invoke<ChangelistView>("m7_changelist_view", { request: { worktreeId } }).then((next) => {
-      if (epoch.current !== current) return;
-      setView(next); onView(next); setError(null);
-    }).catch((caught) => { if (epoch.current === current) setError(toAppError(caught)); })
-      .finally(() => { if (epoch.current === current) setPending(false); });
-    return () => { epoch.current++; };
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const load = async (attempt: number) => {
+      let retrying = false;
+      try {
+        const next = await invoke<ChangelistView>("m7_changelist_view", { request: { worktreeId } });
+        if (epoch.current !== current) return;
+        setView(next); onView(next); setError(null);
+      } catch (caught) {
+        if (epoch.current !== current) return;
+        const failure = toAppError(caught);
+        if (failure.code === "errors.session.aWriteOperationProgressWorktreeWait" && attempt < 3) {
+          retrying = true;
+          retryTimer = setTimeout(() => { if (epoch.current === current) void load(attempt + 1); }, 100 * 2 ** attempt);
+        } else { setView(null); setError(failure); }
+      } finally { if (epoch.current === current && !retrying) setPending(false); }
+    };
+    void load(0);
+    return () => { epoch.current++; clearTimeout(retryTimer); };
   }, [worktreeId, revision, busy, onView]);
   const change = async (action: Action) => {
     if (!view || busy || pending) return;
@@ -98,7 +110,7 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
       return <section key={group.id} className="mb-2 border-b border-panelborder pb-1">
         <div className="flex items-center gap-1">
           <input type="checkbox" aria-label={group.name || t("changelists.default")} checked={active.length > 0 && active.every((item) => item.selected)} disabled={busy || pending || !active.length} onChange={(event) => void change({ kind: "select", items: active.map((i) => i.id), selected: event.target.checked })} />
-          <input key={`${group.id}:${group.name}`} className="min-w-0 flex-1 bg-transparent font-semibold" aria-label={t("changelists.rename")} defaultValue={group.name || t("changelists.default")} maxLength={256} disabled={busy || pending} onBlur={(event) => { if (event.target.value.trim() && event.target.value !== (group.name || t("changelists.default"))) void change({ kind: "rename", group: group.id, name: event.target.value }); }} />
+          <input key={`${group.id}:${group.name}`} className="min-w-0 flex-1 bg-transparent font-semibold" aria-label={t("changelists.rename")} defaultValue={group.name} placeholder={t("changelists.default")} maxLength={256} disabled={busy || pending} onBlur={(event) => { if (event.target.value.trim() && event.target.value !== group.name) void change({ kind: "rename", group: group.id, name: event.target.value }); }} />
           <button className="toolbar-button" disabled={busy || pending || group.id === view.defaultGroup} onClick={() => void change({ kind: "default", group: group.id })} title={t("changelists.makeDefault")}><Codicon name={group.id === view.defaultGroup ? "star-full" : "star-empty"} size={13} /></button>
           <button className="toolbar-button" disabled={busy || pending || view.groups.length === 1} onClick={() => void change({ kind: "delete", group: group.id })}>{t("changelists.delete")}</button>
         </div>

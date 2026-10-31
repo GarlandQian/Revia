@@ -115,3 +115,14 @@ S92“关闭运行中进程前确认…退出应用/安装更新同样纳入关�
 `terminal-session-node-03` 33项通过（终端12项、编辑13项、既有合并写门8项），直接调用生产TerminalSessions/EditSessions/CloseDriver/WriteGuard，含在途A→B、隐藏运行态、取消/等待Git写、持久化错误和最终关闭顺序；所用可控API依赖用于并发回归，不是桌面验收。`terminal-cargo-02` 3项通过：真实自建PTY读写/中文/resize/退出、两worktree隔离，以及损坏页签原件保留。Tauri mock仅承载事件。`terminal-frontend-build-03`、`terminal-lint-01`与`terminal-x18n-02`均exit0；翻译0错误/76个unused-key警告，lint新增一条no-useless-spread提示留backlog。
 
 首轮前端类型检查`terminal-frontend-build-01`真实exit2（占位回调推断为false字面量），修正返回类型后检查通过，失败原件保留。每轮源码hash/argv/exit/原stdout/stderr在批次codex-checks目录。以上为本组检查点，不代表整包或真实桌面通过；更新安装的终端确认/重启全局协调仍随F13继续，当前安装门禁已读取全局运行态，不会因面板隐藏而放行。
+
+
+### Codex：真实桌面场景集中修复与验证（2026-10-31）
+
+固定 Release `5ca9178` / 产品`0dc11c0`已完成四主题及中英文900px真实查看；系统深色测试在finally中恢复原浅色。手动编辑Save前磁盘未变、Save后实际字节正确，草稿跨文件切换保留，外部变化后拒绝覆盖并保留草稿；原生退出按未解决草稿确认，先保留原件再仅丢弃fixture编辑，启动03真实exit0。本地clone实际目标`repos/native-clone-c_0_lf38/checkout`的HEAD与自建bare一致并自动登记打开。诊断原生导出的JSON不含文件正文标记与fixture邮箱。PR未登录和更新无签名公钥边界已观察，正式账号/保护/更新接线未验，D06尚未执行，不能将上述局部结果称整包通过。
+
+原生发现并集中修复：更改列表view把元数据读取记成仓库写入，导致PTY逐字输入被拒及提交后Busy不能自动恢复；默认组未命名input冻结旧语言；设置玻璃透底文字干扰阅读。原始截图/AX/文件在`desktop-acceptance-myntirt_`，终端命令实际残缺并parse error，不能称PTY命令通过。
+
+修复后元数据观察不再设置writing标志；真实写入开始/结束递增代际，只在同一空闲代际内发布元数据，持锁区不运行Git，跨写入结果拒绝。原写互斥与终端真实写入暂停保持。前端仅对明确Busy读取作三次有界重读，绑定原worktree/epoch且卸载取消；失败不继续显示可操作旧凭据。默认名用真实空name和即时翻译placeholder，避免翻译持久化成用户名称。统一浮层保留玻璃装饰/折射路径并增加主题tint与blur遮蔽透底，减少透明度/高对比度仍无滤镜降级。
+
+`task14-native-scene-rust-01`真实exit0，共44通过（更改列表26、PTY3、会话3、共享提交12），含实际会话写代际与Barrier并发发布拒绝。`task14-native-scene-node-01`20通过，前端build/lint/x18n均exit0，翻译0错误/76既有unused警告。源码hash、argv、真实exit、分流原输出与失败原件保留；只改复用既有键，未改locale/绑定。下一步只审本新增量、固定新Release，再真实复验PTY/浮层/默认名与D06；当前不标任务14 done。

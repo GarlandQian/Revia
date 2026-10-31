@@ -282,6 +282,7 @@ pub struct WorktreeSession {
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
     /// 命令层判断“能否重新加载环境”时也要读它（返修 C3）。
     pub(crate) writing: Mutex<bool>,
+    write_generation: AtomicU64,
     /// 审阅标记存储（None 表示未配置，此时界面不显示勾选框）。
     review_store: Option<Arc<ReviewStore>>,
     /// 审阅标记的**真实提交序号**：每次成功写入在会话内单调递增。
@@ -305,7 +306,7 @@ struct HighlightStamp {
 
 /// 写操作互斥 RAII Guard，离开作用域自动释放写锁。
 #[derive(Debug)]
-pub struct WriteGuard<'a>(&'a Mutex<bool>);
+pub struct WriteGuard<'a>(&'a Mutex<bool>, &'a AtomicU64);
 impl WriteGuard<'_> {
     pub(crate) fn holds(&self, session: &WorktreeSession) -> bool {
         std::ptr::eq(self.0, &session.writing)
@@ -315,6 +316,7 @@ impl<'a> Drop for WriteGuard<'a> {
     fn drop(&mut self) {
         if let Ok(mut writing) = self.0.lock() {
             *writing = false;
+            self.1.fetch_add(1, Ordering::Release);
         }
     }
 }
@@ -399,6 +401,7 @@ impl WorktreeSession {
             instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             confirmation_epoch: AtomicU64::new(0),
             writing: Mutex::new(false),
+            write_generation: AtomicU64::new(0),
             review_store,
             review_seq: Mutex::new(0),
             identity: identity.clone(),
@@ -1609,6 +1612,23 @@ impl WorktreeSession {
         &self.git
     }
 
+    /// A read observation does not mark the repository as writing or block PTY input.
+    /// Its result may be published only if no repository write overlapped the read.
+    pub fn idle_observation_version(&self) -> Result<u64> {
+        self.publish_idle_observation(None, || Ok(self.write_generation.load(Ordering::Acquire)))
+    }
+
+    /// Keep the final metadata publication atomic with respect to write admission.
+    /// The callback only publishes application metadata; it must not run Git or async work.
+    pub fn publish_idle_observation<T>(&self, expected: Option<u64>, publish: impl FnOnce() -> Result<T>) -> Result<T> {
+        let writing = self.writing.lock().map_err(|_| AppError::coded(ErrorKind::Internal, "errors.session.writeOperationLockFailed", "Write lock failed", &[]))?;
+        if *writing || expected.is_some_and(|version| version != self.write_generation.load(Ordering::Acquire)) {
+            return Err(AppError::coded(ErrorKind::Rejected, "errors.session.aWriteOperationProgressWorktreeWait", "Worktree write overlapped this observation", &[]));
+        }
+        self.require_identity()?;
+        publish()
+    }
+
     /// 获取当前 worktree 的独占写操作锁（不排队，发现被占用立即拒绝并发写，Q90/T06）。
     pub fn acquire_write_lock(&self) -> Result<WriteGuard<'_>> {
         let mut writing = self.writing.lock().map_err(|_| {
@@ -1628,8 +1648,9 @@ impl WorktreeSession {
             ));
         }
         self.require_identity()?;
+        self.write_generation.fetch_add(1, Ordering::Release);
         *writing = true;
-        Ok(WriteGuard(&self.writing))
+        Ok(WriteGuard(&self.writing, &self.write_generation))
     }
 
     /// 整文件暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009）。
