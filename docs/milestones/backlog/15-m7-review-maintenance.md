@@ -38,3 +38,14 @@ PR网络写后不确定结果的查询核对不作为新增独立已复现数据
 ## 终端组维护观察
 
 `terminal-lint-01`新增1条`unicorn(no-useless-spread)`提示：退出准备对当前pending集合取数组快照后Promise.allSettled。未产生检查错误；不扩大本组为样式/抽象重构。完整诊断和源码hash在本轮codex-checks。
+
+
+## review03 判断建议原文 — 2026-10-31
+
+固定候选4c3b3f8，均P3非阻断，按Q174登记，不扩大本轮重构。
+
+判断（均P3，非阻断；依据任务说明smell baseline，非硬违反）：
+
+- **J1，可能Duplicated Code**：`src/App.tsx:1784,1793,1807,1819` 四次复制五类退出保护条件；新增保护来源须同步四处，容易漂移，可集中判定。
+- **J2，可能Primitive Obsession**：`github/store.rs:30` 的草稿kind为String，`GithubPanel.tsx:119,125` 又把审阅事件写进原表示新旧行的side；新增表单/事件时须维护字符串分支与强制转换，可用明确领域类型。
+- **J3，可能Duplicated Code（仅测试）**：`m7_protection.rs:24` 与 `m7_review_drafts.rs:27` 复制Fixture及HTTP支架；隔离和服务端时序修正需多处同步，可列共享fixture维护项。

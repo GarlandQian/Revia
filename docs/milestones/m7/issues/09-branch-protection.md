@@ -63,3 +63,24 @@ S111“与本地…取并集；完整分页成功才替换缓存；失败保留�
 原始证据在 `/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`：`protection-cargo-02` 7项通过，真实loopback HTTP及独占Git/HOME/appdata覆盖完整分页、清空替换、失败保留、迟到响应、账号/remote/仓库隔离、重建与权限失败；直接调用生产强推判断验证并集。`protection-cargo-01`既有branch_remote31项与PR检出8项通过，但本组6通过/1失败（测试HTTP服务把无请求空连接的读取超时当失败）；修正服务后仅重跑受影响7项，完整失败原件保留。`protection-lib-01`现有GitHub库32项通过；`protection-bindings-01`导出1项通过。前端`protection-frontend-build-01`、`protection-lint-01`和`protection-x18n-01` exit0，翻译0错误/76个既有unused-key警告，不删除保留键。源码hash、精确argv、真实exit和分流stdout/stderr逐轮保存；x18n首次沙箱缓存EPERM也保留，非产品检查失败。
 
 官方branches文档原件在`impl/protection-official.json`。本组仍是中间检查点；F08/F09与F13/F22尚未完成，任务13/14的真实桌面事实仍缺，不称整体通过或最终候选。
+
+
+### Codex / review03 Standards 正式原文 — 2026-10-31
+
+固定候选`4c3b3f838828935dd6bb64efc084750fb292df51`，增量基点`7741dba8725d7b02cc09197cb88d26014c0c48df`。本轴原文如下，不合并重排；详证在本轮`/private/tmp/revia-m7-batch-g5scyw0r/review-03-zika9m9t/standards-evidence.md`。本轮明确P2由Codex直接处理，不再派Pi；P3登记backlog15。
+
+```markdown
+Standards：仅审 `7741dba…4c3b3f8` 的93路径、10提交；以下均为固定源码静态结论。
+
+硬违反（1项）：
+
+- **[P2，H1] 新fixture阻断Windows检查**：`src-tauri/tests/m7_diagnostics.rs:29,35`、`m7_pr_checkout.rs:87`、`m7_protection.rs:72`、`m7_review_drafts.rs:75` 将Git搜索路径限定为Unix目录，普通测试没有平台条件。Windows上的Git仅位于常规PATH时，生产 `git/mod.rs:208` 经 `shell.rs:83` 找不到Git，fixture的unwrap失败，现有 `.github/workflows/compile-check.yml:116` 因而失败。违反 `AGENTS.md:72` 与 `docs/adr/0007-target-platforms.md:7` 的“不写死macOS假设”。应读取平台PATH，仅将Unix专用断言限定平台；未实际运行Windows。
+
+判断（均P3，非阻断；依据任务说明smell baseline，非硬违反）：
+
+- **J1，可能Duplicated Code**：`src/App.tsx:1784,1793,1807,1819` 四次复制五类退出保护条件；新增保护来源须同步四处，容易漂移，可集中判定。
+- **J2，可能Primitive Obsession**：`github/store.rs:30` 的草稿kind为String，`GithubPanel.tsx:119,125` 又把审阅事件写进原表示新旧行的side；新增表单/事件时须维护字符串分支与强制转换，可用明确领域类型。
+- **J3，可能Duplicated Code（仅测试）**：`m7_protection.rs:24` 与 `m7_review_drafts.rs:27` 复制Fixture及HTTP支架；隔离和服务端时序修正需多处同步，可列共享fixture维护项。
+
+无其他新增硬违反。已跳过工具强制检查项及既有backlog；本轮只读核对源码和原始检查，未运行产品/桌面。正式结果不是桌面通过结论，P3按Q174留backlog。
+```

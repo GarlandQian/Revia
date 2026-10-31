@@ -211,3 +211,16 @@ Rust `edit.rs:384` 的会话锁只能拒绝其他仓库写入，不阻止进程�
 本组独占验证原件均在`/private/tmp/revia-m7-batch-g5scyw0r/codex-checks/`：`edit-io-cargo-01` 10项真实Git/权限/BOM/CRLF/身份/冲突/元数据/草稿门禁通过；`edit-final-cargo-01`含原9项编辑及152项共享暂存/丢弃/提交通过、1项ignored；`edit-bindings-cargo-01` 7项含ts-rs导出通过；`edit-session-node-03` 13项实际生产状态/写门/关闭协调器回归通过，含将真实Rust权限错误载荷交给实际双语formatter。前端`edit-frontend-build-02`与`edit-lint-02`exit0；`edit-x18n-01`为0错误/76个unused-key警告，保留键不自动删除。
 
 `edit-cargo-01`编译exit101发现批量丢弃Result包裹不匹配，已修复，失败原stdout/stderr保留；后续检查均单独记录源码hash、精确argv、真实exit和分流原件。清理生成绑定只涉及EditDraft/EditableFile，不清理其它绑定。无关rustfmt差异已去除，并重跑受影响Rust检查。上述不是最终候选/全量最终检查/真实桌面验收；并排编辑、双语窄窗与原生退出仍须任务14真机检查。
+
+
+### Codex / review03 Spec 正式原文 — 2026-10-31
+
+固定候选`4c3b3f838828935dd6bb64efc084750fb292df51`，增量基点`7741dba8725d7b02cc09197cb88d26014c0c48df`。本轴原文如下，不合并重排；详证在本轮`/private/tmp/revia-m7-batch-g5scyw0r/review-03-zika9m9t/spec-evidence.md`。本轮明确P2由Codex直接处理，不再派Pi；P3登记backlog15。
+
+```markdown
+Spec：1 项 P2（需求部分未满足／实现错误），未发现新增 scope creep。仅审固定 7741dba…4c3b3f8 的 10 提交增量；源码根为 /Volumes/T7 Shield/project/Revia-m7。
+
+- **[P2，S03-01，静态推断] 撤销后的旧草稿会复活。** 规格 docs/milestones/m7/spec.md:83：“切换文件、视图、仓库、语言或主题保留内容”。src/lib/m7/editSession.ts:120 在文本回到磁盘原文时跳过持久草稿清理；:89–90 重新打开仅在 dirty 时保留内存，否则加载旧草稿。生产 EditableWorkspace.tsx:79、82–84 与 App.tsx:6096 确实触发此链路：编辑已存在的工作区改动，等待自动落盘，手动撤回原文，再切文件／统一视图后返回，已撤销内容重新出现，后续保存可重新写入它。应让回到基线也有序更新／清除旧草稿。
+
+已核对其余 review02 明确修复的生产入口与控制流，未再确认其他 P1/P2。固定源码 7,875 项、原始证据 900 项散列全吻合；原检查含 Rust exit101、中断 null 与后续 exit0，不称单轮全过；相关 Node 98 通过。此项未做动态或桌面复现，本轴未重跑产品测试。13／14 既有外部阻塞不重复计数。详见 spec-evidence.md。
+```

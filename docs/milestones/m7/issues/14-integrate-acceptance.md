@@ -239,3 +239,37 @@ F01/F07/F18/F19的首轮具体缺口在源码层面已修正。最严重F09：�
 </details>
 
 Standards 硬违反 9 项（P1×4/P2×4/P3×1），判断建议 3 项；Spec 18 项（P1×13/P2×5），存在重叠，不能合称 27 个产品缺陷。P3/smell 记 backlog15；本轮阻断问题由 Codex 直接修，正式 Pi 返修已用尽，不再派发。任务13/14真实桌面前提保持未完成。
+
+
+### Codex / review03 Standards 正式原文 — 2026-10-31
+
+固定候选`4c3b3f838828935dd6bb64efc084750fb292df51`，增量基点`7741dba8725d7b02cc09197cb88d26014c0c48df`。本轴原文如下，不合并重排；详证在本轮`/private/tmp/revia-m7-batch-g5scyw0r/review-03-zika9m9t/standards-evidence.md`。本轮明确P2由Codex直接处理，不再派Pi；P3登记backlog15。
+
+```markdown
+Standards：仅审 `7741dba…4c3b3f8` 的93路径、10提交；以下均为固定源码静态结论。
+
+硬违反（1项）：
+
+- **[P2，H1] 新fixture阻断Windows检查**：`src-tauri/tests/m7_diagnostics.rs:29,35`、`m7_pr_checkout.rs:87`、`m7_protection.rs:72`、`m7_review_drafts.rs:75` 将Git搜索路径限定为Unix目录，普通测试没有平台条件。Windows上的Git仅位于常规PATH时，生产 `git/mod.rs:208` 经 `shell.rs:83` 找不到Git，fixture的unwrap失败，现有 `.github/workflows/compile-check.yml:116` 因而失败。违反 `AGENTS.md:72` 与 `docs/adr/0007-target-platforms.md:7` 的“不写死macOS假设”。应读取平台PATH，仅将Unix专用断言限定平台；未实际运行Windows。
+
+判断（均P3，非阻断；依据任务说明smell baseline，非硬违反）：
+
+- **J1，可能Duplicated Code**：`src/App.tsx:1784,1793,1807,1819` 四次复制五类退出保护条件；新增保护来源须同步四处，容易漂移，可集中判定。
+- **J2，可能Primitive Obsession**：`github/store.rs:30` 的草稿kind为String，`GithubPanel.tsx:119,125` 又把审阅事件写进原表示新旧行的side；新增表单/事件时须维护字符串分支与强制转换，可用明确领域类型。
+- **J3，可能Duplicated Code（仅测试）**：`m7_protection.rs:24` 与 `m7_review_drafts.rs:27` 复制Fixture及HTTP支架；隔离和服务端时序修正需多处同步，可列共享fixture维护项。
+
+无其他新增硬违反。已跳过工具强制检查项及既有backlog；本轮只读核对源码和原始检查，未运行产品/桌面。正式结果不是桌面通过结论，P3按Q174留backlog。
+```
+
+
+### Codex / review03 Spec 正式原文 — 2026-10-31
+
+固定候选`4c3b3f838828935dd6bb64efc084750fb292df51`，增量基点`7741dba8725d7b02cc09197cb88d26014c0c48df`。本轴原文如下，不合并重排；详证在本轮`/private/tmp/revia-m7-batch-g5scyw0r/review-03-zika9m9t/spec-evidence.md`。本轮明确P2由Codex直接处理，不再派Pi；P3登记backlog15。
+
+```markdown
+Spec：1 项 P2（需求部分未满足／实现错误），未发现新增 scope creep。仅审固定 7741dba…4c3b3f8 的 10 提交增量；源码根为 /Volumes/T7 Shield/project/Revia-m7。
+
+- **[P2，S03-01，静态推断] 撤销后的旧草稿会复活。** 规格 docs/milestones/m7/spec.md:83：“切换文件、视图、仓库、语言或主题保留内容”。src/lib/m7/editSession.ts:120 在文本回到磁盘原文时跳过持久草稿清理；:89–90 重新打开仅在 dirty 时保留内存，否则加载旧草稿。生产 EditableWorkspace.tsx:79、82–84 与 App.tsx:6096 确实触发此链路：编辑已存在的工作区改动，等待自动落盘，手动撤回原文，再切文件／统一视图后返回，已撤销内容重新出现，后续保存可重新写入它。应让回到基线也有序更新／清除旧草稿。
+
+已核对其余 review02 明确修复的生产入口与控制流，未再确认其他 P1/P2。固定源码 7,875 项、原始证据 900 项散列全吻合；原检查含 Rust exit101、中断 null 与后续 exit0，不称单轮全过；相关 Node 98 通过。此项未做动态或桌面复现，本轴未重跑产品测试。13／14 既有外部阻塞不重复计数。详见 spec-evidence.md。
+```
