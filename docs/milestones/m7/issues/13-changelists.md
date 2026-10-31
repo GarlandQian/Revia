@@ -114,3 +114,39 @@ Spec：仅审固定 `b5caf5a…ffaa343` 的任务13增量。6项P2、1项P3；�
 原件：`task13-review05-rust-01` 50通过（新18+既有commit12/文件暂存20）；`task13-review05-segments-01` 49通过（hunk24/segment25）；`task13-review05-node-01` 8通过。最后新增非UTF8只读分支后，`task13-review05-rust-03` 本机18通过；其他生产相关源码未再变化。新增非法字节文件名用例在02轮创建fixture时被macOS APFS以EILSEQ拒绝（18通过/1失败），保留全部stdout/stderr/源码散列；该文件名用例现仅在支持它的非macOS Unix编译，本机不能冒称实跑。总相关Rust回归99项跨上述轮次核实，不称单一全套执行。
 
 前端首轮因鼠标事件使用键盘修饰键类型报TS2345，原失败保留；改用ChangesTree既有isPrimaryClick。最后`task13-review05-frontend-03`与`task13-review05-lint-03`均exit0。locale键集/译文未改，既有task13-x18n-01为0错误/76警告，所有新增UI使用已查询键。生成绑定原件task13-review05-bindings-01。Windows和本修复的真实Revia桌面尚未运行。下一步仅新增修复范围独立两轴，审修后重新构建Release；不复用旧二进制验收。
+
+### Codex / review06 Standards（2026-10-31）
+
+固定增量5839e56…2869c81；以下独立正式报告原文，细证据 `/private/tmp/revia-m7-batch-g5scyw0r/review-06-w57zfr6a/standards-evidence.md`。
+
+范围：仅固定 `5839e56c…2869c81` 的 review05 修复增量，9 路径；未重审旧轮次。
+
+硬性规则违反：
+
+- **[P2，H06-01] 预览与待提交块使用不同基线。** `src-tauri/src/m7/changelists.rs:549–555` 将未匹配已暂存签名的 HEAD→工作区块标为 `unstaged`；`src/features/m7/Changelists.tsx:85,104–107` 随即打开既有暂存区→工作区 diff。同一位置先暂存 A→B、再编辑为 C 时，勾选和提交使用 A→C，完整预览却是 B→C。违反 `docs/adr/0004-hunks-come-from-git.md:3`：“补丁就由这同一个 hunk 生成”“保证用户操作的就是看到的、将要暂存的”。应让按范围读取的预览沿用选择项的 HEAD→工作区模型及指纹；仅切换 `source` 无法表达该比较。静态结论，未动态复现。
+
+review05 的只读门禁、整份补丁跨 IPC／原生 diff 滚动、错误随语言切换问题在此增量已修复；图标／状态色亦已接回。未发现新增的基线 smell；旧名称校验重复维持原 backlog，不重复计数。
+
+已核对 7,884 项源码、1,173 项证据散列与固定 diff。原件：Rust01 50 通过、segments01 49 通过；最终 Rust03 本机18通过，frontend03／lint03 exit0；Node01 8通过，既有 x18n 0错误／76警告且语言源未改。Rust02 的 APFS EILSEQ 与 frontend01 的 TS2345 失败原件均保留，未算作通过。未新增或重跑产品检查，未启动桌面，未实跑 Windows 或非 macOS 原字节文件名用例。
+
+合计：1 项 P2 硬违反；P1、P3、新 smell 均为0。明确余项交主 Codex 处理。
+
+
+### Codex / review06 Spec（2026-10-31）
+
+固定增量5839e56…2869c81；以下独立正式报告原文，细证据 `/private/tmp/revia-m7-batch-g5scyw0r/review-06-w57zfr6a/spec-evidence.md`。
+
+Spec：固定 `5839e56…2869c81`，仅 review05 修复增量；2项P2，均为静态结论，未动态复现。
+
+(a) 遗漏／部分实现：未发现下述接线错误以外的独立遗漏。
+
+(b) 范围外行为：未发现 scope creep。
+
+(c) 实现错误：
+
+- **[P2，S06-01] 多选按隐藏的暂存区顺序计算。** `docs/milestones/m4/spec.md:52`要求“Shift 点选连续范围”“⇧↑ / ⇧↓ 扩展”；`docs/README.md:155`明确“两种模式都支持多选”。新接线 `src/App.tsx:5858`直接复用按`treeOrder(snapshot)`计算的回调（`src/hooks/useTreeSelection.ts:68–74,92–106`），但列表按更改列表顺序显示（`src/features/m7/Changelists.tsx:69–81,92`）。例如三份未暂存文件a/b/c，把a移到第二列表，可见顺序b/c/a；单击b再Shift单击a只选中a/b，漏选中间的c；箭头导航也偏离可见顺序，批量丢弃目标随之错误。
+
+- **[P2，S06-02] 相同改动内容使未暂存块打开错误版本。** `docs/milestones/m4/spec.md:51`要求“单击文件：选中并在预览页签……中显示 diff”；`docs/README.md:214`要求“diff 工作区一侧用 ⌘S 明确保存”。`src-tauri/src/m7/changelists.rs:549–555`仅凭增删文本签名存在于已暂存集合就标记`staged`，签名不含位置（`src-tauri/src/git/segments.rs:648–675`）。同文件两处相同替换，先暂存第一处再修改第二处，会把第二处也标记已暂存；`Changelists.tsx:85,104–107`因此打开第一处的已暂存diff，实际点击的工作区变化及其编辑入口缺失（`src/App.tsx:6046`）。应按实际位置／版本关联，不能只比较改动正文。
+
+原件核对：7,884项源码、1,173项证据散列及diff一致。末轮Rust18通过，frontend/lint exit0；其余既有检查及源码映射见`spec-evidence.md`。本修复Revia桌面、Windows和非UTF8路径用例仍未实跑；不重启既有Rebased、不复测已过检查。
+

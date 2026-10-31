@@ -246,3 +246,7 @@ Standards：3项P2、2项P3；Spec：6项P2、1项P3（只读能力边界在两�
 原件：`task13-review05-rust-01` 50通过（新18+既有commit12/文件暂存20）；`task13-review05-segments-01` 49通过（hunk24/segment25）；`task13-review05-node-01` 8通过。最后新增非UTF8只读分支后，`task13-review05-rust-03` 本机18通过；其他生产相关源码未再变化。新增非法字节文件名用例在02轮创建fixture时被macOS APFS以EILSEQ拒绝（18通过/1失败），保留全部stdout/stderr/源码散列；该文件名用例现仅在支持它的非macOS Unix编译，本机不能冒称实跑。总相关Rust回归99项跨上述轮次核实，不称单一全套执行。
 
 前端首轮因鼠标事件使用键盘修饰键类型报TS2345，原失败保留；改用ChangesTree既有isPrimaryClick。最后`task13-review05-frontend-03`与`task13-review05-lint-03`均exit0。locale键集/译文未改，既有task13-x18n-01为0错误/76警告，所有新增UI使用已查询键。生成绑定原件task13-review05-bindings-01。Windows和本修复的真实Revia桌面尚未运行。下一步仅新增修复范围独立两轴，审修后重新构建Release；不复用旧二进制验收。
+
+### review06正式两轴
+
+Standards1P2（预览与选择基线不一致），Spec2P2（可见列表顺序、多处相同正文误识别来源）；原文分别入13/14 Comments。Codex继续直接修：提供明确HEAD→工作区diff源，列表范围选择按真实可见行计算。未构建新版Release，Revia尚未启动，不冒称桌面通过。
