@@ -684,3 +684,8 @@ Spec：固定 `2b79a2c…6021058`，仅 `commands.rs` 日志完整性修复。**
 
 
 Codex核对：两个生产日志入口共用同一Mutex与含换行完整缓冲；独占临时文件8线程共512条真实写入无缺失/拼行，Rust原件1/1 exit0。S14-ST01测试位置P3只记backlog，不扩大重构。下一步固定带观测的Release，在原D06独占fixture真实可见窗口定位；仍不是性能修复或D06通过。
+
+
+### Codex：固定观测Release真实D06归属结果 — 2026-10-31
+
+产品6021058、ReleaseSource5d89202，固定 `fixed-release-d06-zxligxrm`，构建exit0。原D06 fixture真实可见运行 `task14-d06-timing-split-01` exit0，前台/聚焦/rAF有效，四截图已直接查看，源码7,887项散列未变。189条Rust/14条前端时序完整无拼行。首屏224ms仍失败：refresh95.020ms，同线程Git89.503ms，含命令记录26.035ms；并排layout worker28.353ms，实际段布局派生0.528ms，首批行worker约0.5–3.3ms。响应到前端状态发布/后续绘制仍有等待，继续据此定位。并排首跳缓存false/总50ms，返回缓存true/总39ms，只补缓存来源，不冒称独立文字DOM/首帧已验。原252/220/176失败不覆盖，整项不done。详情和原件见[原生验收记录](../native-acceptance.md)最新诊断；进程44971已退出，不复用旧PID。

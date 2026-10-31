@@ -69,3 +69,20 @@ Rebased 1.1.22 的既有暂存、同文件部分暂存、模式切换三组原�
 原件：`task14-cold-fixture.json`、`task14-d06-cold-unified-audit.json`、`codex-checks/task14-d06-cold-unified-01`与其四张原生截图。首屏门槛仍失败、并排冷缓存来源仍未证明，任务14不done。产品源码未改，未重复构建、测试或开审查代理。
 
 本轮只读源码核查排除了“仅绑定RowWindowStore就自动全量取行”和“未开启编辑时也挂载编辑器”的假设；未减少身份重验或数据保护。`launchctl procinfo`需要root而未执行成功，未尝试提权或修改全局配置，也未采样归属不明的WebContent。现有Rust/AppKit栈不足以定位前端热点，后续应补生产IPC边界的测量时序，而非据猜测改性能或安全门。
+
+
+## D06：生产边界时序与并排缓存来源（2026-10-31 后续诊断）
+
+这轮仅补观测，并修复旧测量日志多写者拼行；尚未实施性能优化。产品 `6021058deb8eb30b23c72907739a2e3177df0fd7`，Release 源码 `5d892029e095bc1c3a74980240df4a977592fc85`。新固定目录 `fixed-release-d06-zxligxrm`，二进制 SHA256 `e13744ef4c328a44903302533ca0bda2496fdf14ba48bc7232fc82d4351eabf7`；`task14-d06-timing-release-build-01` 真实 exit 0。原正式产物 `fixed-release-native-3kjfm1yi` 及原 252/220/176ms 失败不覆盖。
+
+时序观测最小检查：既有 Node 80 项、Rust 段计算 10 项、前端 build/lint 均 exit 0；日志完整性修复另以真实独占临时文件、8线程512条记录验证通过。review13 的 Spec S13-SP01 日志拼行 P2 已修；review14 Standards 无 P1/P2、1项P3测试组织差异记 backlog15，Spec0项。两轮正式原文分别已进任务14 Comments，不再续接代理。
+
+`task14-d06-timing-split-01` 使用原 D06 独占 fixture、全新独占 HOME/appdata 和真实前台可见窗口，记录器 exit 0。focused=true、hidden=false、focusLosses=0、hiddenTransitions=0、rAF约60Hz；四张原生截图已直接查看，首张是添加仓库状态，其余含首屏/滚动/最终224ms测量界面。测量后全部7,887项源码散列与本轮记录一致，二进制散列不变；进程44971已退出，只是历史PID。
+
+- 首屏 **224ms**（状态往返96ms，首次行/绘制等待127ms），仍超过150ms。
+- Rust `session.refresh` 95.020ms：status17.878ms、两个diff合计56.477ms、parse2.933ms、条目/快照锁1.587ms、身份及审阅状态16.138ms。相同线程四次Git调用总89.503ms，其中已确认的命令记录阶段合计26.035ms；这些是包括新增观测影响的墙钟时间，不能把跨线程并发命令相加当关键路径。
+- `side_by_side_layout` worker28.353ms，其中全文读取25.421ms，布局一致性和段/折叠派生本身0.528ms；前端layout往返31ms。首批 `side_lines` worker约0.545/3.275ms，IPC约3.082/3.391ms，前端Promise却15/16ms。layout响应后约16ms才发首批取行，后续前端提交/绘制等待仍需定位；这排除了“段布局派生本身耗去百余毫秒”的猜测。
+- 189条Rust TIMING、14条前端 TIMING_JS 均可按完整JSON行解析，没有损坏记录。测量模式新增I/O可能影响计时，本轮用于归属，不当优化后门槛通过。
+- 并排首次目标跳转前缓存 **false**，旧测量边界总50ms；返回目标缓存 **true**、调用返回时数据已覆盖，总39ms。只补缓存来源与原边界数据；split仍未采集独立文字DOM/首合成帧证据，不据此宣称完整100ms/1帧验收通过。自动60滚动帧缺行0与真实截图抽样分别记录，不替代长段目测或整项验收。
+
+原件：`desktop-acceptance-myntirt_/task14-d06-timing-audit.json`、`task14-d06-timing-original-hashes.json`、`apps/d06-timing-pblrlky4/{measure.json,measure.log,timing-analysis.json}`、`codex-checks/task14-d06-timing-split-01` 和四张截图。下一步沿已确认的前端状态发布/布局挂载等待与命令摘要记录成本定位或局部修复；保留同步持久化、脱敏、过期、故障/清空和身份重验边界，不凭猜测弱化保护。任务14保持 ready-for-agent；GitHub/更新正式接线按用户要求保留未验，Windows/CI/长测无新增证明。
