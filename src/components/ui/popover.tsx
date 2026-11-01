@@ -20,6 +20,7 @@ export function Popover({
   trigger,
   children,
   align = "left",
+  side = "bottom",
   width,
 }: {
   open: boolean;
@@ -29,6 +30,8 @@ export function Popover({
   trigger: ReactElement;
   children: ReactNode;
   align?: "left" | "right";
+  /** 首选弹出方向；锚点贴近窗口底部（如侧栏最下面的按钮）时用 top，不要等到放不下才翻转。 */
+  side?: "top" | "bottom";
   width?: number;
 }) {
   // 系统材质下弹层是一块原生玻璃：每个弹层一块，按实例区分。
@@ -45,7 +48,14 @@ export function Popover({
     >
       <PopoverParts.Trigger render={trigger} nativeButton />
       <PopoverParts.Portal className="revia-popover-host">
-        <PopoverParts.Positioner className="pointer-events-auto" align={align === "right" ? "end" : "start"} side="bottom" sideOffset={4}>
+        <PopoverParts.Positioner
+          className="pointer-events-auto"
+          align={align === "right" ? "end" : "start"}
+          side={side}
+          sideOffset={4}
+          // 离窗口边至少留出与卡片外边距相同的空隙，弹层不会贴着窗口边。
+          collisionPadding={10}
+        >
           <PopoverParts.Popup
             ref={glassPane({ id: `popover-${glassId}` })}
             className="revia-popper glass-popover glass-isolate overflow-y-auto p-1 text-[12.5px]"
