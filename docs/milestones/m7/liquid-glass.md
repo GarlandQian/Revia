@@ -162,3 +162,7 @@ macOS 26 起系统提供公开 API `NSGlassEffectView` / `NSGlassEffectContainer
   - 深色外观；
   - 真实桌面合成画面（单窗口截图拿不到窗口后面的玻璃）；
   - Windows 上的镜片与卡片效果（M8）。
+
+### Codex 合并补充（2026-11-01）
+
+第二批已在m7合入，保留Q201引用独立列和原有辅助功能实色回退。GlassLayer在macOS显式使用不含SVG引用的磨砂回退，避免默认WKWebView UA不含Safari而误选无效的 `backdrop-filter: url()`；Windows继续由既有能力选择路径。此改动不影响独立的 `filter: url()` 镜片。实际构建与产品验证结论见本轮合并记录，未验证部分保持未验。

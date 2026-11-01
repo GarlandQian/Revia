@@ -42,8 +42,9 @@ export function GlassLayer({
       greenOffset={GLASS_SURFACE.greenOffset}
       blueOffset={GLASS_SURFACE.blueOffset}
       blur={GLASS_SURFACE.blur}
-      // 支持时走折射路径（Chromium/WebView2 的 SVG 滤镜），WKWebView 自动降级为磨砂。
-      refraction={!flat}
+      // WKWebView 能解析但不渲染 backdrop-filter: url()，且 UA 不含 Safari，
+      // 不依赖 vendor 的 UA 探测；macOS 显式走磨砂，WebView2 保留 SVG 路径（glass-lens-facts.md）。
+      refraction={!flat && !isMac}
       renderer="auto"
     />
   );
