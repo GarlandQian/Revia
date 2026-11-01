@@ -1,6 +1,6 @@
 [package]
 name = "revia"
-version = "0.1.0"
+version = "0.0.1"
 description = "Revia：轻量的 macOS Git 客户端"
 authors = ["Garland Qian"]
 edition = "2024"

@@ -1,5 +1,7 @@
 # 发布与更新签名
 
+当前目标版本为 `0.0.1`（用户于 2026-11-01 指定）。版本准备不表示已通过发布门槛；本轮状态见 [0.0.1 发布准备](milestones/m7/release-0.0.1-readiness.md)。
+
 本文说明 Revia 的版本标签、Release 草稿、更新签名与首次打开的处理方式（M7 任务 12，规格 H、Q62、Q63、Q65、Q182、Q188）。这里写的是**已实现的配置和需要在 GitHub 上完成的一次性接线**；仓库里没有真实凭据，也没有执行过推送、打标签或创建 Release。
 
 ## 工作流分工
@@ -16,8 +18,8 @@
 同一个版本号出现在三处：`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`。标签必须与它们一致，否则 `tools/check-release-version.mjs` 直接失败，避免打出指向错误版本的包。
 
 ```bash
-RELEASE_TAG=v0.1.0 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-version.mjs
-# version=0.1.0
+RELEASE_TAG=v0.0.1 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-version.mjs
+# version=0.0.1
 # channel=stable
 # endpoint=https://github.com/<owner>/<repo>/releases/latest/download/latest.json
 ```
@@ -26,8 +28,8 @@ RELEASE_TAG=v0.1.0 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-ve
 
 | 标签 | 发布渠道 | 该版本清单与安装包 |
 | --- | --- | --- |
-| `v0.1.0` | stable | `releases/download/v0.1.0/latest.json` 及该标签资产 |
-| `v0.1.0-beta.1` | prerelease | `releases/download/v0.1.0-beta.1/latest.json` 及该标签资产 |
+| `v0.0.1` | stable | `releases/download/v0.0.1/latest.json` 及该标签资产 |
+| `v0.0.1-beta.1` | prerelease | `releases/download/v0.0.1-beta.1/latest.json` 及该标签资产 |
 
 两种构建都使用上例同一仓库入口，不能把 beta 客户端固定到自身标签。应用默认只选择稳定版；预发布要在设置里由用户主动开启（规格 H）。清单里的安装包 URL 固定到其自身标签，不能使用 `releases/latest/download` 指向另一版本。
 
@@ -63,7 +65,7 @@ GitHub App（设备码登录）使用公开的 `REVIA_GITHUB_CLIENT_ID`（见 `d
 ## 发布流程
 
 1. 把三处版本号改成目标版本，提交到 `main`。
-2. 打标签并推送：`git tag v0.1.0 && git push origin v0.1.0`（**本轮未执行**，由维护者在确认后操作）。
+2. 打标签并推送：`git tag v0.0.1 && git push origin v0.0.1`（**本轮未执行**，由维护者在确认后操作）。
 3. 等 `Release Draft` 工作流完成，检查草稿里的 `.dmg`、`.app.tar.gz`、`.sig` 与 `latest.json`。
 4. 在真实 macOS Apple Silicon 机器上安装草稿里的 dmg，确认首屏、更新检查与签名校验。
 5. 核对稳定版 / 预发布标记后公开草稿。之后符合用户所选渠道的客户端才会收到这个版本。
@@ -82,10 +84,10 @@ GitHub App（设备码登录）使用公开的 `REVIA_GITHUB_CLIENT_ID`（见 `d
 
 ```bash
 # 版本与标签对齐
-RELEASE_TAG=v0.1.0 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-version.mjs
+RELEASE_TAG=v0.0.1 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-version.mjs
 
 # 生成 updater 覆盖配置（用测试公钥，不要用生产私钥）
-RELEASE_VERSION=0.1.0 \
+RELEASE_VERSION=0.0.1 \
 REVIA_UPDATE_ENDPOINT=https://github.com/<owner>/<repo>/releases/latest/download/latest.json \
 REVIA_UPDATE_PUBKEY="$(cat /tmp/revia-test.pub)" \
 node tools/write-updater-config.mjs
