@@ -311,6 +311,8 @@ export function CommitArea({
             onOpen={() => setOptionsOpen(true)}
             onClose={() => setOptionsOpen(false)}
             align="right"
+            // 按钮在侧栏最下面：往上弹，不贴着窗口底边（返修 B2 曾被底部裁掉）。
+            side="top"
             width={260}
             trigger={
               <button

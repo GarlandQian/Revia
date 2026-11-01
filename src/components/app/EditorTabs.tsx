@@ -16,6 +16,7 @@ import { highlightLevelText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
 import { FileTypeIcon } from "./FileTypeIcon";
+import { useGlassLens } from "@/features/m7/glass/glassLens";
 
 /** 主区域固定的日志页签内容（M5 L01）：不可关闭，打开仓库后默认显示。 */
 export interface CommitDiffTabInfo {
@@ -127,8 +128,16 @@ export function EditorTabs({
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLDivElement>(null);
+  // 切换页签时的玻璃镜片（Q202）；键与各页签的 data-tab-key 一致。
+  useGlassLens({
+    host: tabsRef,
+    track: tabListRef,
+    selected: logActive ? LOG_TAB_KEY : activeCommitKey ? `commit-${activeCommitKey}` : activeKey,
+    attribute: "tabKey",
+  });
   useLayoutEffect(() => {
     const list = tabListRef.current;
     const tab = activeTabRef.current;
@@ -151,7 +160,7 @@ export function EditorTabs({
   }, [activeKey, activeCommitKey, logActive, tabs, commitTabs]);
   const reviewed = entry?.reviewed ?? false;
   return (
-    <div className="editor-tabs flex shrink-0 flex-wrap items-stretch border-b border-[var(--editorgroupheader-tabsborder)] bg-[var(--editorgroupheader-tabsbackground)]">
+    <div ref={tabsRef} className="editor-tabs glass-lens-host flex shrink-0 flex-wrap items-stretch border-b border-[var(--editorgroupheader-tabsborder)] bg-[var(--editorgroupheader-tabsbackground)]">
       <div ref={tabListRef} className="editor-tab-list relative flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* 固定的“日志”页签（L01）：不可关闭，打开仓库后默认显示。 */}
         <div
