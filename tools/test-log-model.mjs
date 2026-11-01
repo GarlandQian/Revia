@@ -220,7 +220,7 @@ test("M5筛选下拉复用修复后的受控弹层和缩放定位层", () => {
   const popover = readFileSync(new URL("../src/components/ui/popover.tsx", import.meta.url), "utf8");
   assert.match(popover, /onOpen: \(\) => void/);
   assert.match(popover, /PopoverParts\.Portal className="revia-popover-host"/);
-  assert.match(popover, /PopoverParts\.Positioner className="pointer-events-auto"/);
+  assert.match(popover, /PopoverParts\.Positioner\s+className="pointer-events-auto"/);
   assert.match(popover, /export function Dropdown/);
   assert.match(popover, /onOpen=\{\(\) => setOpen\(true\)\}/);
 });
