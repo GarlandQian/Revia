@@ -12,7 +12,7 @@ Blocked by: None
 ## Acceptance criteria
 
 - [ ] macOS 26+ 整窗原生 Liquid Glass，工具栏分组胶囊靠左；外壳、日志、diff、终端与 PR 面板材质统一
-- [ ] diff 代码面的中性半透明底能压住背景字形；语法色、行号、选区、增删标记清晰，缩放与侧栏拖动后仍对齐
+- [ ] 编辑区卡片的主题底色能压住背景字形，代码面默认不重复叠底；语法色、行号、选区、增删标记清晰，缩放与侧栏拖动后仍对齐（Q202）
 - [ ] 设置页铺满整窗，浮动对话框和工具栏下拉菜单使用原生玻璃，关闭后原生区域正确撤除 / 恢复
 - [ ] 真实桌面核对浅深色与系统降低透明度 / 动态效果；保留焦点、点击、键盘导航、拖动与滚动
 - [ ] CSS 回退仍可读可操作；React Bits 固定来源与完整许可保留；Windows 11 Mica / Windows 10 回退接线完成，真机在 M8 验证
@@ -150,3 +150,10 @@ Spec：固定 `5ca9178…039fd1a`，仅原生场景修复增量，10路径、1�
 本批独立 Standards 轴无阻断发现、P3观察1项；Spec轴无P1/P2或范围扩张、P3两项。按Q174三项均记 [backlog 16](../../backlog/16-m7-glass-lens-details.md)，不扩大本轮返修：动画期间系统偏好改变的短时残留、设置镜片快照内距2px偏差、搜索期间旧导航快照短时残留。原文分别在 `/private/tmp/revia-m7-glass-round2-jej71x5e/review-standards.md` 与 `review-spec.md`。未将静态审查或实施方调试截图当作规划方全组桌面通过。
 
 交接指出的CSS回退风险已按现有代码与独立WKWebView实验核对：vendor只凭Safari UA和CSS语法判断SVG，默认WKWebView不含Safari但接受url()语法，会误选无效背景滤镜。GlassLayer在macOS明确关闭该refraction，使用已有磨砂路径；不改vendor源码，Windows保留SVG。实际产品CSS回退检查另行记录，不凭静态接线宣称像素通过。
+
+
+### Codex：第二批集成验证收尾（2026-11-01）
+
+固定 Release `429d2f6` 加原有6个未提交文件；类型、Vite、Rust Release及app打包成功，改动文件lint零告警。初次Node 73/74，唯一旧JSX空白断言修正后受影响日志49/49通过，其他25项此前通过。原生模式已观察卡片、内收状态栏、向上提交选项、设置导航与搜索和普通diff；CSS回退设置居中、切页和关闭正常。Q201完整图和独立引用列保留，原有6文件逐字节未变。
+
+根代理已复核macOS回退和规格同步增量，未发现新增Spec问题；独立Spec子代理未实际完成该小增量，不冒称两轴独立通过。3项P3仍记backlog 16。镜片光学中间帧、桌面合成、深色与辅助功能切换、全组交互及D06未完；系统偏好变更许可尚未收到，未擅自切换。完整命令、源码边界、截图、审查口径和未验项见 [第二批集成验证](../glass-round2-integration.md)，任务保持ready-for-human。
