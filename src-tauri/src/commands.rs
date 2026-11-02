@@ -36,6 +36,12 @@ use crate::settings::{Registry, Settings};
 use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 use crate::worktree_status::WorktreeStatusEntry;
 
+/// 分发形态与实际数据位置（M8 任务 01）：界面据此隐藏便携版不支持的更新入口。
+#[tauri::command]
+pub fn distribution_info(state: State<'_, AppState>) -> crate::distribution::DistributionInfo {
+    state.distribution.clone()
+}
+
 /// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
 ///
 /// 生产 `AppState` 与回归测试**共用这一份实现**，测试不再复制比较算法：
@@ -145,6 +151,8 @@ pub struct AppState {
     pub m7_diagnostics: Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>,
     /// 提交操作 ID 计数器（实时输出事件归属用）。
     commit_ops: std::sync::atomic::AtomicU64,
+    /// 分发形态与实际数据位置（M8 任务 01）；启动时由 `lib.rs` 按真实布局覆盖。
+    pub distribution: crate::distribution::DistributionInfo,
 }
 
 impl AppState {
@@ -178,6 +186,14 @@ impl AppState {
             m7_github: Arc::new(crate::m7::github::GithubState::new(&data_dir)),
             m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir, &data_dir)),
             m7_diagnostics: diagnostics,
+            distribution: crate::distribution::DistributionInfo {
+                shape: crate::distribution::Distribution::current(),
+                data_dir: data_dir.to_string_lossy().into_owned(),
+                webview_data_dir: crate::distribution::Distribution::current()
+                    .is_portable()
+                    .then(|| data_dir.join("webview2").to_string_lossy().into_owned()),
+                credential_store: crate::distribution::credential_store().into(),
+            },
             data_dir,
             commit_ops: std::sync::atomic::AtomicU64::new(1),
         }

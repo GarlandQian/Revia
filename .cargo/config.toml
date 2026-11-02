@@ -2,3 +2,8 @@
 [env]
 TS_RS_EXPORT_DIR = { value = "src/types/bindings", relative = true }
 TS_RS_LARGE_INT = "number"
+
+# M8：Windows x64 默认使用动态 CRT，便携单 exe 会额外依赖 VC++ Redistributable。
+# 静态链接 CRT 后，便携版只依赖系统 WebView2；CI 用 dumpbin 核对最终二进制。
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

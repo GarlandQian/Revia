@@ -505,6 +505,7 @@ export function M7UpdateSettings({
           {status && !status.configured ? (
             <p className="text-descriptionforeground">{status.unconfiguredReason ? updateReasonText(status.unconfiguredReason) : t("settings.m7.update.unconfigured")}</p>
           ) : null}
+          {status?.portable ? <p className="text-descriptionforeground">{t("update.portableNotice")}</p> : null}
           {status?.lastCheckedAtMs ? (
             <p className="text-descriptionforeground">{t("settings.m7.update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}</p>
           ) : null}

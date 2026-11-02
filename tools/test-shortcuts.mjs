@@ -9,7 +9,7 @@ const imports = registerHooks({ resolve(specifier, context, nextResolve) {
   if (source) { if (!/\.[^/]+$/.test(source.pathname)) source.pathname += ".ts"; return nextResolve(source.href, context); }
   return nextResolve(specifier, context);
 }});
-const { replaceShortcut, conflictFor, setShortcutOverrides, acceleratorOf, matchShortcut, shortcutDefs } = await import("../src/lib/shortcuts.ts");
+const { replaceShortcut, conflictFor, setShortcutOverrides, acceleratorOf, matchShortcut, shortcutDefs, formatAcceleratorFor, matchesAccelerator } = await import("../src/lib/shortcuts.ts");
 const { isMac } = await import("../src/lib/platform.ts");
 imports.deregister();
 const event = { code: "KeyK", key: "k", metaKey: isMac, ctrlKey: !isMac, altKey: false, shiftKey: false };
@@ -37,4 +37,26 @@ test("未分配值不互相冲突；同键多个旧绑定都明确解除", () =>
   setShortcutOverrides(next);
   assert.equal(matchShortcut(event), "stageFile");
   setShortcutOverrides({});
+});
+
+test("Windows 修饰键文案用 Ctrl / Alt / Shift 并以 + 连接", () => {
+  assert.equal(formatAcceleratorFor("mod+shift+k", false), "Ctrl+Shift+K");
+  assert.equal(formatAcceleratorFor("mod+alt+a", false), "Ctrl+Alt+A");
+  assert.equal(formatAcceleratorFor("ctrl+alt+r", false), "Ctrl+Alt+R");
+  assert.equal(formatAcceleratorFor("mod+shift+k", true), "\u2318\u21e7K");
+});
+
+test("AltGr 的 Ctrl+Alt 输入不命中业务快捷键", () => {
+  const altGraph = {
+    code: "KeyA",
+    key: "a",
+    metaKey: isMac,
+    ctrlKey: !isMac,
+    altKey: true,
+    shiftKey: false,
+    getModifierState: (key) => key === "AltGraph",
+  };
+  assert.equal(matchesAccelerator(altGraph, "mod+alt+a"), false);
+  const plain = { ...altGraph, getModifierState: () => false };
+  assert.equal(matchesAccelerator(plain, "mod+alt+a"), true);
 });

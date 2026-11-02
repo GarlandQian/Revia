@@ -1405,6 +1405,7 @@ pub fn execute_commit(
     for (key, value) in git.env.iter() {
         builder.env(key, value);
     }
+    crate::platform::hide_console(&mut builder);
 
     let started = std::time::Instant::now();
     let mut child = match builder.spawn() {

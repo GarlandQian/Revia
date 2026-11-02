@@ -11,15 +11,15 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M7 规格与实施
+## 当前阶段：M8 合并与 0.0.2 发布
 
-M6“冲突与历史、双语界面”已于 2026-10-30 压成一个提交合入 main，真实桌面全组验收通过；收尾几处小改动的真机复查见 [backlog 14](docs/milestones/backlog/14-m6-final-desktop-recheck.md)。下一步 M7“扩展”，范围见 [产品方向](docs/product-direction.md#实施顺序) 的里程碑表（更改列表模式、diff 工作区一侧可编辑、内置终端、克隆、GitHub PR、导出诊断信息、自动更新）。用户已确认第四版与访谈补充项（Q193–Q199），按下面第 2–4 步整理规格、任务并交 Paseo / Pi 实施。
+M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`），版本 0.0.2。用户要求从 main 创建独立分支实现 M8；实施目录 `/Volumes/T7 Shield/project/Revia-m8`，分支 `m8`，主目录不切分支。
 
-审查按 Q174：首轮全范围两轴审查之后只审增量，真实桌面验收不必等审查零发现；P3 与构造场景的边界问题记 backlog。M4、M5 遗留（Q98 长测、统一视图首次跳转、未做完的桌面验收）在 `docs/milestones/backlog/` 04–06，M6 验收转出的观察在 09–14，都不属于 M7 范围，除非用户在第 1 步中纳入。
+M8 代码已交付，固定候选 `83d4070`；一次 Pi 返修与 Codex 增量审查/接管修复已完成。当前 Mac 可行检查见 [规划方验证](docs/milestones/m8/verification.md)。用户已于 2026-11-02 授权压成一个提交合入 main、发布 0.0.2 并删除现有旧 Release（Q207）；按 [发布记录](docs/milestones/m8/release-0.0.2-readiness.md) 执行双平台 CI、打包与公开。Windows 真实桌面未验收项保持 `ready-for-human`，不因发布改写为通过。默认并发 Rust 两轮有失败，4 线程完整检查通过；原因未确认，保留全部证据。
 
-布局与交互照本机 Rebased 1.1.22，M7 外观改为 Liquid Glass，代码与 diff 清晰度优先（Q189、Q190）。修改材质、颜色主题或代码显示时，读 [UI 方向](docs/ui-direction.md#视觉风格)，同时考虑 macOS 与 Windows 外壳（Q191）；VS Code 颜色主题、代码字体与图标体系继续沿用。启动 M7 实施前，先核对 [开始前确认清单](docs/milestones/m7/confirmation.md)：第四版及补充项已确认，Paseo / Pi 实施、Codex 验证（Q192、Q199）。更改列表处理终端已有暂存内容仍须先实测 Rebased，未完成前只阻塞该任务，不猜测 Git 行为。安全边界与 Revia 独有功能保持原决定。Pi 用 `paseo run --provider pi/magpie/cpa/GLM-5.3-Flash` 起会话，模型请求出错时按 Q137 换模型，返修按 Q113。
+先读 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。本轮确认 Q204–Q206：安装版与便携版均用 Windows Credential Manager；便携版其他数据和 WebView2 数据放 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile；真实 Windows 桌面验收不可由 macOS 检查代替。
 
-M2、M3 剩余与界面无关的验收继续进行，界面验收在 M4 新界面上重做（Q127）。不属于任何里程碑的遗留问题见 `docs/milestones/backlog/`。
+Pi 整包实施，Codex 审查和验证；模型回退 Q137，正式返修最多一次 Q113。审查按 Q174 首轮全范围两轴、后续只审增量。历史里程碑遗留不自动并入 M8。Windows 11 沿 Q200 用 Mica，Windows 10 用 CSS 材质，镜片与浮动卡片沿 Q202；相关改动先读 UI 方向与最新决定。只有 main 历史上的版本可发布（Q203）；本轮推送 main、创建 0.0.2 标签和公开 Release 已由 Q207 授权。
 
 ## 工作流程
 

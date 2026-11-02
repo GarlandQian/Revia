@@ -161,7 +161,8 @@ mod tests {
                 used_fallback: false,
                 var_count: 2,
                 path_entries: path,
-                diagnostics: None,
+                fallback_reason: None,
+                fallback_detail: None,
             },
         }
     }

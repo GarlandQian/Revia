@@ -36,6 +36,7 @@ import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitOutputStore } from "@/lib/commitOutput";
 import { changelistEntriesForView, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
+import { UpdateInstallConfirmation } from "@/lib/m7/updateState";
 import { Changelists, selectionOf, type ChangelistControls } from "@/features/m7/Changelists";
 import type { ChangelistView } from "@/types/bindings/ChangelistView";
 import { invoke } from "@tauri-apps/api/core";
@@ -109,7 +110,7 @@ import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
 import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, t, type LanguagePreference } from "@/lib/i18n/index";
 import { operationKindText, readonlyReasonText } from "@/lib/i18n/text";
-import { isButtonTarget, isCommitMessageTarget, isPrimaryModifier, isTextInputOrDialog } from "@/lib/platform";
+import { isButtonTarget, isCommitMessageTarget, isPrimaryModifier, isTextInputOrDialog, isAltGraph, isImeComposing, isWindows } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
@@ -465,6 +466,9 @@ export function App() {
   const [shortcutsSnapshot, setShortcutsSnapshot] = useState<Record<string, string>>({});
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
   const [updateBannerVersion, setUpdateBannerVersion] = useState<string | null>(null);
+  /** Windows 安装会退出应用：确认“安装并重启”后才进入既有生命周期（R2）。 */
+  const updateInstallConfirmationRef = useRef(new UpdateInstallConfirmation(isWindows));
+  const [updateInstallConfirmOpen, setUpdateInstallConfirmOpen] = useState(false);
   /** 冲突对话框（返修 F10）。 */
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   // 列表和页签共享导航入口；实际取数仍由 openEntry 的选择门校验。
@@ -1871,7 +1875,7 @@ export function App() {
     }
   };
 
-  const requestUpdateLifecycle = useCallback((intent: "installUpdate" | "restartUpdate"): Promise<AppUpdateStatus | null> => {
+  const startUpdateLifecycle = useCallback((intent: "installUpdate" | "restartUpdate"): Promise<AppUpdateStatus | null> => {
     if (updateLifecycleRef.current || lifecyclePreparingRef.current || closeDriver.currentPhase() !== "idle") {
       return Promise.reject(localizedError("rejected", "errors.m7.updateBusy"));
     }
@@ -1880,6 +1884,28 @@ export function App() {
       void lifecycleRequestRef.current(intent);
     });
   }, [closeDriver]);
+
+  const requestUpdateLifecycle = useCallback((intent: "installUpdate" | "restartUpdate"): Promise<AppUpdateStatus | null> => {
+    const decision = updateInstallConfirmationRef.current.request(intent);
+    if (decision.kind === "confirm") {
+      setUpdateInstallConfirmOpen(true);
+      return Promise.resolve(null);
+    }
+    return startUpdateLifecycle(decision.intent);
+  }, [startUpdateLifecycle]);
+
+  const confirmUpdateInstallAndRestart = useCallback(() => {
+    setUpdateInstallConfirmOpen(false);
+    const intent = updateInstallConfirmationRef.current.confirm();
+    if (intent) {
+      void startUpdateLifecycle(intent).catch((caught) => setAppError(toAppError(caught), null));
+    }
+  }, [startUpdateLifecycle, setAppError]);
+
+  const cancelUpdateInstallAndRestart = useCallback(() => {
+    updateInstallConfirmationRef.current.cancel();
+    setUpdateInstallConfirmOpen(false);
+  }, []);
 
   // 监听回调通过 ref 到达同一驱动。
   reconcileCloseRef.current = reconcileClose;
@@ -3220,6 +3246,8 @@ export function App() {
   // 这里只按“命中的动作”分派，避免平台判断散落在 App 里（Q55）。
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 输入法组合与 AltGr 字符输入不触发后台快捷键（M8 任务 04）。
+      if (isImeComposing(event) || isAltGraph(event)) return;
       const action = matchShortcut(event);
 
       // 提交：在提交信息框里由信息框自己处理，其它输入控件与弹窗内不穿透（Q93）。
@@ -5619,6 +5647,25 @@ export function App() {
         onRestart={() => requestUpdateLifecycle("restartUpdate")}
         onClose={() => setUpdateOpen(false)}
       />
+      {updateInstallConfirmOpen ? (
+        <Modal
+          title={t("update.installAndRestartTitle")}
+          width={440}
+          onClose={cancelUpdateInstallAndRestart}
+        >
+          <div className="space-y-3 text-[12.5px]">
+            <p>{t("update.installAndRestartBody")}</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="toolbar-widget h-7 px-3" onClick={cancelUpdateInstallAndRestart}>
+                {t("common.cancel")}
+              </button>
+              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" onClick={confirmUpdateInstallAndRestart}>
+                {t("update.installAndRestartConfirm")}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </>
   );
 

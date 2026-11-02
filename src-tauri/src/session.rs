@@ -321,6 +321,31 @@ impl<'a> Drop for WriteGuard<'a> {
     }
 }
 
+/// 生产环境检查：失败时把结构化回退原因交给界面，原始详情作为独立参数（不持久化）。
+fn shell_environment_check(shell_env: &ShellEnv) -> EnvironmentCheck {
+    let hint = shell_env.info.used_fallback.then(|| {
+        let code = shell_env
+            .info
+            .fallback_reason
+            .unwrap_or("errors.environment.shellFallback");
+        let detail = shell_env.info.fallback_detail.clone().unwrap_or_default();
+        AppError::coded(
+            ErrorKind::Environment,
+            code,
+            "环境解析失败，已回退到进程环境：{detail}",
+            &[("detail", detail)],
+        )
+        .payload()
+    });
+    EnvironmentCheck {
+        name: "shell".into(),
+        ok: !shell_env.info.used_fallback,
+        detail: AppError::coded(ErrorKind::Environment, "errors.environment.shellTiming", "{shell} · {elapsed} 毫秒",
+            &[("shell", shell_env.info.shell.clone()), ("elapsed", shell_env.info.elapsed_ms.to_string())]).payload(),
+        hint,
+    }
+}
+
 impl WorktreeSession {
     pub fn open(
         id: &str,
@@ -364,13 +389,7 @@ impl WorktreeSession {
                   ("minimum", format!("{}.{}", git::MIN_GIT_VERSION.0, git::MIN_GIT_VERSION.1))]).payload(),
             hint: None,
         });
-        checks.push(EnvironmentCheck {
-            name: "shell".into(),
-            ok: !shell_env.info.used_fallback,
-            detail: AppError::coded(ErrorKind::Environment, "errors.environment.shellTiming", "{shell} · {elapsed} 毫秒",
-                &[("shell", shell_env.info.shell.clone()), ("elapsed", shell_env.info.elapsed_ms.to_string())]).payload(),
-            hint: Some(AppError::coded(ErrorKind::Environment, "errors.environment.shellFallback", "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到", &[]).payload()),
-        });
+        checks.push(shell_environment_check(&shell_env));
 
         let info = WorktreeSessionInfo {
             worktree_id: id.to_string(),
@@ -3826,6 +3845,7 @@ pub fn parse_worktrees(text: &str) -> Vec<WorktreeEntry> {
 mod tests {
     use super::*;
     use crate::git::diff::FileChange;
+    use crate::shell::EnvCaptureInfo;
 
     fn file(added: u32, deleted: u32, binary: bool) -> FileChange {
         FileChange {
@@ -3840,6 +3860,33 @@ mod tests {
             new_lines: deleted + 3,
             raw_patch: Vec::new(),
         }
+    }
+
+    #[test]
+    fn shell_check_exposes_structured_fallback_reason_and_raw_detail() {
+        let env = ShellEnv {
+            vars: HashMap::new(),
+            path: Vec::new(),
+            info: EnvCaptureInfo {
+                worktree: "C:\\repo".into(),
+                shell: "pwsh.exe".into(),
+                elapsed_ms: 120,
+                timed_out: false,
+                used_fallback: true,
+                var_count: 0,
+                path_entries: Vec::new(),
+                fallback_reason: Some("errors.environment.shellProfileFailed"),
+                fallback_detail: Some("profile C:\\Users\\x\\profile.ps1: blocked".into()),
+            },
+        };
+        let check = shell_environment_check(&env);
+        assert!(!check.ok);
+        let hint = check.hint.expect("回退应带结构化提示");
+        assert_eq!(hint.code.as_deref(), Some("errors.environment.shellProfileFailed"));
+        assert_eq!(
+            hint.params.as_ref().and_then(|params| params.get("detail")).map(String::as_str),
+            Some("profile C:\\Users\\x\\profile.ps1: blocked")
+        );
     }
 
     #[test]

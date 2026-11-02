@@ -1,7 +1,8 @@
 name: Release Draft
 
-# 仅 main 历史上的版本标签可发布：构建 macOS Apple Silicon 安装包与 updater 产物，进入 Release 草稿。
-# 只有公开草稿后，用户才会在所选渠道里收到更新（规格 H、Q182、Q188）。
+# 仅 main 历史上的版本标签可发布：构建 macOS Apple Silicon 与 Windows x64 安装版 / 便携版，
+# 汇总成一份同时包含两个平台的 updater 清单，进入 Release 草稿。
+# 只有公开草稿后，用户才会在所选渠道里收到更新（规格 H、Q182、Q188、M8 任务 06）。
 # 本工作流不推送、不打标签、不公开 Release；这些动作由维护者手动完成。
 
 on:
@@ -39,6 +40,11 @@ jobs:
       - name: Test release source guard
         run: node --test tools/test-release-source.mjs
 
+      - name: Test release manifest generation
+        run: |
+          node --test tools/test-release-manifest.mjs
+          node --test tools/test-windows-deps.mjs
+
       - name: Require release source on main
         run: node tools/check-release-source.mjs
 
@@ -53,8 +59,6 @@ jobs:
     name: macOS Apple Silicon (arm64) package
     needs: verify-version
     runs-on: macos-15
-    permissions:
-      contents: write
     env:
       # 公钥与检查地址在构建时注入，不写进源码；缺失时构建失败，避免产出无法更新的包。
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -92,7 +96,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock', '.cargo/config.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-release-
             ${{ runner.os }}-cargo-
@@ -126,7 +130,6 @@ jobs:
         run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
 
       - name: Collect artifacts
-        id: artifacts
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -144,7 +147,6 @@ jobs:
           fi
 
       - name: Rename artifacts to release convention
-        id: rename
         env:
           VERSION: ${{ needs.verify-version.outputs.version }}
         run: |
@@ -166,20 +168,199 @@ jobs:
           shasum -a 256 --tag Revia-*.dmg *.app.tar.gz *.app.tar.gz.sig > macos-SHA256SUMS.txt
           cat macos-SHA256SUMS.txt
 
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: revia-macos
+          path: artifacts/*
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows x64 installer and portable
+    needs: verify-version
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      REVIA_UPDATE_PUBKEY: ${{ vars.REVIA_UPDATE_PUBKEY }}
+      REVIA_GITHUB_CLIENT_ID: ${{ vars.REVIA_GITHUB_CLIENT_ID }}
+      REVIA_UPDATE_ENDPOINT: ${{ needs.verify-version.outputs.endpoint }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_VERSION: ${{ needs.verify-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Setup Rust stable (x86_64-pc-windows-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock', '.cargo/config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-
+            ${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Require signing key and update config
+        shell: bash
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set; refusing to build an unverifiable package."
+            exit 1
+          fi
+          if [ -z "${REVIA_UPDATE_PUBKEY}" ]; then
+            echo "::error::REVIA_UPDATE_PUBKEY (repository variable) is not set."
+            exit 1
+          fi
+          if [ -z "${REVIA_UPDATE_ENDPOINT}" ]; then
+            echo "::error::Update endpoint could not be derived from the tag."
+            exit 1
+          fi
+          if [ -z "${REVIA_GITHUB_CLIENT_ID}" ]; then
+            echo "::error::REVIA_GITHUB_CLIENT_ID (repository variable) is not set; refusing to build a package without GitHub device login."
+            exit 1
+          fi
+
+      - name: Write updater config overlays
+        run: node tools/write-updater-config.mjs
+
+      # 便携版：独立的 portable 特性 + --no-bundle，只产出原始 exe；不混入安装包。
+      - name: Build portable executable
+        run: pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle --features portable --config src-tauri/tauri.release.portable.conf.json
+
+      - name: Collect portable executable and zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $exe = "src-tauri/target/x86_64-pc-windows-msvc/release/revia.exe"
+          if (!(Test-Path $exe)) { throw "Portable executable was not produced." }
+          $single = "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-portable.exe"
+          Copy-Item $exe $single
+          # zip 内是 Revia 文件夹（Q66），解压后可直接启动。
+          New-Item -ItemType Directory -Force stage/Revia | Out-Null
+          Copy-Item $exe "stage/Revia/Revia.exe"
+          Compress-Archive -Path stage/Revia -DestinationPath "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-portable.zip" -Force
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      # 普通用户没有 runner 上的 VS 开发工具：核对最终 exe 不依赖动态 CRT / WebView2Loader。
+      - name: Verify portable executable dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (!(Test-Path $vswhere)) { throw "vswhere.exe not found." }
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw "Visual Studio C++ tools not found." }
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -like "*Hostx64\x64*" } | Select-Object -First 1
+          if (!$dumpbin) { throw "dumpbin.exe not found." }
+          & $dumpbin.FullName /dependents "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-portable.exe" |
+            Out-File -Encoding utf8 portable-dependencies.txt
+          Get-Content portable-dependencies.txt
+          node tools/check-windows-deps.mjs portable-dependencies.txt
+
+      - name: Build NSIS installer with updater artifacts
+        run: pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.release.conf.json
+
+      - name: Collect installer artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bundle = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
+          $setup = Get-ChildItem $bundle -Filter "*-setup.exe" | Select-Object -First 1
+          if (!$setup) { throw "No NSIS setup executable was produced." }
+          $signature = Get-ChildItem $bundle -Filter "*-setup.exe.sig" | Select-Object -First 1
+          if (!$signature -or $signature.Name -ne "$($setup.Name).sig") {
+            throw "NSIS setup executable and updater signature do not pair."
+          }
+          # createUpdaterArtifacts=true：setup.exe 本身就是 updater 包（官方 updater 文档）。
+          Copy-Item $setup.FullName "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-setup.exe"
+          Copy-Item $signature.FullName "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-setup.exe.sig"
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      - name: Generate SHA256SUMS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Push-Location artifacts
+          $files = Get-ChildItem -File | Where-Object { $_.Name -notlike "*SHA256SUMS*" } | Sort-Object Name
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file.Name -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          }
+          $lines | Set-Content windows-SHA256SUMS.txt -Encoding ascii
+          Get-Content windows-SHA256SUMS.txt
+          Pop-Location
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: revia-windows
+          path: artifacts/*
+          if-no-files-found: error
+
+  publish:
+    name: Assemble draft release with both platforms
+    needs: [verify-version, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: revia-macos
+          path: artifacts
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: revia-windows
+          path: artifacts
+
       - name: Generate updater manifests
         env:
           VERSION: ${{ needs.verify-version.outputs.version }}
-          # 清单始终固定到自己的tag，后续版本不会改变已下载包的身份。
+          # 清单始终固定到自己的 tag，后续版本不会改变已下载包的身份。
           DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # F14：客户端 updater 请求的清单；没有它配置的 endpoint 404，更新永远不可见。
+          ls -l artifacts
+          # 两个平台先各自构建，再在这里汇总，避免并发 job 互相覆盖清单。
           node tools/generate-latest-json.mjs \
             --artifacts artifacts \
+            --windows-artifacts artifacts \
+            --require-windows \
             --download-base "$DOWNLOAD_BASE" \
             --version "$VERSION" \
             --notes - < /dev/null > artifacts/latest.json
-          # F22：预发布渠道清单——同一份产物，客户端按“预发布渠道开关”请求。
+          # 预发布渠道清单——同一份产物，客户端按“预发布渠道开关”请求。
           cp artifacts/latest.json artifacts/latest-prerelease.json
           python3 -c "import json; json.load(open('artifacts/latest.json')); json.load(open('artifacts/latest-prerelease.json'))"
           cat artifacts/latest.json
@@ -197,6 +378,11 @@ jobs:
             artifacts/*.dmg
             artifacts/*.app.tar.gz
             artifacts/*.app.tar.gz.sig
+            artifacts/*-setup.exe
+            artifacts/*-portable.exe
+            artifacts/*-portable.zip
+            artifacts/*-setup.exe.sig
             artifacts/macos-SHA256SUMS.txt
+            artifacts/windows-SHA256SUMS.txt
             artifacts/latest.json
             artifacts/latest-prerelease.json

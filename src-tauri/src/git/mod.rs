@@ -497,6 +497,7 @@ impl Git {
         for (key, value) in self.env.iter() {
             command.env(key, value);
         }
+        crate::platform::hide_console(&mut command);
 
         let mut child = command.spawn().map_err(|error| match error.kind() {
             io::ErrorKind::NotFound => AppError::coded(

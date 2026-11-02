@@ -9,6 +9,11 @@ export const isMac =
   (navigator.platform.toUpperCase().indexOf("MAC") >= 0 ||
     navigator.userAgent.toUpperCase().indexOf("MACINTOSH") >= 0);
 
+/** Windows 安装器会退出应用，更新入口据此要求“安装并重启”的明确确认（M8 R2）。 */
+export const isWindows =
+  typeof navigator !== "undefined" &&
+  navigator.userAgent.toUpperCase().indexOf("WINDOWS") >= 0;
+
 /**
  * 主工具栏左侧留白（像素）：macOS 的红绿灯覆盖在主工具栏左端（titleBarStyle: Overlay），
  * 其他平台用原生标题栏，主工具栏从窗口边缘开始（Q60）。
@@ -26,10 +31,30 @@ export const MOD_SYMBOLS = isMac
  * 严格互斥：在 macOS 上 Ctrl 键绝不冒充 ⌘（Command），避免在 Mac 上按 Ctrl 触发 ⌘ 快捷键（审查意见 6）。
  */
 export function isPrimaryModifier(event: KeyboardEvent | React.KeyboardEvent): boolean {
+  // AltGr 在浏览器里同时报告 Ctrl+Alt（Windows 输入字符用），不能当成快捷键。
+  if (isAltGraph(event)) return false;
   if (isMac) {
     return event.metaKey && !event.ctrlKey;
   }
   return event.ctrlKey && !event.metaKey;
+}
+
+/**
+ * 是否由 AltGr 产生。Windows 上 AltGr = Ctrl+Alt，输入 `@`、`€` 等字符时
+ * 不应触发 Ctrl+Alt 业务快捷键（Q61、M8 任务 04）。
+ */
+export function isAltGraph(event: {
+  getModifierState?: (key: "AltGraph") => boolean;
+}): boolean {
+  return typeof event.getModifierState === "function" && event.getModifierState("AltGraph");
+}
+
+/** 输入法组合期间不执行后台快捷键；keyCode 229 覆盖旧版 WebView2。 */
+export function isImeComposing(event: {
+  isComposing?: boolean;
+  keyCode?: number;
+}): boolean {
+  return event.isComposing === true || event.keyCode === 229;
 }
 
 /** 判断鼠标点击是否带主修饰键（返修 C11：判断逻辑与键盘一致，集中在这里）。 */

@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：M0 原型与 M1 只读界面已完成（见 [M0 报告](./milestones/m0/report.md)、[M1 报告](./milestones/m1/report.md)）；M2、M3 已于 2026-10-26 合入 main，部分验收未完成（见 [M3 报告](./milestones/m3/report.md)）。M4、M5 已于 2026-10-28 带已知未达标项合入 main（Q154，遗留项见 [backlog](./milestones/backlog/)）；M6 已于 2026-10-30 合入 main（见 [M6 报告](./milestones/m6/report.md)）。M7 访谈及第四版已确认（Q176–Q199），已写规格与 14 项任务，进入 Paseo / Pi 实施准备；更改列表的既有暂存实测单独阻塞。更新日期：2026-10-30。
+状态：M0–M7 已合入 main；M7 于 2026-11-02 压成一个提交（`b9cf807`），应用版本 0.0.2。M8 Windows 已在独立 `m8` worktree 完成代码、一次 Pi 返修、Codex 增量审查与接管修复；当前代码候选 `83d4070`，本机可行检查完成。用户已授权合并 main、发布 0.0.2 并删除现有 Release（Q207）；Windows 未验收项继续保留，发布过程见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。旧里程碑未达标项保留原报告与 backlog。更新日期：2026-11-02。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -18,6 +18,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 - [M7 Liquid Glass 方向与预览](./milestones/m7/liquid-glass.md)：代码清晰度、React Bits 源码核对与 macOS / Windows 外观；第二版整体获认可，第四版及补充建议已确认，进入规格与实施。
 - [M7 规格](./milestones/m7/spec.md)、[任务图](./milestones/m7/issues/)与[Pi 交接](./milestones/m7/paseo-batch.md)：已确认行为的实施契约，单列更改列表事实阻塞。
 - [M7 开始前确认清单](./milestones/m7/confirmation.md)：前面已确认的访谈结论、仍未收口事项与最终候选。
+- [M8 规格](./milestones/m8/spec.md)、[任务图](./milestones/m8/issues/)与[Pi 交接](./milestones/m8/paseo-batch.md)：Windows 安装版、便携版、运行环境和验证边界；[规划记录](./milestones/m8/planning.md)保留用户确认与事实。
 - [术语表](../GLOSSARY.md)：已确认的领域术语和应避免的说法。
 - [里程碑](./milestones/)：每个里程碑的计划、评审意见与报告（`m<N>/`）。
 - [Agent 配置](./agents/)：任务记录与领域文档的约定，供工程类技能读取。
@@ -239,6 +240,10 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 | Q201 | 提交日志中的引用标签独立一列，标签名称与胶囊完整显示、不省略；分支图必须完整渲染所有泳道、圆点和连线，不为适配窄窗裁切或省略。整表放不下时使用横向滚动；主题、作者、日期、哈希等其他文字列可以省略并提供完整内容 | 用户于 2026-11-01 根据桌面截图指出标签和表格项有截断风险，随后明确“标签单独一列”“必须完全渲染 不要省略 其他列可以省略”，并补充“标签也不省略” |
 | Q202 | 外观参照用户提供的参考应用 Loop 的截图：选中项切换时出现一块玻璃镜片，从旧选中项滑到新选中项，镜片下的内容被放大、在边缘弯折并带红蓝色散，落定后变回普通的选中底；先用在编辑器页签和设置页导航。macOS 与 Windows 用同一份网页实现：镜片里放一份列表快照，对快照做 SVG 位移与色散（WKWebView 不支持 `backdrop-filter` 引用 SVG 滤镜），只在系统材质下出现，减少动态效果、减少透明度和高对比度时不出现。主窗口的侧栏与编辑区改为浮在窗口玻璃上的两块圆角卡片，卡片之间露出玻璃，工具栏仍横跨顶部（Q200）；设置页改为左侧浮动侧栏卡片（标题、搜索、带图标的平铺导航，多页分类留小标题）加右侧页面大标题与内容卡片，取代原来照 Rebased 的可折叠树。Windows 上的效果与深色外观留到 M8 和真机复查 | 用户于 2026-11-01 给出 Loop 的截图，要求“研究下 能否做成这样的”，读过镜片调研后要求“你来实现下这个”；随后问“布局块是否可以借鉴下这个”，并指出“设置页面可以参考这个 现在的很难看” |
 | Q203 | 将 m7 已提交内容压成一个提交合入 main，并发布 0.0.2；今后只有 main 上的提交可以发布 Release。保留版本标签触发 Actions、草稿检查后公开及现有已知限制；分支开发不能直接作为发布来源 | 用户于 2026-11-02 明确“m7合并到main，只有main发布release，发布0.0.2版本” |
+| Q204 | Windows 安装版与便携版均使用 Windows Credential Manager 持久保存 GitHub 凭据，作为 Q58 的窄范围例外；其余 Revia 数据及 WebView2 用户数据仍在便携 exe 旁的 data。凭据属于当前 Windows 用户，换机或换用户需重新登录，不把凭据放入普通配置。见 [ADR-0015](./adr/0015-windows-portable-system-credentials.md) | 用户于 2026-11-02 回答“能都用 credential 吗” |
+| Q205 | Windows hooks 环境与内置终端统一优先 PowerShell 7，无则 Windows PowerShell；按 worktree 加载对应用户 profile，捕获失败或超时显式提示并回退进程环境；不修改 profile 或执行策略 | 用户于 2026-11-02 选择“按推荐：优先 PowerShell 7” |
+| Q206 | M8 沿现有 Rust 生产入口和真实 Git 临时仓库补回归，隔离 profile 与应用数据目录；Mica、WebView2 滚动、安装和便携启动必须真实 Windows 桌面验收，当前 Mac 无法验证的部分保持未验收 | 用户于 2026-11-02 选择“按推荐执行” |
+| Q207 | 将 m8 压成一个提交合入 main，继续使用 0.0.2，通过现有 Actions 构建并公开 Release，删除现有旧 Release；本轮授权正常推送 main 和新版本标签。Windows 真机未验收和既有未达标项继续如实披露，不因合并发布改写为通过。保留旧标签与源码历史，不强推 | 用户于 2026-11-02 明确“合并入 main 发布 0.0.2 吧，现在的删除” |
 
 各项的完整说明见对应的方向文档。
 
@@ -375,7 +380,7 @@ Revia
 |   |-- 长测内存按内存压力后取样判定 [Q98 已确认]
 |   `-- 界面清理与美化（任务 12、13） [Q99-Q104、Q107 已确认]
 |-- 目标平台：macOS Apple Silicon（首版）、Windows x64 安装版与便携版（M8）[Q3/Q44/Q55-Q59 已确认；编号按 Q126]
-|   `-- Windows 的技术细节 [M8 规划时确定]
+|   `-- Windows 环境、Credential Manager 与验证 [Q204–Q206 已确认，M8 实施]
 |-- 仓库位置：本机文件系统 [Q4 已确认]
 `-- UI 方向 [Q15-Q19、Q31、Q33 已确认；M1 起跟随系统深浅色，Q50；Q119 起一比一照 Rebased]
     |-- 错误展示、菜单、设置项、界面语言 [Q36、Q38-Q40 已确认]
@@ -391,7 +396,7 @@ Revia
 | 文件列表与历史列表渲染 | 按实际数据规模选择虚拟列表方案 |
 | Git 最低版本 | 按实际用到的命令参数核对 |
 | M2 持久化、文件监视和测试接口 | 在已确认的身份、安全、刷新及测试接缝约束内选择存储格式、身份识别算法、监视库、去抖参数与具体接口 |
-| Windows 技术细节 | M8 规划时确定：hooks 的运行环境（Windows 版 fnm 依赖 PowerShell 配置文件）、换行符设置、路径大小写、查找 Git for Windows、WebView2 下的滚动性能 |
+| Windows 技术细节 | 按 Q204–Q206 与 M8 规格：PowerShell/profile 与凭据边界已定，路径、换行符、Git 查找和 WebView2 性能通过实现与实测确定；不改用户 Git 配置 |
 
 Q4 讨论的是仓库所在的文件系统，不是 Git remote；网络操作的范围由 Q10 单独确定。
 

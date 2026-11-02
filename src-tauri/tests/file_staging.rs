@@ -136,7 +136,8 @@ impl TestContext {
                 used_fallback: true,
                 var_count: 3,
                 path_entries,
-                diagnostics: None,
+                fallback_reason: None,
+                fallback_detail: None,
             },
         };
         WorktreeSession::open("test-worktree", &self.repo_path, shell_env, Arc::new(CommandLog::default()))

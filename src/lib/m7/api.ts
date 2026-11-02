@@ -237,6 +237,7 @@ export const m7 = {
   updateDownload: () => invoke<AppUpdateStatus>("m7_update_download"),
   updateInstall: () => invoke<AppUpdateStatus>("m7_update_install"),
   updateRestart: () => invoke<void>("m7_update_restart"),
+  updateOpenPortableDownload: () => invoke<void>("m7_update_open_portable_download"),
 };
 
 /** 订阅 M7 的后端事件；返回取消订阅函数。 */

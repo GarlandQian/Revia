@@ -2,7 +2,11 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Revia",
+        "create": false,
+        "decorations": true,
+        "shadow": true,
         "width": 1280,
         "height": 800,
         "minWidth": 900,
@@ -10,5 +14,19 @@
         "transparent": true
       }
     ]
+  },
+  "bundle": {
+    "targets": [
+      "nsis"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
   }
 }

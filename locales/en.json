@@ -802,7 +802,11 @@
     "environment": {
       "gitVersion": "{path} ({version}); Git {minimum} or later is required",
       "shellTiming": "{shell} · {elapsed} ms",
-      "shellFallback": "Login shell environment detection fell back to the minimal environment. Hooks and external tools may not be found."
+      "shellFallback": "Login shell environment detection fell back to the minimal environment. Hooks and external tools may not be found.",
+      "shellProfileFailed": "PowerShell profile failed to load or was blocked by execution policy; fell back to the process environment: {detail}",
+      "shellTimeout": "PowerShell environment capture timed out; fell back to the process environment: {detail}",
+      "shellCaptureFailed": "PowerShell environment capture failed; fell back to the process environment: {detail}",
+      "shellWorktreeMissing": "Could not enter the worktree; fell back to the process environment: {detail}"
     },
     "closeGuard": {
       "unavailable": "Close protection is unavailable: {cause}",
@@ -928,12 +932,23 @@
       "changelistChanged": "The changelist or files changed. Refresh and select again.",
       "changelistInvalid": "Invalid changelist action. Check the name and selection.",
       "changelistReconcile": "The commit needs index verification. Original evidence has been kept.",
-      "githubBrowserOpenFailed": "Could not open the browser: {detail}"
+      "githubBrowserOpenFailed": "Could not open the browser: {detail}",
+      "portableUpdateInstallBlocked": "Portable builds do not update automatically. Download the new version and replace the app.",
+      "portableDownloadUnavailable": "No portable build is available yet. Check for updates first.",
+      "portableDownloadOnly": "Only portable builds use the portable download entry.",
+      "browserUrlRejected": "Only https GitHub addresses can be opened."
     },
     "update": {
       "installBlockedBusy": "A Git write or pending verification is in progress — finish it before installing the update",
       "installBlockedTerminal": "A terminal session is still running — close it before installing the update",
       "mergeEditsPending": "The merge editor has unapplied changes. Apply or cancel the merge edits before installing, restarting, or quitting."
+    },
+    "distribution": {
+      "executableUnavailable": "Could not locate the application executable: {error}",
+      "standardDataDirUnavailable": "Could not locate the standard application data directory for the current user.",
+      "portableLocationUnavailable": "The portable build must live in an accessible folder; its directory could not be found.",
+      "portableDataDirUnwritable": "The portable data directory is not writable: {error}",
+      "webview2Missing": "The Microsoft Edge WebView2 Runtime is missing: {error}"
     }
   },
   "app": {
@@ -2304,7 +2319,14 @@
     "lifecycleExplain": "Writes or results awaiting verification remain. Wait for them and verify the results to continue, or stay in the app to cancel this request.",
     "waitInstall": "Wait, then install the update",
     "waitRestart": "Wait, then restart",
-    "downloaded": "Downloaded and verified; ready to install"
+    "downloaded": "Downloaded and verified; ready to install",
+    "portableNotice": "Portable builds only notify you about new versions. Download and replace the app yourself; your data and sign-in stay on this PC.",
+    "portableDownload": "Download portable build",
+    "pendingInstall": "The installer has started, but the new version is not confirmed yet. It is checked against the running version after restart.",
+    "installAndRestart": "Install and restart",
+    "installAndRestartTitle": "Install the update and restart Revia?",
+    "installAndRestartBody": "The Windows installer closes Revia and restarts it after installation. Unsaved edits, Git writes, and terminal sessions are handled by the existing flow first; cancelling does not install.",
+    "installAndRestartConfirm": "Install and restart"
   },
   "shortcuts": {
     "actions": {

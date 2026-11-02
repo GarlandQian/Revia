@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use tauri_plugin_updater::UpdaterExt;
 use ts_rs::TS;
 
+use crate::distribution::Distribution;
 use crate::error::{AppError, ErrorKind, Result};
 use crate::settings::{read_settings, AppUpdateMode};
 
@@ -60,6 +61,21 @@ pub struct AppUpdateStatus {
     pub receipt: Option<UpdateReceipt>,
     pub downloaded_version: Option<String>,
     pub restart_required: bool,
+    /// 便携版：只提示新版本与下载位置，不下载、不安装、不重启（Q58、M8 任务 05）。
+    pub portable: bool,
+    /// 便携版可用版本的下载地址（由配置的 Release 仓库与命名约定生成）。
+    pub portable_download_url: Option<String>,
+    /// 已交给安装器、尚未由新进程核对的版本。
+    pub pending_install: Option<UpdatePendingInstall>,
+}
+
+/// 已调用安装器、尚未确认新进程版本的记录。
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpdatePendingInstall {
+    pub version: String,
+    pub started_at_ms: u64,
 }
 
 /// 下载进度事件。
@@ -81,6 +97,8 @@ struct StoredState {
     downloaded_version: Option<String>,
     downloaded: Option<super::update_package::DownloadedUpdate>,
     checked_prerelease: bool,
+    /// Windows 安装器会结束应用：先落“待安装”，下一次启动按真实版本核对。
+    pending_install: Option<UpdatePendingInstall>,
 }
 
 /// 更新状态的本地存储与并发保护。
@@ -138,20 +156,36 @@ impl UpdateState {
     }
 
     pub fn status(&self, app: &tauri::AppHandle, mode: AppUpdateMode) -> AppUpdateStatus {
-        let stored = self.load();
+        let mut stored = self.load();
+        // 上一次启动把安装交给了安装器：新进程里按真实版本确认，失败则保留待安装状态。
+        if reconcile_pending_install(&mut stored, &app.package_info().version) {
+            let _ = self.store(&stored);
+        }
         let reason = unconfigured_reason(app);
+        let available = stored.available.filter(|available| {
+            semver::Version::parse(&available.version).is_ok_and(|version| {
+                version > effective_version(app, &stored.receipt)
+                    && (self.allow_prerelease() || version.pre.is_empty())
+            })
+        });
+        let portable = Distribution::current().is_portable();
+        let portable_download_url = if portable {
+            available.as_ref().and_then(|available| {
+                configured_endpoints(app)
+                    .ok()
+                    .and_then(|configured| portable_download_url(&configured.endpoint, &available.version))
+            })
+        } else {
+            None
+        };
         AppUpdateStatus {
             configured: reason.is_none(),
             unconfigured_reason: reason,
             mode,
             current_version: app.package_info().version.to_string(),
             last_checked_at_ms: stored.last_checked_at_ms,
-            available: stored.available.filter(|available| {
-                semver::Version::parse(&available.version).is_ok_and(|version| {
-                    version > effective_version(app, &stored.receipt)
-                        && (self.allow_prerelease() || version.pre.is_empty())
-                })
-            }),
+            portable_download_url,
+            available,
             restart_required: stored.receipt.as_ref().is_some_and(|receipt| {
                 match (
                     semver::Version::parse(&receipt.version),
@@ -172,9 +206,60 @@ impl UpdateState {
                         })
                 })
                 .map(|package| package.version.clone()),
+            pending_install: stored.pending_install,
+            portable,
             receipt: stored.receipt,
         }
     }
+}
+
+/// 新进程启动后核对上一次安装：版本达到或超过待安装版本才算成功。
+fn reconcile_pending_install(stored: &mut StoredState, current: &semver::Version) -> bool {
+    let Some(pending) = stored.pending_install.clone() else {
+        return false;
+    };
+    let confirmed = semver::Version::parse(&pending.version).is_ok_and(|version| version <= *current);
+    if !confirmed {
+        return false;
+    }
+    stored.receipt = Some(UpdateReceipt {
+        version: pending.version,
+        installed_at_ms: pending.started_at_ms,
+    });
+    stored.pending_install = None;
+    stored.available = None;
+    stored.downloaded = None;
+    stored.downloaded_version = None;
+    true
+}
+
+/// 便携版的下载地址：按 Q65 的命名约定从配置的 GitHub Release 仓库生成。
+pub fn portable_download_url(endpoint: &str, version: &str) -> Option<String> {
+    let endpoint = url::Url::parse(endpoint).ok()?;
+    if endpoint.scheme() != "https" || endpoint.host_str() != Some("github.com") {
+        return None;
+    }
+    let parts: Vec<_> = endpoint.path_segments()?.collect();
+    if parts.len() < 5 || parts[0].is_empty() || parts[1].is_empty() || parts[2] != "releases" {
+        return None;
+    }
+    Some(format!(
+        "https://github.com/{}/{}/releases/download/v{version}/Revia-{version}-windows-x64-portable.zip",
+        parts[0], parts[1]
+    ))
+}
+
+/// 便携版即使直接调用命令也拒绝下载、安装和重启（Q58、M8 任务 05）。
+fn ensure_install_allowed(distribution: Distribution) -> Result<()> {
+    if distribution.is_portable() {
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.portableUpdateInstallBlocked",
+            "便携版不提供自动更新，请下载新版本后自行替换",
+            &[],
+        ));
+    }
+    Ok(())
 }
 
 fn effective_version(app: &tauri::AppHandle, receipt: &Option<UpdateReceipt>) -> semver::Version {
@@ -327,6 +412,7 @@ pub async fn download_update(
     state: &UpdateState,
     mode: AppUpdateMode,
 ) -> Result<AppUpdateStatus> {
+    ensure_install_allowed(Distribution::current())?;
     let _ = state.begin()?;
     let result = download_inner(&app, state, mode).await;
     state.end();
@@ -339,6 +425,7 @@ pub async fn download_and_install(
     state: &UpdateState,
     mode: AppUpdateMode,
 ) -> Result<AppUpdateStatus> {
+    ensure_install_allowed(Distribution::current())?;
     let _ = state.begin()?;
     let result = install_inner(&app, state, mode).await;
     state.end();
@@ -498,19 +585,31 @@ async fn install_inner(
         state.allow_prerelease(),
     )?;
     let version = update.version.clone();
-    update.install(bytes).map_err(|error| {
-        AppError::coded(
+    // Windows 安装器会结束本进程：先落“待安装”，下一次启动按真实版本核对（M8 任务 05）。
+    let mut stored = state.load();
+    stored.pending_install = Some(UpdatePendingInstall {
+        version: version.clone(),
+        started_at_ms: now_ms(),
+    });
+    state.store(&stored)?;
+    if let Err(error) = update.install(bytes) {
+        // 安装调用失败时保留已下载字节，允许用户核对后重试。
+        let mut stored = state.load();
+        stored.pending_install = None;
+        let _ = state.store(&stored);
+        return Err(AppError::coded(
             ErrorKind::NeedsVerification,
             "errors.m7.updateInstallNeedsVerification",
             "安装更新未完成，请核对应用状态后再操作：{error}",
             &[("error", error.to_string())],
-        )
-    })?;
+        ));
+    }
     let mut stored = state.load();
     stored.receipt = Some(UpdateReceipt {
         version: version.clone(),
         installed_at_ms: now_ms(),
     });
+    stored.pending_install = None;
     stored.available = None;
     stored.downloaded_version = None;
     stored.downloaded = None;
@@ -526,9 +625,36 @@ async fn install_inner(
     Ok(state.status(app, mode))
 }
 
-/// 安装完成后由用户确认重启。
-pub fn restart(app: &tauri::AppHandle) {
-    app.restart();
+/// 安装完成后由用户确认重启；便携版没有安装，不提供重启入口。
+pub fn restart(app: &tauri::AppHandle, distribution: Distribution) -> Result<()> {
+    ensure_install_allowed(distribution)?;
+    app.restart()
+}
+
+/// 便携版：打开对应版本的便携包下载地址（不调用安装器）。
+pub fn open_portable_download(
+    app: &tauri::AppHandle,
+    state: &UpdateState,
+    mode: AppUpdateMode,
+) -> Result<()> {
+    if !Distribution::current().is_portable() {
+        return Err(AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.portableDownloadOnly",
+            "只有便携版使用便携包下载入口",
+            &[],
+        ));
+    }
+    let status = state.status(app, mode);
+    let url = status.portable_download_url.ok_or_else(|| {
+        AppError::coded(
+            ErrorKind::Rejected,
+            "errors.m7.portableDownloadUnavailable",
+            "当前没有可下载的便携版本，请先检查更新",
+            &[],
+        )
+    })?;
+    crate::platform::open_url(&url)
 }
 
 /// 启动后的自动检查：非手动模式时按间隔检查，发现新版本发事件。
@@ -591,6 +717,7 @@ mod tests {
                 downloaded_version: None,
                 downloaded: None,
                 checked_prerelease: false,
+                pending_install: None,
             })
             .unwrap();
         let loaded = state.load();
@@ -599,6 +726,52 @@ mod tests {
         assert_eq!(loaded.receipt.unwrap().installed_at_ms, 9);
         std::fs::write(&state.path, b"{not json").unwrap();
         assert!(state.load().available.is_none());
+    }
+
+    #[test]
+    fn pending_install_is_confirmed_only_when_new_process_reaches_version() {
+        let mut stored = StoredState {
+            pending_install: Some(UpdatePendingInstall {
+                version: "1.2.3".into(),
+                started_at_ms: 7,
+            }),
+            ..StoredState::default()
+        };
+        // 安装器被取消或失败：仍停在旧版本，保留待安装状态供核对。
+        assert!(!reconcile_pending_install(
+            &mut stored,
+            &semver::Version::parse("1.2.2").unwrap()
+        ));
+        assert!(stored.pending_install.is_some());
+        assert!(stored.receipt.is_none());
+
+        // 新进程版本达到待安装版本：确认为安装回执。
+        assert!(reconcile_pending_install(
+            &mut stored,
+            &semver::Version::parse("1.2.3").unwrap()
+        ));
+        assert!(stored.pending_install.is_none());
+        assert_eq!(stored.receipt.unwrap().version, "1.2.3");
+    }
+
+    #[test]
+    fn portable_distribution_refuses_download_install_and_restart() {
+        assert!(ensure_install_allowed(Distribution::Installed).is_ok());
+        assert_eq!(
+            ensure_install_allowed(Distribution::Portable).unwrap_err().code,
+            Some("errors.m7.portableUpdateInstallBlocked")
+        );
+    }
+
+    #[test]
+    fn portable_download_url_follows_the_release_naming_convention() {
+        let endpoint = "https://github.com/owner/repo/releases/latest/download/latest.json";
+        assert_eq!(
+            portable_download_url(endpoint, "1.2.3").as_deref(),
+            Some("https://github.com/owner/repo/releases/download/v1.2.3/Revia-1.2.3-windows-x64-portable.zip")
+        );
+        assert!(portable_download_url("https://example.com/latest.json", "1.2.3").is_none());
+        assert!(portable_download_url("http://github.com/owner/repo/releases/latest/download/latest.json", "1.2.3").is_none());
     }
 
     #[test]

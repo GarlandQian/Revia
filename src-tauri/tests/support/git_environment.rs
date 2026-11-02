@@ -43,7 +43,8 @@ pub fn shell_env(home: &Path, worktree: &Path, global_config: &Path) -> ShellEnv
             used_fallback: true,
             var_count: vars.len(),
             path_entries: path,
-            diagnostics: None,
+            fallback_reason: None,
+            fallback_detail: None,
         },
         vars,
     }

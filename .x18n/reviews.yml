@@ -189,6 +189,26 @@ sources:
     en: 1d6f3d30060efd
   errors.commitOutput.listenerFailed:
     en: 6e0952918824e
+  errors.distribution.executableUnavailable:
+    en: 5abd1f83835ec
+  errors.distribution.portableDataDirUnwritable:
+    en: 186938e7f0569f
+  errors.distribution.portableLocationUnavailable:
+    en: c58ca1c21eb7
+  errors.distribution.standardDataDirUnavailable:
+    en: bd48a5264bb93
+  errors.distribution.webview2Missing:
+    en: d0d7e186d3f7b
+  errors.environment.shellCaptureFailed:
+    en: c192ceaf1fd31
+  errors.environment.shellProfileFailed:
+    en: 11a70eca2aff76
+  errors.environment.shellTimeout:
+    en: 11bf1039957c7
+  errors.environment.shellWorktreeMissing:
+    en: b690340398e83
+  errors.m7.browserUrlRejected:
+    en: 153430b4338e89
   errors.m7.changelistChanged:
     en: 12c80e7abd1f3
   errors.m7.changelistInvalid:
@@ -341,6 +361,12 @@ sources:
     en: 8769485b6bdb8
   errors.m7.githubValidationFailed:
     en: 145de6e9b174f0
+  errors.m7.portableDownloadOnly:
+    en: 3b020e9aacb47
+  errors.m7.portableDownloadUnavailable:
+    en: 4622773b67a47
+  errors.m7.portableUpdateInstallBlocked:
+    en: 15984e3fc52d2a
   errors.m7.taskFailed:
     en: 2956cb2e465d8
   errors.m7.terminalCloseFailed:
@@ -871,6 +897,14 @@ sources:
     en: 10233493f816b9
   update.install:
     en: 1cf3950ba6371f
+  update.installAndRestart:
+    en: 63ca0b8c3c0a3
+  update.installAndRestartBody:
+    en: 95830eeb87d6d
+  update.installAndRestartConfirm:
+    en: 63ca0b8c3c0a3
+  update.installAndRestartTitle:
+    en: 8373d478c627a
   update.installNow:
     en: 17080ba5f033c7
   update.installed:
@@ -887,6 +921,12 @@ sources:
     en: 11610af25e9b6b
   update.modeNotify:
     en: 494fef822c930
+  update.pendingInstall:
+    en: 11ef5bd812b289
+  update.portableDownload:
+    en: fa5f290759c92
+  update.portableNotice:
+    en: 1cacdaa29738d5
   update.published:
     en: 100d0d0beeb4c2
   update.restart:

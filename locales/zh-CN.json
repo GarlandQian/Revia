@@ -1194,7 +1194,11 @@
     "environment": {
       "gitVersion": "{path}（{version}）；需要 Git {minimum} 或更高版本",
       "shellTiming": "{shell} · {elapsed} 毫秒",
-      "shellFallback": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到"
+      "shellFallback": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
+      "shellProfileFailed": "PowerShell profile 加载失败或被执行策略阻止，已回退到进程环境：{detail}",
+      "shellTimeout": "PowerShell 环境捕获超时，已回退到进程环境：{detail}",
+      "shellCaptureFailed": "PowerShell 环境捕获失败，已回退到进程环境：{detail}",
+      "shellWorktreeMissing": "无法进入 worktree，已回退到进程环境：{detail}"
     },
     "closeGuard": {
       "unavailable": "关闭保护不可用：{cause}",
@@ -1320,12 +1324,23 @@
       "changelistChanged": "更改列表或文件已变化，请刷新并重新选择",
       "changelistInvalid": "更改列表操作无效，请核对名称和选择",
       "changelistReconcile": "提交后暂存区需要核对，已保留原件",
-      "githubBrowserOpenFailed": "无法打开浏览器：{detail}"
+      "githubBrowserOpenFailed": "无法打开浏览器：{detail}",
+      "portableUpdateInstallBlocked": "便携版不提供自动更新，请下载新版本后自行替换",
+      "portableDownloadUnavailable": "当前没有可下载的便携版本，请先检查更新",
+      "portableDownloadOnly": "只有便携版使用便携包下载入口",
+      "browserUrlRejected": "只允许打开 GitHub 的 https 地址"
     },
     "update": {
       "installBlockedBusy": "有 Git 写操作或结果待核对，完成后才能安装更新",
       "installBlockedTerminal": "有运行中的终端会话，请先关闭终端再安装更新",
       "mergeEditsPending": "合并编辑仍有未应用的修改。请先应用或取消合并编辑，再继续安装、重启或退出。"
+    },
+    "distribution": {
+      "executableUnavailable": "找不到应用可执行文件：{error}",
+      "standardDataDirUnavailable": "找不到当前用户的标准应用数据目录",
+      "portableLocationUnavailable": "便携版需要位于一个可访问的文件夹中，找不到程序所在目录",
+      "portableDataDirUnwritable": "便携版数据目录不可写：{error}",
+      "webview2Missing": "找不到 Microsoft Edge WebView2 运行时：{error}"
     }
   },
   "commit": {
@@ -2304,7 +2319,14 @@
     "lifecycleExplain": "当前仍有写入或待核对结果。可等待完成并核对后继续，或留在应用并取消本次请求。",
     "waitInstall": "等待完成后安装更新",
     "waitRestart": "等待完成后重启",
-    "downloaded": "已下载并校验，等待安装"
+    "downloaded": "已下载并校验，等待安装",
+    "portableNotice": "便携版只提示新版本；下载后自行替换程序。数据与登录仍在本机，不会随安装包更新。",
+    "portableDownload": "下载便携版",
+    "pendingInstall": "安装器已启动，尚未确认新版本；重启后按实际版本核对。",
+    "installAndRestart": "安装并重启",
+    "installAndRestartTitle": "安装更新并重启 Revia？",
+    "installAndRestartBody": "Windows 安装器会关闭 Revia，安装完成后重新启动。未保存的编辑、Git 写入和终端会话会先按现有流程处理；取消则不会安装。",
+    "installAndRestartConfirm": "安装并重启"
   },
   "shortcuts": {
     "actions": {

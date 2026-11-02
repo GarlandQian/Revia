@@ -10,6 +10,7 @@ pub mod commit;
 pub mod commit_flow;
 pub mod commit_snapshot;
 pub mod commit_warnings;
+pub mod distribution;
 pub mod error;
 pub mod external_tools;
 pub mod file_history;
@@ -44,29 +45,86 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             use tauri::Manager;
-            let data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|error| format!("找不到数据目录：{error}"))?;
+            // 便携形态与 WebView2 用户数据目录必须在创建第一个窗口前确定（M8 任务 01）。
+            // 安装版沿用 Tauri 解析的标准当前用户目录；便携版用 exe 旁的 data。
+            let portable = distribution::Distribution::current().is_portable();
+            let standard_data_dir = if portable {
+                None
+            } else {
+                Some(
+                    app.path()
+                        .app_data_dir()
+                        .map_err(|error| format!("找不到数据目录：{error}"))?,
+                )
+            };
+            let layout = match distribution::startup_layout(standard_data_dir) {
+                Ok(layout) => layout,
+                Err(error) => {
+                    platform::fatal_startup_error(&distribution::startup_failure_message(&error));
+                    std::process::exit(1);
+                }
+            };
+            let data_dir = layout.data_dir().to_path_buf();
             // Explicit diagnostic runs can isolate settings without affecting normal launches.
             let measuring = commands::soak_seconds().is_some()
                 || commands::is_measure_auto_run()
                 || std::env::var_os("REVIA_SMOKE").is_some();
             let acceptance_dir = acceptance::data_directory(&data_dir)?;
-            let data_dir = if let Some(directory) = &acceptance_dir {
-                directory.clone()
+            let (data_dir, explicit_data_override) = if let Some(directory) = &acceptance_dir {
+                (directory.clone(), true)
             } else if measuring {
                 match std::env::var_os("REVIA_MEASURE_DATA_DIR").map(std::path::PathBuf::from) {
-                    Some(path) if path.is_absolute() => path,
+                    Some(path) if path.is_absolute() => (path, true),
                     Some(_) => return Err("测量数据目录必须是绝对路径".into()),
                     None if commands::soak_seconds().is_some() => {
                         return Err("长测必须指定独立数据目录".into());
                     }
-                    None => data_dir,
+                    None => (data_dir, false),
                 }
             } else {
-                data_dir
+                (data_dir, false)
             };
+            // 先选最终目录，再创建/探测：显式验收覆盖时不能先触碰正常便携 data（X3）。
+            let layout = if explicit_data_override {
+                layout.with_isolated_data_dir(&data_dir)
+            } else {
+                layout.with_data_dir(&data_dir)
+            };
+            if layout.info.shape.is_portable() || explicit_data_override {
+                if let Err(error) = distribution::ensure_writable(&layout) {
+                    platform::fatal_startup_error(&distribution::startup_failure_message(&error));
+                    std::process::exit(1);
+                }
+            }
+            #[cfg(windows)]
+            if portable {
+                // 便携版不打包运行时，也不偷偷安装；缺少时在窗口出现前给出明确指引。
+                if let Err(error) = tauri::webview_version() {
+                    let failure = distribution::webview2_missing_error(&error.to_string());
+                    platform::fatal_startup_error(&distribution::startup_failure_message(&failure));
+                    std::process::exit(1);
+                }
+            }
+            // Windows 的窗口配置是 create=false：这里显式建窗，才能在建窗前设置
+            // WebView2 数据目录（便携版在 exe 旁；测量 / 验收覆盖时同样隔离）。
+            // macOS 仍由 Tauri 按配置建窗，保持既有外壳行为不变。
+            #[cfg(windows)]
+            {
+                let window_config = app
+                    .config()
+                    .app
+                    .windows
+                    .iter()
+                    .find(|window| window.label == "main")
+                    .cloned()
+                    .ok_or("缺少主窗口配置")?;
+                let mut window_builder =
+                    tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
+                if let Some(webview_dir) = layout.webview_data_dir() {
+                    window_builder = window_builder.data_directory(webview_dir.to_path_buf());
+                }
+                window_builder.build()?;
+            }
             commands::log_measure(&format!(
                 "Rust 启动：data_dir={} autoRun={:?}",
                 data_dir.display(),
@@ -93,6 +151,7 @@ pub fn run() {
             }
             let data_dir_for_update = data_dir.clone();
             let mut state = AppState::new(data_dir);
+            state.distribution = layout.info.clone();
             state.acceptance = acceptance_dir
                 .map(acceptance::Acceptance::new)
                 .transpose()?
@@ -149,6 +208,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_repos,
+            commands::distribution_info,
             commands::list_settings,
             commands::add_repo,
             commands::select_repo,
@@ -316,6 +376,7 @@ pub fn run() {
             m7::commands::m7_update_download,
             m7::commands::m7_update_install,
             m7::commands::m7_update_restart,
+            m7::commands::m7_update_open_portable_download,
         ])
         .build(tauri::generate_context!())
         .expect("Revia 启动失败");

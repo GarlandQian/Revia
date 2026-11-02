@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CloseCoordinator, CloseDriver } from "../src/lib/refreshGate.ts";
 import { MergeBufferGuards } from "../src/lib/m7/mergeBuffers.ts";
-import { updateCandidate } from "../src/lib/m7/updateState.ts";
+import { updateCandidate, UpdateInstallConfirmation } from "../src/lib/m7/updateState.ts";
 const tick=()=>new Promise((resolve)=>setImmediate(resolve));
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
 function fixture(){
@@ -31,13 +31,46 @@ test("结果待核对时安装不发生，必须真实核对后继续原请求",
 });
 test("旧安装回执不遮新可用版本；真实缓存恢复下载态，重启后的旧回执不再要求重启",()=>{
  const base={available:null,downloadedVersion:null,receipt:{version:"1.0.0"},restartRequired:false};
- assert.deepEqual(updateCandidate({...base,available:{version:"2.0.0"}}),{version:"2.0.0",downloaded:false,restartVersion:null});
- assert.deepEqual(updateCandidate({...base,available:{version:"2.0.0"},downloadedVersion:"2.0.0"}),{version:"2.0.0",downloaded:true,restartVersion:null});
+ assert.deepEqual(updateCandidate({...base,available:{version:"2.0.0"}}),{version:"2.0.0",downloaded:false,pending:false,restartVersion:null});
+ assert.deepEqual(updateCandidate({...base,available:{version:"2.0.0"},downloadedVersion:"2.0.0"}),{version:"2.0.0",downloaded:true,pending:false,restartVersion:null});
  assert.equal(updateCandidate({...base,downloadedVersion:"2.0.0"}).downloaded,true);
  assert.equal(updateCandidate({...base,available:{version:"3.0.0"},downloadedVersion:"2.0.0"}).downloaded,false);
  assert.equal(updateCandidate({...base,restartRequired:true}).restartVersion,"1.0.0");
+ assert.equal(updateCandidate({...base,available:{version:"2.0.0"},pendingInstall:{version:"2.0.0",startedAtMs:1}}).pending,true);
 });
 
 test("合并未应用内容按原编辑器阻止生命周期，释放另一编辑器不清掉它",()=>{
  const guards=new MergeBufferGuards(),observed=[];guards.subscribe(()=>observed.push(guards.hasWork));guards.mark("A/path/fp1");guards.mark("B/path/fp2");guards.clear("B/path/fp2");assert.equal(guards.hasWork,true);guards.clear("A/path/fp1");assert.equal(guards.hasWork,false);assert.deepEqual(observed,[true,true,true,false]);
+});
+
+test("Windows 安装先确认安装并重启，取消不进入生命周期；macOS 安装后仍单独确认重启", () => {
+  const windows = new UpdateInstallConfirmation(true);
+  assert.deepEqual(windows.request("installUpdate"), { kind: "confirm", intent: "installUpdate" });
+  assert.equal(windows.waiting, true);
+  windows.cancel();
+  assert.equal(windows.confirm(), null);
+  assert.equal(windows.waiting, false);
+
+  assert.deepEqual(windows.request("installUpdate"), { kind: "confirm", intent: "installUpdate" });
+  assert.equal(windows.confirm(), "installUpdate");
+  assert.equal(windows.waiting, false);
+  assert.deepEqual(windows.request("restartUpdate"), { kind: "start", intent: "restartUpdate" });
+
+  const mac = new UpdateInstallConfirmation(false);
+  assert.deepEqual(mac.request("installUpdate"), { kind: "start", intent: "installUpdate" });
+  assert.deepEqual(mac.request("restartUpdate"), { kind: "start", intent: "restartUpdate" });
+  assert.equal(mac.waiting, false);
+});
+
+test("Windows 确认后的安装进入既有 CloseDriver 草稿/写入/终端生命周期", async () => {
+  const gate = new UpdateInstallConfirmation(true);
+  gate.request("installUpdate");
+  const intent = gate.confirm();
+  assert.equal(intent, "installUpdate");
+  const f = fixture();
+  f.driver.handleRequest(intent);
+  await tick();
+  assert.deepEqual(f.calls, ["prepare", "install"]);
+  assert.equal(f.driver.currentPhase(), "idle");
+  assert.equal(f.driver.canStartWrite(), true);
 });

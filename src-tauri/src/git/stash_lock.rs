@@ -100,6 +100,7 @@ pub(crate) fn delete_reference(
         .stdin(Stdio::piped())
         .stdout(stdout_writer)
         .stderr(stderr_writer);
+    crate::platform::hide_console(&mut command);
     let mut child = command.spawn()?;
     drop(command);
     let done = Arc::new(AtomicBool::new(false));

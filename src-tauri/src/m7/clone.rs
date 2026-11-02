@@ -288,6 +288,7 @@ fn run<R: tauri::Runtime>(
         command.arg("--recurse-submodules");
     }
     command.arg("--").arg(&request.url).arg(&request.target);
+    crate::platform::hide_console(&mut command);
     command.env_clear();
     command.env("PATH", shell_env.path_string());
     for (key, value) in &shell_env.vars {

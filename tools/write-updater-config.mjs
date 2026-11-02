@@ -87,6 +87,23 @@ console.log(`  version ${conf.version}`);
 console.log(`  endpoint ${endpoint}`);
 console.log(`  pubkey base64 ${pubkey.slice(0, 16)}…`);
 
+/**
+ * 便携构建只嵌入同一套更新检查配置，不生成安装包与 updater 产物（M8 任务 06）。
+ * 用 --no-bundle 构建原始 exe；这份覆盖文件避免 createUpdaterArtifacts 干扰打包。
+ */
+const portable = {
+  plugins: {
+    updater: {
+      pubkey,
+      endpoints: [endpoint],
+      requireSignedVersion: true,
+    },
+  },
+};
+const portableTarget = join(root, "src-tauri/tauri.release.portable.conf.json");
+writeFileSync(portableTarget, `${JSON.stringify(portable, null, 2)}\n`);
+console.log(`wrote ${portableTarget}`);
+
 function fail(message) {
   console.error(`updater-config: ${message}`);
   process.exit(1);

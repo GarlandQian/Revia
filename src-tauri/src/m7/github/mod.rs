@@ -144,6 +144,14 @@ pub struct TokenCredentials {
     pub refresh_expires_at_ms: Option<u64>,
 }
 
+/// 凭据后端：两种 Windows 分发形态都用 Windows Credential Manager（Q204、ADR-0015）；
+/// 只有显式开启的验收实例使用独立文件。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CredentialBackend {
+    System,
+    IsolatedAcceptanceFile,
+}
+
 /// 令牌存储：系统钥匙串；验收实例可显式改用独立文件（仅 `REVIA_ACCEPTANCE=1`）。
 pub struct TokenStore {
     acceptance_file: Option<PathBuf>,
@@ -163,7 +171,20 @@ impl TokenStore {
         } else {
             None
         };
+        Self::with_acceptance_file(acceptance_file)
+    }
+
+    /// 测试可指定后端；生产只由 `new` 决定，与安装版 / 便携版无关。
+    fn with_acceptance_file(acceptance_file: Option<PathBuf>) -> Self {
         Self { acceptance_file }
+    }
+
+    pub fn backend(&self) -> CredentialBackend {
+        if self.acceptance_file.is_some() {
+            CredentialBackend::IsolatedAcceptanceFile
+        } else {
+            CredentialBackend::System
+        }
     }
 
     fn service() -> &'static str {
@@ -753,6 +774,18 @@ mod tests {
         }
         assert_eq!(parse_github_repo("https://gitlab.com/owner/repo.git"), None);
         assert_eq!(parse_github_repo("https://github.com/owner"), None);
+    }
+
+    #[test]
+    fn credential_backend_stays_system_for_both_distribution_shapes() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TokenStore::with_acceptance_file(None);
+        assert_eq!(store.backend(), CredentialBackend::System);
+        // 验收实例显式指定的文件后端不随分发形态改变。
+        let isolated = TokenStore::with_acceptance_file(Some(dir.path().join("tokens")));
+        assert_eq!(isolated.backend(), CredentialBackend::IsolatedAcceptanceFile);
+        // 数据目录本身不决定凭据后端；便携 data 里不会出现令牌。
+        assert!(!dir.path().join("github-tokens").exists());
     }
 
     #[test]

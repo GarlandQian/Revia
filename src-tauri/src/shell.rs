@@ -20,6 +20,10 @@ use crate::error::{AppError, ErrorKind, Result};
 
 #[cfg(unix)]
 mod capture;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod bounded;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod windows_env;
 
 /// 登录 shell 的硬超时。
 pub const SHELL_TIMEOUT: Duration = Duration::from_secs(5);
@@ -38,7 +42,10 @@ pub struct EnvCaptureInfo {
     pub used_fallback: bool,
     pub var_count: usize,
     pub path_entries: Vec<String>,
-    pub diagnostics: Option<String>,
+    /// 回退原因的错误键（前端按当前语言展示）；没有回退时为 None。
+    pub fallback_reason: Option<&'static str>,
+    /// 回退的原始详情（profile 报错等），只随本次会话展示，不持久化。
+    pub fallback_detail: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,10 +63,66 @@ impl ShellEnv {
             .unwrap_or_else(|_| self.path.join(if cfg!(windows) { ";" } else { ":" }))
     }
 
+    /// 按变量名取值。Windows 的变量名不区分大小写（Q205），其他平台保持精确匹配。
+    pub fn var(&self, key: &str) -> Option<&str> {
+        if let Some(value) = self.vars.get(key) {
+            return Some(value);
+        }
+        #[cfg(windows)]
+        {
+            self.vars
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(key))
+                .map(|(_, value)| value.as_str())
+        }
+        #[cfg(not(windows))]
+        {
+            None
+        }
+    }
+
     /// 供展示用的 git / node 等程序的解析结果。
     pub fn which(&self, program: &str) -> Option<PathBuf> {
         which_in(&self.path, program)
     }
+}
+
+/// 终端与 hooks 共用的 shell 选择：macOS 用登录 shell，Windows 用捕获到的 PowerShell。
+pub fn shell_program(env: &ShellEnv) -> PathBuf {
+    if let Some(configured) = env.var("REVIA_SHELL") {
+        let candidate = PathBuf::from(configured);
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    #[cfg(windows)]
+    {
+        windows_env::detect_shell()
+    }
+    #[cfg(not(windows))]
+    {
+        env.var("SHELL")
+            .map(PathBuf::from)
+            .filter(|candidate| candidate.is_file())
+            .unwrap_or_else(|| PathBuf::from("/bin/zsh"))
+    }
+}
+
+/// PowerShell 需要显式关掉 logo；cmd.exe 不接受这些参数。
+pub fn shell_args(shell: &Path) -> Vec<String> {
+    if is_powershell(shell) {
+        vec!["-NoLogo".into()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// 按可执行文件名判断是否为 PowerShell（pwsh 7 或 Windows PowerShell 5.1）。
+pub fn is_powershell(shell: &Path) -> bool {
+    shell
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("pwsh") || name.eq_ignore_ascii_case("powershell"))
 }
 
 fn which_in(path: &[String], program: &str) -> Option<PathBuf> {
@@ -130,6 +193,16 @@ fn fallback_env(home: &Path) -> Vec<(String, String)> {
 }
 
 fn sanitize(mut vars: HashMap<String, String>) -> HashMap<String, String> {
+    #[cfg(windows)]
+    {
+        // Windows 的变量名不区分大小写：`PWD` 与 `pwd` 是同一个变量。
+        vars.retain(|key, _| {
+            !EXCLUDED_KEYS
+                .iter()
+                .any(|excluded| key.eq_ignore_ascii_case(excluded))
+        });
+    }
+    #[cfg(not(windows))]
     for key in EXCLUDED_KEYS {
         vars.remove(*key);
     }
@@ -193,7 +266,8 @@ pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
             used_fallback: false,
             var_count: vars.len(),
             path_entries: path.clone(),
-            diagnostics: captured.diagnostics,
+            fallback_reason: None,
+            fallback_detail: None,
         },
         vars: {
             let mut vars = vars;
@@ -205,33 +279,102 @@ pub fn resolve(home: &Path, worktree: &Path) -> ShellEnv {
 }
 
 #[cfg(windows)]
-/// Windows 下无登录 shell，行为合理降级：使用进程自身环境，确保 Windows CI 与开发环境可用（M2 决策 8、Q55）。
+/// Windows：在 worktree 中启动 PowerShell 7（没有时用 Windows PowerShell），
+/// 加载用户 profile 后捕获环境（Q205）。失败或超时回退到进程环境并保留诊断。
 pub fn resolve(_home: &Path, worktree: &Path) -> ShellEnv {
-    let shell = detect_shell();
+    let shell = windows_env::detect_shell();
     let shell_path = shell.display().to_string();
     let started = Instant::now();
 
-    let mut vars = HashMap::new();
-    for (key, value) in std::env::vars() {
-        vars.insert(key, value);
+    if !worktree.is_dir() {
+        return fallback_windows(
+            worktree,
+            &shell_path,
+            started,
+            false,
+            "errors.environment.shellWorktreeMissing",
+            Some(format!("worktree 目录不存在：{}", worktree.display())),
+        );
     }
-    let vars = sanitize(vars);
+
+    let captured = match windows_env::run(_home, worktree) {
+        Ok(captured) => captured,
+        Err(failure) => {
+            return fallback_windows(
+                worktree,
+                &shell_path,
+                started,
+                failure.timed_out,
+                failure.code,
+                failure.detail,
+            );
+        }
+    };
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let vars = sanitize(windows_env::merge_vars(parse_dump(&captured.environment)));
     let path = split_path(&vars);
+    if vars.is_empty() || path.is_empty() {
+        return fallback_windows(
+            worktree,
+            &shell_path,
+            started,
+            false,
+            "errors.environment.shellCaptureFailed",
+            Some("PowerShell 返回的环境里没有 PATH".into()),
+        );
+    }
 
     ShellEnv {
         info: EnvCaptureInfo {
             worktree: worktree.display().to_string(),
             shell: shell_path.clone(),
-            elapsed_ms: started.elapsed().as_millis() as u64,
+            elapsed_ms,
             timed_out: false,
             used_fallback: false,
             var_count: vars.len(),
             path_entries: path.clone(),
-            diagnostics: None,
+            fallback_reason: None,
+            fallback_detail: None,
         },
         vars: {
             let mut vars = vars;
             vars.insert("REVIA_SHELL".into(), shell_path);
+            vars
+        },
+        path,
+    }
+}
+
+#[cfg(windows)]
+/// 回退到进程环境：Windows 从桌面启动时它通常已包含系统 PATH 与用户变量。
+fn fallback_windows(
+    worktree: &Path,
+    shell: &str,
+    started: Instant,
+    timed_out: bool,
+    reason: &'static str,
+    detail: Option<String>,
+) -> ShellEnv {
+    let mut vars: HashMap<String, String> = std::env::vars()
+        .map(|(key, value)| (key, value))
+        .collect();
+    vars = sanitize(vars);
+    let path = split_path(&vars);
+    ShellEnv {
+        info: EnvCaptureInfo {
+            worktree: worktree.display().to_string(),
+            shell: shell.to_string(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
+            timed_out,
+            used_fallback: true,
+            var_count: vars.len(),
+            path_entries: path.clone(),
+            fallback_reason: Some(reason),
+            fallback_detail: detail,
+        },
+        vars: {
+            let mut vars = vars;
+            vars.insert("REVIA_SHELL".into(), shell.to_string());
             vars
         },
         path,
@@ -260,7 +403,8 @@ fn fallback(
             used_fallback: true,
             var_count: vars.len(),
             path_entries: path.clone(),
-            diagnostics,
+            fallback_reason: Some("errors.environment.shellFallback"),
+            fallback_detail: diagnostics,
         },
         path,
         vars,
@@ -282,21 +426,12 @@ fn detect_shell() -> PathBuf {
     zsh
 }
 
-#[cfg(windows)]
-fn detect_shell() -> PathBuf {
-    if let Some(comspec) = std::env::var_os("ComSpec") {
-        let candidate = PathBuf::from(comspec);
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    PathBuf::from("cmd.exe")
-}
-
 fn split_path(vars: &HashMap<String, String>) -> Vec<String> {
     let path_val = vars.get("PATH").or_else(|| {
         if cfg!(windows) {
-            vars.get("Path").or_else(|| vars.get("path"))
+            vars.iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case("PATH"))
+                .map(|(_, value)| value)
         } else {
             None
         }
@@ -419,6 +554,14 @@ mod tests {
     }
 
     #[test]
+    fn parse_dump_keeps_equals_and_newlines_in_values() {
+        let bytes = "A=x=y\nz\0B=中文\0".as_bytes();
+        let vars = parse_dump(bytes);
+        assert_eq!(vars.get("A").map(String::as_str), Some("x=y\nz"));
+        assert_eq!(vars.get("B").map(String::as_str), Some("中文"));
+    }
+
+    #[test]
     fn parse_dump_ignores_empty_and_malformed_chunks() {
         let bytes = b"\0NOEQUALS\0A=1\0";
         let vars = parse_dump(bytes);
@@ -472,7 +615,8 @@ mod tests {
                 used_fallback: false,
                 var_count: 0,
                 path_entries: vec![],
-                diagnostics: None,
+                fallback_reason: None,
+                fallback_detail: None,
             },
         };
         let joined = env.path_string();

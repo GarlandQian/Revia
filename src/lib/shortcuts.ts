@@ -9,7 +9,7 @@
  * 设置里只保存用户改过的动作；未列出的动作用默认加速键。
  */
 
-import { isMac } from "./platform";
+import { isAltGraph, isMac } from "./platform";
 import { t } from "./i18n/index";
 
 export type ShortcutId =
@@ -207,6 +207,8 @@ const MODIFIER_TOKENS = new Set(["mod", "ctrl", "alt", "shift", "meta"]);
 
 /** 把按键事件转成规范加速键；只按修饰键时返回 `null`。 */
 export function captureAccelerator(event: KeyboardEvent): string | null {
+  // AltGr 产生的 Ctrl+Alt 组合不是用户想绑定的快捷键。
+  if (isAltGraph(event)) return null;
   const key = keyToken(event);
   if (MODIFIER_TOKENS.has(key) || key === "meta" || key === "control" || key === "alt" || key === "shift") {
     return null;
@@ -244,18 +246,23 @@ export function normalizeAccelerator(value: string): string {
   return [...modifiers, ...keys].join("+");
 }
 
-const SYMBOLS: Record<string, string> = isMac
-  ? { mod: "⌘", ctrl: "⌃", meta: "⌘", alt: "⌥", shift: "⇧", equal: "=", minus: "-", plus: "+", backquote: "`", up: "↑", down: "↓", left: "←", right: "→", space: "Space", enter: "↩", escape: "Esc", tab: "⇥", comma: ",", period: ".", slash: "/", semicolon: ";", quote: "'", bracketleft: "[", bracketright: "]", backslash: "\\" }
-  : { mod: "Ctrl+", ctrl: "Ctrl+", meta: "Win+", alt: "Alt+", shift: "Shift+", equal: "=", minus: "-", plus: "+", backquote: "`", up: "↑", down: "↓", left: "←", right: "→", space: "Space", enter: "Enter", escape: "Esc", tab: "Tab", comma: ",", period: ".", slash: "/", semicolon: ";", quote: "'", bracketleft: "[", bracketright: "]", backslash: "\\" };
+const MAC_SYMBOLS: Record<string, string> = { mod: "⌘", ctrl: "⌃", meta: "⌘", alt: "⌥", shift: "⇧", equal: "=", minus: "-", plus: "+", backquote: "`", up: "↑", down: "↓", left: "←", right: "→", space: "Space", enter: "↩", escape: "Esc", tab: "⇥", comma: ",", period: ".", slash: "/", semicolon: ";", quote: "'", bracketleft: "[", bracketright: "]", backslash: "\\" };
+const WINDOWS_SYMBOLS: Record<string, string> = { mod: "Ctrl", ctrl: "Ctrl", meta: "Win", alt: "Alt", shift: "Shift", equal: "=", minus: "-", plus: "+", backquote: "`", up: "↑", down: "↓", left: "←", right: "→", space: "Space", enter: "Enter", escape: "Esc", tab: "Tab", comma: ",", period: ".", slash: "/", semicolon: ";", quote: "'", bracketleft: "[", bracketright: "]", backslash: "\\" };
 
-/** 展示用文案：macOS 用 ⌘⌥⇧ 符号，其他平台用 Ctrl / Alt / Shift。 */
+/** 展示用文案：macOS 用 ⌘⌥⇧ 符号，其他平台用 Ctrl / Alt / Shift，并以 `+` 连接。 */
 export function formatAccelerator(accelerator: string): string {
+  return formatAcceleratorFor(accelerator, isMac);
+}
+
+/** 纯格式化，便于在 macOS 上回归 Windows 的 Ctrl / Alt 文案。 */
+export function formatAcceleratorFor(accelerator: string, mac: boolean): string {
   if (!accelerator) return t("shortcuts.unassigned");
   const parts = accelerator.split("+");
-  if (isMac) {
-    return parts.map((part) => SYMBOLS[part] ?? (part.length === 1 ? part.toUpperCase() : capitalize(part))).join("");
-  }
-  return parts.map((part) => SYMBOLS[part] ?? (part.length === 1 ? part.toUpperCase() : capitalize(part))).join("+");
+  const symbols = mac ? MAC_SYMBOLS : WINDOWS_SYMBOLS;
+  const separator = mac ? "" : "+";
+  return parts
+    .map((part) => symbols[part] ?? (part.length === 1 ? part.toUpperCase() : capitalize(part)))
+    .join(separator);
 }
 
 function capitalize(value: string): string {
@@ -284,6 +291,8 @@ function keysMatch(expected: string, actual: string): boolean {
 /** 判断事件是否命中某个加速键。 */
 export function matchesAccelerator(event: KeyboardEvent, accelerator: string): boolean {
   if (!accelerator) return false;
+  // AltGr 的 Ctrl+Alt 是字符输入，不命中任何业务快捷键（Windows 上尤其重要）。
+  if (isAltGraph(event)) return false;
   const parts = accelerator.split("+");
   const expectedKey = parts.filter((part) => !MODIFIER_TOKENS.has(part)).pop() ?? "";
   if (!expectedKey) return false;

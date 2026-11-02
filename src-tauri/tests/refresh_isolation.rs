@@ -128,7 +128,8 @@ impl TestContext {
                 used_fallback: true,
                 var_count: self.env.len(),
                 path_entries: self.paths.clone(),
-                diagnostics: None,
+                fallback_reason: None,
+                fallback_detail: None,
             },
         };
         WorktreeSession::open(
@@ -855,7 +856,8 @@ fn t13_refresh_does_not_spawn_per_file_git_processes() {
             used_fallback: true,
             var_count: ctx.env.len(),
             path_entries: ctx.paths.clone(),
-            diagnostics: None,
+            fallback_reason: None,
+            fallback_detail: None,
         },
     };
     let session =

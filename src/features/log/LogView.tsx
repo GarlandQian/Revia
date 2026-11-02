@@ -51,6 +51,7 @@ import type { LogWorkspaceState } from "./useLogWorkspace";
 import { buildFileTree, effectiveMergeMode, firstHistoryFile, type FileTreeNode } from "./logFiles";
 import { CommitDiffView, type CommitDiffViewProps } from "./CommitDiffView";
 import { CommitMergeView } from "./CommitMergeView";
+import { isAltGraph } from "@/lib/platform";
 
 /** 固定行高（虚拟滚动与分支图共用）。 */
 export const LOG_ROW_HEIGHT = 26;
@@ -539,6 +540,8 @@ export function LogView(props: LogViewProps) {
     if (!active) return;
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
+      // AltGr 的 Ctrl+Alt 与输入法组合不触发日志快捷键（M8 任务 04）。
+      if (isAltGraph(event) || event.isComposing) return;
       const target = event.target as HTMLElement | null;
       const inInput = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA";
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {

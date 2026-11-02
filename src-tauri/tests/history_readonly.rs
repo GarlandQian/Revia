@@ -60,7 +60,8 @@ fn build_shell_env(
             used_fallback: true,
             var_count: env.len(),
             path_entries: paths.to_vec(),
-            diagnostics: None,
+            fallback_reason: None,
+            fallback_detail: None,
         },
     }
 }

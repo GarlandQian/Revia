@@ -10,7 +10,7 @@ mod language;
 pub use language::{language_from_locale, system_language};
 
 mod browser;
-pub use browser::open_github_device_page;
+pub use browser::{open_github_device_page, open_url};
 
 pub(crate) mod output_pipe;
 
@@ -27,6 +27,38 @@ use crate::error::Result;
 pub fn git_shell_argument(path: &Path) -> String {
     let value = external_path(path).to_string_lossy().into_owned();
     format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// 启动早期（窗口与前端尚不存在）的致命错误提示。
+///
+/// 便携版数据目录不可写或缺少 WebView2 时必须在建窗前拒绝启动；此时无法用界面文案，
+/// Windows 上显示原生消息框，其他平台写入 stderr（便携版只在 Windows 构建）。
+pub fn fatal_startup_error(message: &str) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        let encode = |value: &str| -> Vec<u16> {
+            std::ffi::OsStr::new(value)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
+        };
+        let text = encode(message);
+        let title = encode("Revia");
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn MessageBoxW(
+                window: *mut std::ffi::c_void,
+                text: *const u16,
+                caption: *const u16,
+                flags: u32,
+            ) -> i32;
+        }
+        // MB_OK | MB_ICONERROR：启动失败只需要用户确认，不提供会误导的选项。
+        unsafe { MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), 0x10) };
+    }
+    #[cfg(not(windows))]
+    eprintln!("{message}");
 }
 
 /// Install after Tauri builds its native application, before its event loop starts.
@@ -115,6 +147,20 @@ pub fn sync_directory(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// 后台子进程不额外弹控制台窗口（Windows）。Git 与 hooks 的输出去向由调用方决定。
+pub fn hide_console(command: &mut std::process::Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW：从 GUI 进程启动控制台程序时不创建控制台。
+        command.creation_flags(0x08000000);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = command;
+    }
+}
+
 /// 把内部路径转换成**外部进程**（Git CLI）能接受的形式。
 ///
 /// Windows 上 `std::fs::canonicalize` 会返回 verbatim 路径（`\\?\C:\...`），
@@ -125,17 +171,41 @@ pub fn sync_directory(path: &Path) -> Result<()> {
 pub fn external_path(path: &Path) -> PathBuf {
     #[cfg(windows)]
     {
-        let text = path.as_os_str().to_string_lossy().into_owned();
-        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
-            return PathBuf::from(format!(r"\\{rest}"));
-        }
-        if let Some(rest) = text.strip_prefix(r"\\?\") {
-            return PathBuf::from(rest);
-        }
-        path.to_path_buf()
+        return PathBuf::from(external_path_text(&path.as_os_str().to_string_lossy()));
     }
     #[cfg(not(windows))]
     {
         path.to_path_buf()
+    }
+}
+
+/// verbatim 前缀处理的纯文本部分；与平台无关，便于在 macOS 上回归 UNC / 盘符路径。
+pub fn external_path_text(text: &str) -> String {
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{rest}");
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        return rest.to_string();
+    }
+    text.to_string()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn external_path_text_strips_verbatim_prefixes_without_touching_unc_or_drive_paths() {
+        assert_eq!(external_path_text(r"\\?\C:\work\revia"), r"C:\work\revia");
+        assert_eq!(
+            external_path_text(r"\\?\UNC\server\share\revia"),
+            r"\\server\share\revia"
+        );
+        assert_eq!(external_path_text(r"C:\work\revia"), r"C:\work\revia");
+        assert_eq!(
+            external_path_text(r"\\server\share\revia"),
+            r"\\server\share\revia"
+        );
     }
 }

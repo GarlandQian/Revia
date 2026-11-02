@@ -38,6 +38,8 @@ kill -USR1 $$
 
 pub(super) struct CapturedEnvironment {
     pub environment: Vec<u8>,
+    /// 成功路径当前只保留环境；失败诊断由错误返回。macOS 侧保留字段供后续展示。
+    #[allow(dead_code)]
     pub diagnostics: Option<String>,
 }
 

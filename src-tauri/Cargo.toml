@@ -12,6 +12,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+default = []
+# M8：便携构建（exe 旁 data 与 WebView2 用户数据，Q58、Q204）。安装版不开启。
+portable = []
+
 [dependencies]
 tauri = { version = "2", features = ["custom-protocol"] }
 tauri-plugin-dialog = "2"

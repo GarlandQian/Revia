@@ -194,7 +194,7 @@ impl TerminalManager {
             Some(relative) if !relative.trim().is_empty() => resolve_cwd(worktree_path, relative)?,
             _ => worktree_path.to_path_buf(),
         };
-        let shell = shell_program(shell_env);
+        let shell = crate::shell::shell_program(shell_env);
         let shell_path = shell.to_string_lossy().into_owned();
         let rows = rows.clamp(MIN_ROWS, MAX_ROWS);
         let cols = cols.clamp(MIN_COLS, MAX_COLS);
@@ -219,7 +219,7 @@ impl TerminalManager {
         command.cwd(&cwd);
         // 只传登录环境解析出的变量；不额外读取用户配置或密钥。
         for (key, value) in &shell_env.vars {
-            if key == "PATH" || key == "Path" || key == "path" {
+            if key.eq_ignore_ascii_case("PATH") {
                 continue;
             }
             command.env(key, value);
@@ -230,7 +230,10 @@ impl TerminalManager {
         command.env("TERM_PROGRAM", "Revia");
         // 交互式登录 shell：与用户在系统终端里得到的环境一致。
         if cfg!(windows) {
-            // cmd.exe / PowerShell 由用户默认 shell 决定，不额外加参数。
+            // PowerShell 7 优先，没有时 Windows PowerShell；加载用户 profile（Q205）。
+            for argument in crate::shell::shell_args(&shell) {
+                command.arg(argument);
+            }
         } else {
             command.arg("-l");
         }
@@ -511,32 +514,6 @@ fn resolve_cwd(worktree_path: &Path, relative: &str) -> Result<PathBuf> {
     Ok(canonical)
 }
 
-fn shell_program(env: &crate::shell::ShellEnv) -> PathBuf {
-    #[cfg(windows)]
-    {
-        if let Some(shell) = env.vars.get("ComSpec") {
-            let candidate = PathBuf::from(shell);
-            if candidate.is_file() {
-                return candidate;
-            }
-        }
-        PathBuf::from("cmd.exe")
-    }
-    #[cfg(not(windows))]
-    {
-        if let Some(shell) = env.vars.get("SHELL") {
-            let candidate = PathBuf::from(shell);
-            if candidate.is_file() {
-                return candidate;
-            }
-        }
-        let zsh = PathBuf::from("/bin/zsh");
-        if zsh.is_file() {
-            return zsh;
-        }
-        PathBuf::from("/bin/sh")
-    }
-}
 
 /// 读线程：把 PTY 输出按 UTF-8 边界解码后发事件，并写入回滚缓冲。
 fn spawn_reader<R: tauri::Runtime>(

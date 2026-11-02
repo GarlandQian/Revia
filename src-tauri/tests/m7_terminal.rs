@@ -48,7 +48,8 @@ fn shell_env(home: &PathBuf, worktree: &PathBuf) -> ShellEnv {
             used_fallback: true,
             var_count: 2,
             path_entries,
-            diagnostics: None,
+            fallback_reason: None,
+            fallback_detail: None,
         },
     }
 }

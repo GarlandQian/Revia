@@ -57,7 +57,8 @@ impl Fixture {
             info: EnvCaptureInfo {
                 worktree: repo.display().to_string(), shell: "fixture".into(), elapsed_ms: 0,
                 timed_out: false, used_fallback: false, var_count: 4, path_entries: path,
-                diagnostics: None,
+                fallback_reason: None,
+                fallback_detail: None,
             },
         };
         let fixture = Self {

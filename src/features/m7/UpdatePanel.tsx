@@ -14,6 +14,7 @@ import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { updateReasonText } from "@/lib/i18n/text";
+import { isWindows } from "@/lib/platform";
 import { updateCandidate } from "@/lib/m7/updateState";
 import { m7, onM7Events } from "@/lib/m7/api";
 import { useModalDialog } from "@/features/m7/glass/nativeGlass";
@@ -33,7 +34,7 @@ export interface UpdatePanelProps {
 export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, onInstall, onRestart, onClose }: UpdatePanelProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [progress, setProgress] = useState<{ downloaded: number; total: number | null } | null>(null);
-  const [operation, setOperation] = useState<"check" | "download" | "install" | "restart" | null>(null);
+  const [operation, setOperation] = useState<"check" | "download" | "install" | "restart" | "portable" | null>(null);
   const busy = operation !== null;
   const requestEpoch = useRef(0);
   const statusCallback = useRef(onStatusChange);
@@ -72,6 +73,7 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
     finally { setOperation(null); }
   };
   const install = async () => {
+    if (status?.portable) return;
     const epoch = ++requestEpoch.current; setError(null);
     try {
       if (!candidate.downloaded) {
@@ -84,6 +86,12 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
         if (next) { publishStatus(next); setNotice(t("update.installed", { version: next.receipt?.version ?? "" })); }
       }
     } catch (caught) { if (epoch === requestEpoch.current) setError(toAppError(caught)); }
+    finally { setOperation(null); }
+  };
+  const openPortableDownload = async () => {
+    const epoch = ++requestEpoch.current; setOperation("portable"); setError(null);
+    try { await m7.updateOpenPortableDownload(); }
+    catch (caught) { if (epoch === requestEpoch.current) setError(toAppError(caught)); }
     finally { setOperation(null); }
   };
   const restart = async () => {
@@ -127,7 +135,17 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
             {busy ? t("update.checking") : t("update.check")}
           </button>
         </div>
-        {candidate.restartVersion ? (
+        {status?.portable ? (
+          <p className="rounded border border-panel-border bg-[var(--side-bar-background)] px-2 py-1 text-descriptionforeground">
+            {t("update.portableNotice")}
+          </p>
+        ) : null}
+        {candidate.pending ? (
+          <p role="status" className="rounded border border-panel-border px-2 py-1">
+            {t("update.pendingInstall")}
+          </p>
+        ) : null}
+        {!status?.portable && candidate.restartVersion ? (
           <div className="space-y-2 rounded border border-panel-border p-2">
             <p className="font-semibold">{t("update.installed", { version: candidate.restartVersion })}</p>
             <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy} onClick={() => void restart()}>{t("update.restart")}</button>
@@ -138,14 +156,20 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
             <p className="font-semibold">{t("update.available", { version: candidate.version })}</p>
             {status?.available?.publishedAt ? <p className="text-descriptionforeground">{t("update.published", { time: status.available.publishedAt })}</p> : null}
             {status?.available?.notes ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-[11.5px]">{status.available.notes}</pre> : null}
-            {candidate.downloaded ? <p>{t("update.downloaded")}</p> : null}
+            {!status?.portable && candidate.downloaded ? <p>{t("update.downloaded")}</p> : null}
             {percent !== null && operation === "download" ? <div className="h-1.5 w-full overflow-hidden rounded bg-[var(--progressbar-background)]"><div className="h-full bg-[var(--progressbar-foreground)]" style={{ width: `${percent}%` }} /></div> : null}
-            <div className="flex items-center gap-2">
-              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy || status?.restartRequired || error?.kind === "needsVerification"} onClick={() => void install()}>{candidate.downloaded ? t("update.installNow") : t("update.downloadConfirm")}</button>
-              {operation === "download" ? <span className="text-descriptionforeground">{t("update.downloading")}</span> : null}
-            </div>
+            {status?.portable ? (
+              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy || !status.portableDownloadUrl} onClick={() => void openPortableDownload()}>
+                {t("update.portableDownload")}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy || status?.restartRequired || error?.kind === "needsVerification"} onClick={() => void install()}>{candidate.downloaded ? (isWindows ? t("update.installAndRestart") : t("update.installNow")) : t("update.downloadConfirm")}</button>
+                {operation === "download" ? <span className="text-descriptionforeground">{t("update.downloading")}</span> : null}
+              </div>
+            )}
           </div>
-        ) : !candidate.restartVersion ? <p className="text-descriptionforeground">{t("update.upToDate")}</p> : null}
+        ) : !candidate.restartVersion && !candidate.pending ? <p className="text-descriptionforeground">{t("update.upToDate")}</p> : null}
         {status?.lastCheckedAtMs ? (
           <p className="text-[11.5px] text-descriptionforeground">{t("update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}</p>
         ) : null}

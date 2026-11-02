@@ -34,7 +34,8 @@ fn env(home: &Path, repo: &Path) -> ShellEnv {
             used_fallback: false,
             var_count: 4,
             path_entries: vec![],
-            diagnostics: None,
+            fallback_reason: None,
+            fallback_detail: None,
         },
     }
 }

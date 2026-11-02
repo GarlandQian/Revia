@@ -771,8 +771,17 @@ pub async fn m7_update_install(
 
 #[tauri::command]
 pub async fn m7_update_restart(app: tauri::AppHandle) -> Result<()> {
-    super::update::restart(&app);
-    Ok(())
+    super::update::restart(&app, crate::distribution::Distribution::current())
+}
+
+/// 便携版：打开对应版本的便携包下载地址，不调用安装器。
+#[tauri::command]
+pub async fn m7_update_open_portable_download(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<()> {
+    let mode = update_mode(&state)?;
+    super::update::open_portable_download(&app, &state.m7_update, mode)
 }
 
 // ---------- 更改列表（任务13） ----------

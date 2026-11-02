@@ -1,6 +1,6 @@
 # 发布与更新签名
 
-[Revia 0.0.1](https://github.com/GarlandQian/Revia/releases/tag/v0.0.1) 已于 2026-11-02 公开。用户确认两平台 CI 通过后带已披露限制发布；M7 完整验收仍未完成。构建、验证与发布记录见 [0.0.1 发布准备](milestones/m7/release-0.0.1-readiness.md)。
+用户于 2026-11-02 授权将 M8 合入 main、发布 0.0.2 并删除现有 0.0.1 Release（Q207）。本轮构建、校验与公开状态见 [0.0.2 发布记录](milestones/m8/release-0.0.2-readiness.md)；Windows 真机与 M7 完整验收仍未完成。旧版历史记录见 [0.0.1 发布准备](milestones/m7/release-0.0.1-readiness.md)。
 
 本文说明 Revia 的版本标签、Release 草稿、更新签名与首次打开的处理方式（M7 任务 12，规格 H、Q62、Q63、Q65、Q182、Q188）。这里写的是**已实现的工作流和 GitHub 一次性接线约定**；仓库不保存真实凭据。实际打包运行、配置核对和草稿状态见本轮发布准备记录。
 
@@ -9,7 +9,7 @@
 | 工作流 | 触发 | 做什么 |
 | --- | --- | --- |
 | `.github/workflows/compile-check.yml` | 推送 `main` / `m2` / `m3` / `v*` 标签、手动 | 类型检查、lint、前端构建、Rust 测试、release 编译；macOS arm64 与 Windows x64 各一份 |
-| `.github/workflows/release.yml` | 推送 `v*` 标签 | 校验版本 → 构建 macOS Apple Silicon 的 `.app` / `.dmg` 与 updater 产物 → 上传到**草稿** Release |
+| `.github/workflows/release.yml` | 推送 `v*` 标签 | 校验 main 来源与版本 → 分别构建 macOS arm64 和 Windows x64 安装版 / 便携版 → 汇总签名更新清单并上传到**草稿** Release |
 
 `release.yml` 只做草稿：`draft: true`。公开草稿是维护者的手动动作。客户端读取构建时配置仓库的公开 Releases 完整分页，在用户选择的渠道中选取较新的最高语义版本，再读取该标签自己的 `latest.json`；草稿不参与更新。
 
@@ -47,7 +47,8 @@ RELEASE_TAG=v0.0.1 RELEASE_REPOSITORY=<owner>/<repo> node tools/check-release-ve
 
   公钥文本（`revia-updater.pub` 全文，含 `untrusted comment:` 行）填进仓库变量 `REVIA_UPDATE_PUBKEY`；私钥文件内容填进 secret `TAURI_SIGNING_PRIVATE_KEY`。
 
-- 产物：`Revia-<version>-macos-arm64.dmg`（安装包）、`Revia.app.tar.gz` 与 `Revia.app.tar.gz.sig`（updater 用）。`.sig` 缺失时工作流失败，不会上传无法校验的包。
+- macOS 产物：`Revia-<version>-macos-arm64.dmg`、`Revia.app.tar.gz` 与配套 `.sig`。Windows 产物：`Revia-<version>-windows-x64-setup.exe` 与配套 `.sig`，以及 `portable.exe` / `portable.zip`。便携版不原地更新。
+- 两平台各生成 SHA256 文件，汇总任务生成同时含 `darwin-aarch64` 与 `windows-x86_64` 的 `latest.json`。更新包 `.sig` 缺失时工作流失败。
 
 ## 需要在 GitHub 上配置一次
 
@@ -66,7 +67,7 @@ GitHub App（设备码登录）使用公开的 `REVIA_GITHUB_CLIENT_ID`（见 `d
 
 1. 把三处版本号改成目标版本，提交到 `main`。
 2. 打标签并推送：`git tag v0.0.1 && git push origin v0.0.1`（该次打标签与推送须有用户授权）。
-3. 等 `Release Draft` 工作流完成，检查草稿里的 `.dmg`、`.app.tar.gz`、`.sig` 与 `latest.json`。
+3. 等双平台 `Compile Check` 和 `Release Draft` 完成，核对草稿的 macOS / Windows 产物、SHA256、更新包签名与统一 `latest.json`。
 4. 在真实 macOS Apple Silicon 机器上安装草稿里的 dmg，确认首屏、更新检查与签名校验。
 5. 核对稳定版 / 预发布标记后公开草稿。之后符合用户所选渠道的客户端才会收到这个版本。
 
@@ -102,4 +103,4 @@ pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg \
 
 ## 下载与安装状态
 
-确认下载后，验签通过的原始包字节与签名清单保存在独占应用数据目录。确认安装时重新核对签名、版本与包散列，直接离线安装已保存字节，不再次下载。安装与重启分别进入应用的关闭协调流程；编辑、合并编辑、Git 写入、待核对结果或运行中终端未处理时不安装、不重启。安装后保留回执，重启是独立明确操作；历史回执不会遮住后来发现的新版本。真实生产来源、CI 签名和桌面更新验收仍需部署接线，独占 fixture 检查不能替代。
+确认下载后，验签通过的原始包字节与签名清单保存在独占应用数据目录。确认安装时重新核对签名、版本与包散列，直接离线安装已保存字节，不再次下载。安装与重启分别进入应用的关闭协调流程；编辑、合并编辑、Git 写入、待核对结果或运行中终端未处理时不安装、不重启。macOS 安装后单独确认重启；Windows 安装前明确确认“安装并重启”，先写待安装状态，由新进程核对实际版本后生成回执。便携版只提供新版下载入口。历史回执不会遮住后来发现的新版本。真实生产来源、CI 签名和桌面更新验收仍需部署接线，独占 fixture 检查不能替代。

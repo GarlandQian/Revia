@@ -135,7 +135,8 @@ impl Fixture {
                 used_fallback: true,
                 var_count: self.env.len(),
                 path_entries: self.paths.clone(),
-                diagnostics: None,
+                fallback_reason: None,
+                fallback_detail: None,
             },
         }
     }
