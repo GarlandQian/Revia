@@ -26,3 +26,17 @@ GitHub 依据：[checkout v4 的 ref / fetch-depth](https://github.com/actions/c
 - 工作流 YAML 语法解析通过（4 个 jobs），`git diff --check` 通过；actionlint 当前不可用，没有冒称其检查通过。
 - macOS 已下载产物的 3 项 SHA256 通过；DMG 内部校验有效，更新包确认为 arm64 / 0.0.2。此后仍须核对最终草稿的全部产物与签名。
 - 后续实际工作流重建结果待补录；Windows 真机验收继续 ready-for-human。
+
+## Comments
+
+固定审查 `7d6d092...2557b77`，code-review 两个新建审查者，仅审四文件增量。
+
+### Standards
+
+0 项新增可行动问题。应用与工具来源分别受 main 历史门禁约束；手动重建保留原标签，版本、产物 URL 与草稿使用同一输入；权限未扩大。依赖检查保留静态 CRT 配置，允许系统 UCRT，并继续拒绝额外 VC++ runtime、动态 WebView2Loader 及空依赖输出。未发现需要报告的代码异味。
+
+### Spec
+
+0 项发现。标签推送与手动重建路径的四处应用 checkout 均绑定原标签，工具绑定事件 SHA；两个来源分别校验 main 历史。版本、URL、草稿一致，保留运行库变体、缺失输出和 dumpbin 非零门禁，没有新增需求缺失或未授权扩展。
+
+两轴均为只读审查；不替代实际重建，不将 Windows 桌面验收视为通过。
