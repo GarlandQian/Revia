@@ -27,3 +27,10 @@
 - 此版本适用于接受上述限制的早期试用，不代表全部里程碑验收通过。
 
 [固定源码](https://github.com/GarlandQian/Revia/tree/v0.0.2)
+
+
+## 构建记录
+
+固定源码：`4c384ed4b3452ac1713aa3baed5dccaef2213b39`，来自 main。
+[双平台 CI](https://github.com/GarlandQian/Revia/actions/runs/41448890283) 已通过：macOS 886 项、Windows 795 项测试通过，均无失败，各保留 1 项既有忽略；Windows 便携特性检查与两平台 release binary 构建通过。
+[安装包构建](https://github.com/GarlandQian/Revia/actions/runs/41459104017) 对应该固定源码。上述自动检查不替代已列出的 Windows 真机验收。

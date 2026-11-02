@@ -1,0 +1,68 @@
+[
+  {
+    "name": "latest-prerelease.json",
+    "size": 1270,
+    "digest": "sha256:3c1dc8cbdef6e91c96cf203b5b11f976296d84eef71e92bd689fafe5d6f364b6",
+    "verified": true
+  },
+  {
+    "name": "latest.json",
+    "size": 1270,
+    "digest": "sha256:3c1dc8cbdef6e91c96cf203b5b11f976296d84eef71e92bd689fafe5d6f364b6",
+    "verified": true
+  },
+  {
+    "name": "macos-SHA256SUMS.txt",
+    "size": 294,
+    "digest": "sha256:9e26f46b58f2faf9225bbfc2bac48b6565d4e1f78513b73c097d7d0789fafa18",
+    "verified": true
+  },
+  {
+    "name": "Revia-0.0.2-macos-arm64.dmg",
+    "size": 12485647,
+    "digest": "sha256:936dbbc9a65862bb56001cae8f78fc15942191bd404d3615389d3382920bcf08",
+    "verified": true
+  },
+  {
+    "name": "Revia-0.0.2-windows-x64-portable.exe",
+    "size": 29243392,
+    "digest": "sha256:20ace18840666a767816c60947384b3afb79f24e5062a115acd9e973e536de96",
+    "verified": true
+  },
+  {
+    "name": "Revia-0.0.2-windows-x64-portable.zip",
+    "size": 12234128,
+    "digest": "sha256:e27605c06d58085b36379c8b8f06e7171852dda0a33d0549f1f69d7ccb1a910b",
+    "verified": true
+  },
+  {
+    "name": "Revia-0.0.2-windows-x64-setup.exe",
+    "size": 8616780,
+    "digest": "sha256:111aa545ec3203e0dd4491070954fef524c9fe491cb7b29ddc090cc5db5f3ee7",
+    "verified": true
+  },
+  {
+    "name": "Revia-0.0.2-windows-x64-setup.exe.sig",
+    "size": 432,
+    "digest": "sha256:9422db347a58b5cdd3a4ce3ce12d976fb9bb32807bbd316dd91feb16a234de3a",
+    "verified": true
+  },
+  {
+    "name": "Revia.app.tar.gz",
+    "size": 12324484,
+    "digest": "sha256:a8c82058ffc731981825eda74f1b2c63d41e332317adef095ec6901d2a70332f",
+    "verified": true
+  },
+  {
+    "name": "Revia.app.tar.gz.sig",
+    "size": 420,
+    "digest": "sha256:76dfe629bad1cfb08ffa5442dfb2a3fa3010618e2733fbea9efa1f663c71e279",
+    "verified": true
+  },
+  {
+    "name": "windows-SHA256SUMS.txt",
+    "size": 414,
+    "digest": "sha256:03c7dca73b189356d1b5f9a449d6bda6927d85c03917acafffaa11b8537e6a22",
+    "verified": true
+  }
+]

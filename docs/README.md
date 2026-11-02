@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：M0–M7 已合入 main；M7 于 2026-11-02 压成一个提交（`b9cf807`），应用版本 0.0.2。M8 Windows 已在独立 `m8` worktree 完成代码、一次 Pi 返修、Codex 增量审查与接管修复；当前代码候选 `83d4070`，本机可行检查完成。用户已授权合并 main、发布 0.0.2 并删除现有 Release（Q207）；Windows 未验收项继续保留，发布过程见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。旧里程碑未达标项保留原报告与 backlog。更新日期：2026-11-02。
+状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；旧 0.0.1 Release 已按 Q207 删除，旧标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。更新日期：2026-11-02。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 

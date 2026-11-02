@@ -11,15 +11,13 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M8 合并与 0.0.2 发布
+## 当前阶段：0.0.2 已发布，Windows 真机验收待完成
 
-M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`），版本 0.0.2。用户要求从 main 创建独立分支实现 M8；实施目录 `/Volumes/T7 Shield/project/Revia-m8`，分支 `m8`，主目录不切分支。
+M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压成 `7c97fd6` 合入 main，随后补上仓库列表移除、读取失败时保留工具栏和 Windows 回归隔离。已公开 [Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2)，应用标签固定于 main 历史的 `4c384ed`；旧 0.0.1 Release 已按 Q207 删除，旧标签与源码保留。
 
-M8 代码已交付，固定候选 `83d4070`；一次 Pi 返修与 Codex 增量审查/接管修复已完成。当前 Mac 可行检查见 [规划方验证](docs/milestones/m8/verification.md)。用户已于 2026-11-02 授权压成一个提交合入 main、发布 0.0.2 并删除现有旧 Release（Q207）；按 [发布记录](docs/milestones/m8/release-0.0.2-readiness.md) 执行双平台 CI、打包与公开。Windows 真实桌面未验收项保持 `ready-for-human`，不因发布改写为通过。默认并发 Rust 两轮有失败，4 线程完整检查通过；原因未确认，保留全部证据。
+双平台 CI、安装版/便携版打包、产物摘要与正式更新签名均通过。完整来源、发布工具修正与原始证据见 [发布记录](docs/milestones/m8/release-0.0.2-readiness.md)。Windows 真实桌面仍为 `ready-for-human`，下一步按 [Windows 验收清单](docs/milestones/m8/windows-acceptance.md) 验收发布版本；CI 与发布不代替这些验收。此前本机默认并发 Rust 失败记录及历史里程碑未达标项保留，不自动扩大本轮范围。
 
-先读 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。本轮确认 Q204–Q206：安装版与便携版均用 Windows Credential Manager；便携版其他数据和 WebView2 数据放 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile；真实 Windows 桌面验收不可由 macOS 检查代替。
-
-Pi 整包实施，Codex 审查和验证；模型回退 Q137，正式返修最多一次 Q113。审查按 Q174 首轮全范围两轴、后续只审增量。历史里程碑遗留不自动并入 M8。Windows 11 沿 Q200 用 Mica，Windows 10 用 CSS 材质，镜片与浮动卡片沿 Q202；相关改动先读 UI 方向与最新决定。只有 main 历史上的版本可发布（Q203）；本轮推送 main、创建 0.0.2 标签和公开 Release 已由 Q207 授权。
+实施 worktree `/Volumes/T7 Shield/project/Revia-m8`（分支 `m8`）保留用于后续验收。Pi 的一次正式返修已使用（Q113）；后续 M8 修正由规划方接管，审查只针对新增量（Q174）。需求与已确认取舍见 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
 ## 工作流程
 

@@ -1,0 +1,15 @@
+{
+  "version": "0.0.2",
+  "notes": null,
+  "pub_date": "2026-11-02T14:34:23.894Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRaGhKdjBMbmlBT2tFaVV1V3ZsME41cE1zam1peFljZVFZSlVyaVo3MVAwTDFNVWJGTk4yZHVCMDFLZlZ3cG5uOFlvMTZ3THBwbnRCU1hSUXZ4Qk5KZm1OdkZncHlnbndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjI5MjE1CWZpbGU6UmV2aWEuYXBwLnRhci5negl2ZXJzaW9uOjAuMC4yCnR3b1JxY2VQWjVFWGZxaUloaGJ6c1lLck9FTm0vdTNya1gyb0Rvc3lSK0Q4T0dzT1FlbUlHZHdLRkFzYTVIRG5QWTFGVjcvTndzRmRkK3M5bUZabkNRPT0K",
+      "url": "https://github.com/GarlandQian/Revia/releases/download/v0.0.2/Revia.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRaGhKdjBMbmlBT2dxZjR0TjZBckJhS3RGMTBCY3ZVTHoxK3FZTm10bzBUaDF5ZjBIZUVkNXI0MHFYWXNNYUgyR0lqZjluenJSSXdwc1BTdUM5c2Fjc01DNGlrem1rMVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjI5ODQ3CWZpbGU6UmV2aWFfMC4wLjJfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMC4yCkQ4aEZ2b3QvWUdhR0R5OVNRZHVlaDZEYVJtZGdjUU5YamdyaHJTYytSbXBCSlltL1ZVKytENHhVVy9XekJmUkk0cmdqTjRZZE1aV3U3Nmx6cWNBOUR3PT0K",
+      "url": "https://github.com/GarlandQian/Revia/releases/download/v0.0.2/Revia-0.0.2-windows-x64-setup.exe"
+    }
+  }
+}

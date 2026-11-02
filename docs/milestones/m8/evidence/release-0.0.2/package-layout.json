@@ -1,0 +1,14 @@
+{
+  "macos": {
+    "arch": "arm64",
+    "version": "0.0.2"
+  },
+  "windows": {
+    "portable_arch": "x64",
+    "zip_files": [
+      "Revia/Revia.exe"
+    ],
+    "zip_exe_matches_single_exe": true,
+    "setup_pe": true
+  }
+}

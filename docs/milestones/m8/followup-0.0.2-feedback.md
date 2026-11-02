@@ -1,7 +1,7 @@
 # 0.0.2 发布前用户反馈补修
 
 日期：2026-11-02
-Status: verifying
+Status: ready-for-human
 实施分支：m8；增量基线：656609a（其树与 main 7c97fd6 相同）。
 
 ## 用户要求
@@ -50,3 +50,8 @@ Status: verifying
 - 现有生命周期与刷新门 Node 检查 194/194 通过。
 - 最终类型检查通过；Windows 环境模块本机可运行检查 4/4 通过，Windows 条件用例留待 Actions。
 - `git diff --check` 通过。macOS 真实窗口的移除结果已按 `feedback-ui/verification.json` 核对；独立验收实例正常退出。
+
+
+## 发布结果
+
+两项反馈已合入 main，并包含于公开的 `v0.0.2`（`4c384ed`）。固定源码的两平台完整 CI 与正式打包已通过，Windows fixture 回归也确认通过；细节见 [发布记录](./release-0.0.2-readiness.md)。本文件的 ready-for-human 只保留尚未执行的 Windows 真实桌面验证；macOS 隔离实窗操作与落盘验证已完成。SSH 克隆保持原样。

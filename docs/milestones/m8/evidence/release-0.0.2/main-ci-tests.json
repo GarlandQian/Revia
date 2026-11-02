@@ -1,0 +1,18 @@
+{
+  "ci2-windows-log-retry": {
+    "targets": 32,
+    "passed": 795,
+    "failed": 0,
+    "ignored": 1,
+    "profile_regression": [
+      "Windows x64 (msvc)\tRun Rust tests\t2026-11-02T13:03:38.3578693Z test shell::windows_env::tests::profile_nonterminating_error_rejects_the_partial_environment ... ok"
+    ]
+  },
+  "ci2-macos-log-view": {
+    "targets": 32,
+    "passed": 886,
+    "failed": 0,
+    "ignored": 1,
+    "profile_regression": []
+  }
+}

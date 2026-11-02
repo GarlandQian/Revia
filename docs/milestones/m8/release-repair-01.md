@@ -1,6 +1,6 @@
 # 0.0.2 打包修正 01
 
-Status: verifying
+Status: done
 日期：2026-11-02
 应用源码：`v0.0.2` → `4c384ed4b3452ac1713aa3baed5dccaef2213b39`（main 历史，双平台 CI 通过）。
 
@@ -40,3 +40,8 @@ GitHub 依据：[checkout v4 的 ref / fetch-depth](https://github.com/actions/c
 0 项发现。标签推送与手动重建路径的四处应用 checkout 均绑定原标签，工具绑定事件 SHA；两个来源分别校验 main 历史。版本、URL、草稿一致，保留运行库变体、缺失输出和 dumpbin 非零门禁，没有新增需求缺失或未授权扩展。
 
 两轴均为只读审查；不替代实际重建，不将 Windows 桌面验收视为通过。
+
+
+## 实际结果
+
+main 发布工具为 `45e3e71`；[重建 41459104017](https://github.com/GarlandQian/Revia/actions/runs/41459104017) 的来源门禁、Windows 依赖 gate、NSIS、macOS 及草稿汇总全部通过。实际应用 checkout 仍为 `v0.0.2` 的 `4c384ed`。11 项最终资产、更新签名、版本和公开入口核对后已公开；完整记录见 [发布记录](./release-0.0.2-readiness.md)。Windows 真机状态保持 ready-for-human。

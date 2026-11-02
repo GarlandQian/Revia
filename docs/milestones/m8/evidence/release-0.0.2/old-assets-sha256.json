@@ -1,0 +1,38 @@
+[
+  {
+    "name": "latest-prerelease.json",
+    "size": 673,
+    "digest": "sha256:f235523e80bf4c2b54f7e75ce9d627b19761a57ecaa8003ae57f6b07769c605b",
+    "verified": true
+  },
+  {
+    "name": "latest.json",
+    "size": 673,
+    "digest": "sha256:f235523e80bf4c2b54f7e75ce9d627b19761a57ecaa8003ae57f6b07769c605b",
+    "verified": true
+  },
+  {
+    "name": "macos-SHA256SUMS.txt",
+    "size": 294,
+    "digest": "sha256:c43e24d1ba3e2becfce526b2be9b8b58b9dc201ad50540c469ea110af2c8b856",
+    "verified": true
+  },
+  {
+    "name": "Revia-0.0.1-macos-arm64.dmg",
+    "size": 12461861,
+    "digest": "sha256:40d4775f5e119fbfd3b7a402a5416b2b471989edbb9f86f037e6d8e083f09225",
+    "verified": true
+  },
+  {
+    "name": "Revia.app.tar.gz",
+    "size": 12299775,
+    "digest": "sha256:97050918f41b462178fe3310025a662a042831adee97077276ae1c14e4a7a36e",
+    "verified": true
+  },
+  {
+    "name": "Revia.app.tar.gz.sig",
+    "size": 420,
+    "digest": "sha256:eb55674cc3f61c534bd5077bd7ee7e2752a8e7ad9922509777cbad6ccdb621aa",
+    "verified": true
+  }
+]

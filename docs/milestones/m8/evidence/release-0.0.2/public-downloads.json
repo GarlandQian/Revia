@@ -1,0 +1,71 @@
+[
+  {
+    "name": "Revia-0.0.2-macos-arm64.dmg",
+    "http_status": 206,
+    "downloaded_bytes": 1,
+    "matches_artifact": true,
+    "argv": [
+      "curl",
+      "--silent",
+      "--show-error",
+      "--fail",
+      "--location",
+      "--range",
+      "0-0",
+      "--max-time",
+      "30",
+      "--output",
+      "/private/tmp/revia-m8-publish-tzrt7vd_/Revia-0.0.2-macos-arm64.dmg.public-sample",
+      "--write-out",
+      "%{http_code}",
+      "https://github.com/GarlandQian/Revia/releases/download/v0.0.2/Revia-0.0.2-macos-arm64.dmg"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "Revia-0.0.2-windows-x64-setup.exe",
+    "http_status": 206,
+    "downloaded_bytes": 1,
+    "matches_artifact": true,
+    "argv": [
+      "curl",
+      "--silent",
+      "--show-error",
+      "--fail",
+      "--location",
+      "--range",
+      "0-0",
+      "--max-time",
+      "30",
+      "--output",
+      "/private/tmp/revia-m8-publish-tzrt7vd_/Revia-0.0.2-windows-x64-setup.exe.public-sample",
+      "--write-out",
+      "%{http_code}",
+      "https://github.com/GarlandQian/Revia/releases/download/v0.0.2/Revia-0.0.2-windows-x64-setup.exe"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "Revia-0.0.2-windows-x64-portable.zip",
+    "http_status": 206,
+    "downloaded_bytes": 1,
+    "matches_artifact": true,
+    "argv": [
+      "curl",
+      "--silent",
+      "--show-error",
+      "--fail",
+      "--location",
+      "--range",
+      "0-0",
+      "--max-time",
+      "30",
+      "--output",
+      "/private/tmp/revia-m8-publish-tzrt7vd_/Revia-0.0.2-windows-x64-portable.zip.public-sample",
+      "--write-out",
+      "%{http_code}",
+      "https://github.com/GarlandQian/Revia/releases/download/v0.0.2/Revia-0.0.2-windows-x64-portable.zip"
+    ],
+    "exit_code": 0
+  }
+]
