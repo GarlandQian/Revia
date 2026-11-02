@@ -4,14 +4,21 @@ name: Release Draft
 # 汇总成一份同时包含两个平台的 updater 清单，进入 Release 草稿。
 # 只有公开草稿后，用户才会在所选渠道里收到更新（规格 H、Q182、Q188、M8 任务 06）。
 # 本工作流不推送、不打标签、不公开 Release；这些动作由维护者手动完成。
+# 手动重建时应用 checkout 原标签，发布工具 checkout 已验证的工作流 SHA；原标签保持不变。
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing main-history tag to package (for example v0.0.2)"
+        type: string
+        required: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.release_tag || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -30,7 +37,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           fetch-depth: 0
+
+      # 发布工具可在 main 修正；应用仍按原标签构建，两个来源都必须在 main 历史中。
+      - name: Require release tooling on main
+        env:
+          TOOLING_SHA: ${{ github.sha }}
+        run: git merge-base --is-ancestor "$TOOLING_SHA" origin/main
+
+      - name: Checkout release tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          persist-credentials: false
+          sparse-checkout: |
+            tools/check-windows-deps.mjs
+            tools/test-windows-deps.mjs
+          sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,7 +68,7 @@ jobs:
       - name: Test release manifest generation
         run: |
           node --test tools/test-release-manifest.mjs
-          node --test tools/test-windows-deps.mjs
+          node --test .release-tooling/tools/test-windows-deps.mjs
 
       - name: Require release source on main
         run: node tools/check-release-source.mjs
@@ -51,7 +76,7 @@ jobs:
       - name: Check version consistency
         id: version
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
           RELEASE_REPOSITORY: ${{ github.repository }}
         run: node tools/check-release-version.mjs
 
@@ -66,11 +91,13 @@ jobs:
       REVIA_UPDATE_PUBKEY: ${{ vars.REVIA_UPDATE_PUBKEY }}
       REVIA_GITHUB_CLIENT_ID: ${{ vars.REVIA_GITHUB_CLIENT_ID }}
       REVIA_UPDATE_ENDPOINT: ${{ needs.verify-version.outputs.endpoint }}
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
       RELEASE_VERSION: ${{ needs.verify-version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -185,11 +212,22 @@ jobs:
       REVIA_UPDATE_PUBKEY: ${{ vars.REVIA_UPDATE_PUBKEY }}
       REVIA_GITHUB_CLIENT_ID: ${{ vars.REVIA_GITHUB_CLIENT_ID }}
       REVIA_UPDATE_ENDPOINT: ${{ needs.verify-version.outputs.endpoint }}
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
       RELEASE_VERSION: ${{ needs.verify-version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+
+      - name: Checkout release tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          persist-credentials: false
+          sparse-checkout: tools/check-windows-deps.mjs
+          sparse-checkout-cone-mode: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -279,8 +317,9 @@ jobs:
           if (!$dumpbin) { throw "dumpbin.exe not found." }
           & $dumpbin.FullName /dependents "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-portable.exe" |
             Out-File -Encoding utf8 portable-dependencies.txt
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed with exit code $LASTEXITCODE" }
           Get-Content portable-dependencies.txt
-          node tools/check-windows-deps.mjs portable-dependencies.txt
+          node .release-tooling/tools/check-windows-deps.mjs portable-dependencies.txt
 
       - name: Build NSIS installer with updater artifacts
         run: pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.release.conf.json
@@ -331,6 +370,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
 
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
@@ -348,7 +389,7 @@ jobs:
         env:
           VERSION: ${{ needs.verify-version.outputs.version }}
           # 清单始终固定到自己的 tag，后续版本不会改变已下载包的身份。
-          DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}
+          DOWNLOAD_BASE: https://github.com/${{ github.repository }}/releases/download/${{ inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
           ls -l artifacts
@@ -368,7 +409,7 @@ jobs:
       - name: Upload draft release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
           name: Revia ${{ needs.verify-version.outputs.version }}
           draft: true
           prerelease: ${{ needs.verify-version.outputs.channel == 'prerelease' }}
