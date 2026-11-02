@@ -13,7 +13,7 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 
 ## 当前阶段：0.0.2 已发布，Windows 真机验收待完成
 
-M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压成 `7c97fd6` 合入 main，随后补上仓库列表移除、读取失败时保留工具栏和 Windows 回归隔离。已公开 [Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2)，应用标签固定于 main 历史的 `4c384ed`；旧 0.0.1 Release 已按 Q207 删除，旧标签与源码保留。
+M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压成 `7c97fd6` 合入 main，随后补上仓库列表移除、读取失败时保留工具栏和 Windows 回归隔离。已公开 [Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2)，应用标签固定于 main 历史的 `4c384ed`；0.0.1 Release 曾因规划方误读删除范围而误删，现已恢复原说明和全部资产；0.0.2 保持 latest，两个版本的标签与源码保留。
 
 双平台 CI、安装版/便携版打包、产物摘要与正式更新签名均通过。完整来源、发布工具修正与原始证据见 [发布记录](docs/milestones/m8/release-0.0.2-readiness.md)。Windows 真实桌面仍为 `ready-for-human`，下一步按 [Windows 验收清单](docs/milestones/m8/windows-acceptance.md) 验收发布版本；CI 与发布不代替这些验收。此前本机默认并发 Rust 失败记录及历史里程碑未达标项保留，不自动扩大本轮范围。
 

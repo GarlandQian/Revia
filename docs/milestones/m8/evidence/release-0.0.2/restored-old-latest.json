@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "notes": null,
+  "pub_date": "2026-11-01T07:30:57.467Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRaGhKdjBMbmlBT3R4a2plK3lCdGdLZmpiMUpqMjMxbklXdzNYTTUvcGhpMElSeDkvOFRJYnRlU2Qyb3BONVl2ZUppa3h5VWhKSU1aN2FNTlBkTEwyeFpmclBEWXNHdWdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNTE4MjU2CWZpbGU6UmV2aWEuYXBwLnRhci5negl2ZXJzaW9uOjAuMC4xCk9KeVA1WlU5TCtqNUt4endoWmoreXJBYVJuRWMvSmRvdjErbUlISWdwU3JQeHlzUmdNbmFZZi8rR0kwcnEybW03ZTRRcytVMHU1OGRSTndKTGRJTkNnPT0K",
+      "url": "https://github.com/GarlandQian/Revia/releases/download/v0.0.1/Revia.app.tar.gz"
+    }
+  }
+}

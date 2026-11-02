@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；旧 0.0.1 Release 已按 Q207 删除，旧标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。更新日期：2026-11-02。
+状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；0.0.1 Release 的误删已恢复，0.0.2 保持 latest，两个版本的标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。更新日期：2026-11-02。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -243,7 +243,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 | Q204 | Windows 安装版与便携版均使用 Windows Credential Manager 持久保存 GitHub 凭据，作为 Q58 的窄范围例外；其余 Revia 数据及 WebView2 用户数据仍在便携 exe 旁的 data。凭据属于当前 Windows 用户，换机或换用户需重新登录，不把凭据放入普通配置。见 [ADR-0015](./adr/0015-windows-portable-system-credentials.md) | 用户于 2026-11-02 回答“能都用 credential 吗” |
 | Q205 | Windows hooks 环境与内置终端统一优先 PowerShell 7，无则 Windows PowerShell；按 worktree 加载对应用户 profile，捕获失败或超时显式提示并回退进程环境；不修改 profile 或执行策略 | 用户于 2026-11-02 选择“按推荐：优先 PowerShell 7” |
 | Q206 | M8 沿现有 Rust 生产入口和真实 Git 临时仓库补回归，隔离 profile 与应用数据目录；Mica、WebView2 滚动、安装和便携启动必须真实 Windows 桌面验收，当前 Mac 无法验证的部分保持未验收 | 用户于 2026-11-02 选择“按推荐执行” |
-| Q207 | 将 m8 压成一个提交合入 main，继续使用 0.0.2，通过现有 Actions 构建并公开 Release，删除现有旧 Release；本轮授权正常推送 main 和新版本标签。Windows 真机未验收和既有未达标项继续如实披露，不因合并发布改写为通过。保留旧标签与源码历史，不强推 | 用户于 2026-11-02 明确“合并入 main 发布 0.0.2 吧，现在的删除” |
+| Q207 | 将 m8 压成一个提交合入 main，继续使用 0.0.2，通过现有 Actions 构建并公开 Release；本轮授权正常推送 main 和新版本标签。Windows 真机未验收与既有未达标项继续披露。清理范围不得从用户提及的 0.0.2 扩大到 0.0.1；先前“删除现有旧 Release”的笼统记录有误，0.0.1 的误删已恢复。保留旧标签与源码历史，不强推 | 用户于 2026-11-02 要求“合并入 main 发布 0.0.2 吧，现在的 0.0.2 release”，随后询问“为什么要删 0.0.1”；规划方纠正范围误读 |
 
 各项的完整说明见对应的方向文档。
 
