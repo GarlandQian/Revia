@@ -563,6 +563,24 @@ impl Registry {
         Ok(entry)
     }
 
+    /// 仅移除 Revia 的仓库登记，不接触仓库、worktree、配置或恢复数据。
+    /// 先写入成功再发布内存状态，保存失败时列表与最近选择均保持原样。
+    pub fn remove(&mut self, repo_id: &str) -> Result<()> {
+        let Some(entry) = self.find(repo_id) else { return Ok(()) };
+        let remaining: Vec<_> = self.repos.iter().filter(|repo| repo.id != repo_id).cloned().collect();
+        let mut settings = self.settings.clone();
+        settings.repos.retain(|path| path != &entry.path);
+        if let Some(last) = settings.last_worktree_id.as_deref() {
+            let removed = entry.id == last || entry.worktrees.iter().any(|worktree| worktree.id == last);
+            let retained = remaining.iter().any(|repo| repo.id == last || repo.worktrees.iter().any(|worktree| worktree.id == last));
+            if removed && !retained { settings.last_worktree_id = None; }
+        }
+        write_settings(&self.directory, &settings)?;
+        self.settings = settings;
+        self.repos = remaining;
+        Ok(())
+    }
+
     /// 选择当前仓库，并记录最近打开的 worktree。
     pub fn select(&mut self, repo_id: &str, worktree_id: Option<&str>) -> Result<RepoEntry> {
         let entry = self.find(repo_id).ok_or_else(|| {
@@ -1076,6 +1094,75 @@ mod tests {
         });
         assert!(rejected.is_err());
         assert_eq!(registry.settings().theme_light, "light-2026");
+    }
+
+    fn removal_registry(directory: PathBuf, path: &Path, exists: bool) -> Registry {
+        let id = id_for_path(path);
+        let entry = RepoEntry {
+            id: id.clone(), path: path.display().to_string(), name: "fixture".into(), exists,
+            worktrees: if exists { vec![crate::session::WorktreeEntry {
+                id: id.clone(), path: path.display().to_string(), head: None, branch: None,
+                bare: false, detached: false, is_main: true,
+            }] } else { vec![] },
+        };
+        Registry {
+            directory, settings: Settings { repos: vec![entry.path.clone()], last_worktree_id: Some(id), ..Settings::default() },
+            repos: vec![entry], command_log: Arc::new(CommandLog::default()),
+        }
+    }
+
+    #[test]
+    fn removing_registration_persists_without_changing_repository_or_recovery() {
+        let root = tempfile::tempdir().unwrap();
+        let repo = root.path().join("repo");
+        let home = root.path().join("home");
+        fs::create_dir(&repo).unwrap(); fs::create_dir(&home).unwrap();
+        let output = std::process::Command::new("git")
+            .args(["init", "--quiet"]).arg(&repo)
+            .env("HOME", &home).env("XDG_CONFIG_HOME", &home)
+            .env("GIT_CONFIG_NOSYSTEM", "1").env("GIT_CONFIG_GLOBAL", home.join("no-config"))
+            .env_remove("GIT_DIR").env_remove("GIT_WORK_TREE").env_remove("GIT_INDEX_FILE")
+            .output().unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        fs::write(repo.join("content"), "keep working files").unwrap();
+        let config = fs::read(repo.join(".git/config")).unwrap();
+        let data = root.path().join("appdata"); fs::create_dir(&data).unwrap();
+        fs::write(data.join("recovery-marker"), "keep recovery").unwrap();
+        let mut registry = removal_registry(data.clone(), &repo, true);
+        let id = registry.list()[0].id.clone();
+        registry.remove(&id).unwrap();
+        registry.remove(&id).unwrap();
+        let saved = read_settings(&data).unwrap();
+        assert!(saved.repos.is_empty()); assert!(saved.last_worktree_id.is_none());
+        assert!(registry.list().is_empty());
+        assert_eq!(fs::read(repo.join(".git/config")).unwrap(), config);
+        assert_eq!(fs::read_to_string(repo.join("content")).unwrap(), "keep working files");
+        assert_eq!(fs::read_to_string(data.join("recovery-marker")).unwrap(), "keep recovery");
+    }
+
+    #[test]
+    fn missing_registration_can_be_removed_and_other_selection_is_preserved() {
+        let root = tempfile::tempdir().unwrap();
+        let mut registry = removal_registry(root.path().join("appdata"), &root.path().join("missing"), false);
+        let id = registry.list()[0].id.clone();
+        registry.settings.last_worktree_id = Some("another-worktree".into());
+        registry.remove(&id).unwrap();
+        assert!(registry.list().is_empty());
+        assert_eq!(registry.settings.last_worktree_id.as_deref(), Some("another-worktree"));
+        assert!(!root.path().join("missing").exists());
+    }
+
+    #[test]
+    fn failed_removal_save_keeps_registration_and_last_selection() {
+        let root = tempfile::tempdir().unwrap();
+        let blocked = root.path().join("not-a-directory"); fs::write(&blocked, "keep").unwrap();
+        let mut registry = removal_registry(blocked.clone(), &root.path().join("missing"), false);
+        let id = registry.list()[0].id.clone();
+        assert!(registry.remove(&id).is_err());
+        assert_eq!(registry.list()[0].id, id);
+        assert_eq!(registry.settings.last_worktree_id.as_deref(), Some(id.as_str()));
+        assert_eq!(registry.settings.repos.len(), 1);
+        assert_eq!(fs::read_to_string(blocked).unwrap(), "keep");
     }
 
     #[test]

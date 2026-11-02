@@ -211,6 +211,7 @@ pub fn run() {
             commands::distribution_info,
             commands::list_settings,
             commands::add_repo,
+            commands::remove_repo,
             commands::select_repo,
             commands::set_diff_font_size,
             commands::update_settings,

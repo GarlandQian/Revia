@@ -369,6 +369,10 @@ mod tests {
         let worktree = fixture.path().join("worktree with spaces");
         std::fs::create_dir_all(&home).unwrap();
         std::fs::create_dir_all(&worktree).unwrap();
+        let roaming = home.join("AppData/Roaming");
+        let local = home.join("AppData/Local");
+        let temp = home.join("Temp");
+        for directory in [&roaming, &local, &temp] { std::fs::create_dir_all(directory).unwrap(); }
         let profile = home.join("fixture-profile.ps1");
         std::fs::write(
             &profile,
@@ -378,16 +382,30 @@ mod tests {
         let diagnostics = fixture.path().join("stderr");
 
         // -NoProfile 避免读取真实配置；生产脚本只从 PROFILE 属性取得本测试的 profile。
+        let started_file = fixture.path().join("script-started");
         let script = format!(
-            "$PROFILE = [pscustomobject]@{{ AllUsersAllHosts = $env:REVIA_TEST_PROFILE; AllUsersCurrentHost = ''; CurrentUserAllHosts = ''; CurrentUserCurrentHost = '' }}\n{}",
+            "[IO.File]::WriteAllText($env:REVIA_TEST_STARTED, 'started')\n$PROFILE = [pscustomobject]@{{ AllUsersAllHosts = $env:REVIA_TEST_PROFILE; AllUsersCurrentHost = ''; CurrentUserAllHosts = ''; CurrentUserCurrentHost = '' }}\n{}",
             dump_script(),
         );
-        let mut command = Command::new(detect_shell());
+        let shell = detect_shell();
+        let mut command = Command::new(&shell);
         command
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", &script])
             .current_dir(&worktree)
             .env_clear()
             .envs(base_env(&home))
+            // HOME alone does not isolate Windows' module-analysis cache or user profile.
+            .env("USERPROFILE", &home)
+            .env("APPDATA", &roaming)
+            .env("LOCALAPPDATA", &local)
+            .env("TEMP", &temp)
+            .env("TMP", &temp)
+            .env_remove("HOMEDRIVE")
+            .env_remove("HOMEPATH")
+            .env("PSModulePath", shell.parent().unwrap().join("Modules"))
+            .env("POWERSHELL_TELEMETRY_OPTOUT", "1")
+            .env("POWERSHELL_UPDATECHECK", "Off")
+            .env("REVIA_TEST_STARTED", &started_file)
             .env("REVIA_TEST_PROFILE", &profile)
             .env("REVIA_CAPTURE_WORKTREE", &worktree)
             .env("REVIA_CAPTURE_DESTINATION", &destination)
@@ -401,12 +419,12 @@ mod tests {
             let _ = child.kill();
         }
         let reaped = child.wait().unwrap();
-        assert!(status.is_some(), "fixture PowerShell did not finish within 15s");
+        let detail = std::fs::read(&diagnostics).unwrap();
+        assert!(status.is_some(), "fixture PowerShell did not finish within 15s; shell={}; script_started={}; stderr={}", shell.display(), started_file.exists(), String::from_utf8_lossy(&detail));
         assert_eq!(reaped.code(), Some(13));
         assert_eq!(failure_code(reaped.code()), "errors.environment.shellProfileFailed");
         assert!(!destination.exists(), "partial profile environment must not be published");
-        let detail = std::fs::read(&diagnostics).unwrap();
-        assert!(String::from_utf8_lossy(&detail).contains("fixture-profile-failure"));
+        assert!(String::from_utf8_lossy(&detail).contains("fixture-profile-failure"), "{}", String::from_utf8_lossy(&detail));
     }
 
     #[test]

@@ -755,6 +755,15 @@ pub async fn add_repo(state: State<'_, AppState>, request: AddRepoRequest) -> Re
     }
 }
 
+/// 移除应用列表中的登记；不会删除磁盘内容或释放仍被草稿使用的会话。
+#[tauri::command]
+pub async fn remove_repo(state: State<'_, AppState>, repo_id: String) -> Result<()> {
+    let mut registry = state.registry.lock().map_err(|_| {
+        AppError::coded(ErrorKind::Internal, "errors.commands.repositoryListLockFailed8", "仓库列表锁失败", &[])
+    })?;
+    registry.remove(&repo_id)
+}
+
 #[tauri::command]
 pub async fn select_repo(
     state: State<'_, AppState>,

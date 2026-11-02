@@ -2371,5 +2371,11 @@
     "selectBlock": "Select this Git block",
     "stale": "Block changed. Check its previous group and select again.",
     "wholeFile": "Entire file"
+  },
+  "repository": {
+    "remove": "Remove “{name}”",
+    "removeHint": "Remove this entry from Revia. Repository files and recovery data on disk are kept.",
+    "removeAction": "Remove from list",
+    "removeBlocked": "Resolve unsaved edits and results awaiting verification, and close running terminals before removing a repository."
   }
 }

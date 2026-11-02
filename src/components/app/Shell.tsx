@@ -25,6 +25,7 @@ export function TitleBar({
   activeWorktreeId,
   busy,
   onSelectRepo,
+  onRemoveRepo,
   onChooseRepo,
   onWorktree,
   onSettings,
@@ -39,6 +40,7 @@ export function TitleBar({
   activeWorktreeId: string | null;
   busy: boolean;
   onSelectRepo: (repo: RepoEntry) => void;
+  onRemoveRepo: (repo: RepoEntry) => void;
   onChooseRepo: () => void;
   onWorktree: (worktreeId: string) => void;
   onSettings: () => void;
@@ -83,18 +85,14 @@ export function TitleBar({
           >
             <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.repositories}</p>
             {repos.map((entry) => (
-              <MenuItem
+              <RepositoryListItem
                 key={entry.id}
+                repo={entry}
                 selected={entry.id === repo?.id}
-                title={entry.path}
-                onClick={() => {
-                  setRepoOpen(false);
-                  onSelectRepo(entry);
-                }}
-              >
-                <span className="block truncate">{entry.name}</span>
-                <span className="block truncate text-[11px] text-descriptionforeground">{entry.path}</span>
-              </MenuItem>
+                disabled={busy}
+                onSelect={() => { setRepoOpen(false); onSelectRepo(entry); }}
+                onRemove={() => { setRepoOpen(false); onRemoveRepo(entry); }}
+              />
             ))}
             <MenuSeparator />
             <MenuItem
@@ -346,12 +344,38 @@ export function StatusBar({
   );
 }
 
+/** 选择与移除是并列按钮，移除不会冒泡触发打开仓库。 */
+function RepositoryListItem({ repo, selected, disabled, onSelect, onRemove }: {
+  repo: RepoEntry;
+  selected?: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1 rounded-[3px] hover:bg-toolbar-hoverbackground">
+      <button type="button" role="menuitem" className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left disabled:opacity-50" title={repo.path} disabled={disabled} onClick={onSelect}>
+        <span className="flex w-4 shrink-0 justify-center"><Codicon name={selected ? "check" : "repo"} size={14} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">{repo.name}</span>
+          <span className="block truncate text-[11px] text-descriptionforeground">{repo.path}</span>
+          {!repo.exists || repo.worktrees.length === 0 ? <span className="block text-[11px] text-descriptionforeground">{messages.toolbar.inaccessible}</span> : null}
+        </span>
+      </button>
+      <button type="button" className="icon-action mr-1 shrink-0" title={t("repository.removeHint")} aria-label={t("repository.remove", { name: repo.name })} disabled={disabled} onClick={onRemove}>
+        <Codicon name="close" size={14} />
+      </button>
+    </div>
+  );
+}
+
 export function WelcomeScreen({
   repos,
   busy,
   onChooseRepo,
   onSelectRepo,
   onCloneRepo,
+  onRemoveRepo,
   error,
 }: {
   repos: RepoEntry[];
@@ -359,10 +383,11 @@ export function WelcomeScreen({
   onChooseRepo: () => void;
   onSelectRepo: (repo: RepoEntry) => void;
   onCloneRepo: () => void;
+  onRemoveRepo: (repo: RepoEntry) => void;
   error: React.ReactNode;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8" data-tauri-drag-region>
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto p-8" data-tauri-drag-region>
       <div className="w-full max-w-lg">
         <h1 className="text-center text-[18px] font-semibold">{messages.firstRun.title}</h1>
         <p className="mt-2 text-center text-[12.5px] text-descriptionforeground">{messages.firstRun.description}</p>
@@ -388,18 +413,7 @@ export function WelcomeScreen({
           <ul className="mt-6 overflow-hidden rounded border border-panel-border bg-[var(--sidebar-background)]">
             {repos.map((repo) => (
               <li key={repo.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-toolbar-hoverbackground"
-                  title={repo.path}
-                  onClick={() => onSelectRepo(repo)}
-                >
-                  <Codicon name="repo" size={16} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{repo.name}</span>
-                    <span className="block truncate text-[11px] text-descriptionforeground">{repo.path}</span>
-                  </span>
-                </button>
+                <RepositoryListItem repo={repo} disabled={busy} onSelect={() => onSelectRepo(repo)} onRemove={() => onRemoveRepo(repo)} />
               </li>
             ))}
           </ul>

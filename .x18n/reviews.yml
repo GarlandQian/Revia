@@ -687,6 +687,14 @@ sources:
     en: 3b4ee28ef8bfa
   operation.confirmSkipTitle:
     en: 1f700c27694201
+  repository.remove:
+    en: 16eb428f69bb14
+  repository.removeAction:
+    en: 90c073511cc55
+  repository.removeBlocked:
+    en: f1179c2631ecd
+  repository.removeHint:
+    en: affe5d43e03d1
   settings.keywords.commitMessage:
     en: 838d5b3afb2c6
   settings.licenseReactBits:

@@ -2371,5 +2371,11 @@
     "selectBlock": "选择此 Git 块",
     "stale": "块已失配，请核对原分组并重新选择",
     "wholeFile": "整文件"
+  },
+  "repository": {
+    "remove": "移除「{name}」",
+    "removeHint": "仅从 Revia 的仓库列表移除，磁盘上的仓库文件和恢复数据会保留。",
+    "removeAction": "从列表移除",
+    "removeBlocked": "请先处理未保存编辑、待核对结果，并关闭运行中的终端，再移除仓库。"
   }
 }

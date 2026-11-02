@@ -455,6 +455,8 @@ export function App() {
   const lifecycleRequestRef = useRef<(intent: CloseIntent) => Promise<void>>(async () => undefined);
   const lifecyclePreparingRef = useRef(false);
   const updateLifecycleRef = useRef<{ intent: "installUpdate" | "restartUpdate"; resolve: (status: AppUpdateStatus | null) => void; reject: (error: unknown) => void } | null>(null);
+  const [repoToRemove, setRepoToRemove] = useState<RepoEntry | null>(null);
+  const [repoRemovalError, setRepoRemovalError] = useState<AppErrorPayload | null>(null);
   const [cloneOpen, setCloneOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -4728,6 +4730,40 @@ export function App() {
     }
   }, [openWorktree, setAppError]);
 
+  // 登记移除不清理草稿、回收记录或后端会话。先处理未完成工作，避免隐藏可恢复内容。
+  const repoRemovalBlocked = repoToRemove?.id === activeRepo?.id && (writingWorktrees.size > 0 || closeCoordinatorRef.current.needsExitGuard()
+    || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork);
+  const removeRepo = async (repo: RepoEntry) => {
+    if (busy || repoRemovalBlocked) return;
+    setBusy(true);
+    setRepoRemovalError(null);
+    try {
+      await ipc.removeRepo(repo.id);
+      setRepos((current) => current.filter((entry) => entry.id !== repo.id));
+      if (activeRepo?.id === repo.id) {
+        gateRef.current.activate(null);
+        selectionEpochRef.current += 1;
+        selectionGateRef.current.clear();
+        worktreeIdRef.current = null;
+        setWorktreeId(null);
+        setActiveRepo(null);
+        setInfo(null);
+        setSnapshot(null);
+        setSelected(null);
+        setWorktreeStatuses([]);
+        setTerminalOpen(false);
+        setGithubOpen(false);
+        resetMergeTabs();
+        await ipc.stopWatch().catch((caught) => setAppError(toAppError(caught), null));
+      }
+      setRepoToRemove(null);
+    } catch (caught) {
+      setRepoRemovalError(toAppError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const pinEntry = useCallback((entry: ChangeEntry) => {
     // 冲突文件双击 / Enter 直接打开合并页签（返修 F10，Q143）。
     if (entry.unmerged) {
@@ -5615,6 +5651,18 @@ export function App() {
 
   const m7Dialogs = (
     <>
+      {repoToRemove ? (
+        <Modal title={t("repository.remove", { name: repoToRemove.name })} onClose={() => { if (!busy) setRepoToRemove(null); }} width={460}>
+          <p className="mb-2 break-all text-descriptionforeground">{repoToRemove.path}</p>
+          <p>{t("repository.removeHint")}</p>
+          {repoRemovalBlocked ? <p role="alert" className="mt-3 text-descriptionforeground">{t("repository.removeBlocked")}</p> : null}
+          {repoRemovalError ? <p role="alert" className="mt-3">{formatAppError(repoRemovalError)}</p> : null}
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" className="toolbar-widget h-7 px-3" disabled={busy} onClick={() => setRepoToRemove(null)}>{t("common.cancel")}</button>
+            <button type="button" className="toolbar-widget h-7 px-3" disabled={busy || repoRemovalBlocked} onClick={() => void removeRepo(repoToRemove)}>{t("repository.removeAction")}</button>
+          </div>
+        </Modal>
+      ) : null}
       {editDecision ? <EditDecisionDialog session={editDecision} onDone={finishEditDecision} /> : null}
       {terminalConfirmation ? <Modal title={t("terminal.shutdownTitle")} onClose={() => finishTerminalConfirmation(false)} width={560}>
         <p>{t("terminal.shutdownConfirm", { count: terminalConfirmation.length })}</p>
@@ -5669,15 +5717,95 @@ export function App() {
     </>
   );
 
+  const hasActiveWorktree = !!worktreeId && !!activeRepo?.worktrees.some((entry) => entry.id === worktreeId);
+  const titleBar = (
+      <TitleBar
+        repo={activeRepo}
+        repos={repos}
+        worktrees={activeRepo?.worktrees ?? []}
+        statuses={worktreeStatuses}
+        activeWorktreeId={worktreeId}
+        busy={busy}
+        onSelectRepo={(repo) => void openRepo(repo)}
+        onRemoveRepo={(repo) => { setRepoRemovalError(null); setRepoToRemove(repo); }}
+        onChooseRepo={() => void chooseRepo()}
+        onWorktree={(id) => void switchWorktree(id)}
+        onSettings={() => setSettingsOpen(true)}
+        onRefreshWorktrees={() => void refreshWorktreeStatuses()}
+        branchWidget={hasActiveWorktree ? (
+          <BranchWidget
+            overview={branches.overview}
+            loading={branches.loading}
+            error={branches.error}
+            incoming={branches.incoming}
+            busy={isWriting}
+            onRefresh={branches.reload}
+            onCheckout={(target) => void runCheckout(target, "plain")}
+            onNewBranch={openNewBranch}
+            onFetch={() => { if (worktreeId) void runFetch(worktreeId, "user"); }}
+          />
+        ) : null}
+        extra={(
+          <>
+          <SyncActions busy={busy || isWriting || !hasActiveWorktree} onUpdate={() => { if (worktreeId) void runUpdate(worktreeId); }} onPush={() => void openPushDialog()} />
+          <ToolbarGroup
+            id="tools"
+            label={messages.toolbar.toolWindows}
+            actions={[
+              {
+                id: "terminal",
+                icon: "terminal",
+                label: t("toolbar.terminal"),
+                pressed: terminalOpen,
+                disabled: busy || !hasActiveWorktree,
+                onClick: () => setTerminalOpen((value) => !value),
+              },
+              {
+                id: "clone",
+                icon: "repo-clone",
+                label: t("toolbar.clone"),
+                disabled: busy,
+                onClick: () => setCloneOpen(true),
+              },
+              {
+                id: "github",
+                icon: "git-pull-request",
+                label: t("toolbar.pullRequests"),
+                pressed: githubOpen,
+                disabled: busy || !hasActiveWorktree,
+                onClick: () => setGithubOpen(true),
+              },
+              {
+                id: "diagnostics",
+                icon: "debug-alt",
+                label: t("toolbar.diagnostics"),
+                onClick: () => setDiagnosticsOpen(true),
+              },
+              {
+                id: "update",
+                icon: "cloud-download",
+                label: t("toolbar.update"),
+                attention: !!updateBannerVersion,
+                onClick: () => setUpdateOpen(true),
+              },
+            ]}
+          />
+          </>
+        )}
+      />
+  );
+
   if (!activeRepo) {
     return (
       <div className="welcome-shell flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
+        {titleBar}
         <WelcomeScreen
           repos={repos}
           busy={busy}
           onChooseRepo={() => void chooseRepo()}
           onSelectRepo={(repo) => void openRepo(repo)}
           onCloneRepo={() => setCloneOpen(true)}
+          onRemoveRepo={(repo) => { setRepoRemovalError(null); setRepoToRemove(repo); }}
           error={error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
         />
         {m7Dialogs}
@@ -5712,78 +5840,7 @@ export function App() {
   return (
     <div className="glass-host grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden">
       <GlassLayer variant="window" />
-      <TitleBar
-        repo={activeRepo}
-        repos={repos}
-        worktrees={activeRepo.worktrees}
-        statuses={worktreeStatuses}
-        activeWorktreeId={worktreeId}
-        busy={busy}
-        onSelectRepo={(repo) => void openRepo(repo)}
-        onChooseRepo={() => void chooseRepo()}
-        onWorktree={(id) => void switchWorktree(id)}
-        onSettings={() => setSettingsOpen(true)}
-        onRefreshWorktrees={() => void refreshWorktreeStatuses()}
-        branchWidget={worktreeId ? (
-          <BranchWidget
-            overview={branches.overview}
-            loading={branches.loading}
-            error={branches.error}
-            incoming={branches.incoming}
-            busy={isWriting}
-            onRefresh={branches.reload}
-            onCheckout={(target) => void runCheckout(target, "plain")}
-            onNewBranch={openNewBranch}
-            onFetch={() => void runFetch(worktreeId, "user")}
-          />
-        ) : null}
-        extra={worktreeId ? (
-          <>
-          <SyncActions busy={isWriting} onUpdate={() => void runUpdate(worktreeId)} onPush={() => void openPushDialog()} />
-          <ToolbarGroup
-            id="tools"
-            label={messages.toolbar.toolWindows}
-            actions={[
-              {
-                id: "terminal",
-                icon: "terminal",
-                label: t("toolbar.terminal"),
-                pressed: terminalOpen,
-                onClick: () => setTerminalOpen((value) => !value),
-              },
-              {
-                id: "clone",
-                icon: "repo-clone",
-                label: t("toolbar.clone"),
-                disabled: busy,
-                onClick: () => setCloneOpen(true),
-              },
-              {
-                id: "github",
-                icon: "git-pull-request",
-                label: t("toolbar.pullRequests"),
-                pressed: githubOpen,
-                disabled: busy,
-                onClick: () => setGithubOpen(true),
-              },
-              {
-                id: "diagnostics",
-                icon: "debug-alt",
-                label: t("toolbar.diagnostics"),
-                onClick: () => setDiagnosticsOpen(true),
-              },
-              {
-                id: "update",
-                icon: "cloud-download",
-                label: t("toolbar.update"),
-                attention: !!updateBannerVersion,
-                onClick: () => setUpdateOpen(true),
-              },
-            ]}
-          />
-          </>
-        ) : null}
-      />
+      {titleBar}
 
       <div className="shell-body flex min-h-0 overflow-hidden">
         {/* 原生玻璃下侧栏占满左列（红绿灯在它顶上），顶部留白可以拖动窗口。 */}

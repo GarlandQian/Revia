@@ -289,6 +289,7 @@ export const ipc = {
   listRepos: () => invoke<RepoEntry[]>("list_repos"),
   listSettings: () => invoke<SettingsPayload>("list_settings"),
   addRepo: (path: string) => invoke<RepoEntry>("add_repo", { request: { path } }),
+  removeRepo: (repoId: string) => invoke<void>("remove_repo", { repoId }),
   selectRepo: (repoId: string, worktreeId?: string) =>
     invoke<RepoEntry>("select_repo", {
       request: { repoId, worktreeId: worktreeId ?? null },
