@@ -8,7 +8,7 @@ import type { HistoryMergeText } from "./HistoryMergeText";
  *
  * 只读：没有写入目标、没有块操作；超过两个父提交时明确说明，由按父提交分组显示。
  */
-export type HistoryMergeView = { targetId: string, commit: string, path: string, parents: Array<string>, sides: Array<HistoryMergeSide>, result: HistoryMergeText,
+export type HistoryMergeView = { targetId: string, commit: string, path: string, parents: Array<string>, sides: Array<HistoryMergeSide>, result: HistoryMergeText, 
 /**
  * 父提交不是两个（超过两个父提交或未指认父提交）时不能显示三栏。
  */

@@ -7,6 +7,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
@@ -139,6 +140,7 @@ export interface SettingsPayload {
   diffSoftWrap: boolean;
   diffJumpToNextFile: boolean;
   diffIgnoreWhitespace: number;
+  changelistMode: boolean;
   commitSubjectLimit: number;
   commitBlankLineRequired: boolean;
   commitBodyLineLimit: number;
@@ -166,6 +168,12 @@ export interface SettingsPayload {
   pushDialogOnCommit: boolean;
   pushDialogProtectedOnly: boolean;
   protectedBranches: string[];
+  /** 应用更新方式（M7、Q199）。 */
+  appUpdateMode: AppUpdateMode;
+  /** F22：预发布渠道开关。 */
+  allowPrerelease: boolean;
+  /** 用户自定义快捷键（动作 id → 加速键）。 */
+  shortcuts: Record<string, string>;
 }
 
 /** 日志表格显示列（F06）。 */
@@ -203,6 +211,7 @@ export interface SettingsPatchPayload {
   diffSoftWrap?: boolean;
   diffJumpToNextFile?: boolean;
   diffIgnoreWhitespace?: number;
+  changelistMode?: boolean;
   commitSubjectLimit?: number;
   commitBlankLineRequired?: boolean;
   commitBodyLineLimit?: number;
@@ -227,6 +236,9 @@ export interface SettingsPatchPayload {
   pushDialogOnCommit?: boolean;
   pushDialogProtectedOnly?: boolean;
   protectedBranches?: string[];
+  appUpdateMode?: AppUpdateMode;
+  allowPrerelease?: boolean;
+  shortcuts?: Record<string, string>;
 }
 
 /** 与 Rust 侧 `CommandRecord` 对应（B07：时间、worktree、参数、退出码、耗时、输出）。 */
@@ -514,7 +526,7 @@ export const ipc = {
    * 执行提交。只传登记 worktree ID、信息、amend/skip 与用户所见预期；
    * 不传任何 Git 参数。实时输出走 `revia://commit-output` 事件。
    */
-  executeCommit: (request: { worktreeId: string; options: CommitExecuteOptions }) =>
+  executeCommit: (request: { worktreeId: string; options: CommitExecuteOptions; selection?: import("@/types/bindings/ChangelistSelection").ChangelistSelection | null }) =>
     invoke<CommitOutcome>("execute_commit", { request }),
 
   // ---------- 只读提交历史（M5 任务 01） ----------

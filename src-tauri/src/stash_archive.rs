@@ -161,11 +161,14 @@ impl StashArchiveStore {
         // `git init --bare` into a path we allocated ourselves.  No user config
         // is modified: the repository-local config is the archive's own.
         let init_dir = repo.parent().unwrap_or(repo);
+        // Windows: only the Git argv boundary gets the plain path; identity,
+        // storage and the archive layout keep the canonical verbatim path.
+        let repo_argument = crate::platform::external_path(repo).to_string_lossy().into_owned();
         let init = git.in_isolated_directory(init_dir).run(&[
             "init",
             "--bare",
             "--quiet",
-            repo.to_string_lossy().as_ref(),
+            repo_argument.as_str(),
         ])?;
         init.into_success("创建 stash 归档仓库")?;
 
@@ -358,12 +361,13 @@ impl StashArchiveStore {
             }
         }
         require_target()?;
+        let repo_argument = crate::platform::external_path(&repo).to_string_lossy().into_owned();
         let fetch = git.run_write(&[
             "fetch",
             "--quiet",
             "--no-tags",
             "--update-shallow",
-            repo.to_string_lossy().as_ref(),
+            repo_argument.as_str(),
             &record.archive_ref,
         ])?;
         fetch.into_success("从归档取回 stash 对象")?;

@@ -24,13 +24,14 @@ interface BatchWriteOptions {
   setAppError: (error: AppErrorPayload | null, worktreeId?: string | null) => void;
   notify: (notice: NoticeInput) => void;
   expandToSelection: (entry: ChangeEntry) => ChangeEntry[];
+  beforeWrite?: (worktreeId: string, paths: string[]) => Promise<boolean>;
 }
 
 /** 整批复用 App 的写门和退出保护，不创建第二套锁或结果代际。 */
 export function useBatchWrite({
   worktreeIdRef, writingWorktreesRef, setWritingWorktrees, writeOrchestrator,
   operationGateRef, reviewOverlayRef, acceptSnapshot, scheduleReviewRecovery,
-  refreshTarget, setAppError, notify, expandToSelection,
+  refreshTarget, setAppError, notify, expandToSelection, beforeWrite,
 }: BatchWriteOptions) {
   const performBatchWrite = useCallback(async (
     kind: "stage" | "unstage" | "discard",
@@ -40,6 +41,8 @@ export function useBatchWrite({
     const targetWorktreeId = worktreeIdRef.current;
     if (!targetWorktreeId || entries.length === 0) return;
     if (writingWorktreesRef.current.has(targetWorktreeId)) return;
+    if (beforeWrite && !(await beforeWrite(targetWorktreeId, entries.flatMap((entry) => [entry.path, ...(entry.originalPath ? [entry.originalPath] : [])])))) return;
+    if (worktreeIdRef.current !== targetWorktreeId || writingWorktreesRef.current.has(targetWorktreeId)) return;
     const writable = entries.filter((entry) => !entry.readonlyReason);
     const readonly = entries.filter((entry) => entry.readonlyReason);
     const readonlyLines = () => readonly.map(
@@ -144,7 +147,7 @@ export function useBatchWrite({
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       writeOrchestrator.end(targetWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, notify, operationGateRef, refreshTarget, reviewOverlayRef, scheduleReviewRecovery, setAppError, setWritingWorktrees, worktreeIdRef, writeOrchestrator, writingWorktreesRef]);
+  }, [beforeWrite, acceptSnapshot, notify, operationGateRef, refreshTarget, reviewOverlayRef, scheduleReviewRecovery, setAppError, setWritingWorktrees, worktreeIdRef, writeOrchestrator, writingWorktreesRef]);
 
   const stageFile = useCallback((entry: ChangeEntry) => {
     if (!worktreeIdRef.current || entry.readonlyReason || entry.changes === "staged") return;

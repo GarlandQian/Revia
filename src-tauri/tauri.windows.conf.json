@@ -1,0 +1,14 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Revia",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 520,
+        "transparent": true
+      }
+    ]
+  }
+}

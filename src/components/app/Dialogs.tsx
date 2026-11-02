@@ -3,13 +3,15 @@
  * 丢弃确认（可含多个文件）、写入期间关闭或退出。
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { CommitWarning } from "@/types/bindings/CommitWarning";
-import { messages } from "@/lib/i18n/index";
+import { messages, t } from "@/lib/i18n/index";
 import { commitWarningText } from "@/lib/i18n/text";
 import { Codicon } from "@/components/ui/codicon";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { FileTypeIcon } from "./FileTypeIcon";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
 
 export function Modal({
   title,
@@ -23,22 +25,19 @@ export function Modal({
   width?: number;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
+  useModalDialog(ref);
   return (
     <dialog
       ref={ref}
       aria-label={title}
-      className="app-dialog overflow-auto p-0 text-[13px]"
+      className="app-dialog glass-isolate overflow-auto p-0 text-[13px]"
       style={{ width: `min(${width ?? 520}px, calc(100vw - 40px))`, maxHeight: "calc(100vh - 40px)" }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
+      <GlassLayer variant="popover" />
       <div className="flex items-center gap-2 border-b border-panel-border px-4 py-2.5">
         <h2 className="flex-1 text-[13.5px] font-semibold">{title}</h2>
         <button type="button" className="icon-action" aria-label={messages.recovery.close} onClick={onClose}>
@@ -143,7 +142,7 @@ export function CloseRequestDialog({
   onStay,
   onPendingReviewed,
 }: {
-  intent: "close" | "exit";
+  intent: "close" | "exit" | "installUpdate" | "restartUpdate";
   writing: string[];
   pending: string[];
   onWait: () => void;
@@ -152,9 +151,9 @@ export function CloseRequestDialog({
 }) {
   const hasPending = pending.length > 0;
   return (
-    <Modal title={hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay} width={460}>
+    <Modal title={intent === "installUpdate" || intent === "restartUpdate" ? t("update.lifecycleTitle") : hasPending ? messages.close.pendingTitle : messages.close.title} onClose={onStay} width={460}>
       <div className="space-y-3 text-[12.5px]">
-        <p className="leading-relaxed">{hasPending ? messages.close.pendingExplain : messages.close.explain}</p>
+        <p className="leading-relaxed">{intent === "installUpdate" || intent === "restartUpdate" ? t("update.lifecycleExplain") : hasPending ? messages.close.pendingExplain : messages.close.explain}</p>
         {writing.length > 0 ? (
           <p className="break-all text-descriptionforeground">{messages.close.writing(writing.length)}</p>
         ) : null}
@@ -174,7 +173,7 @@ export function CloseRequestDialog({
           </button>
         ) : (
           <button type="button" className="rounded-[4px] bg-primary px-3 py-1 text-primary-foreground" onClick={onWait}>
-            {intent === "exit" ? messages.close.waitExit : messages.close.wait}
+            {intent === "installUpdate" ? t("update.waitInstall") : intent === "restartUpdate" ? t("update.waitRestart") : intent === "exit" ? messages.close.waitExit : messages.close.wait}
           </button>
         )}
       </div>

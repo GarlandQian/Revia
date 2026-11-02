@@ -6,9 +6,11 @@ import {
   applyCodeFont,
   applyTheme,
   resolveTheme,
+  setImportedThemes,
   systemPrefersDark,
   watchSystemTheme,
 } from "@/lib/theme";
+import { m7 } from "@/lib/m7/api";
 
 export function useAppearance() {
   const [themeLight, setThemeLight] = useState(DEFAULT_LIGHT_THEME);
@@ -19,10 +21,27 @@ export function useAppearance() {
   const uiZoomRef = useRef(uiZoom);
   uiZoomRef.current = uiZoom;
   const [prefersDark, setPrefersDark] = useState(() => systemPrefersDark());
+  /** 导入主题的版本号：重新读取后强制再应用一次（M7 任务 02）。 */
+  const [importedRevision, setImportedRevision] = useState(0);
 
   useEffect(() => {
     applyTheme(resolveTheme(themeLight, themeDark, prefersDark));
-  }, [themeLight, themeDark, prefersDark]);
+  }, [themeLight, themeDark, prefersDark, importedRevision]);
+
+  /** 从 Rust 读取导入主题；失败时只保留内置主题，不阻塞界面。 */
+  const reloadImportedThemes = useCallback(async () => {
+    try {
+      const list = await m7.listImportedThemes();
+      setImportedThemes(list);
+    } catch {
+      setImportedThemes([]);
+    }
+    setImportedRevision((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    void reloadImportedThemes();
+  }, [reloadImportedThemes]);
 
   useEffect(() => watchSystemTheme(setPrefersDark), []);
 
@@ -48,5 +67,6 @@ export function useAppearance() {
     themeLight, setThemeLight, themeDark, setThemeDark,
     codeFontFamily, setCodeFontFamily, fontSize, setFontSize, changeFontSize,
     uiZoom, setUiZoom, uiZoomRef,
+    reloadImportedThemes,
   };
 }

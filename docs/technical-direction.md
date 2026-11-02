@@ -139,7 +139,7 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 - 应用标识（Tauri `identifier`）为 `io.github.garlandqian.revia`，数据目录随之为 `~/Library/Application Support/io.github.garlandqian.revia/`（Q49）。签名、公证和自动更新都使用这个标识，更改需要迁移用户数据。
 - 目标平台：macOS Apple Silicon（arm64）与 Windows x64；不做 Intel Mac、ARM 版 Windows 和 Linux，见 [ADR-0007](./adr/0007-target-platforms.md)。首版只发布 macOS，Windows 在 M8（Q55、Q126）。
 - **构建**：GitHub Actions 分别在 macOS（Apple Silicon）与 Windows 机器上构建，不在 Mac 上交叉编译 Windows 版。推送到 main 时只做编译检查（从 M2 起包括 Windows）；打版本标签才生成安装包和便携包（Q62）。本机开发仍可用 Homebrew 安装的 Rust 构建 macOS 版。
-- **M7 打包**：Q182 重申使用 GitHub Actions；M7 的发布产物只覆盖 macOS Apple Silicon，Windows 发布仍在 M8，现有 Windows 编译检查保留。版本标签触发打包后先生成带安装包的 Release 草稿，确认后公开；只有公开版本进入客户端的相应更新渠道（Q188）。当前只有 [compile-check.yml](../.github/workflows/compile-check.yml)，没有分发包上传或应用更新发布链路，本轮只记录设计。
+- **M7 打包**：Q182 重申使用 GitHub Actions；M7 的发布产物只覆盖 macOS Apple Silicon，Windows 发布仍在 M8，现有 Windows 编译检查保留。版本标签触发 [release.yml](../.github/workflows/release.yml) 打包前必须验证标签提交属于 main 历史（Q203）；通过后先生成带安装包的 Release 草稿，检查后按用户授权公开，只有公开版本进入客户端的相应更新渠道（Q188）。[compile-check.yml](../.github/workflows/compile-check.yml) 保留双平台检查。
 - **M2 验收授权**：允许给 `m2` 增加仅编译、不发布的 CI 入口，并在 M2 验收期间按需将 `m2` 正常推送到现有 `origin`，取得真实 Windows x64 编译结果；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包（Q97）。工作流文件存在不等于已经编译通过。
 - **Windows 安装版**：NSIS 生成的 `.exe` 安装程序，默认只为当前用户安装、不需要管理员权限；不做 MSI（Q57）。
 - **Windows 便携版**：同时提供单个 exe 和 zip，zip 内是一个 `Revia` 文件夹（Q66）；解压即用；设置、回收区、审阅标记等数据放在 exe 旁边的 `data` 文件夹，不写用户目录和注册表；目录不可写时提示用户把程序移到可写的位置；依赖系统自带的 WebView2；不自动更新，只提示新版本（Q58）。

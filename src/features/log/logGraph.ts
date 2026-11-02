@@ -17,6 +17,8 @@ export interface GraphCommitInput {
 export interface GraphRow {
   /** 提交点所在轨道（0 基）。 */
   lane: number;
+  /** 上方有子提交沿这条轨道连下来（提交点上半段要画线）。 */
+  incoming: boolean;
   /** 这一行上方仍在延续的轨道。 */
   railsAbove: number[];
   /** 这一行下方仍在延续的轨道。 */
@@ -60,6 +62,7 @@ export function appendGraphRows(
   const rows: GraphRow[] = [];
   for (const commit of commits) {
     let lane = active.indexOf(commit.oid);
+    const incoming = lane >= 0;
     if (lane < 0) {
       lane = firstFree(active);
       active[lane] = commit.oid;
@@ -100,7 +103,7 @@ export function appendGraphRows(
       ...railsBelow.map((value) => value + 1),
       ...arms.map((arm) => Math.max(arm.from, arm.to) + 1),
     );
-    rows.push({ lane, railsAbove, railsBelow, arms, width });
+    rows.push({ lane, incoming, railsAbove, railsBelow, arms, width });
   }
   return { rows, state: { active } };
 }

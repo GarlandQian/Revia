@@ -2,6 +2,7 @@
 //!
 //! 只写自己的数据目录，不改动用户的 Git 配置，也不往仓库目录里写东西。
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -65,6 +66,8 @@ pub struct Settings {
     pub diff_ignore_whitespace: u32,
     /// 提交信息检查：首行长度上限（0 表示不检查）。
     pub commit_subject_limit: u32,
+    #[serde(default)]
+    pub changelist_mode: bool,
     /// 提交信息检查：首行与正文之间要求空行。
     pub commit_blank_line_required: bool,
     /// 提交信息检查：正文每行长度上限（0 表示不检查）。
@@ -111,6 +114,83 @@ pub struct Settings {
     pub push_dialog_protected_only: bool,
     /// 受保护分支（每行一个，支持 `*` 通配；默认 master、main）。
     pub protected_branches: Vec<String>,
+    /// 应用更新方式（M7、Q199）：手动检查 / 提示。F22：自动下载未实现，已移除。
+    pub app_update_mode: AppUpdateMode,
+    /// F22：用户主动开启预发布渠道（默认稳定版）。
+    #[serde(default)]
+    pub allow_prerelease: bool,
+    /// 用户自定义快捷键（动作 id → 加速键）；未列出的动作用默认快捷键（Q199）。
+    pub shortcuts: BTreeMap<String, String>,
+}
+
+/// 应用更新方式（M7 任务 10）。与拉取时的 `update_mode`（merge / rebase）不是同一件事。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum AppUpdateMode {
+    /// 只在用户主动检查时查询。
+    Manual,
+    /// 定期检查并在有新版本时提示（默认）。
+    #[default]
+    Notify,
+    /// 自动下载新版本，但安装与重启仍由用户确认。
+    Automatic,
+}
+
+/// `f1`–`f24` 形式的按键名。
+fn is_function_key(value: &str) -> bool {
+    value
+        .strip_prefix('f')
+        .and_then(|digits| digits.parse::<u8>().ok())
+        .map(|number| (1..=24).contains(&number))
+        .unwrap_or(false)
+}
+
+/// 自定义快捷键的合法字符：修饰键名、字母、数字与常见符号，用 `+` 连接。
+fn normalize_shortcut(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    // 空覆盖值表示该动作未分配；缺少覆盖项才恢复默认快捷键。
+    if trimmed.is_empty() {
+        return Some(String::new());
+    }
+    if trimmed.len() > 64 {
+        return None;
+    }
+    let mut normalized = String::new();
+    for (index, part) in trimmed.split('+').enumerate() {
+        let part = part.trim();
+        if part.is_empty() {
+            return None;
+        }
+        if index > 0 {
+            normalized.push('+');
+        }
+        let lowered = part.to_ascii_lowercase();
+        if matches!(lowered.as_str(), "mod" | "cmd" | "ctrl" | "alt" | "shift" | "meta") {
+            normalized.push_str(&lowered);
+            continue;
+        }
+        // 按键部分：单个字母 / 数字 / 标点，或约定的按键名（避免 `+` 与分隔符混淆）。
+        const NAMED_KEYS: [&str; 26] = [
+            "plus", "minus", "equal", "comma", "period", "slash", "semicolon", "quote",
+            "backquote", "bracketleft", "bracketright", "backslash", "space", "enter",
+            "tab", "escape", "up", "down", "left", "right", "home", "end", "pageup",
+            "pagedown", "delete", "backspace",
+        ];
+        let single = part.chars().count() == 1
+            && (part.chars().next().unwrap().is_alphanumeric()
+                || "`-=[]\\;',./".contains(part.chars().next().unwrap()));
+        let named = NAMED_KEYS.contains(&lowered.as_str()) || is_function_key(&lowered);
+        if !single && !named {
+            return None;
+        }
+        normalized.push_str(&lowered);
+    }
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
 }
 
 /// 日志表格的显示列（F06）。
@@ -307,6 +387,7 @@ impl Default for Settings {
             diff_jump_to_next_file: true,
             diff_ignore_whitespace: 0,
             commit_subject_limit: 72,
+            changelist_mode: false,
             commit_blank_line_required: false,
             commit_body_line_limit: 0,
             commit_show_ruler: false,
@@ -333,6 +414,9 @@ impl Default for Settings {
                 .iter()
                 .map(|name| name.to_string())
                 .collect(),
+            app_update_mode: AppUpdateMode::default(),
+            allow_prerelease: false,
+            shortcuts: BTreeMap::new(),
         }
     }
 }
@@ -370,6 +454,7 @@ pub struct SettingsPatch {
     pub diff_jump_to_next_file: Option<bool>,
     pub diff_ignore_whitespace: Option<u32>,
     pub commit_subject_limit: Option<u32>,
+    pub changelist_mode: Option<bool>,
     pub commit_blank_line_required: Option<bool>,
     pub commit_body_line_limit: Option<u32>,
     pub commit_show_ruler: Option<bool>,
@@ -393,6 +478,11 @@ pub struct SettingsPatch {
     pub push_dialog_on_commit: Option<bool>,
     pub push_dialog_protected_only: Option<bool>,
     pub protected_branches: Option<Vec<String>>,
+    pub app_update_mode: Option<AppUpdateMode>,
+    /// F22：预发布渠道开关。
+    #[serde(default)]
+    pub allow_prerelease: Option<bool>,
+    pub shortcuts: Option<BTreeMap<String, String>>,
 }
 
 pub struct Registry {
@@ -548,7 +638,7 @@ impl Registry {
     pub fn update_settings(&mut self, patch: &SettingsPatch) -> Result<Settings> {
         let mut next = self.settings.clone();
         if let Some(theme) = &patch.theme_light {
-            if !LIGHT_THEMES.contains(&theme.as_str()) {
+            if !self.theme_allowed(theme, true) {
                 return Err(AppError::coded(
                     ErrorKind::Rejected,
                     "errors.settings.unknownLightColorTheme",
@@ -559,7 +649,7 @@ impl Registry {
             next.theme_light = theme.clone();
         }
         if let Some(theme) = &patch.theme_dark {
-            if !DARK_THEMES.contains(&theme.as_str()) {
+            if !self.theme_allowed(theme, false) {
                 return Err(AppError::coded(
                     ErrorKind::Rejected,
                     "errors.settings.unknownDarkColorTheme",
@@ -670,6 +760,7 @@ impl Registry {
         if let Some(value) = patch.diff_ignore_whitespace {
             next.diff_ignore_whitespace = value.clamp(0, 3);
         }
+        if let Some(value) = patch.changelist_mode { next.changelist_mode = value; }
         if let Some(value) = patch.commit_subject_limit {
             next.commit_subject_limit = value.clamp(0, 200);
         }
@@ -740,9 +831,66 @@ impl Registry {
         if let Some(value) = &patch.protected_branches {
             next.protected_branches = normalize_patterns(value)?;
         }
+        if let Some(value) = patch.app_update_mode {
+            next.app_update_mode = value;
+        }
+        if let Some(value) = patch.allow_prerelease {
+            next.allow_prerelease = value;
+        }
+        if let Some(value) = &patch.shortcuts {
+            let mut shortcuts = BTreeMap::new();
+            for (action, accelerator) in value {
+                let action = action.trim();
+                if action.is_empty() || action.len() > 64 {
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.settings.unknownShortcutAction",
+                        "未知的快捷键动作：{action}",
+                        &[("action", action.to_string())],
+                    ));
+                }
+                let Some(normalized) = normalize_shortcut(accelerator) else {
+                    return Err(AppError::coded(
+                        ErrorKind::Rejected,
+                        "errors.settings.shortcutInvalid",
+                        "快捷键格式不正确：{shortcut}",
+                        &[("shortcut", accelerator.clone())],
+                    ));
+                };
+                shortcuts.insert(action.to_string(), normalized);
+            }
+            if shortcuts.len() > 64 {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.settings.tooManyShortcuts",
+                    "自定义快捷键数量过多",
+                    &[],
+                ));
+            }
+            next.shortcuts = shortcuts;
+        }
         self.settings = next;
         self.persist()?;
         Ok(self.settings.clone())
+    }
+
+    /// 颜色主题可以是内置的，也可以是已导入且深浅色匹配的主题（M7 任务 02）。
+    fn theme_allowed(&self, id: &str, light: bool) -> bool {
+        if (if light { LIGHT_THEMES } else { DARK_THEMES }).contains(&id) {
+            return true;
+        }
+        if !id.starts_with("imported-") {
+            return false;
+        }
+        crate::m7::theme::ThemeStore::new(&self.directory)
+            .list()
+            .map(|themes| {
+                themes.iter().any(|theme| {
+                    theme.id == id
+                        && (theme.kind == crate::m7::theme::ThemeKind::Light) == light
+                })
+            })
+            .unwrap_or(false)
     }
 
     fn persist(&self) -> Result<()> {
@@ -777,7 +925,7 @@ pub fn settings_path(directory: &Path) -> PathBuf {
     directory.join("settings.json")
 }
 
-fn read_settings(directory: &Path) -> Result<Settings> {
+pub fn read_settings(directory: &Path) -> Result<Settings> {
     let path = settings_path(directory);
     let text = std::fs::read_to_string(&path).map_err(|error| {
         AppError::coded(
@@ -884,6 +1032,24 @@ mod tests {
         assert_eq!(read.theme_light, DEFAULT_LIGHT_THEME);
         assert_eq!(read.theme_dark, DEFAULT_DARK_THEME);
         assert!(read.stash_compare_local);
+    }
+
+    #[test]
+    fn unassigned_shortcut_override_survives_settings_save_and_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut registry = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        let updated = registry.update_settings(&SettingsPatch {
+            shortcuts: Some(BTreeMap::from([("commit".into(), String::new()), ("cloneRepo".into(), "mod+k".into())])),
+            ..SettingsPatch::default()
+        }).unwrap();
+        assert_eq!(updated.shortcuts.get("commit").map(String::as_str), Some(""));
+        let reloaded = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        assert_eq!(reloaded.settings().shortcuts, updated.shortcuts);
+        assert_eq!(read_settings(dir.path()).unwrap().shortcuts, updated.shortcuts);
+        registry.update_settings(&SettingsPatch {
+            shortcuts: Some(BTreeMap::new()), ..SettingsPatch::default()
+        }).unwrap();
+        assert!(read_settings(dir.path()).unwrap().shortcuts.is_empty());
     }
 
     #[test]

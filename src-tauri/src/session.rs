@@ -277,10 +277,12 @@ pub struct WorktreeSession {
     highlight_generations: Mutex<HashMap<String, HighlightStamp>>,
     generation_counter: Mutex<u64>,
     instance_id: u64,
+    changelist_mode: std::sync::atomic::AtomicBool,
     confirmation_epoch: AtomicU64,
     /// 是否有正在进行的写操作（同一 worktree 互斥，不排队）。
     /// 命令层判断“能否重新加载环境”时也要读它（返修 C3）。
     pub(crate) writing: Mutex<bool>,
+    write_generation: AtomicU64,
     /// 审阅标记存储（None 表示未配置，此时界面不显示勾选框）。
     review_store: Option<Arc<ReviewStore>>,
     /// 审阅标记的**真实提交序号**：每次成功写入在会话内单调递增。
@@ -304,11 +306,17 @@ struct HighlightStamp {
 
 /// 写操作互斥 RAII Guard，离开作用域自动释放写锁。
 #[derive(Debug)]
-pub struct WriteGuard<'a>(&'a Mutex<bool>);
+pub struct WriteGuard<'a>(&'a Mutex<bool>, &'a AtomicU64);
+impl WriteGuard<'_> {
+    pub(crate) fn holds(&self, session: &WorktreeSession) -> bool {
+        std::ptr::eq(self.0, &session.writing)
+    }
+}
 impl<'a> Drop for WriteGuard<'a> {
     fn drop(&mut self) {
         if let Ok(mut writing) = self.0.lock() {
             *writing = false;
+            self.1.fetch_add(1, Ordering::Release);
         }
     }
 }
@@ -389,9 +397,11 @@ impl WorktreeSession {
             highlighter: Highlighter::start(),
             highlight_generations: Mutex::new(HashMap::new()),
             generation_counter: Mutex::new(0),
+            changelist_mode: std::sync::atomic::AtomicBool::new(false),
             instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             confirmation_epoch: AtomicU64::new(0),
             writing: Mutex::new(false),
+            write_generation: AtomicU64::new(0),
             review_store,
             review_seq: Mutex::new(0),
             identity: identity.clone(),
@@ -399,6 +409,8 @@ impl WorktreeSession {
     }
 
     /// 会话实例代号：进程内唯一，历史目标据此拒绝旧实例的目标。
+    pub fn set_changelist_mode(&self, enabled: bool) { self.changelist_mode.store(enabled, Ordering::Release); }
+
     pub fn instance_id(&self) -> u64 {
         self.instance_id
     }
@@ -430,8 +442,11 @@ impl WorktreeSession {
     }
 
     fn refresh_locked(&self) -> Result<ChangesSnapshot> {
+        let mut timing = crate::commands::MeasureSpan::new("session.refresh");
         let started = std::time::Instant::now();
+        let changelist_mode = self.changelist_mode.load(Ordering::Acquire);
         let status = status::read(&self.git)?;
+        timing.mark("status");
 
         // `git diff` 会分几次读同一个文件（先算 blob 哈希、再取内容）。如果外部正在**直接保存**
         // （先截断再写入），同一次调用可能拿到「index 行的 blob 来自 A 状态、hunk 文本来自 B 状态」
@@ -440,7 +455,7 @@ impl WorktreeSession {
         let watched: Vec<&str> = status
             .entries
             .iter()
-            .filter(|entry| entry.changes != ChangesKind::Staged)
+            .filter(|entry| changelist_mode || entry.changes != ChangesKind::Staged)
             .map(|entry| entry.path.as_str())
             .collect();
         let before = self.worktree_stats(&watched);
@@ -448,7 +463,9 @@ impl WorktreeSession {
         // 一次读取两种 diff：未暂存（工作区 vs 暂存区）与已暂存（暂存区 vs HEAD）。
         let unstaged_patch = self.git.diff_worktree(None)?;
         let staged_patch = self.git.diff_index(None)?;
+        let changelist_patch = if changelist_mode { self.git.diff_changelist(None, IgnoreWhitespace::Off)? } else { Vec::new() };
 
+        timing.mark("git_diffs");
         let after = self.worktree_stats(&watched);
         if before != after {
             // 读取期间工作区变了：这次结果可能是混合的，按「读取失败」处理，不发布。
@@ -459,10 +476,11 @@ impl WorktreeSession {
                 &[],
             ));
         }
-        let fingerprint = git::fingerprint(&[&unstaged_patch, &staged_patch]);
+        let fingerprint = if changelist_mode { git::fingerprint(&[&unstaged_patch, &staged_patch, &changelist_patch]) } else { git::fingerprint(&[&unstaged_patch, &staged_patch]) };
 
         let unstaged = git::diff::parse_bytes(&unstaged_patch);
         let staged = git::diff::parse_bytes(&staged_patch);
+        timing.mark("parse");
 
         let mut models: HashMap<String, FileModelCache> = HashMap::new();
         for file in unstaged.files {
@@ -558,6 +576,22 @@ impl WorktreeSession {
             });
         }
 
+        if changelist_mode {
+            for file in git::diff::parse_bytes(&changelist_patch).files {
+                let template = entries.iter().find(|entry| entry.path == file.path || entry.original_path.as_deref() == Some(file.path.as_str())).cloned();
+                let status_entry = status.entries.iter().find(|entry| entry.path == file.path || entry.original_path.as_deref() == Some(file.path.as_str())).cloned();
+                let (Some(mut entry), Some(mut status_entry)) = (template, status_entry) else { continue };
+                entry.path = file.path.clone(); entry.original_path = None; entry.changes = ChangesKind::Changelist; entry.status = file.status;
+                status_entry.path = file.path.clone(); status_entry.original_path = None; status_entry.changes = ChangesKind::Changelist; status_entry.status = file.status;
+                entry.fingerprint = compute_file_fingerprint_from_patch(&status_entry, &file.raw_patch, &self.path)?;
+                entry.worktree_version = review::worktree_version(Some(&self.git), &self.path, &file.path).ok().flatten();
+                entry.worktree_version_confirmed = entry.worktree_version.is_some() || !self.path.join(&file.path).is_dir();
+                fill_entry(&mut entry, Some(&file));
+                models.insert(key(ChangesKind::Changelist, &file.path), FileModelCache {model:file,unfiled:false,hunk_actions:Vec::new()});
+                entries.push(entry);
+            }
+        }
+
         let mut guard = self.snapshot.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -578,6 +612,7 @@ impl WorktreeSession {
             *counter += 1;
             *counter
         };
+        timing.mark("entries_and_snapshot_lock");
         let revision = generation.to_string();
         for entry in &mut entries {
             entry.snapshot_revision = revision.clone();
@@ -597,6 +632,7 @@ impl WorktreeSession {
                 std::collections::HashSet::new(),
             ),
         };
+        timing.mark("review_identity_and_state");
         let reviewed: std::collections::HashSet<&str> =
             review.reviewed.iter().map(String::as_str).collect();
         for entry in &mut entries {
@@ -777,7 +813,7 @@ impl WorktreeSession {
             })?;
         let revision = snapshot.generation;
         // 块（段）操作目标（返修 A1/Q142）：与显示同批签发，前端原样传回。
-        let segment_actions_available = ignore.allows_segment_actions()
+        let segment_actions_available = entry.changes != ChangesKind::Changelist && ignore.allows_segment_actions()
             && entry.readonly_reason.is_none()
             && !entry.unmerged
             && !entry.binary
@@ -986,7 +1022,7 @@ impl WorktreeSession {
             )
         })?;
         let segments = cached.segments.clone();
-        let actions_available = ignore.allows_segment_actions()
+        let actions_available = entry.changes != ChangesKind::Changelist && ignore.allows_segment_actions()
             && entry.readonly_reason.is_none()
             && !entry.unmerged
             && !entry.binary
@@ -1171,6 +1207,7 @@ impl WorktreeSession {
                 .git
                 .diff_index_with_ignore(path, original_path, ignore)?,
             ChangesKind::Untracked => self.git.diff_untracked(path)?,
+            ChangesKind::Changelist => self.git.diff_changelist(Some(path), ignore)?,
         };
         let mut parsed = git::diff::parse_bytes(&patch);
         Ok(parsed
@@ -1188,8 +1225,10 @@ impl WorktreeSession {
         ignore: IgnoreWhitespace,
         context_lines: u32,
     ) -> Result<String> {
+        let mut timing = crate::commands::MeasureSpan::new("session.side_cache");
         let cache_key = format!("{changes:?}/{path}/{ignore:?}/{context_lines}");
         if snapshot.side_layouts.contains_key(&cache_key) {
+            timing.mark("cache_hit");
             return Ok(cache_key);
         }
         let unmerged = snapshot
@@ -1214,11 +1253,13 @@ impl WorktreeSession {
                     self.git.file_at("HEAD", path).unwrap_or_default(),
                     self.git.file_at("", path).unwrap_or_default(),
                 ),
+                ChangesKind::Changelist => (self.git.file_at("HEAD", path).unwrap_or_default(), self.git.working_file(path).unwrap_or_default()),
                 ChangesKind::Untracked => (
                     String::new(),
                     self.git.working_file(path).unwrap_or_default(),
                 ),
             };
+            timing.mark("texts");
             let model = match self.ensure_ignore_model(snapshot, path, changes, ignore)? {
                 None => snapshot.models.get(&key(changes, path)),
                 Some(ignore_key) => snapshot.ignore_models.get(&ignore_key),
@@ -1226,6 +1267,7 @@ impl WorktreeSession {
             .map(|cached| &cached.model);
             Self::build_side_layout(left_text, right_text, model, context_lines)?
         };
+        timing.mark("layout_built");
         // 派生完成后再改缓存，不必复制快照里的整个 diff 模型。
         // 有界缓存：文件与档位来回切换时不无限累积。
         if snapshot.side_layouts.len() >= 16 {
@@ -1242,6 +1284,7 @@ impl WorktreeSession {
         model: Option<&git::diff::FileChange>,
         context_lines: u32,
     ) -> Result<SideLayoutCache> {
+        let mut timing = crate::commands::MeasureSpan::new("session.build_side_layout");
         // 全文与 diff 不是同一次读取：对不上说明期间文件被改过，不缓存，等刷新后重取。
         if let Some(model) = model {
             if !segments::texts_match_diff(model, &left_text, &right_text) {
@@ -1253,6 +1296,7 @@ impl WorktreeSession {
                 ));
             }
         }
+        timing.mark("texts_match_diff");
         let (segments, folds) = match model {
             Some(model) => {
                 let mut segments: Vec<segments::ChangeSegment> = Vec::new();
@@ -1269,6 +1313,7 @@ impl WorktreeSession {
             }
             None => (Vec::new(), Vec::new()),
         };
+        timing.mark("segments_and_folds");
         Ok(SideLayoutCache {
             left_text,
             right_text,
@@ -1489,6 +1534,7 @@ impl WorktreeSession {
             ChangesKind::Unstaged => self.git.diff_worktree(Some(path))?,
             ChangesKind::Staged => self.git.diff_index_with_orig(path, orig_path)?,
             ChangesKind::Untracked => self.git.diff_untracked(path)?,
+            ChangesKind::Changelist => self.git.diff_changelist(Some(path), IgnoreWhitespace::Off)?,
         };
         Ok(current == expected_raw)
     }
@@ -1504,8 +1550,8 @@ impl WorktreeSession {
             (ChangesKind::Unstaged, FileVersion::Old) | (ChangesKind::Staged, FileVersion::New) => {
                 "index"
             }
-            (ChangesKind::Staged, FileVersion::Old) => "HEAD",
-            (ChangesKind::Unstaged, FileVersion::New) => "worktree",
+            (ChangesKind::Staged | ChangesKind::Changelist, FileVersion::Old) => "HEAD",
+            (ChangesKind::Unstaged | ChangesKind::Changelist, FileVersion::New) => "worktree",
             // 未跟踪文件没有旧版本
             (ChangesKind::Untracked, FileVersion::Old) => "none",
             (ChangesKind::Untracked, FileVersion::New) => "worktree",
@@ -1579,6 +1625,23 @@ impl WorktreeSession {
         &self.git
     }
 
+    /// A read observation does not mark the repository as writing or block PTY input.
+    /// Its result may be published only if no repository write overlapped the read.
+    pub fn idle_observation_version(&self) -> Result<u64> {
+        self.publish_idle_observation(None, || Ok(self.write_generation.load(Ordering::Acquire)))
+    }
+
+    /// Keep the final metadata publication atomic with respect to write admission.
+    /// The callback only publishes application metadata; it must not run Git or async work.
+    pub fn publish_idle_observation<T>(&self, expected: Option<u64>, publish: impl FnOnce() -> Result<T>) -> Result<T> {
+        let writing = self.writing.lock().map_err(|_| AppError::coded(ErrorKind::Internal, "errors.session.writeOperationLockFailed", "Write lock failed", &[]))?;
+        if *writing || expected.is_some_and(|version| version != self.write_generation.load(Ordering::Acquire)) {
+            return Err(AppError::coded(ErrorKind::Rejected, "errors.session.aWriteOperationProgressWorktreeWait", "Worktree write overlapped this observation", &[]));
+        }
+        self.require_identity()?;
+        publish()
+    }
+
     /// 获取当前 worktree 的独占写操作锁（不排队，发现被占用立即拒绝并发写，Q90/T06）。
     pub fn acquire_write_lock(&self) -> Result<WriteGuard<'_>> {
         let mut writing = self.writing.lock().map_err(|_| {
@@ -1598,8 +1661,9 @@ impl WorktreeSession {
             ));
         }
         self.require_identity()?;
+        self.write_generation.fetch_add(1, Ordering::Release);
         *writing = true;
-        Ok(WriteGuard(&self.writing))
+        Ok(WriteGuard(&self.writing, &self.write_generation))
     }
 
     /// 整文件暂存（Q8、Q79、Q81–Q83、ADR-0005、ADR-0009）。
@@ -3392,6 +3456,7 @@ fn supports_hunk_actions(entry: &ChangeEntry, file: &git::diff::FileChange) -> b
     // 既不猜测「删除 + 未跟踪」配对，也不影响真正的普通 M 文件。
     let renamed_by_git = entry.original_path.is_some() || file.old_path.is_some();
     entry.changes != ChangesKind::Untracked
+        && entry.changes != ChangesKind::Changelist
         && !renamed_by_git
         && entry.readonly_reason.is_none()
         && !entry.unmerged
@@ -3546,14 +3611,14 @@ fn compute_file_fingerprint_from_patch(
     // actual worktree bytes too; textual hunks already bind the Git file version.
     let lacks_text_hunks = !diff_bytes.windows(4).any(|bytes| bytes == b"\n@@ ");
     if entry.changes == ChangesKind::Untracked
-        || (entry.changes == ChangesKind::Unstaged && lacks_text_hunks)
+        || (matches!(entry.changes, ChangesKind::Unstaged | ChangesKind::Changelist) && lacks_text_hunks)
     {
         let file_path = worktree_path.join(&entry.path);
         let meta = match std::fs::symlink_metadata(&file_path) {
             Ok(meta) => Some(meta),
             Err(error)
                 if error.kind() == std::io::ErrorKind::NotFound
-                    && entry.changes == ChangesKind::Unstaged =>
+                    && matches!(entry.changes, ChangesKind::Unstaged | ChangesKind::Changelist) =>
             {
                 None
             }

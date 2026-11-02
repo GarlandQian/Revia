@@ -20,7 +20,7 @@ export const TREE_ROW_HEIGHT = 22;
 const OVERSCAN = 8;
 
 /** 分组：冲突组在最上方（返修 F10，Q143），其余三组照旧。 */
-export type TreeGroupKey = ChangesKind | "conflicts";
+export type TreeGroupKey = Exclude<ChangesKind, "changelist"> | "conflicts";
 export type TreeGroupOpen = Record<TreeGroupKey, boolean>;
 
 export function entryKey(entry: Pick<ChangeEntry, "path" | "changes">): string {
@@ -45,7 +45,7 @@ const GROUPS: Array<{ kind: TreeGroupKey; title: () => string }> = [
 
 /** 条目属于哪个显示分组：冲突文件不再出现在已暂存、未暂存组里（Q143）。 */
 function groupOf(entry: ChangeEntry): TreeGroupKey {
-  return entry.unmerged ? "conflicts" : entry.changes;
+  return entry.unmerged ? "conflicts" : entry.changes === "changelist" ? "unstaged" : entry.changes;
 }
 
 interface ChangesTreeProps {

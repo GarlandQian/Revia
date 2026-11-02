@@ -16,6 +16,7 @@ pub mod file_history;
 pub mod git;
 pub mod history;
 mod history_sequence;
+pub mod m7;
 pub mod merge;
 pub mod operation;
 pub mod operation_flow;
@@ -40,6 +41,7 @@ use commands::AppState;
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             use tauri::Manager;
             let data_dir = app
@@ -89,6 +91,7 @@ pub fn run() {
                     }
                 }
             }
+            let data_dir_for_update = data_dir.clone();
             let mut state = AppState::new(data_dir);
             state.acceptance = acceptance_dir
                 .map(acceptance::Acceptance::new)
@@ -140,6 +143,7 @@ pub fn run() {
                 })
                 .ok();
 
+            crate::m7::update::spawn_auto_check(app.handle().clone(), data_dir_for_update, std::sync::Arc::clone(&state.m7_update));
             app.manage(state);
             Ok(())
         })
@@ -251,6 +255,67 @@ pub fn run() {
             commands::external_tool_choices,
             commands::external_tool_launch,
             commands::system_language,
+            m7::commands::m7_list_imported_themes,
+            m7::commands::m7_import_theme,
+            m7::commands::m7_remove_imported_theme,
+            m7::commands::m7_changelist_view,
+            m7::commands::m7_changelist_change,
+            m7::commands::m7_changelist_warnings,
+            m7::commands::m7_open_editable,
+            m7::commands::m7_save_editable,
+            m7::commands::m7_save_edit_draft,
+            m7::commands::m7_load_edit_draft,
+            m7::commands::m7_glass_support,
+            m7::commands::m7_glass_layout,
+            m7::commands::m7_clear_edit_draft,
+            m7::commands::m7_list_edit_drafts,
+            m7::commands::m7_terminal_open,
+            m7::commands::m7_terminal_list,
+            m7::commands::m7_terminal_write,
+            m7::commands::m7_terminal_resize,
+            m7::commands::m7_terminal_snapshot,
+            m7::commands::m7_terminal_close,
+            m7::commands::m7_terminal_close_worktree,
+            m7::commands::m7_terminal_tabs,
+            m7::commands::m7_terminal_save_tabs,
+            m7::commands::m7_clone_start,
+            m7::commands::m7_clone_cancel,
+            m7::commands::m7_clone_active,
+            m7::commands::m7_clone_register,
+            m7::commands::m7_github_status,
+            m7::commands::m7_github_device_start,
+            m7::commands::m7_github_device_open,
+            m7::commands::m7_github_device_poll,
+            m7::commands::m7_github_login_token,
+            m7::commands::m7_github_logout,
+            m7::commands::m7_github_bind_repo,
+            m7::commands::m7_github_remotes,
+            m7::commands::m7_github_pr_list,
+            m7::commands::m7_github_pr_detail,
+            m7::commands::m7_github_pr_files,
+            m7::commands::m7_github_pr_diff,
+            m7::commands::m7_github_pr_comments,
+            m7::commands::m7_github_pr_comment_create,
+            m7::commands::m7_github_device_cancel,
+            m7::commands::m7_github_repo_key,
+            m7::commands::m7_github_review_drafts,
+            m7::commands::m7_github_review_draft_save,
+            m7::commands::m7_github_review_draft_delete,
+            m7::commands::m7_github_review_submit,
+            m7::commands::m7_github_pr_checkout,
+            m7::commands::m7_github_pr_create,
+            m7::commands::m7_github_pr_merge,
+            m7::commands::m7_github_receipts,
+            m7::commands::m7_github_protection_refresh,
+            m7::commands::m7_export_diagnostics,
+            m7::commands::m7_preview_diagnostics,
+            m7::commands::m7_diagnostics_summary,
+            m7::commands::m7_diagnostics_clear,
+            m7::commands::m7_update_status,
+            m7::commands::m7_update_check,
+            m7::commands::m7_update_download,
+            m7::commands::m7_update_install,
+            m7::commands::m7_update_restart,
         ])
         .build(tauri::generate_context!())
         .expect("Revia 启动失败");

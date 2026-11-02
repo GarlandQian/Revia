@@ -14,4 +14,8 @@ requiresChoice: boolean, hasStagedChanges: boolean,
  * ref.  Reword / interactive rebase use this to warn before rewriting
  * already published history; no network request is made.
  */
-published: boolean, overwriteFingerprint: string, resetFingerprint: string, contextVersion: string, overwritePaths: Array<string>, };
+published: boolean,
+/**
+ * 当前分支命中本地与当前账号GitHub缓存的并集；历史确认必须显示该保护提示。
+ */
+protectedBranch: string | null, overwriteFingerprint: string, resetFingerprint: string, contextVersion: string, overwritePaths: Array<string>, };

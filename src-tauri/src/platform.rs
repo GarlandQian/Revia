@@ -2,9 +2,15 @@
 
 #[cfg(target_os = "macos")]
 mod macos_exit;
+#[cfg(target_os = "macos")]
+mod macos_glass;
+pub mod window_glass;
 
 mod language;
 pub use language::{language_from_locale, system_language};
+
+mod browser;
+pub use browser::open_github_device_page;
 
 pub(crate) mod output_pipe;
 

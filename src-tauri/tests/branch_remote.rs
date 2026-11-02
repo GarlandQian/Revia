@@ -60,7 +60,7 @@ fn run_git(directory: &Path, env: &HashMap<String, String>, args: &[&str]) -> St
         .current_dir(directory)
         .env_clear()
         .envs(env)
-        .args(args)
+        .args(args.iter().map(|argument| revia_lib::platform::external_path(Path::new(argument))))
         .output()
         .expect("执行 Git");
     assert!(
@@ -78,7 +78,7 @@ fn run_git_output(directory: &Path, env: &HashMap<String, String>, args: &[&str]
         .current_dir(directory)
         .env_clear()
         .envs(env)
-        .args(args)
+        .args(args.iter().map(|argument| revia_lib::platform::external_path(Path::new(argument))))
         .output()
         .expect("执行 Git")
 }
@@ -112,12 +112,12 @@ impl Fixture {
         }
         let joined_path = std::env::join_paths(paths.iter().map(Path::new)).unwrap();
         let mut env = HashMap::from([
-            ("HOME".into(), home.display().to_string()),
-            ("USERPROFILE".into(), home.display().to_string()),
-            ("XDG_CONFIG_HOME".into(), home.display().to_string()),
+            ("HOME".into(), revia_lib::platform::external_path(&home).display().to_string()),
+            ("USERPROFILE".into(), revia_lib::platform::external_path(&home).display().to_string()),
+            ("XDG_CONFIG_HOME".into(), revia_lib::platform::external_path(&home).display().to_string()),
             (
                 "GIT_CONFIG_GLOBAL".into(),
-                global_config.display().to_string(),
+                revia_lib::platform::external_path(&global_config).display().to_string(),
             ),
             ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
             ("GIT_TERMINAL_PROMPT".into(), "0".into()),
@@ -149,7 +149,7 @@ impl Fixture {
             &env,
             &["init", "--bare", "-b", "main", origin.to_str().unwrap()],
         );
-        let url = format!("file://{}", origin.display());
+        let url = url::Url::from_directory_path(revia_lib::platform::external_path(&origin)).unwrap().to_string();
         run_git(&repo, &env, &["remote", "add", "origin", &url]);
         run_git(&repo, &env, &["push", "-u", "origin", "main"]);
         run_git(&root, &env, &["clone", &url, other.to_str().unwrap()]);
@@ -376,7 +376,9 @@ fn checkout_is_refused_when_another_worktree_holds_the_branch() {
     let error = checkout(&f, local("busy"), CheckoutStrategy::Plain).unwrap_err();
     let message = error.message.clone();
     assert!(
-        message.contains("already checked out") || message.contains("已经被工作区"),
+        message.contains("already checked out")
+            || message.contains("already used by worktree")
+            || message.contains("已经被工作区"),
         "{message}"
     );
 }
@@ -932,7 +934,10 @@ fn push_is_rejected_when_the_remote_has_new_commits() {
         panic!("非快进推送应被拒绝");
     };
     assert!(
-        reason.contains("拒绝") || reason.contains("non-fast-forward"),
+        reason.contains("拒绝")
+            || reason.contains("non-fast-forward")
+            || reason.contains("[rejected]")
+            || reason.contains("fetch first"),
         "{reason}"
     );
     // 更新后可以再推（前端编排；这里验证底层）。

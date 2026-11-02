@@ -53,7 +53,7 @@ pub fn partial_staged_paths(git: &Git) -> Result<Vec<String>> {
             ChangesKind::Unstaged => {
                 unstaged.insert(entry.path.clone());
             }
-            ChangesKind::Untracked => {}
+            ChangesKind::Untracked | ChangesKind::Changelist => {}
         }
     }
     Ok(staged.intersection(&unstaged).cloned().collect())

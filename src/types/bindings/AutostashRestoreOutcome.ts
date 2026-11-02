@@ -2,7 +2,7 @@
 import type { AppErrorPayload } from "./AppErrorPayload";
 import type { AutostashLink } from "./AutostashLink";
 
-export type AutostashRestoreOutcome = { link: AutostashLink, restored: boolean, conflicted: boolean,
+export type AutostashRestoreOutcome = { link: AutostashLink, restored: boolean, conflicted: boolean, 
 /**
  * The stash was archived and removed after a clean apply.
  */

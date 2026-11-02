@@ -16,6 +16,8 @@ pub enum ChangesKind {
     Unstaged,
     Staged,
     Untracked,
+    /// 更改列表专用 HEAD → 工作区读取源，不是可暂存的分组。
+    Changelist,
 }
 
 /// 文件在某一组里的状态，对应界面上的单字母（Q31）。

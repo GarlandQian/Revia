@@ -3,4 +3,4 @@
 /**
  * 改动所属的分组。术语见 GLOSSARY：未暂存改动 / 已暂存改动 / 未跟踪文件。
  */
-export type ChangesKind = "unstaged" | "staged" | "untracked";
+export type ChangesKind = "unstaged" | "staged" | "untracked" | "changelist";

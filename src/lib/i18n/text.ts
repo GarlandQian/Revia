@@ -51,7 +51,7 @@ export function renamedFrom(dir: string, original: string): string {
 }
 
 export function sideLabels(
-  changes: "unstaged" | "staged" | "untracked",
+  changes: "unstaged" | "staged" | "untracked" | "changelist",
   conflict: boolean,
 ): { left: string; right: string } {
   if (conflict) {
@@ -71,6 +71,8 @@ export function sideLabels(
         left: t("diff.sideLabels.staged.left"),
         right: t("diff.sideLabels.staged.right"),
       };
+    case "changelist":
+      return { left: t("diff.sideLabels.staged.left"), right: t("diff.sideLabels.unstaged.right") };
     case "untracked":
       return {
         left: t("diff.sideLabels.untracked.left"),
@@ -297,5 +299,19 @@ export function checkoutNoteText(note: import("@/types/bindings/CheckoutNote").C
     case "existingTracking": return t("remote.notes.existingTracking", { remote: note.remote, branch: note.branch });
     case "createdTracking": return t("remote.notes.createdTracking", { remote: note.remote, branch: note.branch });
     case "stashRestoreConflicted": return t("remote.notes.stashRestoreConflicted");
+  }
+}
+
+/** 更新通道未配置的原因（后端只给稳定的翻译键，Q168）。 */
+export function updateReasonText(reason: string): string {
+  switch (reason) {
+    case "errors.m7.updateReasonNoPlugin":
+      return t("errors.m7.updateReasonNoPlugin");
+    case "errors.m7.updateReasonNoPubkey":
+      return t("errors.m7.updateReasonNoPubkey");
+    case "errors.m7.updateReasonNoEndpoints":
+      return t("errors.m7.updateReasonNoEndpoints");
+    default:
+      return t("update.unconfigured");
   }
 }

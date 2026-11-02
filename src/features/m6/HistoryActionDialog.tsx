@@ -17,7 +17,7 @@ import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { RemoteTarget } from "@/features/branches/remoteContinuation";
 import { ipc } from "@/lib/ipc";
 import { formatAppError, toAppError } from "@/lib/error";
-import { messages } from "@/lib/i18n/index";
+import { messages, t } from "@/lib/i18n/index";
 import { Codicon } from "@/components/ui/codicon";
 import { Modal } from "@/components/app/Dialogs";
 
@@ -266,6 +266,12 @@ export function HistoryActionDialog({
         {(action === "reword" || action === "interactive" || action === "reset") && preflight?.published ? (
           <p className="rounded border border-[var(--editorwarning-foreground)]/50 px-2 py-1.5 text-[12px] text-[var(--editorwarning-foreground)]">
             {messages.historyActions.publishedWarning}
+          </p>
+        ) : null}
+
+        {(action === "reword" || action === "interactive" || action === "reset") && preflight?.protectedBranch ? (
+          <p className="rounded border border-[var(--editorwarning-foreground)]/50 px-2 py-1.5 text-[12px] text-[var(--editorwarning-foreground)]">
+            {t("historyActions.protectedWarning", { branch: preflight.protectedBranch })}
           </p>
         ) : null}
 

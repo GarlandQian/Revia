@@ -8,39 +8,39 @@ import type { UpstreamStatus } from "./UpstreamStatus";
 /**
  * 提交上下文（F02/F03/F06）：预期、模板、最近信息、草稿、上游状态、门禁。
  */
-export type CommitContext = { draftIdentity: string | null, worktreeId: string, expectation: CommitExpectation,
+export type CommitContext = { draftIdentity: string | null, worktreeId: string, expectation: CommitExpectation, 
 /**
  * `commit.template` 的内容；未设置或读取失败为 None。
  */
-template: string | null,
+template: string | null, 
 /**
  * 模板读取失败的原因（可见，但不阻断读草稿与提交，F02.3）。
  */
-templateError: AppErrorPayload | null,
+templateError: AppErrorPayload | null, 
 /**
  * 最近 N 条提交信息（完整多行原文，最多 20 条）。
  */
-recentMessages: Array<string>,
+recentMessages: Array<string>, 
 /**
  * 该 worktree 的持久草稿；没有为 None。
  */
-draft: CommitDraft | null,
+draft: CommitDraft | null, 
 /**
  * 草稿读取失败的原因（持久化失败必须可见，F02.5）；成功为 None。
  */
-draftError: AppErrorPayload | null,
+draftError: AppErrorPayload | null, 
 /**
  * 本地上游包含状态（截至上次 fetch，F06.3）。
  */
-upstream: UpstreamStatus,
+upstream: UpstreamStatus, 
 /**
  * 本地上游跟踪分支名；未配置为 None。
  */
-upstreamName: string | null,
+upstreamName: string | null, 
 /**
  * 上游读数版本：变化使旧的 amend 二次确认失效。
  */
-upstreamVersion: string,
+upstreamVersion: string, 
 /**
  * 门禁摘要（展示用；执行时重新校验，不只信 UI，F01.3）。
  */

@@ -37,11 +37,21 @@ impl Fixture {
         let path: Vec<String> = std::env::split_paths(&std::env::var_os("PATH").unwrap())
             .map(|entry| entry.to_string_lossy().into_owned()).collect();
         let vars = HashMap::from([
-            ("HOME".into(), home.display().to_string()),
-            ("GIT_CONFIG_GLOBAL".into(), config.display().to_string()),
+            ("HOME".into(), revia_lib::platform::external_path(&home).display().to_string()),
+            ("GIT_CONFIG_GLOBAL".into(), revia_lib::platform::external_path(&config).display().to_string()),
             ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
             ("PATH".into(), std::env::join_paths(path.iter().map(Path::new)).unwrap().to_string_lossy().into_owned()),
         ]);
+        #[cfg(windows)]
+        let vars = {
+            let mut vars = vars;
+            for name in ["SystemRoot", "WINDIR", "COMSPEC", "PATHEXT"] {
+                if let Ok(value) = std::env::var(name) {
+                    vars.insert(name.into(), value);
+                }
+            }
+            vars
+        };
         let env = ShellEnv {
             path: path.clone(), vars,
             info: EnvCaptureInfo {
@@ -63,7 +73,7 @@ impl Fixture {
     }
 
     fn git_output(&self, args: &[&str]) -> Output {
-        Command::new("git").args(args).current_dir(&self.repo)
+        Command::new("git").args(args.iter().map(|argument| revia_lib::platform::external_path(Path::new(argument)))).current_dir(&self.repo)
             .env_clear().envs(&self.env.vars).output().unwrap()
     }
 

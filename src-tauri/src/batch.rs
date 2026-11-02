@@ -278,10 +278,8 @@ mod tests {
     }
 
     fn shell_env(dir: &Path) -> ShellEnv {
-        let path: Vec<String> = std::env::var("PATH")
-            .unwrap_or_default()
-            .split(':')
-            .map(str::to_string)
+        let path: Vec<String> = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .map(|path| path.to_string_lossy().into_owned())
             .collect();
         let vars = [
             (
@@ -300,7 +298,7 @@ mod tests {
             path: path.clone(),
             info: EnvCaptureInfo {
                 worktree: dir.display().to_string(),
-                shell: "/bin/zsh".into(),
+                shell: "fixture".into(),
                 elapsed_ms: 0,
                 timed_out: false,
                 used_fallback: false,
@@ -316,6 +314,7 @@ mod tests {
         let repo = dir.path().join("repo");
         std::fs::create_dir_all(&repo).unwrap();
         git(&repo, &["init", "-q"]);
+        git(&repo, &["config", "core.autocrlf", "false"]);
         git(&repo, &["config", "user.email", "revia@example.com"]);
         git(&repo, &["config", "user.name", "Revia Test"]);
         std::fs::write(repo.join("a.txt"), "a1\n").unwrap();
@@ -445,6 +444,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn batch_skips_readonly_entries_with_reason() {
         let (_dir, repo) = fixture();
         std::fs::write(repo.join("a.txt"), "a2\n").unwrap();

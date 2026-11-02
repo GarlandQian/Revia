@@ -1026,7 +1026,7 @@ export async function runReviewRecoveryBatch(
 // ---------------- 写入期间的安全关闭/退出（任务 08，Q90/Q91/Q96）----------------
 
 /** 关闭/退出请求的类型。 */
-export type CloseIntent = "close" | "exit";
+export type CloseIntent = "close" | "exit" | "installUpdate" | "restartUpdate";
 
 /** 一次关闭请求在某个时刻应该做什么。 */
 export type CloseDecision =
@@ -1493,6 +1493,8 @@ export interface CloseDriverDeps {
   closeWindow: () => Promise<void>;
   /** 原退出请求走真正的应用退出，而不是用销毁窗口冒充。 */
   exitApp: () => Promise<void>;
+  installUpdate?: () => Promise<void>;
+  restartUpdate?: () => Promise<void>;
   onError: (error: unknown) => void;
   onAsk: (intent: CloseIntent, writing: string[], pending: string[]) => void;
   onSettled: () => void;
@@ -1592,7 +1594,7 @@ export class CloseDriver {
   private async execute(attempt: CloseAttempt): Promise<void> {
     const coordinator = this.deps.coordinator;
     try {
-      if (attempt.intent === "exit") await this.deps.releaseExitGuard();
+      if (attempt.intent !== "close") await this.deps.releaseExitGuard();
       if (this.attempt !== attempt) return;
       if (!coordinator.isExecutionValid(attempt.generation)) {
         coordinator.abandonExecution(attempt.claimId);
@@ -1605,14 +1607,20 @@ export class CloseDriver {
       this.phase = "closing";
       this.deps.onSettled();
       if (attempt.intent === "exit") await this.deps.exitApp();
-      else await this.deps.closeWindow();
+      else if (attempt.intent === "close") await this.deps.closeWindow();
+      else if (attempt.intent === "installUpdate" && this.deps.installUpdate) await this.deps.installUpdate();
+      else if (attempt.intent === "restartUpdate" && this.deps.restartUpdate) await this.deps.restartUpdate();
+      else throw new Error("Lifecycle action is unavailable");
       if (this.attempt !== attempt) return;
       coordinator.completeExecution(attempt.claimId);
       this.attempt = null;
+      if (attempt.intent === "installUpdate") { this.phase = "idle"; this.deps.onSettled(); }
       // IPC 回包不等于窗口已经销毁；保持 closing，迟到的事件/选择不能重新开放写入。
     } catch (error) {
       if (this.attempt !== attempt) return;
       coordinator.failExecution(attempt.claimId);
+      // 更新动作的调用方已收到失败；取消本次请求，重新安装/重启必须重新走完整协调。
+      if (attempt.intent === "installUpdate" || attempt.intent === "restartUpdate") coordinator.keepOpen();
       this.attempt = null;
       this.phase = "idle";
       this.deps.onError(error);

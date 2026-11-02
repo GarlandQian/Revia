@@ -244,7 +244,10 @@ fn stash_archive_survives_gc_and_restores_into_stash_list_without_touching_workt
 
     let session = f.session();
     let identity = f.identity(&session);
-    let archives = f.archives();
+    // Exercise canonical application-data paths at both Git argv boundaries.
+    fs::create_dir_all(f.data()).unwrap();
+    let data = fs::canonicalize(f.data()).unwrap();
+    let archives = StashArchiveStore::new(&data);
     let record = archives
         .archive(
             &session.git,
@@ -264,7 +267,7 @@ fn stash_archive_survives_gc_and_restores_into_stash_list_without_touching_workt
     assert!(stash::list(&session.git).unwrap().is_empty());
 
     // 新实例模拟应用重启后重新打开同一个数据目录。
-    let reopened = StashArchiveStore::new(&f.data());
+    let reopened = StashArchiveStore::new(&data);
     let summaries = reopened.list(Some(&identity)).unwrap();
     assert_eq!(summaries.len(), 1);
     assert!(summaries[0].identity_confirmed);
@@ -588,7 +591,7 @@ fn interactive_rebase_edit_stop_allows_amend_but_other_operations_do_not() {
     f.commit_all("three");
 
     let editor = f.temp.path().join("edit-sequence.sh");
-    fs::write(&editor, "#!/bin/sh\nsed -i '' 's/^pick /edit /' \"$1\"\n").unwrap();
+    fs::write(&editor, "#!/bin/sh\nsed 's/^pick /edit /' \"$1\" > \"$1.revia-test\"\nmv \"$1.revia-test\" \"$1\"\n").unwrap();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -597,7 +600,7 @@ fn interactive_rebase_edit_stop_allows_amend_but_other_operations_do_not() {
     let output = f.command(
         &["rebase", "--interactive", "--root"],
         &[
-            ("GIT_SEQUENCE_EDITOR", editor.to_string_lossy().as_ref()),
+            ("GIT_SEQUENCE_EDITOR", revia_lib::platform::git_shell_argument(&editor).as_str()),
             ("GIT_EDITOR", "true"),
         ],
     );
@@ -1225,13 +1228,17 @@ fn file_history_stops_at_same_path_delete_recreate_boundary() {
 #[test]
 fn file_history_keeps_control_characters_in_paths_and_commit_fields() {
     let f = Fixture::new();
-    let paths = ["before\u{1e}after.txt".to_string(),
-        format!("\u{1e}{}", "a".repeat(40)), "line\nname\t.txt".to_string()];
+    // Windows cannot store control characters in filenames; commit fields still exercise them.
+    let paths = if cfg!(windows) {
+        ["before after.txt".to_string(), format!("separator {}", "a".repeat(40)), "line name [tab].txt".to_string()]
+    } else {
+        ["before\u{1e}after.txt".to_string(), format!("\u{1e}{}", "a".repeat(40)), "line\nname\t.txt".to_string()]
+    };
     f.git(&["config", "user.name", "Author\u{1e}Name"]);
     f.write("before", b"unrelated alias bytes\n");
     for path in &paths { f.write(path, b"real object\n"); }
     let root = f.commit_all("subject\u{1e}with separator");
-    let renamed = "new\u{1e}name\n.txt";
+    let renamed = if cfg!(windows) { "new name [line].txt" } else { "new\u{1e}name\n.txt" };
     f.git(&["mv", &paths[0], renamed]);
     let tip = f.commit_all("rename\u{1e}subject");
     let session = f.session();
@@ -1853,13 +1860,14 @@ fn confirmed_hard_reset_rejects_later_file_or_index_changes_without_writing() {
 #[test]
 fn force_cherry_pick_treats_metacharacters_as_literal_paths_and_rejects_stale_confirmation() {
     let f = Fixture::new();
-    f.write("a*", b"base\n"); f.write("abc", b"unrelated\n");
+    let (literal_path, other_path) = if cfg!(windows) { ("a[bc]", "ab") } else { ("a*", "abc") };
+    f.write(literal_path, b"base\n"); f.write(other_path, b"unrelated\n");
     let base = f.commit_all("base");
-    f.branch("feature"); f.write("a*", b"feature\n"); let feature = f.commit_all("feature");
-    f.checkout("main"); f.write("a*", b"local\n"); f.write("abc", b"unrelated dirty\n");
+    f.branch("feature"); f.write(literal_path, b"feature\n"); let feature = f.commit_all("feature");
+    f.checkout("main"); f.write(literal_path, b"local\n"); f.write(other_path, b"unrelated dirty\n");
     let session = f.session();
     let confirmed = rewrite::preflight(&session, &[feature.clone()]).unwrap();
-    f.write("a*", b"later\n");
+    f.write(literal_path, b"later\n");
     let request = CherryPickRequest {
             expected_context: revia_lib::write_guard::context(&session.git).unwrap(), oids: vec![feature.clone()], expected_head: base,
         dirty_strategy: Some(DirtyStrategy::Force), expected_state: Some(confirmed.overwrite_fingerprint),
@@ -1867,13 +1875,13 @@ fn force_cherry_pick_treats_metacharacters_as_literal_paths_and_rejects_stale_co
     let index = f.index();
     let error = rewrite::cherry_pick(&session, &f.recovery(), &f.autostash(), &f.archives(), &request).unwrap_err();
     assert_eq!(error.code, Some("errors.rewrite.stateChanged"));
-    assert_eq!(f.read("a*"), b"later\n"); assert_eq!(f.index(), index);
+    assert_eq!(f.read(literal_path), b"later\n"); assert_eq!(f.index(), index);
     let confirmed = rewrite::preflight(&session, &[feature]).unwrap();
     let request = CherryPickRequest { expected_state: Some(confirmed.overwrite_fingerprint), ..request };
     let result = rewrite::cherry_pick(&session, &f.recovery(), &f.autostash(), &f.archives(), &request).unwrap();
     assert!(result.completed && result.error.is_none());
-    assert_eq!(f.read("a*"), b"feature\n");
-    assert_eq!(f.read("abc"), b"unrelated dirty\n");
+    assert_eq!(f.read(literal_path), b"feature\n");
+    assert_eq!(f.read(other_path), b"unrelated dirty\n");
 }
 
 #[test]
@@ -2392,7 +2400,12 @@ fn mixed_reset_rejects_an_index_changed_after_confirmation() {
 
 #[test]
 fn stash_inspection_preserves_unicode_tabs_and_newlines_in_git_paths() {
-    let f = Fixture::new(); let paths = ["说明 文件.txt", "tab\tfile", "line\nfile"];
+    let f = Fixture::new();
+    let paths = if cfg!(windows) {
+        ["说明 文件.txt", "tab file", "line file [brackets]"]
+    } else {
+        ["说明 文件.txt", "tab\tfile", "line\nfile"]
+    };
     for path in paths { f.write(path, b"old\n"); } f.commit_all("base");
     for path in paths { f.write(path, b"new\n"); }
     f.git(&["stash", "push", "--quiet"]); let session = f.session();
@@ -2479,16 +2492,17 @@ fn real_external_tool_timeout_is_uncertain_and_preserves_recovery() {
 #[test]
 fn review_file_history_must_treat_filename_metacharacters_literally() {
     let f = Fixture::new();
-    f.write("a*", b"literal name\n");
+    let (literal_path, other_path) = if cfg!(windows) { ("a[bc]", "ab") } else { ("a*", "abc") };
+    f.write(literal_path, b"literal name\n");
     let original = f.commit_all("literal a-star");
-    f.write("abc", b"unrelated path\n");
-    let unrelated = f.commit_all("only abc changes");
+    f.write(other_path, b"unrelated path\n");
+    let unrelated = f.commit_all("only other path changes");
     let session = f.session();
     let result = file_history::history(&session.git, &FileHistoryRequest {
-        path: "a*".into(), all_branches: false, skip: 0, limit: 40, anchor: None,
+        path: literal_path.into(), all_branches: false, skip: 0, limit: 40, anchor: None,
     }).unwrap();
     println!("fixture={} original={original} unrelated={unrelated} result={result:?}", f.temp.path().display());
-    assert!(!result.entries.iter().any(|entry| entry.oid == unrelated), "History for literal a* includes unrelated abc commit");
+    assert!(!result.entries.iter().any(|entry| entry.oid == unrelated), "History for literal {literal_path} includes unrelated {other_path} commit");
 }
 
 #[test]
@@ -4379,12 +4393,13 @@ fn file_history_and_stash_patches_keep_non_ascii_paths_readable() {
     let page = file_history::history(&session.git, &FileHistoryRequest {
         path: "文档 目录/说明 文件.txt".into(), all_branches: false, skip: 0, limit: 40, anchor: None,
     }).unwrap();
-    assert!(page.entries[0].patch.contains("a/文档 目录/说明 文件.txt"), "{}", page.entries[0].patch);
+    assert!(page.entries[0].patch.contains("文档 目录/说明 文件.txt"), "{}", page.entries[0].patch);
     f.write("文档 目录/说明 文件.txt", b"three\n"); f.git(&["stash", "push", "--quiet"]);
     let oid = stash::list(&session.git).unwrap()[0].oid.clone();
     for compare_local in [false, true] {
         let inspection = stash::inspect(&session.git, &oid, compare_local).unwrap();
-        assert!(inspection.patch.contains("b/文档 目录/说明 文件.txt"), "{}", inspection.patch);
+        // Require readable path text; Git may omit the a/ and b/ display prefixes.
+        assert!(inspection.patch.contains("文档 目录/说明 文件.txt"), "{}", inspection.patch);
         assert!(!inspection.patch.contains("\\346"));
     }
 }

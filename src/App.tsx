@@ -35,6 +35,10 @@ import { CommitArea, messageSubmittable, type CommitResultView } from "@/compone
 import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitOutputStore } from "@/lib/commitOutput";
+import { changelistEntriesForView, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
+import { Changelists, selectionOf, type ChangelistControls } from "@/features/m7/Changelists";
+import type { ChangelistView } from "@/types/bindings/ChangelistView";
+import { invoke } from "@tauri-apps/api/core";
 import { ChangesTree, entryKey, treeOrder } from "@/components/app/ChangesTree";
 import { Breadcrumbs, EditorTabs, mergeTabKey, tabKey, type DiffToolbarOptions } from "@/components/app/EditorTabs";
 import { MergeView } from "@/features/diff/MergeView";
@@ -44,10 +48,10 @@ import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { NotificationStack } from "@/components/app/Notifications";
 import { RecoveryPanel } from "@/components/app/RecoveryPanel";
 import { SettingsDialog, type SettingsPatch } from "@/components/app/SettingsDialog";
-import { ActivityBar, StatusBar, TitleBar, WelcomeScreen } from "@/components/app/Shell";
+import { ActivityBar, StatusBar, TitleBar, ToolbarGroup, WelcomeScreen } from "@/components/app/Shell";
 import { Codicon } from "@/components/ui/codicon";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/popover";
-import { logToBackend, setLoggingEnabled } from "@/features/diff/log";
+import { beginSynchronousMeasurement, flushSynchronousMeasurements, logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
 import { DiffView, ROW_HEIGHT, type DiffViewHandle } from "@/features/diff/DiffView";
 import { SideBySideView, type SideBySideHandle, type DiffOptions } from "@/features/diff/SideBySideView";
@@ -79,7 +83,7 @@ import {
   preparePush, remoteShortcutAction, remoteTargetIsCurrent, runPushSequence,
   type BoundPushPreview, type RemoteTarget,
 } from "@/features/branches/remoteContinuation";
-import { BranchWidget } from "@/features/branches/BranchWidget";
+import { BranchWidget, SyncActions } from "@/features/branches/BranchWidget";
 import { CheckoutConflictDialog, NewBranchDialog, PushDialog } from "@/features/branches/BranchDialogs";
 import { useBranches } from "@/features/branches/useBranches";
 import type { IncomingToken } from "@/features/branches/incomingState";
@@ -103,9 +107,9 @@ import { soakScroller } from "@/lib/soakScroller";
 import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus, type WatchStatusPayload } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
 import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
-import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, type LanguagePreference } from "@/lib/i18n/index";
+import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, t, type LanguagePreference } from "@/lib/i18n/index";
 import { operationKindText, readonlyReasonText } from "@/lib/i18n/text";
-import { isButtonTarget, isCommitMessageTarget, isCommitShortcut, isDiscardFileShortcut, isPrimaryModifier, isReviewShortcut, isStageFileShortcut, isTextInputOrDialog } from "@/lib/platform";
+import { isButtonTarget, isCommitMessageTarget, isPrimaryModifier, isTextInputOrDialog } from "@/lib/platform";
 import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
 import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
@@ -116,6 +120,26 @@ import type { OperationContext } from "@/lib/refreshGate";
 import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { formatAppError, resultNeedsVerification, getErrorMessage, toAppError } from "@/lib/error";
 import { useAppearance } from "@/hooks/useAppearance";
+import { matchShortcut, setShortcutOverrides as applyShortcutOverrides } from "@/lib/shortcuts";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { reviewDraftSessions } from "@/lib/m7/reviewDrafts";
+import { mergeBufferGuards } from "@/lib/m7/mergeBuffers";
+import { flushM7State, registerM7Flusher } from "@/lib/m7/flush";
+import { m7, onM7Events } from "@/lib/m7/api";
+import { EditableWorkspace, EditDecisionDialog } from "@/features/m7/EditableWorkspace";
+import { EditSessions, type EditSession, type EditTarget } from "@/lib/m7/editSession";
+import { runEditWrite } from "@/lib/m7/editWrite";
+import type { EditSavePayload } from "@/lib/m7/api";
+import type { EditSaved } from "@/types/bindings/EditSaved";
+import { TerminalPanel } from "@/features/m7/TerminalPanel";
+import { TerminalSessions } from "@/lib/m7/terminalSessions";
+import type { TerminalSessionInfo } from "@/types/bindings/TerminalSessionInfo";
+import { CloneDialog } from "@/features/m7/CloneDialog";
+import { GithubPanel } from "@/features/m7/GithubPanel";
+import { DiagnosticsDialog } from "@/features/m7/DiagnosticsDialog";
+import { UpdateBanner, UpdatePanel } from "@/features/m7/UpdatePanel";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
+import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
 import { useNotifications, type NoticeInput } from "@/hooks/useNotifications";
 import { useTreeSelection } from "@/hooks/useTreeSelection";
 import { useEditorTabs } from "@/hooks/useEditorTabs";
@@ -257,6 +281,17 @@ export function App() {
     ignoreWhitespace: 0 as 0 | 1 | 2 | 3,
   });
   /** 提交信息检查与提交时警告（Q139）。 */
+  const [changelistMode, setChangelistMode] = useState(false);
+  const changelistModeRef = useRef(changelistMode);
+  changelistModeRef.current = changelistMode;
+  const [changelistView, setChangelistView] = useState<ChangelistView | null>(null);
+  const changelistRef = useRef<ChangelistView | null>(null);
+  const changelistControls = useRef<ChangelistControls | null>(null);
+  const [changelistSelectedPaths, setChangelistSelectedPaths] = useState<{worktreeId: string; paths: string[]}>({worktreeId:"",paths:[]});
+  const changelistSelectedPathsRef = useRef(changelistSelectedPaths);
+  changelistSelectedPathsRef.current = changelistSelectedPaths;
+  const acceptChangelistSelection = useCallback((worktreeId: string, paths: string[]) => setChangelistSelectedPaths((current) => current.worktreeId === worktreeId && JSON.stringify(current.paths) === JSON.stringify(paths) ? current : {worktreeId,paths}), []);
+  const acceptChangelistView = useCallback((view: ChangelistView | null) => { changelistRef.current = view; setChangelistView(view); setAmendConfirm(null); setCommitWarningConfirm(null); }, []);
   const [commitChecks, setCommitChecks] = useState({
     subjectLimit: 72,
     blankLineRequired: false,
@@ -350,7 +385,7 @@ export function App() {
 
   const {
     themeLight, setThemeLight, themeDark, setThemeDark, codeFontFamily, setCodeFontFamily,
-    fontSize, setFontSize, changeFontSize, uiZoom, setUiZoom, uiZoomRef,
+    fontSize, setFontSize, changeFontSize, uiZoom, setUiZoom, uiZoomRef, reloadImportedThemes,
   } = useAppearance();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -362,16 +397,88 @@ export function App() {
   const [localeRevision, setLocaleRevision] = useState(0);
   useEffect(() => subscribeLocale(() => setLocaleRevision((value) => value + 1)), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // ---------- M7 扩展状态（终端、编辑、克隆、PR、诊断、更新） ----------
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(240);
+  const terminalCallbacksRef = useRef({ report: (_id: string | null, _error: AppErrorPayload) => {}, blocked: (_id: string): boolean => false, activity: (_id: string) => {} });
+  const [terminalSessions] = useState(() => new TerminalSessions({
+    list: () => m7.terminalList(), loadTabs: () => m7.terminalTabs(), saveTabs: (tabs) => m7.terminalSaveTabs(tabs),
+    open: (id, cwd) => m7.terminalOpen({ worktreeId: id, cwd, rows: 24, cols: 80 }),
+    close: (id) => m7.terminalClose(id), write: (id, data) => m7.terminalWrite(id, data),
+    resize: (id, rows, cols) => m7.terminalResize(id, rows, cols),
+    report: (id, error) => terminalCallbacksRef.current.report(id, error),
+    blocked: (id) => terminalCallbacksRef.current.blocked(id), activity: (id) => terminalCallbacksRef.current.activity(id),
+  }));
+  useSyncExternalStore(terminalSessions.subscribe, terminalSessions.snapshot);
+  const [terminalConfirmation, setTerminalConfirmation] = useState<TerminalSessionInfo[] | null>(null);
+  const terminalConfirmationRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const askTerminalShutdown = useCallback((sessions: TerminalSessionInfo[]): Promise<boolean> => new Promise((resolve) => {
+    terminalConfirmationRef.current = resolve; setTerminalConfirmation(sessions);
+  }), []);
+  const finishTerminalConfirmation = useCallback((confirmed: boolean) => {
+    const resolve = terminalConfirmationRef.current; terminalConfirmationRef.current = null;
+    setTerminalConfirmation(null); resolve?.(confirmed);
+  }, []);
+  const terminalActivityTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  /** 正在编辑的文件（同一时刻只编辑一个，切换文件前先处理未保存改动）。 */
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editingWorktreeId, setEditingWorktreeId] = useState<string | null>(null);
+  const editWriteRef = useRef<((request: EditSavePayload) => Promise<EditSaved>) | null>(null);
+  const editReportRef = useRef<(target: EditTarget, error: AppErrorPayload) => void>(() => undefined);
+  const editBlockedRef = useRef<(id: string) => boolean>(() => false);
+  const [editSessions] = useState(() => new EditSessions({
+    open: ({ worktreeId, path }) => m7.openEditable(worktreeId, path),
+    loadDraft: ({ worktreeId, path }) => m7.loadEditDraft(worktreeId, path),
+    listDrafts: (id) => m7.listEditDrafts(id),
+    persist: (draft) => m7.saveEditDraft(draft),
+    clear: ({ worktreeId, path }, identity) => m7.clearEditDraft(worktreeId, path, identity),
+    save: (request) => editWriteRef.current ? editWriteRef.current(request) : Promise.reject(localizedError("internal", "errors.closeGuard.installing")),
+    blocked: (id) => editBlockedRef.current(id),
+    report: (target, error) => editReportRef.current(target, error),
+  }));
+  useSyncExternalStore(editSessions.subscribe, editSessions.snapshot);
+  const editDirty = editingPath && editingWorktreeId
+    ? editSessions.get({ worktreeId: editingWorktreeId, path: editingPath }).dirty : false;
+  const [editDecision, setEditDecision] = useState<EditSession | null>(null);
+  const editDecisionRef = useRef<((resolved: boolean) => void) | null>(null);
+  const askEdit = useCallback((session: EditSession): Promise<boolean> => new Promise((resolve) => {
+    editDecisionRef.current = resolve; setEditDecision(session);
+  }), []);
+  const finishEditDecision = useCallback((resolved: boolean) => {
+    const resolve = editDecisionRef.current; editDecisionRef.current = null;
+    setEditDecision(null); resolve?.(resolved);
+  }, []);
+  const editWorktreesRef = useRef<string[]>([]);
+  editWorktreesRef.current = [...new Set([...repos.filter((repo) => repo.exists).flatMap((repo) => repo.worktrees.map((worktree) => worktree.id)), ...editSessions.worktreeIds, ...(worktreeId ? [worktreeId] : [])])];
+  const lifecycleRequestRef = useRef<(intent: CloseIntent) => Promise<void>>(async () => undefined);
+  const lifecyclePreparingRef = useRef(false);
+  const updateLifecycleRef = useRef<{ intent: "installUpdate" | "restartUpdate"; resolve: (status: AppUpdateStatus | null) => void; reject: (error: unknown) => void } | null>(null);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [appUpdateMode, setAppUpdateMode] = useState<AppUpdateMode>("notify");
+  /** F22：预发布渠道开关（设置持久化）。 */
+  const [allowPrerelease, setAllowPrerelease] = useState(false);
+  const updateChannelEpoch = useRef(0);
+  const [shortcutsSnapshot, setShortcutsSnapshot] = useState<Record<string, string>>({});
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
+  const [updateBannerVersion, setUpdateBannerVersion] = useState<string | null>(null);
   /** 冲突对话框（返修 F10）。 */
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   // 列表和页签共享导航入口；实际取数仍由 openEntry 的选择门校验。
   const entryNavigationRef = useRef<((entry: ChangeEntry) => void) | null>(null);
   const navigateEntry = useCallback((entry: ChangeEntry) => entryNavigationRef.current?.(entry), []);
+  const entryOrder = useCallback((current: ChangesSnapshot): ChangeEntry[] => {
+    return changelistModeRef.current ? changelistEntriesForView(current, changelistRef.current) : treeOrder(current);
+  }, []);
+
   const {
     treeSelection, groupOpen, setGroupOpen, dirOpen, followActiveEntry,
     expandToSelection, treeSelectedEntries, activateTreeEntry, moveTreeSelection,
     selectAllEntries, toggleGroup, toggleDir,
-  } = useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry: navigateEntry });
+  } = useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry: navigateEntry, order: entryOrder });
   /** worktree 下拉的只读状态（F02.1、F09.2）。 */
   const [worktreeStatuses, setWorktreeStatuses] = useState<WorktreeStatusEntry[]>([]);
   /** 丢弃确认（可含多个文件，或一个块）。 */
@@ -457,6 +564,8 @@ export function App() {
       setGlobalError(err);
     }
   }, []);
+
+  editReportRef.current = (target, error) => setAppError(error, target.worktreeId);
 
   useEffect(() => {
     let active = true;
@@ -584,6 +693,10 @@ export function App() {
   }, []);
 
   const pickFirstEntry = useCallback((next: ChangesSnapshot, preferred?: string | null): ChangeEntry | null => {
+    if (changelistModeRef.current) {
+      const display = changelistEntriesForView(next, changelistRef.current);
+      return display.find((entry) => entry.path === preferred) ?? display.find((entry) => entry.hunkCount > 0) ?? display[0] ?? null;
+    }
     const order = ["unstaged", "staged", "untracked"] as const;
     if (preferred) {
       const match = next.entries.find((entry) => entry.path === preferred);
@@ -710,6 +823,7 @@ export function App() {
       if (target.activate === false && mainViewRef.current !== "diff") {
         return { covered: false, rafPainted: false, viewportHeight: null, devicePixelRatio: window.devicePixelRatio };
       }
+      const finishCoverageMeasurement = beginSynchronousMeasurement("open.entry.coverage.wait");
       const covered = await waitUntil(
         () => {
           // 并排视图的行来自 side_lines（返修 A1），不用 RowWindowStore。
@@ -725,10 +839,14 @@ export function App() {
         },
         4000,
       );
+      finishCoverageMeasurement();
       if (!covered) {
         debugLog(`首屏取行超时：${entry.path}（已加载块 ${rowStore.getSnapshot().loadedChunks}）`);
       }
+      const finishPaintMeasurement = beginSynchronousMeasurement("open.entry.paint.wait");
       const paint = await nextPaint();
+      finishPaintMeasurement();
+      flushSynchronousMeasurements();
       const element = document.querySelector<HTMLElement>(".diff-scroll");
       return {
         covered,
@@ -755,8 +873,8 @@ export function App() {
     }
     const current = selectedRef.current;
     const previous = snapshotRef.current;
-    const display = getDisplayOrderEntries(next);
-    const oldIndex = current && previous ? getDisplayOrderEntries(previous).findIndex(
+    const display = changelistModeRef.current ? entryOrder(next) : getDisplayOrderEntries(next);
+    const oldIndex = current && previous ? (changelistModeRef.current ? entryOrder(previous) : getDisplayOrderEntries(previous)).findIndex(
       (entry) => entry.path === current.path && entry.changes === current.changes,
     ) : 0;
     const entry = current
@@ -772,7 +890,7 @@ export function App() {
       enterDiff();
       clearEditorSelection();
     }
-  }, [applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
+  }, [entryOrder, applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
 
   const openWorktree = useCallback(
     async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean; activateDiff?: boolean } = {}) => {
@@ -1168,7 +1286,7 @@ export function App() {
           event.preventDefault();
           const driver = closeDriverRef.current;
           if (!driver || disposed) return;
-          applyEffectRef.current?.(driver.handleNativeCloseRequest());
+          void lifecycleRequestRef.current("close");
         });
         if (disposed) stop(); else stops.push(stop);
         windowGuard = true;
@@ -1181,7 +1299,7 @@ export function App() {
           if (disposed) return;
           const driver = closeDriverRef.current;
           if (!driver) return;
-          applyEffectRef.current?.(driver.handleRequest("exit"));
+          void lifecycleRequestRef.current("exit");
         });
         if (disposed) stop(); else stops.push(stop);
         exitGuard = true;
@@ -1269,6 +1387,7 @@ export function App() {
         setSidebarWidth(settings.sidebarWidth);
         setView(settings.viewMode);
         setUiZoom(settings.uiZoom);
+        setAllowPrerelease(settings.allowPrerelease ?? false);
         setTreeGroupByDirectory(settings.treeGroupByDirectory);
         setDiffOptions({
           contextLines: settings.diffContextLines,
@@ -1280,6 +1399,8 @@ export function App() {
           jumpToNextFile: settings.diffJumpToNextFile,
           ignoreWhitespace: settings.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
         });
+        changelistModeRef.current = settings.changelistMode;
+        setChangelistMode(settings.changelistMode);
         setCommitChecks({
           subjectLimit: settings.commitSubjectLimit,
           blankLineRequired: settings.commitBlankLineRequired,
@@ -1310,6 +1431,9 @@ export function App() {
           pushDialogProtectedOnly: settings.pushDialogProtectedOnly,
           protectedBranches: settings.protectedBranches,
         });
+        setShortcutsSnapshot(settings.shortcuts ?? {});
+        applyShortcutOverrides(settings.shortcuts ?? {});
+        setAppUpdateMode(settings.appUpdateMode ?? "notify");
         setRepos(list);
         await highlightStore.loadCategories();
         const config = await ipc.measureConfig();
@@ -1519,13 +1643,14 @@ export function App() {
   const focusNextFile = useCallback(
     (direction: 1 | -1) => {
       if (!snapshot || !selected) return;
-      const index = snapshot.entries.findIndex(
+      const display = changelistModeRef.current ? entryOrder(snapshot) : snapshot.entries;
+      const index = display.findIndex(
         (entry) => entry.path === selected.path && entry.changes === selected.changes,
       );
-      const next = snapshot.entries[index + direction];
+      const next = display[index + direction];
       if (next && worktreeId) void openEntry(next, { view, worktreeId });
     },
-    [openEntry, selected, snapshot, view, worktreeId],
+    [entryOrder, openEntry, selected, snapshot, view, worktreeId],
   );
   focusNextFileRef.current = focusNextFile;
 
@@ -1541,6 +1666,8 @@ export function App() {
    * 待核对结果先展示。从不杀 Git、不重跑写命令。
    */
   const closeCoordinatorRef = useRef(new CloseCoordinator());
+  /** 终端是否有运行中的会话（任务 04 / F13）：关闭协调与更新安装都要用它。 */
+  // 运行态由App级TerminalSessions持有，隐藏面板不解除退出保护。
   /** 当前需要用户选择的关闭/退出请求（`null` 表示没有）。 */
   const [closeRequest, setCloseRequest] = useState<CloseDecision | null>(null);
   /** 当前询问对应的原动作（close / exit）：由 reconcile 从被保留的原请求写入。 */
@@ -1603,29 +1730,58 @@ export function App() {
 
   /** 先落草稿再执行不可撤销的原生动作；失败时抛出，绝不静默关闭。 */
   const closeAfterDraftFlush = useCallback(
-    async (action: () => Promise<void>): Promise<void> => {
+    async (action: () => Promise<void>, releaseGuard = true): Promise<void> => {
       await flushCommitDraftRef.current();
+      // 编辑草稿与终端页签先落盘，再执行不可撤销的原生动作（M7 任务 03、04）。
+      await editSessions.flush();
+      await flushM7State();
+      if (mergeBufferGuards.hasWork) throw localizedError("rejected", "errors.update.mergeEditsPending");
+      if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
+      await terminalSessions.finishShutdown();
+      if (releaseGuard) await syncExitBlocked(false);
       await action();
     },
-    [],
+    [editSessions, terminalSessions, syncExitBlocked],
   );
 
   const closeDriverRef = useRef<CloseDriver | null>(null);
   if (closeDriverRef.current === null) {
     closeDriverRef.current = new CloseDriver({
       coordinator: closeCoordinatorRef.current,
-      releaseExitGuard: () => syncExitBlocked(false),
+      releaseExitGuard: async () => {
+        if (mergeBufferGuards.hasWork) throw localizedError("rejected", "errors.update.mergeEditsPending");
+        if (editSessions.hasWork) throw localizedError("rejected", "workspace.editUnsavedBlock");
+        await syncExitBlocked(true);
+        // 真正解除原生保护留到最终草稿冲刷和已确认终端关闭之后。
+      },
       // 关闭/退出前必须先把草稿落盘并等待完成：落盘失败时不得静默销毁窗口（F02.5）。
       closeWindow: () => closeAfterDraftFlush(() => getCurrentWindow().destroy()),
       exitApp: () => closeAfterDraftFlush(() => ipc.requestExit()),
-      onError: (caught) => setAppError(toAppError(caught), null),
+      installUpdate: () => closeAfterDraftFlush(async () => {
+        const status = await m7.updateInstall();
+        updateLifecycleRef.current?.resolve(status); updateLifecycleRef.current = null;
+      }, false),
+      restartUpdate: () => closeAfterDraftFlush(async () => {
+        await m7.updateRestart();
+        updateLifecycleRef.current?.resolve(null); updateLifecycleRef.current = null;
+      }),
+      onError: (caught) => {
+        updateLifecycleRef.current?.reject(caught); updateLifecycleRef.current = null;
+        editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null);
+      },
       onAsk: (intent, writing, pending) => {
         closeIntentRef.current = intent;
         setCloseRequest(
           pending.length > 0 ? { action: "showPending", writing, pending } : { action: "ask", writing },
         );
       },
-      onSettled: () => setCloseRequest(null),
+      onSettled: () => {
+        setCloseRequest(null);
+        if (closeDriverRef.current?.currentPhase() === "idle") {
+          editSessions.setClosing(false); terminalSessions.cancelShutdown();
+          updateLifecycleRef.current?.resolve(null); updateLifecycleRef.current = null;
+        }
+      },
     });
   }
   const closeDriver = closeDriverRef.current;
@@ -1652,11 +1808,78 @@ export function App() {
    */
   const reconcileClose = useCallback(() => {
     const coordinator = closeCoordinatorRef.current;
-    void syncExitBlocked(coordinator.needsExitGuard()).catch((caught) => {
+    if (closeDriver.currentPhase() !== "closing") void syncExitBlocked(coordinator.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork).catch((caught) => {
       setAppError(toAppError(caught), null);
     });
     applyEffect(closeDriver.notifyStateChanged());
-  }, [applyEffect, closeDriver, syncExitBlocked]);
+  }, [applyEffect, closeDriver, editSessions, terminalSessions, syncExitBlocked]);
+
+  useEffect(() => {
+    const sync = () => {
+      if (closeDriver.currentPhase() === "closing") return;
+      void syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork)
+        .catch((caught) => setAppError(toAppError(caught), null));
+    };
+    sync();
+    const stopEdit = editSessions.subscribe(sync), stopTerminal = terminalSessions.subscribe(sync), stopReview = reviewDraftSessions.subscribe(sync), stopMerge = mergeBufferGuards.subscribe(sync);
+    return () => { stopEdit(); stopTerminal(); stopReview(); stopMerge(); };
+  }, [closeDriver, editSessions, terminalSessions, setAppError, syncExitBlocked]);
+  // 存在磁盘草稿但尚未打开编辑器时，原生Quit也必须进入同一决策入口。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await syncExitBlocked(true);
+        await editSessions.discover(editWorktreesRef.current);
+        if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork);
+      } catch (caught) { if (!cancelled) setAppError(toAppError(caught), null); }
+    })();
+    return () => { cancelled = true; };
+  }, [repos, closeDriver, editSessions, terminalSessions, setAppError, syncExitBlocked]);
+  useEffect(() => registerM7Flusher(() => editSessions.flush()), [editSessions]);
+  useEffect(() => registerM7Flusher(() => terminalSessions.flush()), [terminalSessions]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await syncExitBlocked(true);
+      await terminalSessions.initialize();
+      if (!cancelled && closeDriver.currentPhase() !== "closing") await syncExitBlocked(closeCoordinatorRef.current.needsExitGuard() || editSessions.hasWork || terminalSessions.needsExitGuard || reviewDraftSessions.hasWork || mergeBufferGuards.hasWork);
+    })().catch((caught) => { if (!cancelled) setAppError(toAppError(caught), null); });
+    return () => { cancelled = true; };
+  }, [closeDriver, terminalSessions, editSessions, setAppError, syncExitBlocked]);
+
+
+  lifecycleRequestRef.current = async (intent) => {
+    if (mergeBufferGuards.hasWork) {
+      const failure = localizedError("rejected", "errors.update.mergeEditsPending");
+      updateLifecycleRef.current?.reject(failure); updateLifecycleRef.current = null;
+      setAppError(failure, null); return;
+    }
+    if (lifecyclePreparingRef.current || closeDriver.currentPhase() === "closing") return;
+    if (closeDriver.currentPhase() !== "idle") { applyEffect(closeDriver.handleRequest(intent)); return; }
+    lifecyclePreparingRef.current = true;
+    try {
+      const edits = await editSessions.resolve(editWorktreesRef.current, null, askEdit);
+      if (!edits.ok) return;
+      editSessions.setClosing(true);
+      if (!(await terminalSessions.prepareShutdown(askTerminalShutdown))) { editSessions.setClosing(false); return; }
+      applyEffect(closeDriver.handleRequest(intent));
+    } catch (caught) { editSessions.setClosing(false); terminalSessions.cancelShutdown(); setAppError(toAppError(caught), null); }
+    finally {
+      lifecyclePreparingRef.current = false;
+      if (closeDriver.currentPhase() === "idle") { updateLifecycleRef.current?.resolve(null); updateLifecycleRef.current = null; }
+    }
+  };
+
+  const requestUpdateLifecycle = useCallback((intent: "installUpdate" | "restartUpdate"): Promise<AppUpdateStatus | null> => {
+    if (updateLifecycleRef.current || lifecyclePreparingRef.current || closeDriver.currentPhase() !== "idle") {
+      return Promise.reject(localizedError("rejected", "errors.m7.updateBusy"));
+    }
+    return new Promise((resolve, reject) => {
+      updateLifecycleRef.current = { intent, resolve, reject };
+      void lifecycleRequestRef.current(intent);
+    });
+  }, [closeDriver]);
 
   // 监听回调通过 ref 到达同一驱动。
   reconcileCloseRef.current = reconcileClose;
@@ -1727,9 +1950,56 @@ export function App() {
   }
   const writeOrchestrator = writeOrchestratorRef.current;
 
+  editBlockedRef.current = (id) => writingWorktreesRef.current.has(id) || closeDriver.currentPhase() === "closing";
+  terminalCallbacksRef.current.report = (id, error) => setAppError(error, id);
+  terminalCallbacksRef.current.blocked = (id) => writingWorktreesRef.current.has(id) || closeDriver.currentPhase() === "closing";
+  terminalCallbacksRef.current.activity = (id) => {
+    const timers = terminalActivityTimersRef.current;
+    const previous = timers.get(id); if (previous !== undefined) clearTimeout(previous);
+    timers.set(id, setTimeout(() => { timers.delete(id); void refreshTarget(id); }, 900));
+  };
+  editWriteRef.current = (request) => runEditWrite<OperationContext>({
+    writing: writingWorktreesRef.current,
+    publishWriting: () => setWritingWorktrees(new Set(writingWorktreesRef.current)),
+    begin: (id) => writeOrchestrator.begin(id),
+    end: (id, needsVerification) => writeOrchestrator.end(id, needsVerification),
+    beginOperation: (id) => operationGateRef.current.begin(id),
+    canRecord: (token) => operationGateRef.current.canRecord(token),
+    execute: (write) => m7.saveEditable(write),
+    refreshTarget,
+    reportFailure: (id, error) => setAppError(error, id),
+    toError: toAppError,
+    busyMessage: messages.merge.busy,
+    guardUnavailable: messages.close.guardUnavailable,
+  }, request);
+
+  const prepareEditTargets = useCallback(async (id: string, paths: string[]): Promise<boolean> => {
+    try {
+      const edits = await editSessions.resolve([id], paths, askEdit);
+      if (!edits.ok) return false;
+      if (edits.saved) {
+        await refreshTarget(id);
+        setAppError(localizedError("rejected", "edit.reviewAfterSave"), id);
+        return false;
+      }
+      return true;
+    } catch (caught) { setAppError(toAppError(caught), id); return false; }
+  }, [askEdit, editSessions, refreshTarget, setAppError]);
+
+  const closeEdit = useCallback(async (target: EditTarget) => {
+    try {
+      const edits = await editSessions.resolve([target.worktreeId], [target.path], askEdit);
+      if (edits.ok && worktreeIdRef.current === target.worktreeId) {
+        setEditingPath((path) => path === target.path ? null : path);
+      }
+    } catch (caught) { setAppError(toAppError(caught), target.worktreeId); }
+  }, [askEdit, editSessions, setAppError]);
+
   const performWrite = useCallback(async (target: StagingTarget | DiscardTarget, discard = false) => {
     const opWorktreeId = target.worktreeId;
     // ref 在同一事件循环内也互斥；按钮禁用和 Rust 写锁共同兜底，不积压点击。
+    if (writingWorktreesRef.current.has(opWorktreeId)) return;
+    if (!(await prepareEditTargets(opWorktreeId, [target.path]))) return;
     if (writingWorktreesRef.current.has(opWorktreeId)) return;
     // 本次写操作的结果是否无法确定（Q91）：决定关闭时是否先展示待核对。
     let needsVerification = false;
@@ -1827,12 +2097,13 @@ export function App() {
       setWritingWorktrees(new Set(writingWorktreesRef.current));
       writeOrchestrator.end(opWorktreeId, needsVerification);
     }
-  }, [acceptSnapshot, notify, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
+  }, [acceptSnapshot, notify, prepareEditTargets, refresh, scheduleReviewRecovery, setAppError, writeOrchestrator]);
 
   const { performBatchWrite, stageFile, unstageFile } = useBatchWrite({
     worktreeIdRef, writingWorktreesRef, setWritingWorktrees, writeOrchestrator,
     operationGateRef, reviewOverlayRef, acceptSnapshot, scheduleReviewRecovery,
     refreshTarget, setAppError, notify, expandToSelection,
+    beforeWrite: prepareEditTargets,
   });
 
   /**
@@ -2316,6 +2587,15 @@ export function App() {
     }
     const target = origin.worktreeId;
     if (commitSubmittingRef.current.has(target) || writingWorktreesRef.current.has(target) || closeDriver.currentPhase() === "closing") return;
+    const listView = changelistMode ? changelistRef.current : null;
+    if (changelistMode && (!listView || listView.worktreeId !== target || (!listView.items.some((item) => item.selected && !item.stale && !item.readonlyReason) && !commitInputRef.current.amend && !commitContextRef.current?.gates.allowsEmptyDiffCommit))) {
+      setAppError(localizedError("rejected", "errors.m7.changelistChanged"), target); return;
+    }
+    const listSelection = listView ? selectionOf(listView) : null;
+    const related = listView ? listView.items.filter((item) => item.selected && !item.stale).map((item) => item.path) : commitContextRef.current?.expectation.index.filter((entry) => entry.status !== "F")
+      .flatMap((entry) => [entry.path, ...(entry.originalPath ? [entry.originalPath] : [])]) ?? [];
+    if (!(await prepareEditTargets(target, related))) return;
+    if (worktreeIdRef.current !== target || gateRef.current.token().activation !== origin.activation) return;
     const context = commitContextRef.current;
     if (!context || context.worktreeId !== target) {
       setAppError(localizedError("rejected", "commit.stale"), target);
@@ -2346,8 +2626,11 @@ export function App() {
     if (!options.skipWarnings) {
       let warnings: CommitWarning[] = [];
       try {
-        warnings = await ipc.commitWarnings(target);
-      } catch {
+        warnings = listSelection
+          ? await invoke<CommitWarning[]>("m7_changelist_warnings", { request: { worktreeId: target, selection: listSelection, amend: input.amend } })
+          : await ipc.commitWarnings(target);
+      } catch (caught) {
+        if (listSelection) { setAppError(toAppError(caught), target); return; }
         warnings = [];
       }
       if (!remoteTargetIsCurrent(origin, gateRef.current.token())) return;
@@ -2436,6 +2719,7 @@ export function App() {
     try {
       const outcome = await ipc.executeCommit({
         worktreeId: target,
+        selection: listSelection,
         options: {
           message: submitted.message,
           amend: submitted.amend,
@@ -2544,7 +2828,7 @@ export function App() {
         writeOrchestrator.end(target, needsVerification || pushNeedsVerification);
       }, (original, lease) => commitAndPushRef.current?.(original, lease) ?? Promise.resolve());
     }
-  }, [closeDriver, commitOutputs, draftPersistence, loadCommitContext, refreshTarget, setAppError, writeOrchestrator]);
+  }, [changelistMode, closeDriver, commitOutputs, draftPersistence, loadCommitContext, prepareEditTargets, refreshTarget, setAppError, writeOrchestrator]);
 
   /** 确认 amend 的二次警告：只对**当前**上下文成立时生效（F06.2）。 */
   const confirmAmend = useCallback(() => {
@@ -2725,7 +3009,9 @@ export function App() {
       return unique;
     };
 
-    const unique = uniqueEntries(getDisplayOrderEntries(current));
+    const targetChangelistMode = changelistModeRef.current;
+    const targetChangelistRevision = targetChangelistMode ? changelistRef.current?.revision : null;
+    const unique = uniqueEntries(changelistModeRef.current ? entryOrder(current) : getDisplayOrderEntries(current));
     if (unique.length === 0) return;
     const activeEntry = unique.find((entry) => entry.path === active.path);
 
@@ -2739,6 +3025,8 @@ export function App() {
 
     // 导航必须绑定发起时的上下文：等待期间切换 worktree、刷新或另选文件都作废。
     const stillSameContext = () => worktreeIdRef.current === targetWorktreeId
+      && changelistModeRef.current === targetChangelistMode
+      && (!targetChangelistMode || changelistRef.current?.revision === targetChangelistRevision)
       && gateRef.current.token().activation === targetActivation
       && snapshotRef.current?.revision === targetRevision
       // 选择代际：点击尚未加载指标的 B、或 A→B→A，都会在这里被判为失效。
@@ -2777,7 +3065,7 @@ export function App() {
       total: unique.length,
     });
     debugLog(`审阅：${messages.review.allReviewed}`);
-  }, [openEntry, setReviewMark, worktreeId]);
+  }, [entryOrder, openEntry, setReviewMark, worktreeId]);
 
   const changeHunk = useCallback((action: HunkAction) => {
     const current = selectedRef.current;
@@ -2857,7 +3145,11 @@ export function App() {
     const current = snapshotRef.current;
     const activeWorktree = worktreeIdRef.current;
     if (!current || !activeWorktree) return;
-    const candidates = entries.filter(
+    const listSelection = changelistSelectedPathsRef.current;
+    const paths = entries.some((entry) => entry.changes === "changelist") && listSelection.worktreeId === activeWorktree && listSelection.paths.length
+      ? listSelection.paths : entries.map((entry) => entry.path);
+    const sourceEntries = entries.some((entry) => entry.changes === "changelist") ? current.entries.filter((entry) => paths.includes(entry.path)) : entries;
+    const candidates = sourceEntries.filter(
       (entry) => entry.changes === "unstaged" || entry.changes === "untracked",
     );
     const discardable = candidates.filter((entry) => !entry.readonlyReason);
@@ -2924,13 +3216,14 @@ export function App() {
     );
   }, []);
 
-  // 快捷键（Q19、Q93、审查意见 6）：
+  // 快捷键（Q19、Q93、Q199）：默认加速键与自定义覆盖都在 lib/shortcuts.ts 里，
+  // 这里只按“命中的动作”分派，避免平台判断散落在 App 里（Q55）。
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // 提交快捷键（⌘K / Ctrl+K，M3 F06.5）：
-      // - 在提交信息框里由信息框自己处理，这里不再重复触发；
-      // - 其它输入控件与任何弹窗内不穿透（Q93）。
-      if (isCommitShortcut(event) && !isCommitMessageTarget(event.target)) {
+      const action = matchShortcut(event);
+
+      // 提交：在提交信息框里由信息框自己处理，其它输入控件与弹窗内不穿透（Q93）。
+      if (action === "commit" && !isCommitMessageTarget(event.target)) {
         if (isTextInputOrDialog(event.target) || document.querySelector("[role='dialog'], dialog[open]")) return;
         event.preventDefault();
         void performCommit();
@@ -2939,91 +3232,102 @@ export function App() {
 
       // 只对文本输入控件和弹窗内的按键放行，不穿透到后台文件操作（Q93、审查意见 6）
       if (isTextInputOrDialog(event.target)) return;
+      if (!action) return;
 
-      if (isDiscardFileShortcut(event)) {
-        event.preventDefault();
-        if (isWriting) return;
-        const targets = treeSelectedEntries();
-        requestDiscardEntries(targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : []);
-        return;
-      }
-
-      if (isReviewShortcut(event)) {
-        // 必须在 ⌘R 刷新分支之前处理，否则会被刷新吞掉（Q93、D04）。
-        // 焦点在按钮/勾选框上时不穿透：那类控件用自己的键盘行为（spec 决策 7）。
-        if (isButtonTarget(event.target)) return;
-        event.preventDefault();
-        void reviewNextFile();
-        return;
-      }
-
-      if (isStageFileShortcut(event)) {
-        event.preventDefault();
-        if (isWriting) return;
-        const targets = treeSelectedEntries();
-        const entries = targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : [];
-        // 不过滤只读条目：批量入口会让后端逐个返回跳过原因（返修 C6，F03.5）。
-        const staged = entries.filter((entry) => entry.changes === "staged");
-        const unstaged = entries.filter((entry) => entry.changes !== "staged");
-        // 选中项混有两组时串行执行：同一 worktree 的写门只放一个，并发发两笔
-        // 第二笔会被静默丢掉（返修 C5）。逐组等待前一组完成再发。
-        const runSequentially = async () => {
-          if (unstaged.length > 0) await performBatchWrite("stage", unstaged);
-          if (staged.length > 0) await performBatchWrite("unstage", staged);
-          if (unstaged.length === 0 && staged.length === 0 && entries.length > 0) {
-            notify({ tone: "warning", title: () => (messages.changes.batchNothing), persistent: true });
-          }
-        };
-        void runSequentially();
-        return;
-      }
-
-      // 界面缩放（返修 E.2，Q139）：快捷键照 JetBrains（⌃⌥= / ⌃⌥- / ⌃⌥0）。
-      if (event.altKey && event.ctrlKey && !event.metaKey) {
-        const nextZoom =
-          event.key === "=" || event.key === "+"
-            ? Math.min(150, Math.round(uiZoomRef.current / 10) * 10 + 10)
-            : event.key === "-"
-              ? Math.max(80, Math.round(uiZoomRef.current / 10) * 10 - 10)
-              : event.key === "0"
-                ? 100
-                : null;
-        if (nextZoom !== null) {
+      switch (action) {
+        case "discardFile": {
           event.preventDefault();
+          if (isWriting) return;
+          const targets = treeSelectedEntries();
+          requestDiscardEntries(targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : []);
+          return;
+        }
+        case "reviewNextFile": {
+          // 焦点在按钮/勾选框上时不穿透：那类控件用自己的键盘行为（spec 决策 7）。
+          if (isButtonTarget(event.target)) return;
+          event.preventDefault();
+          void reviewNextFile();
+          return;
+        }
+        case "stageFile": {
+          event.preventDefault();
+          if (isWriting) return;
+          const targets = treeSelectedEntries();
+          const entries = targets.length > 0 ? targets : selectedEntry ? [selectedEntry] : [];
+          // 不过滤只读条目：批量入口会让后端逐个返回跳过原因（返修 C6，F03.5）。
+          const staged = entries.filter((entry) => entry.changes === "staged");
+          const unstaged = entries.filter((entry) => entry.changes !== "staged");
+          // 选中项混有两组时串行执行：同一 worktree 的写门只放一个（返修 C5）。
+          const runSequentially = async () => {
+            if (unstaged.length > 0) await performBatchWrite("stage", unstaged);
+            if (staged.length > 0) await performBatchWrite("unstage", staged);
+            if (unstaged.length === 0 && staged.length === 0 && entries.length > 0) {
+              notify({ tone: "warning", title: () => (messages.changes.batchNothing), persistent: true });
+            }
+          };
+          void runSequentially();
+          return;
+        }
+        case "zoomIn":
+        case "zoomOut":
+        case "zoomReset": {
+          event.preventDefault();
+          const nextZoom =
+            action === "zoomReset" ? 100 : Math.min(150, Math.max(80, Math.round(uiZoomRef.current / 10) * 10 + (action === "zoomIn" ? 10 : -10)));
           setUiZoom(nextZoom);
           void ipc.updateSettings({ uiZoom: nextZoom }).catch(() => {});
           return;
         }
-      }
-
-      const primary = isPrimaryModifier(event);
-      if (primary && event.key.toLowerCase() === "o") {
-        event.preventDefault();
-        void chooseRepo();
-      } else if (primary && event.key.toLowerCase() === "r") {
-        event.preventDefault();
-        void refresh();
-      } else if (primary && event.key === "+") {
-        event.preventDefault();
-        void changeFontSize(1);
-      } else if (primary && event.key === "-") {
-        event.preventDefault();
-        void changeFontSize(-1);
-      } else if (event.key === "F7" && !mergeTabPathRef.current) {
-        // 合并页签里的 F7 由合并页签自己处理（上一处、下一处冲突）。
-        event.preventDefault();
-        jumpToHunk(event.shiftKey ? -1 : 1);
-      } else if (event.key === "ArrowDown" && primary) {
-        event.preventDefault();
-        focusNextFile(1);
-      } else if (event.key === "ArrowUp" && primary) {
-        event.preventDefault();
-        focusNextFile(-1);
+        case "openRepo":
+          event.preventDefault();
+          void chooseRepo();
+          return;
+        case "cloneRepo":
+          event.preventDefault();
+          if (!busy) setCloneOpen(true);
+          return;
+        case "pullRequests":
+          event.preventDefault();
+          if (!busy && worktreeId) setGithubOpen(true);
+          return;
+        case "refresh":
+          event.preventDefault();
+          void refresh();
+          return;
+        case "fontUp":
+          event.preventDefault();
+          void changeFontSize(1);
+          return;
+        case "fontDown":
+          event.preventDefault();
+          void changeFontSize(-1);
+          return;
+        case "nextHunk":
+        case "prevHunk":
+          // 合并页签里的 F7 由合并页签自己处理（上一处、下一处冲突）。
+          if (mergeTabPathRef.current) return;
+          event.preventDefault();
+          jumpToHunk(action === "nextHunk" ? 1 : -1);
+          return;
+        case "nextFile":
+          event.preventDefault();
+          focusNextFile(1);
+          return;
+        case "prevFile":
+          event.preventDefault();
+          focusNextFile(-1);
+          return;
+        case "toggleTerminal":
+          event.preventDefault();
+          if (worktreeId) setTerminalOpen((value) => !value);
+          return;
+        default:
+          return;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, notify, performBatchWrite, performCommit, refresh, requestDiscardEntries, reviewNextFile, selectedEntry, treeSelectedEntries]);
+  }, [busy, changeFontSize, chooseRepo, focusNextFile, isWriting, jumpToHunk, notify, performBatchWrite, performCommit, refresh, requestDiscardEntries, reviewNextFile, selectedEntry, treeSelectedEntries, worktreeId]);
 
   // ---------------- 测量 ----------------
 
@@ -3081,14 +3385,19 @@ export function App() {
           });
         };
         const measureJump = async (top: number) => {
+          const cachedBeforeJump = handle?.captureCoverage();
           const started = performance.now();
           handle?.setScrollTop(top);
           // 跳转同步提交行窗口：调用返回时已有内容，就在这一帧画出（口径同统一视图）。
           const withinOneFrame = visibleCovered();
+          const targetWasCached = cachedBeforeJump && handle ? (["left", "right"] as const).every((side) => {
+            const visible = handle.getVisibleRange(side);
+            return cachedBeforeJump(visible.from, visible.to, side);
+          }) : null;
           const covered = await waitUntil(visibleCovered, 4000);
           const dataAt = performance.now();
           await nextPaint();
-          return { appearMs: performance.now() - started, dataAt: dataAt - started, covered, withinOneFrame };
+          return { appearMs: performance.now() - started, dataAt: dataAt - started, covered, withinOneFrame, targetWasCached };
         };
         const cold = await measureJump(Math.floor(contentHeight * 0.6));
         const warm = await measureJump(0);
@@ -3141,6 +3450,8 @@ export function App() {
             contentHeight,
             segments: segmentCount,
             jumpAppearMs: cold.appearMs,
+            jumpTargetWasCached: cold.targetWasCached,
+            warmJumpTargetWasCached: warm.targetWasCached,
             warmJumpAppearMs: warm.appearMs,
             jumpWithinOneFrame: cold.withinOneFrame,
             warmJumpWithinOneFrame: warm.withinOneFrame,
@@ -3151,6 +3462,7 @@ export function App() {
             frameP95Ms: percentile(frames, 0.95),
           },
         };
+        flushSynchronousMeasurements();
         setMeasurements((current) => [splitMeasurement, ...current]);
         return splitMeasurement;
       }
@@ -3436,7 +3748,18 @@ export function App() {
         if (splitTarget) {
           debugLog(`冒烟：并排视图检查开始 ${splitTarget.path}`);
           await openEntry(splitTarget, { view: "split", worktreeId: worktree.id, expand: true });
-          await nextPaint();
+          // 色带在两栏量高、布局提交之后才画：等到画布出现非透明像素，而不是固定等几次 RAF。
+          await waitUntil(() => {
+            const element = document.querySelector<HTMLCanvasElement>(".sbs-bands");
+            if (!element) return false;
+            const context = element.getContext("2d");
+            if (!context) return false;
+            const data = context.getImageData(0, 0, Math.max(1, element.width), Math.max(1, element.height)).data;
+            for (let index = 3; index < data.length; index += 4) {
+              if (data[index] !== 0) return true;
+            }
+            return false;
+          }, 4000);
           const columns = document.querySelectorAll(".sbs-column").length;
           const canvas = document.querySelector<HTMLCanvasElement>(".sbs-bands");
           let canvasPainted = false;
@@ -3498,6 +3821,26 @@ export function App() {
           commitArea: !!document.querySelector("[data-commit-composer]"),
           commitMessage: !!document.querySelector("[data-commit-message]"),
           activityBadge: document.querySelector(".activity-badge")?.textContent ?? null,
+          // 玻璃材质（M7 任务 01）：确认三个组件真的挂载，而不是只写了 CSS。
+          glass: {
+            rootChildren: document.getElementById("root")?.childElementCount ?? -1,
+            bodyText: document.body.innerText.replace(/\s+/g, " ").slice(0, 120),
+            windowLayer: !!document.querySelector(".glass-host > .glass-layer--window"),
+            popoverLayer: document.querySelectorAll(".glass-layer--popover").length,
+            panelLayers: {
+              sidebar: !!document.querySelector(".changes-sidebar"),
+              status: !!document.querySelector(".window-status"),
+              toolbar: !!document.querySelector(".titlebar"),
+            },
+            glassButtons: document.querySelectorAll(".glass-button").length,
+            specularButtons: document.querySelectorAll(".specular-button").length,
+            refractionEnabled: Array.from(document.querySelectorAll(".glass-surface")).filter(
+              (node) => !node.classList.contains("glass-surface--fallback") && !node.classList.contains("glass-layer--flat"),
+            ).length,
+            tools: document.querySelectorAll(".toolbar-group .toolbar-group-item").length,
+            nativeGlass: document.documentElement.classList.contains("native-glass"),
+            commitButton: !!document.querySelector(".m7-commit-button"),
+          },
           statusBar: document.querySelector("footer")?.textContent?.slice(0, 120) ?? null,
         };
         if (firstRow) {
@@ -3514,6 +3857,14 @@ export function App() {
           if (!element) return null;
           const box = element.getBoundingClientRect();
           return { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.width), h: Math.round(box.height) };
+        };
+        ui.viewport = {
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          zoom: getComputedStyle(document.documentElement).zoom,
+          uiZoomVar: getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom").trim(),
+          dpr: window.devicePixelRatio,
+          docScrollHeight: document.documentElement.scrollHeight,
         };
         ui.layout = {
           titlebar: rect(".titlebar"),
@@ -3540,6 +3891,41 @@ export function App() {
         });
         if (previousTheme) document.documentElement.dataset.theme = previousTheme;
         if (previousKind) document.documentElement.dataset.kind = previousKind;
+        // M7 命令通路（任务 02–04、09、11）：走真实 IPC，确认 Rust 侧能返回而不 panic。
+        const m7Probe: Record<string, unknown> = {};
+        const attempt = async (name: string, work: () => Promise<unknown>) => {
+          try {
+            m7Probe[name] = await work();
+          } catch (error) {
+            m7Probe[name] = { error: String(error) };
+          }
+        };
+        await attempt("importedThemes", async () => (await m7.listImportedThemes()).length);
+        await attempt("updateStatus", async () => {
+          const status = await m7.updateStatus();
+          return { mode: status.mode, configured: status.configured, reason: status.unconfiguredReason };
+        });
+        await attempt("terminalTabs", async () => (await m7.terminalTabs()).length);
+        await attempt("diagnostics", async () => {
+          const preview = await m7.previewDiagnostics({ destination: "", worktreeId: worktree.id });
+          return { chars: preview.text.length, redactions: preview.redactions };
+        });
+        await attempt("editable", async () => {
+          const entry = snapshot.entries.find((candidate) => !candidate.binary && candidate.status !== "deleted");
+          if (!entry) return null;
+          const file = await m7.openEditable(worktree.id, entry.path);
+          return { path: entry.path, readonlyReason: file.readonlyReason ?? null, bytes: file.text?.length ?? 0 };
+        });
+        // 内置终端（任务 04）：真实开一个 PTY、等首屏输出、再关闭；不向 shell 发任何命令。
+        await attempt("terminal", async () => {
+          const session = await m7.terminalOpen({ worktreeId: worktree.id, cwd: null, cols: 80, rows: 24 });
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          const snapshot = await m7.terminalSnapshot(session.sessionId);
+          const running = (await m7.terminalList()).some((item) => item.sessionId === session.sessionId);
+          await m7.terminalClose(session.sessionId);
+          return { id: session.sessionId, shell: session.shell, running, bytes: snapshot.length };
+        });
+        report.m7 = m7Probe;
         report.ui = ui;
         report.ok = true;
       } catch (caught) {
@@ -4156,6 +4542,7 @@ export function App() {
         diffSoftWrap: patch.diffSoftWrap,
         diffJumpToNextFile: patch.diffJumpToNextFile,
         diffIgnoreWhitespace: patch.diffIgnoreWhitespace,
+        changelistMode: patch.changelistMode,
         commitSubjectLimit: patch.commitSubjectLimit,
         commitBlankLineRequired: patch.commitBlankLineRequired,
         commitBodyLineLimit: patch.commitBodyLineLimit,
@@ -4180,7 +4567,23 @@ export function App() {
         pushDialogOnCommit: patch.pushDialogOnCommit,
         pushDialogProtectedOnly: patch.pushDialogProtectedOnly,
         protectedBranches: patch.protectedBranches,
+        appUpdateMode: patch.appUpdateMode,
+        allowPrerelease: patch.allowPrerelease,
+        shortcuts: patch.shortcuts,
       });
+      if (patch.shortcuts) {
+        setShortcutsSnapshot(patch.shortcuts);
+        applyShortcutOverrides(patch.shortcuts);
+      }
+      setAppUpdateMode(next.appUpdateMode);
+      setAllowPrerelease(next.allowPrerelease ?? false);
+      if (patch.allowPrerelease !== undefined) {
+        const epoch = ++updateChannelEpoch.current;
+        void m7.updateStatus().then((status) => {
+          if (epoch !== updateChannelEpoch.current) return;
+          setUpdateStatus(status); setUpdateBannerVersion(status.available?.version ?? null);
+        }).catch((caught) => setAppError(toAppError(caught), null));
+      }
       setThemeLight(next.themeLight);
       setThemeDark(next.themeDark);
       setCodeFontFamily(next.codeFontFamily);
@@ -4207,6 +4610,9 @@ export function App() {
         jumpToNextFile: next.diffJumpToNextFile,
         ignoreWhitespace: next.diffIgnoreWhitespace as 0 | 1 | 2 | 3,
       });
+      changelistModeRef.current = next.changelistMode;
+      setChangelistMode(next.changelistMode);
+      if (patch.changelistMode !== undefined) { acceptChangelistView(null); await refresh(); }
       setCommitChecks({
         subjectLimit: next.commitSubjectLimit,
         blankLineRequired: next.commitBlankLineRequired,
@@ -4241,7 +4647,7 @@ export function App() {
     } catch (caught) {
       return toAppError(caught);
     }
-  }, []);
+  }, [refresh, acceptChangelistView]);
 
   /** 重新加载登录 shell 环境与 Git 程序（F08）。 */
   const reloadEnvironment = useCallback(async (): Promise<AppErrorPayload | null> => {
@@ -5045,6 +5451,42 @@ export function App() {
     );
   }, [diffArea, selectedEntry]);
 
+  // 应用更新状态：启动读一次；有新版本事件时刷新（手动模式不主动查询，由 Rust 侧决定）。
+  useEffect(() => {
+    let cancelled = false;
+    void m7
+      .updateStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setUpdateStatus(status);
+        setAppUpdateMode(status.mode);
+        if (status.available) setUpdateBannerVersion(status.available.version);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(
+    () =>
+      onM7Events({
+        onTerminalOutput: (event) => terminalSessions.output(event),
+        onTerminalExit: (event) => terminalSessions.exitedSession(event),
+        onListenError: (caught) => setAppError(toAppError(caught), null),
+        onUpdateAvailable: (event) => {
+          setUpdateBannerVersion(event.version);
+          void m7.updateStatus().then(setUpdateStatus).catch(() => undefined);
+        },
+      }),
+    [],
+  );
+
+  useEffect(() => () => {
+    for (const timer of terminalActivityTimersRef.current.values()) clearTimeout(timer);
+    terminalActivityTimersRef.current.clear();
+  }, []);
+
   if (!bootstrapDone) {
     return <div className="flex h-full items-center justify-center text-descriptionforeground">{messages.app.loading}</div>;
   }
@@ -5059,12 +5501,12 @@ export function App() {
   const activeStatus = worktreeStatuses.find((status) => status.id === worktreeId);
   const selectedTreeEntries = treeSelectedEntries();
   // 工具条上的“第 n / m 个文件”：按改动树顺序（返修 A1/Q138）。
-  const orderedEntries = snapshot ? treeOrder(snapshot) : [];
+  const orderedEntries = snapshot ? entryOrder(snapshot) : [];
   const activeIndex = selected
     ? orderedEntries.findIndex((entry) => entry.path === selected.path && entry.changes === selected.changes)
     : -1;
   const filePosition = { index: activeIndex + 1, total: orderedEntries.length };
-  const discardableSelected = selectedTreeEntries.filter(
+  const discardableSelected = (changelistMode && snapshot && changelistSelectedPaths.worktreeId === worktreeId ? snapshot.entries.filter((entry) => changelistSelectedPaths.paths.includes(entry.path)) : selectedTreeEntries).filter(
     (entry) => entry.changes === "unstaged" || entry.changes === "untracked",
   );
   const allReviewed = !!reviewNotice
@@ -5112,6 +5554,7 @@ export function App() {
     diffSoftWrap: diffOptions.softWrap,
     diffJumpToNextFile: diffOptions.jumpToNextFile,
     diffIgnoreWhitespace: diffOptions.ignoreWhitespace,
+    changelistMode,
     commitSubjectLimit: commitChecks.subjectLimit,
     commitBlankLineRequired: commitChecks.blankLineRequired,
     commitBodyLineLimit: commitChecks.bodyLineLimit,
@@ -5137,18 +5580,60 @@ export function App() {
     pushDialogProtectedOnly: pushSettings.pushDialogProtectedOnly,
     protectedBranches: pushSettings.protectedBranches.join("\n"),
     detectedGitPath: info?.gitPath ?? null,
+    appUpdateMode,
+    allowPrerelease,
+    shortcuts: shortcutsSnapshot,
   };
+
+  const m7Dialogs = (
+    <>
+      {editDecision ? <EditDecisionDialog session={editDecision} onDone={finishEditDecision} /> : null}
+      {terminalConfirmation ? <Modal title={t("terminal.shutdownTitle")} onClose={() => finishTerminalConfirmation(false)} width={560}>
+        <p>{t("terminal.shutdownConfirm", { count: terminalConfirmation.length })}</p>
+        <ul className="my-3 max-h-48 overflow-auto text-[12px]">{terminalConfirmation.map((session) => <li key={session.sessionId} className="truncate" title={session.cwd}>{session.worktreePath} · {session.title}</li>)}</ul>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => finishTerminalConfirmation(false)}>{t("common.cancel")}</button>
+          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => finishTerminalConfirmation(true)}>{t("terminal.shutdownYes")}</button>
+        </div>
+      </Modal> : null}
+      <CloneDialog
+        open={cloneOpen}
+        onClose={() => setCloneOpen(false)}
+        onRegistered={(repo) => {
+          setCloneOpen(false);
+          setRepos((current) => [...current.filter((entry) => entry.id !== repo.id), repo]);
+          void openRepo(repo);
+        }}
+      />
+      <DiagnosticsDialog open={diagnosticsOpen} worktreeId={worktreeId} onClose={() => setDiagnosticsOpen(false)} />
+      <UpdatePanel
+        open={updateOpen}
+        status={updateStatus}
+        mode={appUpdateMode}
+        onModeChange={(mode) => void updateSettings({ appUpdateMode: mode })}
+        onStatusChange={(status) => {
+          setUpdateStatus(status);
+          if (!status.available) setUpdateBannerVersion(null);
+        }}
+        onInstall={() => requestUpdateLifecycle("installUpdate")}
+        onRestart={() => requestUpdateLifecycle("restartUpdate")}
+        onClose={() => setUpdateOpen(false)}
+      />
+    </>
+  );
 
   if (!activeRepo) {
     return (
-      <div className="flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
+      <div className="welcome-shell flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
         <WelcomeScreen
           repos={repos}
           busy={busy}
           onChooseRepo={() => void chooseRepo()}
           onSelectRepo={(repo) => void openRepo(repo)}
+          onCloneRepo={() => setCloneOpen(true)}
           error={error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
         />
+        {m7Dialogs}
         <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />
         {settingsOpen ? (
           <SettingsDialog
@@ -5157,6 +5642,10 @@ export function App() {
             onClose={() => setSettingsOpen(false)}
             onChange={updateSettings}
             onReloadEnvironment={reloadEnvironment}
+            worktreeId={worktreeId}
+            updateStatus={updateStatus}
+            onUpdateStatus={setUpdateStatus}
+            onThemesChanged={reloadImportedThemes}
           />
         ) : null}
         {closeRequest && closeRequest.action !== "proceed" ? (
@@ -5174,7 +5663,8 @@ export function App() {
   }
 
   return (
-    <div className="grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden bg-[var(--editor-background)]">
+    <div className="glass-host grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden">
+      <GlassLayer variant="window" />
       <TitleBar
         repo={activeRepo}
         repos={repos}
@@ -5187,7 +5677,7 @@ export function App() {
         onWorktree={(id) => void switchWorktree(id)}
         onSettings={() => setSettingsOpen(true)}
         onRefreshWorktrees={() => void refreshWorktreeStatuses()}
-        extra={worktreeId ? (
+        branchWidget={worktreeId ? (
           <BranchWidget
             overview={branches.overview}
             loading={branches.loading}
@@ -5198,20 +5688,66 @@ export function App() {
             onCheckout={(target) => void runCheckout(target, "plain")}
             onNewBranch={openNewBranch}
             onFetch={() => void runFetch(worktreeId, "user")}
-            onUpdate={() => void runUpdate(worktreeId)}
-            onPush={() => void openPushDialog()}
           />
+        ) : null}
+        extra={worktreeId ? (
+          <>
+          <SyncActions busy={isWriting} onUpdate={() => void runUpdate(worktreeId)} onPush={() => void openPushDialog()} />
+          <ToolbarGroup
+            id="tools"
+            label={messages.toolbar.toolWindows}
+            actions={[
+              {
+                id: "terminal",
+                icon: "terminal",
+                label: t("toolbar.terminal"),
+                pressed: terminalOpen,
+                onClick: () => setTerminalOpen((value) => !value),
+              },
+              {
+                id: "clone",
+                icon: "repo-clone",
+                label: t("toolbar.clone"),
+                disabled: busy,
+                onClick: () => setCloneOpen(true),
+              },
+              {
+                id: "github",
+                icon: "git-pull-request",
+                label: t("toolbar.pullRequests"),
+                pressed: githubOpen,
+                disabled: busy,
+                onClick: () => setGithubOpen(true),
+              },
+              {
+                id: "diagnostics",
+                icon: "debug-alt",
+                label: t("toolbar.diagnostics"),
+                onClick: () => setDiagnosticsOpen(true),
+              },
+              {
+                id: "update",
+                icon: "cloud-download",
+                label: t("toolbar.update"),
+                attention: !!updateBannerVersion,
+                onClick: () => setUpdateOpen(true),
+              },
+            ]}
+          />
+          </>
         ) : null}
       />
 
-      <div className="flex min-h-0 overflow-hidden">
+      <div className="shell-body flex min-h-0 overflow-hidden">
+        {/* 原生玻璃下侧栏占满左列（红绿灯在它顶上），顶部留白可以拖动窗口。 */}
+        <div className="sidebar-pane" data-tauri-drag-region>
         <ActivityBar
           pressed={sidebarVisible}
           count={new Set((snapshot?.entries ?? []).map((entry) => entry.path)).size}
           onToggle={() => setSidebarVisible((value) => !value)}
         />
         {sidebarVisible ? (
-          <aside className="changes-sidebar relative flex min-h-0 shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-background)]" style={{ width: sidebarWidth }}>
+          <aside className="changes-sidebar relative flex min-h-0 shrink-0 flex-col border-r border-[var(--sidebar-border)]" style={{ width: sidebarWidth }}>
             <div
               className="sidebar-resizer"
               role="separator"
@@ -5219,13 +5755,18 @@ export function App() {
               aria-label={messages.changes.resizeSidebar}
               onPointerDown={(event) => {
                 const sidebar = event.currentTarget.parentElement;
-                if (!sidebar?.offsetWidth || !sidebar.parentElement) return;
+                // 侧栏包在 .sidebar-pane 里，原生玻璃下外层行是 display: contents：按整个窗口外壳算可用宽度。
+                const pane = sidebar?.closest<HTMLElement>(".sidebar-pane");
+                const row = pane?.closest<HTMLElement>(".glass-host");
+                if (!sidebar?.offsetWidth || !pane || !row) return;
                 const activityWidth = sidebar.previousElementSibling?.getBoundingClientRect().width ?? 0;
                 const scale = sidebar.getBoundingClientRect().width / sidebar.offsetWidth;
                 const editorMinWidth = Number.parseFloat(getComputedStyle(sidebar).getPropertyValue("--editor-min-width"));
+                const paneStyle = getComputedStyle(pane);
+                const paneMargins = (Number.parseFloat(paneStyle.marginLeft) || 0) + (Number.parseFloat(paneStyle.marginRight) || 0);
                 sidebarDragRef.current = {
                   pointerId: event.pointerId, clientX: event.clientX, width: sidebar.offsetWidth, scale,
-                  maxWidth: Math.min(720, sidebar.parentElement.clientWidth - activityWidth / scale - editorMinWidth),
+                  maxWidth: Math.min(720, row.clientWidth - paneMargins - activityWidth / scale - editorMinWidth),
                   latestWidth: sidebar.offsetWidth,
                 };
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -5323,7 +5864,7 @@ export function App() {
                     <Codicon name="collapse-all" size={15} />
                   </button>
                   <SidebarMore
-                    onSelectAll={selectAllEntries}
+                    onSelectAll={() => changelistMode ? changelistControls.current?.selectAll() : selectAllEntries()}
                     onRefresh={() => void refresh()}
                     onCloseAll={closeAllTabs}
                     groupByDirectory={treeGroupByDirectory}
@@ -5339,7 +5880,9 @@ export function App() {
 
             {sideTab === "commit" ? (
               <>
-                {snapshot ? (
+                {changelistMode && worktreeId && snapshot ? (
+                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} controls={changelistControls} onSelection={acceptChangelistSelection} snapshot={snapshot} onActivate={activateTreeEntry} onPin={pinEntry} onDiscard={(paths) => requestDiscardEntries(snapshot.entries.filter((entry) => paths.includes(entry.path) && (entry.changes === "unstaged" || entry.changes === "untracked")))} />
+                ) : snapshot ? (
                   <ChangesTree
                     snapshot={snapshot}
                     active={selected}
@@ -5366,7 +5909,7 @@ export function App() {
                 )}
                 {worktreeId ? (
                   <CommitArea
-                    context={commitContext}
+                    context={changelistMode && commitContext ? { ...commitContext, gates: { ...commitContext.gates, hasStagedChanges: changelistView?.worktreeId === worktreeId && changelistView.items.some((item) => item.selected && !item.stale) === true } } : commitContext}
                     message={commitInput.message}
                     amend={commitInput.amend}
                     skipHooks={commitInput.skipHooks}
@@ -5458,8 +6001,12 @@ export function App() {
             )}
           </aside>
         ) : null}
+        </div>
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+          {updateBannerVersion ? (
+            <UpdateBanner version={updateBannerVersion} onOpen={() => setUpdateOpen(true)} onDismiss={() => setUpdateBannerVersion(null)} />
+          ) : null}
           <OperationBanner
             origin={captureRemoteTarget(gateRef.current.token(), worktreeId)}
             state={operationState}
@@ -5513,11 +6060,43 @@ export function App() {
             onCloseCommit={(tab) => commitTabs.close(tab.key)}
           />
           {mainView === "diff" && selectedEntry && !mergeEntry ? (
-            <Breadcrumbs
-              entry={selectedEntry}
-              view={view}
-              changeCount={displayChangeCount}
-            />
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <Breadcrumbs
+                  entry={selectedEntry}
+                  view={view}
+                  changeCount={displayChangeCount}
+                />
+              </div>
+              {/* F20：编辑只作用于 split 视图的工作区侧（unstaged）。
+               * 统一视图 / 暂存区 / 历史保持只读；统一视图点编辑先切到同文件的并排视图。 */}
+              {!selectedEntry.unmerged && !selectedEntry.binary && (selectedEntry.changes === "unstaged" || selectedEntry.changes === "changelist") ? (
+                <button
+                  type="button"
+                  className="toolbar-widget mr-1 shrink-0"
+                  aria-pressed={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split"}
+                  title={
+                    view !== "split"
+                      ? t("workspace.editSwitchToSplit")
+                      : editDirty
+                        ? t("workspace.editDirty")
+                        : t("workspace.edit")
+                  }
+                  onClick={() => {
+                    if (!worktreeId) return;
+                    if (editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split") {
+                      void closeEdit({ worktreeId, path: selectedEntry.path }); return;
+                    }
+                    if (view !== "split") void switchView("split");
+                    setEditingWorktreeId(worktreeId);
+                    setEditingPath(selectedEntry.path);
+                  }}
+                >
+                  <Codicon name={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? "close" : "edit"} size={13} />
+                  <span>{editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? t("common.close") : t("workspace.edit")}</span>
+                </button>
+              ) : null}
+            </div>
           ) : null}
           {mainView === "diff" && error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
           {mainView === "diff" && allReviewed && !mergeEntry ? (
@@ -5563,8 +6142,22 @@ export function App() {
             </EditorBanner>
           ) : null}
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {mainView === "diff" ? (mergeEntry ? (
+          <div className="editor-surface min-h-0 min-w-0 flex-1 overflow-hidden">
+            {mainView === "diff" ? (editingPath && worktreeId && editingWorktreeId === worktreeId && view === "split" && (selectedEntry?.changes === "unstaged" || selectedEntry?.changes === "changelist") && !selectedEntry.binary && !selectedEntry.unmerged && editingPath === selectedEntry.path ? (
+              <EditableWorkspace
+                key={`${worktreeId}/${editingPath}`}
+                session={editSessions.get({ worktreeId, path: editingPath })}
+                fontSize={fontSize}
+                fontFamily={codeFontFamily}
+                blocked={isWriting}
+                onClose={() => void closeEdit({ worktreeId, path: editingPath })}
+                renderDiff={(editor) => <SideBySideView
+                  worktreeId={worktreeId} entry={selectedEntry} fontSize={fontSize} fontFamily={codeFontFamily}
+                  options={{ ...sideBySideOptions, foldUnchanged: false, softWrap: false, syncScroll: false }}
+                  highlights={highlightStore} isWriting={isWriting} rightEditor={editor}
+                />}
+              />
+            ) : mergeEntry ? (
               <MergeView
                 key={`${worktreeId}/${mergeEntry.path}`}
                 worktreeId={worktreeId ?? ""}
@@ -5720,6 +6313,33 @@ export function App() {
             ) : null}
           </div>
 
+          {terminalOpen && worktreeId ? (
+            <TerminalPanel
+              worktreeId={worktreeId}
+              worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
+              fontSize={fontSize}
+              fontFamily={codeFontFamily}
+              height={terminalHeight}
+              onHeightChange={setTerminalHeight}
+              registry={terminalSessions}
+              busy={isWriting}
+              onClose={() => setTerminalOpen(false)}
+            />
+          ) : null}
+
+          {githubOpen && worktreeId ? (
+            <GithubPanel
+              key={worktreeId}
+              worktreeId={worktreeId}
+              worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
+              currentBranch={snapshot?.branch ?? null}
+              onClose={() => setGithubOpen(false)}
+              onCheckout={(request) => performM6Write(request.worktreeId, () => m7.prCheckout(request))}
+              onCheckedOut={() => void refresh()}
+              onWorkspaceTouched={() => void refresh()}
+            />
+          ) : null}
+
           {/* Git 命令日志（B07）：底部面板，默认隐藏。 */}
           {commandLogOpen ? (
             <CommandLogPanel open={commandLogOpen} onClose={() => setCommandLogOpen(false)} />
@@ -5848,7 +6468,8 @@ export function App() {
           worktreeId={worktreeId}
           onClose={() => setConflictDialogOpen(false)}
           onOpenMerge={(path) => {
-            const entry = snapshotRef.current?.entries.find((candidate) => candidate.path === path);
+            const current = snapshotRef.current;
+            const entry = current && (changelistModeRef.current ? changelistEntryForPath(current, path) : current.entries.find((candidate) => candidate.path === path));
             setConflictDialogOpen(false);
             if (entry) openMergeTab(entry);
           }}
@@ -5953,6 +6574,8 @@ export function App() {
         </Modal>
       ) : null}
 
+      {m7Dialogs}
+
       {settingsOpen ? (
         <SettingsDialog
           open
@@ -5960,6 +6583,10 @@ export function App() {
           onClose={() => setSettingsOpen(false)}
           onChange={updateSettings}
           onReloadEnvironment={reloadEnvironment}
+          worktreeId={worktreeId}
+          updateStatus={updateStatus}
+          onUpdateStatus={setUpdateStatus}
+          onThemesChanged={reloadImportedThemes}
         />
       ) : null}
 

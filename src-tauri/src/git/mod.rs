@@ -87,6 +87,7 @@ pub struct CommandRecord {
 #[derive(Debug, Default)]
 pub struct CommandLog {
     inner: Mutex<LogInner>,
+    diagnostics: Option<Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>>,
 }
 
 #[derive(Debug, Default)]
@@ -96,11 +97,32 @@ struct LogInner {
 }
 
 impl CommandLog {
+    pub(crate) fn with_diagnostics_snapshot<T>(&self, read: impl FnOnce(&[CommandRecord]) -> Result<T>) -> Result<T> {
+        let inner = self.inner.lock().unwrap_or_else(|error| error.into_inner());
+        let records: Vec<_> = inner.records.iter().cloned().collect();
+        read(&records)
+    }
+
+    pub fn with_diagnostics(store: Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>) -> Self {
+        Self { inner: Mutex::new(LogInner::default()), diagnostics: Some(store) }
+    }
+
+    pub fn clear_diagnostics(&self, worktree_id: Option<&str>) -> Result<usize> {
+        let mut inner = self.inner.lock().unwrap_or_else(|error| error.into_inner());
+        let removed = match &self.diagnostics {
+            Some(store) => store.clear(worktree_id)?,
+            None => 0,
+        };
+        inner.records.retain(|record| record.worktree_id.as_deref() != worktree_id);
+        Ok(removed)
+    }
+
     pub fn record(&self, record: CommandRecord) {
         if let Ok(mut inner) = self.inner.lock() {
             inner.next_sequence += 1;
             let mut record = record;
             record.sequence = inner.next_sequence;
+            if let Some(store) = &self.diagnostics { store.observe(&record); }
             inner.records.push_back(record);
             while inner.records.len() > LOG_CAPACITY {
                 inner.records.pop_front();
@@ -450,6 +472,7 @@ impl Git {
         timeout: Duration,
         output_limit: Option<usize>,
     ) -> Result<GitOutput> {
+        let mut timing = crate::commands::MeasureSpan::new("git.run");
         let started = Instant::now();
         let started_at_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -528,6 +551,7 @@ impl Git {
             .unwrap_or(-1);
         let (output, output_truncated) = command_output(&stdout, &stderr_bytes);
 
+        timing.mark("process_collected");
         self.log.record(CommandRecord {
             sequence,
             worktree_id: self.worktree_id.clone(),
@@ -544,6 +568,7 @@ impl Git {
             output_truncated,
         });
 
+        timing.mark("command_recorded");
         if let Some(error) = waited.err().or_else(|| status.err()) {
             return Err(if has_input {
                 AppError::coded(
@@ -669,6 +694,23 @@ impl Git {
         let text = self.try_run(&["config", "--get", key])?;
         let value = text.trim();
         (!value.is_empty()).then(|| value.to_string())
+    }
+
+    pub fn changelist_base(&self) -> Result<String> {
+        if let Some(head) = crate::commit::read_head(self)? { return Ok(head); }
+        Ok(self.run_with_input(&["hash-object", "-t", "tree", "--stdin"], Vec::new())?.into_success("读取空树标识")?.stdout_lossy().trim().to_string())
+    }
+
+    /// 更改列表的固定比较基线；所有预览、选择与指纹复用同一组 Git 参数。
+    pub fn diff_changelist(&self, path: Option<&str>, ignore: IgnoreWhitespace) -> Result<Vec<u8>> {
+        let base = self.changelist_base()?;
+        let mut args = vec!["--literal-pathspecs", "-c", "core.quotePath=false", "diff"];
+        args.extend_from_slice(DIFF_FLAGS);
+        args.extend_from_slice(ignore.diff_args());
+        if ignore.ignore_blank_lines() { args.push("--ignore-blank-lines"); }
+        args.extend_from_slice(&["--no-renames", "--binary", base.as_str(), "--"]);
+        if let Some(path) = path { args.push(path); }
+        Ok(self.run_ok(&args, "读取更改列表 Git diff")?.stdout)
     }
 
     /// 工作区相对 HEAD 的 diff（冲突文件的只读对照，设计 3.2）。

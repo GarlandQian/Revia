@@ -10,7 +10,7 @@ import type { NoticeText } from "@/components/app/Notifications";
  * 本组件只读它并回报变化，因此切换 worktree 再回来时位置不丢。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { HistoryCommit } from "@/types/bindings/HistoryCommit";
 import type { HistoryCommitDetail } from "@/types/bindings/HistoryCommitDetail";
 import type { HistoryCommitFiles } from "@/types/bindings/HistoryCommitFiles";
@@ -56,6 +56,15 @@ import { CommitMergeView } from "./CommitMergeView";
 export const LOG_ROW_HEIGHT = 26;
 /** 分支图每条轨道占的宽度（像素）。 */
 export const LOG_LANE_WIDTH = 14;
+const GRAPH_PADDING = 6;
+const AUTHOR_COLUMN_WIDTH = 150;
+const HASH_COLUMN_WIDTH = 80;
+const MIN_REF_COLUMN_WIDTH = 100;
+
+/** 轨道画在格子中间：第 0 条轨道的提交点不贴着列的左边缘。 */
+function laneX(lane: number): number {
+  return GRAPH_PADDING + lane * LOG_LANE_WIDTH + LOG_LANE_WIDTH / 2;
+}
 /** 表格在滚动时多渲染的行数，避免快速滚动出现空白。 */
 const ROW_OVERSCAN = 8;
 /**
@@ -127,6 +136,29 @@ interface DetailsState {
 }
 
 const EMPTY_DETAILS: DetailsState = { targetId: null, commit: null, detail: null, files: null, merge: null, error: null, loading: false };
+
+/** 引用标签按类型着色：HEAD、当前分支实心，其余为同色淡底。 */
+function refChipClass(chip: { kind: string; label: string; current: boolean }): string {
+  return ["log-ref-chip", chip.kind, chip.current ? "current" : "", chip.label === "HEAD" ? "head" : ""].filter(Boolean).join(" ");
+}
+
+function commitRefChips(commit: HistoryCommit, currentBranch: string | null, headCommit: string | null) {
+  const chips = refChips(commit.refs, currentBranch).map((chip) => ({
+    ...chip,
+    current: chip.current || (commit.refs.some((ref) => ref.shortName === "HEAD") && chip.label === currentBranch),
+  }));
+  if (headCommit === commit.oid) chips.unshift({ kind: "branch", label: "HEAD", fullName: "HEAD", current: true });
+  return chips;
+}
+
+function LogRefChips({ chips }: { chips: ReturnType<typeof refChips> }) {
+  return chips.map((chip) => (
+    <span key={chip.fullName} className={refChipClass(chip)} title={chip.fullName}>
+      <Codicon name={chip.kind === "tag" ? "tag" : chip.kind === "remoteBranch" ? "cloud" : "git-branch"} size={10} />
+      {chip.label}
+    </span>
+  ));
+}
 
 export function LogView(props: LogViewProps) {
   const {
@@ -413,9 +445,32 @@ export function LogView(props: LogViewProps) {
   const lastVisible = Math.min(total, Math.ceil((scrollTop + viewport) / LOG_ROW_HEIGHT) + ROW_OVERSCAN);
   const visible = rows.slice(firstVisible, Math.max(firstVisible, lastVisible));
   const tableHeight = total * LOG_ROW_HEIGHT;
-  const graphColumnWidth = Math.max(2, ...graphRows.map((row) => row.width)) * LOG_LANE_WIDTH;
-  const tableMinWidth = graphColumnWidth + SUBJECT_MIN_WIDTH + (settings.columns.author ? 150 : 0)
-    + (settings.columns.date ? DATE_COLUMN_WIDTH : 0) + (settings.columns.hash ? 80 : 0);
+  const graphColumnWidth = Math.max(2, ...graphRows.map((row) => row.width)) * LOG_LANE_WIDTH + GRAPH_PADDING * 2;
+  const refGroups = useMemo(() => rows
+    .map((commit) => ({ oid: commit.oid, chips: commitRefChips(commit, currentBranch, headCommit) }))
+    .filter((group) => group.chips.length > 0), [rows, currentBranch, headCommit]);
+  const refMeasure = useRef<HTMLDivElement | null>(null);
+  const [refColumnWidth, setRefColumnWidth] = useState(MIN_REF_COLUMN_WIDTH);
+  useLayoutEffect(() => {
+    const element = refMeasure.current;
+    if (!element) return;
+    // 用与行内完全相同的标签量取自然宽度；CSS zoom 下仍使用布局像素。
+    const measure = () => setRefColumnWidth(Math.max(MIN_REF_COLUMN_WIDTH,
+      Math.ceil(Number.parseFloat(getComputedStyle(element).width) || 0) + 17));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [refGroups]);
+  const tableGridColumns = [
+    `${graphColumnWidth}px`, `${refColumnWidth}px`, `minmax(${SUBJECT_MIN_WIDTH}px, 1fr)`,
+    ...(settings.columns.author ? [`${AUTHOR_COLUMN_WIDTH}px`] : []),
+    ...(settings.columns.date ? [`${DATE_COLUMN_WIDTH}px`] : []),
+    ...(settings.columns.hash ? [`${HASH_COLUMN_WIDTH}px`] : []),
+  ].join(" ");
+  const tableMinWidth = graphColumnWidth + refColumnWidth + SUBJECT_MIN_WIDTH
+    + (settings.columns.author ? AUTHOR_COLUMN_WIDTH : 0)
+    + (settings.columns.date ? DATE_COLUMN_WIDTH : 0) + (settings.columns.hash ? HASH_COLUMN_WIDTH : 0);
 
   // 滚动位置按 worktree 保留，但不逐像素写入全局状态：节流后再存，
   // 否则外层 App 会被每一次滚动事件重渲染。
@@ -627,7 +682,10 @@ export function LogView(props: LogViewProps) {
 
   const filterCount = activeFilterCount(filter);
   return (
-    <div className="log-view flex h-full min-h-0 flex-col bg-[var(--editor-background)]">
+    <div className="log-view relative flex h-full min-h-0 flex-col bg-[var(--editor-background)]">
+      <div ref={refMeasure} className="log-ref-measure" aria-hidden="true">
+        {refGroups.map((group) => <span key={group.oid} className="log-ref-group"><LogRefChips chips={group.chips} /></span>)}
+      </div>
       {/* 工具栏：文字、分支、作者、日期、路径（L04），以及列与预览开关。 */}
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-panel-border px-2 py-1">
         <div className="relative">
@@ -788,39 +846,30 @@ export function LogView(props: LogViewProps) {
             onScroll={onScroll}
           >
             <div style={{ minWidth: tableMinWidth }}>
-              <div className="log-table-head sticky top-0 z-[1] flex h-[24px] items-center border-b border-panel-border bg-[var(--editor-background)] text-[11px] text-descriptionforeground">
+              <div className="log-table-head sticky top-0 z-[1] grid h-[24px] items-center border-b border-panel-border bg-[var(--editor-background)] text-[11px] text-descriptionforeground" style={{ gridTemplateColumns: tableGridColumns }}>
                 {/* 分支图列只有几条轨道宽，表头文字放不下；同 Rebased 不显示列名，只保留可读标签。 */}
                 <span className="log-graph-col shrink-0" style={{ width: graphColumnWidth }} title={messages.log.graph} aria-label={messages.log.graph} />
-                <span className="min-w-0 flex-1 px-2">{messages.log.subject}</span>
-                {settings.columns.author ? <span className="w-[150px] shrink-0 px-2">{messages.log.author}</span> : null}
+                <span className="px-2">{messages.log.refsLabel}</span>
+                <span className="min-w-0 truncate px-2">{messages.log.subject}</span>
+                {settings.columns.author ? <span className="min-w-0 truncate px-2">{messages.log.author}</span> : null}
                 {settings.columns.date ? <span className="shrink-0 overflow-hidden text-ellipsis whitespace-nowrap px-2" style={{ width: DATE_COLUMN_WIDTH }}>{messages.log.date}</span> : null}
-                {settings.columns.hash ? <span className="w-[80px] shrink-0 px-2">{messages.log.hash}</span> : null}
+                {settings.columns.hash ? <span className="min-w-0 truncate px-2">{messages.log.hash}</span> : null}
               </div>
               <div className="relative" style={{ height: tableHeight }}>
                 {visible.map((commit, offset) => {
                   const index = firstVisible + offset;
                   const graph = graphRows[index];
                   const selected = (selection.length > 0 ? selection.includes(commit.oid) : commit.oid === selectedOid);
-                  const chips = refChips(
-                    commit.refs,
-                    currentBranch,
-                  ).map((chip) => ({
-                    ...chip,
-                    // 当前分支突出显示；HEAD 也按当前分支处理。
-                    current: chip.current || (commit.refs.some((ref) => ref.shortName === "HEAD") && chip.label === currentBranch),
-                  }));
+                  const chips = commitRefChips(commit, currentBranch, headCommit);
                   const rails = graph ? graph.railsAbove : [];
-                  if (headCommit === commit.oid) {
-                    chips.unshift({ kind: "branch", label: "HEAD", fullName: "HEAD", current: true });
-                  }
                   return (
                     <div
                       key={commit.oid}
                       role="row"
                       aria-selected={selected}
                       tabIndex={-1}
-                      className={`log-row absolute inset-x-0 flex items-center ${selected ? "selected" : ""}`}
-                      style={{ top: index * LOG_ROW_HEIGHT, height: LOG_ROW_HEIGHT }}
+                      className={`log-row absolute inset-x-0 grid items-center ${selected ? "selected" : ""}`}
+                      style={{ top: index * LOG_ROW_HEIGHT, height: LOG_ROW_HEIGHT, gridTemplateColumns: tableGridColumns }}
                       onClick={(event) => selectRow(event, commit)}
                       onDoubleClick={() => {
                         const first = firstFileOf(details, commit.oid);
@@ -840,26 +889,10 @@ export function LogView(props: LogViewProps) {
                           if (jump) onState({ selectedCommit: jump.oid });
                         }}
                       />
-                      <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden px-2">
-                        {chips.length ? <span className="flex max-w-[50%] shrink-0 gap-1.5 overflow-hidden">
-                          {chips.map((chip) => (
-                            <span
-                              key={`${chip.fullName}`}
-                              className={`log-ref-chip ${chip.current ? "current" : ""} ${chip.kind === "tag" ? "tag" : ""} ${chip.kind === "remoteBranch" ? "remote" : ""}`}
-                              title={chip.fullName}
-                            >
-                              <Codicon
-                                name={chip.kind === "tag" ? "tag" : chip.kind === "remoteBranch" ? "cloud" : "git-branch"}
-                                size={10}
-                              />
-                              {chip.label}
-                            </span>
-                          ))}
-                        </span> : null}
-                        <span className="min-w-0 truncate" title={commit.subject}>{commit.subject}</span>
-                      </span>
+                      <span className="log-ref-group px-2"><LogRefChips chips={chips} /></span>
+                      <span className="min-w-0 truncate px-2" title={commit.subject}>{commit.subject}</span>
                       {settings.columns.author ? (
-                        <span className="w-[150px] shrink-0 truncate px-2 text-[11.5px] text-descriptionforeground" title={authorKey(commit)}>
+                        <span className="min-w-0 truncate px-2 text-[11.5px] text-descriptionforeground" title={authorKey(commit)}>
                           {authorLabel(commit)}
                         </span>
                       ) : null}
@@ -873,7 +906,7 @@ export function LogView(props: LogViewProps) {
                         </span>
                       ) : null}
                       {settings.columns.hash ? (
-                        <span className="w-[80px] shrink-0 px-2 font-mono text-[11.5px] text-descriptionforeground">
+                        <span className="min-w-0 truncate px-2 font-mono text-[11.5px] text-descriptionforeground" title={commit.oid}>
                           {shortOid(commit.oid)}
                         </span>
                       ) : null}
@@ -994,7 +1027,7 @@ function GraphCell({
           <span
             key={`rail-${lane}`}
             className={`log-rail${collapsed ? " collapsed" : ""}`}
-            style={{ left: lane * LOG_LANE_WIDTH, background: collapsed ? "transparent" : laneColor(lane) }}
+            style={{ left: laneX(lane), background: collapsed ? "transparent" : laneColor(lane) }}
           />
         );
       })}
@@ -1003,7 +1036,7 @@ function GraphCell({
           <span
             key={`below-${lane}`}
             className="log-rail"
-            style={{ left: lane * LOG_LANE_WIDTH, top: "50%", height: "50%", background: laneColor(lane) }}
+            style={{ left: laneX(lane), top: "50%", height: "50%", background: laneColor(lane) }}
           />
         ),
       )}
@@ -1012,31 +1045,38 @@ function GraphCell({
           <span
             key={`above-${lane}`}
             className="log-rail"
-            style={{ left: lane * LOG_LANE_WIDTH, top: 0, height: "50%", background: laneColor(lane) }}
+            style={{ left: laneX(lane), top: 0, height: "50%", background: laneColor(lane) }}
           />
         ),
       )}
-      {graph.arms.map((arm) => {
-        const left = Math.min(arm.from, arm.to) * LOG_LANE_WIDTH;
-        const widthValue = Math.max(LOG_LANE_WIDTH, Math.abs(arm.to - arm.from) * LOG_LANE_WIDTH);
-        return (
-          <span
-            key={`arm-${arm.from}-${arm.to}`}
-            className="log-arm"
-            style={{ left, width: widthValue, background: laneColor(arm.to) }}
-          />
-        );
-      })}
+      {/* 提交点自己那条轨道：上方的子提交连下来的一段（railsAbove 不含它）。 */}
+      {graph.incoming ? (
+        <span
+          className="log-rail"
+          style={{ left: laneX(graph.lane), top: 0, height: "50%", background: laneColor(graph.lane) }}
+        />
+      ) : null}
+      {graph.arms.map((arm) => (
+        <span
+          key={`arm-${arm.from}-${arm.to}`}
+          className="log-arm"
+          style={{
+            left: laneX(Math.min(arm.from, arm.to)),
+            width: Math.abs(arm.to - arm.from) * LOG_LANE_WIDTH,
+            background: laneColor(arm.to),
+          }}
+        />
+      ))}
       <span
         className="log-node"
-        style={{ left: graph.lane * LOG_LANE_WIDTH, background: laneColor(graph.lane) }}
+        style={{ left: laneX(graph.lane), background: laneColor(graph.lane) }}
       />
       {markers.map((marker) => (
         <button
           key={`marker-${marker.lane}-${marker.direction}`}
           type="button"
           className="log-long-edge"
-          style={{ left: marker.lane * LOG_LANE_WIDTH + (marker.direction === "down" ? 0 : 0) }}
+          style={{ left: laneX(marker.lane) }}
           title={messages.log.longEdgeJump}
           onClick={(event) => {
             event.stopPropagation();
@@ -1205,7 +1245,7 @@ function CommitDetails({
               <dt className="w-[64px] shrink-0">{messages.log.refsLabel}</dt>
               <dd className="flex min-w-0 flex-1 flex-wrap gap-1">
                 {refChips(refLabels, null).map((chip) => (
-                  <span key={chip.fullName} className={`log-ref-chip ${chip.kind}`} title={chip.fullName}>
+                  <span key={chip.fullName} className={refChipClass(chip)} title={chip.fullName}>
                     {chip.label}
                   </span>
                 ))}
@@ -1564,7 +1604,7 @@ function PathFilterMenu({
       {selected.length > 0 ? (
         <div className="flex flex-wrap gap-1 px-2 pb-1">
           {selected.map((path) => (
-            <button key={path} type="button" className="log-ref-chip" onClick={() => toggle(path)} title={messages.log.removePath}>
+            <button key={path} type="button" className="log-ref-chip path" onClick={() => toggle(path)} title={messages.log.removePath}>
               {path}
               <Codicon name="close" size={10} />
             </button>

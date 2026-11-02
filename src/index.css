@@ -181,16 +181,19 @@
     border-bottom: 1px solid var(--titlebar-border);
   }
 
+  /* 工具按钮：第四版的低饱和透明填充（M7 任务 01），状态与 GlassButton 一致。 */
   .toolbar-widget,
   .icon-action {
     display: inline-flex;
     align-items: center;
+    border: 1px solid transparent;
     border-radius: 5px;
     color: inherit;
     white-space: nowrap;
     outline: none;
+    background: transparent;
     /* 返修 B11：与 VS Code 相当的短过渡（悬停、按下）。 */
-    transition: background-color 120ms ease, color 120ms ease;
+    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
   }
 
   .toolbar-widget {
@@ -207,24 +210,38 @@
     color: var(--icon-foreground);
   }
 
+  .toolbar-widget:not(:disabled),
+  .icon-action:not(:disabled) {
+    background: color-mix(in srgb, var(--glass-edge) 7%, transparent);
+  }
+
   .toolbar-widget:hover:not(:disabled),
   .icon-action:hover:not(:disabled) {
-    background: var(--toolbar-hoverbackground);
+    background: var(--glass-button-hover);
+    box-shadow: inset 0 1px #ffffff14, 0 2px 4px #00000015;
+  }
+
+  .toolbar-widget:active:not(:disabled),
+  .icon-action:active:not(:disabled) {
+    background: var(--glass-button-press);
   }
 
   .toolbar-widget:focus-visible,
   .icon-action:focus-visible {
-    outline: 1px solid var(--focusborder);
-    outline-offset: -1px;
+    outline: 2px solid var(--focusborder);
+    outline-offset: 2px;
   }
 
   .icon-action:disabled {
     color: color-mix(in srgb, var(--descriptionforeground) 55%, var(--editor-background));
+    background: transparent;
+    box-shadow: none;
     cursor: default;
   }
 
+  .toolbar-widget[aria-pressed="true"],
   .icon-action[aria-pressed="true"] {
-    background: var(--toolbar-hoverbackground);
+    background: var(--glass-button-press);
     color: var(--foreground);
   }
 
@@ -314,6 +331,10 @@
 
   .side-tab:hover {
     opacity: 1;
+  }
+
+  .side-tab[aria-selected="true"] {
+    border-bottom-color: var(--accent, var(--focusborder));
   }
 
   .section-header {
@@ -970,16 +991,17 @@
   pointer-events: none;
 }
 
-/* 弹层内容挂在顶层（返修 B3、Comments 3）：由 Base UI 的 portal 定位。 */
+/* 弹层内容挂在顶层（返修 B3、Comments 3）：由 Base UI 的 portal 定位。
+ * 背景 F01：材质由内部 GlassLayer 提供，这里只保留圆角 / 边框 / 阴影兜底。 */
 .revia-popper {
   max-height: min(70vh, var(--available-height));
   max-width: var(--available-width);
   z-index: 60;
-  border-radius: 6px;
-  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  border: 1px solid var(--glass-line, var(--panel-border));
   background: var(--editorwidget-background);
   color: var(--foreground);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 28%);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
   animation: revia-pop-in 120ms ease;
 }
 
@@ -1447,7 +1469,6 @@
   font-family: var(--font-sans);
   font-size: 12px;
   cursor: default;
-  border-left: 2px solid transparent;
   contain: layout paint style;
 }
 
@@ -1457,7 +1478,7 @@
 
 .log-row.selected {
   background: var(--list-activeSelectionbackground, var(--toolbar-hoverbackground));
-  border-left-color: var(--focusborder);
+  box-shadow: inset 2px 0 var(--focusborder);
 }
 
 .log-graph-col {
@@ -1472,6 +1493,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
+  margin-left: -1px;
   border-radius: 1px;
 }
 
@@ -1493,7 +1515,7 @@
   width: 9px;
   height: 9px;
   margin-top: -4.5px;
-  margin-left: -4px;
+  margin-left: -4.5px;
   border-radius: 50%;
   box-shadow: 0 0 0 1px var(--editor-background);
 }
@@ -1520,35 +1542,87 @@
   background: var(--toolbar-hoverbackground);
 }
 
+/* 引用标签：按类型着色（macOS 系统色，深浅色各一套），胶囊形。 */
+:root {
+  --ref-head: #007aff;
+  --ref-branch: #248a3d;
+  --ref-remote: #8944ab;
+  --ref-tag: #c93400;
+  --ref-other: #0071a4;
+}
+
+html[data-kind="dark"] {
+  --ref-head: #0a84ff;
+  --ref-branch: #30d158;
+  --ref-remote: #bf5af2;
+  --ref-tag: #ff9f0a;
+  --ref-other: #64d2ff;
+}
+
 .log-ref-chip {
+  --ref: var(--ref-branch);
   display: inline-flex;
   align-items: center;
   gap: 3px;
   flex: none;
-  max-width: 180px;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--gitdecoration-headsresourceforeground, var(--badge-background)) 22%, transparent);
-  color: var(--foreground);
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ref) 18%, transparent);
+  color: var(--ref);
   font-size: 10.5px;
+  font-weight: 500;
   line-height: 16px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.log-ref-chip.remote {
-  background: color-mix(in srgb, var(--descriptionforeground) 18%, transparent);
+.log-ref-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+}
+
+/* 所有已加载引用的自然宽度决定整列宽度，不压缩、不裁掉胶囊。 */
+.log-ref-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  height: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+.log-ref-chip.remoteBranch {
+  --ref: var(--ref-remote);
 }
 
 .log-ref-chip.tag {
-  background: color-mix(in srgb, var(--editorwarning-foreground) 24%, transparent);
+  --ref: var(--ref-tag);
 }
 
-.log-ref-chip.current {
-  background: var(--focusborder);
-  color: var(--editor-background);
+.log-ref-chip.other {
+  --ref: var(--ref-other);
+}
+
+.log-ref-chip.head {
+  --ref: var(--ref-head);
+}
+
+/* HEAD 与当前分支：实心底、白字。 */
+.log-ref-chip:is(.head, .current) {
+  background: var(--ref);
+  color: #fff;
   font-weight: 600;
+}
+
+/* 路径筛选也用这个形状，但不是引用：保持中性。 */
+.log-ref-chip.path {
+  --ref: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 
 .log-file-row {
@@ -1643,27 +1717,1234 @@
 .dialog-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   height: 24px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--icon-foreground) 24%, transparent);
-  border-radius: 3px;
-  background: transparent;
+  border: 1px solid var(--glass-button-edge);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--glass-edge) 8%, transparent);
   color: var(--foreground);
   font: 12px/22px var(--font-sans);
+  outline: none;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .dialog-button:hover:not(:disabled) {
-  background: var(--toolbar-hoverbackground);
+  background: var(--glass-button-hover);
+  box-shadow: inset 0 1px #ffffff14, 0 2px 4px #00000015;
+}
+
+.dialog-button:active:not(:disabled) {
+  background: var(--glass-button-press);
+}
+
+.dialog-button:focus-visible {
+  outline: 2px solid var(--focusborder);
+  outline-offset: 2px;
 }
 
 .dialog-button.primary {
-  border-color: var(--focusborder);
-  background: var(--focusborder);
-  color: var(--editor-background);
+  border-color: var(--glass-button-edge);
+  background: color-mix(in srgb, var(--glass-edge) 22%, transparent);
+  color: var(--foreground);
   font-weight: 600;
 }
 
 .dialog-button:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+/* ---------- 玻璃材质（M7 任务 01、Q189–Q191） ----------
+   三个 React Bits 组件（GlassSurface / GlassIcons / SpecularButton）自带样式；
+   这里只补它们与真实布局的接缝：玻璃层压在内容下面、工具入口的间距、
+   以及减少透明度 / 高对比度 / 减少动态效果下的退化方式。
+   代码、行号与 diff 背景始终不透明（玻璃层不进入编辑器区域）。 */
+/* ---------- Liquid Glass 材质（M7 任务 01，Q189–Q199） ----------
+ *
+ * 第四版把材质连成一整窗：窗口外壳一层玻璃，顶栏 / 工具条 / 侧栏 / 状态栏
+ * 都是这层玻璃上的半透明层，浮层与对话框单独悬起。这里的变量从当前颜色主题
+ * 推导，代码与 diff 区域始终用不透明的 --editor-background。
+ */
+
+html[data-kind="dark"] {
+  --glass-window-tint: #0c1219;
+  --glass-window-accent: #a1c9ee;
+  --glass-window-accent-opacity: 0.1;
+  --glass-titlebar-tint: #ffffff0f;
+  --glass-side-tint: #ffffff08;
+  --glass-rail-tint: #0000001f;
+  --glass-status-tint: #ffffff08;
+  --glass-line: #ffffff1f;
+  --glass-edge: #d2e1e958;
+  --glass-shine: #f2faff56;
+  --glass-button-hover: #b9cedb36;
+  --glass-button-press: #b9cedb22;
+  --glass-button-edge: #afc6d037;
+  --glass-popover-tint: #10161ded;
+  --glass-shell-solid: var(--editor-background);
+}
+
+html[data-kind="light"] {
+  --glass-window-tint: #ffffff;
+  --glass-window-accent: #245c8e;
+  --glass-window-accent-opacity: 0.08;
+  --glass-titlebar-tint: #ffffffa8;
+  --glass-side-tint: #ffffff70;
+  --glass-rail-tint: #ffffff52;
+  --glass-status-tint: #ffffff70;
+  --glass-line: #354d6426;
+  --glass-edge: #ffffffe6;
+  --glass-shine: #ffffffed;
+  --glass-button-hover: #405b712b;
+  --glass-button-press: #405b7138;
+  --glass-button-edge: #5d788b50;
+  --glass-popover-tint: #f5f8fbef;
+  --glass-shell-solid: var(--editor-background);
+}
+
+@layer components {
+  /* 材质宿主：隔离层叠上下文，内容统一抬到材质之上。 */
+  .glass-host {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(120% 90% at 12% -10%, color-mix(in srgb, var(--glass-window-accent) calc(var(--glass-window-accent-opacity) * 100%), transparent), transparent 62%),
+      radial-gradient(110% 80% at 88% 110%, color-mix(in srgb, var(--glass-window-accent) calc(var(--glass-window-accent-opacity) * 70%), transparent), transparent 58%),
+      var(--editor-background);
+  }
+
+  .glass-host > *:not(.glass-layer) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 浮层 / 对话框 / 通知的材质宿主：同样把内容抬到材质之上。 */
+  .glass-isolate {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .glass-isolate > *:not(.glass-layer) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 材质层本身不参与命中测试，也不进入无障碍树。
+   * absolute 脱离文档流：放在 grid / flex 容器里不能占一个轨道
+   * （smoke 布局核对发现它曾把顶栏挤下去一行）。
+   * vendor 的 .glass-surface{position:relative} 是非 layered 样式，
+   * 必须用 !important 才能稳定覆盖（grid/flex 宿主都依赖这一点）。 */
+  .glass-layer.glass-surface {
+    position: absolute !important;
+    inset: 0 !important;
+    /* F01：清除 vendor 默认 200×80 行内宽高的布局影响（width/height="100%" 为基础，
+     * !important 保证样式优先级不依赖加载顺序）。 */
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 0;
+    pointer-events: none;
+    contain: layout style;
+  }
+
+  .glass-layer .glass-surface__content {
+    padding: 0;
+  }
+
+  .glass-layer--flat .glass-surface {
+    background: var(--glass-shell-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .glass-layer--flat .glass-surface__sheen,
+  .glass-layer--flat .glass-surface__rim,
+  .glass-layer--flat .glass-surface__line,
+  .glass-layer--flat .glass-surface__glow {
+    display: none;
+  }
+
+  /* 外壳各区域：玻璃上的半透明层，而不是各自一块实色。 */
+  .titlebar {
+    background: linear-gradient(180deg, var(--glass-titlebar-tint), transparent), transparent;
+    border-bottom: 1px solid var(--glass-line);
+  }
+
+  .activity-bar {
+    background: var(--glass-rail-tint);
+    border-right: 1px solid var(--glass-line);
+    padding-top: 6px;
+  }
+
+  .changes-sidebar {
+    background: var(--glass-side-tint);
+    border-right: 1px solid var(--glass-line);
+  }
+
+  .window-status {
+    background: var(--glass-status-tint);
+    border-top: 1px solid var(--glass-line);
+  }
+
+  /* 编辑器页签行：代码底色与外壳材质的衔接带（第四版 editor-tabs）。 */
+  .editor-tabs {
+    background: color-mix(in srgb, var(--editor-background) 72%, var(--glass-side-tint));
+    border-bottom: 1px solid var(--glass-line);
+  }
+
+  /* 浮层与对话框：单独一层玻璃，圆角与阴影照第四版。 */
+  .revia-popper {
+    position: relative;
+    background: var(--glass-popover-tint);
+    backdrop-filter: blur(20px) saturate(1.05);
+    -webkit-backdrop-filter: blur(20px) saturate(1.05);
+    border-color: var(--glass-line);
+    box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
+  }
+
+  .app-dialog {
+    position: relative;
+    background: var(--glass-popover-tint);
+    backdrop-filter: blur(20px) saturate(1.05);
+    -webkit-backdrop-filter: blur(20px) saturate(1.05);
+    border-color: var(--glass-edge);
+    box-shadow: 0 20px 60px rgb(0 0 0 / 32%);
+  }
+
+  .notification {
+    position: relative;
+    background: var(--glass-popover-tint);
+    backdrop-filter: blur(20px) saturate(1.05);
+    -webkit-backdrop-filter: blur(20px) saturate(1.05);
+    border-color: var(--glass-edge);
+  }
+
+  .glass-layer--popover {
+    border-radius: inherit;
+  }
+
+  /* ---------- 按钮材质：一套状态覆盖工具按钮与操作按钮 ---------- */
+
+  .glass-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--glass-button-edge);
+    color: var(--gb-text, var(--foreground));
+    background: color-mix(in srgb, var(--gb-tint, transparent) calc(var(--gb-opacity, 0.045) * 100%), transparent);
+    box-shadow: inset 0 1px #ffffff0d, 0 1px 2px #00000012;
+    transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+    outline: none;
+    white-space: nowrap;
+  }
+
+  .glass-button:hover:not(:disabled) {
+    background: var(--glass-button-hover);
+    box-shadow: inset 0 1px #ffffff14, 0 2px 4px #00000015;
+  }
+
+  .glass-button:active:not(:disabled) {
+    background: var(--glass-button-press);
+  }
+
+  .glass-button:focus-visible {
+    outline: 2px solid var(--focusborder);
+    outline-offset: 2px;
+  }
+
+  .glass-button:disabled {
+    /* 禁用靠 disabled 属性与降饱和，不用 pointer-events 假禁用。 */
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
+  }
+
+  .glass-button--primary {
+    border-color: var(--glass-button-edge);
+    font-weight: 500;
+  }
+
+  .glass-button--flat {
+    background: var(--glass-shell-solid);
+    box-shadow: none;
+  }
+
+  /* 工具按钮沿用既有尺寸，只替换材质。 */
+  .toolbar-widget.glass-button {
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 5px;
+    color: inherit;
+  }
+
+  .icon-action.glass-button {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 5px;
+    color: var(--icon-foreground);
+  }
+
+  .toolbar-widget:disabled,
+  .icon-action:disabled {
+    color: color-mix(in srgb, var(--descriptionforeground) 55%, var(--editor-background));
+  }
+
+  .toolbar-widget[aria-pressed="true"],
+  .icon-action[aria-pressed="true"] {
+    background: var(--glass-button-press);
+    color: var(--foreground);
+  }
+
+  .m7-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    width: 100%;
+  }
+
+  /* 主提交按钮：第四版尺寸与权重。 */
+  .glass-button.m7-commit-button {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 29px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 550;
+  }
+}
+
+/* 减少透明度：材质层退回主题实色，隐藏高光与折射装饰。 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-layer {
+    display: none;
+  }
+
+  .titlebar,
+  .changes-sidebar,
+  .activity-bar,
+  .window-status,
+  .editor-tabs {
+    background: var(--glass-shell-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .revia-popper,
+  .app-dialog,
+  .notification {
+    background: var(--editorwidget-background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-button,
+  .glass-button:hover:not(:disabled) {
+    background: var(--glass-shell-solid);
+    box-shadow: none;
+  }
+
+  .glass-surface__sheen,
+  .glass-surface__rim,
+  .glass-icon-shine,
+  .glass-icon-shade,
+  .specular-button__light,
+  .glass-icons-canvas {
+    display: none;
+  }
+}
+
+/* 高对比度：实色底 + 描边，不依赖半透明与高光。 */
+@media (forced-colors: active) {
+  .glass-layer {
+    display: none;
+  }
+
+  .titlebar,
+  .changes-sidebar,
+  .activity-bar,
+  .window-status,
+  .revia-popper,
+  .app-dialog,
+  .notification {
+    background: Canvas;
+    color: CanvasText;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    border: 1px solid CanvasText;
+  }
+
+  .glass-button {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-button:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* 减少动态效果：玻璃组件的过渡与入场动画全部关掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .glass-icon,
+  .glass-icon-plate,
+  .glass-icon-glass,
+  .glass-icon-face,
+  .glass-surface,
+  .specular-button {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------- 工具栏分组按钮（一组图标共用一块胶囊） ---------- */
+@layer components {
+  .toolbar-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .toolbar-group {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    margin-inline-start: 4px;
+    padding: 0 2px;
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--glass-edge) 7%, transparent);
+  }
+
+  .toolbar-group-item {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 22px;
+    border-radius: 999px;
+    color: var(--icon-foreground);
+    outline: none;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .toolbar-group-item:hover:not(:disabled) {
+    background: var(--glass-button-hover);
+  }
+
+  .toolbar-group-item:active:not(:disabled),
+  .toolbar-group-item[aria-pressed="true"] {
+    background: var(--glass-button-press);
+    color: var(--foreground);
+  }
+
+  .toolbar-group-item:disabled {
+    opacity: 0.45;
+  }
+
+  .toolbar-group-item:focus-visible {
+    outline: 2px solid var(--focusborder);
+    outline-offset: 1px;
+  }
+
+  .toolbar-attention {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--focusborder);
+  }
+}
+
+/* macOS 工具栏统一 52pt，与系统 unified 工具栏一致；红绿灯位置在 tauri.conf.json。 */
+html[data-platform="macos"] {
+  --titlebar-height: 52px;
+}
+
+/* 侧栏面板只在窗口有系统材质时排进外壳网格；其他情况下不参与布局。 */
+.sidebar-pane {
+  display: contents;
+}
+
+/* ---------- 系统窗口材质：网页透明，外壳与代码都放在系统材质上 ----------
+ * html.window-material：窗口底是系统材质时的共用规则（macOS 26 的 Liquid Glass；
+ * Windows 11 的 Mica / Acrylic 在 M8 接入时也用这一层，Q191）。
+ * html.native-glass：只在 macOS，工具栏胶囊也由 AppKit 的玻璃绘制，网页里的胶囊不画底色。
+ * 这些规则不放进 @layer：要压过 Tailwind 工具类里的底色与边框。 */
+html.window-material {
+  /* glass：窗口透明，整窗系统材质（macOS 玻璃 / Windows Mica）；solid：窗口画成编辑器底色。 */
+  --glass-window: glass;
+  --glass-window-background: var(--editor-background);
+  --capsule-height: 36px;
+  --capsule-hover: color-mix(in srgb, var(--foreground) 9%, transparent);
+  --capsule-press: color-mix(in srgb, var(--foreground) 15%, transparent);
+}
+
+html.native-glass {
+  /* 整窗玻璃的圆角，与系统窗口圆角一致。 */
+  --window-radius: 16px;
+}
+
+/* 布局块（Q202，参照 Loop）：侧栏、编辑区、设置页的卡片是窗口玻璃上的半透明底加亮边，选中项是一块白色胶囊。 */
+html.window-material {
+  /* 卡片圆角与内距成套：贴着卡片边的元素至少内缩 --block-inset，圆角取 --block-inner-radius（同心）。 */
+  --block-radius: 18px;
+  --block-inset: 8px;
+  --block-inner-radius: 10px;
+  /* 内容卡片（编辑区、设置项）用主题底色压住背后的窗口，免得透出幽灵字；侧栏卡片留一些透明度，透出玻璃的颜色。 */
+  --block-fill: color-mix(in srgb, var(--editor-background) 82%, transparent);
+  --block-side-fill: color-mix(in srgb, var(--editor-background) 50%, transparent);
+  --block-border: color-mix(in srgb, white 70%, transparent);
+  --block-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 10px 28px rgb(0 0 0 / 6%);
+  --block-pill: color-mix(in srgb, white 90%, transparent);
+  --block-pill-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 4px 14px rgb(0 0 0 / 7%);
+}
+
+html.window-material[data-kind="dark"] {
+  --block-border: color-mix(in srgb, white 10%, transparent);
+  --block-shadow: 0 1px 2px rgb(0 0 0 / 24%), 0 10px 28px rgb(0 0 0 / 18%);
+  --block-pill: color-mix(in srgb, white 13%, transparent);
+  --block-pill-shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 14px rgb(0 0 0 / 18%);
+}
+
+html.window-material,
+html.window-material body,
+html.window-material #root,
+html.window-material .glass-host {
+  background: transparent;
+}
+
+html.window-material .glass-layer {
+  display: none;
+}
+
+/* 工具栏：没有底色；相关控件共用一块玻璃胶囊，胶囊里的按钮只在悬停、按下时出现内衬。 */
+html.window-material .titlebar {
+  gap: 10px;
+  padding-right: 10px;
+  background: transparent;
+  border-bottom: 0;
+}
+
+html.window-material .titlebar :is(.toolbar-capsule, .toolbar-group, .icon-action) {
+  height: var(--capsule-height);
+  margin: 0;
+  border: 0;
+  border-radius: calc(var(--capsule-height) / 2);
+  background: transparent;
+  box-shadow: none;
+}
+
+html.window-material .titlebar :is(.toolbar-capsule, .toolbar-group) {
+  gap: 0;
+  padding: 0 4px;
+}
+
+/* 没有按区域的系统玻璃时（Windows 的 Mica / Acrylic 只铺整窗），胶囊由网页画一层淡底。 */
+html.window-material:not(.native-glass) .titlebar :is(.toolbar-capsule, .toolbar-group, .icon-action) {
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+/* Windows 外壳：控件用 Fluent 的小圆角，不用胶囊（Q55、Q191）。 */
+html[data-platform="windows"].window-material .titlebar :is(.toolbar-capsule, .toolbar-group, .icon-action, .toolbar-capsule .toolbar-widget, .toolbar-group-item) {
+  border-radius: 6px;
+}
+
+html.window-material .titlebar .icon-action {
+  width: var(--capsule-height);
+  color: var(--titlebar-activeforeground);
+}
+
+html.window-material .titlebar :is(.toolbar-capsule .toolbar-widget, .toolbar-group-item) {
+  height: calc(var(--capsule-height) - 8px);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--titlebar-activeforeground);
+}
+
+html.window-material .titlebar .toolbar-capsule .toolbar-widget {
+  gap: 6px;
+  padding: 0 10px;
+  font-weight: 500;
+}
+
+html.window-material .titlebar .toolbar-group-item {
+  width: 34px;
+}
+
+/* 胶囊内各段之间一条细分隔线（系统分段胶囊的写法）。 */
+html.window-material .titlebar .toolbar-capsule > * + * {
+  position: relative;
+}
+
+html.window-material .titlebar .toolbar-capsule > * + *::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: -1px;
+  width: 1px;
+  background: color-mix(in srgb, var(--titlebar-activeforeground) 16%, transparent);
+  pointer-events: none;
+}
+
+html.window-material .titlebar .toolbar-attention {
+  top: 5px;
+  right: 7px;
+}
+
+html.window-material .titlebar :is(.toolbar-capsule .toolbar-widget, .toolbar-group-item, .icon-action):hover:not(:disabled) {
+  background: var(--capsule-hover);
+  box-shadow: none;
+}
+
+html.window-material .titlebar :is(.toolbar-capsule .toolbar-widget, .toolbar-group-item, .icon-action):active:not(:disabled),
+html.window-material .titlebar :is(.toolbar-capsule .toolbar-widget, .toolbar-group-item, .icon-action)[aria-pressed="true"] {
+  background: var(--capsule-press);
+}
+
+/* 整窗玻璃的布局：同一块玻璃上，工具栏横跨顶部（胶囊紧跟红绿灯靠左），
+ * 下面左列是侧栏，右列是编辑区和状态栏。中间那一行不参与布局，侧栏和编辑区直接排进外壳网格。 */
+html.window-material .glass-host {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: var(--titlebar-height) minmax(0, 1fr) calc(var(--statusbar-height) + 10px);
+  grid-template-areas:
+    "bar bar"
+    "side main"
+    "side status";
+}
+
+html.window-material .shell-body {
+  display: contents;
+}
+
+html.window-material .glass-host > .titlebar {
+  grid-area: bar;
+}
+
+html.window-material .sidebar-pane {
+  grid-area: side;
+  display: flex;
+  min-height: 0;
+  max-width: calc(100vw - var(--editor-min-width));
+  /* 侧栏是一块浮动卡片；不裁切内容，侧栏右缘的拖动条跨在卡片边上。 */
+  margin: 0 0 10px 10px;
+  border: 1px solid var(--block-border);
+  border-radius: var(--block-radius);
+  background: var(--block-side-fill);
+  box-shadow: var(--block-shadow);
+}
+
+/* 右列和左侧一样直接放在整窗玻璃上：页签、路径栏、日志、PR 面板，连同 diff、合并和编辑器的代码，
+ * 都不再垫编辑器底色。增删行的颜色本身带透明度，透出玻璃；语法高亮颜色照旧。 */
+html.window-material {
+  --diff-bg: transparent;
+  --diff-empty-bg: transparent;
+  --diff-mid-bg: transparent;
+  --diff-hunk-bg: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --diff-placeholder-bg: transparent;
+  --diff-placeholder-gutter: transparent;
+  --diff-placeholder-line: color-mix(in srgb, var(--foreground) 4%, transparent);
+  --diff-gutter-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+html.window-material .shell-body > main {
+  /* 编辑区（页签、日志、diff、终端、PR 面板）是另一块卡片，和侧栏之间露出窗口玻璃。
+   * 卡片向下占住状态栏那一行，状态栏落在卡片底部（见下面 .window-status）。 */
+  grid-area: 2 / 2 / 4 / 3;
+  margin: 0 10px 10px 8px;
+  padding-bottom: var(--statusbar-height);
+  overflow: hidden;
+  border: 1px solid var(--block-border);
+  border-radius: var(--block-radius);
+  background: var(--block-fill);
+  box-shadow: var(--block-shadow);
+}
+
+html.window-material :is(
+  .log-view,
+  .github-panel,
+  .editable-workspace,
+  .editable-editor,
+  .sbs-header,
+  .sbs-gutter,
+  .merge-toolbar,
+  .merge-footer
+) {
+  background: transparent;
+}
+
+/* 代码面（diff、合并、编辑器）：玻璃会透出窗口后面的桌面和别的窗口，在代码里看着像一层幽灵字（Q190）。
+ * 现在编辑区卡片本身用主题底色压住背后的窗口（布局块，Q202），代码面不再另叠一层底；
+ * 变量留给辅助功能回退改成实色。 */
+html.window-material {
+  --code-veil: transparent;
+}
+
+html.window-material .editor-surface:has(.diff-scroll, .sbs-column, .merge-view, .editable-editor) {
+  background: var(--code-veil);
+}
+
+/* 吸顶的表头盖在滚动的行上：用网页里的模糊挡住下面的行，玻璃仍透出来。 */
+html.window-material .log-table-head {
+  background: transparent;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* PR 面板盖在编辑区上：自己透明时，把下面的内容藏起来，免得透出来。 */
+html.window-material main:has(> .github-panel) > :not(.github-panel) {
+  visibility: hidden;
+}
+
+/* 终端（xterm 开了透明）同样放在玻璃上，只用一条细线和上面的编辑区分开。 */
+html.window-material .terminal-panel {
+  background: transparent;
+  border-top-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+html.window-material .glass-host > .window-status {
+  grid-area: status;
+  position: relative;
+  z-index: 1;
+  /* 与编辑区卡片同宽，叠在卡片底部的那一条里。 */
+  margin: 0 11px 10px 9px;
+  padding-inline: 12px;
+  border-bottom-left-radius: var(--block-radius);
+  border-bottom-right-radius: var(--block-radius);
+}
+
+html.window-material :is(.activity-bar, .changes-sidebar) {
+  background: transparent;
+  border-right: 0;
+}
+
+html.window-material .changes-sidebar {
+  max-width: none;
+}
+
+html.window-material .activity-item {
+  isolation: isolate;
+}
+
+html.window-material .activity-bar {
+  padding-top: 0;
+}
+
+html.window-material .activity-item {
+  height: var(--tab-height);
+  color: var(--descriptionforeground);
+}
+
+html.window-material .activity-item[aria-pressed="true"] {
+  color: var(--foreground);
+}
+
+html.window-material .activity-item[aria-pressed="true"]::before {
+  display: none;
+}
+
+html.window-material .window-status {
+  background: transparent;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+/* 编辑区页签：融进窗口底色，页签是圆角内衬，不再是一条深色横带。 */
+html.window-material .editor-tabs {
+  padding-inline: var(--block-inset);
+  background: transparent;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+
+html.window-material .editor-tab {
+  height: calc(var(--tab-height) - 10px);
+  margin: 6px 4px 4px 0;
+  padding: 0 10px;
+  border-right: 0;
+  border-radius: var(--block-inner-radius);
+  background: transparent;
+}
+
+html.window-material .editor-tab[data-active="true"] {
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+html.window-material .editor-tab[data-active="true"]::before {
+  display: none;
+}
+
+html.window-material .editor-tab:hover:not([data-active="true"]) {
+  background: var(--capsule-hover);
+}
+
+/* 选中项切换时的玻璃镜片（glassLens.ts，Q202）：镜片充当移动中的选中底，
+   动画期间列表带 data-glass-lens，各控件藏起自己的选中底。 */
+.glass-lens-host {
+  position: relative;
+}
+
+.glass-lens-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glass-lens-layer {
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glass-lens {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  /* 选中底的颜色加一层自上而下的高光；边缘只留很淡的一圈，顶部一道亮线。 */
+  background-color: var(--glass-lens-fill, color-mix(in srgb, var(--foreground) 10%, transparent));
+  background-image: linear-gradient(to bottom, color-mix(in srgb, white 16%, transparent), transparent 70%);
+  box-shadow:
+    inset 0 0.5px 0 color-mix(in srgb, white 55%, transparent),
+    inset 0 0 0 0.5px color-mix(in srgb, white 18%, transparent),
+    0 4px 14px color-mix(in srgb, black 14%, transparent);
+}
+
+.glass-lens__optic {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+.glass-lens__snapshot {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+html.window-material .editor-tab-list[data-glass-lens] .editor-tab[data-active="true"],
+html.window-material .settings-nav [data-glass-lens] [data-lens-key][aria-pressed="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 浮层：系统菜单的圆角与阴影；材质仍在网页里模糊（它覆盖的是网页内容）。 */
+html.window-material .revia-popper {
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--editorwidget-background) 86%, transparent);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 28%);
+}
+
+/* macOS：弹层是一块原生玻璃（登记在 Popover 里）。网页这层透明，只用模糊糊掉弹层下面的字，
+ * 让它看起来像玻璃压在界面上；不像对话框那样把整个界面淡出。 */
+html.native-glass .glass-popover {
+  border: 0;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--editor-background) 22%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: none;
+  animation: none;
+}
+
+html.window-material .glass-popover .menu-item {
+  border-radius: 7px;
+}
+
+html.window-material :is(.app-dialog, .notification) {
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--editorwidget-background) 90%, transparent);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+}
+
+/* 主提交按钮：系统的强调胶囊按钮。 */
+/* 主提交按钮：系统强调色胶囊（跟随“系统设置 → 外观 → 强调色”）。 */
+html.window-material .glass-button.m7-commit-button {
+  border: 0;
+  border-radius: 999px;
+  background: AccentColor;
+  color: AccentColorText;
+  box-shadow: none;
+}
+
+html.window-material .glass-button.m7-commit-button:hover:not(:disabled) {
+  background: color-mix(in srgb, AccentColor 88%, white);
+}
+
+html.window-material .glass-button.m7-commit-button:disabled {
+  background: color-mix(in srgb, AccentColor 35%, transparent);
+  color: color-mix(in srgb, AccentColorText 60%, transparent);
+}
+
+/* 侧栏内容放在玻璃上：分组标题与按钮不再垫底色，行选中改成内缩圆角（macOS 侧栏写法）。 */
+html.window-material .changes-sidebar .section-header {
+  background: transparent;
+  color: color-mix(in srgb, var(--sidebarsectionheader-foreground, var(--foreground)) 70%, transparent);
+}
+
+html.window-material .changes-sidebar .icon-action:not(:disabled) {
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.window-material .changes-sidebar .icon-action:hover:not(:disabled) {
+  background: var(--capsule-hover);
+}
+
+html.window-material .changes-sidebar :is(.change-row, .section-header) {
+  left: var(--block-inset);
+  right: var(--block-inset);
+  border-radius: var(--block-inner-radius);
+}
+
+html.window-material .changes-sidebar .change-row:hover {
+  background: var(--capsule-hover);
+}
+
+html.window-material .changes-sidebar .commit-composer {
+  border-top-color: transparent;
+}
+
+html.window-material .changes-sidebar .commit-message {
+  border-radius: 10px;
+  border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+html.window-material .changes-sidebar .count-badge {
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  color: color-mix(in srgb, var(--foreground) 75%, transparent);
+}
+
+/* 编辑区里的小控件：与玻璃同一套圆角，底色改成前景色的淡层，去掉硬边框。 */
+html.window-material :is(.log-input, .log-filter-button) {
+  height: 24px;
+  border-color: transparent;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+html.window-material .log-filter-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+html.window-material main :is(.toolbar-widget, .icon-action) {
+  border-radius: 7px;
+}
+
+/* ---------- 设置页：系统材质下铺满整窗，直接放在玻璃上 ----------
+ * 打开时藏起工具栏、主界面和状态栏；左侧分类与右侧设置项和主界面的侧栏、编辑区同一种样式。 */
+html.window-material .welcome-shell {
+  background: transparent;
+}
+
+html.window-material .settings-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  animation: none;
+}
+
+html.window-material .settings-dialog::backdrop {
+  background: transparent;
+}
+
+html.window-material:has(.settings-dialog[open]) :is(
+  :is(.glass-host, .welcome-shell) > :not(dialog, .shell-body),
+  .shell-body > *
+) {
+  visibility: hidden;
+}
+
+/* ---------- 设置页：参照 Loop 的版式（Q202） ----------
+ * 左边一块浮动的圆角侧栏卡片（红绿灯落在卡片左上角），右边是页面大标题和装着设置项的卡片；
+ * 卡片是窗口玻璃上的半透明底与亮边，选中项是一块白色胶囊（切换时由玻璃镜片滑过去）。 */
+html.window-material .settings-body {
+  flex: 1 1 auto;
+  gap: 6px;
+  height: auto;
+  min-height: 0;
+  padding: 10px;
+}
+
+html.window-material .settings-nav {
+  width: 248px;
+  border: 1px solid var(--block-border);
+  border-radius: var(--block-radius);
+  background: var(--block-side-fill);
+  box-shadow: var(--block-shadow);
+}
+
+html.window-material .settings-nav-head {
+  padding: 16px 18px 6px;
+}
+
+/* macOS 的红绿灯在卡片左上角：标题排在它下面。 */
+html[data-platform="macos"].window-material .settings-nav-head {
+  padding-top: 44px;
+}
+
+html.window-material .settings-nav-head h2 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+html.window-material .settings-nav > .relative {
+  padding: 6px 12px 8px;
+}
+
+html.window-material .settings-nav > .relative .codicon {
+  left: 24px;
+}
+
+html.window-material .settings-nav > .overflow-y-auto {
+  padding: 0 10px 12px;
+  scrollbar-width: none;
+}
+
+html.window-material .settings-nav > .overflow-y-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* 单页的分类没有小标题：和上一组之间留出间距，免得看着像挂在上一组下面（两种材质都用）。 */
+.settings-nav-group:not(:has(.settings-nav-caption)) {
+  margin-top: 10px;
+}
+
+html.window-material .settings-nav-caption {
+  padding: 10px 12px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+html.window-material .settings-nav-item {
+  height: 33px;
+  gap: 11px;
+  padding: 0 12px;
+  border-radius: var(--block-inner-radius);
+  font-size: 13px;
+}
+
+html.window-material .settings-nav-item .codicon {
+  font-size: 16px !important;
+  opacity: 0.82;
+}
+
+html.window-material .settings-nav-item[aria-pressed="true"] {
+  background: var(--block-pill);
+  box-shadow: var(--block-pill-shadow);
+  font-weight: 500;
+}
+
+html.window-material .settings-nav-item:hover:not([aria-pressed="true"]) {
+  background: var(--capsule-hover);
+}
+
+html.window-material .settings-header {
+  align-items: center;
+  padding: 22px 12px 14px 24px;
+  border-bottom: 0;
+}
+
+html.window-material .settings-crumb {
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+html.window-material .settings-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+html.window-material .settings-header .icon-action {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--block-border);
+  border-radius: 999px;
+  background: var(--block-fill);
+  box-shadow: var(--block-shadow);
+}
+
+html.window-material .settings-scroll {
+  padding: 4px 12px 24px 24px;
+}
+
+/* 每一页的设置项装进一张卡片；报错与提示行留在卡片外。 */
+html.window-material .settings-scroll > :not(p) {
+  max-width: 760px;
+  padding: 22px 24px;
+  border: 1px solid var(--block-border);
+  border-radius: var(--block-radius);
+  background: var(--block-fill);
+  box-shadow: var(--block-shadow);
+}
+
+html.window-material :is(.settings-input, .settings-select) {
+  height: 30px;
+  padding: 0 10px;
+  border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+html.window-material .settings-nav .settings-input {
+  height: 32px;
+  padding-left: 30px;
+  border-radius: 10px;
+}
+
+/* ---------- 对话框：系统材质下是一块浮在窗口上的原生玻璃 ----------
+ * 玻璃画在网页下面，后面的主界面不让开就会盖住它：对话框打开时主界面淡出，
+ * 工具栏胶囊的玻璃也暂时撤掉（useModalDialog），只留对话框这一块。 */
+html.window-material .app-dialog:not(.settings-dialog) {
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  animation: none;
+}
+
+html.window-material .app-dialog::backdrop {
+  background: transparent;
+}
+
+/* Windows（Mica 只铺整窗，没有按区域的系统材质）：对话框由网页画成 Acrylic 风格的面板，
+ * 用 Fluent 的 8px 圆角与阴影。 */
+html.window-material:not(.native-glass) .app-dialog:not(.settings-dialog) {
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--editorwidget-background) 82%, transparent);
+  backdrop-filter: blur(30px) saturate(1.3);
+  -webkit-backdrop-filter: blur(30px) saturate(1.3);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 30%);
+}
+
+html[data-platform="windows"].window-material :is(.glass-popover, .revia-popper) {
+  border-radius: 8px;
+}
+
+/* 后面的界面淡出并模糊：透过对话框的玻璃看过去像被玻璃折射。
+ * 中间那一行是 display: contents，自己没有盒子：作用在它的子元素上。 */
+html.window-material:has(.app-dialog[open]:not(.settings-dialog)) :is(
+  :is(.glass-host, .welcome-shell) > :not(dialog, .shell-body),
+  .shell-body > *
+) {
+  opacity: 0.35;
+  filter: blur(12px);
+}
+
+/* 对话框里的分隔线和代码块也放在玻璃上。 */
+html.window-material .app-dialog :is(.border-panel-border, .border-b, .border-t) {
+  border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+html.window-material .app-dialog pre {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+/* PR 面板里的卡片、代码块和提示条：放在玻璃上，只留淡底与细边。 */
+html.window-material .github-panel :is(.rounded, .rounded-md) {
+  border-radius: 12px;
+}
+
+html.window-material .github-panel :is([class*="bg-[var(--editor-background)]"], [class*="bg-[var(--side-bar-background)]"]) {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+html.window-material .github-panel .border-panel-border {
+  border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+/* 面板内的确认框盖在面板内容上：用网页里的模糊挡住下面的字。 */
+html.window-material .github-panel [role="dialog"] {
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--editor-background) 72%, transparent);
+  backdrop-filter: blur(30px) saturate(1.4);
+  -webkit-backdrop-filter: blur(30px) saturate(1.4);
+}
+
+/* 设置页上再打开退出确认时，确认框仍须可见，设置内容退到玻璃面板之后。 */
+html.window-material:has(.app-dialog[open]:not(.settings-dialog)) .settings-dialog[open] {
+  opacity: 0.35;
+  filter: blur(12px);
+}
+
+/* 系统材质的辅助功能回退最后应用，避免原生模式的高优先级规则重新开启透明和模糊。
+ * solid 同步给 Rust 后会移除整窗玻璃 / Mica 与所有区域玻璃。 */
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  html.window-material {
+    --glass-window: solid;
+    --glass-window-background: var(--editor-background);
+    --code-veil: var(--editor-background);
+  }
+
+  html.window-material :is(.revia-popper, .app-dialog, .notification, .github-panel [role="dialog"]) {
+    background: var(--editorwidget-background) !important;
+    border: 1px solid var(--panel-border) !important;
+    box-shadow: none !important;
+  }
+
+  html.window-material :is(
+    .glass-host > *, .shell-body > *, .settings-dialog[open],
+    .revia-popper, .app-dialog, .notification, .log-table-head, .github-panel [role="dialog"]
+  ) {
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  html.window-material {
+    --glass-window-background: Canvas;
+    --code-veil: Canvas;
+  }
+
+  html.window-material :is(.revia-popper, .app-dialog, .notification, .github-panel [role="dialog"]) {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+  }
 }

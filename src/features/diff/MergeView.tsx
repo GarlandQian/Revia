@@ -16,6 +16,7 @@ import type { MergeLayout } from "@/types/bindings/MergeLayout";
 import type { MergeChunk } from "@/types/bindings/MergeChunk";
 import type { MergeSide } from "@/types/bindings/MergeSide";
 import { ipc } from "@/lib/ipc";
+import { mergeBufferGuards } from "@/lib/m7/mergeBuffers";
 import { messages } from "@/lib/i18n/index";
 import {
   conflictCountText,
@@ -319,6 +320,7 @@ function MergeEditor({
   const mounted = useMountedRef();
 
   const conflicts = unresolvedConflicts(chunks);
+  const lifecycleKey = JSON.stringify([layout.worktreeId, layout.path, layout.fingerprint]);
 
   // 外观通过 Compartment 重配；只有换合并快照才重建编辑器。
   useLayoutEffect(() => {
@@ -371,7 +373,9 @@ function MergeEditor({
           EditorView.updateListener.of((update: ViewUpdate) => {
             const after = update.state.field(chunkField);
             if (update.startState.field(chunkField) !== after) setChunks(after);
-            if (update.docChanged) setTouched(true);
+            if (update.docChanged || update.startState.field(chunkField) !== after) {
+              setTouched(true); mergeBufferGuards.mark(lifecycleKey);
+            }
             if (update.docChanged) scheduleGeometry(update.view);
           }),
         ],
@@ -462,6 +466,7 @@ function MergeEditor({
     }
     refresh();
     return () => {
+      mergeBufferGuards.clear(lifecycleKey);
       disposed = true;
       cancelAnimationFrame(frame);
       resize.disconnect();

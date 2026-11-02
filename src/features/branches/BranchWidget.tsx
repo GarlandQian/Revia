@@ -18,6 +18,7 @@ import { messages } from "@/lib/i18n/index";
 import { MOD_SYMBOLS } from "@/lib/platform";
 import { Codicon } from "@/components/ui/codicon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
+import { glassPane } from "@/features/m7/glass/nativeGlass";
 
 export interface BranchWidgetProps {
   overview: BranchOverview | null;
@@ -29,8 +30,6 @@ export interface BranchWidgetProps {
   onCheckout: (target: CheckoutTarget) => void;
   onNewBranch: (start: BranchStart) => void;
   onFetch: () => void;
-  onUpdate: () => void;
-  onPush: () => void;
 }
 
 export function BranchWidget(props: BranchWidgetProps) {
@@ -56,167 +55,173 @@ export function BranchWidget(props: BranchWidgetProps) {
   };
 
   return (
-    <>
-      <div className="relative min-w-0">
-        <Popover
-          open={open}
-          onOpen={() => {
-            setOpen(true);
-            props.onRefresh();
-          }}
-          onClose={() => {
+    <div className="relative min-w-0">
+      <Popover
+        open={open}
+        onOpen={() => {
+          setOpen(true);
+          props.onRefresh();
+        }}
+        onClose={() => {
+          setOpen(false);
+          setSubmenu(null);
+        }}
+        width={420}
+        trigger={
+          <button
+            type="button"
+            className="toolbar-widget min-w-0"
+            disabled={busy}
+            title={error ? formatAppError(error) : messages.branches.open}
+          >
+            <Codicon name="git-branch" size={14} />
+            <span className="max-w-[220px] truncate">{label ?? messages.changes.detachedHead}</span>
+            {incoming ? (
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-[var(--gitdecoration-modifiedresourceforeground)]"
+                title={messages.branches.incoming}
+              />
+            ) : null}
+            <Codicon name="chevron-down" size={12} />
+          </button>
+        }
+      >
+        <div className="px-1 pb-1">
+          <div className="relative">
+            <Codicon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-descriptionforeground" />
+            <input
+              className="settings-input w-full pl-6"
+              placeholder={messages.branches.search}
+              aria-label={messages.branches.search}
+              value={query}
+              spellCheck={false}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+        </div>
+        <MenuItem
+          onClick={() => {
             setOpen(false);
-            setSubmenu(null);
+            props.onNewBranch({ kind: "head" });
           }}
-          width={420}
-          trigger={
+        >
+          <span className="flex items-center gap-1.5">
+            <Codicon name="add" size={13} />
+            {messages.branches.newBranch}
+          </span>
+        </MenuItem>
+        <MenuItem
+          disabled={busy}
+          onClick={() => {
+            setOpen(false);
+            props.onFetch();
+          }}
+        >
+          <span className="flex items-center gap-1.5">
+            <Codicon name="cloud-download" size={13} />
+            {messages.branches.fetch}
+          </span>
+        </MenuItem>
+        <MenuSeparator />
+        {loading && !overview ? (
+          <p className="px-2 py-1.5 text-[11.5px] text-descriptionforeground">{messages.branches.loading}</p>
+        ) : null}
+        {error ? <p className="px-2 py-1.5 text-[11.5px] text-destructive">{formatAppError(error)}</p> : null}
+        <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.local}</p>
+        {local.length === 0 ? (
+          <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noLocal}</p>
+        ) : null}
+        {local.map((branch) => (
+          <div key={branch.fullName} className="relative">
             <button
               type="button"
-              className="toolbar-widget min-w-0"
-              disabled={busy}
-              title={error ? formatAppError(error) : messages.branches.open}
+              role="menuitem"
+              className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left hover:bg-toolbar-hoverbackground"
+              onClick={() => setSubmenu(submenu === branch.fullName ? null : branch.fullName)}
             >
-              <Codicon name="git-branch" size={14} />
-              <span className="max-w-[220px] truncate">{label ?? messages.changes.detachedHead}</span>
-              {incoming ? (
-                <span
-                  className="size-1.5 shrink-0 rounded-full bg-[var(--gitdecoration-modifiedresourceforeground)]"
-                  title={messages.branches.incoming}
-                />
-              ) : null}
-              <Codicon name="chevron-down" size={12} />
-            </button>
-          }
-        >
-          <div className="px-1 pb-1">
-            <div className="relative">
-              <Codicon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-descriptionforeground" />
-              <input
-                className="settings-input w-full pl-6"
-                placeholder={messages.branches.search}
-                aria-label={messages.branches.search}
-                value={query}
-                spellCheck={false}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-          </div>
-          <MenuItem
-            onClick={() => {
-              setOpen(false);
-              props.onNewBranch({ kind: "head" });
-            }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Codicon name="add" size={13} />
-              {messages.branches.newBranch}
-            </span>
-          </MenuItem>
-          <MenuItem
-            disabled={busy}
-            onClick={() => {
-              setOpen(false);
-              props.onFetch();
-            }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Codicon name="cloud-download" size={13} />
-              {messages.branches.fetch}
-            </span>
-          </MenuItem>
-          <MenuSeparator />
-          {loading && !overview ? (
-            <p className="px-2 py-1.5 text-[11.5px] text-descriptionforeground">{messages.branches.loading}</p>
-          ) : null}
-          {error ? <p className="px-2 py-1.5 text-[11.5px] text-destructive">{formatAppError(error)}</p> : null}
-          <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.local}</p>
-          {local.length === 0 ? (
-            <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noLocal}</p>
-          ) : null}
-          {local.map((branch) => (
-            <div key={branch.fullName} className="relative">
-              <button
-                type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left hover:bg-toolbar-hoverbackground"
-                onClick={() => setSubmenu(submenu === branch.fullName ? null : branch.fullName)}
-              >
-                <span className="flex w-4 shrink-0 justify-center">
-                  {branch.isCurrent ? <Codicon name="check" size={12} /> : null}
-                </span>
-                <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="min-w-0 truncate">{branch.name}</span>
-                  {branch.upstreamGone ? (
-                    <span className="shrink-0 rounded bg-[var(--badge-background)] px-1 text-[10px] text-[var(--editorwarning-foreground)]">
-                      {messages.branches.upstreamGone}
-                    </span>
-                  ) : null}
-                </span>
-                {branch.ahead || branch.behind ? (
-                  <span className="flex shrink-0 items-center gap-1 text-[11px] text-descriptionforeground tabular-nums" title={messages.statusBar.upstreamHint}>
-                    <Codicon name="arrow-up" size={10} />
-                    {branch.ahead}
-                    <Codicon name="arrow-down" size={10} />
-                    {branch.behind}
+              <span className="flex w-4 shrink-0 justify-center">
+                {branch.isCurrent ? <Codicon name="check" size={12} /> : null}
+              </span>
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className="min-w-0 truncate">{branch.name}</span>
+                {branch.upstreamGone ? (
+                  <span className="shrink-0 rounded bg-[var(--badge-background)] px-1 text-[10px] text-[var(--editorwarning-foreground)]">
+                    {messages.branches.upstreamGone}
                   </span>
                 ) : null}
-                <Codicon name="chevron-right" size={11} />
-              </button>
-              {submenu === branch.fullName ? (
-                <div className="ml-6 border-l border-panel-border pl-1">
-                  <MenuItem
-                    disabled={branch.isCurrent || busy}
-                    onClick={() => runCheckout({ kind: "local", name: branch.name })}
-                  >
-                    {messages.branches.checkout}
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => {
-                      setOpen(false);
-                      setSubmenu(null);
-                      props.onNewBranch({ kind: "ref", fullName: branch.fullName });
-                    }}
-                  >
-                    {messages.branches.newFromBranch}
-                  </MenuItem>
-                </div>
+              </span>
+              {branch.ahead || branch.behind ? (
+                <span className="flex shrink-0 items-center gap-1 text-[11px] text-descriptionforeground tabular-nums" title={messages.statusBar.upstreamHint}>
+                  <Codicon name="arrow-up" size={10} />
+                  {branch.ahead}
+                  <Codicon name="arrow-down" size={10} />
+                  {branch.behind}
+                </span>
               ) : null}
-            </div>
-          ))}
-          <MenuSeparator />
-          <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.remote}</p>
-          {remotes.length === 0 ? (
-            <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noRemote}</p>
-          ) : null}
-          {remotes.map((group) => (
-            <div key={group.name}>
-              <p className="flex items-center gap-1 px-2 py-1 text-[11px] text-descriptionforeground">
-                <Codicon name="cloud" size={11} />
-                {group.name}
-              </p>
-              {group.branches.map((branch) => (
-                <RemoteBranchRow
-                  key={branch.fullName}
-                  branch={branch}
-                  remote={group.name}
-                  onCheckout={() => runCheckout({ kind: "remote", remote: group.name, branch: branch.branch })}
-                  onNewBranch={() => {
+              <Codicon name="chevron-right" size={11} />
+            </button>
+            {submenu === branch.fullName ? (
+              <div className="ml-6 border-l border-panel-border pl-1">
+                <MenuItem
+                  disabled={branch.isCurrent || busy}
+                  onClick={() => runCheckout({ kind: "local", name: branch.name })}
+                >
+                  {messages.branches.checkout}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
                     setOpen(false);
                     setSubmenu(null);
                     props.onNewBranch({ kind: "ref", fullName: branch.fullName });
                   }}
-                />
-              ))}
-            </div>
-          ))}
-        </Popover>
-      </div>
+                >
+                  {messages.branches.newFromBranch}
+                </MenuItem>
+              </div>
+            ) : null}
+          </div>
+        ))}
+        <MenuSeparator />
+        <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.remote}</p>
+        {remotes.length === 0 ? (
+          <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noRemote}</p>
+        ) : null}
+        {remotes.map((group) => (
+          <div key={group.name}>
+            <p className="flex items-center gap-1 px-2 py-1 text-[11px] text-descriptionforeground">
+              <Codicon name="cloud" size={11} />
+              {group.name}
+            </p>
+            {group.branches.map((branch) => (
+              <RemoteBranchRow
+                key={branch.fullName}
+                branch={branch}
+                remote={group.name}
+                onCheckout={() => runCheckout({ kind: "remote", remote: group.name, branch: branch.branch })}
+                onNewBranch={() => {
+                  setOpen(false);
+                  setSubmenu(null);
+                  props.onNewBranch({ kind: "ref", fullName: branch.fullName });
+                }}
+              />
+            ))}
+          </div>
+        ))}
+      </Popover>
+    </div>
+  );
+}
+
+/** 更新与推送共用一块胶囊（M5 B02 的两个按钮）。 */
+export function SyncActions({ busy, onUpdate, onPush }: { busy: boolean; onUpdate: () => void; onPush: () => void }) {
+  return (
+    <div ref={glassPane({ id: "toolbar-sync" })} className="toolbar-capsule" role="group">
       <button
         type="button"
         className="toolbar-widget"
         title={messages.branches.updateHint(`${MOD_SYMBOLS.primary}T`)}
         disabled={busy}
-        onClick={props.onUpdate}
+        onClick={onUpdate}
       >
         <Codicon name="cloud-download" size={14} />
         <span className="max-w-[120px] truncate">{messages.branches.update}</span>
@@ -226,12 +231,12 @@ export function BranchWidget(props: BranchWidgetProps) {
         className="toolbar-widget"
         title={messages.branches.pushHint(`${MOD_SYMBOLS.primary}${MOD_SYMBOLS.shift}K`)}
         disabled={busy}
-        onClick={props.onPush}
+        onClick={onPush}
       >
         <Codicon name="cloud-upload" size={14} />
         <span className="max-w-[120px] truncate">{messages.branches.push}</span>
       </button>
-    </>
+    </div>
   );
 }
 

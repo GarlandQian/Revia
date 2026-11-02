@@ -249,7 +249,8 @@ pub fn inspect_selected(git: &Git, oid: &str, key: Option<&str>, compare_local: 
     let temporary_index = third.as_ref().map(|_| tempfile::tempdir()).transpose()?;
     let untracked_git = if let (Some(third), Some(directory)) = (&third, &temporary_index) {
         let index = std::fs::canonicalize(directory.path())?.join("index");
-        let isolated = git.with_env_vars(&[("GIT_INDEX_FILE", index.to_string_lossy().as_ref())]);
+        let index_argument = crate::platform::external_path(&index);
+        let isolated = git.with_env_vars(&[("GIT_INDEX_FILE", index_argument.to_string_lossy().as_ref())]);
         isolated.run_ok(&["read-tree", third], "读取 stash 未跟踪树")?;
         Some(isolated)
     } else { None };

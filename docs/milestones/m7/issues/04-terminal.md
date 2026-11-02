@@ -1,6 +1,6 @@
 # 04：运行归属 worktree 的内置终端
 
-Status: ready-for-agent
+Status: ready-for-human
 Blocked by: None
 
 ## What to build
@@ -11,14 +11,219 @@ Blocked by: None
 
 ## Acceptance criteria
 
-- [ ] Rust 创建 PTY，前端输入字节 / resize；正常 shell、UTF-8 / 中文、交互和退出状态可观察
-- [ ] 多个 worktree / 会话相互独立，运行中关闭可取消，应用关闭协调保留仍运行的会话
-- [ ] 重启恢复页签 / 起始目录并新开 shell；不恢复旧进程、不重放输入、不持久保存输出
-- [ ] 写入期间显示所属 worktree 忙碌，终端变化触发外部核对；Git 命令日志仍可查看
-- [ ] 真实安全子进程验证读写 / resize / 取消 / 退出，故障不清理用户进程
+- [x] Rust 创建 PTY，前端输入字节 / resize；正常 shell、UTF-8 / 中文、交互和退出状态可观察
+- [x] 多个 worktree / 会话相互独立，运行中关闭可取消，应用关闭协调保留仍运行的会话
+- [x] 重启恢复页签 / 起始目录并新开 shell；不恢复旧进程、不重放输入、不持久保存输出
+- [x] 写入期间显示所属 worktree 忙碌，终端变化触发外部核对；Git 命令日志仍可查看
+- [x] 真实安全子进程验证读写 / resize / 取消 / 退出，故障不清理用户进程
 
 ## Validation
 
 在生产入口和独占 fixture 中核对实际可观察结果；原始证据保存到交接指定目录。相关改动完成后集中验证，遵守本地验证规则。产品真实桌面由任务 14 统一完成。
 
 ## Comments
+
+### Codex / review01 Standards — 2026-10-31T03:14:30.306434+08:00
+
+固定候选 `46574071b591b138a31d51be4403c29ba578a0d1`，本轴正式意见与证据摘录按原文转录。来源：/private/tmp/revia-m7-batch-g5scyw0r/review-01-oim6d9nj/standards.md；完整证据附录保存在本轮证据目录。
+
+9. **[P2] 关闭终端直接杀进程**：`src/features/m7/TerminalPanel.tsx:271` 无确认调用 close；违反 `docs/ui-direction.md:157`“关闭运行中进程前先确认”。
+
+## H9 关闭运行终端无确认（P2）
+
+规则：`docs/ui-direction.md:157`：“关闭运行中进程前先确认”。
+
+TerminalPanel.tsx:263–278 closeTab 不检查 tab.running，也无确认，先 dispose 视图再调用 terminalClose。按钮 335 行直接触发该函数。Rust terminal.rs 的 close 删除会话并在未 exited 时 killer.kill，随后 drop master。不存在后端确认兜底。
+
+触发：终端里有长时间运行的任务，点页签的 x。后果推断：任务直接终止，用户失去取消关闭的机会。此项与“关闭面板应保留终端”的实现问题分开，本轴仅记明文确认规则。
+
+Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Codex / review01 Spec — 2026-10-31T03:14:30.306434+08:00
+
+固定候选 `46574071b591b138a31d51be4403c29ba578a0d1`，本轴正式意见与证据摘录按原文转录。来源：/private/tmp/revia-m7-batch-g5scyw0r/review-01-oim6d9nj/spec.md；完整证据附录保存在本轮证据目录。
+
+| F05 P1 | “切换保留进程”：混worktree页签；绝对cwd恢复被拒 | src/features/m7/TerminalPanel.tsx:131；src-tauri/src/m7/terminal.rs:275,429 |
+
+## F05 [P1] 终端会话在切换、重挂载与重启不能正确恢复
+
+规格 S91：“在应用运行期间切换保留进程”；S92：“重启只恢复页签、原 worktree 与起始目录，启动新 shell”。
+
+`src/features/m7/TerminalPanel.tsx:75,131–154` worktree变化不清tabs也不通过terminalList认领已有进程，直接openSession；`src/App.tsx:6019–6031` 隐藏会卸载整个面板，重开又建shell，原PTY留后端成为不可达会话。切A→B时A的tabs仍显示在B标题下，可误向A输入。跨重启还必错：后端 `src-tauri/src/m7/terminal.rs:275` 返回绝对cwd，前端86–96原样持久化、147原样重开；后端429–437拒绝绝对路径，所有已保存页签失败。上述是生产状态/参数链，不依赖PTY模拟。
+
+| F06 P1 | “关闭…前确认”：页签×直接kill | src/features/m7/TerminalPanel.tsx:263 |
+
+## F06 [P1] 关闭运行中终端没有确认
+
+规格 S92：“关闭运行中进程前确认，取消则保留；退出应用 / 安装更新同样纳入关闭协调器”。
+
+`TerminalPanel.tsx:263–276,340` 点击页签×直接terminalClose；Rust `terminal.rs:386–395` 立即kill。App关闭保护 `App.tsx:1638–1655,1747–1759` 不注册终端运行状态。触发：终端中执行长任务后点×或退出。结果：没有确认/取消机会，进程直接终止。尚未实际启动任务；源码无确认分支。
+
+Codex 核对：以上为固定源码及原证据支持的审查发现；未执行的动态复现须在返修时补充，不能写成桌面通过。P1/P2 属本次正式返修范围；P3/构造边界登记 backlog 15，非阻断且不要求额外重构。原勾选项需在返修后逐项按真实证据重新核对，当前不得据旧勾选宣称 done。
+
+### Pi 正式返修处理 — 2026-10-31
+
+- **F05**：重挂载先 `terminalList` 认领本 worktree 仍在运行的会话（不新建不可达进程）；切 worktree 清空 tabs 并销毁前端视图（后端进程保留待认领）；`resolve_cwd` 接受 worktree 内的绝对 cwd（持久化恢复），外部/逃逸路径仍拒绝（新增回归测试 `terminal::cwd_tests`）。
+- **F06/H9**：关闭运行中页签先内联确认（终止并关闭 / 取消），确认才调用 terminalClose。
+- **busy 提示**：面板会话运行态经 `onRunningChange` 同步给 App（terminalRunningRef），参与更新安装门禁与关闭协调；Git 写锁仍然互斥。
+
+### Codex / review02 Spec / F05 — 2026-10-31
+
+| F05 P1 | S91“独立”：A的在途认领/打开晚回仍加入B页签 | TerminalPanel.tsx:136,149 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F05 [P1] 在途终端认领/打开跨worktree污染页签
+
+S91“每个worktree…独立…切换保留进程”。`TerminalPanel.tsx:157–188`的cancelled只在terminalTabs后和循环前检查；新 `claimOrOpen:136–153`等待terminalList后，及 `openSession:106–121`等待terminalOpen后均无代际/目标检查，直接setTabs/setActive。触发：A发起认领或打开未返回，切到B，B effect清空页签后A请求才返回；A的Tab被加入B列表，active也指A。输入:268–269只按该sessionId写终端，所以可在B标题下向A工作区shell输入。绝对cwd的后端修正确实可接受worktree内部路径，未重复报旧的绝对路径问题。无真实PTY启动；这是异步结果所有权的静态事实。
+
+</details>
+
+### Codex / review02 Spec / F06 — 2026-10-31
+
+| F06 P1 | S92“退出…协调器”：页签有确认，应用退出仍不问运行进程 | App.tsx:1667,1717 |
+
+<details>
+<summary>本项证据原文</summary>
+
+## F06 [P1] 应用退出仍不确认运行中的终端
+
+S92“关闭运行中进程前确认…退出应用/安装更新同样纳入关闭协调器”；S93“Revia写入期间显示对应worktree忙碌”。页签确认 `TerminalPanel.tsx:308–326,395–406`已加。新增 `terminalRunningRef`只由当前面板anyRunning同步(App6125–6127)，仅在beforeUpdateInstall:1655消费；正常closeAfterDraftFlush:1667、CloseDriver:1683、reconcileClose:1717均不消费终端状态。触发：shell中长任务时直接退出；仍无进程确认/取消，页签flush不等于运行进程协调。切换到无运行会话的B还会用false覆盖A的运行状态，更新门禁也无法覆盖全局终端。TerminalPanel:200只有busy注释，props/渲染没有写入状态，原busy要求仍未实现。静态链，未结束任何用户进程。
+
+</details>
+
+### Codex / review02 Standards / R08 — 2026-10-31
+
+<details>
+<summary>本项证据原文</summary>
+
+## H9 / R08：正常退出没有运行终端确认（P2）
+
+规则原文：`docs/ui-direction.md:157`：“关闭运行中进程前先确认”。
+
+本轮页签关闭 `TerminalPanel.tsx:308–322,395–404` 有明确终止/取消选择，原“直接点页签×杀进程”的分支已修。新增运行态只通过 `App.tsx:6125–6127` 写terminalRunningRef，唯一读取点为更新前检查 `1655`。普通窗口关闭/退出 `1667–1684` 不读它，CloseCoordinator只接登记的写入/pending。故终端运行任务时正常关闭窗口或退出仍无确认/取消机会。报告将“参与关闭协调”写为已实现，与实际接线不一致。没有启动用户shell或真实PTY。
+
+</details>
+
+## Codex 直接修复终端所有权与关闭（F05/F06/H9）
+
+终端改由App级TerminalSessions持有；异步打开/恢复、运行态、错误与输出活动都绑定原worktree，A晚回不会追加到B，隐藏面板不丢进程或解除退出保护。首次完整读取持久页签后再写入；按cwd认领已有PTY，其余页签新开shell。全局串行保存保留其它worktree记录；失败不以初始空列表覆盖旧页签，最后页签持久化也保留原生退出保护。
+
+页签关闭必须显式确认运行中的进程。应用关闭/退出先冻结新终端，等已发打开结束，列出全局仍运行的进程供确认；取消不结束进程，确认也只准备，仍由既有CloseDriver等待Git写入/待核对并在实际关闭时终止已确认进程。最终草稿冲刷、终端页签落盘与关闭成功后才解除原生退出保护。Rust关闭失败保留原句柄并回传结构化cause；终端输入和忙碌提示核对实际会话所属worktree。
+
+`terminal-session-node-03` 33项通过（终端12项、编辑13项、既有合并写门8项），直接调用生产TerminalSessions/EditSessions/CloseDriver/WriteGuard，含在途A→B、隐藏运行态、取消/等待Git写、持久化错误和最终关闭顺序；所用可控API依赖用于并发回归，不是桌面验收。`terminal-cargo-02` 3项通过：真实自建PTY读写/中文/resize/退出、两worktree隔离，以及损坏页签原件保留。Tauri mock仅承载事件。`terminal-frontend-build-03`、`terminal-lint-01`与`terminal-x18n-02`均exit0；翻译0错误/76个unused-key警告，lint新增一条no-useless-spread提示留backlog。
+
+首轮前端类型检查`terminal-frontend-build-01`真实exit2（占位回调推断为false字面量），修正返回类型后检查通过，失败原件保留。每轮源码hash/argv/exit/原stdout/stderr在批次codex-checks目录。以上为本组检查点，不代表整包或真实桌面通过；更新安装的终端确认/重启全局协调仍随F13继续，当前安装门禁已读取全局运行态，不会因面板隐藏而放行。
+
+
+### Codex：真实桌面场景集中修复与验证（2026-10-31）
+
+固定 Release `5ca9178` / 产品`0dc11c0`已完成四主题及中英文900px真实查看；系统深色测试在finally中恢复原浅色。手动编辑Save前磁盘未变、Save后实际字节正确，草稿跨文件切换保留，外部变化后拒绝覆盖并保留草稿；原生退出按未解决草稿确认，先保留原件再仅丢弃fixture编辑，启动03真实exit0。本地clone实际目标`repos/native-clone-c_0_lf38/checkout`的HEAD与自建bare一致并自动登记打开。诊断原生导出的JSON不含文件正文标记与fixture邮箱。PR未登录和更新无签名公钥边界已观察，正式账号/保护/更新接线未验，D06尚未执行，不能将上述局部结果称整包通过。
+
+原生发现并集中修复：更改列表view把元数据读取记成仓库写入，导致PTY逐字输入被拒及提交后Busy不能自动恢复；默认组未命名input冻结旧语言；设置玻璃透底文字干扰阅读。原始截图/AX/文件在`desktop-acceptance-myntirt_`，终端命令实际残缺并parse error，不能称PTY命令通过。
+
+修复后元数据观察不再设置writing标志；真实写入开始/结束递增代际，只在同一空闲代际内发布元数据，读取不把仓库标为writing；最终发布的Mutex区仍包含身份重验证及其系统Git调用，可能短暂等待输入IPC，新版真实输入结果另行验证，跨写入结果拒绝。原写互斥与终端真实写入暂停保持。前端仅对明确Busy读取作三次有界重读，绑定原worktree/epoch且卸载取消；失败不继续显示可操作旧凭据。默认名用真实空name和即时翻译placeholder，避免翻译持久化成用户名称。统一浮层保留玻璃装饰/折射路径并增加主题tint与blur遮蔽透底，减少透明度/高对比度仍无滤镜降级。
+
+`task14-native-scene-rust-01`真实exit0，共44通过（更改列表26、PTY3、会话3、共享提交12），含实际会话写代际与Barrier并发发布拒绝。`task14-native-scene-node-01`20通过，前端build/lint/x18n均exit0，翻译0错误/76既有unused警告。源码hash、argv、真实exit、分流原输出与失败原件保留；只改复用既有键，未改locale/绑定。下一步只审本新增量、固定新Release，再真实复验PTY/浮层/默认名与D06；当前不标任务14 done。
+
+
+### Codex / review10 Standards (2026-10-31)
+
+Standards：固定 `5ca917889efa5141442d0b73d6e48931828acf93...039fd1a3dbea7cf7e0c7bac91cd648509943dd41`，仅本轮10路径新增量，未读Spec。
+
+硬违反0项；判断2项，均P3、仅backlog：
+
+- S10-ST01，证据口径不一致：`docs/milestones/m7/report.md:303`及任务01:88、04:126、13:292、14:507称“持锁区不运行Git”，实际新增`session.rs:1624–1628`持有writing Mutex调用require_identity，经recovery.rs:188、160、122执行git rev-parse。按`docs/agents/local-validation.md:16`“每项结论都能对应固定源码、生产入口和实际可观察结果”，建议修正文档；没有另立“锁内禁Git”硬规范，未复现新输入丢失或输入延迟，不能据此升格P2。
+- S10-ST02，possible Duplicated Code：`src/index.css:1848–1850`、1857–1859、1866–1868重复同一tint与两条blur声明，可合并选择器共用材质规则；无功能失败证据。
+
+其余11项固定smell已逐项判断，无新增发现；仓库规则优先，工具强制项跳过。
+
+已核固定diff、33项源码/规则快照、106项相关原件散列。原记录Rust44、node20通过，build/lint/x18n exit0，翻译0错误/76警告。Rust受测源码一致（CSS之后另改，最终前端快照一致）。未重跑、未启动桌面；新Release原生PTY/Busy/浮层/默认名、D06、Windows仍待规划方验证。两项P3按Q174不阻断验收。
+
+
+
+### Codex / review10 Spec (2026-10-31)
+
+Spec：固定 `5ca9178…039fd1a`，仅原生场景修复增量，10路径、1提交（Q174）。**新增发现0：P1/P2=0，P3=0。**
+
+(a) 遗漏／部分实现：未发现。列表观察不再占用仓库写标志，真实写入前后代际校验阻止跨写发布；真实PTY输入仍按所属worktree的写门暂停。Busy读取最多重试三次，原epoch与卸载门禁保留，终态失败清掉列表凭据。
+
+(b) 范围外行为：未发现scope creep。
+
+(c) 实现错误：未发现。默认名称以空name保存，翻译只作即时placeholder；浮层增加主题tint／blur，减少透明度与高对比度仍移除滤镜。对应规格 `spec.md:68,90–93,133,138`、`ui-direction.md:191`；生产接线见 `changelists.rs:177–204`、`session.rs:1617–1653`、`Changelists.tsx:58–80,113`、`index.css:1846–1868,2010–2015,2035–2051`。
+
+已核38项相关源码／规范、106项本轮原件及固定diff；Rust44、Node20、build／lint／x18n真实exit0，翻译0错误／76既有警告，受测Rust与最终前端源码对应。未重跑检查、未改产品或启动桌面；新Release原生复验、D06及Windows仍未验证。详见 `spec-evidence.md`。
+
+
+
+### Codex：终端视图生命周期修复与原生停点 — 2026-10-31
+
+固定 Release source `78c5658e4b1b370266e2044992e5de3787cd86ac` / 产品 `039fd1a` 的原生复验仍发现95字符输入丢字；原件 `final-pty-running-01` 保留，Python因路径残缺未启动。另一次聚焦提交说明后文本进入终端，不能将其当输入框通过。源码每次render产生新的ref回调，React detach时dispose xterm，随后重新读取snapshot并focus。
+
+仅修复该生命周期：每个页签使用稳定ref，字号/字体通过现有更新路径同步，不重建视图；只有实际激活页签才请求焦点，布局回调检查实例仍存活。PTY后端、写保护、Git与locale均未改。`terminal-viewport-node-01`现有终端所有权/关闭12项通过；`terminal-viewport-frontend-01`、`terminal-viewport-lint-01`真实exit0。未新增以源码形状为断言的测试，相关UI仍须新固定Release真实复验；不把现有Node检查当作React焦点验证。全部argv/源码hash/分流输出保留。
+
+完整第二次输入曾成功运行独占Python进程，`pty-final-process-proof.json`记录PID14626/parent12952和独占HOME/cwd；首轮连续输入缺陷仍成立。原生页签关闭提供Terminate & close/Cancel，取消后CmdQ显示全局End processes and continue；只终止本批shell，`task14-native-launch-04`真实exit0。下一步仅此增量全新两轴，再构建固定Release、复验持续输入/其他控件焦点和D06；整包14仍未完成。
+
+
+### Codex / review11 正式两轴原文 — 2026-10-31
+
+固定增量 `78c5658e4b1b370266e2044992e5de3787cd86ac…b0dcafe2b5321f6f480cefea4895bc72582787e8`。两轴已结束，以下分别原文追加。Standards 0硬违反/0判断；Spec 1项P2（S11-SP01）。Codex直接核对新字体fit后缺PTY resize属实，待修后重新固定增量；原生连续输入/焦点与D06尚未通过。
+
+Standards
+
+Standards：0 项新增硬违反，0 项需报告的 smell 判断。
+
+固定范围 `78c5658…b0dcafe`，2 个提交、4 个文件，仅审增量；工作区与固定 head 一致。未发现 `CODING_STANDARDS` / `CONTRIBUTING` 文件，`CLAUDE.md` 指向 `AGENTS.md`。
+
+`TerminalPanel.tsx:27–35,80–81,118–120,150–177,310–316`：每页签组件使 ref 回调稳定，创建实例读取最新字体参数，已有 effect 同步字体；布局回调核对实例，焦点 effect 随激活页签变化并取消待执行帧。未新增平台假设、Git/shell 拼接、文案或持久化，符合 `AGENTS.md`“不写死 macOS 假设／Git 调用只放 Rust 层”及技术方向的现有分层。
+
+3 份文档新增段落保留失败原件、真实退出码和后续 Release 复验停点，没有把任务标为完成，符合 `docs/agents/local-validation.md` 第 3 条及“完成条件”、`docs/agents/issue-tracker.md` 的 Comments 约定。核实 Node 12 项通过、build/lint exit 0，受测关键源码散列对应固定 head；Node 只覆盖会话归属与关闭，不能证明 React 焦点。
+
+已逐项判断全部 12 种 Fowler 基线，未形成新增发现；`TerminalViewport` 承担必要的 ref 生命周期，不按 Middle Man 报告。工具可管的格式与 lint 项跳过，未扩审旧代码或追加 P3 重构。
+
+本次未重跑检查、运行应用或联系 Pi。新 Release 持续输入与其他控件焦点、D06、Windows 未由本轴验证；按技术方向“完整交互仍需在实际 Tauri WebView 中验证”，桌面复验仍须完成。核查明细见 `standards-evidence.md`。
+
+Spec
+
+Spec：固定 `78c5658e4b1b370266e2044992e5de3787cd86ac…b0dcafe2b5321f6f480cefea4895bc72582787e8`，仅 Q174 终端视图生命周期增量。**新增发现 1：P1=0，P2=1，P3=0。**
+
+**[P2，S11-SP01] 字体变化保留视图，却没有同步 PTY 新尺寸。** 规格 `docs/milestones/m7/spec.md:90` 要求“前端发送用户的输入字节与尺寸”；`docs/ui-direction.md:12` 明确“代码字体与字号可配置”。新 `src/features/m7/TerminalPanel.tsx:160` 移除字体依赖，稳定 ref（`:33`）使字体变化不再重建终端；但保留的字体更新路径 `:180–192` 只更新选项并 `fit.fit()`，没有 `registry.resize`。本地 `@xterm/addon-fit` 0.10.0 的 `fit()` 仅调用前端 `terminal.resize`（`node_modules/@xterm/addon-fit/src/FitAddon.ts:34–46`）。生产 PTY 尺寸只经显式 IPC 更新（`terminalSessions.ts:159–162`、`src-tauri/src/m7/terminal.rs:358–380`）；容器固定时，字体变化不会触发观察容器尺寸的 `TerminalPanel.tsx:129–139`。以上为静态事实；影响推断：调字号/字体后 shell 仍按旧行列换行，全屏程序可能错位，直到另一次容器 resize。应在字体更新完成 fit 后同步所属 session 的真实 rows/cols，保留稳定实例。
+
+未发现其他本增量缺漏、范围扩张或错误实现。新 Release 的连续输入、其他控件焦点与 D06 仍待真实桌面复验；旧版第二次完整输入成功及 Node 12 项不能证明本次 UI 修复通过。核查范围与限制见 `spec-evidence.md`。
+
+
+### Codex：S11-SP01 尺寸同步修复 — 2026-10-31
+
+保留稳定终端实例，统一监听 xterm 实际 onResize 事件，将 rows/cols 发送给同一 session 的 registry.resize；容器、字体/字号、页签激活的 fit 都走同一链路，移除原两处显式重复发送。错误继续归原会话，不取消真实写保护。`terminal-size-frontend-01` 与 `terminal-size-lint-01` 均真实exit0，原始源码hash/argv/stdout/stderr保留。未改Rust、locale或会话业务层，不重复不受影响的旧回归；字体后真实PTY尺寸仍待新固定Release原生验证。下一步仅此修复增量两轴，完成后重建Release并继续任务13/14。
+
+
+### Codex / review12 两轴正式报告 — 2026-10-31
+
+固定增量 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4aa43324c185211435c`。两轴已结束；Standards 0硬违反/0判断，Spec 0项P1/P2、1项P3构造边界（S12-SP01）。以下分别原文追加。Codex核对源码与原始散列，P3仅登记backlog15，不继续扩产品；下一步固定新Release和真实原生复验。
+
+Standards
+
+# Standards
+
+固定 `38d1bb883e6a0db6aa066a474490f7a50396151f...8eccde51e3cba87522fca4aa43324c185211435c`，仅审 S11-SP01 尺寸同步修复增量（Q174）。
+
+**0 项硬违反，0 项 possible 代码异味，0 项新增 backlog 判断。**
+
+`src/features/m7/TerminalPanel.tsx:129–131` 的 `onResize` 回调捕获所属 `sessionId`，通过现有带类型的 `registry.resize` 回传真实行列；错误仍由 registry 归属原 worktree（`src/lib/m7/terminalSessions.ts:159–162`）。符合 `AGENTS.md:73` 的前端调用边界及 ADR-0013 的结构化错误规则。移除容器与初始化两处显式回传，集中同类变化，没有新增无需求抽象。十二项 Fowler 基线仅作判断，未见本增量达到报告门槛的异味。
+
+三份中文交接文档保留真实 Release 待验状态，未把构建或旧 Node 12 项当成本次 UI 通过证明，符合 `docs/agents/local-validation.md:9–10`。工具已覆盖的类型、lint 项不重复报告。
+
+独立核对 diff、7,886 项源码及 1,723 项原始证据哈希全部匹配；已有 `terminal-size-frontend-01` / `terminal-size-lint-01` 均真实 exit 0，检查时产品源码与固定提交一致。本轮未运行应用、构建或测试；字体调整后的真实 PTY、焦点及 D06 仍待新固定 Release 原生验收。
+
+Spec
+
+Spec：固定 `38d1bb883e6a0db6aa066a474490f7a50396151f…8eccde51e3cba87522fca4aa43324c185211435c`，仅 Q174 的 S11-SP01 尺寸修复。**新增阻断发现 0；P3 构造边界 1，仅 backlog。**
+
+(a) 缺漏 / partial：未见新增阻断项。规格 `spec.md:90`“前端发送用户的输入字节与尺寸”、`ui-direction.md:12`“代码字体与字号可配置”。事实：`TerminalPanel.tsx:129–131` 统一监听实际 `onResize`；字体 `:179–191`、容器 `:132–139`、激活 `:163–176` 的 fit 通过同一回调发送原 session 的行列。`terminalSessions.ts:159–162` 保留原归属及结构化错误。推断：S11-SP01 的字体尺寸漏发路径已补齐。
+
+(b) scope creep：未见。7 行产品增量仅统一尺寸发送，3 份文档只记证据与待验收。
+
+(c) **[S12-SP01，P3，仅 backlog] 重挂载的首 fit 恰好为 80×24 时可能漏对齐。** 仍对照规格 `:90`“前端发送…尺寸”。事实：移除初始化显式发送（新 `TerminalPanel.tsx:150–156`）；新 xterm 默认 80×24（`OptionsService.ts:13–14`），`FitAddon.ts:44–46` 只在尺寸变化时 resize。推断：若已存活 PTY 保留其他行列，关闭面板再重开（`App.tsx:6316–6328`），且新布局正好 80×24，就没有事件把后台改回该尺寸。仅构造边界，登记 backlog；不要求本轮返修。
+
+已核对 build/lint 原件 exit 0 及产品散列；未重跑检查或启动应用。新 Release 的持续输入、其他控件焦点、字体后真实 PTY 尺寸及 D06 仍待桌面复验；旧 Node / 旧桌面不能证明本修复通过。详见 `spec-evidence.md`。

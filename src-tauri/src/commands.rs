@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::State;
 
-use crate::acceptance::{Acceptance, deliver};
+use crate::acceptance::{deliver, Acceptance};
 use crate::batch::{BatchOutcome, BatchTarget};
 use crate::commit::{CommitDraft, DraftStore};
 use crate::commit_flow::{self, CommitOptions, CommitOutcome, CommitOutputEvent};
@@ -33,7 +33,7 @@ use crate::session::{
     WorktreeSessionInfo,
 };
 use crate::settings::{Registry, Settings};
-use crate::watch::{WatchController, WatchEvents, WatchStatus, resolve_roots};
+use crate::watch::{resolve_roots, WatchController, WatchEvents, WatchStatus};
 use crate::worktree_status::WorktreeStatusEntry;
 
 /// 退出保护的**版本化接收端**（任务 08、ST-B05-08-2）。
@@ -126,27 +126,58 @@ pub struct AppState {
     pub drafts: DraftStore,
     /// Revia 数据目录（跳过 hooks 的临时空目录放在这里，F04.2）。
     pub data_dir: PathBuf,
+    pub changelists: Arc<crate::m7::changelists::ChangelistStore>,
+    /// M7：导入的颜色主题。
+    pub m7_themes: Arc<crate::m7::theme::ThemeStore>,
+    /// M7：工作区编辑草稿。
+    pub m7_edit_drafts: Arc<crate::m7::edit::EditDraftStore>,
+    /// M7：内置终端（PTY 进程）。
+    pub m7_terminal: Arc<crate::m7::terminal::TerminalManager>,
+    /// M7：终端 tab 列表（跨重启保留）。
+    pub m7_terminal_tabs: Arc<crate::m7::terminal::TerminalTabStore>,
+    /// M7：克隆任务。
+    pub m7_clone: Arc<crate::m7::clone::CloneManager>,
+    /// M7：GitHub 账号、草稿、回执与设备码流程。
+    pub m7_github: Arc<crate::m7::github::GithubState>,
+    /// M7：应用更新状态。
+    pub m7_update: Arc<crate::m7::update::UpdateState>,
+    /// M7：诊断摘要（F21：脱敏摘要持久化 7 天，可清空）。
+    pub m7_diagnostics: Arc<crate::m7::diagnostics::DiagnosticsSummaryStore>,
     /// 提交操作 ID 计数器（实时输出事件归属用）。
     commit_ops: std::sync::atomic::AtomicU64,
 }
 
 impl AppState {
     pub fn new(data_dir: PathBuf) -> Self {
-        let command_log = Arc::new(CommandLog::default());
+        let diagnostics = Arc::new(crate::m7::diagnostics::DiagnosticsSummaryStore::new(
+            &data_dir,
+        ));
+        let command_log = Arc::new(CommandLog::with_diagnostics(Arc::clone(&diagnostics)));
         Self {
             recovery: RecoveryStore::new(data_dir.clone()),
             stash_archive: crate::stash_archive::StashArchiveStore::new(&data_dir.clone()),
             autostash: crate::autostash::AutostashStore::new(&data_dir.clone()),
             review: Arc::new(crate::review::ReviewStore::new(data_dir.clone())),
-            registry: Mutex::new(Registry::load(data_dir.clone(), command_log.clone())),
+            registry: Mutex::new(Registry::load(data_dir.clone(), Arc::clone(&command_log))),
             sessions: Mutex::new(HashMap::new()),
-            command_log,
+            command_log: Arc::clone(&command_log),
             history: Arc::new(HistoryStore::new()),
             watch: Arc::new(WatchController::new()),
             watch_events: Arc::new(Mutex::new(WatchEvents::default())),
             acceptance: None,
             exit_guard: Arc::new(ExitGuard::default()),
             drafts: DraftStore::new(data_dir.clone()),
+            m7_themes: Arc::new(crate::m7::theme::ThemeStore::new(&data_dir)),
+            changelists: Arc::new(crate::m7::changelists::ChangelistStore::new(&data_dir)),
+            m7_edit_drafts: Arc::new(crate::m7::edit::EditDraftStore::new(&data_dir)),
+            m7_terminal: Arc::new(crate::m7::terminal::TerminalManager::new()),
+            m7_terminal_tabs: Arc::new(crate::m7::terminal::TerminalTabStore::new(&data_dir)),
+            m7_clone: Arc::new(crate::m7::clone::CloneManager::new(Arc::clone(
+                &command_log,
+            ))),
+            m7_github: Arc::new(crate::m7::github::GithubState::new(&data_dir)),
+            m7_update: Arc::new(crate::m7::update::UpdateState::new(&data_dir, &data_dir)),
+            m7_diagnostics: diagnostics,
             data_dir,
             commit_ops: std::sync::atomic::AtomicU64::new(1),
         }
@@ -941,14 +972,54 @@ pub fn log_measure(message: &str) {
     if minimal_soak_logging() {
         return;
     }
-    let log = path.with_extension("log");
+    append_measure_line(&path.with_extension("log"), &format!("{} {message}", chrono_like_stamp()));
+}
+
+/// Rust 阶段日志和前端日志共用完整记录写入，避免并发 write_fmt 拼接字段。
+fn append_measure_line(path: &std::path::Path, message: &str) {
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log)
-    {
-        let _ = writeln!(file, "{} {message}", chrono_like_stamp());
+    static WRITER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _writer = WRITER.lock().unwrap_or_else(|error| error.into_inner());
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = file.write_all(format!("{message}\n").as_bytes());
+    }
+}
+
+/// 测量模式的阶段观测；退出时一次写日志，阶段之间不插入磁盘 I/O。
+/// 只记录固定名称、线程和时间，不记录参数、正文或凭据。不是验收通过判定。
+pub(crate) struct MeasureSpan {
+    name: &'static str,
+    started: Option<(std::time::Instant, u128)>,
+    marks: Vec<(&'static str, u128)>,
+}
+
+impl MeasureSpan {
+    pub(crate) fn new(name: &'static str) -> Self {
+        let started = (std::env::var_os("REVIA_MEASURE_LOG").is_some()
+            && !minimal_soak_logging()).then(|| (
+                std::time::Instant::now(),
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .map(|value| value.as_micros()).unwrap_or_default(),
+            ));
+        Self { name, started, marks: Vec::new() }
+    }
+
+    pub(crate) fn mark(&mut self, name: &'static str) {
+        if let Some((started, _)) = self.started {
+            self.marks.push((name, started.elapsed().as_micros()));
+        }
+    }
+}
+
+impl Drop for MeasureSpan {
+    fn drop(&mut self) {
+        if let Some((started, epoch_us)) = self.started {
+            let elapsed_us = started.elapsed().as_micros();
+            log_measure(&format!("[TIMING] {}", serde_json::json!({
+                "span": self.name, "startedAtUs": epoch_us, "elapsedUs": elapsed_us,
+                "thread": format!("{:?}", std::thread::current().id()), "marksUs": self.marks,
+            })));
+        }
     }
 }
 
@@ -1024,9 +1095,16 @@ pub async fn list_changes(
     request: WorktreeRequest,
 ) -> Result<ChangesSnapshot> {
     log_measure("list_changes 收到");
+    let mut timing = MeasureSpan::new("ipc.list_changes");
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
+    let changelist_mode = state.registry.lock().map_err(|_| AppError::coded(ErrorKind::Internal,"errors.m7.taskFailed","后台任务失败：{error}",&[("error","settings lock".into())]))?.settings().changelist_mode;
+    session.set_changelist_mode(changelist_mode);
     log_measure("list_changes 会话就绪，开始读取");
-    let result = tauri::async_runtime::spawn_blocking(move || session.refresh())
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.list_changes");
+        session.refresh()
+    })
         .await
         .map_err(|error| {
             AppError::coded(
@@ -1043,6 +1121,7 @@ pub async fn list_changes(
             inner.elapsed_ms
         ));
     }
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "list_changes",
@@ -1064,8 +1143,12 @@ pub async fn stage_file(
     ));
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.stage_file(&request.path, &request.fingerprint)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.stage_file(&request.path, &request.fingerprint)
+        })
     })
     .await
     .map_err(|error| {
@@ -1097,8 +1180,12 @@ pub async fn unstage_file(
     ));
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.unstage_file(&request.path, &request.fingerprint)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.unstage_file(&request.path, &request.fingerprint)
+        })
     })
     .await
     .map_err(|error| {
@@ -1126,8 +1213,12 @@ pub async fn stage_hunk(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.stage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        })
     })
     .await
     .map_err(|error| {
@@ -1155,8 +1246,12 @@ pub async fn unstage_hunk(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.unstage_hunk(&request.path, &request.fingerprint, &request.hunk_id)
+        })
     })
     .await
     .map_err(|error| {
@@ -1193,23 +1288,27 @@ async fn execute_discard(
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        if let Some(id) = request.hunk_id {
-            session.discard_hunk(
-                &request.path,
-                &request.fingerprint,
-                &request.snapshot_revision,
-                &id,
-                &store,
-            )
-        } else {
-            session.discard_file(
-                &request.path,
-                &request.fingerprint,
-                &request.snapshot_revision,
-                &store,
-            )
-        }
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            if let Some(id) = request.hunk_id {
+                session.discard_hunk(
+                    &request.path,
+                    &request.fingerprint,
+                    &request.snapshot_revision,
+                    &id,
+                    &store,
+                )
+            } else {
+                session.discard_file(
+                    &request.path,
+                    &request.fingerprint,
+                    &request.snapshot_revision,
+                    &store,
+                )
+            }
+        })
     })
     .await
     .map_err(|error| {
@@ -1237,23 +1336,32 @@ pub async fn stage_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
-    let result =
-        tauri::async_runtime::spawn_blocking(move || session.stage_files(&request.targets, true))
-            .await
-            .map_err(|error| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.batchStagingFailedCause",
-                    "批量暂存失败：{error}",
-                    &[("error", error.to_string())],
-                )
-            })?;
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let paths: Vec<_> = request
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            Ok(session.stage_files(&request.targets, true))
+        })
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.batchStagingFailedCause",
+            "批量暂存失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     deliver(
         state.acceptance.as_ref(),
         "stage_files",
         &context.worktree_id,
         None,
-        Ok(result),
+        result,
     )
     .await
 }
@@ -1265,23 +1373,32 @@ pub async fn unstage_files(
 ) -> Result<BatchOutcome> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
-    let result =
-        tauri::async_runtime::spawn_blocking(move || session.stage_files(&request.targets, false))
-            .await
-            .map_err(|error| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.batchUnstagingFailedCause",
-                    "批量取消暂存失败：{error}",
-                    &[("error", error.to_string())],
-                )
-            })?;
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let paths: Vec<_> = request
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            Ok(session.stage_files(&request.targets, false))
+        })
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.batchUnstagingFailedCause",
+            "批量取消暂存失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?;
     deliver(
         state.acceptance.as_ref(),
         "unstage_files",
         &context.worktree_id,
         None,
-        Ok(result),
+        result,
     )
     .await
 }
@@ -1302,8 +1419,16 @@ pub async fn discard_files(
         )
     })?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.discard_files(&request.targets, &revision, &store)
+        let paths: Vec<String> = request
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect();
+        edit_drafts.with_resolved(&session, &paths, || {
+            Ok(session.discard_files(&request.targets, &revision, &store))
+        })
     })
     .await
     .map_err(|error| {
@@ -1319,7 +1444,7 @@ pub async fn discard_files(
         "discard_files",
         &context.worktree_id,
         None,
-        Ok(result),
+        result,
     )
     .await
 }
@@ -1755,13 +1880,16 @@ pub async fn purge_recovery(state: State<'_, AppState>) -> Result<u64> {
 
 #[tauri::command]
 pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Result<RowSlice> {
+    let mut timing = MeasureSpan::new("ipc.get_rows");
     log_measure(&format!(
         "get_rows 收到：{} {}..{}",
         request.path, request.from, request.to
     ));
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.get_rows");
         session.rows_with_ignore(
             &request.path,
             request.changes,
@@ -1780,6 +1908,7 @@ pub async fn get_rows(state: State<'_, AppState>, request: RowsRequest) -> Resul
             &[("error", error.to_string())],
         )
     })?;
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "get_rows",
@@ -1796,9 +1925,12 @@ pub async fn side_by_side_layout(
     state: State<'_, AppState>,
     request: SideLayoutRequest,
 ) -> Result<crate::session::SideBySideLayout> {
+    let mut timing = MeasureSpan::new("ipc.side_by_side_layout");
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.side_by_side_layout");
         session.side_layout(
             &request.path,
             request.changes,
@@ -1815,6 +1947,7 @@ pub async fn side_by_side_layout(
             &[("error", error.to_string())],
         )
     })?;
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "side_by_side_layout",
@@ -1831,9 +1964,12 @@ pub async fn side_lines(
     state: State<'_, AppState>,
     request: SideLinesRequest,
 ) -> Result<Vec<crate::git::segments::SideLine>> {
+    let mut timing = MeasureSpan::new("ipc.side_lines");
     let session = state.session(&request.worktree_id)?;
+    timing.mark("session_ready");
     let context = request.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _worker = MeasureSpan::new("worker.side_lines");
         session.side_lines(
             &request.path,
             request.changes,
@@ -1854,6 +1990,7 @@ pub async fn side_lines(
             &[("error", error.to_string())],
         )
     })?;
+    timing.mark("worker_joined");
     deliver(
         state.acceptance.as_ref(),
         "side_lines",
@@ -1872,15 +2009,19 @@ pub async fn stage_segment(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.execute_segment_op(
-            &request.path,
-            &request.credential,
-            request.hunk_index,
-            request.segment_index,
-            true,
-            request.ignore_whitespace,
-        )
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.execute_segment_op(
+                &request.path,
+                &request.credential,
+                request.hunk_index,
+                request.segment_index,
+                true,
+                request.ignore_whitespace,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -1909,15 +2050,19 @@ pub async fn unstage_segment(
 ) -> Result<ChangesSnapshot> {
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.execute_segment_op(
-            &request.path,
-            &request.credential,
-            request.hunk_index,
-            request.segment_index,
-            false,
-            request.ignore_whitespace,
-        )
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.execute_segment_op(
+                &request.path,
+                &request.credential,
+                request.hunk_index,
+                request.segment_index,
+                false,
+                request.ignore_whitespace,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -1947,16 +2092,20 @@ pub async fn discard_segment(
     let session = state.session(&request.worktree_id)?;
     let context = request.clone();
     let store = state.recovery.clone();
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        session.discard_segment(
-            &request.path,
-            &request.credential,
-            &request.snapshot_revision,
-            request.hunk_index,
-            request.segment_index,
-            request.ignore_whitespace,
-            &store,
-        )
+        let paths: Vec<String> = vec![request.path.clone()];
+        edit_drafts.with_resolved(&session, &paths, || {
+            session.discard_segment(
+                &request.path,
+                &request.credential,
+                &request.snapshot_revision,
+                request.hunk_index,
+                request.segment_index,
+                request.ignore_whitespace,
+                &store,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -2115,7 +2264,7 @@ pub struct PushBranchPayload {
 }
 
 /// 读一份设置快照（命令参数与网络选项都从这里取，前端不传设置值）。
-fn settings_snapshot(state: &State<'_, AppState>) -> Result<Settings> {
+pub(crate) fn settings_snapshot(state: &State<'_, AppState>) -> Result<Settings> {
     let registry = state.registry.lock().map_err(|_| {
         AppError::coded(
             ErrorKind::Internal,
@@ -2178,7 +2327,13 @@ pub async fn checkout_branch(
     let store = state.recovery.clone();
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::remote_ops::checkout(&session, &store, &request.target, request.strategy, &archive)
+        crate::remote_ops::checkout(
+            &session,
+            &store,
+            &request.target,
+            request.strategy,
+            &archive,
+        )
     })
     .await
     .map_err(|error| {
@@ -2268,6 +2423,16 @@ pub async fn update_project(
 }
 
 /// 推送对话框的预览：目标远端 / 分支、将要推送的提交与受保护分支判断。
+/// F10：本地保护列表与 GitHub 保护缓存取并集（远端已保护而本地未配置的分支同样拦强推）。
+fn protected_with_github(
+    github: &Arc<crate::m7::github::GithubState>,
+    session: &crate::session::WorktreeSession,
+    remote: Option<&str>,
+    local: &[String],
+) -> Result<Vec<String>> {
+    crate::m7::github::protection::effective(session, github, remote, local)
+}
+
 #[tauri::command]
 pub async fn push_preview(
     state: State<'_, AppState>,
@@ -2275,8 +2440,13 @@ pub async fn push_preview(
 ) -> Result<crate::remote_ops::PushPreview> {
     let settings = settings_snapshot(&state)?;
     let session = state.worktree_session(&request.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
-        crate::remote_ops::push_preview(&session, &settings.protected_branches)
+        let preview = crate::remote_ops::push_preview(&session, &settings.protected_branches)?;
+        let protected = protected_with_github(
+            &github, &session, Some(&preview.remote), &settings.protected_branches,
+        )?;
+        crate::remote_ops::push_preview(&session, &protected)
     })
     .await
     .map_err(|error| {
@@ -2297,11 +2467,22 @@ pub async fn push_branch(
 ) -> Result<crate::remote_ops::PushResult> {
     let settings = settings_snapshot(&state)?;
     let session = state.worktree_session(&request.worktree_id)?;
+    let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
+        // F10：实际推送保护使用并集。
+        let remote = match &request.request.remote {
+            Some(remote) => remote.clone(),
+            None => crate::remote_ops::push_preview(&session, &settings.protected_branches)?.remote,
+        };
+        let protected = protected_with_github(
+            &github, &session, Some(&remote), &settings.protected_branches,
+        )?;
+        let mut push_request = request.request;
+        push_request.remote = Some(remote);
         crate::remote_ops::push(
             &session,
-            &request.request,
-            &settings.protected_branches,
+            &push_request,
+            &protected,
             crate::remote_ops::default_network_timeout(),
         )
     })
@@ -2918,15 +3099,7 @@ pub async fn debug_log(message: String) -> Result<()> {
     else {
         return Ok(());
     };
-    let log = path.with_extension("log");
-    use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log)
-    {
-        let _ = writeln!(file, "{message}");
-    }
+    append_measure_line(&path.with_extension("log"), &message);
     Ok(())
 }
 
@@ -3071,6 +3244,8 @@ pub async fn clear_commit_draft(
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecuteCommitRequest {
+    #[serde(default)]
+    pub selection: Option<crate::m7::changelists::ChangelistSelection>,
     /// 登记的 worktree ID（前端不传任何路径或 Git 参数，F03.1）。
     pub worktree_id: String,
     pub options: CommitOptions,
@@ -3099,6 +3274,9 @@ pub async fn execute_commit(
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     );
     let options = request.options;
+    let selection = request.selection;
+    let changelists = Arc::clone(&state.changelists);
+    let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     tauri::async_runtime::spawn_blocking(move || {
         let emit_app = app.clone();
         let emit: Arc<dyn Fn(CommitOutputEvent) + Send + Sync> =
@@ -3107,14 +3285,35 @@ pub async fn execute_commit(
                 // 事件发送失败（窗口已关）不影响提交本身；输出仍留在返回值里。
                 let _ = emit_app.emit("revia://commit-output", &event);
             });
-        session.execute_commit_flow(
-            &drafts,
-            &recovery,
-            hooks_off_root,
-            options,
-            operation_id,
-            emit,
-        )
+        let mut paths: Vec<String> = options
+            .expected
+            .index
+            .iter()
+            .filter(|entry| entry.status != "F")
+            .flat_map(|entry| {
+                std::iter::once(entry.path.clone()).chain(entry.original_path.clone())
+            })
+            .collect();
+        if let Some(selection) = &selection {
+            let view = changelists.view(&session)?;
+            if view.identity != selection.identity || view.revision != selection.revision {
+                return Err(AppError::coded(ErrorKind::Rejected,"errors.m7.changelistChanged","更改列表或文件已变化，请刷新并重新选择",&[]));
+            }
+            paths = view.items.iter().filter(|i|i.selected&&!i.stale).map(|i|i.path.clone()).collect();
+        }
+        edit_drafts.with_resolved(&session, &paths, || {
+            if let Some(selection) = selection {
+                return session.execute_changelist_commit_flow(&changelists, &selection, &drafts, &recovery, hooks_off_root, options, operation_id, emit);
+            }
+            session.execute_commit_flow(
+                &drafts,
+                &recovery,
+                hooks_off_root,
+                options,
+                operation_id,
+                emit,
+            )
+        })
     })
     .await
     .map_err(|error| {
@@ -3224,7 +3423,12 @@ pub async fn stash_inspect(
 ) -> Result<crate::stash::StashInspection> {
     let session = state.session(&request.worktree_id)?;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::stash::inspect_selected(&session.git, &request.oid, Some(&request.entry_key), request.compare_local)
+        crate::stash::inspect_selected(
+            &session.git,
+            &request.oid,
+            Some(&request.entry_key),
+            request.compare_local,
+        )
     })
     .await
     .map_err(|error| {
@@ -3248,13 +3452,31 @@ pub struct StashPreflightCommand {
 }
 
 #[tauri::command]
-pub async fn stash_preflight(state: State<'_, AppState>, request: StashPreflightCommand) -> Result<String> {
+pub async fn stash_preflight(
+    state: State<'_, AppState>,
+    request: StashPreflightCommand,
+) -> Result<String> {
     let session = state.session(&request.worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || if request.collection {
-        crate::stash::collection_preflight(&session)
-    } else { crate::stash::preflight_selected(&session, request.oid.as_deref(), request.entry_key.as_deref()) })
-        .await.map_err(|error| AppError::coded(ErrorKind::Internal,
-            "errors.commands.stashInspectInterrupted", "读取 stash 内容时中断：{error}", &[("error", error.to_string())]))?
+    tauri::async_runtime::spawn_blocking(move || {
+        if request.collection {
+            crate::stash::collection_preflight(&session)
+        } else {
+            crate::stash::preflight_selected(
+                &session,
+                request.oid.as_deref(),
+                request.entry_key.as_deref(),
+            )
+        }
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.stashInspectInterrupted",
+            "读取 stash 内容时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -3344,7 +3566,13 @@ pub async fn stash_drop(
     let session = state.session(&request.worktree_id)?;
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::stash::drop_selected(&session, &archive, &request.oid, &request.entry_key, &request.expected_state)
+        crate::stash::drop_selected(
+            &session,
+            &archive,
+            &request.oid,
+            &request.entry_key,
+            &request.expected_state,
+        )
     })
     .await
     .map_err(|error| {
@@ -3373,7 +3601,12 @@ pub async fn stash_clear(
     let session = state.session(&request.worktree_id)?;
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::stash::clear_confirmed(&session, &archive, &request.expected_oids, &request.expected_state)
+        crate::stash::clear_confirmed(
+            &session,
+            &archive,
+            &request.expected_oids,
+            &request.expected_state,
+        )
     })
     .await
     .map_err(|error| {
@@ -3467,7 +3700,13 @@ pub async fn autostash_restore(
     let store = state.autostash.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _write = session.acquire_write_lock()?;
-        store.restore_confirmed(&session, &recovery, &archive, &request.link, &request.expected_state)
+        store.restore_confirmed(
+            &session,
+            &recovery,
+            &archive,
+            &request.link,
+            &request.expected_state,
+        )
     })
     .await
     .map_err(|error| {
@@ -3489,13 +3728,26 @@ pub struct AutostashRestoreCommand {
 }
 
 #[tauri::command]
-pub async fn autostash_forget(state: State<'_, AppState>, worktree_id: String, id: String) -> Result<()> {
+pub async fn autostash_forget(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    id: String,
+) -> Result<()> {
     let session = state.session(&worktree_id)?;
     let store = state.autostash.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _write = session.acquire_write_lock()?;
         store.forget(&session, &id)
-    }).await.map_err(|error| AppError::coded(ErrorKind::Internal, "errors.commands.autostashForgetInterrupted", "保留自动 stash 时中断：{error}", &[("error", error.to_string())]))?
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.autostashForgetInterrupted",
+            "保留自动 stash 时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[tauri::command]
@@ -3546,9 +3798,18 @@ pub async fn rewrite_range(
     state: State<'_, AppState>, worktree_id: String, target: String, expected_head: String,
 ) -> Result<Vec<crate::history::HistoryCommit>> {
     let session = state.session(&worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || crate::rewrite::range(&session, &target, &expected_head))
-        .await.map_err(|error| AppError::coded(ErrorKind::Internal,
-            "errors.commands.rewritePreflightInterrupted", "检查本地改动时中断：{error}", &[("error", error.to_string())]))?
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::rewrite::range(&session, &target, &expected_head)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.rewritePreflightInterrupted",
+            "检查本地改动时中断：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[tauri::command]
@@ -3559,9 +3820,15 @@ pub async fn rewrite_preflight(
     reset_target: Option<String>,
 ) -> Result<crate::rewrite::RewritePreflight> {
     let session = state.session(&worktree_id)?;
-    tauri::async_runtime::spawn_blocking(move || match reset_target {
-        Some(target) => crate::rewrite::reset_preflight(&session, &target),
-        None => crate::rewrite::preflight(&session, &oids),
+    let settings = settings_snapshot(&state)?;
+    let github = Arc::clone(&state.m7_github);
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut result = match reset_target {
+            Some(target) => crate::rewrite::reset_preflight(&session, &target)?,
+            None => crate::rewrite::preflight(&session, &oids)?,
+        };
+        result.protected_branch = crate::m7::github::protection::history_branch(&session, &github, &settings.protected_branches)?;
+        Ok(result)
     })
         .await
         .map_err(|error| {
@@ -3800,15 +4067,19 @@ pub async fn external_tool_choices(
     };
     let configured_diff = settings.diff_tool.clone();
     let configured_merge = settings.merge_tool.clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<crate::external_tools::ExternalToolSetup> {
-        let choices = crate::external_tools::choices(
-            &session.git,
-            configured_diff.as_deref(),
-            configured_merge.as_deref(),
-        );
-        Ok(crate::external_tools::ExternalToolSetup { choices,
-            context: crate::external_tools::confirmation_context(&session)? })
-    })
+    tauri::async_runtime::spawn_blocking(
+        move || -> Result<crate::external_tools::ExternalToolSetup> {
+            let choices = crate::external_tools::choices(
+                &session.git,
+                configured_diff.as_deref(),
+                configured_merge.as_deref(),
+            );
+            Ok(crate::external_tools::ExternalToolSetup {
+                choices,
+                context: crate::external_tools::confirmation_context(&session)?,
+            })
+        },
+    )
     .await
     .map_err(|error| {
         AppError::coded(
@@ -3861,4 +4132,51 @@ pub async fn external_tool_launch(
 #[tauri::command]
 pub async fn system_language() -> Result<String> {
     Ok(crate::settings::system_language())
+}
+
+#[cfg(test)]
+mod measurement_log_tests {
+    use super::append_measure_line;
+    use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn concurrent_measurement_records_remain_complete() {
+        // 仅自建临时日志；不改进程环境，也不打开用户的测量文件。
+        let directory = tempfile::tempdir().unwrap();
+        let path = Arc::new(directory.path().join("measure.log"));
+        let barrier = Arc::new(Barrier::new(8));
+        let threads: Vec<_> = (0..8).map(|worker| {
+            let path = Arc::clone(&path);
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                for index in 0..32 {
+                    let payload = serde_json::json!({"worker": worker, "index": index, "text": "x".repeat(2048)});
+                    append_measure_line(&path, &payload.to_string());
+                    append_measure_line(&path, &format!("frontend-{worker}-{index}"));
+                }
+            })
+        }).collect();
+        for thread in threads { thread.join().unwrap(); }
+        let text = std::fs::read_to_string(&*path).unwrap();
+        let mut records = std::collections::HashSet::new();
+        let mut frontend = std::collections::HashSet::new();
+        for line in text.lines() {
+            if line.starts_with('{') {
+                let value: serde_json::Value = serde_json::from_str(line).unwrap();
+                assert_eq!(value["text"].as_str().unwrap().len(), 2048);
+                assert!(records.insert((value["worker"].as_u64().unwrap(), value["index"].as_u64().unwrap())));
+            } else {
+                assert!(frontend.insert(line.to_owned()));
+            }
+        }
+        assert_eq!(records.len(), 8 * 32);
+        assert_eq!(frontend.len(), 8 * 32);
+        assert!(text.ends_with('\n'));
+        for worker in 0..8 {
+            for index in 0..32 {
+                assert!(frontend.contains(&format!("frontend-{worker}-{index}")));
+            }
+        }
+    }
 }

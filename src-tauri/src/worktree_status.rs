@@ -135,10 +135,8 @@ mod tests {
     use crate::shell::{EnvCaptureInfo, ShellEnv};
 
     fn shell_env(dir: &Path) -> ShellEnv {
-        let path: Vec<String> = std::env::var("PATH")
-            .unwrap_or_default()
-            .split(':')
-            .map(str::to_string)
+        let path: Vec<String> = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .map(|path| path.to_string_lossy().into_owned())
             .collect();
         let vars = [
             (
@@ -157,7 +155,7 @@ mod tests {
             path: path.clone(),
             info: EnvCaptureInfo {
                 worktree: dir.display().to_string(),
-                shell: "/bin/zsh".into(),
+                shell: "fixture".into(),
                 elapsed_ms: 0,
                 timed_out: false,
                 used_fallback: false,

@@ -17,7 +17,7 @@ import type {
   UpdateMode,
 } from "@/lib/ipc";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { messages } from "@/lib/i18n/index";
+import { messages, t } from "@/lib/i18n/index";
 import { highlightLevelText, notifyKindText } from "@/lib/i18n/text";
 
 /** 搜索关键词在资源里以 `|` 分隔，避免运行期拼接翻译键（Q171）。 */
@@ -26,6 +26,12 @@ function keywordList(value: string): string[] {
 }
 import { themesOfKind } from "@/lib/theme";
 import { Codicon } from "@/components/ui/codicon";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { M7GithubSettings, M7ShortcutSettings, M7ThemeSettings, M7UpdateSettings } from "@/features/m7/settings";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
+import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
+import { useModalDialog } from "@/features/m7/glass/nativeGlass";
+import { useGlassLens } from "@/features/m7/glass/glassLens";
 
 export interface SettingsValues {
   themeLight: string;
@@ -49,6 +55,7 @@ export interface SettingsValues {
   diffSoftWrap: boolean;
   diffJumpToNextFile: boolean;
   diffIgnoreWhitespace: number;
+  changelistMode: boolean;
   commitSubjectLimit: number;
   commitBlankLineRequired: boolean;
   commitBodyLineLimit: number;
@@ -76,6 +83,9 @@ export interface SettingsValues {
   protectedBranches: string;
   /** 当前会话实际使用的 Git 程序（只读展示）。 */
   detectedGitPath: string | null;
+  appUpdateMode: AppUpdateMode;
+  allowPrerelease: boolean;
+  shortcuts: Record<string, string>;
 }
 
 export interface SettingsPatch {
@@ -101,6 +111,7 @@ export interface SettingsPatch {
   diffSoftWrap?: boolean;
   diffJumpToNextFile?: boolean;
   diffIgnoreWhitespace?: number;
+  changelistMode?: boolean;
   commitSubjectLimit?: number;
   commitBlankLineRequired?: boolean;
   commitBodyLineLimit?: number;
@@ -125,9 +136,12 @@ export interface SettingsPatch {
   pushDialogOnCommit?: boolean;
   pushDialogProtectedOnly?: boolean;
   protectedBranches?: string[];
+  appUpdateMode?: AppUpdateMode;
+  allowPrerelease?: boolean;
+  shortcuts?: Record<string, string>;
 }
 
-type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "about";
+type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "extensions" | "about";
 type Page =
   | "theme"
   | "language"
@@ -140,6 +154,10 @@ type Page =
   | "notifications"
   | "gitTools"
   | "updatePush"
+  | "themeColors"
+  | "shortcuts"
+  | "githubAccounts"
+  | "appUpdate"
   | "about";
 
 interface PageDef {
@@ -225,12 +243,58 @@ function buildCategories(): CategoryDef[] {
     ],
   },
   {
+    id: "extensions",
+    title: t("settings.m7.title"),
+    pages: [
+      {
+        id: "themeColors",
+        title: t("settings.m7.theme.title"),
+        keywords: keywordList(t("settings.m7.theme.keywords")),
+      },
+      {
+        id: "shortcuts",
+        title: t("settings.m7.shortcuts.title"),
+        keywords: keywordList(t("settings.m7.shortcuts.keywords")),
+      },
+      {
+        id: "githubAccounts",
+        title: t("settings.m7.github.title"),
+        keywords: keywordList(t("settings.m7.github.keywords")),
+      },
+      {
+        id: "appUpdate",
+        title: t("settings.m7.update.title"),
+        keywords: keywordList(t("settings.m7.update.keywords")),
+      },
+    ],
+  },
+  {
     id: "about",
     title: messages.settings.about,
     pages: [{ id: "about", title: messages.settings.about, keywords: keywordList(messages.settings.keywords.about) }],
   },
   ];
 }
+
+/** 导航行的图标（Q202，参照 Loop 侧栏）。 */
+const PAGE_ICONS: Record<Page, string> = {
+  theme: "symbol-color",
+  language: "globe",
+  font: "text-size",
+  commitMessage: "comment-draft",
+  commitWarnings: "warning",
+  diffDisplay: "diff",
+  logSettings: "list-unordered",
+  fileHistory: "history",
+  notifications: "bell",
+  gitTools: "tools",
+  updatePush: "repo-push",
+  themeColors: "paintcan",
+  shortcuts: "keyboard",
+  githubAccounts: "github",
+  appUpdate: "cloud-download",
+  about: "info",
+};
 
 const CATEGORY_OF_PAGE: Record<Page, Category> = {
   theme: "appearance",
@@ -244,6 +308,10 @@ const CATEGORY_OF_PAGE: Record<Page, Category> = {
   notifications: "notifications",
   gitTools: "git",
   updatePush: "git",
+  themeColors: "extensions",
+  shortcuts: "extensions",
+  githubAccounts: "extensions",
+  appUpdate: "extensions",
   about: "about",
 };
 
@@ -253,16 +321,30 @@ export function SettingsDialog({
   onClose,
   onChange,
   onReloadEnvironment,
+  worktreeId = null,
+  updateStatus = null,
+  onUpdateStatus,
+  onThemesChanged,
+  onAccountChanged,
 }: {
   open: boolean;
   values: SettingsValues;
   onClose: () => void;
   onChange: (patch: SettingsPatch) => Promise<AppErrorPayload | null>;
   onReloadEnvironment: () => Promise<AppErrorPayload | null>;
+  /** M7：GitHub 账号页要按当前仓库读取绑定关系。 */
+  worktreeId?: string | null;
+  updateStatus?: AppUpdateStatus | null;
+  onUpdateStatus?: (status: AppUpdateStatus) => void;
+  onThemesChanged?: () => Promise<void> | void;
+  onAccountChanged?: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const pageListRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<Page>("theme");
-  const [expanded, setExpanded] = useState<Set<Category>>(new Set(["appearance", "commit", "diff"]));
+  // 切换设置页时的玻璃镜片（Q202）。
+  useGlassLens({ host: navRef, track: pageListRef, selected: page });
   const [query, setQuery] = useState("");
   const [font, setFont] = useState(values.codeFontFamily);
   const [size, setSize] = useState(String(values.fontSize));
@@ -306,12 +388,8 @@ export function SettingsDialog({
     values.protectedBranches,
   ]);
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog || !open) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, [open]);
+  // 系统材质下设置页铺满整窗，放在整窗玻璃上。
+  useModalDialog(ref, open, "page");
 
   const categories = buildCategories();
   const trimmedQuery = query.trim();
@@ -351,33 +429,30 @@ export function SettingsDialog({
   const activePageTitle = activePage?.pages.find((candidate) => candidate.id === page)?.title ?? "";
   const activeCategoryTitle = activePage?.title ?? "";
 
-  const openPage = (next: Page) => {
-    setPage(next);
-    setExpanded((current) => new Set(current).add(CATEGORY_OF_PAGE[next]));
-  };
-
-  const visibleCategories = trimmedQuery && matches
-    ? categories.filter((category) => category.pages.some((candidate) => matches.includes(candidate)))
-    : categories;
+  // 导航平铺（Q202）：多页的分类只留一行小标题，单页分类直接是一行；搜索时只留命中的页。
+  const visibleCategories = categories
+    .map((category) => ({
+      ...category,
+      pages: trimmedQuery && matches ? category.pages.filter((candidate) => matches.includes(candidate)) : category.pages,
+    }))
+    .filter((category) => category.pages.length > 0);
 
   return (
     <dialog
       ref={ref}
       aria-label={messages.settings.title}
-      className="app-dialog w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
+      className="settings-dialog app-dialog glass-isolate w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      <div className="flex items-center gap-2 border-b border-panel-border px-4 py-2.5">
-        <h2 className="flex-1 text-[14px] font-semibold">{messages.settings.title}</h2>
-        <button type="button" className="icon-action" aria-label={messages.recovery.close} title={messages.recovery.close} onClick={onClose}>
-          <Codicon name="close" size={16} />
-        </button>
-      </div>
-      <div className="flex h-[min(560px,calc(100vh-140px))]">
-        <nav className="flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--sidebar-background)]" aria-label={messages.settings.title}>
+      <GlassLayer variant="popover" />
+      <div className="settings-body flex h-[min(560px,calc(100vh-140px))]">
+        <nav ref={navRef} className="settings-nav glass-lens-host flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--glass-side-tint)]" aria-label={messages.settings.title}>
+          <div className="settings-nav-head px-3 pt-3 pb-1" data-tauri-drag-region>
+            <h2 className="text-[14px] font-semibold" data-tauri-drag-region>{messages.settings.title}</h2>
+          </div>
           <div className="relative px-2 py-2">
             <Codicon name="search" size={13} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-descriptionforeground" />
             <input
@@ -389,60 +464,47 @@ export function SettingsDialog({
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-            {visibleCategories.map((category) => {
-              const isOpen = !!trimmedQuery || expanded.has(category.id);
-              return (
-                <div key={category.id}>
+          <div ref={pageListRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+            {visibleCategories.map((category) => (
+              <div key={category.id} className="settings-nav-group">
+                {category.pages.length > 1 ? (
+                  <div className="settings-nav-caption truncate px-2 pt-2 pb-1 text-[11px] text-descriptionforeground">{category.title}</div>
+                ) : null}
+                {category.pages.map((candidate) => (
                   <button
+                    key={candidate.id}
                     type="button"
-                    className={`flex h-7 w-full items-center gap-1 rounded-[3px] px-1 text-left text-[12.5px] outline-none hover:bg-toolbar-hoverbackground focus-visible:bg-toolbar-hoverbackground ${
-                      CATEGORY_OF_PAGE[page] === category.id ? "font-semibold" : ""
+                    className={`settings-nav-item flex h-7 w-full items-center gap-2 rounded-[3px] px-2 text-left text-[12.5px] outline-none hover:bg-toolbar-hoverbackground focus-visible:bg-toolbar-hoverbackground ${
+                      page === candidate.id ? "bg-[var(--list-inactiveselectionbackground)]" : ""
                     }`}
-                    aria-expanded={isOpen}
-                    onClick={() => {
-                      setExpanded((current) => {
-                        const next = new Set(current);
-                        if (next.has(category.id)) next.delete(category.id);
-                        else next.add(category.id);
-                        return next;
-                      });
-                      if (category.pages.length === 1) openPage(category.pages[0].id);
-                    }}
+                    aria-pressed={page === candidate.id}
+                    data-lens-key={candidate.id}
+                    onClick={() => setPage(candidate.id)}
                   >
-                    <Codicon name={isOpen ? "chevron-down" : "chevron-right"} size={12} />
-                    <span className="min-w-0 flex-1 truncate">{category.title}</span>
+                    <Codicon name={PAGE_ICONS[candidate.id]} size={15} className="shrink-0" />
+                    <span className="min-w-0 truncate">{candidate.title}</span>
                   </button>
-                  {isOpen
-                    ? category.pages.map((candidate) => (
-                        <button
-                          key={candidate.id}
-                          type="button"
-                          className={`flex h-7 w-full items-center rounded-[3px] pr-2 pl-6 text-left text-[12.5px] outline-none hover:bg-toolbar-hoverbackground focus-visible:bg-toolbar-hoverbackground ${
-                            page === candidate.id ? "bg-[var(--list-inactiveselectionbackground)]" : ""
-                          }`}
-                          aria-pressed={page === candidate.id}
-                          onClick={() => openPage(candidate.id)}
-                        >
-                          <span className="min-w-0 truncate">{candidate.title}</span>
-                        </button>
-                      ))
-                    : null}
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            ))}
             {trimmedQuery && matches && matches.length === 0 ? (
               <p className="px-2 py-2 text-[12px] text-descriptionforeground">{messages.settings.searchEmpty}</p>
             ) : null}
           </div>
         </nav>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-panel-border px-4 text-[12px] text-descriptionforeground">
-            <span>{activeCategoryTitle}</span>
-            <Codicon name="chevron-right" size={12} />
-            <span className="text-foreground">{activePageTitle}</span>
+        <div className="settings-main flex min-w-0 flex-1 flex-col">
+          <div className="settings-header flex shrink-0 items-start gap-3 border-b border-panel-border px-5 pt-3 pb-2.5" data-tauri-drag-region>
+            <div className="min-w-0 flex-1" data-tauri-drag-region>
+              {activeCategoryTitle !== activePageTitle ? (
+                <p className="settings-crumb truncate text-[11.5px] text-descriptionforeground" data-tauri-drag-region>{activeCategoryTitle}</p>
+              ) : null}
+              <h3 className="settings-title truncate text-[15px] font-semibold" data-tauri-drag-region>{activePageTitle}</h3>
+            </div>
+            <button type="button" className="icon-action shrink-0" aria-label={messages.recovery.close} title={messages.recovery.close} onClick={onClose}>
+              <Codicon name="close" size={16} />
+            </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="settings-scroll min-h-0 flex-1 overflow-y-auto p-5">
             {error ? (
               <p role="alert" className="mb-3 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] bg-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_10%,var(--editor-background))] px-3 py-2 text-[12px]">
                 {formatAppError(error)}
@@ -578,6 +640,7 @@ export function SettingsDialog({
                   checked={values.cherryPickIncludeSource}
                   onChange={(value) => void commit({ cherryPickIncludeSource: value })}
                 />
+                <Toggle label={t("changelists.mode")} checked={values.changelistMode} onChange={(value) => void commit({ changelistMode: value })} />
                 <Field label={messages.settings.commitSubjectLimit} hint={messages.settings.commitSubjectLimitHint}>
                   <input
                     className="settings-input w-24"
@@ -1019,6 +1082,37 @@ export function SettingsDialog({
               </div>
             ) : null}
 
+            {page === "themeColors" ? (
+              <M7ThemeSettings
+                themeLight={values.themeLight}
+                themeDark={values.themeDark}
+                onChange={(patch) => commit(patch)}
+                onThemesChanged={() => onThemesChanged?.()}
+              />
+            ) : null}
+
+            {page === "shortcuts" ? (
+              <M7ShortcutSettings
+                shortcuts={values.shortcuts ?? {}}
+                onChange={(next) => commit({ shortcuts: next })}
+              />
+            ) : null}
+
+            {page === "githubAccounts" ? (
+              <M7GithubSettings worktreeId={worktreeId} onChangeAccount={() => onAccountChanged?.()} />
+            ) : null}
+
+            {page === "appUpdate" ? (
+              <M7UpdateSettings
+                mode={values.appUpdateMode ?? "notify"}
+                onChangeMode={(mode) => commit({ appUpdateMode: mode })}
+                allowPrerelease={values.allowPrerelease ?? false}
+                onChangeAllowPrerelease={(value) => commit({ allowPrerelease: value })}
+                status={updateStatus}
+                onStatusChange={(status) => onUpdateStatus?.(status)}
+              />
+            ) : null}
+
             {page === "about" ? (
               <div className="space-y-3 text-[12.5px] leading-relaxed">
                 <p className="text-[15px] font-semibold">Revia</p>
@@ -1029,6 +1123,7 @@ export function SettingsDialog({
                     <li>{messages.settings.licenseCodicons}</li>
                     <li>{messages.settings.licenseMaterial}</li>
                     <li>{messages.settings.licenseThemes}</li>
+                    <li>{messages.settings.licenseReactBits}</li>
                   </ul>
                 </div>
               </div>

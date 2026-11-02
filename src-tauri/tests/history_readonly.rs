@@ -39,7 +39,7 @@ fn run_git_in(repo: &Path, env: &HashMap<String, String>, args: &[&str]) -> Outp
         .current_dir(repo)
         .env_clear()
         .envs(env)
-        .args(args)
+        .args(args.iter().map(|argument| revia_lib::platform::external_path(Path::new(argument))))
         .output()
         .expect("执行 Git")
 }
@@ -94,10 +94,10 @@ impl Fixture {
         }
         let joined_path = std::env::join_paths(paths.iter().map(Path::new)).unwrap();
         let mut env = HashMap::from([
-            ("HOME".into(), home.display().to_string()),
-            ("USERPROFILE".into(), home.display().to_string()),
-            ("XDG_CONFIG_HOME".into(), home.display().to_string()),
-            ("GIT_CONFIG_GLOBAL".into(), global_config.display().to_string()),
+            ("HOME".into(), revia_lib::platform::external_path(&home).display().to_string()),
+            ("USERPROFILE".into(), revia_lib::platform::external_path(&home).display().to_string()),
+            ("XDG_CONFIG_HOME".into(), revia_lib::platform::external_path(&home).display().to_string()),
+            ("GIT_CONFIG_GLOBAL".into(), revia_lib::platform::external_path(&global_config).display().to_string()),
             ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
             ("GIT_TERMINAL_PROMPT".into(), "0".into()),
             ("PATH".into(), joined_path.to_string_lossy().into_owned()),
@@ -153,7 +153,7 @@ impl Fixture {
     }
 
     fn git_output_in(&self, repo: &Path, args: &[&str]) -> Output {
-        self.command_in(repo).args(args).output().expect("执行 Git")
+        self.command_in(repo).args(args.iter().map(|argument| revia_lib::platform::external_path(Path::new(argument)))).output().expect("执行 Git")
     }
 
     fn git_in(&self, repo: &Path, args: &[&str]) -> String {
@@ -674,16 +674,12 @@ fn binary_and_mode_only_changes_are_explicit() {
     f.track("a.txt", b"one\n", "first");
     f.write("bin.dat", b"head\0tail\n");
     let binary = f.commit_all("binary");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        f.write("script.sh", b"#!/bin/sh\necho hi\n");
-        f.commit_all("script");
-        let mut permissions = fs::metadata(f.repo.join("script.sh")).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(f.repo.join("script.sh"), permissions).unwrap();
-    }
-    let mode_only = f.commit_all("mode only");
+    f.write("script.sh", b"#!/bin/sh\necho hi\n");
+    f.commit_all("script");
+    // Git tree modes can be verified without host filesystem chmod support.
+    f.git(&["update-index", "--chmod=+x", "--", "script.sh"]);
+    f.git(&["commit", "-m", "mode only"]);
+    let mode_only = f.head();
 
     let (target_id, _) = f.open();
     let target = f.target(&target_id);
@@ -709,7 +705,6 @@ fn binary_and_mode_only_changes_are_explicit() {
     assert!(layout.folds.is_empty());
     assert_eq!(layout.empty_reason, Some(revia_lib::history::HistoryEmptyReason::Binary));
 
-    #[cfg(unix)]
     {
         let parent = f.git(&["rev-parse", &format!("{mode_only}^")]).trim().to_string();
         let files = target.commit_files(&mode_only, Some(&parent)).unwrap();
@@ -730,16 +725,22 @@ fn binary_and_mode_only_changes_are_explicit() {
 fn special_paths_are_matched_literally_and_read_correctly() {
     let f = Fixture::new();
     let base = f.track("base.txt", b"base\n", "base");
-    let names = [
-        "--help",
-        ":(glob)*",
-        "a[1].txt",
-        " lead and trail ",
-        "with space.txt",
-        "tab\tname.txt",
-        "replace\u{fffd}name.txt",
-        "中文 文件.txt",
-    ];
+    // Windows disallows colon/star, control characters and trailing spaces.
+    let names = if cfg!(windows) {
+        ["--help", "(glob)literal", "a[1].txt", " lead", "with space.txt",
+            "tab name.txt", "replace\u{fffd}name.txt", "中文 文件.txt"]
+    } else {
+        [
+            "--help",
+            ":(glob)*",
+            "a[1].txt",
+            " lead and trail ",
+            "with space.txt",
+            "tab\tname.txt",
+            "replace\u{fffd}name.txt",
+            "中文 文件.txt",
+        ]
+    };
     for name in names {
         f.write(name, format!("content of {name}\n").as_bytes());
     }
@@ -1415,7 +1416,7 @@ fn partial_clone_missing_objects_error_instead_of_lazy_fetching() {
     let old_blob = f.git(&["rev-parse", &format!("{first}:old.txt")]).trim().to_string();
     f.git(&["config", "uploadpack.allowFilter", "true"]);
     let clone = f.root.join("partial-clone");
-    let url = format!("file://{}", f.repo.display());
+    let url = url::Url::from_directory_path(revia_lib::platform::external_path(&f.repo)).unwrap().to_string();
     let output = f.git_output_in(
         &f.root,
         &["clone", "--filter=blob:none", &url, clone.to_str().unwrap()],
@@ -1499,7 +1500,7 @@ impl Fixture {
         let output = self
             .command_in(&self.repo)
             .envs(extra.iter().copied())
-            .args(args)
+            .args(args.iter().map(|argument| revia_lib::platform::external_path(Path::new(argument))))
             .output()
             .expect("执行 Git");
         assert!(

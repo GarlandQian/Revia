@@ -7,9 +7,11 @@
  * Popover.Trigger 用 render 接管调用方的按钮，保留原有样式与受控逻辑。
  */
 
-import { useState, type ReactNode, type ReactElement } from "react";
+import { useId, useState, type ReactNode, type ReactElement } from "react";
 
 import { Popover as PopoverParts } from "@base-ui/react/popover";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { glassPane } from "@/features/m7/glass/nativeGlass";
 
 export function Popover({
   open,
@@ -18,6 +20,7 @@ export function Popover({
   trigger,
   children,
   align = "left",
+  side = "bottom",
   width,
 }: {
   open: boolean;
@@ -27,8 +30,12 @@ export function Popover({
   trigger: ReactElement;
   children: ReactNode;
   align?: "left" | "right";
+  /** 首选弹出方向；锚点贴近窗口底部（如侧栏最下面的按钮）时用 top，不要等到放不下才翻转。 */
+  side?: "top" | "bottom";
   width?: number;
 }) {
+  // 系统材质下弹层是一块原生玻璃：每个弹层一块，按实例区分。
+  const glassId = useId();
   return (
     <PopoverParts.Root
       open={open}
@@ -41,12 +48,22 @@ export function Popover({
     >
       <PopoverParts.Trigger render={trigger} nativeButton />
       <PopoverParts.Portal className="revia-popover-host">
-        <PopoverParts.Positioner className="pointer-events-auto" align={align === "right" ? "end" : "start"} side="bottom" sideOffset={4}>
+        <PopoverParts.Positioner
+          className="pointer-events-auto"
+          align={align === "right" ? "end" : "start"}
+          side={side}
+          sideOffset={4}
+          // 离窗口边至少留出与卡片外边距相同的空隙，弹层不会贴着窗口边。
+          collisionPadding={10}
+        >
           <PopoverParts.Popup
-            className="revia-popper overflow-y-auto p-1 text-[12.5px]"
+            ref={glassPane({ id: `popover-${glassId}` })}
+            className="revia-popper glass-popover glass-isolate overflow-y-auto p-1 text-[12.5px]"
             style={width ? { width } : { minWidth: 240 }}
             role="menu"
           >
+            {/* 浮层材质（M7 任务 01）：第四版统一参数，玻璃层压在文字下面，不改弹层的尺寸与滚动。 */}
+            <GlassLayer variant="popover" />
             {children}
           </PopoverParts.Popup>
         </PopoverParts.Positioner>
@@ -108,7 +125,7 @@ export function MenuItem({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-[3px] px-2 py-[5px] text-left whitespace-nowrap outline-none transition-colors duration-100 hover:bg-toolbar-hoverbackground focus-visible:bg-toolbar-hoverbackground disabled:opacity-50"
+      className="menu-item flex w-full items-center gap-2 rounded-[3px] px-2 py-[5px] text-left whitespace-nowrap outline-none transition-colors duration-100 hover:bg-toolbar-hoverbackground focus-visible:bg-toolbar-hoverbackground disabled:opacity-50"
     >
       <span className="flex w-4 shrink-0 justify-center">
         {selected ? <span className="codicon codicon-check" aria-hidden /> : null}

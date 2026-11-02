@@ -9,6 +9,7 @@
 import { messages } from "@/lib/i18n/index";
 import { useEffect, useRef, useState } from "react";
 import { Codicon } from "@/components/ui/codicon";
+import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 
 export type NoticeTone = "info" | "success" | "warning" | "error";
 export type NoticeText = string | (() => string | null | undefined);
@@ -73,9 +74,10 @@ export function NotificationCard({
   return (
     <article
       role={notice.tone === "error" ? "alert" : "status"}
-      className="notification pointer-events-auto flex gap-2 p-3"
+      className="notification glass-isolate pointer-events-auto flex gap-2 p-3"
       data-tone={notice.tone}
     >
+      <GlassLayer variant="popover" />
       <Codicon
         name={TONE_ICON[notice.tone]}
         size={16}

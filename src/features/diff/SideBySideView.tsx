@@ -21,6 +21,7 @@ import type { SegmentAction } from "@/types/bindings/SegmentAction";
 import type { FoldRange } from "@/types/bindings/FoldRange";
 import type { IgnoreWhitespace } from "@/types/bindings/IgnoreWhitespace";
 import { ipc } from "@/lib/ipc";
+import { beginSynchronousMeasurement, traceMeasurement, traceSynchronousMeasurement } from "./log";
 import { formatAppError, toAppError } from "@/lib/error";
 import { messages } from "@/lib/i18n/index";
 import { sideLabels } from "@/lib/i18n/text";
@@ -72,6 +73,8 @@ export interface SideBySideHandle {
   getContentHeight(): number;
   getVisibleRange(side?: Side): { from: number; to: number };
   isCovered(from: number, to: number, side?: Side): boolean;
+  /** 跳转前复制缓存身份，随后按真实目标可见范围查询；不触发读取。 */
+  captureCoverage(): ((from: number, to: number, side: Side) => boolean) | null;
   isSettled(): boolean;
   isCompact(): boolean;
   /** 两栏中线的对应误差（行）：测量同步滚动用。 */
@@ -91,6 +94,7 @@ interface WorktreeSideProps {
   worktreeId: string;
   entry: ChangeEntry;
   history?: never;
+  rightEditor?: React.ReactNode;
   isWriting?: boolean;
   onStageSegment?: (action: SegmentAction) => void;
   onUnstageSegment?: (action: SegmentAction) => void;
@@ -102,6 +106,7 @@ interface HistorySideProps {
   history: HistorySideSource;
   worktreeId?: never;
   entry?: never;
+  rightEditor?: never;
   isWriting?: never;
   onStageSegment?: never;
   onUnstageSegment?: never;
@@ -152,21 +157,24 @@ export function SideBySideView(props: SideBySideViewProps) {
   useLayoutEffect(() => {
     let cancelled = false;
     setLayoutError(null);
-    const readLayout = history ? history.layout() : ipc.sideBySideLayout({
+    const readLayout = traceMeasurement<HistorySideLayout | SideBySideLayout>("side.layout", () => history ? history.layout() : ipc.sideBySideLayout({
         worktreeId: worktreeId!,
         path: entry!.path,
         changes: entry!.changes,
         ignoreWhitespace,
         contextLines: options.contextLines,
         highlight,
-      });
+      }));
     void readLayout
       .then((next) => {
         if (cancelled) return;
-        setLayout(next);
-        setLayoutKey(cacheKey);
-        if ("worktreeId" in next) onLayout?.(next);
-        setExpandedFolds(new Set());
+        // 异步布局已核对目标；同一任务挂载两栏并发出可见行请求，避免再等一帧。
+        traceSynchronousMeasurement("side.layout.publish", () => flushSync(() => {
+          setLayout(next);
+          setLayoutKey(cacheKey);
+          if ("worktreeId" in next) onLayout?.(next);
+          setExpandedFolds(new Set());
+        }));
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -224,7 +232,7 @@ export function SideBySideView(props: SideBySideViewProps) {
       const current = cache.current;
       if (current.key !== cacheKey) return;
       current.ensure(side, { visible, buffered, lineCount }, {
-        load: (targetSide, from, to) => history ? history.lines(targetSide, from, to) : ipc.sideLines({
+        load: (targetSide, from, to) => traceMeasurement("side.lines", () => history ? history.lines(targetSide, from, to) : ipc.sideLines({
           worktreeId: worktreeId!,
           path: entry!.path,
           changes: entry!.changes,
@@ -234,9 +242,14 @@ export function SideBySideView(props: SideBySideViewProps) {
           version: targetSide === "left" ? "old" : "new",
           from,
           to,
-        }),
+        }), { side: targetSide, from, to }),
         isCurrent: () => cache.current === current,
-        publish: () => setCacheVersion((value) => value + 1),
+        publish: (visibleChanged) => {
+          const publish = () => setCacheVersion((value) => value + 1);
+          // 只有当前可见文字刚补齐时立即提交；纯预取仍交给 React 合批。
+          if (visibleChanged) traceSynchronousMeasurement("side.lines.publish", () => flushSync(publish));
+          else publish();
+        },
       });
     },
     [cacheKey, worktreeId, entry?.path, entry?.changes, history, ignoreWhitespace, options.contextLines, highlight],
@@ -246,7 +259,7 @@ export function SideBySideView(props: SideBySideViewProps) {
   const redrawBands = useCallback(() => {
     const leftTop = leftRef.current?.getScrollTop() ?? scrollTops.current.left;
     const rightTop = rightRef.current?.getScrollTop() ?? scrollTops.current.right;
-    drawBands(gutterRef.current, gutterBoxRef.current, { leftTop, rightTop, segments, leftRows, rightRows, leftHeights, rightHeights, hovered });
+    traceSynchronousMeasurement("side.bands", () => drawBands(gutterRef.current, gutterBoxRef.current, { leftTop, rightTop, segments, leftRows, rightRows, leftHeights, rightHeights, hovered }));
   }, [segments, leftRows, rightRows, leftHeights, rightHeights, hovered]);
 
   const alignFollower = useCallback((side: Side, top: number) => {
@@ -395,6 +408,21 @@ export function SideBySideView(props: SideBySideViewProps) {
         }
         return true;
       },
+      captureCoverage() {
+        if (!currentLayout || cache.current.key !== cacheKey) return null;
+        const oldLines = new Set(cache.current.old.keys());
+        const newLines = new Set(cache.current.new.keys());
+        return (from, to, side) => {
+          const lines = side === "left" ? oldLines : newLines;
+          const rows = side === "left" ? leftRows : rightRows;
+          for (const range of lineRangesForRows(rows.rows, from, to)) {
+            for (let line = range.from; line <= range.to; line += 1) {
+              if (!lines.has(line)) return false;
+            }
+          }
+          return true;
+        };
+      },
       isSettled() {
         return !!currentLayout && cache.current.key === cacheKey && cache.current.pendingRequests === 0;
       },
@@ -414,7 +442,7 @@ export function SideBySideView(props: SideBySideViewProps) {
       },
     }),
     [segments, leftRows, rightRows, leftHeights, rightHeights, layout, positionSegment,
-      currentLayout, folds, foldUnchanged, expandedFolds, positionFileAnchor],
+      currentLayout, cacheKey, folds, foldUnchanged, expandedFolds, positionFileAnchor],
   );
 
   useEffect(() => {
@@ -455,7 +483,7 @@ export function SideBySideView(props: SideBySideViewProps) {
   const rightActions = !workspaceLayout || workspaceLayout.conflict ? "none" : workspaceLayout.changes === "unstaged" ? "stage" : "none";
 
   // 段按钮是否可用：Q140“同时忽略空行”一档下按钮变灰并说明原因。
-  const actionsEnabled = !!workspaceLayout?.segmentActionsAvailable && !isWriting;
+  const actionsEnabled = !!workspaceLayout?.segmentActionsAvailable && !isWriting && !props.rightEditor;
   const actionsDisabled = !actionsEnabled;
   const actionFor = (index: number): SegmentAction | null => workspaceLayout?.segmentActions[index] ?? null;
 
@@ -501,7 +529,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           onExpandFold={(index) => setExpandedFolds((current) => new Set(current).add(index))}
         />
         <div className="sbs-gutter relative shrink-0" style={{ width: gutterWidth }} ref={gutterBoxRef}>
-          <canvas ref={gutterRef} className="sbs-bands" />
+          <canvas ref={gutterRef} className={props.rightEditor ? "sbs-bands hidden" : "sbs-bands"} />
           <GutterNumbers
             side="left"
             rows={leftRows}
@@ -521,6 +549,7 @@ export function SideBySideView(props: SideBySideViewProps) {
             width={GUTTER_NUMBERS}
             align="right"
           />
+          {!props.rightEditor ? (
           <GutterNumbers
             side="right"
             rows={rightRows}
@@ -539,7 +568,9 @@ export function SideBySideView(props: SideBySideViewProps) {
             align="left"
             offset={GUTTER_NUMBERS + GUTTER_BAND}
           />
+          ) : null}
         </div>
+        {props.rightEditor ? <div className="flex min-h-0 min-w-0 flex-1">{props.rightEditor}</div> : (
         <SideColumn
           handleRef={rightRef}
           side="right"
@@ -567,6 +598,7 @@ export function SideBySideView(props: SideBySideViewProps) {
           hovered={hovered}
           onExpandFold={(index) => setExpandedFolds((current) => new Set(current).add(index))}
         />
+        )}
       </div>
     </div>
   );
@@ -701,10 +733,10 @@ function SideColumn(props: SideColumnProps) {
   useLayoutEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    const measure = () => {
+    const measure = () => traceSynchronousMeasurement("side.viewport.measure", () => {
       setViewportHeight(element.clientHeight);
       onWidth(side, element.clientWidth);
-    };
+    });
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     measure();
@@ -712,6 +744,7 @@ function SideColumn(props: SideColumnProps) {
   }, [onWidth, side]);
 
   useLayoutEffect(() => {
+    const finishMeasurement = beginSynchronousMeasurement("side.geometry.effect");
     const old = previous.current;
     const changed = old.rows !== rows || old.heights !== heights || old.viewportHeight !== viewportHeight;
     const anchor = filePositionAtY(old.rows, old.heights, scrollTopRef.current);
@@ -733,6 +766,7 @@ function SideColumn(props: SideColumnProps) {
       onHeightsChanged();
     }
     paint();
+    finishMeasurement();
   });
 
   useEffect(() => {

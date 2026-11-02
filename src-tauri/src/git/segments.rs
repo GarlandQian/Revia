@@ -550,6 +550,16 @@ pub fn rewrite_hunk_for_segment(
     segment_index: u32,
     forward: bool,
 ) -> Option<Vec<u8>> {
+    rewrite_hunk_for_selection(file, hunk_index, &[segment_index], forward)
+}
+
+/// 同一原始 Git hunk 中选择若干块，一次应用，避免前一块破坏后一块的上下文。
+pub fn rewrite_hunk_for_selection(
+    file: &FileChange,
+    hunk_index: usize,
+    selected: &[u32],
+    forward: bool,
+) -> Option<Vec<u8>> {
     let hunk = file.hunks.get(hunk_index)?;
     let header = file.raw_patch.get(..file.hunks.first()?.raw_range.start)?;
     let body = file.raw_patch.get(hunk.raw_range.clone())?;
@@ -560,7 +570,7 @@ pub fn rewrite_hunk_for_segment(
     let raw_lines: Vec<&[u8]> = raw_lines.collect();
     let owners = line_owners(hunk);
     // 原始行与解析结果一一对应，前缀也必须一致；对不上就不切（拒绝写入）。
-    if raw_lines.len() != owners.len() || !owners.contains(&Some(segment_index)) {
+    if raw_lines.len() != owners.len() || (selected.is_empty() || selected.iter().any(|index| !owners.contains(&Some(*index)))) {
         return None;
     }
     let mut out_lines: Vec<u8> = Vec::with_capacity(body.len());
@@ -576,7 +586,7 @@ pub fn rewrite_hunk_for_segment(
         if raw.first() != Some(&expected) {
             return None;
         }
-        let target = *owner == Some(segment_index);
+        let target = owner.is_some_and(|index| selected.contains(&index));
         let prefix = match line.kind {
             LineKind::NoEol => {
                 if kept_previous {

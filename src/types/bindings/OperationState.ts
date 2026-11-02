@@ -4,25 +4,25 @@ import type { OperationKind } from "./OperationKind";
 /**
  * 一次进行中操作的检测结果（面向前端提示与提交门禁）。
  */
-export type OperationState = { kind: OperationKind,
+export type OperationState = { kind: OperationKind, 
 /**
  * 是否处于多提交序列（sequencer）中间阶段。
  */
-sequencerPending: boolean,
+sequencerPending: boolean, 
 /**
  * 交互式 rebase 停在一个明确的 edit 停点（Q166）：允许 amend / 新建提交。
  */
-editStop: boolean,
+editStop: boolean, 
 /**
  * 未解决冲突的去重路径数；大于 0 时提交一律禁用。
  */
-conflictCount: number,
+conflictCount: number, 
 /**
  * 真实操作元数据版本：覆盖 MERGE_HEAD、rebase 状态文件、CHERRY_PICK_HEAD /
  * REVERT_HEAD、sequencer 待办等**内容**。同一种操作内容变化时版本也变，
  * 旧确认随之失效（F03.2）。
  */
-metadataVersion: string,
+metadataVersion: string, 
 /**
  * Confirmation includes current file bytes, index and branch identity.
  */

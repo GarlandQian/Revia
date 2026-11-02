@@ -13,7 +13,7 @@ export const isMac =
  * 主工具栏左侧留白（像素）：macOS 的红绿灯覆盖在主工具栏左端（titleBarStyle: Overlay），
  * 其他平台用原生标题栏，主工具栏从窗口边缘开始（Q60）。
  */
-export const MAIN_TOOLBAR_INSET = isMac ? 84 : 10;
+export const MAIN_TOOLBAR_INSET = isMac ? 92 : 10;
 
 /** 平台修饰键符号（返修 C11）：macOS 用 ⌘ / ⌥ / ⇧，其他平台用 Ctrl / Alt / Shift。 */
 export const MOD_SYMBOLS = isMac
