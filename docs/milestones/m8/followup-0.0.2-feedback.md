@@ -29,3 +29,24 @@ Status: verifying
 原 main 的 Compile Check #41441512775：macOS 完整检查与 release binary 通过；Windows 编译成功，但新加的 PowerShell 非终止错误回归超过 15 秒，其余目标通过。日志：`ci-failure-01.log`。根因尚未确认，不能直接认定是并发或与本轮无关。
 
 复核发现该回归只隔离 HOME，仍继承 runner 的 USERPROFILE/AppData/module-analysis cache。补齐 fixture 的这些路径及内置模块范围，并在超时诊断中记录 shell、脚本是否已启动和 fixture stderr；保留原 15 秒上限、exit 13、部分环境不得发布等断言。只改测试，不改生产捕获、profile、执行策略或 SSH 行为。修正后的 Windows 结果须由后续 Actions 确认。
+
+
+## Comments
+
+固定审查：`656609a...0d08340`，使用 code-review skill 的两个独立审查者，只审本次增量。
+
+### Standards
+
+未发现本增量引入的可行动问题。文档标准违规 0 项；启发式代码异味 0 项。仓库移除遵守仅修改应用登记、保留磁盘与恢复数据的边界；新增错误沿结构化本地化链路呈现。Windows 改动仅涉及测试隔离与诊断，保留 15 秒上限及原断言。
+
+### Spec
+
+未发现本增量新增的需求缺失、未授权扩展或错误实现。已核对仅移除登记、失效路径、保存失败、当前目标离开与迟到响应、全局工具及禁用状态。未发现 SSH 生产行为改动。Windows 修改仅限测试环境隔离与诊断，保留原断言。
+
+两轴各 0 项发现，无轴内阻断。审查只读，未替代执行检查。
+
+### 最终增量检查
+
+- 现有生命周期与刷新门 Node 检查 194/194 通过。
+- 最终类型检查通过；Windows 环境模块本机可运行检查 4/4 通过，Windows 条件用例留待 Actions。
+- `git diff --check` 通过。macOS 真实窗口的移除结果已按 `feedback-ui/verification.json` 核对；独立验收实例正常退出。

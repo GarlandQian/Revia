@@ -4,6 +4,8 @@
 
 ## 本次更新
 
+- 仓库下拉框和欢迎页支持“从列表移除”，保留磁盘文件；仓库无法读取时，克隆、诊断与应用更新入口仍然可用。
+
 - Windows 新增当前用户安装版与便携版；便携版将应用及 WebView2 数据保存在 exe 旁的 `data`，GitHub 凭据由当前用户的 Windows Credential Manager 保存。移动到其他电脑或用户后需重新登录。
 - hooks 与内置终端优先使用 PowerShell 7，缺失时使用 Windows PowerShell；按 worktree 加载 profile，环境捕获失败或超时明确回退。
 - 改善 Windows 路径、CRLF、AltGr 与 IME 处理；安装版提供签名更新，便携版提示下载新版。
