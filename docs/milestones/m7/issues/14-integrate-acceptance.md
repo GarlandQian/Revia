@@ -757,3 +757,7 @@ Codex直接核对源码、两份检查原件及每份7,887项源码散列，均�
 固定诊断Release`fixed-release-d06-pzpysd72`真实可见采样exit0，首屏238ms仍失败（list94ms，取行/绘制144ms）。194条Rust、14条JS、282条缓冲同步记录完整，dropped0；三截图直接查看，进程正常退出，全部7887源码hash匹配。layout.publish31ms内含一次bands12ms，首批lines.publish17ms内含bands15ms；coverage114ms、paint28ms，嵌套计时不可相加。原件见`task14-d06-sync-observation-audit.json`及original-hashes；旧失败全部保留。
 
 据此仅修正色带在纯文字缓存发布时的冗余重绘、改为二分定位可见段后绘制；几何/折叠/软换行量高/悬停与滚动仍触发真实绘制。同时删除Git子进程启动后读取最终必被覆盖的预估序号锁，实际完成序号仍在record内分配，摘要同步持久化、脱敏/过期/故障清空和身份保护不变。实际收益须在检查、增量双轴及新固定Release后验证。
+
+### 2026-11-05：按用户要求归并遗留增量
+
+用户确认将 m7 六个未提交文件纳入 main。固定 `0791e83...50ef777`：前端 build/lint 通过，既有 997 条 lint 警告保留，四个新增代码路径无诊断；Node 滚动、行窗口和输入回归 36/36，Rust Git 日志、生产命令日志、诊断和会话检查共 11/11。Standards / Spec 有效增量审查均 0 项，任务文本传递异常及规划方范围复核见[归并记录](../../../branch-consolidation-2026-11-05.md)。代码已推送 main，旧分支已清理，worktree 文件及完整历史备份保留。未进行新固定 Release 的 D06 或 Windows 桌面采样，历史 238ms 失败及 ready-for-human 状态继续保留，不宣称实测收益。

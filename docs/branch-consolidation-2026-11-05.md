@@ -40,4 +40,26 @@ origin 上另有 m2、m7，分别为本地对应分支的祖先，没有仅存�
 
 ## 验证、审查与最终状态
 
-待本次集中检查和两轴增量审查完成后记录结果，再执行分支清理。Windows 真机验收仍待完成。
+新增量固定为 `50ef777405fbfdc0fe690ddce8383e7d15716b94`，对照 `0791e8384c9ccefd7764e2e975592bf7b207ea36`。规划方集中执行：
+
+- `pnpm build` 通过，含 TypeScript 检查；保留 Vite 的配置与大块产物提示。
+- `pnpm lint` 退出 0；保留 997 条既有警告，新增代码四个路径没有诊断。
+- `node --test tools/test-sync-scroll.mjs tools/test-side-line-window.mjs tools/test-ui-input.mjs`，36 passed / 0 failed。
+- Rust `--lib git::tests::` 5/5、`branch_remote` 的生产命令日志回归 1/1、`m7_diagnostics` 2/2、`session_flow` 3/3；均离线运行，使用 4 个测试线程。
+- `git diff --check`、完整 bundle 验证、11 个原分支 SHA 核对、主目录 `.gitignore` 和 m7 六文件原字节检查均通过。
+
+首次前端构建因本地缺依赖、pnpm 自动补装受沙箱网络限制而退出 127；随后 `pnpm install --frozen-lockfile` 成功，再跑前端检查通过。package.json 和 pnpm-lock.yaml 未改。失败原件与成功原件分别保留。
+
+### Standards
+
+按 `0791e83...50ef777` 审查，未发现新增硬违反或值得报告的代码异味判断。已核对协作规则、术语、技术/UI 规则、相关 ADR 与并排视图设计；二分保留原绘制边界，必要重绘入口与日志完成序号分配保留。
+
+### Spec
+
+按同一范围审查，0 项缺漏、范围扩张或错误实现。二分符合并排视图设计 4.3；缓存发布重绘调整保留几何、量高、折叠、悬停及滚动入口；Git 记录仍持锁分配完成序号，诊断持久化路径未变。238ms 失败及 Windows 未验状态保留。
+
+首个 Standards 代理因任务文本显示为不可读内容而未执行，未计入审查；替代 Standards 与 Spec 代理均实际静态审查了上述范围，最终报告说明范围由当前提交和归并记录推定。规划方已核对其固定基线、候选及实际八文件范围与本次任务一致，并自行复核绘制触发和日志入口。两份有效原文、首个未执行记录与检查 stdout/stderr/退出码保存在上述持久备份目录。两轴均 0 项，不代表真实桌面性能验收通过。
+
+`50ef777` 已正常推送 origin/main 后，三个附属 worktree 转为各自原 HEAD 的 detached HEAD，文件未变；随后删除全部 11 个本地开发分支，并原子删除 origin/m2、origin/m7。再次读取远端 heads 和本地分支，均只剩 main；origin/HEAD 仍指向 origin/main。两个版本标签保留，Release 未改动。
+
+本轮没有启动应用或进行新的 D06 测量，也没有 Windows 桌面环境；实际性能收益和 Windows 真机验收仍待完成。
