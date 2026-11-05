@@ -32,7 +32,7 @@ import { clampLine } from "./syncScroll";
 import { buildRows, type RowIndex, type Side } from "./rowIndex";
 import { RowHeights } from "./rowHeights";
 import { SideLineWindow, lineRangesForRows, type SideLineRange } from "./sideLineWindow";
-import { filePositionAtY, yAtFilePosition, syncPositionError, syncTargetTop } from "./sideGeometry";
+import { filePositionAtY, yAtFilePosition, syncPositionError, syncTargetTop, visibleSegmentRange } from "./sideGeometry";
 import { useFontRevision } from "./useFontRevision";
 import { ROW_HEIGHT } from "./DiffView";
 import { sideFileAnchor, type FileAnchor } from "./fileAnchor";
@@ -330,10 +330,8 @@ export function SideBySideView(props: SideBySideViewProps) {
     redrawBands();
   }, [alignFollower, positionFileAnchor, positionSegment, redrawBands, heightsVersion, currentLayout]);
 
-  // 布局到达、折叠展开、悬停变化后重画色带。
-  useLayoutEffect(() => {
-    redrawBands();
-  }, [redrawBands, cacheVersion, gutterWidth]);
+  // 色带只依赖几何与悬停；上面的 effect 已覆盖这些变化。
+  // 取到文字不改变固定行高，软换行的实际量高另经 heightsVersion 重画。
 
   useImperativeHandle(
     handleRef,
@@ -1235,7 +1233,11 @@ function drawBands(
   const bandTo = width - GUTTER_NUMBERS;
   const { segments, leftTop, rightTop, leftRows, rightRows, leftHeights, rightHeights, hovered } = options;
 
-  segments.forEach((segment, index) => {
+  const range = visibleSegmentRange(segments,
+    { rows: leftRows, heights: leftHeights, viewportHeight: height, scrollTop: leftTop },
+    { rows: rightRows, heights: rightHeights, viewportHeight: height, scrollTop: rightTop });
+  for (let index = range.from; index < range.to; index += 1) {
+    const segment = segments[index];
     // 行区间换成显示行（折叠区占一行）；长度为 0 的一侧落在插入点上。
     const ends: BandEnds = {
       leftTop: yAtFilePosition(leftRows, leftHeights, segment.leftStart) - leftTop,
@@ -1243,7 +1245,7 @@ function drawBands(
       rightTop: yAtFilePosition(rightRows, rightHeights, segment.rightStart) - rightTop,
       rightBottom: yAtFilePosition(rightRows, rightHeights, segment.rightEnd) - rightTop,
     };
-    if (!bandVisible(ends, height)) return;
+    if (!bandVisible(ends, height)) continue;
     const deleted = segment.leftEnd > segment.leftStart;
     const added = segment.rightEnd > segment.rightStart;
     const strong = hovered === index;
@@ -1260,5 +1262,5 @@ function drawBands(
         ? bandDel
         : bandIns;
     drawBand(context, bandFrom, bandTo, ends, fill, strong ? (added ? edgeIns : edgeDel) : undefined);
-  });
+  }
 }

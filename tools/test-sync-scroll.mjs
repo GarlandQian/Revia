@@ -22,7 +22,7 @@ const imports = registerHooks({
 const { mapLine, clampLine } = await import("../src/features/diff/syncScroll.ts");
 const { buildRows, lineToRow, rowToLine } = await import("../src/features/diff/rowIndex.ts");
 const { RowHeights } = await import("../src/features/diff/rowHeights.ts");
-const { filePositionAtY, yAtFilePosition, syncTargetTop, syncPositionError } = await import("../src/features/diff/sideGeometry.ts");
+const { filePositionAtY, yAtFilePosition, syncTargetTop, syncPositionError, visibleSegmentRange } = await import("../src/features/diff/sideGeometry.ts");
 const { unifiedFileAnchor, sideFileAnchor, sameAnchorTarget } = await import("../src/features/diff/fileAnchor.ts");
 imports.deregister();
 
@@ -306,4 +306,53 @@ test("同步误差对照夹紧后的可达目标，不把文件首尾限制算�
   const sourceBottom = left.heights.total() - left.viewportHeight;
   assert.equal(syncTargetTop("left", sourceBottom, left, right, segments), bottom);
   assert.equal(syncPositionError("left", sourceBottom, bottom, left, right, segments), 0);
+});
+
+
+test("色带二分窗口保留折叠、换行、零长段及两栏错位时的原可见集合", () => {
+  const segments = [
+    { leftStart: 0, leftEnd: 0, rightStart: 0, rightEnd: 3 },
+    { leftStart: 4, leftEnd: 9, rightStart: 7, rightEnd: 7 },
+    { leftStart: 20, leftEnd: 23, rightStart: 18, rightEnd: 24 },
+    { leftStart: 80, leftEnd: 99, rightStart: 100, rightEnd: 110 },
+  ];
+  const folds = [{ leftStart: 30, leftEnd: 70, rightStart: 31, rightEnd: 90 }];
+  for (const wrap of [false, true]) for (const expanded of [new Set(), new Set([0])]) {
+    const leftRows = buildRows(100, folds, "left", expanded);
+    const rightRows = buildRows(111, folds, "right", expanded);
+    const leftHeights = new RowHeights(leftRows.rows.length, 19, wrap);
+    const rightHeights = new RowHeights(rightRows.rows.length, 19, wrap);
+    leftHeights.measure(0, 76); rightHeights.measure(4, 95);
+    const positions = [0, 1, 57, 76, 152, 380, 570, 1000, 1900, 2200];
+    for (const l of positions) for (const rr of positions) for (const height of [0, 19, 133, 900]) {
+      const left = { rows: leftRows, heights: leftHeights, viewportHeight: height, scrollTop: l };
+      const right = { rows: rightRows, heights: rightHeights, viewportHeight: height, scrollTop: rr };
+      // 旧完整扫描是输出的对照；不把新二分算法复制进断言。
+      const expected = segments.flatMap((segment, index) => {
+        const bottom = Math.max(yAtFilePosition(leftRows, leftHeights, segment.leftEnd) - l,
+          yAtFilePosition(rightRows, rightHeights, segment.rightEnd) - rr);
+        const top = Math.min(yAtFilePosition(leftRows, leftHeights, segment.leftStart) - l,
+          yAtFilePosition(rightRows, rightHeights, segment.rightStart) - rr);
+        return bottom >= 0 && top <= height ? [index] : [];
+      });
+      const { from, to } = visibleSegmentRange(segments, left, right);
+      assert.deepEqual(Array.from({ length: to - from }, (_, i) => from + i), expected);
+      assert.deepEqual(visibleSegmentRange([], left, right), { from: 0, to: 0 });
+    }
+  }
+});
+
+test("大文件色带只查找可见窗口，不逐段换算整文件", () => {
+  const segments = Array.from({ length: 8192 }, (_, i) => ({
+    leftStart: i * 4, leftEnd: i * 4 + 2, rightStart: i * 4, rightEnd: i * 4 + 2,
+  }));
+  let reads = 0;
+  const counted = new Proxy(segments, { get(target, key, receiver) {
+    if (typeof key === "string" && /^\d+$/.test(key)) reads += 1;
+    return Reflect.get(target, key, receiver);
+  } });
+  const rows = buildRows(32768, [], "left", new Set());
+  const geometry = { rows, heights: new RowHeights(32768, 19, false), viewportHeight: 380, scrollTop: 4096 * 4 * 19 };
+  assert.deepEqual(visibleSegmentRange(counted, geometry, geometry), { from: 4096, to: 4102 });
+  assert.ok(reads <= 28, `expected logarithmic segment reads, got ${reads}`);
 });

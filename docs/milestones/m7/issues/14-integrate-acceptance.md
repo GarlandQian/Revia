@@ -750,3 +750,10 @@ Spec：固定 `94e53c6…26fc4c5`，仅 Q174 的首屏同步阶段观测增量�
 已直接复核两份原始argv、exit、stdout/stderr、diff及各7,887项源码散列：build/lint均exit0；lint有既有警告，无本增量三路径诊断。本轴未重跑检查、运行应用或联系Pi。新Release与真实采样未验，不列为本增量缺陷或通过；236ms及旧失败保留，不能把诊断或构建通过当作D06修复。详见 `spec-evidence.md`。
 
 Codex直接核对源码、两份检查原件及每份7,887项源码散列，均匹配，build/lint真实exit0；997条既有lint警告保留。两轴完成结束，新增硬违反/判断/P1/P2/P3均0。此次仅缓冲阶段观测，不是性能修复；236ms及旧失败保留，下一步固定Release真实采样。
+
+
+### 2026-10-31：首屏同步阶段归属与局部修复
+
+固定诊断Release`fixed-release-d06-pzpysd72`真实可见采样exit0，首屏238ms仍失败（list94ms，取行/绘制144ms）。194条Rust、14条JS、282条缓冲同步记录完整，dropped0；三截图直接查看，进程正常退出，全部7887源码hash匹配。layout.publish31ms内含一次bands12ms，首批lines.publish17ms内含bands15ms；coverage114ms、paint28ms，嵌套计时不可相加。原件见`task14-d06-sync-observation-audit.json`及original-hashes；旧失败全部保留。
+
+据此仅修正色带在纯文字缓存发布时的冗余重绘、改为二分定位可见段后绘制；几何/折叠/软换行量高/悬停与滚动仍触发真实绘制。同时删除Git子进程启动后读取最终必被覆盖的预估序号锁，实际完成序号仍在record内分配，摘要同步持久化、脱敏/过期/故障清空和身份保护不变。实际收益须在检查、增量双轴及新固定Release后验证。

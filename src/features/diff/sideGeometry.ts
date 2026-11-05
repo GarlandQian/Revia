@@ -88,3 +88,32 @@ export function syncPositionError(
 function clampScrollTop(top: number, geometry: SideGeometry): number {
   return clampLine(top, Math.max(0, geometry.heights.total() - geometry.viewportHeight));
 }
+
+/** Git 段在两侧均单调；二分排除两端都在同一视口外的段，保留跨越两栏的长色带。 */
+export function visibleSegmentRange(
+  segments: readonly SyncSegment[],
+  left: SideGeometry & { scrollTop: number },
+  right: SideGeometry & { scrollTop: number },
+): { from: number; to: number } {
+  let low = 0;
+  let high = segments.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const segment = segments[mid];
+    const above = yAtFilePosition(left.rows, left.heights, segment.leftEnd) < left.scrollTop
+      && yAtFilePosition(right.rows, right.heights, segment.rightEnd) < right.scrollTop;
+    if (above) low = mid + 1;
+    else high = mid;
+  }
+  const from = low;
+  high = segments.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const segment = segments[mid];
+    const below = yAtFilePosition(left.rows, left.heights, segment.leftStart) > left.scrollTop + left.viewportHeight
+      && yAtFilePosition(right.rows, right.heights, segment.rightStart) > right.scrollTop + right.viewportHeight;
+    if (below) high = mid;
+    else low = mid + 1;
+  }
+  return { from, to: low };
+}

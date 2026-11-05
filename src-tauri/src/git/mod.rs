@@ -136,13 +136,6 @@ impl CommandLog {
             .map(|inner| inner.records.iter().cloned().collect())
             .unwrap_or_default()
     }
-
-    fn next_sequence(&self) -> u64 {
-        self.inner
-            .lock()
-            .map(|inner| inner.next_sequence + 1)
-            .unwrap_or_default()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -514,7 +507,6 @@ impl Git {
             ),
         })?;
 
-        let sequence = self.log.next_sequence();
         // 三条管道并发处理；stdin 大补丁也必须受同一超时约束。
         drop(command);
         let stdout_finished = finished.clone(); let stderr_finished = finished.clone();
@@ -554,7 +546,7 @@ impl Git {
 
         timing.mark("process_collected");
         self.log.record(CommandRecord {
-            sequence,
+            sequence: 0, // 完成入口 record 持锁分配；管道读取前不提前等待日志锁。
             worktree_id: self.worktree_id.clone(),
             started_at_ms,
             program: self.program.display().to_string(),

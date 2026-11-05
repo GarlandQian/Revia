@@ -91,3 +91,10 @@ Rebased 1.1.22 的既有暂存、同文件部分暂存、模式切换三组原�
 ### 2026-10-31：可见行发布修复的真实复验仍失败
 
 产品`c6e3d76648c1d5fbc59c5b920fff00d98fa1e362`，Release源码`965657e7fcf65fc59eee17e9387d0139cf736319`，固定`fixed-release-d06-khcl7wto`（二进制SHA256 `80c999563fc8965b8ef4e1bdf775d9e65a8eca90beaa6dbc3e066b1821db7bff`）。构建及真实可见`task14-d06-visible-publication-split-01`均exit0，四截图直接查看，7,887项源码散列未变。首屏236ms（list92ms、取行/绘制144ms）仍超过150ms，不能声称修复成功或收益。refresh89.851ms，记录阶段合计21.064ms，layout worker34.149ms；layout前端37ms后约15ms才发首批行，Rust行IPC2.166/4.424ms但JS28/34ms。继续定位前端同步提交/布局/绘制成本，不降低门槛或削弱保护。自动60帧及缓存来源单独保留，不作独立DOM/首帧证明。原件及散列见`task14-d06-visible-publication-audit.json`与`task14-d06-visible-publication-original-hashes.json`；旧224/252/220/176失败不覆盖，进程已正常退出。
+
+
+### 2026-10-31：首屏同步阶段归属与局部修复
+
+固定诊断Release`fixed-release-d06-pzpysd72`真实可见采样exit0，首屏238ms仍失败（list94ms，取行/绘制144ms）。194条Rust、14条JS、282条缓冲同步记录完整，dropped0；三截图直接查看，进程正常退出，全部7887源码hash匹配。layout.publish31ms内含一次bands12ms，首批lines.publish17ms内含bands15ms；coverage114ms、paint28ms，嵌套计时不可相加。原件见`task14-d06-sync-observation-audit.json`及original-hashes；旧失败全部保留。
+
+据此仅修正色带在纯文字缓存发布时的冗余重绘、改为二分定位可见段后绘制；几何/折叠/软换行量高/悬停与滚动仍触发真实绘制。同时删除Git子进程启动后读取最终必被覆盖的预估序号锁，实际完成序号仍在record内分配，摘要同步持久化、脱敏/过期/故障清空和身份保护不变。实际收益须在检查、增量双轴及新固定Release后验证。
