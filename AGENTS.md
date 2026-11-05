@@ -17,7 +17,7 @@ M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压
 
 双平台 CI、安装版/便携版打包、产物摘要与正式更新签名均通过。完整来源、发布工具修正与原始证据见 [发布记录](docs/milestones/m8/release-0.0.2-readiness.md)。Windows 真实桌面仍为 `ready-for-human`，下一步按 [Windows 验收清单](docs/milestones/m8/windows-acceptance.md) 验收发布版本；CI 与发布不代替这些验收。此前本机默认并发 Rust 失败记录及历史里程碑未达标项保留，不自动扩大本轮范围。
 
-2026-11-05 用户要求把其他分支的成果归入 main 后删除其他分支，并确认纳入 m7 的 6 个未提交文件；执行与恢复位置见 [分支归并记录](docs/branch-consolidation-2026-11-05.md)。原实施目录 `/Volumes/T7 Shield/project/Revia-m8` 保留用于后续验收，清理分支后使用 detached HEAD。Pi 的一次正式返修已使用（Q113）；后续 M8 修正由规划方接管，审查只针对新增量（Q174）。需求与已确认取舍见 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
+2026-11-05 用户要求把其他分支的成果归入 main 后删除其他分支，并确认纳入 m7 的 6 个未提交文件；随后又要求删除三个附属 worktree 和本轮备份，现仅保留主目录的 main。执行与清理结果见 [分支归并记录](docs/branch-consolidation-2026-11-05.md)。后续从 main 继续验收。Pi 的一次正式返修已使用（Q113）；后续 M8 修正由规划方接管，审查只针对新增量（Q174）。需求与已确认取舍见 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
 ## 工作流程
 

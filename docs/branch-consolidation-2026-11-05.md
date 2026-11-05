@@ -30,11 +30,11 @@ origin 上另有 m2、m7，分别为本地对应分支的祖先，没有仅存�
 - Git 子进程启动后直接启动管道读取，移除最终会被完成记录覆盖的预估日志序号读取；完成序号仍由 CommandLog.record 持锁分配。
 - 保留两项已有未提交的色带回归及两份历史观测记录。历史首屏 238ms 仍为失败；本次归并不表示 D06 或 Windows 真机性能已达标。
 
-## 备份与目录
+## 备份与目录（归并时快照）
 
 清理前保存全部引用的完整 bundle，并通过 git bundle verify；四个 worktree 的 staged / unstaged patch、未提交文件原字节和散列也已保存。
 
-持久备份：`.git/branch-backups/2026-11-05-zmwwl4wp/`。其中 `all-refs.bundle` 保存分支、标签及原有其他引用的历史，`refs-before.txt` 记录原 SHA，`m7/` 保存 6 个未提交文件。需要恢复历史分支时，从 bundle 中指定的 `refs/heads/<原分支>` 取回即可。
+当时的持久备份为 `.git/branch-backups/2026-11-05-zmwwl4wp/`，包含完整 bundle、原引用 SHA 和 6 个未提交文件。该目录及临时副本已按用户后续要求删除，见文末清理结果。
 
 主目录原有 `.gitignore` 未提交改动继续保留。现有 Revia-glass、Revia-m7、Revia-m8 目录及其构建产物保留；删除所占用分支前只把各目录切到当前提交的 detached HEAD。m7 的原始未提交改动也原处保留，main 已收纳同一增量。
 
@@ -58,8 +58,16 @@ origin 上另有 m2、m7，分别为本地对应分支的祖先，没有仅存�
 
 按同一范围审查，0 项缺漏、范围扩张或错误实现。二分符合并排视图设计 4.3；缓存发布重绘调整保留几何、量高、折叠、悬停及滚动入口；Git 记录仍持锁分配完成序号，诊断持久化路径未变。238ms 失败及 Windows 未验状态保留。
 
-首个 Standards 代理因任务文本显示为不可读内容而未执行，未计入审查；替代 Standards 与 Spec 代理均实际静态审查了上述范围，最终报告说明范围由当前提交和归并记录推定。规划方已核对其固定基线、候选及实际八文件范围与本次任务一致，并自行复核绘制触发和日志入口。两份有效原文、首个未执行记录与检查 stdout/stderr/退出码保存在上述持久备份目录。两轴均 0 项，不代表真实桌面性能验收通过。
+首个 Standards 代理因任务文本显示为不可读内容而未执行，未计入审查；替代 Standards 与 Spec 代理均实际静态审查了上述范围，最终报告说明范围由当前提交和归并记录推定。规划方已核对其固定基线、候选及实际八文件范围与本次任务一致，并自行复核绘制触发和日志入口。两份有效原文、首个未执行记录与检查 stdout/stderr/退出码曾保存在上述持久备份目录，后随本轮备份按用户要求删除。两轴均 0 项，不代表真实桌面性能验收通过。
 
 `50ef777` 已正常推送 origin/main 后，三个附属 worktree 转为各自原 HEAD 的 detached HEAD，文件未变；随后删除全部 11 个本地开发分支，并原子删除 origin/m2、origin/m7。再次读取远端 heads 和本地分支，均只剩 main；origin/HEAD 仍指向 origin/main。两个版本标签保留，Release 未改动。
 
 本轮没有启动应用或进行新的 D06 测量，也没有 Windows 桌面环境；实际性能收益和 Windows 真机验收仍待完成。
+
+## 后续 worktree 与备份清理
+
+同日用户要求删除 worktree，并明确选择“备份也一起删除”。删除前再次核对：m7 四个代码文件的增量已应用到 main，两份文档的原内容也已进入 main；六文件原字节与备份一致。随后删除 `/Volumes/T7 Shield/project/Revia-glass`、`/Volumes/T7 Shield/project/Revia-m7`、`/Volumes/T7 Shield/project/Revia-m8` 及对应 Git worktree 登记。
+
+用户指定的本轮持久备份 `.git/branch-backups/2026-11-05-zmwwl4wp/` 和临时副本 `/private/tmp/revia-branch-consolidation-zmwwl4wp/` 也已删除。其他历史备份未改动。本文件上方保留的是归并时的执行记录，不再表示这些目录当前存在。
+
+最终检查 `git worktree list --porcelain` 只剩主目录的 main；三个附属目录、两个备份目录均不存在，主目录原有 `.gitignore` 字节保持不变。本次仅清理目录并更新记录，使用目录/登记核对与 `git diff --check` 验证，没有重跑应用构建和测试。
