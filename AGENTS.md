@@ -19,6 +19,8 @@ M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压
 
 2026-11-05 用户要求把其他分支的成果归入 main 后删除其他分支，并确认纳入 m7 的 6 个未提交文件；随后又要求删除三个附属 worktree 和本轮备份，现仅保留主目录的 main。执行与清理结果见 [分支归并记录](docs/branch-consolidation-2026-11-05.md)。后续从 main 继续验收。Pi 的一次正式返修已使用（Q113）；后续 M8 修正由规划方接管，审查只针对新增量（Q174）。需求与已确认取舍见 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
+2026-11-08 起规划 M9：Windows 与 macOS 性能、生成提交信息。决策见 [docs/README.md](docs/README.md) Q208–Q221；[规格](docs/milestones/m9/spec.md)、[任务图](docs/milestones/m9/issues/)和 [Pi 交接](docs/milestones/m9/paseo-batch.md)已写好。任务 05（打开 worktree 时的环境加载时机）等用户确认，其余任务可以派发。
+
 ## 工作流程
 
 不同会话和工具之间通过仓库中的文件交接，不依赖用户转述。需求规格、任务单和报告的位置与写法见 [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)。
@@ -69,7 +71,7 @@ M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压
   完整列表见 [产品方向](docs/product-direction.md#安全边界)。
 - **不写死 macOS 假设**：从 M2 起，平台相关的代码（登录 shell 环境解析、窗口外观、快捷键修饰键等）集中放在少数模块中，其他代码保持平台无关（Q55）。
 - **Git 调用只放在 Rust 层**：前端只调用固定、带类型的操作，不拼接 Git 参数或 shell 命令。
-- **推送和 PR**：除非用户明确要求，不推送，不开 PR。M2 的唯一例外是 Q97：为编译验收按需正常推送 `m2` 到现有 `origin` 并运行仅编译的 CI；不推送 `main`、不强推、不打标签、不创建 PR、不发布安装包。
+- **推送和 PR**：除非用户明确要求，不推送，不开 PR。例外只有两项：M2 的 Q97，为编译验收按需正常推送 `m2` 到现有 `origin` 并运行仅编译的 CI；M9 的 Q216，为 Windows 测量版与验收版按需正常推送 `m9`，由 CI 打包成 Actions 产物。两项都不推送 `main`、不强推、不打标签、不创建 PR、不发布 Release。
 - **语言**：文档使用简体中文；界面文案按简体中文 / English 设置显示（Q164），回复仍默认简体中文。
 
 ## 文档维护
