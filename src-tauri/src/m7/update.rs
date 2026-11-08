@@ -350,6 +350,10 @@ async fn check_inner(
     force: bool,
 ) -> Result<AppUpdateStatus> {
     let status = state.status(app, mode);
+    // M9 测量版 / 验收版关闭应用更新检查（Q216）。
+    if crate::measure::IS_MEASURE {
+        return Ok(status);
+    }
     if !status.configured {
         return Err(AppError::coded(
             ErrorKind::Rejected,

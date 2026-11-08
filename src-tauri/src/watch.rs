@@ -11,6 +11,7 @@
 //! 事件只做「有变化」的通知，具体读取仍走 `WorktreeSession::refresh()`，
 //! 因此监视失败不会降低写前校验强度（ADR-0005、ADR-0009）。
 
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
@@ -20,6 +21,8 @@ use std::time::Duration;
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 
 use crate::error::{AppError, AppErrorPayload, ErrorKind};
+use crate::git::Git;
+use crate::m7::perf::{PerfStore, WatchEventKind};
 
 /// 监视不可用的统一结构化原因：`detail` 只放路径与系统错误等数据。
 fn unavailable(detail: String) -> AppErrorPayload {
@@ -129,6 +132,20 @@ impl WorktreeWatcher {
     where
         F: Fn(u64) + Send + 'static,
     {
+        Self::start_with_ignore(roots, activation, None, None, on_change)
+    }
+
+    /// 带 Git 忽略判定与性能计数的启动（M9 任务 04、Q210、Q213）。
+    pub fn start_with_ignore<F>(
+        roots: WatchRoots,
+        activation: u64,
+        ignore: Option<Arc<IgnoreMatcher>>,
+        perf: Option<Arc<PerfStore>>,
+        on_change: F,
+    ) -> Self
+    where
+        F: Fn(u64) + Send + 'static,
+    {
         let stop = Arc::new(AtomicBool::new(false));
         let status = Arc::new(Mutex::new(WatchStatus {
             active: false,
@@ -145,12 +162,30 @@ impl WorktreeWatcher {
 
         // 运行时错误不能丢弃：记录第一条，状态对外持续为不可用（Q95）。
         let callback_errors = runtime_errors.clone();
+        // core.excludesFile 所在目录：文件常被编辑器原子替换，监视目录而不是文件本身。
+        let excludes_dir = ignore
+            .as_ref()
+            .and_then(|matcher| matcher.excludes_file.as_ref())
+            .and_then(|file| file.parent().map(Path::to_path_buf))
+            .filter(|dir| dir.is_dir());
         let filter = WatchFilter::from_roots(&roots);
         let mut watcher =
             match notify::recommended_watcher(move |result: notify::Result<Event>| match result {
                 Ok(event) => {
-                    if filter.event_relevant(&event) {
-                        let _ = tx.send(Ok(()));
+                    // Q213、S1：被忽略的路径不触发刷新；统计只记次数，不发送刷新。
+                    match filter.classify(&event, ignore.as_deref()) {
+                        Verdict::Refresh(kind) => {
+                            if let Some(perf) = &perf {
+                                perf.note_watch_event(kind);
+                            }
+                            let _ = tx.send(Ok(()));
+                        }
+                        Verdict::Ignored => {
+                            if let Some(perf) = &perf {
+                                perf.note_watch_event(WatchEventKind::Ignored);
+                            }
+                        }
+                        Verdict::None => {}
                     }
                 }
                 Err(error) => {
@@ -217,6 +252,14 @@ impl WorktreeWatcher {
                     Err(error) => failures.push(format!("{}: {error}", refs.display())),
                 }
             }
+            // info/exclude 是这个 worktree 的忽略规则之一（linked worktree 也读公共目录的）。
+            let info = common.join("info");
+            if info.is_dir() {
+                match watcher.watch(&info, RecursiveMode::NonRecursive) {
+                    Ok(()) => root_count += 1,
+                    Err(error) => failures.push(format!("{}: {error}", info.display())),
+                }
+            }
             for name in ["packed-refs", "HEAD", "ORIG_HEAD"] {
                 let file = common.join(name);
                 if file.exists() {
@@ -225,6 +268,13 @@ impl WorktreeWatcher {
                         Err(error) => failures.push(format!("{}: {error}", file.display())),
                     }
                 }
+            }
+        }
+
+        if let Some(dir) = excludes_dir.filter(|dir| !dir.starts_with(&roots.worktree)) {
+            match watcher.watch(&dir, RecursiveMode::NonRecursive) {
+                Ok(()) => root_count += 1,
+                Err(error) => failures.push(format!("{}: {error}", dir.display())),
             }
         }
 
@@ -336,7 +386,7 @@ impl Drop for WorktreeWatcher {
 /// 除了丢弃只读访问事件（避免读取自身形成刷新环），还要按路径过滤：
 /// 递归监视工作区会顺带覆盖 `.git` 子树，若不筛选就会把其他 worktree 的
 /// 私有 index / 对象库变化也算成本 worktree 的改动（Q88）。
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WatchFilter {
     /// 工作区目录；其下的 `.git` 子树不算工作区改动。
     pub worktree: PathBuf,
@@ -375,11 +425,11 @@ impl WatchFilter {
         }
     }
 
-    /// 单个路径是否相关。
+    /// 单个路径的相关性。
     ///
     /// 顺序很重要：`.git` 子树既可能属于工作区，也可能就是 gitDir / commonDir，
     /// 因此先判定共享 refs 与自有元数据，最后才回落到「工作区里的普通文件」。
-    fn path_relevant(&self, raw: &Path) -> bool {
+    fn path_kind(&self, raw: &Path) -> PathKind {
         // 事件路径与根路径都可能是真实路径或未规范化的临时路径（macOS 的 /var 与 /private/var）。
         // 新建/删除的路径本身可能还不存在，此时规范化它的父目录再拼回文件名。
         let path_buf = canonicalize_path(raw);
@@ -395,7 +445,11 @@ impl WatchFilter {
             let mut components = relative.components();
             let first = components.next();
             if first.is_some() && components.next().is_none() {
-                return name_is_metadata(path);
+                return if name_is_metadata(path) {
+                    PathKind::GitMetadata
+                } else {
+                    PathKind::Irrelevant
+                };
             }
         }
 
@@ -412,27 +466,41 @@ impl WatchFilter {
                     .next()
                     .map(|part| part.as_os_str().to_string_lossy().into_owned());
                 if first.as_deref() == Some("refs") {
-                    return true;
+                    return PathKind::GitMetadata;
                 }
                 // commonDir 顶层的 ref 指针文件（packed-refs / HEAD / ORIG_HEAD）。
                 if first.is_some() && components.next().is_none() {
-                    return first.as_deref() != Some("index") && name_is_metadata(path);
+                    return if first.as_deref() != Some("index") && name_is_metadata(path) {
+                        PathKind::GitMetadata
+                    } else {
+                        PathKind::Irrelevant
+                    };
+                }
+                if relative == Path::new("info/exclude") || relative == Path::new("info").join("exclude") {
+                    return PathKind::IgnoreRule;
                 }
                 // 其余（objects/、worktrees/<other>/ 等）与本 worktree 无关。
-                return false;
+                return PathKind::Irrelevant;
             }
         }
 
-        // 2. 该 worktree 自己的 gitDir 顶层元数据（linked worktree 位于 commonDir/worktrees/<name>）。
+        // 2. 该 worktree 自己的 gitDir 顶层元数据与 info/exclude
         if let Ok(relative) = path.strip_prefix(&self.git_dir) {
+            if relative == Path::new("info/exclude") || relative == Path::new("info").join("exclude") {
+                return PathKind::IgnoreRule;
+            }
             let mut components = relative.components();
             let first = components.next();
             let single = first.is_some() && components.next().is_none();
             if single {
-                return name_is_metadata(path);
+                return if name_is_metadata(path) {
+                    PathKind::GitMetadata
+                } else {
+                    PathKind::Irrelevant
+                };
             }
             // 更深的层级（例如 index.lock 之外的内容）不影响展示状态。
-            return false;
+            return PathKind::Irrelevant;
         }
 
         // 3. 工作区里的普通文件改动；排除 `.git` 子树（含其他 worktree 的私有元数据）。
@@ -442,26 +510,283 @@ impl WatchFilter {
                 .next()
                 .map(|part| part.as_os_str().to_string_lossy().into_owned());
             if first.as_deref() != Some(".git") {
-                return true;
+                return PathKind::Worktree;
+            }
+            if relative == Path::new(".git/info/exclude") || relative == Path::new(".git").join("info").join("exclude") {
+                return PathKind::IgnoreRule;
             }
             // 工作区内的 .git：只接受本 worktree 自己的顶层元数据文件。
             let single = components.next().is_some() && components.next().is_none();
-            return single && name_is_metadata(path);
+            return if single && name_is_metadata(path) {
+                PathKind::GitMetadata
+            } else {
+                PathKind::Irrelevant
+            };
         }
 
-        false
+        PathKind::Irrelevant
     }
 
-    fn event_relevant(&self, event: &Event) -> bool {
+    /// 判定一个事件：是否需要刷新、是否已被忽略（Q213、S1）。
+    ///
+    /// - `.git` 内部元数据：一定刷新；同时清空忽略缓存（index 变化后「已跟踪」判定会变）；
+    /// - 忽略规则文件（`.gitignore`、`<gitDir>/info/exclude`、`core.excludesFile`）：清空缓存并刷新一次；
+    /// - 工作区里的普通文件：交给 Git 的 `check-ignore` 判定，命中就跳过刷新。
+    fn classify(&self, event: &Event, ignore: Option<&IgnoreMatcher>) -> Verdict {
         if matches!(event.kind, EventKind::Access(_)) {
-            return false;
+            return Verdict::None;
         }
         // 有些平台（如 FSEvents）可能不携带路径；此时保守放行，避免漏刷新。
         if event.paths.is_empty() {
+            return Verdict::Refresh(WatchEventKind::Normal);
+        }
+        let excludes = ignore.and_then(|m| m.excludes_file.as_deref());
+        let kinds: Vec<(PathKind, PathBuf)> = event
+            .paths
+            .iter()
+            .map(|path| {
+                let canonical = canonicalize_path(path);
+                // core.excludesFile 通常在仓库之外，按路径单独识别。
+                let kind = if excludes.is_some_and(|file| canonical == file) {
+                    PathKind::IgnoreRule
+                } else {
+                    self.path_kind(path)
+                };
+                (kind, canonical)
+            })
+            .collect();
+        if kinds.iter().all(|(kind, _)| *kind == PathKind::Irrelevant) {
+            return Verdict::None;
+        }
+        if kinds.iter().any(|(kind, _)| *kind == PathKind::GitMetadata) {
+            if let Some(matcher) = ignore {
+                matcher.invalidate();
+            }
+            return Verdict::Refresh(WatchEventKind::GitInternal);
+        }
+        let paths: Vec<PathBuf> = kinds
+            .iter()
+            .filter(|(kind, _)| *kind == PathKind::Worktree || *kind == PathKind::IgnoreRule)
+            .map(|(_, path)| path.clone())
+            .collect();
+        if kinds.iter().any(|(kind, _)| *kind == PathKind::IgnoreRule)
+            || paths.iter().any(|path| is_ignore_rule_file(path, excludes))
+        {
+            if let Some(matcher) = ignore {
+                matcher.invalidate();
+            }
+            return Verdict::Refresh(WatchEventKind::Normal);
+        }
+        match ignore {
+            // 没有 Git 判据时保守刷新：宁多刷一次，不漏改动。
+            None => Verdict::Refresh(WatchEventKind::Normal),
+            Some(matcher) => {
+                if matcher.all_ignored(&paths) {
+                    Verdict::Ignored
+                } else {
+                    Verdict::Refresh(WatchEventKind::Normal)
+                }
+            }
+        }
+    }
+
+    /// 测试用：旧布尔语义（是否与当前 worktree 状态有关）。
+    #[cfg(test)]
+    fn path_relevant(&self, raw: &Path) -> bool {
+        self.path_kind(raw) != PathKind::Irrelevant
+    }
+
+    /// 测试用：事件是否值得刷新（忽略命中时为 false）。
+    #[cfg(test)]
+    fn event_relevant(&self, event: &Event) -> bool {
+        !matches!(self.classify(event, None), Verdict::None)
+    }
+}
+
+/// 路径与当前 worktree 状态的关系。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PathKind {
+    Irrelevant,
+    /// `.git` 内部元数据：index、HEAD、refs 等。
+    GitMetadata,
+    /// 忽略规则文件（.gitignore、<gitDir>/info/exclude 等）。
+    IgnoreRule,
+    /// 工作区里的普通文件（可能被忽略）。
+    Worktree,
+}
+
+/// 一次事件判定的结果。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    /// 与当前 worktree 无关，或只读访问。
+    None,
+    /// 被忽略路径的事件（S1：跳过刷新，只记入统计）。
+    Ignored,
+    /// 需要刷新，并计入对应类别的监视统计。
+    Refresh(WatchEventKind),
+}
+
+/// Git 的默认全局忽略文件位置（未配置 `core.excludesFile` 时）。
+fn default_excludes_file() -> Option<PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| crate::shell::home_dir().ok().map(|home| home.join(".config")))?;
+    Some(base.join("git").join("ignore"))
+}
+
+/// 忽略规则文件：内容变化会让 `check-ignore` 的结论失效。
+fn is_ignore_rule_file(path: &Path, excludes_file: Option<&Path>) -> bool {
+    if path.file_name().is_some_and(|name| name == ".gitignore") {
+        return true;
+    }
+    if path.ends_with("info/exclude") {
+        return true;
+    }
+    if let Some(excludes) = excludes_file {
+        if canonicalize_path(path) == *excludes {
             return true;
         }
-        event.paths.iter().any(|path| self.path_relevant(path))
     }
+    false
+}
+
+/// 用 Git 自己的判定过滤被忽略的路径（Q213）。
+///
+/// 判定标准与 `git status` 完全一致：只看 Git 的结果，不在这里重新实现通配规则。
+/// 结论缓存在内存里；`.git` 元数据或忽略规则文件变化时清空（index 变化会让
+/// 「已跟踪因此不忽略」的结论失效）。
+pub struct IgnoreMatcher {
+    git: Git,
+    /// 规范化后的工作区根；事件路径也是规范化的，比较前必须同口径。
+    root: PathBuf,
+    pub excludes_file: Option<PathBuf>,
+    state: Mutex<IgnoreCache>,
+}
+
+#[derive(Debug, Default)]
+struct IgnoreCache {
+    /// 已确认被忽略的路径（文件或目录）。
+    ignored: HashSet<PathBuf>,
+    /// 已确认不被忽略的路径。
+    tracked_or_normal: HashSet<PathBuf>,
+}
+
+/// 缓存上限：超过就整体清空，避免长时间运行无限增长。
+const IGNORE_CACHE_LIMIT: usize = 4096;
+
+impl IgnoreMatcher {
+    /// `git` 的目录必须是工作区根目录（`check-ignore` 按工作区相对路径工作）。
+    pub fn new(git: Git) -> Self {
+        let root = canonicalize_path(&git.directory);
+        // 未配置 core.excludesFile 时，Git 默认读 `$XDG_CONFIG_HOME/git/ignore`（或 `~/.config/git/ignore`）。
+        let excludes_file = git
+            .try_run(&["config", "--path", "core.excludesFile"])
+            .and_then(|out| {
+                let text = out.trim();
+                (!text.is_empty()).then(|| PathBuf::from(text))
+            })
+            .or_else(default_excludes_file)
+            .map(|path| canonicalize_path(&path));
+        Self {
+            git,
+            root,
+            excludes_file,
+            state: Mutex::new(IgnoreCache::default()),
+        }
+    }
+
+    pub fn invalidate(&self) {
+        if let Ok(mut cache) = self.state.lock() {
+            cache.ignored.clear();
+            cache.tracked_or_normal.clear();
+        }
+    }
+
+    /// 这些路径是否**全部**被忽略（任何一个没被忽略就要刷新）。
+    pub fn all_ignored(&self, paths: &[PathBuf]) -> bool {
+        if paths.is_empty() {
+            return false;
+        }
+        // 与事件路径同口径：都规范化后再比较（macOS 的 /var 与 /private/var）。
+        let paths: Vec<PathBuf> = paths.iter().map(|path| canonicalize_path(path)).collect();
+        let mut pending: Vec<PathBuf> = Vec::new();
+        {
+            let Ok(cache) = self.state.lock() else {
+                return false;
+            };
+            for path in &paths {
+                if ancestor_ignored(&cache.ignored, path) || cache.ignored.contains(path) {
+                    continue;
+                }
+                if cache.tracked_or_normal.contains(path) {
+                    return false;
+                }
+                pending.push(path.clone());
+            }
+        }
+        if pending.is_empty() {
+            return true;
+        }
+        let Some(ignored) = self.query(&pending) else {
+            return false;
+        };
+        if let Ok(mut cache) = self.state.lock() {
+            if cache.ignored.len() + cache.tracked_or_normal.len() > IGNORE_CACHE_LIMIT {
+                cache.ignored.clear();
+                cache.tracked_or_normal.clear();
+            }
+            for path in &pending {
+                if ignored.contains(path) {
+                    cache.ignored.insert(path.clone());
+                } else {
+                    cache.tracked_or_normal.insert(path.clone());
+                }
+            }
+        }
+        pending.iter().all(|path| ignored.contains(path))
+    }
+
+    /// 一次 Git 调用判定一批路径；失败返回 None（调用方保守刷新）。
+    fn query(&self, paths: &[PathBuf]) -> Option<HashSet<PathBuf>> {
+        let root = &self.root;
+        let mut input = Vec::new();
+        let mut relative: HashMap<PathBuf, PathBuf> = HashMap::new();
+        for path in paths {
+            let relative_path = path.strip_prefix(root).ok()?.to_path_buf();
+            input.extend_from_slice(relative_path.as_os_str().as_encoded_bytes());
+            input.push(0);
+            relative.insert(relative_path, path.clone());
+        }
+        let output = self.git.run_stdin(&["check-ignore", "--stdin", "-z"], input).ok()?;
+        // 0 = 有被忽略的路径，1 = 一个都没有；其他退出码说明判定失败。
+        if output.exit_code != 0 && output.exit_code != 1 {
+            return None;
+        }
+        let mut ignored = HashSet::new();
+        for chunk in output.stdout.split(|byte| *byte == 0) {
+            if chunk.is_empty() {
+                continue;
+            }
+            let name = PathBuf::from(String::from_utf8_lossy(chunk).into_owned());
+            if let Some(original) = relative.get(&name) {
+                ignored.insert(original.clone());
+            }
+        }
+        Some(ignored)
+    }
+}
+
+/// 是否有更上层的目录已被判定为忽略（忽略目录下的所有内容都不刷新）。
+fn ancestor_ignored(ignored: &HashSet<PathBuf>, path: &Path) -> bool {
+    let mut current = path.parent();
+    while let Some(parent) = current {
+        if ignored.contains(parent) {
+            return true;
+        }
+        current = parent.parent();
+    }
+    false
 }
 
 struct WatchInstallState {
@@ -530,13 +855,30 @@ impl WatchController {
     where
         F: Fn(u64) + Send + 'static,
     {
-        self.activate_with_start(roots, requested, on_change, || {})
+        self.activate_filtered(roots, requested, None, None, on_change)
+    }
+
+    /// 带 Git 忽略判定与性能计数的激活（M9 任务 04）。
+    pub fn activate_filtered<F>(
+        &self,
+        roots: WatchRoots,
+        requested: u64,
+        ignore: Option<Arc<IgnoreMatcher>>,
+        perf: Option<Arc<PerfStore>>,
+        on_change: F,
+    ) -> WatchStatus
+    where
+        F: Fn(u64) + Send + 'static,
+    {
+        self.activate_with_start(roots, requested, ignore, perf, on_change, || {})
     }
 
     fn activate_with_start<F, S>(
         &self,
         roots: WatchRoots,
         requested: u64,
+        ignore: Option<Arc<IgnoreMatcher>>,
+        perf: Option<Arc<PerfStore>>,
         on_change: F,
         before_start: S,
     ) -> WatchStatus
@@ -580,7 +922,11 @@ impl WatchController {
             .and_then(|guard| guard.clone());
         let watcher = failure
             .is_none()
-            .then(|| Arc::new(WorktreeWatcher::start(roots, requested, on_change)));
+            .then(|| {
+                Arc::new(WorktreeWatcher::start_with_ignore(
+                    roots, requested, ignore, perf, on_change,
+                ))
+            });
         let status = match &watcher {
             Some(watcher) => watcher.status(),
             None => WatchStatus {
@@ -799,6 +1145,8 @@ mod tests {
                 pending.activate_with_start(
                     roots,
                     activation,
+                    None,
+                    None,
                     |_| {},
                     || {
                         entered_tx.send(()).unwrap();
@@ -977,5 +1325,195 @@ mod tests {
         // 手动刷新不改变监视失败状态：不能假装监视已恢复。
         assert!(!controller.status().active);
         assert!(controller.status().error.is_some());
+    }
+}
+
+#[cfg(test)]
+mod ignore_tests {
+    use super::*;
+    use crate::git::CommandLog;
+    use crate::shell::{EnvCaptureInfo, ShellEnv};
+    use std::process::Command;
+
+    fn test_shell_env(dir: &Path) -> ShellEnv {
+        let path: Vec<String> = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .map(|entry| entry.to_string_lossy().into_owned())
+            .collect();
+        let vars = [
+            (
+                "HOME".to_string(),
+                std::env::var("HOME").unwrap_or_default(),
+            ),
+            (
+                "PATH".to_string(),
+                std::env::var("PATH").unwrap_or_default(),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        ShellEnv {
+            vars,
+            path: path.clone(),
+            info: EnvCaptureInfo {
+                worktree: dir.display().to_string(),
+                shell: "fixture".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: false,
+                var_count: 2,
+                path_entries: path,
+                fallback_reason: None,
+                fallback_detail: None,
+            },
+        }
+    }
+
+    fn git_repo() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
+        std::fs::write(repo.join(".gitignore"), "node_modules/\n*.log\n").unwrap();
+        std::fs::write(repo.join("node_modules/pkg/index.js"), "x").unwrap();
+        std::fs::write(repo.join("debug.log"), "x").unwrap();
+        std::fs::write(repo.join("src/app.ts"), "x").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", ".gitignore", "src/app.ts"],
+        ] {
+            let status = Command::new("git").args(&args).current_dir(&repo).status().unwrap();
+            assert!(status.success());
+        }
+        dir
+    }
+
+    fn matcher(repo: &Path) -> IgnoreMatcher {
+        let env = test_shell_env(repo);
+        let git = Git::new(repo, &env, Arc::new(CommandLog::default())).unwrap();
+        IgnoreMatcher::new(git)
+    }
+
+    #[test]
+    fn git_decides_ignored_and_normal_paths() {
+        let dir = git_repo();
+        let repo = dir.path().join("repo");
+        let matcher = matcher(&repo);
+        assert!(matcher.all_ignored(&[repo.join("node_modules/pkg/index.js")]));
+        assert!(matcher.all_ignored(&[repo.join("debug.log")]));
+        assert!(!matcher.all_ignored(&[repo.join("src/app.ts")]));
+        // 混合批次：只要有一个没被忽略，就必须刷新。
+        assert!(!matcher.all_ignored(&[
+            repo.join("debug.log"),
+            repo.join("src/app.ts")
+        ]));
+        // 已跟踪文件不会被忽略。
+        assert!(!matcher.all_ignored(&[repo.join(".gitignore")]));
+    }
+
+    #[test]
+    fn invalidate_requeries_after_rules_change() {
+        let dir = git_repo();
+        let repo = dir.path().join("repo");
+        let matcher = matcher(&repo);
+        let target = repo.join("src/other.ts");
+        std::fs::write(&target, "x").unwrap();
+        assert!(!matcher.all_ignored(&[target.clone()]));
+        // 规则变化后缓存失效，重新问 Git。
+        std::fs::write(repo.join(".gitignore"), "src/other.ts\n").unwrap();
+        matcher.invalidate();
+        assert!(matcher.all_ignored(&[target]));
+    }
+
+    #[test]
+    fn ignore_rule_and_metadata_events_always_refresh() {
+        let dir = git_repo();
+        let repo = dir.path().join("repo");
+        let roots = resolve_roots(&repo, None, None);
+        let filter = WatchFilter::from_roots(&roots);
+        let modify = |path: PathBuf| Event {
+            kind: EventKind::Modify(notify::event::ModifyKind::Any),
+            paths: vec![path],
+            attrs: Default::default(),
+        };
+        assert_eq!(
+            filter.classify(&modify(repo.join(".gitignore")), None),
+            Verdict::Refresh(WatchEventKind::Normal)
+        );
+        assert_eq!(
+            filter.classify(&modify(repo.join(".git/index")), None),
+            Verdict::Refresh(WatchEventKind::GitInternal)
+        );
+        // 没有 Git 判据时保守刷新。
+        assert_eq!(
+            filter.classify(&modify(repo.join("debug.log")), None),
+            Verdict::Refresh(WatchEventKind::Normal)
+        );
+    }
+
+    #[test]
+    fn ignored_events_do_not_refresh_when_matcher_is_present() {
+        let dir = git_repo();
+        let repo = dir.path().join("repo");
+        let roots = resolve_roots(&repo, None, None);
+        let filter = WatchFilter::from_roots(&roots);
+        let matcher = matcher(&repo);
+        let modify = |path: PathBuf| Event {
+            kind: EventKind::Modify(notify::event::ModifyKind::Any),
+            paths: vec![path],
+            attrs: Default::default(),
+        };
+        assert_eq!(
+            filter.classify(&modify(repo.join("node_modules/pkg/index.js")), Some(&matcher)),
+            Verdict::Ignored
+        );
+        assert_eq!(
+            filter.classify(&modify(repo.join("src/app.ts")), Some(&matcher)),
+            Verdict::Refresh(WatchEventKind::Normal)
+        );
+        // S1：.git/info/exclude 变更清空缓存并刷新
+        assert_eq!(
+            filter.classify(&modify(repo.join(".git/info/exclude")), Some(&matcher)),
+            Verdict::Refresh(WatchEventKind::Normal)
+        );
+    }
+
+    /// S1：仓库外的 core.excludesFile 变化也清空缓存并刷新；其他仓库外的路径照旧不相关。
+    #[test]
+    fn excludes_file_outside_worktree_invalidates_and_refreshes() {
+        let dir = git_repo();
+        let repo = dir.path().join("repo");
+        let global = dir.path().join("global-ignore");
+        std::fs::write(&global, "src/extra.ts\n").unwrap();
+        // 只写测试仓库自己的配置（fixture），不碰用户的 Git 配置。
+        let status = Command::new("git")
+            .args(["config", "core.excludesFile", global.to_str().unwrap()])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let roots = resolve_roots(&repo, None, None);
+        let filter = WatchFilter::from_roots(&roots);
+        let matcher = matcher(&repo);
+        assert_eq!(matcher.excludes_file.as_deref(), Some(canonicalize_path(&global).as_path()));
+        let target = repo.join("src/extra.ts");
+        std::fs::write(&target, "x").unwrap();
+        assert!(matcher.all_ignored(&[target.clone()]));
+
+        let modify = |path: PathBuf| Event {
+            kind: EventKind::Modify(notify::event::ModifyKind::Any),
+            paths: vec![path],
+            attrs: Default::default(),
+        };
+        std::fs::write(&global, "").unwrap();
+        assert_eq!(
+            filter.classify(&modify(global.clone()), Some(&matcher)),
+            Verdict::Refresh(WatchEventKind::Normal)
+        );
+        // 缓存已清空：重新问 Git，规则删除后不再被忽略。
+        assert!(!matcher.all_ignored(&[target]));
+        assert_eq!(
+            filter.classify(&modify(dir.path().join("unrelated.txt")), Some(&matcher)),
+            Verdict::None
+        );
     }
 }

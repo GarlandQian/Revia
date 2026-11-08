@@ -10,6 +10,10 @@ export type WorktreeSessionInfo = { worktreeId: string, worktreePath: string, gi
  */
 shellElapsedMs: number, 
 /**
+ * 读取 Git 版本耗时（M9 性能记录用）。
+ */
+gitVersionMs: number, 
+/**
  * 是否回退到了最小环境。
  */
 usedFallback: boolean, pathEntries: number, checks: Array<EnvironmentCheck>, };

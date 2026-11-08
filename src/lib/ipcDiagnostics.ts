@@ -1,6 +1,7 @@
 /** Opt-in observations only: fetch completion means response headers, not body/callback completion. */
 
-const IPC_PREFIX = "ipc://localhost/";
+/** Windows（WebView2）用 `http://ipc.localhost/`，macOS 用 `ipc://localhost/`（M9，Q210）。 */
+const IPC_PREFIXES = ["ipc://localhost/", "http://ipc.localhost/"];
 const MAX_COMMANDS = 32;
 const MAX_CALLBACK_IDS = 512;
 const OTHER_COMMAND = "<other>";
@@ -45,8 +46,10 @@ function defaultHost(): IpcDiagnosticsHost {
 
 function ipcCommand(input: Parameters<typeof fetch>[0]): string | null {
   // Tauri 2.12.4 supplies a string URL. Do not coerce foreign Request/URL objects or read their bodies.
-  if (typeof input !== "string" || !input.startsWith(IPC_PREFIX)) return null;
-  const path = input.slice(IPC_PREFIX.length).split(/[?#]/, 1)[0];
+  if (typeof input !== "string") return null;
+  const prefix = IPC_PREFIXES.find((candidate) => input.startsWith(candidate));
+  if (!prefix) return null;
+  const path = input.slice(prefix.length).split(/[?#]/, 1)[0];
   if (path.length > 160) return OTHER_COMMAND;
   try {
     return decodeURIComponent(path) || OTHER_COMMAND;

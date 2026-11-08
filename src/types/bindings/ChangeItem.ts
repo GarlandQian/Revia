@@ -2,7 +2,7 @@
 import type { ChangesKind } from "./ChangesKind";
 import type { ReadonlyReason } from "./ReadonlyReason";
 
-export type ChangeItem = { id: string, path: string, group: string, fingerprint: string, selected: boolean, stale: boolean, summary: string, segment: number | null, readonlyReason: ReadonlyReason | null, source: ChangesKind | null,
+export type ChangeItem = { id: string, path: string, group: string, fingerprint: string, selected: boolean, stale: boolean, summary: string, segment: number | null, readonlyReason: ReadonlyReason | null, source: ChangesKind | null, 
 /**
  * None 表示整文件条目；Some 是系统 Git 的原始 hunk 序号。
  */

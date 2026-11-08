@@ -86,12 +86,13 @@ fn real_hook_output_never_enters_summary_and_export_is_exact_preview() {
         .snapshot()
         .iter()
         .any(|record| record.output.contains(body)));
-    // 未打开诊断界面，摘要已经写出。
+    // M9（Q212）：诊断摘要攒批写入，测试显式 flush 后核对落盘内容。
+    store.flush().unwrap();
     let stored = fs::read_to_string(f.data.join("diagnostics-summary.json")).unwrap();
     let mut settings = Settings::default();
     settings.theme_light = f.repo.join("PRIVATE-THEME.json").display().to_string();
     let mut request = f.request(Some("a"));
-    let preview = diagnostics::preview(&request, &settings, &log, &store, None).unwrap();
+    let preview = diagnostics::preview(&request, &settings, &log, &store, None, None).unwrap();
     for forbidden in [
         body,
         "PRIVATE-DIFF",
@@ -133,6 +134,7 @@ fn real_hook_output_never_enters_summary_and_export_is_exact_preview() {
         &CommandLog::default(),
         &restarted_store,
         None,
+        None,
     )
     .unwrap();
     let restarted: serde_json::Value = serde_json::from_str(&restarted.text).unwrap();
@@ -143,7 +145,7 @@ fn real_hook_output_never_enters_summary_and_export_is_exact_preview() {
     request.snapshot_id = Some(preview.snapshot_id);
     assert!(diagnostics::export(&request, &store).is_err());
     for _ in 0..2 {
-        let p = diagnostics::preview(&request, &settings, &log, &store, None).unwrap();
+        let p = diagnostics::preview(&request, &settings, &log, &store, None, None).unwrap();
         let p: serde_json::Value = serde_json::from_str(&p.text).unwrap();
         assert!(p["failures"].as_array().unwrap().is_empty());
     }
@@ -157,7 +159,7 @@ fn scope_expiry_legacy_scrubbing_and_storage_failure_are_observable() {
     let log = Arc::new(CommandLog::with_diagnostics(Arc::clone(&store)));
     f.git(Arc::clone(&log), "a").run(&["version"]).unwrap();
     f.git(Arc::clone(&log), "b").run(&["status"]).unwrap(); // self-built, not a Git repository yet
-    let no_owner = diagnostics::preview(&f.request(None), &settings, &log, &store, None).unwrap();
+    let no_owner = diagnostics::preview(&f.request(None), &settings, &log, &store, None, None).unwrap();
     let no_owner: serde_json::Value = serde_json::from_str(&no_owner.text).unwrap();
     assert!(no_owner["commands"].as_array().unwrap().is_empty());
     assert!(no_owner["history"].as_array().unwrap().is_empty());
@@ -166,12 +168,14 @@ fn scope_expiry_legacy_scrubbing_and_storage_failure_are_observable() {
     log.clear_diagnostics(Some("a")).unwrap();
     assert_eq!(store.list(Some("b")).unwrap().len(), 1);
 
+    store.flush().unwrap();
     let path = f.data.join("diagnostics-summary.json");
     let mut entries: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     entries[0]["startedAtMs"] = 0.into();
     fs::write(&path, serde_json::to_vec(&entries).unwrap()).unwrap();
     assert!(store.list(Some("b")).unwrap().is_empty());
     f.git(Arc::clone(&log), "a").run(&["version"]).unwrap();
+    store.flush().unwrap();
     let mut entries: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     assert_eq!(entries.as_array().unwrap().len(), 1); // expired row physically removed on next completion
     entries[0]["summary"] = "PRIVATE-BODY".into();
@@ -189,6 +193,7 @@ fn scope_expiry_legacy_scrubbing_and_storage_failure_are_observable() {
         &CommandLog::default(),
         &fresh,
         None,
+        None,
     )
     .unwrap();
     assert!(!preview.text.contains("PRIVATE-"));
@@ -198,9 +203,9 @@ fn scope_expiry_legacy_scrubbing_and_storage_failure_are_observable() {
     fs::create_dir(&path).unwrap();
     f.git(Arc::clone(&log), "a").run(&["version"]).unwrap(); // Git result remains usable
     let error =
-        diagnostics::preview(&f.request(Some("a")), &settings, &log, &store, None).unwrap_err();
+        diagnostics::preview(&f.request(Some("a")), &settings, &log, &store, None, None).unwrap_err();
     assert_eq!(error.code, Some("errors.m7.diagnosticsStoreFailed"));
     fs::remove_dir(&path).unwrap();
     log.clear_diagnostics(Some("a")).unwrap();
-    assert!(diagnostics::preview(&f.request(Some("a")), &settings, &log, &store, None).is_ok());
+    assert!(diagnostics::preview(&f.request(Some("a")), &settings, &log, &store, None, None).is_ok());
 }

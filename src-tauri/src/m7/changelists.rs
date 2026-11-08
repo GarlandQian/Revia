@@ -302,6 +302,37 @@ impl ChangelistStore {
         self.write(&key, &saved)?;
         Self::to_view(session, key, saved, &scan)
     }
+
+    /// M9：按勾选内容在临时目录建独立 index，返回它的 Git 句柄；用户 index 不变（ADR-0003，S7）。
+    pub(crate) fn selection_index(
+        &self,
+        session: &WorktreeSession,
+        selection: &ChangelistSelection,
+    ) -> Result<(tempfile::TempDir, crate::git::Git)> {
+        let _lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        let (key, saved, scan) = self.refreshed(session, None)?;
+        let view = Self::to_view(session, key, saved, &scan)?;
+        if view.identity != selection.identity || view.revision != selection.revision {
+            return Err(rejected());
+        }
+        let selected: Vec<_> = view
+            .items
+            .iter()
+            .filter(|item| item.selected && !item.stale)
+            .cloned()
+            .collect();
+        let git = session.git();
+        let actual = commit::capture(git)?;
+        let directory = tempfile::Builder::new()
+            .prefix("ai-diff-")
+            .tempdir()?;
+        let index = directory.path().join("index");
+        let alternate =
+            git.with_env_vars(&[("GIT_INDEX_FILE", index.to_str().ok_or_else(invalid)?)]);
+        populate_alternate_index(&alternate, actual.head.as_deref(), &selected, &scan)?;
+        Ok((directory, alternate))
+    }
+
     pub(crate) fn prepare<'a>(
         &'a self,
         session: &WorktreeSession,
@@ -349,11 +380,7 @@ impl ChangelistStore {
         let index = directory.join("selected-index");
         let alternate =
             git.with_env_vars(&[("GIT_INDEX_FILE", index.to_str().ok_or_else(invalid)?)]);
-        if let Some(head) = &actual.head {
-            alternate.run_ok(&["read-tree", head], "初始化选择提交")?;
-        } else {
-            alternate.run_ok(&["read-tree", "--empty"], "初始化选择提交")?;
-        }
+        // index 由下面的 `populate_alternate_index` 统一初始化（read-tree 只做一次）。
         std::fs::write(
             directory.join("selection.json"),
             serde_json::to_vec_pretty(&view)?,
@@ -374,33 +401,8 @@ impl ChangelistStore {
             )?
             .stdout,
         )?;
+        populate_alternate_index(&alternate, actual.head.as_deref(), &selected, &scan)?;
         let paths: BTreeSet<_> = selected.iter().map(|i| i.path.clone()).collect();
-        for path in &paths {
-            let chosen: Vec<_> = selected.iter().filter(|i| &i.path == path).collect();
-            let all = scan.items.iter().filter(|i| &i.path == path).count() == chosen.len();
-            if all {
-                alternate
-                    .stage_file(path, None)?
-                    .into_success("写入所选文件")?;
-            } else {
-                let file = scan.files.get(path).ok_or_else(rejected)?;
-                let mut hunks: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
-                for item in chosen {
-                    hunks
-                        .entry(item.hunk.ok_or_else(rejected)?)
-                        .or_default()
-                        .push(item.segment.ok_or_else(rejected)?);
-                }
-                for (hunk, segments) in hunks {
-                    let patch =
-                        git::segments::rewrite_hunk_for_selection(file, hunk, &segments, true)
-                            .ok_or_else(rejected)?;
-                    alternate
-                        .apply_index_patch(patch, false, false)?
-                        .into_success("写入所选 Git 块")?;
-                }
-            }
-        }
         let prepared = Prepared {
             git: alternate,
             directory,
@@ -521,6 +523,48 @@ impl Prepared<'_> {
         self.store
             .finish(session, &self.selection, &self.ids, &self.remaining)
     }
+}
+
+/// 在私有 index 上写入所选的变更文件与块（消除 Duplicated Code，S7）。
+fn populate_alternate_index(
+    alternate: &crate::git::Git,
+    actual_head: Option<&str>,
+    selected: &[ChangeItem],
+    scan: &Scan,
+) -> Result<()> {
+    if let Some(head) = actual_head {
+        alternate.run_ok(&["read-tree", head], "初始化选择提交")?;
+    } else {
+        alternate.run_ok(&["read-tree", "--empty"], "初始化选择提交")?;
+    }
+    let paths: BTreeSet<_> = selected.iter().map(|item| item.path.clone()).collect();
+    for path in &paths {
+        let chosen: Vec<_> = selected.iter().filter(|item| &item.path == path).collect();
+        let all = scan.items.iter().filter(|item| &item.path == path).count() == chosen.len();
+        if all {
+            alternate
+                .stage_file(path, None)?
+                .into_success("写入所选文件")?;
+        } else {
+            let file = scan.files.get(path).ok_or_else(rejected)?;
+            let mut hunks: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
+            for item in chosen {
+                hunks
+                    .entry(item.hunk.ok_or_else(rejected)?)
+                    .or_default()
+                    .push(item.segment.ok_or_else(rejected)?);
+            }
+            for (hunk, segments) in hunks {
+                let patch =
+                    crate::git::segments::rewrite_hunk_for_selection(file, hunk, &segments, true)
+                        .ok_or_else(rejected)?;
+                alternate
+                    .apply_index_patch(patch, false, false)?
+                    .into_success("写入所选 Git 块")?;
+            }
+        }
+    }
+    Ok(())
 }
 fn scan(session: &WorktreeSession) -> Result<Scan> {
     session.require_identity()?;

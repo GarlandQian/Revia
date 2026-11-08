@@ -2948,3 +2948,85 @@ html.window-material:has(.app-dialog[open]:not(.settings-dialog)) .settings-dial
     border-color: CanvasText !important;
   }
 }
+
+/* ---------- M9（Q209）：Windows 渲染降级 ----------
+ * Windows 11 的 Mica 只铺整窗，按区域的 backdrop-filter 在 WebView2 上开销大：
+ * 这里去掉吸顶表头、通知、弹层、对话框与 PR 面板确认框的模糊，改成不透明或高不透明度底色；
+ * 对话框打开时背后界面只降低不透明度，不再整页 filter: blur；不播放玻璃镜片，也不渲染 SVG 折射。
+ * 卡片布局与 Mica 窗口底保留；macOS 的样式不受影响。 */
+html[data-platform="windows"].window-material :is(
+  .log-table-head,
+  .notification,
+  .glass-popover,
+  .revia-popper,
+  .app-dialog,
+  .github-panel [role="dialog"]
+) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 不透明 / 高不透明度底色：去掉模糊后文字对比度不能下降（Q190）。 */
+html[data-platform="windows"].window-material .log-table-head {
+  background: var(--editor-background);
+}
+
+html[data-platform="windows"].window-material :is(.notification, .glass-popover, .revia-popper) {
+  background: color-mix(in srgb, var(--editorwidget-background) 97%, transparent);
+}
+
+html[data-platform="windows"].window-material .app-dialog {
+  background: var(--editorwidget-background);
+}
+
+html[data-platform="windows"].window-material .github-panel [role="dialog"] {
+  background: var(--editor-background);
+}
+
+/* 对话框打开时，背后的界面只降低不透明度；不再整页模糊。 */
+html[data-platform="windows"].window-material:has(.app-dialog[open]:not(.settings-dialog)) :is(
+  :is(.glass-host, .welcome-shell) > :not(dialog, .shell-body),
+  .shell-body > *
+) {
+  opacity: 0.5;
+  filter: none;
+}
+
+html[data-platform="windows"].window-material:has(.app-dialog[open]:not(.settings-dialog)) .settings-dialog[open] {
+  opacity: 0.5;
+  filter: none;
+}
+
+/* 镜片：Windows 上不播放（glassLens.ts 也直接跳过），选中项显示普通底色。 */
+html[data-platform="windows"].window-material .glass-lens-layer {
+  display: none;
+}
+
+html[data-platform="windows"].window-material .editor-tab-list[data-glass-lens] .editor-tab[data-active="true"],
+html[data-platform="windows"].window-material .settings-nav [data-glass-lens] [data-lens-key][aria-pressed="true"] {
+  background: var(--capsule-hover);
+  box-shadow: none;
+}
+
+/* ---------- M9 对照外观（朴素外观，S4/Q210） ----------
+ * 窗口完全不透明：无模糊、无滤镜、无镜片、卡片与弹层均为完全不透明实色。 */
+html[data-plain-appearance="true"] {
+  --glass-window: solid !important;
+  --glass-popover: solid !important;
+}
+
+html[data-plain-appearance="true"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+html[data-plain-appearance="true"] .glass-layer,
+html[data-plain-appearance="true"] .glass-lens-layer {
+  display: none !important;
+}
+
+html[data-plain-appearance="true"] :is(.shell-body > main, .sidebar-pane, .app-dialog, .notification, .revia-popper, .log-table-head) {
+  background: var(--editor-background) !important;
+  box-shadow: none !important;
+}

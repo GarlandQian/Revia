@@ -178,7 +178,9 @@ impl GitOutput {
 pub struct Git {
     pub program: PathBuf,
     pub directory: PathBuf,
-    pub env: Arc<Vec<(String, String)>>,
+    /// 子进程环境；打开 worktree 后可能在后台换成完整登录环境（Q212），
+    /// 因此用读写锁而不是一次性快照。
+    pub env: Arc<std::sync::RwLock<Vec<(String, String)>>>,
     pub log: Arc<CommandLog>,
     /// 发起调用的 worktree（命令日志归属，规格 B07）；不属于 worktree 的探测为 None。
     pub worktree_id: Option<String>,
@@ -210,13 +212,13 @@ impl Git {
         Ok(Self {
             program,
             directory: directory.to_path_buf(),
-            env: Arc::new(
+            env: Arc::new(std::sync::RwLock::new(
                 shell_env
                     .vars
                     .iter()
                     .map(|(key, value)| (key.clone(), value.clone()))
                     .collect(),
-            ),
+            )),
             log,
             worktree_id: None,
         })
@@ -234,10 +236,18 @@ impl Git {
         Self {
             program: self.program.clone(),
             directory: directory.to_path_buf(),
-            env: self.env.clone(),
+            env: Arc::clone(&self.env),
             log: self.log.clone(),
             worktree_id: self.worktree_id.clone(),
         }
+    }
+
+    /// 读取当前子进程环境的快照（消除 Shotgun Surgery）。
+    pub fn env_snapshot(&self) -> Vec<(String, String)> {
+        self.env
+            .read()
+            .map(|env| env.clone())
+            .unwrap_or_default()
     }
 
     /// 返回一个带额外环境变量的副本；同名变量以新值为准，不重复追加。
@@ -249,7 +259,7 @@ impl Git {
     ///
     /// 低版本 Git 会忽略不认识的 `GIT_*` 变量，行为退回旧版默认（见报告已知限制）。
     pub fn with_env_vars(&self, vars: &[(&str, &str)]) -> Self {
-        let mut env: Vec<(String, String)> = self.env.as_ref().clone();
+        let mut env = self.env_snapshot();
         for (key, value) in vars {
             match env
                 .iter_mut()
@@ -262,7 +272,7 @@ impl Git {
         Self {
             program: self.program.clone(),
             directory: self.directory.clone(),
-            env: Arc::new(env),
+            env: Arc::new(std::sync::RwLock::new(env)),
             log: self.log.clone(),
             worktree_id: self.worktree_id.clone(),
         }
@@ -295,8 +305,8 @@ impl Git {
             "GIT_GRAFT_FILE",
             "GIT_REPLACE_REF_BASE",
         ];
-        let env = self
-            .env
+        let current = self.env_snapshot();
+        let env = current
             .iter()
             .filter(|(key, _)| {
                 if key.to_ascii_uppercase().starts_with("GIT_CONFIG_KEY_")
@@ -313,9 +323,26 @@ impl Git {
         Self {
             program: self.program.clone(),
             directory: directory.to_path_buf(),
-            env: Arc::new(env),
+            env: Arc::new(std::sync::RwLock::new(env)),
             log: self.log.clone(),
             worktree_id: self.worktree_id.clone(),
+        }
+    }
+
+    /// 换成完整登录环境（Q212）：只替换环境变量，Git 程序路径变化由会话层换会话。
+    pub fn set_env(&self, shell_env: &ShellEnv) {
+        let mut vars: Vec<(String, String)> = shell_env
+            .vars
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        // PATH 以 `ShellEnv::path` 为准：`vars` 里可能还是打开时的旧值。
+        match vars.iter_mut().find(|(key, _)| key == "PATH") {
+            Some(slot) => slot.1 = shell_env.path_string(),
+            None => vars.push(("PATH".into(), shell_env.path_string())),
+        }
+        if let Ok(mut env) = self.env.write() {
+            *env = vars;
         }
     }
 
@@ -327,6 +354,11 @@ impl Git {
     /// 执行一次 Git 调用，遇到 `index.lock` 时短暂重试。
     pub fn run(&self, args: &[&str]) -> Result<GitOutput> {
         self.run_with_timeout(args, GIT_TIMEOUT)
+    }
+
+    /// 通过 stdin 传入数据的只读调用（例如 `check-ignore --stdin`，M9 任务 04）。
+    pub fn run_stdin(&self, args: &[&str], input: Vec<u8>) -> Result<GitOutput> {
+        self.run_with_options(args, Some(input), GIT_TIMEOUT, None, true)
     }
 
     /// 带显式超时的一次调用（网络操作用 10 分钟上限，规格 B01）。
@@ -376,7 +408,7 @@ impl Git {
         let mut last: Option<GitOutput> = None;
         let attempts = if retry_lock { LOCK_RETRIES + 1 } else { 1 };
         for attempt in 0..attempts {
-            let output = self.run_once_with_timeout(args, input.clone(), timeout, output_limit)?;
+            let output = self.run_once_with_timeout(args, input.clone(), timeout, output_limit, true)?;
             if !retry_lock || !is_lock_error(&output) {
                 return Ok(output);
             }
@@ -417,13 +449,19 @@ impl Git {
         .run_with_timeout(args, timeout)
     }
 
+    /// 敏感调用（例如 AI 发送内容生成）：执行命令，但**绝不把输出正文记录到日志**（Q180、Q214）。
+    pub fn run_private_ok(&self, args: &[&str], what: &str) -> Result<GitOutput> {
+        let output = self.run_once_with_timeout(args, None, GIT_TIMEOUT, None, false)?;
+        output.into_success(what)
+    }
+
     pub fn run_ok(&self, args: &[&str], what: &str) -> Result<GitOutput> {
         self.run(args)?.into_success(what)
     }
 
     /// 带 stdin 的一次调用（只用于只读计算，例如按仓库哈希算法求空 tree）。
     pub fn run_with_input(&self, args: &[&str], input: Vec<u8>) -> Result<GitOutput> {
-        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT, None)
+        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT, None, true)
     }
 
     /// 允许非零退出码（例如 `git diff --no-index` 在有差异时返回 1）。
@@ -455,7 +493,7 @@ impl Git {
     }
 
     fn run_once(&self, args: &[&str]) -> Result<GitOutput> {
-        self.run_once_with_timeout(args, None, GIT_TIMEOUT, None)
+        self.run_once_with_timeout(args, None, GIT_TIMEOUT, None, true)
     }
 
     fn run_once_with_timeout(
@@ -464,6 +502,7 @@ impl Git {
         input: Option<Vec<u8>>,
         timeout: Duration,
         output_limit: Option<usize>,
+        capture_log_output: bool,
     ) -> Result<GitOutput> {
         let mut timing = crate::commands::MeasureSpan::new("git.run");
         let started = Instant::now();
@@ -487,7 +526,8 @@ impl Git {
             .stdout(stdout_writer)
             .stderr(stderr_writer)
             .env_clear();
-        for (key, value) in self.env.iter() {
+        let env = self.env_snapshot();
+        for (key, value) in env.iter() {
             command.env(key, value);
         }
         crate::platform::hide_console(&mut command);
@@ -542,7 +582,11 @@ impl Git {
             .ok()
             .and_then(|value| value.code())
             .unwrap_or(-1);
-        let (output, output_truncated) = command_output(&stdout, &stderr_bytes);
+        let (output, output_truncated) = if capture_log_output {
+            command_output(&stdout, &stderr_bytes)
+        } else {
+            (String::new(), false)
+        };
 
         timing.mark("process_collected");
         self.log.record(CommandRecord {
@@ -848,7 +892,7 @@ impl Git {
             args.push("--reverse");
         }
         args.push("-");
-        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT, None)
+        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT, None, true)
     }
 
     pub fn discard_patch(&self, path: &str) -> Result<Vec<u8>> {
@@ -872,6 +916,7 @@ impl Git {
             Some(patch),
             GIT_TIMEOUT,
             None,
+            true,
         )
     }
 

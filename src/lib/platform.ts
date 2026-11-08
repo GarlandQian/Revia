@@ -14,6 +14,19 @@ export const isWindows =
   typeof navigator !== "undefined" &&
   navigator.userAgent.toUpperCase().indexOf("WINDOWS") >= 0;
 
+/** M9 平台特性判断集中收敛（Q55、Q209、T1）。 */
+export function supportsGlassLens(): boolean {
+  return isMac;
+}
+
+export function supportsSpecularButton(): boolean {
+  return isMac;
+}
+
+export function defaultCssMaterial(): string {
+  return isMac ? "css" : "mica";
+}
+
 /**
  * 主工具栏左侧留白（像素）：macOS 的红绿灯覆盖在主工具栏左端（titleBarStyle: Overlay），
  * 其他平台用原生标题栏，主工具栏从窗口边缘开始（Q60）。

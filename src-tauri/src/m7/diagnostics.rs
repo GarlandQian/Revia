@@ -14,6 +14,8 @@ use ts_rs::TS;
 
 pub const SUMMARY_RETENTION_MS: u64 = 7 * 24 * 60 * 60 * 1000;
 const SUMMARY_MAX_ENTRIES: usize = 500;
+/// 摘要攒批写入的间隔（Q212）：记录时只进内存，最多 5 秒后合并写一次。
+pub const SUMMARY_FLUSH_INTERVAL_MS: u64 = 5_000;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,6 +79,10 @@ struct StoreState {
     failed: bool,
     next_snapshot: u64,
     snapshots: VecDeque<Snapshot>,
+    /// 还没落盘的摘要（Q212）。记录时只追加到这里，不碰磁盘。
+    pending: Vec<DiagnosticsSummaryEntry>,
+    /// 上次成功写盘的时间；攒批间隔据此判断。
+    last_write_ms: u64,
 }
 
 #[derive(Debug)]
@@ -143,29 +149,73 @@ impl DiagnosticsSummaryStore {
         Ok(entries)
     }
 
-    /// 由统一命令日志完成入口调用，持有日志锁，和清空操作保持同一顺序。
+    /// 由统一命令日志完成入口调用，持有日志锁。
+    ///
+    /// **只追加到内存**：不在锁内读取整份摘要、整份重写并 `sync_all`（Q212）。
+    /// 后台线程每 5 秒、主动刷新与正常退出时合并写盘（`maybe_flush` / `flush`）。
     pub(crate) fn observe(&self, record: &CommandRecord) {
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
-        let result = (|| -> Result<()> {
-            let mut entries = self.load()?;
-            entries.push(summary(record));
-            if entries.len() > SUMMARY_MAX_ENTRIES {
-                entries.remove(0);
-            }
-            super::atomic_write(&self.path, &serde_json::to_vec_pretty(&entries)?)
-        })();
-        if result.is_err() {
-            state.failed = true;
+        state.pending.push(summary(record));
+        // 极端情况下（长时间不写盘）也限制内存占用；丢最早的是可接受的。
+        while state.pending.len() > SUMMARY_MAX_ENTRIES {
+            state.pending.remove(0);
         }
     }
 
+    /// 到间隔才写盘；没有待写记录或还没到间隔时什么也不做。
+    pub fn maybe_flush(&self) {
+        let due = {
+            let state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            !state.pending.is_empty()
+                && now_ms().saturating_sub(state.last_write_ms) >= SUMMARY_FLUSH_INTERVAL_MS
+        };
+        if due {
+            let _ = self.flush();
+        }
+    }
+
+    /// 把内存里的摘要合并写入磁盘；返回写入的条数。
+    pub fn flush(&self) -> Result<usize> {
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if state.pending.is_empty() {
+            return Ok(0);
+        }
+        let pending: Vec<_> = state.pending.drain(..).collect();
+        let written = pending.len();
+        let result = (|| -> Result<()> {
+            let mut entries = self.load()?;
+            entries.extend(pending);
+            if entries.len() > SUMMARY_MAX_ENTRIES {
+                entries.drain(..entries.len() - SUMMARY_MAX_ENTRIES);
+            }
+            super::atomic_write(&self.path, &serde_json::to_vec_pretty(&entries)?)?;
+            state.last_write_ms = now_ms();
+            Ok(())
+        })();
+        if let Err(error) = result {
+            state.failed = true;
+            return Err(error);
+        }
+        Ok(written)
+    }
+
+    /// 磁盘上的摘要加上还没落盘的部分（导出与列表都要带上，Q187、Q212）。
+    fn load_with_pending(&self, state: &mut StoreState) -> Result<Vec<DiagnosticsSummaryEntry>> {
+        let mut entries = self.load()?;
+        entries.extend(state.pending.iter().cloned());
+        if entries.len() > SUMMARY_MAX_ENTRIES {
+            entries.drain(..entries.len() - SUMMARY_MAX_ENTRIES);
+        }
+        Ok(entries)
+    }
+
     pub fn list(&self, worktree_id: Option<&str>) -> Result<Vec<DiagnosticsSummaryEntry>> {
-        let state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.failed {
             return Err(store_error());
         }
         Ok(self
-            .load()?
+            .load_with_pending(&mut state)?
             .into_iter()
             .filter(|entry| in_scope(worktree_id, entry.worktree_id.as_deref()))
             .collect())
@@ -179,7 +229,12 @@ impl DiagnosticsSummaryStore {
         let mut entries = loaded.unwrap_or_default();
         let before = entries.len();
         entries.retain(|entry| !in_scope(worktree_id, entry.worktree_id.as_deref()));
+        // 还没落盘的部分同样要清空，否则下一次写盘会把清掉的记录带回来。
+        state
+            .pending
+            .retain(|entry| !in_scope(worktree_id, entry.worktree_id.as_deref()));
         super::atomic_write(&self.path, &serde_json::to_vec_pretty(&entries)?)?;
+        state.last_write_ms = now_ms();
         state.failed = false;
         state
             .snapshots
@@ -288,9 +343,10 @@ pub fn preview(
     command_log: &CommandLog,
     store: &DiagnosticsSummaryStore,
     session: Option<&WorktreeSession>,
+    perf: Option<&super::perf::PerfStore>,
 ) -> Result<DiagnosticsPreview> {
     command_log.with_diagnostics_snapshot(|records| {
-        preview_records(request, settings, records, store, session)
+        preview_records(request, settings, records, store, session, perf)
     })
 }
 
@@ -300,6 +356,7 @@ fn preview_records(
     records: &[CommandRecord],
     store: &DiagnosticsSummaryStore,
     session: Option<&WorktreeSession>,
+    perf: Option<&super::perf::PerfStore>,
 ) -> Result<DiagnosticsPreview> {
     let records: Vec<_> = records
         .iter()
@@ -318,7 +375,7 @@ fn preview_records(
         return Err(store_error());
     }
     let entries: Vec<_> = store
-        .load()?
+        .load_with_pending(&mut state)?
         .into_iter()
         .filter(|entry| in_scope(request.worktree_id.as_deref(), entry.worktree_id.as_deref()))
         .collect();
@@ -371,6 +428,11 @@ fn preview_records(
             "failures": combined.iter().filter(|entry| entry.exit_code != 0).count(),
             "totalElapsedMs": combined.iter().map(|entry| entry.elapsed_ms).sum::<u64>(),
             "slowest": slowest.iter().take(10).map(public_entry).collect::<Vec<_>>() },
+        // Q210、Q217：帧耗时、长任务、交互延迟、进程 CPU / 内存、打开分段耗时与电脑配置。
+        "performanceRecording": perf.map(|perf| perf.diagnostics_json()),
+        "machine": super::perf::machine_info(),
+        // M9：测量版构建来源与对照外观状态（Q216）。
+        "build": crate::measure::diagnostics_json(),
         "redactions": redactions,
     });
     let text = serde_json::to_string_pretty(&manifest)?;
@@ -468,4 +530,130 @@ fn validate_destination(text: &str) -> Result<PathBuf> {
         ));
     }
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(sequence: u64, started_at_ms: u64) -> CommandRecord {
+        CommandRecord {
+            sequence,
+            worktree_id: Some("wt-1".into()),
+            started_at_ms,
+            program: "git".into(),
+            args: vec!["status".into(), "--porcelain=v2".into()],
+            directory: "/tmp/repo".into(),
+            exit_code: 0,
+            elapsed_ms: 5,
+            timed_out: false,
+            stdout_bytes: 0,
+            stderr_excerpt: String::new(),
+            output: String::new(),
+            output_truncated: false,
+        }
+    }
+
+    fn store() -> (tempfile::TempDir, DiagnosticsSummaryStore) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = DiagnosticsSummaryStore::new(dir.path());
+        (dir, store)
+    }
+
+    #[test]
+    fn observe_does_not_touch_disk_until_flush() {
+        let (dir, store) = store();
+        store.observe(&record(1, now_ms()));
+        assert!(!dir.path().join("diagnostics-summary.json").exists());
+        assert_eq!(store.flush().unwrap(), 1);
+        assert!(dir.path().join("diagnostics-summary.json").exists());
+        // 没有待写记录时 flush 是空操作。
+        assert_eq!(store.flush().unwrap(), 0);
+    }
+
+    #[test]
+    fn list_and_preview_include_pending_entries() {
+        let (_dir, store) = store();
+        store.observe(&record(1, now_ms()));
+        store.observe(&record(2, now_ms()));
+        // 还没到间隔：文件里没有，但列表要带上内存里的记录（Q212）。
+        let listed = store.list(Some("wt-1")).unwrap();
+        assert_eq!(listed.len(), 2);
+    }
+
+    #[test]
+    fn maybe_flush_respects_interval_and_checks_disk() {
+        let (dir, store) = store();
+        let path = dir.path().join("diagnostics-summary.json");
+        store.observe(&record(1, now_ms()));
+        // 显式 flush 写入磁盘第一条
+        store.flush().unwrap();
+        let disk_entries1: Vec<DiagnosticsSummaryEntry> =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(disk_entries1.len(), 1);
+
+        // 记录第二条进内存
+        store.observe(&record(2, now_ms()));
+        // 尚未到 5 秒间隔，maybe_flush 不会落盘
+        store.maybe_flush();
+        let disk_entries2: Vec<DiagnosticsSummaryEntry> =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        // S13: 验证磁盘状态仍只有 1 条
+        assert_eq!(disk_entries2.len(), 1);
+
+        // 模拟正常退出时写盘（flush）
+        assert_eq!(store.flush().unwrap(), 1);
+        let disk_entries3: Vec<DiagnosticsSummaryEntry> =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(disk_entries3.len(), 2);
+    }
+
+    /// S13：过了间隔，`maybe_flush` 真的写盘。
+    #[test]
+    fn maybe_flush_writes_after_interval() {
+        let (dir, store) = store();
+        let path = dir.path().join("diagnostics-summary.json");
+        store.observe(&record(1, now_ms()));
+        store.state.lock().unwrap().last_write_ms = now_ms() - SUMMARY_FLUSH_INTERVAL_MS - 1;
+        store.maybe_flush();
+        let disk: Vec<DiagnosticsSummaryEntry> =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(disk.len(), 1);
+        assert!(store.state.lock().unwrap().pending.is_empty());
+    }
+
+    #[test]
+    fn clear_removes_pending_entries_too() {
+        let (_dir, store) = store();
+        store.flush().unwrap();
+        store.observe(&record(1, now_ms()));
+        let removed = store.clear(Some("wt-1")).unwrap();
+        assert_eq!(removed, 0);
+        assert!(store.list(Some("wt-1")).unwrap().is_empty());
+        store.flush().unwrap();
+        assert!(store.list(Some("wt-1")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn expired_entries_are_dropped_on_read() {
+        let (dir, store) = store();
+        let old = DiagnosticsSummaryEntry {
+            sequence: 1,
+            started_at_ms: now_ms().saturating_sub(SUMMARY_RETENTION_MS + 60_000),
+            worktree_id: Some("wt-1".into()),
+            program: "git".into(),
+            exit_code: 0,
+            timed_out: false,
+            error_class: "ok".into(),
+            summary: "ok".into(),
+            elapsed_ms: 1,
+            args: vec!["status".into()],
+        };
+        std::fs::write(
+            dir.path().join("diagnostics-summary.json"),
+            serde_json::to_vec_pretty(&vec![old]).unwrap(),
+        )
+        .unwrap();
+        assert!(store.list(Some("wt-1")).unwrap().is_empty());
+    }
 }

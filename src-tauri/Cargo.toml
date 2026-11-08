@@ -1,6 +1,6 @@
 [package]
 name = "revia"
-version = "0.0.2"
+version = "0.0.3"
 description = "Revia：轻量的 macOS Git 客户端"
 authors = ["Garland Qian"]
 edition = "2024"
@@ -16,6 +16,8 @@ tauri-build = { version = "2", features = [] }
 default = []
 # M8：便携构建（exe 旁 data 与 WebView2 用户数据，Q58、Q204）。安装版不开启。
 portable = []
+# M9：测量版 / 验收版（Q216）。关闭更新检查，提供对照外观开关；正式构建不开启。
+measure = []
 
 [dependencies]
 tauri = { version = "2", features = ["custom-protocol"] }
@@ -35,7 +37,9 @@ portable-pty = "0.9"
 keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "crypto-rust"] }
 minisign-verify = "0.2"
 tauri-plugin-updater = "2"
-reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "json", "rustls"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "json", "rustls", "stream"] }
+futures-util = "0.3"
+tokio = { version = "1", features = ["macros", "sync", "time"] }
 url = "2"
 semver = "1"
 

@@ -104,6 +104,7 @@ import { CommitMergeView } from "@/features/log/CommitMergeView";
 import { CommandLogPanel } from "@/features/commands/CommandLogPanel";
 import { EditorView } from "@codemirror/view";
 import { monitorSoakVisibility, sleep, waitForSoak, type SoakVisibility } from "@/lib/soak";
+import { perfRecorder, type RepoOpenTrace } from "@/lib/perfRecorder";
 import { soakScroller } from "@/lib/soakScroller";
 import { ipc, COMMIT_OUTPUT_EVENT, newCommitNonce, type SoakFocus, type WatchStatusPayload } from "@/lib/ipc";
 import { startIpcDiagnostics } from "@/lib/ipcDiagnostics";
@@ -573,16 +574,40 @@ export function App() {
 
   editReportRef.current = (target, error) => setAppError(error, target.worktreeId);
 
+  /** M9 测量版状态；正式构建 measure=false，帮助菜单没有对照开关（Q216）。 */
+  const [measureState, setMeasureState] = useState<{ measure: boolean; commit: string; plainAppearance: boolean } | null>(null);
+
   useEffect(() => {
     let active = true;
     const failed = (caught: unknown) => {
       if (active) setGlobalError({ ...localizedError("environment", "errors.nativeMenu.unavailable"), cause: toAppError(caught) });
     };
-    void updateNativeMenu(() => {
-      void getCurrentWindow().close().catch((caught) => { if (active) setGlobalError(toAppError(caught)); });
-    }).catch(failed);
+    void updateNativeMenu(
+      () => {
+        void getCurrentWindow().close().catch((caught) => { if (active) setGlobalError(toAppError(caught)); });
+      },
+      measureState?.measure
+        ? {
+            plainAppearance: measureState.plainAppearance,
+            onTogglePlain: () => {
+              const next = !measureState.plainAppearance;
+              void ipc.setPlainAppearance(next)
+                .then(() => setMeasureState((current) => (current ? { ...current, plainAppearance: next } : current)))
+                .catch((caught: unknown) => setGlobalError(toAppError(caught)));
+            },
+          }
+        : undefined,
+    ).catch(failed);
     return () => { active = false; };
-  }, [localeRevision]);
+  }, [localeRevision, measureState]);
+
+  useEffect(() => {
+    let active = true;
+    void ipc.measureState()
+      .then((state) => { if (active) setMeasureState(state); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   /** 记录一次无归属操作的结果；`seq` 用来拒绝旧完成覆盖较新的错误。 */
   const recordExternalResult = useCallback((seq: number, err: AppErrorPayload | null) => {
@@ -898,11 +923,28 @@ export function App() {
     }
   }, [entryOrder, applySnapshot, clearEditorSelection, enterDiff, mergeTabTargetRef, openEntry, pickFirstEntry, setAppError]);
 
+  /** 打开 / 切换仓库时正在上报的分段耗时；日志首屏画出后补齐（Q210）。 */
+  const repoOpenTraceRef = useRef<{ worktreeId: string; trace: RepoOpenTrace } | null>(null);
+
   const openWorktree = useCallback(
-    async (id: string, options: { targetPath?: string | null; view?: ViewMode; expand?: boolean; activateDiff?: boolean } = {}) => {
+    async (
+      id: string,
+      options: {
+        targetPath?: string | null;
+        view?: ViewMode;
+        expand?: boolean;
+        activateDiff?: boolean;
+        /** false：等 diff 首屏就绪再返回（测量用）；默认先出文件列表，其余在后台补。 */
+        progressive?: boolean;
+      } = {},
+    ) => {
       const targetView = options.view ?? view;
+      const progressive = options.progressive !== false;
       setBusy(true);
       const openStart = performance.now();
+      // 分段耗时从用户点击（或按键）那一刻开始，到文件列表绘制后的下一帧结束（Q211、S11）。
+      const trace = perfRecorder.beginRepoOpen(id, perfRecorder.triggerTimestamp(openStart));
+      repoOpenTraceRef.current = { worktreeId: id, trace };
       if (id !== worktreeIdRef.current) resetMergeTabs();
       // 切换请求发起时立即改激活目标：此后旧 worktree 的响应一律丢弃（含 A→B→A）。
       gateRef.current.activate(id);
@@ -916,11 +958,20 @@ export function App() {
       setNewBranchStart(null);
       const myToken = gateRef.current.token();
       try {
+        // 触发排队：从处理点击到发出 open_worktree 的时间（Q211）。
+        const triggerStart = performance.now();
         const sessionInfo = await ipc.openWorktree(id);
+        const triggerMs = performance.now() - triggerStart;
         if (gateRef.current.token().activation !== myToken.activation) return null;
         debugLog(`open_worktree 完成：${Math.round(performance.now() - openStart)} ms`);
         setInfo(sessionInfo);
         setWorktreeId(id);
+        // 环境仍在后台加载时，状态栏说明“正在加载”；就绪后由事件收起（Q222）。
+        void ipc.environmentStatus(id)
+          .then((status) => {
+            if (worktreeIdRef.current === id) setEnvironmentLoading(!status.ready);
+          })
+          .catch(() => undefined);
         const failed = sessionInfo.checks.filter((check) => !check.ok);
         if (failed.length > 0) {
           const errors = failed.flatMap((check) => check.hint ? [check.detail, check.hint] : [check.detail]);
@@ -929,11 +980,15 @@ export function App() {
 
         // 监视只跟随当前 worktree；切换即释放旧监视（Q88）。
         // 把发起时的激活代号带给后端：迟到进入的旧请求会被拒绝，不会装成最新监视。
-        const watch = await ipc.watchWorktree(id, myToken.activation).catch(() => null);
-        if (gateRef.current.token().activation === myToken.activation && watch
-          && watch.target === infoRef.current?.worktreePath) {
-          setWatchState({ active: watch.active, error: watch.error });
-        }
+        // 启动监视不挡文件列表：失败或迟到都按激活代号丢弃（M9 任务 06）。
+        void ipc.watchWorktree(id, myToken.activation)
+          .then((watch) => {
+            if (gateRef.current.token().activation === myToken.activation && watch
+              && watch.target === infoRef.current?.worktreePath) {
+              setWatchState({ active: watch.active, error: watch.error });
+            }
+          })
+          .catch(() => undefined);
 
         const startedAt = performance.now();
         // 重开仓库（再次添加当前仓库会走到这里）同样要按请求前分界合并，
@@ -958,11 +1013,42 @@ export function App() {
         if (!entry) {
           setSelected(null);
           setStatus(messages.changes.empty);
+          trace.listReady(listChangesMs, 0, triggerMs);
           return null;
         }
         setStatus(messages.changes.fileCount(next.entries.length));
+        // 文件列表已可用：记下绘制时刻，日志与首屏 diff 随后补（Q211）。
+        trace.listReady(listChangesMs, next.entries.length, triggerMs);
         const firstRowsStart = performance.now();
         debugLog(`选中文件：${entry.path}（${entry.changes}）`);
+        if (progressive) {
+          // 先解除忙碌，让文件列表可以操作；首屏 diff 在后台补上，
+          // 迟到的结果仍按激活代号丢弃（Q90）。
+          setBusy(false);
+          void openEntry(entry, {
+            view: targetView,
+            worktreeId: id,
+            expand: options.expand,
+            select: true,
+            activate: options.activateDiff === true,
+          }).catch((caught: unknown) => {
+            if (gateRef.current.token().activation === myToken.activation) {
+              setAppError(toAppError(caught), id);
+            }
+          });
+          return {
+            listChangesMs,
+            firstRowsMs: 0,
+            firstScreenMs: performance.now() - startedAt,
+            openMs: performance.now() - openStart,
+            rowCount: targetView === "split" ? entry.rowCountSplit : entry.rowCountUnified,
+            fileCount: next.entries.length,
+            entry,
+            rafPainted: false,
+            viewportHeight: null,
+            devicePixelRatio: window.devicePixelRatio,
+          };
+        }
         const opened = await openEntry(entry, {
           view: targetView,
           worktreeId: id,
@@ -1089,6 +1175,9 @@ export function App() {
     [acceptSnapshot],
   );
 
+  /** 当前 worktree 的完整登录环境是否还在后台加载（Q222）。 */
+  const [environmentLoading, setEnvironmentLoading] = useState(false);
+
   const refresh = useCallback(async () => {
     if (!worktreeId) return;
     const targetWorktreeId = worktreeId;
@@ -1109,6 +1198,48 @@ export function App() {
       if (gateRef.current.token().activation === token.activation) setBusy(false);
     }
   }, [readAndAccept, setAppError, worktreeId]);
+
+  /**
+   * 环境在后台就绪（Q222）：Git 路径变了就重读一次，并收起“正在加载环境”的提示。
+   * 迟到的结果只对当前激活的 worktree 生效。
+   */
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+  useEffect(() => {
+    let disposed = false;
+    let stop: (() => void) | null = null;
+    void listen<{ worktreeId: string; gitChanged: boolean; error: AppErrorPayload | null }>(
+      "revia://environment-ready",
+      (event) => {
+        if (disposed) return;
+        const { worktreeId: readyId, error } = event.payload;
+        if (readyId !== worktreeIdRef.current) return;
+        setEnvironmentLoading(false);
+        // 捕获失败、回退到进程环境时按 Q205 提示。
+        if (error) {
+          notifyRef.current({
+            tone: "warning",
+            title: () => messages.statusBar.environmentFallbackTitle,
+            detail: () => formatAppError(error),
+            persistent: true,
+          });
+        }
+        // 用完整环境重读一次：Git 路径变了要换新 Git，就绪前失败的读取（如缺 git-lfs）也借此重试（Q222）。
+        void refreshRef.current();
+      },
+    )
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, []);
 
   /**
    * 对**指定** worktree 做一次真实重读（Q90、Q91）。
@@ -1207,7 +1338,16 @@ export function App() {
         if (snapshot.status.activation !== token.activation) return;
         const expectedTarget = infoRef.current?.worktreePath ?? null;
         if (expectedTarget && snapshot.status.target !== expectedTarget) return;
-        setWatchState({ active: snapshot.status.active, error: snapshot.status.error });
+        // 轮询结果没变时保持原对象：整棵界面不因一次空轮询重渲染（M9 任务 04）。
+        const nextActive = snapshot.status.active;
+        const nextError = snapshot.status.error;
+        setWatchState((current) =>
+          current.active === nextActive
+          && (current.error === nextError
+            || (current.error && nextError && formatAppError(current.error) === formatAppError(nextError)))
+            ? current
+            : { active: nextActive, error: nextError },
+        );
         if (notifications.consume(token.activation, snapshot)) {
           refreshCoordinator.request();
         }
@@ -3376,6 +3516,8 @@ export function App() {
         view: targetView,
         expand: true,
         activateDiff: true,
+        // 测量要等 diff 首屏真正就绪，不走分段加载。
+        progressive: false,
       });
       if (!opened) return null;
       const entry = opened.entry;
@@ -4819,9 +4961,19 @@ export function App() {
         }
         openedId = info.targetId;
         setHistorySession({ worktreeId, epoch: historyEpoch, targetId: info.targetId, refs: info.refs });
+        // 日志首屏就绪：补上这次打开的分段耗时（Q211）。
+        if (repoOpenTraceRef.current?.worktreeId === worktreeId) {
+          repoOpenTraceRef.current.trace.logReady();
+        }
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setAppError(toAppError(caught), worktreeId);
+        if (!cancelled) {
+          setAppError(toAppError(caught), worktreeId);
+          // 日志打不开时也要结掉这次打开记录，避免一直等不到日志首屏。
+          if (repoOpenTraceRef.current?.worktreeId === worktreeId) {
+            repoOpenTraceRef.current.trace.logReady();
+          }
+        }
       });
     return () => {
       cancelled = true;
@@ -6041,6 +6193,8 @@ export function App() {
                     onPickRecent={pickRecentMessage}
                     onAmendConfirm={confirmAmend}
                     onAmendCancel={() => setAmendConfirm(null)}
+                    worktreeId={worktreeId}
+                    changelistSelection={changelistMode && changelistRef.current ? selectionOf(changelistRef.current) : null}
                   />
                 ) : null}
               </>
@@ -6471,6 +6625,7 @@ export function App() {
         onRefresh={() => void refresh()}
         onOpenCommandLog={() => setCommandLogOpen((value) => !value)}
         autoFetchError={autoFetchError ? formatAppError(autoFetchError) : null}
+        environmentLoading={environmentLoading}
       />
 
       <NotificationStack notices={allNotices} onDismiss={dismissAllNotices} />

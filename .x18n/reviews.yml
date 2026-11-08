@@ -65,6 +65,36 @@ sources:
     en: 1cfe0f849c6e2e
   clone.urlPlaceholder:
     en: 97e15eb02be0d
+  commit.ai.cancel:
+    en: ac7950f3a317e
+  commit.ai.confirmBody:
+    en: 9518840edc2bf
+  commit.ai.confirmBodyAmend:
+    en: ac4df8bd9e18e
+  commit.ai.confirmInsecure:
+    en: 17aff7a18cc20b
+  commit.ai.confirmSend:
+    en: 101f3accd5567d
+  commit.ai.confirmTitle:
+    en: "1583316e57432"
+  commit.ai.generate:
+    en: 16a2fe1e8fdf9
+  commit.ai.noContent:
+    en: 1f05827f7f7995
+  commit.ai.notConfigured:
+    en: 114ddcba8bf593
+  commit.ai.replaceBody:
+    en: 23896362ff5f1
+  commit.ai.replaceConfirm:
+    en: c9b573630a116
+  commit.ai.replaceTitle:
+    en: 1859b803fb1022
+  commit.ai.running:
+    en: 2e0fbd2c635ff
+  commit.ai.undo:
+    en: 13ba7269c6a880
+  commit.ai.undoHint:
+    en: 20f0d0c679ea1
   commit.operationCherryPick:
     en: 7ac76241d749c
   commit.operationHintSentence:
@@ -177,6 +207,34 @@ sources:
     en: 15d8867d68ab2c
   edit.unsaved:
     en: 8156086bbc9a1
+  errors.ai.auth:
+    en: 1798f116ac1c88
+  errors.ai.credentialStore:
+    en: f4077706271e1
+  errors.ai.empty:
+    en: 1b2b72755e696e
+  errors.ai.modelMissing:
+    en: 16f0e527b2785
+  errors.ai.network:
+    en: ab834efa98718
+  errors.ai.notConfigured:
+    en: 1a68cad3d7d9bf
+  errors.ai.payload:
+    en: 5d0b42cd4496a
+  errors.ai.rateLimited:
+    en: "2e36768112167"
+  errors.ai.server:
+    en: 1d50c14ede998a
+  errors.ai.settingsLock:
+    en: 32b3de64595f
+  errors.ai.timeout:
+    en: 18795170abca72
+  errors.ai.unavailable:
+    en: 90bb365316008
+  errors.ai.urlInvalid:
+    en: 17f9c62788b52e
+  errors.ai.urlNotConfirmed:
+    en: 4078fa4cb8e58
   errors.autostash.restoreTargetChanged:
     en: 6f613417e2307
   errors.closeGuard.exitListener:
@@ -199,6 +257,8 @@ sources:
     en: bd48a5264bb93
   errors.distribution.webview2Missing:
     en: d0d7e186d3f7b
+  errors.environment.reloaded:
+    en: 1a299b66e569b9
   errors.environment.shellCaptureFailed:
     en: c192ceaf1fd31
   errors.environment.shellProfileFailed:
@@ -641,6 +701,8 @@ sources:
     en: cfee598b03894
   historyActions.singleCommitOnly:
     en: 1c1d2a90834706
+  measure.plainAppearanceTitle:
+    en: 12cc9ffde0fae4
   nativeMenu.about:
     en: 63a0b7a9801bb
   nativeMenu.closeAll:
@@ -669,6 +731,8 @@ sources:
     en: 2ebe4a724e1bc
   nativeMenu.paste:
     en: 1c32312acb30b2
+  nativeMenu.plainAppearance:
+    en: 6fc323c161974
   nativeMenu.quit:
     en: 1c0e295c9321d2
   nativeMenu.redo:
@@ -695,6 +759,54 @@ sources:
     en: f1179c2631ecd
   repository.removeHint:
     en: affe5d43e03d1
+  settings.ai.baseUrl:
+    en: 1ffb9dfe3ccf48
+  settings.ai.baseUrlHint:
+    en: 114bbe0ec69b06
+  settings.ai.clearKey:
+    en: fde2e639fc244
+  settings.ai.configured:
+    en: 1e6f395f9f1e74
+  settings.ai.description:
+    en: 68db02b6a1966
+  settings.ai.key:
+    en: 4e48dce8b0616
+  settings.ai.keyBinding:
+    en: 1170a67a4452da
+  settings.ai.keyHint:
+    en: 9ccf5324365f4
+  settings.ai.keySet:
+    en: 1ba6039a9c4aab
+  settings.ai.keyUnset:
+    en: 1eaf5df9a80472
+  settings.ai.language:
+    en: f55f038a2fa1
+  settings.ai.languageChinese:
+    en: e347be795ea2a
+  settings.ai.languageEnglish:
+    en: 16f508ccfaf0ce
+  settings.ai.languageRepo:
+    en: 1460ec4626c218
+  settings.ai.model:
+    en: f5a36c11fedf8
+  settings.ai.modelHint:
+    en: 5021f16d8ae72
+  settings.ai.prompt:
+    en: 1dd9536be189c4
+  settings.ai.promptHint:
+    en: 1a0424ed1cb28c
+  settings.ai.resetPrompt:
+    en: 14c57040cbbc8c
+  settings.ai.saveKey:
+    en: 1ca366f4bfd483
+  settings.ai.title:
+    en: 1ec2b4bc52f7be
+  settings.ai.unconfigured:
+    en: c3a02e02ee83c
+  settings.ai.unsavedKey:
+    en: 1482684d74d134
+  settings.keywords.ai:
+    en: bc5fc0844d47a
   settings.keywords.commitMessage:
     en: 838d5b3afb2c6
   settings.licenseReactBits:
@@ -805,6 +917,10 @@ sources:
     en: 10dc14fbf166da
   settings.m7.update.version:
     en: 1fe7cd9832d7c9
+  settings.measureBuild:
+    en: 15d99a93456d68
+  settings.pages.ai:
+    en: 193f7f279b32f6
   shortcuts.actions.cloneRepo:
     en: 1fcf7ca8580073
   shortcuts.actions.commit:
@@ -851,6 +967,12 @@ sources:
     en: e0e8ecd497b0f
   stash.otherArchives:
     en: e8b9f10217ce4
+  statusBar.environmentFallbackTitle:
+    en: 190f4a04992e6e
+  statusBar.environmentLoading:
+    en: d434f73990f8a
+  statusBar.environmentLoadingHint:
+    en: f2e8fe4e78c5d
   terminal.closePanel:
     en: ee9c6e43198b
   terminal.closeRunningConfirm:

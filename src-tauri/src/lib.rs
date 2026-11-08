@@ -3,6 +3,7 @@
 //! 边界：所有 Git 调用都在 Rust 层完成（ADR-0002）；前端只调用固定、带类型的命令。
 
 pub mod acceptance;
+pub mod ai;
 pub mod autostash;
 pub mod batch;
 pub mod commands;
@@ -11,6 +12,7 @@ pub mod commit_flow;
 pub mod commit_snapshot;
 pub mod commit_warnings;
 pub mod distribution;
+pub mod environment;
 pub mod error;
 pub mod external_tools;
 pub mod file_history;
@@ -26,6 +28,7 @@ pub mod recovery;
 pub mod remote_ops;
 pub mod review;
 pub mod rewrite;
+pub mod measure;
 pub mod session;
 pub mod settings;
 pub mod shell;
@@ -65,6 +68,8 @@ pub fn run() {
                 }
             };
             let data_dir = layout.data_dir().to_path_buf();
+            // M9 测量版：读入上次保存的对照外观开关，决定窗口是否以不透明方式创建（Q216）。
+            measure::init(&data_dir);
             // Explicit diagnostic runs can isolate settings without affecting normal launches.
             let measuring = commands::soak_seconds().is_some()
                 || commands::is_measure_auto_run()
@@ -122,6 +127,10 @@ pub fn run() {
                     tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
                 if let Some(webview_dir) = layout.webview_data_dir() {
                     window_builder = window_builder.data_directory(webview_dir.to_path_buf());
+                }
+                // 对照外观：窗口不透明创建，不用 Mica（Q216）。
+                if measure::plain_appearance() {
+                    window_builder = window_builder.transparent(false);
                 }
                 window_builder.build()?;
             }
@@ -202,7 +211,34 @@ pub fn run() {
                 })
                 .ok();
 
+            // Q212：诊断摘要攒批写入，每 5 秒合并一次；正常退出时再写最后一次（见 app.run）。
+            let diagnostics_flush = std::sync::Arc::clone(&state.m7_diagnostics);
+            std::thread::Builder::new()
+                .name("revia-diagnostics-flush".into())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(
+                        crate::m7::diagnostics::SUMMARY_FLUSH_INTERVAL_MS,
+                    ));
+                    let _ = diagnostics_flush.maybe_flush();
+                })
+                .ok();
+            // Q210：每 5 秒采样一次进程 CPU 与内存，只保留最近 30 分钟。
+            let perf_samples = std::sync::Arc::clone(&state.perf);
+            std::thread::Builder::new()
+                .name("revia-perf-sample".into())
+                .spawn(move || {
+                    std::thread::sleep(crate::m7::perf::SYSTEM_SAMPLE_INTERVAL);
+                    loop {
+                        if let Some(sample) = crate::m7::perf::sample_system() {
+                            perf_samples.note_system_sample(sample);
+                        }
+                        std::thread::sleep(crate::m7::perf::SYSTEM_SAMPLE_INTERVAL);
+                    }
+                })
+                .ok();
+
             crate::m7::update::spawn_auto_check(app.handle().clone(), data_dir_for_update, std::sync::Arc::clone(&state.m7_update));
+            let _ = state.app.set(app.handle().clone());
             app.manage(state);
             Ok(())
         })
@@ -254,7 +290,17 @@ pub fn run() {
             commands::purge_recovery,
             commands::change_entry,
             commands::measure_config,
+            ai::commands::ai_status,
+            ai::commands::ai_set_key,
+            ai::commands::ai_clear_key,
+            ai::commands::ai_confirm,
+            ai::commands::ai_generate,
+            ai::commands::ai_cancel,
+            commands::m9_measure_state,
+            commands::m9_set_plain_appearance,
             commands::write_measurement,
+            commands::report_performance,
+            commands::environment_status,
             commands::debug_log,
             commands::set_exit_blocked,
             commands::request_exit,
@@ -384,6 +430,12 @@ pub fn run() {
     platform::install_exit_interceptor(app.handle()).expect("原生退出保护安装失败");
     app.run(|app, event| {
         use tauri::{Emitter, Manager};
+        // 正常退出写最后一次诊断摘要（Q212）；崩溃时最多丢最后 5 秒。
+        if let tauri::RunEvent::Exit = event {
+            if let Some(state) = app.try_state::<AppState>() {
+                state.on_exit();
+            }
+        }
         // Runtime 退出的最后一道保护；macOS terminate: 在平台层先转交同一前端驱动。
         // 前端窗口已销毁时放行，避免进程无法结束。
         if let tauri::RunEvent::ExitRequested { api, .. } = event {

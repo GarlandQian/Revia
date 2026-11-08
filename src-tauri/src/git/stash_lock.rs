@@ -96,7 +96,7 @@ pub(crate) fn delete_reference(
         .current_dir(&git.directory)
         .args(args)
         .env_clear()
-        .envs(git.env.iter().cloned())
+        .envs(git.env_snapshot())
         .stdin(Stdio::piped())
         .stdout(stdout_writer)
         .stderr(stderr_writer);

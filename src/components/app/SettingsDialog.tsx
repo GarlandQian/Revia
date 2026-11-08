@@ -1,5 +1,5 @@
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { formatAppError } from "@/lib/error";
+import { formatAppError, toAppError } from "@/lib/error";
 /**
  * 设置对话框（M4 F08、返修 E/Q139）：左上角搜索、左侧分类可展开、右侧顶部
  * 显示“分类 › 页名”，外观照 VS Code。
@@ -9,12 +9,15 @@ import { formatAppError } from "@/lib/error";
  * 按键都写设置。所有设置都存在 Rust 的 settings.rs 里，前端不用 localStorage。
  */
 
-import type {
-  FetchTagMode,
-  LogColumns,
-  LogPreviewPosition,
-  NotifyKinds,
-  UpdateMode,
+import {
+  ipc,
+  type AiLanguage,
+  type AiStatus,
+  type FetchTagMode,
+  type LogColumns,
+  type LogPreviewPosition,
+  type NotifyKinds,
+  type UpdateMode,
 } from "@/lib/ipc";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { messages, t } from "@/lib/i18n/index";
@@ -139,6 +142,11 @@ export interface SettingsPatch {
   appUpdateMode?: AppUpdateMode;
   allowPrerelease?: boolean;
   shortcuts?: Record<string, string>;
+  /** M9：AI 服务配置（密钥走单独的 ai_set_key）。 */
+  aiBaseUrl?: string;
+  aiModel?: string;
+  aiLanguage?: AiLanguage;
+  aiPrompt?: string;
 }
 
 type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "extensions" | "about";
@@ -148,6 +156,7 @@ type Page =
   | "font"
   | "commitMessage"
   | "commitWarnings"
+  | "ai"
   | "diffDisplay"
   | "logSettings"
   | "fileHistory"
@@ -197,6 +206,11 @@ function buildCategories(): CategoryDef[] {
         id: "commitWarnings",
         title: messages.settings.pages.commitWarnings,
         keywords: keywordList(messages.settings.keywords.commitWarnings),
+      },
+      {
+        id: "ai",
+        title: messages.settings.pages.ai,
+        keywords: keywordList(messages.settings.keywords.ai),
       },
     ],
   },
@@ -283,6 +297,7 @@ const PAGE_ICONS: Record<Page, string> = {
   font: "text-size",
   commitMessage: "comment-draft",
   commitWarnings: "warning",
+  ai: "sparkle",
   diffDisplay: "diff",
   logSettings: "list-unordered",
   fileHistory: "history",
@@ -302,6 +317,7 @@ const CATEGORY_OF_PAGE: Record<Page, Category> = {
   font: "appearance",
   commitMessage: "commit",
   commitWarnings: "commit",
+  ai: "commit",
   diffDisplay: "diff",
   logSettings: "log",
   fileHistory: "log",
@@ -358,6 +374,23 @@ export function SettingsDialog({
   const [protectedBranches, setProtectedBranches] = useState(values.protectedBranches);
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState(false);
+  // M9：AI 服务配置（密钥只保存到系统凭据库，读不回原文）。
+  const [ai, setAi] = useState<AiStatus | null>(null);
+  const [aiBaseUrl, setAiBaseUrl] = useState("");
+  const [aiModel, setAiModel] = useState("");
+  const [aiKey, setAiKey] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLanguage, setAiLanguage] = useState<AiLanguage>("repo");
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  // M9 测量版：关于页显示构建来源（Q216）。
+  const [measure, setMeasure] = useState<{ measure: boolean; commit: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    void ipc.measureState()
+      .then((state) => { if (active) setMeasure(state); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -406,7 +439,46 @@ export function SettingsDialog({
     return result;
   }, [categories, trimmedQuery]);
 
+  const loadAi = async () => {
+    try {
+      const status = await ipc.aiStatus();
+      setAi(status);
+      setAiBaseUrl(status.baseUrl);
+      setAiModel(status.model);
+      setAiPrompt(status.prompt);
+      setAiLanguage(status.language);
+      setAiKey("");
+    } catch (caught) {
+      setError(toAppError(caught));
+    }
+  };
+
+  useEffect(() => {
+    if (open && page === "ai") void loadAi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, page]);
+
   if (!open) return null;
+
+  const saveAiKey = async () => {
+    try {
+      setAi(await ipc.aiSetKey(aiKey));
+      setAiKey("");
+      setAiNotice(t("settings.ai.keySet"));
+    } catch (caught) {
+      setError(toAppError(caught));
+    }
+  };
+
+  const clearAiKey = async () => {
+    try {
+      setAi(await ipc.aiClearKey());
+      setAiKey("");
+      setAiNotice(t("settings.ai.keyUnset"));
+    } catch (caught) {
+      setError(toAppError(caught));
+    }
+  };
 
   const commit = async (patch: SettingsPatch) => {
     const failure = await onChange(patch);
@@ -745,6 +817,101 @@ export function SettingsDialog({
                     <span className="text-[12px] text-descriptionforeground">MB</span>
                   </div>
                 </Field>
+              </div>
+            ) : null}
+
+            {page === "ai" ? (
+              <div className="space-y-5">
+                <p className="text-[12px] leading-relaxed text-descriptionforeground">{t("settings.ai.description")}</p>
+                <Field label={t("settings.ai.baseUrl")} hint={t("settings.ai.baseUrlHint")}>
+                  <input
+                    className="settings-input w-full"
+                    value={aiBaseUrl}
+                    spellCheck={false}
+                    onChange={(event) => setAiBaseUrl(event.target.value)}
+                    onBlur={() => {
+                      if (aiBaseUrl.trim() !== (ai?.baseUrl ?? "")) {
+                        void commit({ aiBaseUrl: aiBaseUrl.trim() }).then((ok) => { if (ok) void loadAi(); });
+                      }
+                    }}
+                  />
+                </Field>
+                <Field label={t("settings.ai.model")} hint={t("settings.ai.modelHint")}>
+                  <input
+                    className="settings-input w-full"
+                    value={aiModel}
+                    spellCheck={false}
+                    onChange={(event) => setAiModel(event.target.value)}
+                    onBlur={() => {
+                      if (aiModel.trim() !== (ai?.model ?? "")) void commit({ aiModel: aiModel.trim() });
+                    }}
+                  />
+                </Field>
+                <Field label={t("settings.ai.language")}>
+                  <select
+                    className="settings-input"
+                    value={aiLanguage}
+                    onChange={(event) => {
+                      const value = event.target.value as AiLanguage;
+                      setAiLanguage(value);
+                      void commit({ aiLanguage: value });
+                    }}
+                  >
+                    <option value="repo">{t("settings.ai.languageRepo")}</option>
+                    <option value="chinese">{t("settings.ai.languageChinese")}</option>
+                    <option value="english">{t("settings.ai.languageEnglish")}</option>
+                  </select>
+                </Field>
+                <div>
+                  <span className="mb-1 block text-[12.5px] font-semibold">{t("settings.ai.key")}</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="settings-input min-w-0 flex-1"
+                      type="password"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={aiKey}
+                      placeholder={ai?.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")}
+                      onChange={(event) => setAiKey(event.target.value)}
+                    />
+                    <button type="button" className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50" disabled={!aiKey.trim()} onClick={() => void saveAiKey()}>
+                      {t("settings.ai.saveKey")}
+                    </button>
+                    <button type="button" className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50" disabled={!ai?.keySet} onClick={() => void clearAiKey()}>
+                      {t("settings.ai.clearKey")}
+                    </button>
+                  </div>
+                  <span className="mt-1 block text-[11.5px] leading-relaxed text-descriptionforeground">
+                    {ai?.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")} · {t("settings.ai.keyHint")} {t("settings.ai.keyBinding")}
+                  </span>
+                </div>
+                <div>
+                  <span className="mb-1 block text-[12.5px] font-semibold">{t("settings.ai.prompt")}</span>
+                  <textarea
+                    className="settings-input min-h-40 w-full font-mono text-[12px] leading-relaxed"
+                    value={aiPrompt}
+                    spellCheck={false}
+                    onChange={(event) => setAiPrompt(event.target.value)}
+                    onBlur={() => {
+                      if (aiPrompt !== (ai?.prompt ?? "")) void commit({ aiPrompt });
+                    }}
+                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                      onClick={() => {
+                        setAiPrompt(ai?.defaultPrompt ?? "");
+                        void commit({ aiPrompt: "" }).then((ok) => { if (ok) void loadAi(); });
+                      }}
+                    >
+                      {t("settings.ai.resetPrompt")}
+                    </button>
+                    <span className="text-[11.5px] leading-relaxed text-descriptionforeground">{t("settings.ai.promptHint")}</span>
+                  </div>
+                </div>
+                {!ai?.configured ? <p className="text-[12px] text-descriptionforeground">{t("settings.ai.unconfigured")}</p> : null}
+                {aiNotice ? <p role="status" className="text-[12px] text-descriptionforeground">{aiNotice}</p> : null}
               </div>
             ) : null}
 
@@ -1117,6 +1284,9 @@ export function SettingsDialog({
               <div className="space-y-3 text-[12.5px] leading-relaxed">
                 <p className="text-[15px] font-semibold">Revia</p>
                 <p className="text-descriptionforeground">{messages.settings.aboutText}</p>
+                {measure?.measure ? (
+                  <p className="text-descriptionforeground">{t("settings.measureBuild", { commit: measure.commit })}</p>
+                ) : null}
                 <div>
                   <p className="font-semibold">{messages.settings.licenses}</p>
                   <ul className="mt-1 list-disc space-y-1 pl-5 text-descriptionforeground">

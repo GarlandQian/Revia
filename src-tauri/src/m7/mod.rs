@@ -12,6 +12,7 @@ pub mod commands;
 pub mod diagnostics;
 pub mod edit;
 pub mod github;
+pub mod perf;
 pub mod terminal;
 pub mod theme;
 pub mod update;

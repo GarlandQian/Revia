@@ -544,7 +544,7 @@ fn restart_retains_cache_and_replacement_worktree_does_not_adopt_it() {
     f.session = WorktreeSession::open(
         "protection-fixture",
         &f.repo,
-        f.session.shell_env.clone(),
+        f.session.shell_env_snapshot(),
         Arc::new(CommandLog::default()),
     )
     .unwrap();

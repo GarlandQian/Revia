@@ -218,16 +218,19 @@ pub async fn m7_terminal_open(
     app: tauri::AppHandle,
     request: TerminalOpenRequest,
 ) -> Result<TerminalSessionInfo> {
+    // 内置终端使用完整登录环境（Q212）：未就绪时等待，界面显示正在等待。
+    state.await_environment(&request.worktree_id)?;
     let session = session_for(&state, &request.worktree_id)?;
     let manager = Arc::clone(&state.m7_terminal);
     let cwd = request.cwd.clone();
+    let shell_env = session.shell_env_snapshot();
     blocking(move || {
         session.require_identity()?;
         manager.open(
             &app,
             &session.id,
             &session.path,
-            &session.shell_env,
+            &shell_env,
             cwd.as_deref(),
             request.rows,
             request.cols,
@@ -674,6 +677,7 @@ pub async fn m7_preview_diagnostics(
     };
     let command_log = Arc::clone(&state.command_log);
     let summaries = Arc::clone(&state.m7_diagnostics);
+    let perf = Arc::clone(&state.perf);
     blocking(move || {
         super::diagnostics::preview(
             &request,
@@ -681,6 +685,7 @@ pub async fn m7_preview_diagnostics(
             &command_log,
             &summaries,
             session.as_deref(),
+            Some(&perf),
         )
     })
     .await

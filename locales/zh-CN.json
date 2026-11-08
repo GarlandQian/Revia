@@ -21,7 +21,10 @@
   },
   "statusBar": {
     "upstreamHint": "领先和落后数按本地记录，截至上次 fetch；不会联网核对。",
-    "asOfLastFetch": "截至上次 fetch"
+    "asOfLastFetch": "截至上次 fetch",
+    "environmentLoading": "正在加载登录环境",
+    "environmentLoadingHint": "完整的登录环境还在后台加载；提交、fetch/push 与内置终端会等它就绪。",
+    "environmentFallbackTitle": "登录环境加载失败，已使用进程环境"
   },
   "firstRun": {
     "title": "添加仓库",
@@ -1192,13 +1195,15 @@
       "protocol": "Git 的 stash 删除事务未按预期完成，请刷新后核对"
     },
     "environment": {
+      "stillLoading": "登录环境仍在加载，请稍候",
       "gitVersion": "{path}（{version}）；需要 Git {minimum} 或更高版本",
       "shellTiming": "{shell} · {elapsed} 毫秒",
       "shellFallback": "登录 shell 环境解析回退到了最小环境，hooks 与外部工具可能找不到",
       "shellProfileFailed": "PowerShell profile 加载失败或被执行策略阻止，已回退到进程环境：{detail}",
       "shellTimeout": "PowerShell 环境捕获超时，已回退到进程环境：{detail}",
       "shellCaptureFailed": "PowerShell 环境捕获失败，已回退到进程环境：{detail}",
-      "shellWorktreeMissing": "无法进入 worktree，已回退到进程环境：{detail}"
+      "shellWorktreeMissing": "无法进入 worktree，已回退到进程环境：{detail}",
+      "reloaded": "运行环境已更新，请重试一次"
     },
     "closeGuard": {
       "unavailable": "关闭保护不可用：{cause}",
@@ -1213,6 +1218,7 @@
       "unavailable": "无法更新原生菜单：{cause}"
     },
     "m7": {
+      "measureOnly": "此功能仅在测量版构建中可用",
       "editPathOutsideWorktree": "只能编辑当前 worktree 里的文件",
       "editSymlinkReadonly": "符号链接只读，不能在这里编辑",
       "editNotRegularFile": "不是普通文件，不能编辑",
@@ -1341,6 +1347,22 @@
       "portableLocationUnavailable": "便携版需要位于一个可访问的文件夹中，找不到程序所在目录",
       "portableDataDirUnwritable": "便携版数据目录不可写：{error}",
       "webview2Missing": "找不到 Microsoft Edge WebView2 运行时：{error}"
+    },
+    "ai": {
+      "auth": "认证失败，请检查密钥",
+      "modelMissing": "找不到模型或接口",
+      "rateLimited": "请求过于频繁，请稍后再试",
+      "network": "无法连接 AI 服务",
+      "timeout": "AI 服务响应超时",
+      "server": "AI 服务出错",
+      "empty": "AI 服务返回了空内容",
+      "notConfigured": "还没有配置 AI 服务",
+      "urlNotConfirmed": "这个服务地址还没有确认发送",
+      "urlInvalid": "服务地址必须以 http:// 或 https:// 开头",
+      "payload": "整理发送内容失败",
+      "unavailable": "AI 请求暂时不可用",
+      "credentialStore": "无法访问系统凭据库",
+      "settingsLock": "读取设置失败"
     }
   },
   "commit": {
@@ -1443,7 +1465,24 @@
         "reservedName": "{component} 是 Windows 保留名称"
       }
     },
-    "operationHintSentence": "{text}。"
+    "operationHintSentence": "{text}。",
+    "ai": {
+      "generate": "生成",
+      "cancel": "取消",
+      "replaceTitle": "替换提交信息？",
+      "replaceBody": "提交信息框里已有内容。生成会替换这些内容，完成后可以撤销。",
+      "replaceConfirm": "替换并生成",
+      "confirmTitle": "确认发送内容",
+      "confirmBody": "将把改动内容、文件清单和最近提交标题发送到 {url}。",
+      "confirmBodyAmend": "将把改动内容、文件清单、最近提交标题和原提交信息发送到 {url}。",
+      "confirmInsecure": "这个地址使用未加密的 http 连接，内容可能在网络中被看到。",
+      "confirmSend": "确认发送",
+      "undo": "撤销生成",
+      "undoHint": "恢复到生成前的内容",
+      "noContent": "没有可发送的改动",
+      "notConfigured": "先在设置中配置 AI 服务",
+      "running": "生成中…"
+    }
   },
   "settings": {
     "open": "设置",
@@ -1470,7 +1509,8 @@
       "updatePush": "更新与推送",
       "log": "日志",
       "language": "语言",
-      "fileHistory": "文件历史"
+      "fileHistory": "文件历史",
+      "ai": "AI"
     },
     "uiZoom": "界面缩放",
     "uiZoomHint": "80%–150%；也可以用 {control}{alt}= / {control}{alt}- / {control}{alt}0 调整。",
@@ -1561,7 +1601,8 @@
       "log": "日志|列|哈希|合并线拉直|第一父提交|预览位置|Long Edges",
       "about": "关于|版本|许可|Revia",
       "language": "语言|界面语言|中文|English|自动",
-      "fileHistory": "文件历史|显示文件名|路径|重命名|blame"
+      "fileHistory": "文件历史|显示文件名|路径|重命名|blame",
+      "ai": "AI 提交信息 服务 模型 密钥 提示词"
     },
     "cherryPickIncludeSource": "Cherry-pick 时记录来源",
     "cherryPickIncludeSourceHint": "提交已存在于本地远端跟踪引用时，添加 `-x` 来源行。",
@@ -1643,7 +1684,31 @@
         "prereleaseHint": "开启后同时检查预发布版本（默认只查稳定版）"
       }
     },
-    "licenseReactBits": "React Bits 玻璃组件（MIT + Commons Clause，见 src/components/m7/glass/LICENSE.md）"
+    "licenseReactBits": "React Bits 玻璃组件（MIT + Commons Clause，见 src/components/m7/glass/LICENSE.md）",
+    "measureBuild": "测量构建 m9 · {commit}",
+    "ai": {
+      "title": "AI 生成提交信息",
+      "description": "使用 OpenAI 兼容服务生成提交信息。密钥保存在系统凭据库，只与这个服务地址绑定。",
+      "baseUrl": "服务地址",
+      "baseUrlHint": "例如 https://api.openai.com/v1、https://api.deepseek.com、http://localhost:11434/v1",
+      "model": "模型名",
+      "modelHint": "例如 gpt-4o-mini、deepseek-chat、qwen2.5-coder",
+      "key": "密钥",
+      "keyHint": "留空表示服务不需要密钥。密钥只保存到系统凭据库，读不回原文。",
+      "keySet": "已保存密钥",
+      "keyUnset": "未保存密钥",
+      "saveKey": "保存密钥",
+      "clearKey": "清除密钥",
+      "language": "生成语言",
+      "languageRepo": "跟随仓库",
+      "languageChinese": "中文",
+      "languageEnglish": "English",
+      "prompt": "提示词",
+      "promptHint": "可整段改写。生成语言、首行上限、空行和“只输出提交信息”的规则始终追加在提示词之后。",
+      "resetPrompt": "恢复默认",
+      "unconfigured": "服务地址和模型名都填写后才算已配置。",
+      "keyBinding": "换了服务地址会删除旧密钥，需要重新填写。"
+    }
   },
   "log": {
     "title": "日志",
@@ -1868,7 +1933,8 @@
     "render": "界面渲染",
     "jump": "跳转后内容出现",
     "uncovered": "滚动中未覆盖行数",
-    "frames": "帧间隔 p50 / p95"
+    "frames": "帧间隔 p50 / p95",
+    "plainAppearanceTitle": "Revia（对照外观）"
   },
   "close": {
     "title": "仍有写操作在进行",
@@ -2112,7 +2178,8 @@
     "selectAll": "全选",
     "minimize": "最小化",
     "maximize": "缩放",
-    "fullscreen": "切换全屏"
+    "fullscreen": "切换全屏",
+    "plainAppearance": "对照外观（下次启动生效）"
   },
   "edit": {
     "save": "保存",

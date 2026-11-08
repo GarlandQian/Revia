@@ -2,7 +2,7 @@
 import type { GlassBackground } from "./GlassBackground";
 import type { GlassRegion } from "./GlassRegion";
 
-export type GlassLayout = { background: GlassBackground,
+export type GlassLayout = { background: GlassBackground, 
 /**
  * 浮在窗口底上的玻璃（工具栏胶囊等）。
  */

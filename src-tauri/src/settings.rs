@@ -82,6 +82,16 @@ pub struct Settings {
     pub commit_warn_large_file_bytes: u64,
     /// 提交时警告：在其他系统上不合法的文件名。
     pub commit_warn_invalid_filename: bool,
+    /// M9：AI 服务地址（OpenAI 兼容；空表示未配置，Q213）。
+    pub ai_base_url: String,
+    /// M9：AI 模型名；与服务地址同时非空才算已配置。
+    pub ai_model: String,
+    /// M9：生成语言（Q213）。
+    pub ai_language: crate::ai::AiLanguage,
+    /// M9：可整段改写的提示词；空表示用默认提示词。
+    pub ai_prompt: String,
+    /// M9：已确认发送的服务地址（Q221：地址变了要重新确认）。
+    pub ai_confirmed_urls: Vec<String>,
     /// 各类成功通知是否弹出（E.6；失败与结果待核对始终弹出）。
     pub notify: NotifyKinds,
     /// 合并时自动应用无冲突改动（Q143；关闭后初始结果用共同祖先）。
@@ -395,6 +405,11 @@ impl Default for Settings {
             commit_warn_detached: true,
             commit_warn_large_file_bytes: 50 * 1024 * 1024,
             commit_warn_invalid_filename: true,
+            ai_base_url: String::new(),
+            ai_model: String::new(),
+            ai_language: crate::ai::AiLanguage::Repo,
+            ai_prompt: String::new(),
+            ai_confirmed_urls: Vec::new(),
             notify: NotifyKinds::default(),
             merge_auto_apply: true,
             log_columns: LogColumns::default(),
@@ -462,6 +477,11 @@ pub struct SettingsPatch {
     pub commit_warn_detached: Option<bool>,
     pub commit_warn_large_file_bytes: Option<u64>,
     pub commit_warn_invalid_filename: Option<bool>,
+    /// M9：AI 服务配置（密钥不在这里，只写系统凭据库）。
+    pub ai_base_url: Option<String>,
+    pub ai_model: Option<String>,
+    pub ai_language: Option<crate::ai::AiLanguage>,
+    pub ai_prompt: Option<String>,
     pub notify: Option<NotifyKinds>,
     pub merge_auto_apply: Option<bool>,
     pub log_columns: Option<LogColumns>,
@@ -803,6 +823,24 @@ impl Registry {
         if let Some(value) = patch.commit_warn_invalid_filename {
             next.commit_warn_invalid_filename = value;
         }
+        if let Some(value) = &patch.ai_base_url {
+            let normalized = crate::ai::normalize_base_url(value)?;
+            if normalized != next.ai_base_url {
+                // Q221：换了服务地址视为换了服务，旧密钥与发送确认都失效。
+                crate::ai::clear_key(&next.ai_base_url)?;
+                next.ai_confirmed_urls.clear();
+                next.ai_base_url = normalized;
+            }
+        }
+        if let Some(value) = &patch.ai_model {
+            next.ai_model = value.trim().to_string();
+        }
+        if let Some(value) = patch.ai_language {
+            next.ai_language = value;
+        }
+        if let Some(value) = &patch.ai_prompt {
+            next.ai_prompt = value.clone();
+        }
         if let Some(value) = patch.notify {
             next.notify = value;
         }
@@ -888,6 +926,19 @@ impl Registry {
             next.shortcuts = shortcuts;
         }
         self.settings = next;
+        self.persist()?;
+        Ok(self.settings.clone())
+    }
+
+    /// 记下当前服务地址已经确认发送；地址变了要重新确认（Q221）。
+    pub fn confirm_ai_url(&mut self) -> Result<Settings> {
+        let url = self.settings.ai_base_url.clone();
+        if url.is_empty() {
+            return Err(crate::ai::not_configured());
+        }
+        if !self.settings.ai_confirmed_urls.iter().any(|known| known == &url) {
+            self.settings.ai_confirmed_urls.push(url);
+        }
         self.persist()?;
         Ok(self.settings.clone())
     }

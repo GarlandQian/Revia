@@ -4,7 +4,7 @@ import type { Distribution } from "./Distribution";
 /**
  * 供界面与诊断查看的实际启动布局。
  */
-export type DistributionInfo = { shape: Distribution, dataDir: string,
+export type DistributionInfo = { shape: Distribution, dataDir: string, 
 /**
  * 便携版：`data/webview2`；安装版交给系统默认位置，故为 None。
  */

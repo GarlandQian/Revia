@@ -216,9 +216,14 @@ set +e
 $GIT -C "$OUT/conflicts" merge --no-edit feature >/dev/null 2>&1
 set -e
 
+# ---------------------------------------------------------------- 大仓库 fixture（M9 任务 06）
+
+init_repo large
+$PYTHON "$(dirname "$0")/gen_large_repo.py" "$OUT/large"
+
 echo
 printf '=== fixture 概览 ===\n'
-for name in node-versioned node-default mergetool diffs conflicts; do
+for name in node-versioned node-default mergetool diffs conflicts large; do
   printf '%-16s %s\n' "$name" "$OUT/$name"
 done
 printf 'diffs 仓库改动行数：%s\n' \

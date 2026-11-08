@@ -210,6 +210,8 @@ pub struct WorktreeSessionInfo {
     pub shell: String,
     /// 登录 shell 解析耗时。
     pub shell_elapsed_ms: u64,
+    /// 读取 Git 版本耗时（M9 性能记录用）。
+    pub git_version_ms: u64,
     /// 是否回退到了最小环境。
     pub used_fallback: bool,
     pub path_entries: u32,
@@ -267,7 +269,8 @@ pub struct WorktreeSession {
     pub id: String,
     pub path: PathBuf,
     pub git: Git,
-    pub shell_env: ShellEnv,
+    /// 完整登录环境；后台解析完成后可能在原会话上替换（Q212）。
+    pub shell_env: std::sync::Mutex<ShellEnv>,
     pub info: WorktreeSessionInfo,
     snapshot: Mutex<Option<Snapshot>>,
     /// 状态读取串行锁：读取与发布必须成对，避免早开始的读取后发布、覆盖较新的快照（Q88）。
@@ -283,6 +286,10 @@ pub struct WorktreeSession {
     /// 命令层判断“能否重新加载环境”时也要读它（返修 C3）。
     pub(crate) writing: Mutex<bool>,
     write_generation: AtomicU64,
+    /// 写操作开始前等待完整环境就绪的入口（Q222、S9）；只有命令层打开的会话会设置。
+    env_gate: std::sync::OnceLock<EnvGate>,
+    /// Git 路径变化后被新会话取代：仍持有旧会话的写操作必须重新获取（Q222）。
+    superseded: std::sync::atomic::AtomicBool,
     /// 审阅标记存储（None 表示未配置，此时界面不显示勾选框）。
     review_store: Option<Arc<ReviewStore>>,
     /// 审阅标记的**真实提交序号**：每次成功写入在会话内单调递增。
@@ -305,8 +312,12 @@ struct HighlightStamp {
 }
 
 /// 写操作互斥 RAII Guard，离开作用域自动释放写锁。
-#[derive(Debug)]
 pub struct WriteGuard<'a>(&'a Mutex<bool>, &'a AtomicU64);
+impl std::fmt::Debug for WriteGuard<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("WriteGuard").field(self.0).field(self.1).finish()
+    }
+}
 impl WriteGuard<'_> {
     pub(crate) fn holds(&self, session: &WorktreeSession) -> bool {
         std::ptr::eq(self.0, &session.writing)
@@ -321,8 +332,20 @@ impl<'a> Drop for WriteGuard<'a> {
     }
 }
 
+/// 等待完整环境就绪；超时返回结构化错误。
+pub type EnvGate = Arc<dyn Fn() -> Result<()> + Send + Sync>;
+
+fn environment_reloaded() -> AppError {
+    AppError::coded(
+        ErrorKind::Rejected,
+        "errors.environment.reloaded",
+        "运行环境已更新，请重试一次",
+        &[],
+    )
+}
+
 /// 生产环境检查：失败时把结构化回退原因交给界面，原始详情作为独立参数（不持久化）。
-fn shell_environment_check(shell_env: &ShellEnv) -> EnvironmentCheck {
+pub(crate) fn shell_environment_check(shell_env: &ShellEnv) -> EnvironmentCheck {
     let hint = shell_env.info.used_fallback.then(|| {
         let code = shell_env
             .info
@@ -347,6 +370,43 @@ fn shell_environment_check(shell_env: &ShellEnv) -> EnvironmentCheck {
 }
 
 impl WorktreeSession {
+    /// 换成完整登录环境（Q212）：Git 子进程与内置终端都用新的 PATH / 变量。
+    ///
+    /// Git 程序路径变化不在原会话上处理，由命令层换一个会话并重读一次。
+    pub fn apply_environment(&self, env: ShellEnv) {
+        self.git.set_env(&env);
+        if let Ok(mut current) = self.shell_env.lock() {
+            *current = env;
+        }
+    }
+
+    /// Git 版本是否满足下限（打开时已检查过，不再额外运行 Git）。
+    pub fn git_version_ok(&self) -> bool {
+        self.info
+            .checks
+            .iter()
+            .find(|check| check.name == "git")
+            .is_none_or(|check| check.ok)
+    }
+
+    /// 设置写操作前的环境等待入口（命令层打开会话后调用一次）。
+    pub fn set_env_gate(&self, gate: EnvGate) {
+        let _ = self.env_gate.set(gate);
+    }
+
+    /// 标记已被新会话取代（调用方须持有本会话的 `writing` 锁且没有写操作在进行）。
+    pub fn mark_superseded(&self) {
+        self.superseded.store(true, Ordering::Release);
+    }
+
+    /// 当前环境是否仍是打开时的临时环境（供状态展示）。
+    pub fn shell_env_snapshot(&self) -> ShellEnv {
+        self.shell_env
+            .lock()
+            .map(|env| env.clone())
+            .unwrap_or_else(|error| error.into_inner().clone())
+    }
+
     pub fn open(
         id: &str,
         path: &Path,
@@ -378,7 +438,9 @@ impl WorktreeSession {
     ) -> Result<Arc<Self>> {
         let git =
             Git::with_program(path, &shell_env, command_log, git_program)?.with_worktree_id(id);
+        let version_started = std::time::Instant::now();
         let git_version = git.version()?;
+        let git_version_ms = version_started.elapsed().as_millis() as u64;
         let (major, minor) = git::parse_version(&git_version).unwrap_or((0, 0));
         let mut checks = Vec::new();
         checks.push(EnvironmentCheck {
@@ -398,6 +460,7 @@ impl WorktreeSession {
             git_version,
             shell: shell_env.info.shell.clone(),
             shell_elapsed_ms: shell_env.info.elapsed_ms,
+            git_version_ms,
             used_fallback: shell_env.info.used_fallback,
             path_entries: shell_env.path.len() as u32,
             checks,
@@ -409,7 +472,7 @@ impl WorktreeSession {
             id: id.to_string(),
             path: path.to_path_buf(),
             git,
-            shell_env,
+            shell_env: std::sync::Mutex::new(shell_env),
             info,
             snapshot: Mutex::new(None),
             read_lock: Mutex::new(()),
@@ -421,6 +484,8 @@ impl WorktreeSession {
             confirmation_epoch: AtomicU64::new(0),
             writing: Mutex::new(false),
             write_generation: AtomicU64::new(0),
+            env_gate: std::sync::OnceLock::new(),
+            superseded: std::sync::atomic::AtomicBool::new(false),
             review_store,
             review_seq: Mutex::new(0),
             identity: identity.clone(),
@@ -1663,6 +1728,10 @@ impl WorktreeSession {
 
     /// 获取当前 worktree 的独占写操作锁（不排队，发现被占用立即拒绝并发写，Q90/T06）。
     pub fn acquire_write_lock(&self) -> Result<WriteGuard<'_>> {
+        // 所有写操作统一在这里等待完整环境（hooks、凭据、git-lfs 等都需要完整 PATH，Q222、S9）。
+        if let Some(gate) = self.env_gate.get() {
+            gate()?;
+        }
         let mut writing = self.writing.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -1678,6 +1747,10 @@ impl WorktreeSession {
                 "当前 worktree 有正在进行的写操作，请稍候",
                 &[],
             ));
+        }
+        // 环境安装与会话替换都在持有 `writing` 锁时进行，这里的判断是权威的。
+        if self.superseded.load(Ordering::Acquire) {
+            return Err(environment_reloaded());
         }
         self.require_identity()?;
         self.write_generation.fetch_add(1, Ordering::Release);
@@ -3860,6 +3933,54 @@ mod tests {
             new_lines: deleted + 3,
             raw_patch: Vec::new(),
         }
+    }
+
+    fn temp_repo() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("repo")).unwrap();
+        let status = std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(dir.path().join("repo"))
+            .status()
+            .unwrap();
+        assert!(status.success());
+        dir
+    }
+
+    #[test]
+    fn apply_environment_swaps_git_and_terminal_env() {
+        let dir = temp_repo();
+        let repo = dir.path().join("repo");
+        let env = ShellEnv::minimal(&repo);
+        let session = WorktreeSession::open(
+            "wt-1",
+            &repo,
+            env,
+            std::sync::Arc::new(crate::git::CommandLog::default()),
+        )
+        .unwrap();
+        let mut resolved = ShellEnv::minimal(&repo);
+        resolved.vars.insert("REVIA_TEST_PATH".into(), "/custom/bin".into());
+        resolved.path = vec!["/custom/bin".into()];
+        session.apply_environment(resolved);
+        // hooks 与提交走 git 子进程环境（Q212）。
+        let git_env = session.git.env.read().unwrap();
+        assert!(git_env
+            .iter()
+            .any(|(key, value)| key == "REVIA_TEST_PATH" && value == "/custom/bin"));
+        assert!(git_env
+            .iter()
+            .any(|(key, value)| key == "PATH" && value.contains("/custom/bin")));
+        drop(git_env);
+        // 内置终端用会话里的环境快照。
+        assert_eq!(
+            session
+                .shell_env_snapshot()
+                .vars
+                .get("REVIA_TEST_PATH")
+                .map(String::as_str),
+            Some("/custom/bin")
+        );
     }
 
     #[test]

@@ -493,9 +493,56 @@ impl EnvCache {
         env
     }
 
+    /// 只读缓存，不触发解析（M9 打开路径用）。
+    pub fn peek(&self, worktree: &Path) -> Option<ShellEnv> {
+        self.inner
+            .read()
+            .ok()
+            .and_then(|guard| guard.get(worktree).cloned())
+    }
+
+    /// 任意一个已解析的结果（「先取本次运行中其他 worktree 的结果」）。
+    pub fn peek_any(&self) -> Option<ShellEnv> {
+        self.inner
+            .read()
+            .ok()
+            .and_then(|guard| guard.values().next().cloned())
+    }
+
+    pub fn store(&self, worktree: &Path, env: ShellEnv) {
+        if let Ok(mut guard) = self.inner.write() {
+            guard.insert(worktree.to_path_buf(), env);
+        }
+    }
+
     pub fn clear(&self) {
         if let Ok(mut guard) = self.inner.write() {
             guard.clear();
+        }
+    }
+}
+
+impl ShellEnv {
+    /// 进程环境的最小副本：没有登录 shell 结果时用它兜底（Q205 的回退）。
+    ///
+    /// `used_fallback` 为真，界面沿用现有的回退提示；不修改用户的 profile 或执行策略。
+    pub fn minimal(worktree: &Path) -> Self {
+        let vars = sanitize(std::env::vars().collect());
+        let path = split_path(&vars);
+        ShellEnv {
+            info: EnvCaptureInfo {
+                worktree: worktree.display().to_string(),
+                shell: "process".into(),
+                elapsed_ms: 0,
+                timed_out: false,
+                used_fallback: true,
+                var_count: vars.len(),
+                path_entries: path.clone(),
+                fallback_reason: Some("process-env"),
+                fallback_detail: None,
+            },
+            vars,
+            path,
         }
     }
 }

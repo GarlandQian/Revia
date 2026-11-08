@@ -1402,7 +1402,8 @@ pub fn execute_commit(
         .stdout(stdout_writer)
         .stderr(stderr_writer)
         .env_clear();
-    for (key, value) in git.env.iter() {
+    let env = git.env_snapshot();
+    for (key, value) in env.iter() {
         builder.env(key, value);
     }
     crate::platform::hide_console(&mut builder);

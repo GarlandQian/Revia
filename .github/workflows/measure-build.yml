@@ -1,0 +1,207 @@
+name: Measure Build
+
+# M9（Q216）：只为测量与验收打出 Windows 安装版和便携版，供用户在自己的电脑上跑两轮测量；
+# 同时打出 macOS Apple Silicon 测量版，供规划方在 Mac 桌面复测（测量包一律由 Actions 打，不用本地构建）。
+# 不签名、不生成更新清单、不创建 Release、不打标签；只在推送 m9 或手动指定 m9 时运行。
+# 正式发布仍走 release.yml，行为不变。
+
+on:
+  push:
+    branches:
+      - m9
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Windows x64 measure build
+    if: github.ref == 'refs/heads/m9'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout m9
+        uses: actions/checkout@v4
+        with:
+          ref: m9
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Setup Rust stable (x86_64-pc-windows-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-measure-${{ hashFiles('**/Cargo.lock', '.cargo/config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-measure-
+            ${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve build labels
+        id: labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse --short=7 HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "artifact=revia-m9-$sha" >> "$GITHUB_OUTPUT"
+          echo "REVIA_BUILD_COMMIT=$sha" >> "$GITHUB_ENV"
+
+      # 便携版：独立 portable 特性 + --no-bundle，只产出原始 exe；不混入安装包。
+      - name: Build portable executable (measure)
+        run: pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle --features portable,measure
+
+      - name: Collect portable executable and zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $exe = "src-tauri/target/x86_64-pc-windows-msvc/release/revia.exe"
+          if (!(Test-Path $exe)) { throw "Portable executable was not produced." }
+          $tag = "m9-${{ steps.labels.outputs.sha }}"
+          Copy-Item $exe "artifacts/Revia-$tag-windows-x64-portable.exe"
+          New-Item -ItemType Directory -Force stage/Revia | Out-Null
+          Copy-Item $exe "stage/Revia/Revia.exe"
+          Compress-Archive -Path stage/Revia -DestinationPath "artifacts/Revia-$tag-windows-x64-portable.zip" -Force
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      # 测量建议用便携版：先单独上传，安装包这一步出问题时也能下载到便携版。
+      - name: Upload portable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.labels.outputs.artifact }}-portable
+          path: artifacts/*-portable.*
+          retention-days: 14
+          if-no-files-found: error
+
+      # 打包时要从 GitHub 下载 NSIS 工具；下载服务偶发 5xx，重试几次（编译产物已缓存，重试只重新打包）。
+      - name: Build NSIS installer (measure)
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 4; $attempt++) {
+            pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --features measure
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 4) {
+              Write-Host "NSIS bundling failed (attempt $attempt); retrying in 90s"
+              Start-Sleep -Seconds 90
+            }
+          }
+          exit 1
+
+      - name: Collect installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "m9-${{ steps.labels.outputs.sha }}"
+          $setup = Get-ChildItem "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis" -Filter *-setup.exe |
+            Select-Object -First 1
+          if (!$setup) { throw "NSIS installer was not produced." }
+          Copy-Item $setup.FullName "artifacts/Revia-$tag-windows-x64-setup.exe"
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.labels.outputs.artifact }}-setup
+          path: artifacts/*-setup.exe
+          retention-days: 14
+          if-no-files-found: error
+
+  build-macos:
+    name: macOS arm64 measure build
+    if: github.ref == 'refs/heads/m9'
+    runs-on: macos-15
+    steps:
+      - name: Checkout m9
+        uses: actions/checkout@v4
+        with:
+          ref: m9
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Setup Rust stable (aarch64-apple-darwin)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-measure-${{ hashFiles('**/Cargo.lock', '.cargo/config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-measure-
+            ${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve build labels
+        id: labels
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse --short=7 HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "artifact=revia-m9-$sha-macos" >> "$GITHUB_OUTPUT"
+          echo "REVIA_BUILD_COMMIT=$sha" >> "$GITHUB_ENV"
+
+      # 不签名、不生成更新包；dmg 保留 .app 的可执行权限与符号链接（直接上传 .app 会丢失）。
+      - name: Build macOS app and dmg (measure)
+        run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg --features measure
+
+      - name: Collect dmg
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          dmg="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -maxdepth 1 -name '*.dmg' | head -1)"
+          if [ -z "$dmg" ]; then
+            echo "::error::No .dmg produced."
+            exit 1
+          fi
+          cp "$dmg" "artifacts/Revia-m9-${{ steps.labels.outputs.sha }}-macos-arm64.dmg"
+          ls -l artifacts
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.labels.outputs.artifact }}
+          path: artifacts/*.dmg
+          retention-days: 14
+          if-no-files-found: error

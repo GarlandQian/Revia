@@ -13,6 +13,7 @@ mod browser;
 pub use browser::{open_github_device_page, open_url};
 
 pub(crate) mod output_pipe;
+pub mod system;
 
 use std::fs;
 #[cfg(any(unix, windows))]

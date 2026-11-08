@@ -20,6 +20,7 @@ import {
 import { SpecularButton } from "@/components/m7/glass";
 import { glassButtonOptics, glassButtonTheme } from "@/features/m7/glass/material";
 import { nativeGlassActive } from "@/features/m7/glass/nativeGlass";
+import { supportsSpecularButton } from "@/lib/platform";
 import { useFlatGlass, useReducedMotion, useThemeKind } from "@/hooks/useGlassPrefs";
 
 /** 同时存在的着色器按钮上限（每个实例一个 WebGL2 上下文）。 */
@@ -86,7 +87,9 @@ export const GlassButton = forwardRef(function GlassButton(
     .join(" ");
 
   // 原生玻璃下按钮跟随系统样式；着色器画布在透明 webview 里会留下一块偏色矩形。
-  if (specular && slot && !nativeGlassActive()) {
+  // M9 对照外观（S4）与 Windows 降级（Q209）：不使用 WebGL 特效按钮，只保留普通实色/半透明。
+  const plain = typeof document !== "undefined" && document.documentElement.dataset.plainAppearance === "true";
+  if (specular && slot && supportsSpecularButton() && !nativeGlassActive() && !plain) {
     const optics = glassButtonOptics(flat);
     return (
       <SpecularButton

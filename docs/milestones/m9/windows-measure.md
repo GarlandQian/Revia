@@ -8,8 +8,8 @@ Status: ready-for-human
 
 ## 1. 下载
 
-1. 打开 <https://github.com/GarlandQian/Revia/actions/workflows/measure-build.yml>，点进最新一次在 `m9` 上成功的运行，在 Artifacts 中下载 `m9` 开头的 Windows 产物。
-2. 解压后使用**便携版**，以免覆盖已安装的 0.0.2。便携版的数据放在 exe 旁的 `data` 文件夹，仓库需要重新添加一次。
+1. 打开 <https://github.com/GarlandQian/Revia/actions/workflows/measure-build.yml>，点进最新一次在 `m9` 上的运行，在 Artifacts 中下载以 `-portable` 结尾的产物（`-setup` 是安装版，测量时不需要）。
+2. 解压后使用其中的**便携版** exe，以免覆盖已安装的 0.0.2。便携版的数据放在 exe 旁的 `data` 文件夹，仓库需要重新添加一次。
 3. 测量版没有签名。如果出现 SmartScreen 提示，点“更多信息”，再点“仍要运行”。
 4. 打开“帮助 → 关于”，确认显示 `m9` 和提交编号。
 

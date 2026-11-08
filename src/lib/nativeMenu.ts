@@ -3,7 +3,10 @@ import { t } from "@/lib/i18n/index";
 import { isMac } from "@/lib/platform";
 
 /** Keep native editing/window roles while giving every product label a locale. */
-export function nativeMenuOptions(closeWindow: () => void): MenuOptions {
+export function nativeMenuOptions(
+  closeWindow: () => void,
+  measure?: { plainAppearance: boolean; onTogglePlain: () => void },
+): MenuOptions {
   const close = (id: string, accelerator?: string) => ({
     id, text: t("nativeMenu.closeWindow"), accelerator, action: closeWindow,
   });
@@ -43,8 +46,10 @@ export function nativeMenuOptions(closeWindow: () => void): MenuOptions {
       { item: "Separator" },
       close("revia-window-close"),
     ] },
-    { id: "__tauri_help_menu__", text: t("nativeMenu.help"), items: isMac ? [] : [
-      { item: { About: null }, text: t("nativeMenu.about") },
+    { id: "__tauri_help_menu__", text: t("nativeMenu.help"), items: [
+      ...(isMac ? [] : [{ item: { About: null }, text: t("nativeMenu.about") } as const]),
+      // M9 测量版：对照外观开关只在 measure 构建里出现（Q216）。
+      ...(measure ? [{ id: "revia-plain-appearance", text: `${t("nativeMenu.plainAppearance")}${measure.plainAppearance ? " ✓" : ""}`, action: measure.onTogglePlain }] : []),
     ] },
   ] };
 }
@@ -52,10 +57,13 @@ export function nativeMenuOptions(closeWindow: () => void): MenuOptions {
 let updates: Promise<void> = Promise.resolve();
 
 /** Serialize native updates; queued work reads the latest locale when it runs. */
-export function updateNativeMenu(closeWindow: () => void): Promise<void> {
+export function updateNativeMenu(
+  closeWindow: () => void,
+  measure?: { plainAppearance: boolean; onTogglePlain: () => void },
+): Promise<void> {
   const next = updates.catch(() => undefined).then(async () => {
     const { Menu } = await import("@tauri-apps/api/menu");
-    const menu = await Menu.new(nativeMenuOptions(closeWindow));
+    const menu = await Menu.new(nativeMenuOptions(closeWindow, measure));
     try {
       const previous = await menu.setAsAppMenu();
       await previous?.close();

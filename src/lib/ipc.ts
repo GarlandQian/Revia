@@ -174,7 +174,36 @@ export interface SettingsPayload {
   allowPrerelease: boolean;
   /** 用户自定义快捷键（动作 id → 加速键）。 */
   shortcuts: Record<string, string>;
+  /** M9：AI 服务配置（密钥不在设置里）。 */
+  aiBaseUrl: string;
+  aiModel: string;
+  aiLanguage: AiLanguage;
+  aiPrompt: string;
+  aiConfirmedUrls: string[];
 }
+
+/** AI 生成语言（M9）。 */
+export type AiLanguage = "repo" | "chinese" | "english";
+
+/** AI 服务配置状态（`ai_status`）。 */
+export interface AiStatus {
+  configured: boolean;
+  baseUrl: string;
+  model: string;
+  language: AiLanguage;
+  prompt: string;
+  defaultPrompt: string;
+  keySet: boolean;
+  confirmed: boolean;
+  /** 非本机的明文 http：确认弹窗要提示连接未加密。 */
+  insecure: boolean;
+}
+
+/** 下一次提交的来源（M9，S7）。 */
+export type AiCommitMode =
+  | { kind: "staged" }
+  | { kind: "changelist"; selection: import("@/types/bindings/ChangelistSelection").ChangelistSelection; amend?: boolean }
+  | { kind: "amend" };
 
 /** 日志表格显示列（F06）。 */
 export interface LogColumns {
@@ -239,6 +268,10 @@ export interface SettingsPatchPayload {
   appUpdateMode?: AppUpdateMode;
   allowPrerelease?: boolean;
   shortcuts?: Record<string, string>;
+  aiBaseUrl?: string;
+  aiModel?: string;
+  aiLanguage?: AiLanguage;
+  aiPrompt?: string;
 }
 
 /** 与 Rust 侧 `CommandRecord` 对应（B07：时间、worktree、参数、退出码、耗时、输出）。 */
@@ -296,6 +329,16 @@ export const ipc = {
     }),
   setDiffFontSize: (size: number) => invoke<SettingsPayload>("set_diff_font_size", { size }),
   updateSettings: (request: SettingsPatchPayload) => invoke<SettingsPayload>("update_settings", { request }),
+  /** M9：AI 服务配置状态（密钥只报是否已设置）。 */
+  aiStatus: () => invoke<AiStatus>("ai_status"),
+  aiSetKey: (key: string) => invoke<AiStatus>("ai_set_key", { key }),
+  aiClearKey: () => invoke<AiStatus>("ai_clear_key"),
+  /** 记下当前服务地址已经确认发送。 */
+  aiConfirm: () => invoke<AiStatus>("ai_confirm"),
+  /** 开始生成提交信息；结果经 revia://ai-* 事件流式返回。 */
+  aiGenerate: (request: { worktreeId: string; mode: AiCommitMode; requestId: string }) =>
+    invoke<void>("ai_generate", { request }),
+  aiCancel: (requestId: string) => invoke<boolean>("ai_cancel", { requestId }),
   reloadEnvironment: () => invoke<void>("reload_environment"),
   listWorktreeStatus: (repoId: string) =>
     invoke<WorktreeStatusEntry[]>("list_worktree_status", { request: { repoId } }),
@@ -773,5 +816,17 @@ export const ipc = {
     "external_tool_launch", { worktreeId, request },
   ),
   systemLanguage: () => invoke<string>("system_language"),
+
+  // ---------- M9: 性能记录与环境进度 ----------
+  /** 前端性能聚合（帧、交互、长任务、显示环境、打开阶段）；只含固定字段（Q210）。 */
+  reportPerformance: (report: import("@/lib/perfRecorder").ClientReport) =>
+    invoke<void>("report_performance", { report }),
+  /** M9 测量版：构建来源与对照外观状态（Q216）。 */
+  measureState: () => invoke<import("@/lib/perfRecorder").MeasureState>("m9_measure_state"),
+  /** M9 测量版：切换对照外观，下次启动生效；正式构建拒绝。 */
+  setPlainAppearance: (enabled: boolean) => invoke<void>("m9_set_plain_appearance", { enabled }),
+  /** worktree 的完整登录环境是否已在后台就绪（Q222）。 */
+  environmentStatus: (worktreeId: string) =>
+    invoke<import("@/lib/perfRecorder").EnvStatus>("environment_status", { worktreeId }),
 
 };

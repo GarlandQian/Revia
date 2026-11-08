@@ -278,6 +278,7 @@ export function StatusBar({
   onRefresh,
   onOpenCommandLog,
   autoFetchError,
+  environmentLoading = false,
 }: {
   branch: string | null;
   ahead: number;
@@ -290,6 +291,8 @@ export function StatusBar({
   onOpenCommandLog: () => void;
   /** 自动 fetch 失败的提示（只在状态栏，不弹通知）。 */
   autoFetchError: string | null;
+  /** 完整登录环境仍在后台加载：提交、fetch/push 与终端会等它就绪（Q222）。 */
+  environmentLoading?: boolean;
 }) {
   return (
     <footer className="window-status flex h-[var(--statusbar-height)] shrink-0 items-center gap-0.5 overflow-hidden px-1.5 text-[12px] whitespace-nowrap text-[var(--statusbar-foreground)]">
@@ -304,6 +307,15 @@ export function StatusBar({
         {behind}
         <span className="ml-1">{messages.statusBar.asOfLastFetch}</span>
       </span>
+      {environmentLoading ? (
+        <span
+          className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5"
+          title={messages.statusBar.environmentLoadingHint}
+        >
+          <Codicon name="sync" size={13} />
+          {messages.statusBar.environmentLoading}
+        </span>
+      ) : null}
       {watchError ? (
         <button
           type="button"

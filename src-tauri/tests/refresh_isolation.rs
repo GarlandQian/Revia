@@ -368,7 +368,7 @@ fn t13_highlight_rejects_external_edit_before_refresh() {
     ctx.write("src/app.ts", b"const a = 9;\nconst b = 2;\n");
 
     let session = ctx.open();
-    let snapshot = session.refresh().unwrap();
+    let _snapshot = session.refresh().unwrap();
 
     // 快照与行都取好后，外部做等长改写（行数、字节数完全相同），且**不刷新**。
     ctx.write("src/app.ts", b"const a = 7;\nconst b = 2;\n");

@@ -7,23 +7,23 @@ import type { UpdateReceipt } from "./UpdateReceipt";
 /**
  * 更新状态。
  */
-export type AppUpdateStatus = {
+export type AppUpdateStatus = { 
 /**
  * 是否配置了更新通道（公钥与接口）。
  */
-configured: boolean,
+configured: boolean, 
 /**
  * 未配置时的原因（界面直接显示）。
  */
-unconfiguredReason: string | null, mode: AppUpdateMode, currentVersion: string, lastCheckedAtMs: number | null, available: AvailableUpdate | null, receipt: UpdateReceipt | null, downloadedVersion: string | null, restartRequired: boolean,
+unconfiguredReason: string | null, mode: AppUpdateMode, currentVersion: string, lastCheckedAtMs: number | null, available: AvailableUpdate | null, receipt: UpdateReceipt | null, downloadedVersion: string | null, restartRequired: boolean, 
 /**
  * 便携版：只提示新版本与下载位置，不下载、不安装、不重启（Q58、M8 任务 05）。
  */
-portable: boolean,
+portable: boolean, 
 /**
  * 便携版可用版本的下载地址（由配置的 Release 仓库与命名约定生成）。
  */
-portableDownloadUrl: string | null,
+portableDownloadUrl: string | null, 
 /**
  * 已交给安装器、尚未由新进程核对的版本。
  */

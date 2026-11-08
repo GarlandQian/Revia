@@ -22,6 +22,10 @@ export function GlassLayer({
   className?: string;
 }) {
   const flat = useFlatGlass();
+  // M9 对照外观（S4）：完全不渲染 GlassLayer（hooks 之后再提前返回）。
+  if (typeof document !== "undefined" && document.documentElement.dataset.plainAppearance === "true") {
+    return null;
+  }
   const radius = variant === "panel" ? 0 : glassRadius(variant, isMac ? "macos" : "windows");
 
   return (
@@ -42,9 +46,9 @@ export function GlassLayer({
       greenOffset={GLASS_SURFACE.greenOffset}
       blueOffset={GLASS_SURFACE.blueOffset}
       blur={GLASS_SURFACE.blur}
-      // WKWebView 能解析但不渲染 backdrop-filter: url()，且 UA 不含 Safari，
-      // 不依赖 vendor 的 UA 探测；macOS 显式走磨砂，WebView2 保留 SVG 路径（glass-lens-facts.md）。
-      refraction={!flat && !isMac}
+      // M9（Q209）：Windows 不渲染 SVG 折射（WebView2 的 backdrop-filter: url() 开销高），
+      // 只保留普通半透明与卡片；macOS 本来就走磨砂（WKWebView 不渲染 SVG 折射）。
+      refraction={false}
       renderer="auto"
     />
   );

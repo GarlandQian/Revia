@@ -136,7 +136,7 @@ fn execute(
         || storage.as_deref().is_some_and(|value| value != "files")
         || session
             .git
-            .env
+            .env_snapshot()
             .iter()
             .any(|(key, value)| key == "GIT_NAMESPACE" && !value.is_empty())
     {

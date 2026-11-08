@@ -800,13 +800,15 @@
       "protocol": "The Git stash deletion transaction did not complete as expected. Refresh and verify the result."
     },
     "environment": {
+      "stillLoading": "Login environment is still loading, please wait",
       "gitVersion": "{path} ({version}); Git {minimum} or later is required",
       "shellTiming": "{shell} · {elapsed} ms",
       "shellFallback": "Login shell environment detection fell back to the minimal environment. Hooks and external tools may not be found.",
       "shellProfileFailed": "PowerShell profile failed to load or was blocked by execution policy; fell back to the process environment: {detail}",
       "shellTimeout": "PowerShell environment capture timed out; fell back to the process environment: {detail}",
       "shellCaptureFailed": "PowerShell environment capture failed; fell back to the process environment: {detail}",
-      "shellWorktreeMissing": "Could not enter the worktree; fell back to the process environment: {detail}"
+      "shellWorktreeMissing": "Could not enter the worktree; fell back to the process environment: {detail}",
+      "reloaded": "The environment was updated. Please try again."
     },
     "closeGuard": {
       "unavailable": "Close protection is unavailable: {cause}",
@@ -821,6 +823,7 @@
       "unavailable": "Failed to update the native menu: {cause}"
     },
     "m7": {
+      "measureOnly": "This feature is only available in measure builds",
       "cloneBranchInvalid": "The branch name contains invalid characters",
       "cloneDepthInvalid": "Shallow depth must be between 1 and 1000",
       "cloneJobUnknown": "The clone job has finished or does not exist",
@@ -949,6 +952,22 @@
       "portableLocationUnavailable": "The portable build must live in an accessible folder; its directory could not be found.",
       "portableDataDirUnwritable": "The portable data directory is not writable: {error}",
       "webview2Missing": "The Microsoft Edge WebView2 Runtime is missing: {error}"
+    },
+    "ai": {
+      "auth": "Authentication failed. Check the API key.",
+      "modelMissing": "The model or endpoint was not found.",
+      "rateLimited": "Too many requests. Try again later.",
+      "network": "Could not reach the AI service.",
+      "timeout": "The AI service timed out.",
+      "server": "The AI service returned an error.",
+      "empty": "The AI service returned an empty result.",
+      "notConfigured": "The AI service is not configured.",
+      "urlNotConfirmed": "Sending to this service address has not been confirmed.",
+      "urlInvalid": "The service address must start with http:// or https://.",
+      "payload": "Could not prepare the content to send.",
+      "unavailable": "AI requests are temporarily unavailable.",
+      "credentialStore": "Could not access the system credential store.",
+      "settingsLock": "Could not read settings."
     }
   },
   "app": {
@@ -973,7 +992,10 @@
   },
   "statusBar": {
     "upstreamHint": "Ahead and behind counts come from local records as of the last fetch; Revia does not check online.",
-    "asOfLastFetch": "as of the last fetch"
+    "asOfLastFetch": "as of the last fetch",
+    "environmentLoading": "Loading login environment",
+    "environmentLoadingHint": "The full login environment is still loading in the background; commit, fetch/push and the built-in terminal wait for it.",
+    "environmentFallbackTitle": "Couldn't load the login environment; using the process environment"
   },
   "firstRun": {
     "title": "Add Repository",
@@ -1443,7 +1465,24 @@
         "reservedName": "{component} is a reserved Windows name"
       }
     },
-    "operationHintSentence": "{text}. "
+    "operationHintSentence": "{text}. ",
+    "ai": {
+      "generate": "Generate",
+      "cancel": "Cancel",
+      "replaceTitle": "Replace the commit message?",
+      "replaceBody": "The commit message box already has content. Generating replaces it, and you can undo afterwards.",
+      "replaceConfirm": "Replace and generate",
+      "confirmTitle": "Confirm what is sent",
+      "confirmBody": "The diff, file list and recent commit subjects will be sent to {url}.",
+      "confirmBodyAmend": "The diff, file list, recent commit subjects and the original commit message will be sent to {url}.",
+      "confirmInsecure": "This address uses an unencrypted http connection, so the content may be visible on the network.",
+      "confirmSend": "Send",
+      "undo": "Undo generation",
+      "undoHint": "Restore the content from before generating",
+      "noContent": "No changes to send",
+      "notConfigured": "Configure the AI service in Settings first",
+      "running": "Generating…"
+    }
   },
   "close": {
     "title": "Write Operations in Progress",
@@ -1489,7 +1528,8 @@
       "updatePush": "Update and Push",
       "log": "Commit Log",
       "language": "Language",
-      "fileHistory": "File History"
+      "fileHistory": "File History",
+      "ai": "AI"
     },
     "uiZoom": "Interface Zoom",
     "uiZoomHint": "80%–150%; you can also use {control}{alt}= / {control}{alt}- / {control}{alt}0.",
@@ -1580,7 +1620,8 @@
       "log": "log|columns|hash|long edges|first parent|preview position",
       "about": "about|version|licenses|Revia",
       "language": "language|interface language|Chinese|English|automatic",
-      "fileHistory": "File History|Show file names|path|rename|blame"
+      "fileHistory": "File History|Show file names|path|rename|blame",
+      "ai": "AI commit message service model key prompt"
     },
     "cherryPickIncludeSource": "Include source in cherry-pick commit",
     "cherryPickIncludeSourceHint": "Add an `-x` source line when the commit already exists on a local remote-tracking ref.",
@@ -1662,7 +1703,31 @@
         "prereleaseHint": "Also check prerelease versions when enabled (stable only by default)"
       }
     },
-    "licenseReactBits": "React Bits glass components (MIT + Commons Clause, see src/components/m7/glass/LICENSE.md)"
+    "licenseReactBits": "React Bits glass components (MIT + Commons Clause, see src/components/m7/glass/LICENSE.md)",
+    "measureBuild": "Measure build m9 · {commit}",
+    "ai": {
+      "title": "AI commit messages",
+      "description": "Generate commit messages with an OpenAI-compatible service. The key is stored in the system credential store and bound to this service address.",
+      "baseUrl": "Service address",
+      "baseUrlHint": "For example https://api.openai.com/v1, https://api.deepseek.com, http://localhost:11434/v1",
+      "model": "Model",
+      "modelHint": "For example gpt-4o-mini, deepseek-chat, qwen2.5-coder",
+      "key": "API key",
+      "keyHint": "Leave empty when the service needs no key. The key is only stored in the system credential store and cannot be read back.",
+      "keySet": "Key saved",
+      "keyUnset": "No key saved",
+      "saveKey": "Save key",
+      "clearKey": "Clear key",
+      "language": "Output language",
+      "languageRepo": "Follow repository",
+      "languageChinese": "Chinese",
+      "languageEnglish": "English",
+      "prompt": "Prompt",
+      "promptHint": "You can rewrite the whole prompt. Language, subject limit, blank line and \"output only the message\" rules are always appended after it.",
+      "resetPrompt": "Restore default",
+      "unconfigured": "Both the service address and model are required.",
+      "keyBinding": "Changing the service address deletes the old key, so it must be entered again."
+    }
   },
   "log": {
     "title": "Commit Log",
@@ -1887,7 +1952,8 @@
     "render": "UI render",
     "jump": "Content appears after jump",
     "uncovered": "Rows not covered while scrolling",
-    "frames": "Frame interval p50 / p95"
+    "frames": "Frame interval p50 / p95",
+    "plainAppearanceTitle": "Revia (Plain Appearance)"
   },
   "operation": {
     "kinds": {
@@ -2112,7 +2178,8 @@
     "selectAll": "Select All",
     "minimize": "Minimize",
     "maximize": "Zoom",
-    "fullscreen": "Toggle Full Screen"
+    "fullscreen": "Toggle Full Screen",
+    "plainAppearance": "Plain appearance (next launch)"
   },
   "edit": {
     "save": "Save",

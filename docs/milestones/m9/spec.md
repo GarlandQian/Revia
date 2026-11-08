@@ -1,6 +1,6 @@
 # M9：Windows 与 macOS 性能、生成提交信息
 
-Status: ready-for-agent
+Status: done（2026-11-08 合入 main 并发布 0.0.3，Q223；Windows 实测与验收见任务 10、11）
 日期：2026-11-08
 依据：Q21、Q27、Q30、Q76、Q97、Q113、Q137、Q180、Q187、Q200、Q202–Q205、Q208–Q222；ADR-0002、0003、0004、0013、0015。排查事实见 [perf-facts](./perf-facts.md)。
 

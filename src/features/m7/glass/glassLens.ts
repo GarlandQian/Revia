@@ -11,6 +11,7 @@
  */
 
 import { useLayoutEffect, useRef, type RefObject } from "react";
+import { supportsGlassLens } from "@/lib/platform";
 
 export type GlassLensOptions = {
   /** 镜片层挂在这里，需要 `position: relative`（`.glass-lens-host`）。 */
@@ -61,6 +62,9 @@ export function useGlassLens({ host, track, selected, attribute = "lensKey" }: G
 }
 
 function lensEnabled(): boolean {
+  // M9 对照外观（S4）与 Windows 降级（Q209）：不播放镜片。
+  if (document.documentElement.dataset.plainAppearance === "true") return false;
+  if (!supportsGlassLens()) return false;
   if (!document.documentElement.classList.contains("window-material")) return false;
   if (typeof window.matchMedia !== "function") return true;
   return !["(prefers-reduced-motion: reduce)", "(prefers-reduced-transparency: reduce)", "(forced-colors: active)"].some(

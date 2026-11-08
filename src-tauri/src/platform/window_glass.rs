@@ -76,6 +76,10 @@ pub enum GlassSupport {
 
 /// `REVIA_GLASS=css` 强制走 CSS 材质，便于对照。
 pub fn support() -> GlassSupport {
+    // M9 对照外观：不透明窗口，不用系统材质（Q216）。
+    if crate::measure::plain_appearance() {
+        return GlassSupport::Unsupported;
+    }
     if std::env::var("REVIA_GLASS").is_ok_and(|value| value == "css") {
         return GlassSupport::Unsupported;
     }

@@ -435,7 +435,7 @@ if [ "$1" = --version ]; then echo 'git version 2.28.0'; else exec /usr/bin/git 
     f.session = WorktreeSession::open_with_options(
         "fixture-oldgit",
         &f.repo,
-        f.session.shell_env.clone(),
+        f.session.shell_env_snapshot(),
         Arc::new(CommandLog::default()),
         None,
         Some(&program),

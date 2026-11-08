@@ -8,6 +8,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { perfRecorder } from "@/lib/perfRecorder";
 import type { CloneFinished } from "@/types/bindings/CloneFinished";
 import type { CloneProgress } from "@/types/bindings/CloneProgress";
 import type { DiagnosticsExport } from "@/types/bindings/DiagnosticsExport";
@@ -221,8 +222,11 @@ export const m7 = {
     invoke<ProtectionInfo>("m7_github_protection_refresh", { request: { worktreeId, remote }, branch }),
 
   // 诊断
-  previewDiagnostics: (request: DiagnosticsExportPayload) =>
-    invoke<DiagnosticsPreview>("m7_preview_diagnostics", { request }),
+  previewDiagnostics: async (request: DiagnosticsExportPayload) => {
+    // 先把前端累计的帧、交互与打开阶段耗时送给 Rust，诊断里才是最新数据（Q210）。
+    await perfRecorder.flush();
+    return invoke<DiagnosticsPreview>("m7_preview_diagnostics", { request });
+  },
   exportDiagnostics: (request: DiagnosticsExportPayload) =>
     invoke<DiagnosticsExport>("m7_export_diagnostics", { request }),
   /** F21：7 天脱敏摘要（跨重启保留）。 */
