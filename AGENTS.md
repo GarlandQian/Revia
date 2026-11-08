@@ -19,7 +19,7 @@ M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压
 
 2026-11-05 用户要求把其他分支的成果归入 main 后删除其他分支，并确认纳入 m7 的 6 个未提交文件；随后又要求删除三个附属 worktree 和本轮备份，现仅保留主目录的 main。执行与清理结果见 [分支归并记录](docs/branch-consolidation-2026-11-05.md)。后续从 main 继续验收。Pi 的一次正式返修已使用（Q113）；后续 M8 修正由规划方接管，审查只针对新增量（Q174）。需求与已确认取舍见 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
-2026-11-08 起规划 M9：Windows 与 macOS 性能、生成提交信息。决策见 [docs/README.md](docs/README.md) Q208–Q221；[规格](docs/milestones/m9/spec.md)、[任务图](docs/milestones/m9/issues/)和 [Pi 交接](docs/milestones/m9/paseo-batch.md)已写好。任务 05（打开 worktree 时的环境加载时机）等用户确认，其余任务可以派发。
+2026-11-08 起规划 M9：Windows 与 macOS 性能、生成提交信息。决策见 [docs/README.md](docs/README.md) Q208–Q222；[规格](docs/milestones/m9/spec.md)、[任务图](docs/milestones/m9/issues/)和 [Pi 交接](docs/milestones/m9/paseo-batch.md)已写好，可以派发。
 
 ## 工作流程
 

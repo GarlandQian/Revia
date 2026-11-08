@@ -7,11 +7,11 @@ Status: ready-for-agent（派发前由规划方把本轮文档提交到 main，�
 
 在 `/Volumes/T7 Shield/project/Revia-m9` 的 `m9` 分支上实施 M9，基线是包含本交接的 main 提交。用 implement-spec 阅读 [规格](./spec.md)、[任务图](./issues/) 和 [排查事实](./perf-facts.md)。
 
-开始前先读根目录的 AGENTS、docs/README（重点是 Q208–Q221）、GLOSSARY、ADR-0002/0003/0004/0013/0015，以及 docs/agents/local-validation.md。
+开始前先读根目录的 AGENTS、docs/README（重点是 Q208–Q222）、GLOSSARY、ADR-0002/0003/0004/0013/0015，以及 docs/agents/local-validation.md。
 
 用同一个 Paseo / Pi 会话按依赖顺序完成任务，不另派功能代理，也不另建功能 worktree，不逐任务等待用户：
 
-1. 先做性能：01、02、03、04、06。任务 05 处于 needs-info，等规划方在 Comments 中写明访谈 Q27 的结论后再做；在此之前不要自行决定环境加载时机。
+1. 先做性能：01、02、03、04、05、06。
 2. 再做生成提交信息：07、08、09（Q208）。
 
 任务 10、11 由规划方和用户完成，Pi 只提供本机检查证据和 report。

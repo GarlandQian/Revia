@@ -1,6 +1,6 @@
 # Revia 设计文档
 
-状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；0.0.1 Release 的误删已恢复，0.0.2 保持 latest，两个版本的标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。M9（Windows 与 macOS 性能、生成提交信息）的规格与任务单已写好（Q208–Q221），其中打开 worktree 时的环境加载时机仍待确认。更新日期：2026-11-08。
+状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；0.0.1 Release 的误删已恢复，0.0.2 保持 latest，两个版本的标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。M9（Windows 与 macOS 性能、生成提交信息）的规格与任务单已写好（Q208–Q222），可以派发实施。更新日期：2026-11-08。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -19,7 +19,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 - [M7 规格](./milestones/m7/spec.md)、[任务图](./milestones/m7/issues/)与[Pi 交接](./milestones/m7/paseo-batch.md)：已确认行为的实施契约，单列更改列表事实阻塞。
 - [M7 开始前确认清单](./milestones/m7/confirmation.md)：前面已确认的访谈结论、仍未收口事项与最终候选。
 - [M8 规格](./milestones/m8/spec.md)、[任务图](./milestones/m8/issues/)与[Pi 交接](./milestones/m8/paseo-batch.md)：Windows 安装版、便携版、运行环境和验证边界；[规划记录](./milestones/m8/planning.md)保留用户确认与事实。
-- [M9 规格](./milestones/m9/spec.md)、[任务图](./milestones/m9/issues/)、[Pi 交接](./milestones/m9/paseo-batch.md)与 [Windows 测量步骤](./milestones/m9/windows-measure.md)：性能与生成提交信息的实施契约（Q208–Q221）；[卡顿排查](./milestones/m9/perf-facts.md)保留嫌疑、代码位置与真机确认顺序。
+- [M9 规格](./milestones/m9/spec.md)、[任务图](./milestones/m9/issues/)、[Pi 交接](./milestones/m9/paseo-batch.md)与 [Windows 测量步骤](./milestones/m9/windows-measure.md)：性能与生成提交信息的实施契约（Q208–Q222）；[卡顿排查](./milestones/m9/perf-facts.md)保留嫌疑、代码位置与真机确认顺序。
 - [术语表](../GLOSSARY.md)：已确认的领域术语和应避免的说法。
 - [里程碑](./milestones/)：每个里程碑的计划、评审意见与报告（`m<N>/`）。
 - [Agent 配置](./agents/)：任务记录与领域文档的约定，供工程类技能读取。
@@ -259,6 +259,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 | Q219 | 设置新增“AI”一页，填写服务地址、模型名、密钥，并改写提示词（Q215）。没有配置 AI 服务时，提交信息框旁不显示“生成”按钮 | 用户于 2026-11-08 对第三轮 Q24 回答“按推荐” |
 | Q220 | 修改上一次提交（amend）时，发送修改后的提交将包含的全部内容，即原提交的改动加上新加入的改动，同时附上原提交信息，由 AI 服务在原信息的基础上改写 | 用户于 2026-11-08 对第三轮 Q25 回答“按推荐” |
 | Q221 | 同一时间只配置一个 AI 服务。改了服务地址视为换了服务，第一次使用前重新弹出发送确认（Q214） | 用户于 2026-11-08 对第三轮 Q26 回答“按推荐” |
+| Q222 | 两个平台第一次打开 worktree 时，都不再等待登录 shell 环境（macOS 的登录 shell、Windows 的 PowerShell 与 profile）。手动指定的 Git（Q27）始终直接使用；否则先用已经找到过的 Git 及其环境的 PATH（本次运行中其他 worktree 解析出的，或上次运行记住的），立即读取状态、diff 和日志。该 worktree 的完整环境在后台加载，执行 hooks、提交、fetch/pull/push、打开内置终端时，如果尚未加载完就等待。后台结果显示 Git 路径变了，就切换并重读一次。从未找到过 Git 时照旧等待。环境内容仍按 worktree 解析，失败与超时的提示沿用 Q205；本条调整 Q21、Q27 的加载时机，并把 Q212 的后台加载扩展到 macOS | 规划方写规格时发现 Q212 未覆盖 Git 查找与 macOS（在本机实测登录 shell 约 0.12–0.19 秒），补问访谈 Q27；用户于 2026-11-08 回复“按推进按”，按“按推荐”理解 |
 
 各项的完整说明见对应的方向文档。
 
@@ -350,7 +351,7 @@ Revia
 |   |   |-- 日志引用独立列、标签与分支图完整显示，整表横向滚动 [Q201]
 |   |   `-- 选中项玻璃镜片、侧栏与编辑区成卡片、设置页照 Loop 版式 [Q202]
 |   `-- 日志索引 [Q151：大仓库筛选确实慢才做，当前无触发证据]
-|-- M9 性能与生成提交信息 [Q208-Q221 已确认，规格与任务单已写；环境加载时机待确认]
+|-- M9 性能与生成提交信息 [Q208-Q222 已确认，规格与任务单已写，可以派发]
 |   |-- 范围：Windows 全场景卡顿、macOS 打开与切换仓库、生成提交信息；先性能后 AI [Q208]
 |   |-- Windows 流畅优先：去掉网页模糊与镜片，保留卡片与 Mica，必要时实色窗口底 [Q209]
 |   |-- 诊断信息附带性能记录，测量版临时加朴素外观对照开关 [Q210]
@@ -364,11 +365,12 @@ Revia
 |   |-- Windows 实测两轮：带修正的测量版、验收版 [Q218]
 |   |-- 设置“AI”页；未配置时不显示“生成” [Q219]
 |   |-- amend 发送修改后提交的全部内容与原信息 [Q220]
-|   `-- 同时只配一个 AI 服务，换地址重新确认 [Q221]
+|   |-- 同时只配一个 AI 服务，换地址重新确认 [Q221]
+|   `-- 打开 worktree 先用已找到的 Git，完整环境后台加载（两个平台） [Q222]
 |-- 技术栈：Tauri 2 + React + TypeScript + Vite + shadcn/ui + Tailwind CSS [T1/Q1/Q6/Q7 已确认]
 |   |-- Git 执行：Rust 层受控调用 Git CLI [Q7 已确认]
-|   |   |-- Git 程序：登录 shell PATH 中的 git，不自带 [Q27 已确认]
-|   |   |-- 运行环境：按 worktree 解析 [Q21 已确认]
+|   |   |-- Git 程序：登录 shell PATH 中的 git，不自带 [Q27 已确认；打开时先用已找到的 Git，Q222]
+|   |   |-- 运行环境：按 worktree 解析 [Q21 已确认；第一次打开时后台加载，Q222]
 |   |   `-- 写操作校验 diff 指纹 [Q26 已确认；M2 按文件限定范围，Q80]
 |   |-- shadcn/ui 组件基座：Base UI [Q51 已确认]
 |   |-- 应用标识：io.github.garlandqian.revia [Q49 已确认]
