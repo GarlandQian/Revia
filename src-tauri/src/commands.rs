@@ -412,7 +412,7 @@ impl AppState {
                     opened?
                 } else {
                     // S2：记住的 Git 不存在、无法执行或版本过低：丢弃记忆，退回同步等待完整环境。
-                    self.env.remove_memory(&path);
+                    self.env.forget_git(&path, &program);
                     let (resolved, found) = self.resolve_environment_now(worktree_id, &path, None);
                     synced = true;
                     open(resolved, Some(&found))?

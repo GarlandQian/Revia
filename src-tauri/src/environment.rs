@@ -97,13 +97,18 @@ impl EnvMemory {
         }
     }
 
-    /// 忘记某个 worktree 的环境记忆（S2：记住的 Git 路径失效时丢弃）。
-    pub fn remove(&self, worktree: &Path) {
+    /// 丢弃失效的 Git 记忆（S2）：这个 worktree 的记忆，以及所有指向同一个 Git 的记忆。
+    ///
+    /// 打开时用到的 Git 可能来自其他 worktree 的记忆（`any`），只删当前 worktree 的键
+    /// 会留下那条失效记忆，下次启动又被取到。
+    pub fn forget_git(&self, worktree: &Path, git_path: &Path) {
+        let stale = git_path.display().to_string();
         let snapshot = {
             let Ok(mut guard) = self.state.lock() else {
                 return;
             };
             guard.remove(&key(worktree));
+            guard.retain(|_, remembered| remembered.git_path != stale);
             guard.clone()
         };
         if let Ok(bytes) = serde_json::to_vec_pretty(&snapshot) {
@@ -386,8 +391,9 @@ impl EnvCoordinator {
         }
     }
 
-    pub fn remove_memory(&self, worktree: &Path) {
-        self.memory.remove(worktree);
+    /// 记住的 Git 不可用时丢弃相关记忆（S2）。
+    pub fn forget_git(&self, worktree: &Path, git_path: &Path) {
+        self.memory.forget_git(worktree, git_path);
     }
 
     pub fn clear_memory(&self) {
@@ -490,6 +496,34 @@ mod tests {
             Some(PathBuf::from("/opt/homebrew/bin/git"))
         );
         assert_eq!(provisional.env.path.len(), 2);
+    }
+
+    /// S2：失效的 Git 来自其他 worktree 的记忆时，那条记忆也要丢弃，其他记忆保留。
+    #[test]
+    fn forgetting_a_stale_git_drops_every_entry_that_points_to_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("env-memory.json");
+        let other = dir.path().join("other");
+        let healthy = dir.path().join("healthy");
+        let opening = dir.path().join("opening");
+        let stale_git = dir.path().join("deleted-git");
+        let good_git = dir.path().join("good-git");
+        let memory = EnvMemory::load(path.clone());
+        memory.remember(&other, &ShellEnv::minimal(&other), &stale_git);
+        memory.remember(&healthy, &ShellEnv::minimal(&healthy), &good_git);
+
+        memory.forget_git(&opening, &stale_git);
+
+        let reloaded = EnvMemory::load(path);
+        assert!(reloaded.get(&other).is_none());
+        assert_eq!(
+            reloaded.get(&healthy).map(|entry| entry.git_path),
+            Some(good_git.display().to_string())
+        );
+        assert_eq!(
+            reloaded.any().map(|entry| entry.git_path),
+            Some(good_git.display().to_string())
+        );
     }
 
     #[test]
