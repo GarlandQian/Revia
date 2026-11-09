@@ -153,6 +153,10 @@ jobs:
       - name: Write updater config overlay
         run: node tools/write-updater-config.mjs
 
+      # 缓存恢复的 src-tauri/target/ 可能留有旧版本的 bundle；构建前清掉，只收集本次产物。
+      - name: Remove stale bundles restored from cache
+        run: rm -rf src-tauri/target/aarch64-apple-darwin/release/bundle
+
       - name: Build macOS bundle with updater artifacts
         run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
 
@@ -170,6 +174,17 @@ jobs:
           fi
           if ! ls artifacts/*.app.tar.gz.sig >/dev/null 2>&1; then
             echo "::error::No updater signature produced."
+            exit 1
+          fi
+          dmg_count=$(find artifacts -maxdepth 1 -name '*.dmg' | wc -l | tr -d ' ')
+          if [ "$dmg_count" -ne 1 ]; then
+            echo "::error::Expected exactly one .dmg, found ${dmg_count}."
+            exit 1
+          fi
+          # 更新签名的 trusted comment 记录构建时的应用版本；不是本版本说明拾取了旧产物。
+          version_pattern="version:${RELEASE_VERSION//./\\.}([[:space:]]|$)"
+          if ! base64 -d < artifacts/Revia.app.tar.gz.sig | grep -Eq "^trusted comment: .*${version_pattern}"; then
+            echo "::error::Revia.app.tar.gz.sig was not signed for version ${RELEASE_VERSION}."
             exit 1
           fi
 
@@ -321,6 +336,14 @@ jobs:
           Get-Content portable-dependencies.txt
           node .release-tooling/tools/check-windows-deps.mjs portable-dependencies.txt
 
+      # 缓存恢复的 src-tauri/target/ 可能留有旧版本的安装包（0.0.3 首次构建因此拾取了 0.0.2 的
+      # setup.exe）；构建前清掉，只收集本次产物。
+      - name: Remove stale installer bundles restored from cache
+        shell: pwsh
+        run: |
+          $bundle = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+          if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
+
       - name: Build NSIS installer with updater artifacts
         run: pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.release.conf.json
 
@@ -329,11 +352,20 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $bundle = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
-          $setup = Get-ChildItem $bundle -Filter "*-setup.exe" | Select-Object -First 1
-          if (!$setup) { throw "No NSIS setup executable was produced." }
-          $signature = Get-ChildItem $bundle -Filter "*-setup.exe.sig" | Select-Object -First 1
-          if (!$signature -or $signature.Name -ne "$($setup.Name).sig") {
-            throw "NSIS setup executable and updater signature do not pair."
+          $expected = "Revia_$($env:RELEASE_VERSION)_x64-setup.exe"
+          $setups = @(Get-ChildItem $bundle -Filter "*-setup.exe")
+          if ($setups.Count -ne 1 -or $setups[0].Name -ne $expected) {
+            throw "Expected only $expected, found: $($setups.Name -join ', ')"
+          }
+          $setup = $setups[0]
+          $signature = Get-Item "$($setup.FullName).sig" -ErrorAction SilentlyContinue
+          if (!$signature) { throw "NSIS setup executable and updater signature do not pair." }
+          # 更新签名的 trusted comment 记录构建时的文件名与应用版本；对不上说明拾取了旧产物。
+          $comment = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content $signature.FullName -Raw).Trim()))
+          $file = [regex]::Escape("file:$expected")
+          $version = [regex]::Escape("version:$($env:RELEASE_VERSION)")
+          if ($comment -notmatch "(?m)^trusted comment: .*$file\t.*$version(\s|$)") {
+            throw "$($signature.Name) was not signed for $expected."
           }
           # createUpdaterArtifacts=true：setup.exe 本身就是 updater 包（官方 updater 文档）。
           Copy-Item $setup.FullName "artifacts/Revia-$env:RELEASE_VERSION-windows-x64-setup.exe"
