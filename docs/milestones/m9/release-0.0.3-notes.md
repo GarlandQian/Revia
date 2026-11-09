@@ -29,3 +29,9 @@
 - 此版本适用于接受上述限制的早期试用，不代表 M9 验收通过。
 
 [固定源码](https://github.com/GarlandQian/Revia/tree/v0.0.3)
+
+## 构建记录
+
+固定源码：`03bda233ce371e28cd242ff8886d2cd310463118`，来自 main。
+[双平台 CI](https://github.com/GarlandQian/Revia/actions/runs/42485916531) 已通过：macOS 943 项、Windows 848 项测试通过，均无失败，各保留 1 项既有忽略；Windows 便携特性检查与两平台 release binary 构建通过。
+[安装包构建](https://github.com/GarlandQian/Revia/actions/runs/42557562343) 由修正后的发布流程按原标签重建，应用源码仍为上述固定源码。首次构建的 Windows 安装包误用了缓存中的 0.0.2 产物，该草稿未公开即已删除。上述自动检查不替代已列出的 Windows 真机验收。

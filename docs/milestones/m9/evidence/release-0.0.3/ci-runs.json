@@ -1,0 +1,90 @@
+[
+  {
+    "conclusion": "success",
+    "databaseId": 42485916531,
+    "event": "push",
+    "headSha": "03bda233ce371e28cd242ff8886d2cd310463118",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "name": "macOS Apple Silicon (arm64)"
+      },
+      {
+        "conclusion": "success",
+        "name": "Windows x64 (msvc)"
+      }
+    ],
+    "url": "https://github.com/GarlandQian/Revia/actions/runs/42485916531",
+    "workflowName": "Compile Check"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 42547456937,
+    "event": "push",
+    "headSha": "03bda233ce371e28cd242ff8886d2cd310463118",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "name": "macOS Apple Silicon (arm64)"
+      },
+      {
+        "conclusion": "success",
+        "name": "Windows x64 (msvc)"
+      }
+    ],
+    "url": "https://github.com/GarlandQian/Revia/actions/runs/42547456937",
+    "workflowName": "Compile Check"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 42547457065,
+    "event": "push",
+    "headSha": "03bda233ce371e28cd242ff8886d2cd310463118",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "name": "Verify tag matches app version"
+      },
+      {
+        "conclusion": "success",
+        "name": "Windows x64 installer and portable"
+      },
+      {
+        "conclusion": "success",
+        "name": "macOS Apple Silicon (arm64) package"
+      },
+      {
+        "conclusion": "success",
+        "name": "Assemble draft release with both platforms"
+      }
+    ],
+    "url": "https://github.com/GarlandQian/Revia/actions/runs/42547457065",
+    "workflowName": "Release Draft"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 42557562343,
+    "event": "workflow_dispatch",
+    "headSha": "ab88f5021693ad83003a28cddda339c956d7c0e3",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "name": "Verify tag matches app version"
+      },
+      {
+        "conclusion": "success",
+        "name": "Windows x64 installer and portable"
+      },
+      {
+        "conclusion": "success",
+        "name": "macOS Apple Silicon (arm64) package"
+      },
+      {
+        "conclusion": "success",
+        "name": "Assemble draft release with both platforms"
+      }
+    ],
+    "url": "https://github.com/GarlandQian/Revia/actions/runs/42557562343",
+    "workflowName": "Release Draft"
+  }
+]

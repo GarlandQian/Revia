@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Revia-0.0.3-macos-arm64.dmg",
+    "sha256": "84fab06f8a6e73e6a74aa18d7802f2d10ee34dac4532bd026ffb3e0df754a4a8"
+  },
+  {
+    "name": "Revia.app.tar.gz",
+    "sha256": "a810029e34a55e69c372c7ff4ac98c82d4c3f2ccbd369e3c3ca5231177442c34"
+  },
+  {
+    "name": "Revia.app.tar.gz.sig",
+    "sha256": "711d3d2734d7de4ef613a3d8570e0bdbfb5845f90841af03a0572a49839e7f30"
+  },
+  {
+    "name": "Revia-0.0.3-windows-x64-portable.exe",
+    "sha256": "93efa33fec5b0b2d1a42e1bf8955eb442f77fc7422d07d142e5985f6df4c31ec"
+  },
+  {
+    "name": "Revia-0.0.3-windows-x64-portable.zip",
+    "sha256": "8b0796f2c80b5bca06b9fdde7070915b63fe68c447bd8b8208a78420a75aacad"
+  },
+  {
+    "name": "Revia-0.0.3-windows-x64-setup.exe",
+    "sha256": "a73a4442828688f27a6d26b001c9641c5577dcee50f7e5ab10e912d415b00b0a"
+  },
+  {
+    "name": "Revia-0.0.3-windows-x64-setup.exe.sig",
+    "sha256": "a151f55bcdb45ae619ad388459867c6f0400460b720624033c60871d41c44537"
+  },
+  {
+    "platform": "darwin-aarch64",
+    "name": "Revia.app.tar.gz",
+    "payloadSignature": true,
+    "trustedCommentSignature": true,
+    "trustedComment": "timestamp:1794196301\tfile:Revia.app.tar.gz\tversion:0.0.3"
+  },
+  {
+    "platform": "windows-x86_64",
+    "name": "Revia-0.0.3-windows-x64-setup.exe",
+    "payloadSignature": true,
+    "trustedCommentSignature": true,
+    "trustedComment": "timestamp:1794196863\tfile:Revia_0.0.3_x64-setup.exe\tversion:0.0.3"
+  }
+]
