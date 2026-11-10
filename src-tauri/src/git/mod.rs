@@ -147,6 +147,17 @@ pub struct GitOutput {
     pub timed_out: bool,
 }
 
+/// 只观察真实进程与管道阶段；用于本地验证安排读取和退出的先后。
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitOutputEvent {
+    StdoutIdle,
+    StderrIdle,
+    ProcessExited,
+}
+
+type OutputObserver = Arc<dyn Fn(GitOutputEvent) + Send + Sync>;
+
 impl GitOutput {
     pub fn stdout_lossy(&self) -> String {
         String::from_utf8_lossy(&self.stdout).into_owned()
@@ -366,6 +377,17 @@ impl Git {
         self.run_with_options(args, None, timeout, None, true)
     }
 
+    /// 显式验证接缝：每次调用独占观察者，不能提供或替换 Git 输出。
+    #[doc(hidden)]
+    pub fn run_with_output_observer(
+        &self,
+        args: &[&str],
+        timeout: Duration,
+        observer: Arc<dyn Fn(GitOutputEvent) + Send + Sync>,
+    ) -> Result<GitOutput> {
+        self.run_once_with_timeout(args, None, timeout, None, true, Some(observer))
+    }
+
     /// Mutations run once: an abnormal exit may follow a committed write.
     /// Positive exits remain available to callers handling real conflict stops.
     pub fn run_write(&self, args: &[&str]) -> Result<GitOutput> {
@@ -408,7 +430,7 @@ impl Git {
         let mut last: Option<GitOutput> = None;
         let attempts = if retry_lock { LOCK_RETRIES + 1 } else { 1 };
         for attempt in 0..attempts {
-            let output = self.run_once_with_timeout(args, input.clone(), timeout, output_limit, true)?;
+            let output = self.run_once_with_timeout(args, input.clone(), timeout, output_limit, true, None)?;
             if !retry_lock || !is_lock_error(&output) {
                 return Ok(output);
             }
@@ -451,7 +473,7 @@ impl Git {
 
     /// 敏感调用（例如 AI 发送内容生成）：执行命令，但**绝不把输出正文记录到日志**（Q180、Q214）。
     pub fn run_private_ok(&self, args: &[&str], what: &str) -> Result<GitOutput> {
-        let output = self.run_once_with_timeout(args, None, GIT_TIMEOUT, None, false)?;
+        let output = self.run_once_with_timeout(args, None, GIT_TIMEOUT, None, false, None)?;
         output.into_success(what)
     }
 
@@ -461,7 +483,7 @@ impl Git {
 
     /// 带 stdin 的一次调用（只用于只读计算，例如按仓库哈希算法求空 tree）。
     pub fn run_with_input(&self, args: &[&str], input: Vec<u8>) -> Result<GitOutput> {
-        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT, None, true)
+        self.run_once_with_timeout(args, Some(input), GIT_TIMEOUT, None, true, None)
     }
 
     /// 允许非零退出码（例如 `git diff --no-index` 在有差异时返回 1）。
@@ -493,7 +515,7 @@ impl Git {
     }
 
     fn run_once(&self, args: &[&str]) -> Result<GitOutput> {
-        self.run_once_with_timeout(args, None, GIT_TIMEOUT, None, true)
+        self.run_once_with_timeout(args, None, GIT_TIMEOUT, None, true, None)
     }
 
     fn run_once_with_timeout(
@@ -503,6 +525,7 @@ impl Git {
         timeout: Duration,
         output_limit: Option<usize>,
         capture_log_output: bool,
+        observer: Option<OutputObserver>,
     ) -> Result<GitOutput> {
         let mut timing = crate::commands::MeasureSpan::new("git.run");
         let started = Instant::now();
@@ -550,8 +573,13 @@ impl Git {
         // 三条管道并发处理；stdin 大补丁也必须受同一超时约束。
         drop(command);
         let stdout_finished = finished.clone(); let stderr_finished = finished.clone();
-        let stdout_reader = std::thread::spawn(move || read_pipe(stdout_pipe, output_limit, stdout_finished));
-        let stderr_reader = std::thread::spawn(move || read_pipe(stderr_pipe, output_limit, stderr_finished));
+        let stdout_observer = observer.clone(); let stderr_observer = observer.clone();
+        let stdout_reader = std::thread::spawn(move || read_pipe(
+            stdout_pipe, output_limit, stdout_finished, stdout_observer, GitOutputEvent::StdoutIdle,
+        ));
+        let stderr_reader = std::thread::spawn(move || read_pipe(
+            stderr_pipe, output_limit, stderr_finished, stderr_observer, GitOutputEvent::StderrIdle,
+        ));
         let stdin_writer = input.map(|bytes| {
             let pipe = child.stdin.take();
             std::thread::spawn(move || -> Result<()> {
@@ -567,6 +595,7 @@ impl Git {
         }
         let status = child.wait();
         finished.store(true, std::sync::atomic::Ordering::Release);
+        if let Some(observer) = &observer { observer(GitOutputEvent::ProcessExited); }
         // 包括超时/中断路径：先结束子进程，再回收全部管道线程。
         let input_error = stdin_writer.and_then(|writer| match writer.join() {
             Ok(Ok(())) => None,
@@ -892,7 +921,7 @@ impl Git {
             args.push("--reverse");
         }
         args.push("-");
-        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT, None, true)
+        self.run_once_with_timeout(&args, Some(patch), GIT_TIMEOUT, None, true, None)
     }
 
     pub fn discard_patch(&self, path: &str) -> Result<Vec<u8>> {
@@ -917,6 +946,7 @@ impl Git {
             GIT_TIMEOUT,
             None,
             true,
+            None,
         )
     }
 
@@ -990,10 +1020,17 @@ impl Git {
     }
 }
 
-fn read_pipe(mut pipe: crate::platform::output_pipe::OutputPipe, limit: Option<usize>, finished: Arc<std::sync::atomic::AtomicBool>) -> Vec<u8> {
+fn read_pipe(
+    mut pipe: crate::platform::output_pipe::OutputPipe,
+    limit: Option<usize>,
+    finished: Arc<std::sync::atomic::AtomicBool>,
+    observer: Option<OutputObserver>,
+    idle_event: GitOutputEvent,
+) -> Vec<u8> {
     let mut buffer = Vec::new(); let mut chunk = [0u8; 16 * 1024]; let mut exited = None;
     loop {
-        if finished.load(std::sync::atomic::Ordering::Acquire) {
+        let finished_before_read = finished.load(std::sync::atomic::Ordering::Acquire);
+        if finished_before_read {
             // Drain bytes already written by Git, but never wait indefinitely
             // for a hook/tool descendant retaining a copy of the output pipe.
             let at = exited.get_or_insert_with(Instant::now);
@@ -1005,8 +1042,13 @@ fn read_pipe(mut pipe: crate::platform::output_pipe::OutputPipe, limit: Option<u
                 let take = limit.map_or(read, |limit| read.min(limit.saturating_sub(buffer.len())));
                 buffer.extend_from_slice(&chunk[..take]);
             }
-            Err(error) if matches!(error.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted) => {
-                if finished.load(std::sync::atomic::Ordering::Acquire) { break; }
+            // Interrupted does not say whether the pipe contains any data.
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) if matches!(error.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock) => {
+                if let Some(observer) = &observer { observer(idle_event); }
+                // Only an empty read started after exit proves Git's output was drained.
+                // A child may write and exit after an earlier read returned temporarily empty.
+                if finished_before_read { break; }
                 std::thread::sleep(Duration::from_millis(2));
             }
             Err(_) => break,
