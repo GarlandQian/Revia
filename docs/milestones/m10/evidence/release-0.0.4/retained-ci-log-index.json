@@ -1,0 +1,22 @@
+[
+  {
+    "file": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/ci-monitor/42815099704-macos-job-raw.log",
+    "bytes": 320085,
+    "sha256": "8207817e8af7143cddddd470841f27e1267fbd4342969a0fad29abfb4d131058"
+  },
+  {
+    "file": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/ci-monitor/42815099704-windows-job-raw.log",
+    "bytes": 267132,
+    "sha256": "d074ed2e6715ae20564656e4570b660f84e46f04d521ccc6a92046c1e084aa72"
+  },
+  {
+    "file": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/ci-monitor/fix-b832854/42822614141-job-129851722197.log",
+    "bytes": 339643,
+    "sha256": "2cbbf87b09e6a2b764afdc432822db77b0a5e4db0aa79b8127a7b21e369ad03c"
+  },
+  {
+    "file": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/ci-monitor/fix-b832854/42822614141-job-129851722730.log",
+    "bytes": 265902,
+    "sha256": "556d883c7d70dac2298ccc40c0754877e6d6fedfcde496bcb183c51776ec99f3"
+  }
+]

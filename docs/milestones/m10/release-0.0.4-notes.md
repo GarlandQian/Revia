@@ -20,9 +20,13 @@
 
 ## 验证与已知限制
 
-- M10 最终源码的本地完整 Rust 测试为 954 通过、0 失败、1 忽略；前端类型检查、lint、构建和相关 Node 行为测试通过。macOS 可见窗口已验证切换、手动刷新与环境重载后的文件监视，以及本机模拟 AI 的生成、取消、草稿归属和撤销。
+- 最终发布源码的双平台 CI 通过：macOS 957 项、Windows 859 项 Rust 测试通过，均为 0 失败、1 忽略；前端类型检查、lint、构建、release 编译和 Windows 便携版检查通过。M10 的相关 Node 行为测试通过；macOS 可见窗口已验证切换、手动刷新与环境重载后的文件监视，以及本机模拟 AI 的生成、取消、草稿归属和撤销。
 - Windows 真实桌面与性能验收仍未完成：安装、卸载、升级、便携启动、Credential Manager、PowerShell profile/hooks、Mica、DPI、IME/AltGr 等仍待真机确认。CI 构建与回归不能替代这些验收。
 - 生成提交信息尚未连接真实 AI 服务做桌面验收；本轮只使用本机模拟服务。
 - 本轮未重新执行 M8/M9 的历史性能验收或长期运行检查，不将重构表述为已测得的性能提升。M7 及更早里程碑的既有未达标项保留。
 
 [固定源码](https://github.com/GarlandQian/Revia/tree/v0.0.4) · [M10 验收报告](https://github.com/GarlandQian/Revia/blob/v0.0.4/docs/milestones/m10/report.md)
+
+## 构建记录
+
+应用源码固定为 `97211ab`。首轮草稿未公开；修复 CI 中发现的问题后，按维护者确认更新本轮标签，由[最终工作流](https://github.com/GarlandQian/Revia/actions/runs/42831536896)重新构建全部资产。双平台编译、资产摘要、真实更新签名、内嵌版本和架构核对通过；原始失败与返修过程保留在[发布记录](https://github.com/GarlandQian/Revia/blob/main/docs/milestones/m10/release-0.0.4.md)。

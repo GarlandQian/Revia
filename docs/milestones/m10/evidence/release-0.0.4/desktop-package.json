@@ -1,0 +1,11 @@
+{
+  "pid": 94616,
+  "app": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/desktop/Revia.app",
+  "binary": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/desktop/Revia.app/Contents/MacOS/revia",
+  "binary_sha256": "cd6ae972c8bcbfdba4834ea24d5a7f5393cc3eb359176c2877281fcc13cdf3dc",
+  "version": "0.0.4",
+  "same_binary_as_updater_tar": true,
+  "app_data": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/desktop-app-data",
+  "mount_point": "/Volumes/Revia",
+  "launched_utc": "2026-11-10T14:26:09.369268+00:00"
+}

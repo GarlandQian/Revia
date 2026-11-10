@@ -1,0 +1,7 @@
+{
+  "source": "97211abb1ea0c5398eee3fe6f08c567801a8119b",
+  "old_tag_object": "0ad5980995cbfd8113db1d735de892f0559db777",
+  "tag_object": "96d2e6dd4ebe8fbcda4577657438e9c509781987",
+  "tag": "v0.0.4",
+  "push_guard": "exact old-object force-with-lease"
+}

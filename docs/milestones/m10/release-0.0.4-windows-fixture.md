@@ -1,6 +1,6 @@
 # 0.0.4 Windows 环境测试夹具返修
 
-Status: ready-for-review（本地检查与两轴审查通过，Windows CI 待完成）
+Status: done（本地检查、两轴审查与 Windows CI 通过）
 日期：2026-11-10
 基线：`b83285451ed6965f5903dc8117c12b982e01e699`
 
@@ -21,7 +21,7 @@ Status: ready-for-review（本地检查与两轴审查通过，Windows CI 待完
 
 ## 证据
 
-固定实现：`ecbcee0`，仅修改 `src-tauri/tests/environment_concurrency.rs`。本地 13 项全部通过，退出码 0；Windows 分支待 CI。
+固定实现：`ecbcee0`，仅修改 `src-tauri/tests/environment_concurrency.rs`，压成 `97211ab` 合入 main。本地 13 项全部通过，退出码 0；[最终 main CI](https://github.com/GarlandQian/Revia/actions/runs/42826584536) 的 Windows Rust 全套 859 通过、0 失败、1 忽略，portable 检查与 release 编译通过。原先挂起的 `replaced_session_rejects_waiting_write`、`slow_open_does_not_block_an_existing_worktree` 均在原始日志中明确为 `ok`。
 
 本地证据：`/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-004-windows-fixture-i8mf6vml`。
 旧 Windows 日志、固定源码与分析：发布证据根的 `ci-monitor/windows-hang-analysis.md`。
@@ -32,4 +32,4 @@ Status: ready-for-review（本地检查与两轴审查通过，Windows CI 待完
 
 ## Spec
 
-0 项代码偏差、范围扩张或实现错误。两条真实 Git 路径预检、规范化 worktree 身份、失败时有限退出，以及旧会话拒绝写入、新会话身份、Git 路径和环境标记断言均保留。Windows 特有分支仍以 CI 验证为准，本地 13 项通过与静态审查不替代它。
+0 项代码偏差、范围扩张或实现错误。两条真实 Git 路径预检、规范化 worktree 身份、失败时有限退出，以及旧会话拒绝写入、新会话身份、Git 路径和环境标记断言均保留。审查时待完成的 Windows CI 后续已通过，原始结果见发布证据根 `ci-monitor/final-97211ab`；这些检查不替代 Windows 真实桌面验收。

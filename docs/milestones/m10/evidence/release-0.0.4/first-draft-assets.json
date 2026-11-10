@@ -1,0 +1,112 @@
+{
+  "id": 440358262,
+  "tag_name": "v0.0.4",
+  "name": "Revia 0.0.4",
+  "draft": true,
+  "prerelease": false,
+  "created_at": "2026-11-10T12:16:43Z",
+  "published_at": null,
+  "html_url": "https://github.com/GarlandQian/Revia/releases/tag/untagged-fdf5fc63ff78ae464abb",
+  "target_commitish": "main",
+  "assets": [
+    {
+      "id": 731421860,
+      "name": "latest-prerelease.json",
+      "size": 1270,
+      "digest": "sha256:f501022a11111f09f4fb4e8ba82d3e9b3824d8ae0c7a4d42487f2a12a6b60052",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/latest-prerelease.json"
+    },
+    {
+      "id": 731421868,
+      "name": "latest.json",
+      "size": 1270,
+      "digest": "sha256:f501022a11111f09f4fb4e8ba82d3e9b3824d8ae0c7a4d42487f2a12a6b60052",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/latest.json"
+    },
+    {
+      "id": 731421857,
+      "name": "macos-SHA256SUMS.txt",
+      "size": 294,
+      "digest": "sha256:d0f89e3980c1c92cedc6c47a7d2f14f10ddce736ca0ee5ae6507e51713088709",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/macos-SHA256SUMS.txt"
+    },
+    {
+      "id": 731421866,
+      "name": "Revia-0.0.4-macos-arm64.dmg",
+      "size": 12686411,
+      "digest": "sha256:67f8d06949ea20b4562cd538d57262ad07d92f13d29cdb80afbc61901a4bd5f9",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia-0.0.4-macos-arm64.dmg"
+    },
+    {
+      "id": 731421863,
+      "name": "Revia-0.0.4-windows-x64-portable.exe",
+      "size": 29934592,
+      "digest": "sha256:7c8bb5d39c6ec1449eb964cbb80725be6e19851535bcba64ba54f07e147d7346",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:40Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia-0.0.4-windows-x64-portable.exe"
+    },
+    {
+      "id": 731421869,
+      "name": "Revia-0.0.4-windows-x64-portable.zip",
+      "size": 12506885,
+      "digest": "sha256:8f5ce39e7441e47ca9e47b3528ac52bd91734cfb1dd5240762296526ce5d5744",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia-0.0.4-windows-x64-portable.zip"
+    },
+    {
+      "id": 731421858,
+      "name": "Revia-0.0.4-windows-x64-setup.exe",
+      "size": 8795665,
+      "digest": "sha256:92e3191fc948e1ff546644c7e411fa546f1440e253f96252eb5c511cc71bf592",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia-0.0.4-windows-x64-setup.exe"
+    },
+    {
+      "id": 731421862,
+      "name": "Revia-0.0.4-windows-x64-setup.exe.sig",
+      "size": 432,
+      "digest": "sha256:a0af53d48826d98cd7028699e5ee6954fa787eccc02bfd881d81023efd10c110",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia-0.0.4-windows-x64-setup.exe.sig"
+    },
+    {
+      "id": 731421871,
+      "name": "Revia.app.tar.gz",
+      "size": 12530351,
+      "digest": "sha256:1e7d683fb674c4daae44917340dbd7b650b291d1ad1eb1545ab56e363530f7cb",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:40Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia.app.tar.gz"
+    },
+    {
+      "id": 731421859,
+      "name": "Revia.app.tar.gz.sig",
+      "size": 420,
+      "digest": "sha256:3266210f5cf89ab1e1014990c8440278383a6bea11afbae4b827814b55d9f0a1",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/Revia.app.tar.gz.sig"
+    },
+    {
+      "id": 731421861,
+      "name": "windows-SHA256SUMS.txt",
+      "size": 414,
+      "digest": "sha256:e8747076652403577599b68fa1dcc298945bd20904c972c4980dfedc9a9e9015",
+      "created_at": "2026-11-10T12:50:38Z",
+      "updated_at": "2026-11-10T12:50:39Z",
+      "browser_download_url": "https://github.com/GarlandQian/Revia/releases/download/untagged-fdf5fc63ff78ae464abb/windows-SHA256SUMS.txt"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "latest-prerelease.json": {
+    "size": 1270,
+    "sha256": "c8929b68b1e511fa1d7c32b13d8814a31d05bafa016113c41863ec85bc8e58ce"
+  },
+  "latest.json": {
+    "size": 1270,
+    "sha256": "c8929b68b1e511fa1d7c32b13d8814a31d05bafa016113c41863ec85bc8e58ce"
+  },
+  "macos-SHA256SUMS.txt": {
+    "size": 294,
+    "sha256": "5f1435efa103f241c57deafb6ba942151879584f51b17a22c945c45d44f10b3d"
+  },
+  "Revia-0.0.4-macos-arm64.dmg": {
+    "size": 12688179,
+    "sha256": "4da387a60ad1773cf89c27d0a2d2e50b5a67e59dd6261de73c84fc7186867ce6"
+  },
+  "Revia-0.0.4-windows-x64-portable.exe": {
+    "size": 29935616,
+    "sha256": "c59e42e1d7025808b3c9aedb949cd4362985de265647bcdd7fe8a4d03c554fe5",
+    "path": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/artifacts/Revia-0.0.4-windows-x64-portable.exe",
+    "machine": "0x8664",
+    "optional_header_magic": "0x20b",
+    "architecture": "x86_64",
+    "resource_directory_rva": "0x1c83000",
+    "version_resources": [
+      {
+        "resource_path": [
+          16,
+          1,
+          1033
+        ],
+        "data_rva": "0x1c83220",
+        "file_offset": 29854752,
+        "resource_size": 456,
+        "codepage": 0,
+        "key": "VS_VERSION_INFO",
+        "fixed_value_offset_in_resource": 40,
+        "structure_version": 65536,
+        "structure_version_hex": "0x00010000",
+        "file_version": [
+          0,
+          0,
+          4,
+          0
+        ],
+        "product_version": [
+          0,
+          0,
+          4,
+          0
+        ],
+        "file_type": 1,
+        "resource_bytes": "version-resource-0.bin",
+        "resource_sha256": "d0fa454b3be3aaab7d1b7627d3bfc68347ad1dd40a5fdfe811e8f4a6ed3632b9"
+      }
+    ],
+    "version_resource_directory": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/pe-resources-wb7v9_9t/portable"
+  },
+  "Revia-0.0.4-windows-x64-portable.zip": {
+    "size": 12506176,
+    "sha256": "7d373b8a10ebdb13a84adef0000fd57caa8372a1b613f02ebbb1a8655f824947"
+  },
+  "Revia-0.0.4-windows-x64-setup.exe": {
+    "size": 8792772,
+    "sha256": "7fdfba7d8ba52269694417620f5aa5cc5503767673230d44c40d62b189170283",
+    "path": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/artifacts/Revia-0.0.4-windows-x64-setup.exe",
+    "machine": "0x14c",
+    "optional_header_magic": "0x10b",
+    "architecture": "x86",
+    "resource_directory_rva": "0x58000",
+    "version_resources": [
+      {
+        "resource_path": [
+          16,
+          1,
+          1033
+        ],
+        "data_rva": "0x5bf48",
+        "file_offset": 50504,
+        "resource_size": 448,
+        "codepage": 0,
+        "key": "VS_VERSION_INFO",
+        "fixed_value_offset_in_resource": 40,
+        "structure_version": 0,
+        "structure_version_hex": "0x00000000",
+        "file_version": [
+          0,
+          0,
+          4,
+          0
+        ],
+        "product_version": [
+          0,
+          0,
+          4,
+          0
+        ],
+        "file_type": 1,
+        "resource_bytes": "version-resource-0.bin",
+        "resource_sha256": "161acd06344ab003e515a14ed5efe81445dee9ff10292b876799003e99e784d2"
+      }
+    ],
+    "version_resource_directory": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/pe-resources-wb7v9_9t/setup"
+  },
+  "Revia-0.0.4-windows-x64-setup.exe.sig": {
+    "size": 432,
+    "sha256": "edc2f4e6ddb133ae16fd0621669a5318021f95b1d5ccba926582aeca83782f63"
+  },
+  "Revia.app.tar.gz": {
+    "size": 12531426,
+    "sha256": "19c14f45565625c328dbfb9d27a2e74136eb082941879f6bb03e8f7a9a6ce532"
+  },
+  "Revia.app.tar.gz.sig": {
+    "size": 420,
+    "sha256": "2b1767339becbbff50273678ad5225db6fddacb06f5c91afa047302b97b47c60"
+  },
+  "windows-SHA256SUMS.txt": {
+    "size": 414,
+    "sha256": "95b97a31e64ba6df655a99d7aafe4cbb4f107b72c1eb1a70e79051e251d0cf21"
+  },
+  "macos-app": {
+    "version": "0.0.4",
+    "architecture": "arm64",
+    "binary_sha256": "cd6ae972c8bcbfdba4834ea24d5a7f5393cc3eb359176c2877281fcc13cdf3dc"
+  },
+  "windows-installed-app": {
+    "path": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/windows-payload/extracted-lzyo300u/revia.exe",
+    "size": 29928448,
+    "sha256": "1135ac9c5525607f342c3c43d5398e5eed6e9b49043eb8dd0242217cbff96242",
+    "machine": "0x8664",
+    "optional_header_magic": "0x20b",
+    "architecture": "x86_64",
+    "resource_directory_rva": "0x1c82000",
+    "version_resources": [
+      {
+        "resource_path": [
+          16,
+          1,
+          1033
+        ],
+        "data_rva": "0x1c82220",
+        "file_offset": 29847584,
+        "resource_size": 456,
+        "codepage": 0,
+        "key": "VS_VERSION_INFO",
+        "fixed_value_offset_in_resource": 40,
+        "file_version": [
+          0,
+          0,
+          4,
+          0
+        ],
+        "product_version": [
+          0,
+          0,
+          4,
+          0
+        ],
+        "file_type": 1,
+        "resource_bytes": "version-resource-0.bin",
+        "resource_sha256": "d0fa454b3be3aaab7d1b7627d3bfc68347ad1dd40a5fdfe811e8f4a6ed3632b9"
+      }
+    ]
+  }
+}
