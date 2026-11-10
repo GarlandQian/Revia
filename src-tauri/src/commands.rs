@@ -104,15 +104,6 @@ impl ExitGuard {
     }
 }
 
-/// 后台环境就绪事件（Q222）：Git 路径变化时前端重读；捕获失败时带 Q205 的结构化原因。
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct EnvironmentReady {
-    worktree_id: String,
-    git_changed: bool,
-    error: Option<crate::error::AppErrorPayload>,
-}
-
 /// 解析某个 worktree 完整登录环境的函数（生产用登录 shell / PowerShell）。
 pub type ShellResolver = Arc<dyn Fn(&std::path::Path) -> crate::shell::ShellEnv + Send + Sync>;
 
@@ -123,80 +114,7 @@ fn default_shell_resolver(path: &std::path::Path) -> crate::shell::ShellEnv {
     }
 }
 
-/// 解析 worktree 的完整登录环境，返回环境、要用的 Git 程序和回退原因（Q205）。
-fn capture_environment(
-    resolver: &ShellResolver,
-    path: &std::path::Path,
-    manual_git: Option<&std::path::Path>,
-) -> (
-    crate::shell::ShellEnv,
-    std::path::PathBuf,
-    Option<crate::error::AppErrorPayload>,
-) {
-    let resolved = resolver(path);
-    let git_path = manual_git
-        .map(std::path::Path::to_path_buf)
-        .or_else(|| resolved.which("git"))
-        .unwrap_or_else(|| std::path::PathBuf::from("git"));
-    let failure = resolved
-        .info
-        .used_fallback
-        .then(|| crate::session::shell_environment_check(&resolved).detail);
-    (resolved, git_path, failure)
-}
-
-/// 把完整环境装进当前会话；Git 路径变了就换成新会话（Q222）。返回是否换了会话。
-///
-/// 只在持有该会话 `writing` 锁且没有写操作时动手，写操作进行中就稍后再试，
-/// 不会绕过写锁（Q90）。会话已被关闭、重新加载或换了路径时放弃，迟到的结果不登记到别处。
-fn install_environment(
-    sessions: &Mutex<std::collections::HashMap<String, Arc<WorktreeSession>>>,
-    worktree_id: &str,
-    expected: &Arc<WorktreeSession>,
-    resolved: &crate::shell::ShellEnv,
-    git_path: &std::path::Path,
-    open_next: impl Fn(crate::shell::ShellEnv) -> Result<Arc<WorktreeSession>>,
-) -> bool {
-    loop {
-        let Ok(mut map) = sessions.lock() else {
-            return false;
-        };
-        // 只装进发起解析时的那个会话：它已被关闭、重新加载或替换时放弃。
-        let Some(current) = map
-            .get(worktree_id)
-            .cloned()
-            .filter(|current| Arc::ptr_eq(current, expected))
-        else {
-            return false;
-        };
-        let Ok(writing) = current.writing.lock() else {
-            return false;
-        };
-        if !*writing {
-            if current.git.program == git_path {
-                current.apply_environment(resolved.clone());
-                return false;
-            }
-            return match open_next(resolved.clone()) {
-                Ok(next) => {
-                    current.mark_superseded();
-                    map.insert(worktree_id.to_string(), next);
-                    true
-                }
-                Err(_) => {
-                    // 新 Git 打不开：保留可用的旧 Git，只换环境。
-                    current.apply_environment(resolved.clone());
-                    false
-                }
-            };
-        }
-        drop(writing);
-        drop(map);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-}
-
-fn session_lock_error() -> AppError {
+pub(crate) fn session_lock_error() -> AppError {
     AppError::coded(
         ErrorKind::Internal,
         "errors.commands.sessionLockFailed",
@@ -259,6 +177,9 @@ pub struct AppState {
     pub ai: Arc<crate::ai::AiManager>,
     /// 解析 worktree 完整登录环境的入口；测试可替换成替身，避免运行用户真实的登录 shell。
     shell_resolver: ShellResolver,
+    /// 会话创建与重新加载的串行门（M10 任务 02）：打开要么整体在重载之前完成，
+    /// 要么在重载之后重新登记，不会把旧代次的会话插到重载之后。
+    pub(crate) lifecycle: Mutex<()>,
     /// 后台任务向前端发事件用（lib.rs 启动时写入）。
     pub app: std::sync::OnceLock<tauri::AppHandle>,
     /// 提交操作 ID 计数器（实时输出事件归属用）。
@@ -285,6 +206,7 @@ impl AppState {
             )),
             ai: Arc::new(crate::ai::AiManager::default()),
             shell_resolver: Arc::new(default_shell_resolver),
+            lifecycle: Mutex::new(()),
             app: std::sync::OnceLock::new(),
             command_log: Arc::clone(&command_log),
             history: Arc::new(HistoryStore::new()),
@@ -346,271 +268,29 @@ impl AppState {
         self
     }
 
+    /// 环境生命周期 module 共用的解析入口（生产登录 shell / 测试替身）。
+    pub(crate) fn resolver(&self) -> &ShellResolver {
+        &self.shell_resolver
+    }
+
     pub(crate) fn session(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-        if let Some(session) = self
-            .sessions
-            .lock()
-            .map_err(|_| session_lock_error())?
-            .get(worktree_id)
-        {
-            return Ok(session.clone());
-        }
-        let path = {
-            let registry = self.registry.lock().map_err(|_| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.repositoryListLockFailed",
-                    "仓库列表锁失败",
-                    &[],
-                )
-            })?;
-            registry.worktree_path(worktree_id).ok_or_else(|| {
-                AppError::coded(
-                    ErrorKind::Rejected,
-                    "errors.commands.theWorktreeRegisteredAddRepositoryFirst",
-                    "worktree 未登记，请先添加仓库",
-                    &[],
-                )
-            })?
-        };
-        // 设置里手动指定的 Git 程序（Q27）；未指定时使用记住的 Git 或登录 shell PATH 中的 git。
-        let manual_git = {
-            let registry = self.registry.lock().map_err(|_| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.repositoryListLockFailed2",
-                    "仓库列表锁失败",
-                    &[],
-                )
-            })?;
-            registry
-                .settings()
-                .git_path
-                .clone()
-                .map(std::path::PathBuf::from)
-        };
-        // Q212：打开路径上不跑登录 shell，先用记忆里的 Git 与环境（不持会话表锁）。
-        let provisional = self.env.provisional(&path);
-        let generation = self.env.begin(worktree_id);
-        let open = |env: crate::shell::ShellEnv, program: Option<&std::path::Path>| {
-            WorktreeSession::open_with_options(
-                worktree_id,
-                &path,
-                env,
-                self.command_log.clone(),
-                Some(self.review.clone()),
-                program,
-            )
-        };
-        // 已经同步解析过完整环境（不再在后台重复跑登录 shell，S2）。
-        let mut synced = false;
-        let session = match manual_git.clone().or_else(|| provisional.git_path.clone()) {
-            Some(program) => {
-                let opened = open(provisional.env.clone(), Some(&program));
-                let usable = opened.as_ref().is_ok_and(|session| session.git_version_ok());
-                if usable || manual_git.is_some() {
-                    opened?
-                } else {
-                    // S2：记住的 Git 不存在、无法执行或版本过低：丢弃记忆，退回同步等待完整环境。
-                    self.env.forget_git(&path, &program);
-                    let (resolved, found) = self.resolve_environment_now(worktree_id, &path, None);
-                    synced = true;
-                    open(resolved, Some(&found))?
-                }
-            }
-            None => {
-                // 从未找到过 Git：照旧同步等待完整环境就绪（规格 D、Q222）。
-                let (resolved, found) = self.resolve_environment_now(worktree_id, &path, None);
-                synced = true;
-                open(resolved, Some(&found))?
-            }
-        };
-        session.set_env_gate(self.env_gate(worktree_id));
-        // 双重检查：并发的第一个请求只发布一个会话。
-        let mut sessions = self.sessions.lock().map_err(|_| session_lock_error())?;
-        if let Some(existing) = sessions.get(worktree_id) {
-            return Ok(existing.clone());
-        }
-        sessions.insert(worktree_id.to_string(), session.clone());
-        drop(sessions);
-
-        if synced {
-            // 完整环境已在打开前就绪。
-        } else if provisional.needs_capture {
-            self.spawn_env_capture(worktree_id.to_string(), generation, &session, manual_git);
-        } else {
-            // 本次运行已解析过这个 worktree：缓存就是完整环境。
-            let git_path = provisional
-                .git_path
-                .clone()
-                .unwrap_or_else(|| session.git.program.clone());
-            self.env
-                .complete(worktree_id, &path, provisional.env, git_path, None);
-        }
-        Ok(session)
-    }
-
-    /// 同步解析完整登录环境并宣布就绪，返回环境与要用的 Git 程序。
-    fn resolve_environment_now(
-        &self,
-        worktree_id: &str,
-        path: &std::path::Path,
-        manual_git: Option<&std::path::Path>,
-    ) -> (crate::shell::ShellEnv, std::path::PathBuf) {
-        let (resolved, git_path, failure) =
-            capture_environment(&self.shell_resolver, path, manual_git);
-        self.env
-            .complete(worktree_id, path, resolved.clone(), git_path.clone(), failure);
-        (resolved, git_path)
-    }
-
-    /// 写操作开始前等待这个 worktree 的完整环境（会话的 `acquire_write_lock` 调用）。
-    fn env_gate(&self, worktree_id: &str) -> crate::session::EnvGate {
-        let env = Arc::clone(&self.env);
-        let id = worktree_id.to_string();
-        Arc::new(move || {
-            if env.wait_ready(&id, crate::environment::WAIT_TIMEOUT) {
-                Ok(())
-            } else {
-                Err(crate::environment::still_loading())
-            }
-        })
-    }
-
-    /// 后台解析完整登录环境（Q212）。
-    ///
-    /// 先把环境装进会话（Git 路径变了就换会话），再宣布就绪：
-    /// 等在 `acquire_write_lock` 里的写操作醒来时，用的已经是完整环境。
-    fn spawn_env_capture(
-        &self,
-        worktree_id: String,
-        generation: u64,
-        expected: &Arc<WorktreeSession>,
-        manual_git: Option<std::path::PathBuf>,
-    ) {
-        let path = expected.path.clone();
-        let expected = Arc::clone(expected);
-        let resolver = Arc::clone(&self.shell_resolver);
-        let env = Arc::clone(&self.env);
-        let sessions = Arc::clone(&self.sessions);
-        let command_log = Arc::clone(&self.command_log);
-        let review = Arc::clone(&self.review);
-        let gate = self.env_gate(&worktree_id);
-        let app = self.app.get().cloned();
-        std::thread::Builder::new()
-            .name("revia-env".into())
-            .spawn(move || {
-                let (resolved, git_path, failure) =
-                    capture_environment(&resolver, &path, manual_git.as_deref());
-                let changed = install_environment(
-                    &sessions,
-                    &worktree_id,
-                    &expected,
-                    &resolved,
-                    &git_path,
-                    |next_env| {
-                        let next = WorktreeSession::open_with_options(
-                            &worktree_id,
-                            &path,
-                            next_env,
-                            Arc::clone(&command_log),
-                            Some(Arc::clone(&review)),
-                            Some(&git_path),
-                        )?;
-                        next.set_env_gate(Arc::clone(&gate));
-                        Ok(next)
-                    },
-                );
-                let payload = failure.clone();
-                // 重新加载环境后，旧的结果不再宣布就绪（槽位已换代）。
-                if !env.complete_generation(&worktree_id, generation, &path, resolved, git_path, failure) {
-                    return;
-                }
-                if let Some(app) = app {
-                    use tauri::Emitter;
-                    let _ = app.emit(
-                        "revia://environment-ready",
-                        EnvironmentReady { worktree_id, git_changed: changed, error: payload },
-                    );
-                }
-            })
-            .ok();
+        // 临时环境、解析租约、安装/替换、就绪发布与会话登记都在同一个入口里完成。
+        crate::worktree_environment::WorktreeEnvironment::new(self).open(worktree_id)
     }
 
     /// 等环境就绪后再执行网络操作与内置终端（Q212）；写操作另由 `acquire_write_lock` 统一等待。
     pub fn await_environment(&self, worktree_id: &str) -> Result<()> {
-        if self.env.wait_ready(worktree_id, crate::environment::WAIT_TIMEOUT) {
-            Ok(())
-        } else {
-            Err(crate::environment::still_loading())
-        }
+        crate::worktree_environment::WorktreeEnvironment::new(self).await_ready(worktree_id)
     }
 
     /// 环境未就绪时打开失败不立即报错：等它就绪后重试一次（Q212）。
     pub fn session_retrying(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-        match self.session(worktree_id) {
-            Ok(session) => Ok(session),
-            Err(first) => {
-                if self
-                    .env
-                    .wait(worktree_id, crate::environment::WAIT_TIMEOUT)
-                    .is_none()
-                {
-                    return Err(first);
-                }
-                self.session(worktree_id)
-            }
-        }
+        crate::worktree_environment::WorktreeEnvironment::new(self).session_retrying(worktree_id)
     }
 
     /// 清空全部会话缓存：重新解析登录 shell 环境与 Git 程序（设置里的“重新加载环境”）。
-    ///
-    /// 有任何会话正在写操作时拒绝：清缓存会让下一次打开换一个新会话，
-    /// 绕过它的写锁，同一 worktree 可能并发写（返修 C3，Q90）。
     pub fn reload_sessions(&self) -> Result<()> {
-        let sessions = self.sessions.lock().map_err(|_| {
-            AppError::coded(
-                ErrorKind::Internal,
-                "errors.commands.sessionLockFailed2",
-                "会话锁失败",
-                &[],
-            )
-        })?;
-        for session in sessions.values() {
-            if *session.writing.lock().map_err(|_| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.commands.writeOperationLockFailed",
-                    "写操作锁失败",
-                    &[],
-                )
-            })? {
-                return Err(AppError::coded(
-                    ErrorKind::Rejected,
-                    "errors.commands.aWriteOperationProgressReloadEnvironment",
-                    "有正在进行的写操作，完成后再重新加载环境",
-                    &[],
-                ));
-            }
-        }
-        // 环境记忆也一起清空：下一次打开重新解析登录环境（Q212）。
-        self.env.reset();
-        // 清空缓存之前先让旧会话实例失效：`history_open` 可能在读 Git 期间被
-        // 这里抢先完成，只清目标表拦不住它随后把旧会话登记成新目标。
-        let instances: Vec<(String, u64)> = sessions
-            .iter()
-            .map(|(worktree_id, session)| (worktree_id.clone(), session.instance_id()))
-            .collect();
-        drop(sessions);
-        for (worktree_id, instance_id) in instances {
-            self.history.invalidate_session(&worktree_id, instance_id);
-        }
-        if let Ok(mut sessions) = self.sessions.lock() {
-            sessions.clear();
-        }
-        // 环境重载后旧的历史目标（含其 Git 程序与 shell 环境）不再有效。
-        self.history.clear();
-        Ok(())
+        crate::worktree_environment::WorktreeEnvironment::new(self).reload()
     }
 
     /// 取得某个已登记 worktree 的会话（命令层与生产入口测试共用同一条路径）。

@@ -11,11 +11,11 @@ import { listen } from "@tauri-apps/api/event";
 import type { CommitContext } from "@/types/bindings/CommitContext";
 import type { CommitHookChanges } from "@/types/bindings/CommitHookChanges";
 import type { CommitOutcome } from "@/types/bindings/CommitOutcome";
-import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { ChangelistSelection } from "@/types/bindings/ChangelistSelection";
 import { messages, t } from "@/lib/i18n/index";
 import { formatAppError, toAppError } from "@/lib/error";
 import { ipc, type AiCommitMode, type AiStatus } from "@/lib/ipc";
+import type { GenerationControl, GenerationIntent, GenerationView } from "@/lib/commitMessageGeneration";
 import { acceleratorOf, formatAccelerator, matchesAccelerator } from "@/lib/shortcuts";
 import { Codicon } from "@/components/ui/codicon";
 import type { NoticeText } from "./Notifications";
@@ -86,6 +86,10 @@ export interface CommitResultView {
   snapshotPaths: string[];
 }
 
+/** 生成提交信息的显示与控制入口（请求生命周期与目标资格都在 `commitMessageGeneration`）。 */
+/** M10 任务 03：生成控制面由 module 持有（引用稳定），显示层只表达意图。 */
+export type CommitGenerationControl = GenerationControl;
+
 export function CommitArea({
   context,
   message,
@@ -110,6 +114,8 @@ export function CommitArea({
   onAmendCancel,
   worktreeId,
   changelistSelection,
+  generation,
+  generationView,
 }: {
   context: CommitContext | null;
   message: string;
@@ -138,19 +144,26 @@ export function CommitArea({
   /** M9：当前 worktree ID 与更改列表勾选（AI 生成用）。 */
   worktreeId?: string | null;
   changelistSelection?: ChangelistSelection | null;
+  /** M10 任务 03：生成请求的显示与控制（App 持有 module 实例）。 */
+  generation: CommitGenerationControl;
+  /** 生成状态快照（与稳定控制面分开，重新渲染不影响生命周期）。 */
+  generationView: GenerationView;
 }) {
   const [recentOpen, setRecentOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
-  // M9 任务 09：AI 提交信息生成交互
+  // M9 任务 09：AI 提交信息生成交互（M10 任务 03：请求生命周期已移入模块，这里只保留配置与确认流程）
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
-  const [aiGenerating, setAiGenerating] = useState(false);
   const [aiConfirmOpen, setAiConfirmOpen] = useState(false);
   const [aiReplaceConfirmOpen, setAiReplaceConfirmOpen] = useState(false);
+  /** 配置检查等本地失败；生成失败由模块的 view.error 提供。 */
   const [aiError, setAiError] = useState<string | null>(null);
-  const [canUndo, setCanUndo] = useState(false);
-  const preAiMessage = useRef("");
-  const activeRequestId = useRef<string | null>(null);
-  const streamingText = useRef("");
+  /** 异步确认对话框期间暂存的完整意图：回包时用同一份目标与模式发起，失效则不再生成。 */
+  const [pendingIntent, setPendingIntent] = useState<GenerationIntent | null>(null);
+  const aiGenerating = generationView.generating;
+  const generationError = generationView.error ? formatAppError(generationView.error) : null;
+  const canUndo = generationView.canUndo;
+  /** 显示与判定使用同一份合并后的文案（M10 返修 SP6 / ST1）。 */
+  const displayedError = generationError ?? aiError;
 
   const firstLine = firstLineLength(message);
   const subjectLimit = checks.subjectLimit;
@@ -194,105 +207,38 @@ export function CommitArea({
   }, [worktreeId]);
 
   useEffect(() => {
+    // 提交区卸载时取消；worktree 切换由共同 resetTarget 入口恢复旧目标并重置。
+    // 控制面引用稳定，不会因重新渲染而取消正在进行的生成（M10 返修 SP1）。
     return () => {
-      if (activeRequestId.current) {
-        void ipc.aiCancel(activeRequestId.current);
-      }
+      generation.cancel();
     };
-  }, [worktreeId]);
+  }, [generation]);
 
-  useEffect(() => {
-    let unlistenDelta: (() => void) | null = null;
-    let unlistenDone: (() => void) | null = null;
-    let unlistenError: (() => void) | null = null;
-    let disposed = false;
+  // 异步回包必须读取最新勾选，不能沿用点击时 render 闭包中的 props。
+  const modeRef = useRef<AiCommitMode>({ kind: "staged" });
+  modeRef.current = changelistSelection
+    ? { kind: "changelist", selection: changelistSelection, amend }
+    : amend ? { kind: "amend" } : { kind: "staged" };
+  const currentMode = () => modeRef.current;
 
-    void listen<{ requestId: string; text: string }>("revia://ai-delta", (event) => {
-      if (disposed || event.payload.requestId !== activeRequestId.current) return;
-      streamingText.current += event.payload.text;
-      onMessage(streamingText.current);
-    }).then((un) => {
-      if (disposed) un();
-      else unlistenDelta = un;
-    });
-
-    void listen<{ requestId: string; text: string; cancelled: boolean }>("revia://ai-done", (event) => {
-      if (disposed || event.payload.requestId !== activeRequestId.current) return;
-      setAiGenerating(false);
-      activeRequestId.current = null;
-      if (event.payload.cancelled) {
-        onMessage(preAiMessage.current);
-      } else {
-        onMessage(event.payload.text);
-        setCanUndo(true);
-      }
-    }).then((un) => {
-      if (disposed) un();
-      else unlistenDone = un;
-    });
-
-    void listen<{ requestId: string; error: AppErrorPayload }>("revia://ai-error", (event) => {
-      // 只接受当前请求的错误：已取消请求迟到的错误不能覆盖用户之后输入的内容。
-      if (disposed || event.payload.requestId !== activeRequestId.current) return;
-      setAiGenerating(false);
-      activeRequestId.current = null;
-      onMessage(preAiMessage.current);
-      setAiError(formatAppError(event.payload.error));
-    }).then((un) => {
-      if (disposed) un();
-      else unlistenError = un;
-    });
-
-    return () => {
-      disposed = true;
-      unlistenDelta?.();
-      unlistenDone?.();
-      unlistenError?.();
-    };
-  }, [onMessage]);
-
-  const startGenerating = async () => {
-    if (!worktreeId) return;
-    preAiMessage.current = message;
-    streamingText.current = "";
-    setCanUndo(false);
-    setAiGenerating(true);
+  const startWith = (intent: GenerationIntent) => {
+    if (!generation.intentStillValid(intent, currentMode())) return;
     setAiError(null);
-    // 请求 ID 先在前端生成：事件和取消从一开始就能对上（S12）。
-    const requestId = crypto.randomUUID();
-    activeRequestId.current = requestId;
-    onMessage("");
-
-    // S7：更改列表模式下支持勾选 amend
-    const mode: AiCommitMode = changelistSelection
-      ? { kind: "changelist", selection: changelistSelection, amend }
-      : amend
-        ? { kind: "amend" }
-        : { kind: "staged" };
-
-    try {
-      await ipc.aiGenerate({ worktreeId, mode, requestId });
-    } catch (caught) {
-      // 期间已取消或换了新请求时，不再改动提交信息框。
-      if (activeRequestId.current !== requestId) return;
-      setAiGenerating(false);
-      activeRequestId.current = null;
-      onMessage(preAiMessage.current);
-      setAiError(formatAppError(toAppError(caught)));
-    }
+    generation.dismissError();
+    generation.begin(intent);
   };
 
   const handleGenerateClick = async () => {
     if (aiGenerating) {
-      // S12：ID 在发请求前就有了，取消总能送达后端；后端在登记前收到取消时直接不发请求。
-      const requestId = activeRequestId.current;
-      activeRequestId.current = null;
-      setAiGenerating(false);
-      onMessage(preAiMessage.current);
-      if (requestId) void ipc.aiCancel(requestId);
+      generation.cancel();
       return;
     }
     setAiError(null);
+    generation.dismissError();
+    // 点击时就捕获完整意图（目标 + 模式 + 当时的文字）：等待配置或确认期间的
+    // 任何变化都会让这次点击失效，不会用旧文字判定新输入，也不会发到新 worktree。
+    const intent = generation.captureIntent(currentMode(), message);
+    if (!intent) return;
     let status = aiStatus;
     try {
       status = await ipc.aiStatus();
@@ -301,22 +247,32 @@ export function CommitArea({
       setAiError(formatAppError(toAppError(caught)));
       return;
     }
-    if (!status.configured) return;
+    if (!status.configured || !generation.intentStillValid(intent, currentMode())) return;
 
-    if (message.trim().length > 0) {
+    if (intent.message.trim().length > 0) {
+      setPendingIntent(intent);
       setAiReplaceConfirmOpen(true);
       return;
     }
     if (!status.confirmed) {
+      setPendingIntent(intent);
       setAiConfirmOpen(true);
       return;
     }
-    await startGenerating();
+    startWith(intent);
+  };
+
+  const confirmAndStart = () => {
+    const intent = pendingIntent;
+    setPendingIntent(null);
+    if (!intent) return;
+    // 确认期间切换 worktree、编辑输入、改模式或勾选都让这次点击失效，不再生成。
+    if (!generation.intentStillValid(intent, currentMode())) return;
+    startWith(intent);
   };
 
   const handleUndo = () => {
-    onMessage(preAiMessage.current);
-    setCanUndo(false);
+    generation.undo();
   };
 
   return (
@@ -445,7 +401,10 @@ export function CommitArea({
             <button
               type="button"
               className="banner-link text-[11.5px]"
-              onClick={() => setAiReplaceConfirmOpen(false)}
+              onClick={() => {
+                setAiReplaceConfirmOpen(false);
+                setPendingIntent(null);
+              }}
             >
               {messages.recovery.cancel}
             </button>
@@ -458,7 +417,7 @@ export function CommitArea({
                   setAiConfirmOpen(true);
                   return;
                 }
-                void startGenerating();
+                confirmAndStart();
               }}
             >
               {messages.commit.ai.replaceConfirm}
@@ -622,22 +581,28 @@ export function CommitArea({
         />
       ) : null}
 
-      {aiError ? (
+      {displayedError ? (
         <p role="status" className="mt-1 flex items-start gap-1 text-[11px] leading-relaxed text-[var(--editorerror-foreground)]">
           <Codicon name="error" size={13} className="mt-0.5 shrink-0" />
-          <span className="min-w-0">{aiError}</span>
+          <span className="min-w-0">{displayedError}</span>
         </p>
       ) : null}
 
       {aiConfirmOpen && aiStatus ? (
         <Modal
           title={messages.commit.ai.confirmTitle}
-          onClose={() => setAiConfirmOpen(false)}
+          onClose={() => {
+            setAiConfirmOpen(false);
+            setPendingIntent(null);
+          }}
           width={440}
         >
           <div className="space-y-3">
             <p className="leading-relaxed text-[12.5px]">
-              {amend
+              {(pendingIntent
+                ? pendingIntent.mode.kind === "amend"
+                  || (pendingIntent.mode.kind === "changelist" && pendingIntent.mode.amend)
+                : amend)
                 ? t("commit.ai.confirmBodyAmend", { url: aiStatus.baseUrl })
                 : t("commit.ai.confirmBody", { url: aiStatus.baseUrl })}
             </p>
@@ -648,7 +613,14 @@ export function CommitArea({
               </div>
             ) : null}
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="banner-link text-[12px]" onClick={() => setAiConfirmOpen(false)}>
+              <button
+                type="button"
+                className="banner-link text-[12px]"
+                onClick={() => {
+                  setAiConfirmOpen(false);
+                  setPendingIntent(null);
+                }}
+              >
                 {messages.recovery.cancel}
               </button>
               <button
@@ -659,7 +631,7 @@ export function CommitArea({
                     const updated = await ipc.aiConfirm();
                     setAiStatus(updated);
                     setAiConfirmOpen(false);
-                    void startGenerating();
+                    confirmAndStart();
                   } catch (caught) {
                     setAiConfirmOpen(false);
                     setAiError(formatAppError(toAppError(caught)));

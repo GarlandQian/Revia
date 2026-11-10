@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
@@ -156,6 +157,10 @@ struct SlotState {
 struct EnvSlot {
     /// 每次登记都换一个代号：重新加载环境后，旧的后台结果不会写进新槽位。
     generation: u64,
+    /// 重新加载已作废这个槽位：即使租约代号偶然相同也绝不发布。
+    invalidated: AtomicBool,
+    /// 正阻塞在这个槽位等待完整环境的线程数（生产等待阶段的观测接缝，M10 返修 ST2）。
+    waiting: std::sync::atomic::AtomicUsize,
     state: Mutex<SlotState>,
     ready: Condvar,
 }
@@ -165,7 +170,9 @@ static SLOT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 impl EnvSlot {
     fn new() -> Self {
         Self {
-            generation: SLOT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            generation: SLOT_GENERATION.fetch_add(1, Ordering::Relaxed),
+            invalidated: AtomicBool::new(false),
+            waiting: std::sync::atomic::AtomicUsize::new(0),
             state: Mutex::new(SlotState {
                 ready: false,
                 env: None,
@@ -175,6 +182,27 @@ impl EnvSlot {
             }),
             ready: Condvar::new(),
         }
+    }
+}
+
+/// 一次后台解析的**租约**（M10 任务 02）。
+///
+/// 发布必须带租约：只有它登记时的槽位仍然有效（未被重新加载作废、没有被替换）时
+/// 才能写入缓存、记忆、ready 与通知。调用方不再自行组合 begin/install/complete，
+/// 也不会出现「检查代次与真正写入之间被重新加载插进来」的间隙。
+pub struct EnvLease {
+    worktree_id: String,
+    generation: u64,
+    slot: Arc<EnvSlot>,
+}
+
+impl EnvLease {
+    pub fn worktree_id(&self) -> &str {
+        &self.worktree_id
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 }
 
@@ -259,63 +287,56 @@ impl EnvCoordinator {
         self.cache.store(worktree, env.clone());
     }
 
-    /// 登记一次后台解析（同一个 worktree 复用同一个槽位），返回槽位代号。
-    pub fn begin(&self, worktree_id: &str) -> u64 {
+    /// 登记一次后台解析（同一个 worktree 复用同一个槽位），返回可发布的租约。
+    pub fn begin(&self, worktree_id: &str) -> EnvLease {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-        slots
+        let slot = slots
             .entry(worktree_id.to_string())
             .or_insert_with(|| Arc::new(EnvSlot::new()))
-            .generation
+            .clone();
+        EnvLease {
+            worktree_id: worktree_id.to_string(),
+            generation: slot.generation,
+            slot,
+        }
     }
 
-    /// 后台解析完成，但只在槽位仍是登记时那一个时生效；返回是否生效。
-    pub fn complete_generation(
+    /// 用租约发布完整环境；只有租约仍有效时才写缓存、记忆、ready 并唤醒等待者。
+    ///
+    /// 整个检查与发布持有 `slots` 锁，`reset()` 也必须拿同一把锁：
+    /// 重新加载要么发生在发布之前（租约作废，发布被拒），要么之后（旧槽位已清空），
+    /// 不存在「检查通过后旧代次又写回新槽位」的间隙。
+    pub fn publish(
         &self,
-        worktree_id: &str,
-        generation: u64,
+        lease: &EnvLease,
         worktree: &Path,
         env: ShellEnv,
         git_path: PathBuf,
         error: Option<AppErrorPayload>,
     ) -> bool {
-        let current = self
-            .slots
-            .lock()
-            .ok()
-            .and_then(|slots| slots.get(worktree_id).map(|slot| slot.generation));
-        if current != Some(generation) {
+        let slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(current) = slots.get(&lease.worktree_id) else {
+            return false;
+        };
+        if !Arc::ptr_eq(current, &lease.slot)
+            || current.generation != lease.generation
+            || lease.slot.invalidated.load(Ordering::Acquire)
+        {
             return false;
         }
-        self.complete(worktree_id, worktree, env, git_path, error);
-        true
-    }
-
-    /// 后台解析完成：写入记忆与缓存，并唤醒等待者。
-    pub fn complete(
-        &self,
-        worktree_id: &str,
-        worktree: &Path,
-        env: ShellEnv,
-        git_path: PathBuf,
-        error: Option<AppErrorPayload>,
-    ) {
         self.store_cache(worktree, &env);
         self.memory.remember(worktree, &env, &git_path);
-        let slot = {
-            let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-            slots
-                .entry(worktree_id.to_string())
-                .or_insert_with(|| Arc::new(EnvSlot::new()))
-                .clone()
-        };
-        let mut state = slot.state.lock().unwrap_or_else(|error| error.into_inner());
-        state.ready = true;
-        state.env = Some(env);
-        state.git_path = Some(git_path);
-        state.error = error;
-        state.ready_at_ms = Some(now_ms());
-        drop(state);
-        slot.ready.notify_all();
+        {
+            let mut state = lease.slot.state.lock().unwrap_or_else(|error| error.into_inner());
+            state.ready = true;
+            state.env = Some(env);
+            state.git_path = Some(git_path);
+            state.error = error;
+            state.ready_at_ms = Some(now_ms());
+        }
+        drop(slots);
+        lease.slot.ready.notify_all();
+        true
     }
 
     /// 等环境就绪；没有登记过或超时返回 None。
@@ -325,9 +346,15 @@ impl EnvCoordinator {
             .lock()
             .ok()
             .and_then(|slots| slots.get(worktree_id).cloned())?;
+        // 从这个点起线程就在生产等待阶段里（不靠调用前的握手判断，M10 返修 ST2）。
+        let _waiting = WaitingSlot::enter(&slot);
         let deadline = Instant::now() + timeout;
         let mut state = slot.state.lock().unwrap_or_else(|error| error.into_inner());
         while !state.ready {
+            // 重新加载已作废这个槽位：立刻停止等待，不再假装「稍后就绪」。
+            if slot.invalidated.load(Ordering::Acquire) {
+                return None;
+            }
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return None;
@@ -360,12 +387,49 @@ impl EnvCoordinator {
 
     /// 等这个 worktree 的完整环境就绪；没有登记过（不由协调器管理）视为就绪。超时返回 false。
     pub fn wait_ready(&self, worktree_id: &str, timeout: Duration) -> bool {
-        let tracked = self
+        let Some(slot) = self
             .slots
             .lock()
             .ok()
-            .is_some_and(|slots| slots.contains_key(worktree_id));
-        !tracked || self.is_ready(worktree_id) || self.wait(worktree_id, timeout).is_some()
+            .and_then(|slots| slots.get(worktree_id).cloned())
+        else {
+            return true;
+        };
+        // 槽位已作废：等待者不再阻塞，交给会话的 `superseded` 检查给出结构化错误。
+        if slot.invalidated.load(Ordering::Acquire) {
+            return true;
+        }
+        if self.is_ready(worktree_id) {
+            return true;
+        }
+        if self.wait(worktree_id, timeout).is_some() {
+            return true;
+        }
+        slot.invalidated.load(Ordering::Acquire)
+    }
+
+    /// 正阻塞在这个 worktree 环境等待上的线程数（诊断与测试用）。
+    pub fn waiters(&self, worktree_id: &str) -> usize {
+        self.slots
+            .lock()
+            .ok()
+            .and_then(|slots| slots.get(worktree_id).map(|slot| slot.waiting.load(Ordering::Acquire)))
+            .unwrap_or(0)
+    }
+
+    /// 租约是否仍然有效：槽位没被重新加载作废、也没有被替换。
+    ///
+    /// 后台安装用它先确认代次，再改动会话表：重载后迟到的结果不会把旧会话重新登记回来。
+    pub fn is_lease_valid(&self, lease: &EnvLease) -> bool {
+        self.slots
+            .lock()
+            .ok()
+            .and_then(|slots| slots.get(&lease.worktree_id).cloned())
+            .is_some_and(|current| {
+                Arc::ptr_eq(&current, &lease.slot)
+                    && current.generation == lease.generation
+                    && !lease.slot.invalidated.load(Ordering::Acquire)
+            })
     }
 
     pub fn status(&self, worktree_id: &str) -> EnvStatus {
@@ -400,13 +464,40 @@ impl EnvCoordinator {
         self.memory.clear();
     }
 
-    /// 重新加载环境（设置里的「重新加载环境」）：清空本次运行的缓存、槽位与跨运行记忆（S2）。
+    /// 重新加载环境（设置里的「重新加载环境」）：作废所有租约、清空本次运行的缓存、
+    /// 槽位与跨运行记忆（S2）。
+    ///
+    /// 整个作废与清除都在 `slots` 锁内完成（M10 返修 SP3）：`publish()` 也拿同一把锁，
+    /// 所以不会出现「清完缓存、还没清槽位时旧代次又写回缓存」的间隙。
     pub fn reset(&self) {
+        let Ok(mut slots) = self.slots.lock() else {
+            return;
+        };
+        // 先唤醒所有等待者再清槽位：它们醒来会看到作废，不会白等到超时。
+        for slot in slots.values() {
+            slot.invalidated.store(true, Ordering::Release);
+            slot.ready.notify_all();
+        }
+        // 缓存与记忆也在同一临界区内清：迟到的发布拿不到锁，只能等这里完成。
         self.cache.clear();
         self.clear_memory();
-        if let Ok(mut slots) = self.slots.lock() {
-            slots.clear();
-        }
+        slots.clear();
+    }
+}
+
+/// 统计阻塞在某个槽位等待上的线程：进入生产等待点计数，离开时（含提前返回）减回去。
+struct WaitingSlot<'a>(&'a EnvSlot);
+
+impl<'a> WaitingSlot<'a> {
+    fn enter(slot: &'a EnvSlot) -> Self {
+        slot.waiting.fetch_add(1, Ordering::AcqRel);
+        Self(slot)
+    }
+}
+
+impl Drop for WaitingSlot<'_> {
+    fn drop(&mut self) {
+        self.0.waiting.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
@@ -480,13 +571,15 @@ mod tests {
                 fallback_detail: None,
             },
         };
-        EnvCoordinator::new(path.clone()).complete(
-            "wt-1",
+        let writer = EnvCoordinator::new(path.clone());
+        let lease = writer.begin("wt-1");
+        assert!(writer.publish(
+            &lease,
             &worktree,
             env,
             PathBuf::from("/opt/homebrew/bin/git"),
             None,
-        );
+        ));
         // 模拟重启：新的协调器从磁盘读回记忆。
         let restarted = EnvCoordinator::new(path);
         let provisional = restarted.provisional(&worktree);
@@ -531,19 +624,19 @@ mod tests {
         let (dir, coordinator) = temp_memory();
         let worktree = dir.path().join("repo");
         std::fs::create_dir_all(&worktree).unwrap();
-        coordinator.begin("wt-1");
+        let lease = coordinator.begin("wt-1");
         assert!(!coordinator.is_ready("wt-1"));
         assert!(coordinator
             .wait("wt-1", Duration::from_millis(20))
             .is_none());
         let env = ShellEnv::minimal(&worktree);
-        coordinator.complete(
-            "wt-1",
+        assert!(coordinator.publish(
+            &lease,
             &worktree,
             env,
             PathBuf::from("/usr/bin/git"),
             None,
-        );
+        ));
         let (ready_env, git_path) = coordinator
             .wait("wt-1", Duration::from_millis(20))
             .expect("环境应已就绪");
@@ -559,13 +652,13 @@ mod tests {
         let b = dir.path().join("b");
         std::fs::create_dir_all(&a).unwrap();
         std::fs::create_dir_all(&b).unwrap();
-        coordinator.begin("a");
-        coordinator.begin("b");
-        coordinator.complete("a", &a, ShellEnv::minimal(&a), PathBuf::from("git"), None);
+        let lease_a = coordinator.begin("a");
+        let lease_b = coordinator.begin("b");
+        assert!(coordinator.publish(&lease_a, &a, ShellEnv::minimal(&a), PathBuf::from("git"), None));
         assert!(coordinator.is_ready("a"));
         assert!(!coordinator.is_ready("b"));
         // b 的迟到结果只登记到 b。
-        coordinator.complete("b", &b, ShellEnv::minimal(&b), PathBuf::from("git"), None);
+        assert!(coordinator.publish(&lease_b, &b, ShellEnv::minimal(&b), PathBuf::from("git"), None));
         assert!(coordinator.is_ready("b"));
     }
 
@@ -575,15 +668,16 @@ mod tests {
         let worktree = dir.path().join("repo");
         std::fs::create_dir_all(&worktree).unwrap();
         // 先写一条记忆，模拟上次运行记住的 Git。
-        coordinator.complete(
-            "wt-1",
+        let remembered_lease = coordinator.begin("wt-1");
+        assert!(coordinator.publish(
+            &remembered_lease,
             &worktree,
             ShellEnv::minimal(&worktree),
             PathBuf::from("/opt/homebrew/bin/git"),
             None,
-        );
+        ));
         let coordinator = EnvCoordinator::new(dir.path().join("env-memory.json"));
-        coordinator.begin("wt-1");
+        let lease = coordinator.begin("wt-1");
         let provisional = coordinator.provisional(&worktree);
         assert!(provisional.needs_capture);
         assert_eq!(
@@ -591,13 +685,13 @@ mod tests {
             Some(PathBuf::from("/opt/homebrew/bin/git"))
         );
         // 后台解析找到新的 Git（记住的那个被删除或换了版本）。
-        coordinator.complete(
-            "wt-1",
+        assert!(coordinator.publish(
+            &lease,
             &worktree,
             ShellEnv::minimal(&worktree),
             PathBuf::from("/usr/local/bin/git"),
             None,
-        );
+        ));
         let (_, git_path) = coordinator.wait("wt-1", Duration::from_millis(50)).unwrap();
         assert_eq!(git_path, PathBuf::from("/usr/local/bin/git"));
         // 记忆已更新：下次启动直接用新路径。
@@ -613,15 +707,124 @@ mod tests {
         let (dir, coordinator) = temp_memory();
         let worktree = dir.path().join("repo");
         std::fs::create_dir_all(&worktree).unwrap();
-        coordinator.begin("wt-1");
-        coordinator.complete(
-            "wt-1",
+        let lease = coordinator.begin("wt-1");
+        assert!(coordinator.publish(
+            &lease,
             &worktree,
             ShellEnv::minimal(&worktree),
             PathBuf::from("git"),
             None,
-        );
+        ));
+        assert!(coordinator.is_ready("wt-1"));
         coordinator.reset();
         assert!(!coordinator.is_ready("wt-1"));
+        // 旧代次的租约在重新加载后不能重新发布 ready / 缓存 / 记忆。
+        assert!(!coordinator.publish(
+            &lease,
+            &worktree,
+            ShellEnv::minimal(&worktree),
+            PathBuf::from("git"),
+            None,
+        ));
+        assert!(!coordinator.is_ready("wt-1"));
+        assert!(coordinator.wait("wt-1", Duration::from_millis(10)).is_none());
+    }
+
+    /// SP3：重载的「作废 + 清缓存/记忆 + 清槽位」与发布在同一临界区，
+    /// 无论发布抢在重载前还是后，重载结束后都不会留下旧缓存。
+    #[test]
+    fn reset_never_leaves_stale_cache_behind_a_publish() {
+        let (dir, coordinator) = temp_memory();
+        let coordinator = Arc::new(coordinator);
+        let worktree = dir.path().join("repo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        for _ in 0..50 {
+            let lease = coordinator.begin("wt-1");
+            let path = worktree.clone();
+            let publisher = {
+                let coordinator = Arc::clone(&coordinator);
+                std::thread::spawn(move || {
+                    coordinator.publish(
+                        &lease,
+                        &path,
+                        ShellEnv::minimal(&path),
+                        PathBuf::from("git"),
+                        None,
+                    )
+                })
+            };
+            coordinator.reset();
+            publisher.join().unwrap();
+            assert!(!coordinator.is_ready("wt-1"));
+            assert!(
+                coordinator.provisional(&worktree).needs_capture,
+                "reset must not leave a stale cached environment behind"
+            );
+        }
+    }
+
+    #[test]
+    fn lease_validity_tracks_reset_and_replacement() {
+        let (dir, coordinator) = temp_memory();
+        let worktree = dir.path().join("repo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        let lease = coordinator.begin("wt-1");
+        assert!(coordinator.is_lease_valid(&lease));
+        coordinator.reset();
+        assert!(!coordinator.is_lease_valid(&lease));
+        let fresh = coordinator.begin("wt-1");
+        assert!(coordinator.is_lease_valid(&fresh));
+        assert!(!coordinator.is_lease_valid(&lease));
+        let _ = worktree;
+    }
+
+    #[test]
+    fn waiters_counts_threads_blocked_in_the_wait() {
+        let (dir, coordinator) = temp_memory();
+        let worktree = dir.path().join("repo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        let _lease = coordinator.begin("wt-1");
+        let shared = Arc::new(coordinator);
+        let waiter = {
+            let shared = Arc::clone(&shared);
+            std::thread::spawn(move || shared.wait("wt-1", Duration::from_secs(5)).is_some())
+        };
+        // 只观察生产等待点何时被进入，不用 sleep 驱动被测逻辑。
+        let started = Instant::now();
+        while shared.waiters("wt-1") == 0 && started.elapsed() < Duration::from_secs(3) {
+            std::thread::yield_now();
+        }
+        assert_eq!(shared.waiters("wt-1"), 1, "waiter must be counted inside wait()");
+        shared.reset();
+        assert!(!waiter.join().unwrap(), "reset must wake the waiter");
+        assert_eq!(shared.waiters("wt-1"), 0);
+    }
+
+    #[test]
+    fn lease_from_a_replaced_slot_cannot_publish() {
+        let (dir, coordinator) = temp_memory();
+        let worktree = dir.path().join("repo");
+        std::fs::create_dir_all(&worktree).unwrap();
+        let stale = coordinator.begin("wt-1");
+        coordinator.reset();
+        // 重新加载后重新登记：旧租约属于已作废的槽位，不能发布。
+        let fresh = coordinator.begin("wt-1");
+        assert!(!coordinator.publish(
+            &stale,
+            &worktree,
+            ShellEnv::minimal(&worktree),
+            PathBuf::from("old-git"),
+            None,
+        ));
+        assert!(!coordinator.is_ready("wt-1"));
+        assert!(coordinator.publish(
+            &fresh,
+            &worktree,
+            ShellEnv::minimal(&worktree),
+            PathBuf::from("new-git"),
+            None,
+        ));
+        let (_, git_path) = coordinator.wait("wt-1", Duration::from_millis(20)).unwrap();
+        assert_eq!(git_path, PathBuf::from("new-git"));
     }
 }

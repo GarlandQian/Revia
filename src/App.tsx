@@ -34,6 +34,7 @@ import type { CommitOutputEvent } from "@/types/bindings/CommitOutputEvent";
 import { CommitArea, messageSubmittable, type CommitResultView } from "@/components/app/CommitComposer";
 import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from "@/lib/commitDraft";
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
+import { CommitMessageGeneration, type GeneratedInput, type GenerationView } from "@/lib/commitMessageGeneration";
 import { CommitOutputStore } from "@/lib/commitOutput";
 import { changelistEntriesForView, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
 import { UpdateInstallConfirmation } from "@/lib/m7/updateState";
@@ -112,8 +113,9 @@ import { diagnoseJumpDom, observeJumpDom } from "@/lib/jumpDiagnostics";
 import { messages, resolveLocale, setLocale, setSystemLanguage, subscribeLocale, t, type LanguagePreference } from "@/lib/i18n/index";
 import { operationKindText, readonlyReasonText } from "@/lib/i18n/text";
 import { isButtonTarget, isCommitMessageTarget, isPrimaryModifier, isTextInputOrDialog, isAltGraph, isImeComposing, isWindows } from "@/lib/platform";
-import { OperationResultGate, RefreshCoordinator, ReviewOverlay, SelectionGate, SnapshotGate, WatchEventGate } from "@/lib/refreshGate";
+import { OperationResultGate, ReviewOverlay, SelectionGate, SnapshotGate } from "@/lib/refreshGate";
 import { mergePublishedReview, publishReviewSuccess, readThroughReview, ReviewRecoveryScheduler, reviewedSetForNavigation } from "@/lib/refreshGate";
+import { WorktreeRefresh } from "@/lib/worktreeRefresh";
 import { CloseCoordinator, CloseDriver, CloseGuardGate, ExitGuardSync, runReviewRecoveryBatch, WriteGuardOrchestrator } from "@/lib/refreshGate";
 import type { CloseDriverEffect } from "@/lib/refreshGate";
 import type { CloseDecision, CloseIntent } from "@/lib/refreshGate";
@@ -926,6 +928,60 @@ export function App() {
   /** 打开 / 切换仓库时正在上报的分段耗时；日志首屏画出后补齐（Q210）。 */
   const repoOpenTraceRef = useRef<{ worktreeId: string; trace: RepoOpenTrace } | null>(null);
 
+  /**
+   * M10 任务 01：激活、监视、读取接收与刷新合并都由同一个 module 持有。
+   * 这里只提供传输与发布回调；module 复用 App 已有的接收门（Q88、Q90）。
+   */
+  const openTimingRef = useRef<{ startedAt: number; triggerMs: number; targetPath: string | null; trace: RepoOpenTrace } | null>(null);
+  const openedRef = useRef<{ worktreeId: string; next: ChangesSnapshot; entry: ChangeEntry | null } | null>(null);
+  const publishOpenedRef = useRef<(snap: ChangesSnapshot) => void>(() => undefined);
+  const acceptSnapshotRef = useRef<(snap: ChangesSnapshot) => void>(() => undefined);
+  const refreshModuleRef = useRef<WorktreeRefresh<ChangesSnapshot> | null>(null);
+  if (refreshModuleRef.current === null) {
+    refreshModuleRef.current = new WorktreeRefresh<ChangesSnapshot>(
+      {
+        overlay: reviewOverlayRef.current,
+        listChanges: (id) => ipc.listChanges(id),
+        publishOpened: (snap) => publishOpenedRef.current(snap),
+        publishRefreshed: (snap) => acceptSnapshotRef.current(snap),
+        onError: (error, id) => setAppError(toAppError(error), id),
+        recover: (id) => requestReviewRecovery(id),
+        registerWatch: (id, activation) => ipc.watchWorktree(id, activation),
+        watchStatus: () => ipc.watchStatus(),
+        onWatchState: (state) =>
+          setWatchState((current) =>
+            current.active === state.active
+            && (current.error === state.error
+              || (current.error && state.error && formatAppError(current.error) === formatAppError(state.error as AppErrorPayload)))
+              ? current
+              : { active: state.active, error: state.error as AppErrorPayload | null },
+          ),
+        isWriting: (id) => writingWorktreesRef.current.has(id),
+        watchTarget: () => infoRef.current?.worktreePath ?? null,
+      },
+      gateRef.current,
+    );
+  }
+  const refreshModule = refreshModuleRef.current;
+  useEffect(() => () => refreshModule.dispose(), [refreshModule]);
+
+  /** 打开路径的发布：文件列表一可用就画出来，首屏 diff 仍由 `openWorktree` 后台补。 */
+  publishOpenedRef.current = (raw) => {
+    const next = applySnapshot(raw);
+    const timing = openTimingRef.current;
+    const entry = pickFirstEntry(next, timing?.targetPath ?? null);
+    openedRef.current = { worktreeId: raw.worktreeId, next, entry };
+    if (timing) {
+      timing.trace.listReady(performance.now() - timing.startedAt, next.entries.length, timing.triggerMs);
+    }
+    if (!entry) {
+      setSelected(null);
+      setStatus(messages.changes.empty);
+      return;
+    }
+    setStatus(messages.changes.fileCount(next.entries.length));
+  };
+
   const openWorktree = useCallback(
     async (
       id: string,
@@ -946,8 +1002,8 @@ export function App() {
       const trace = perfRecorder.beginRepoOpen(id, perfRecorder.triggerTimestamp(openStart));
       repoOpenTraceRef.current = { worktreeId: id, trace };
       if (id !== worktreeIdRef.current) resetMergeTabs();
-      // 切换请求发起时立即改激活目标：此后旧 worktree 的响应一律丢弃（含 A→B→A）。
-      gateRef.current.activate(id);
+      // 切换请求发起时立即改激活目标：此后旧 worktree 的响应、监视状态与错误一律丢弃（含 A→B→A）。
+      refreshModule.activate(id);
       setM6State(null);
       setHistoryAction(null);
       setExternalTool(null);
@@ -978,47 +1034,27 @@ export function App() {
           setAppError({ ...errors[0], related: errors.slice(1) }, id);
         }
 
-        // 监视只跟随当前 worktree；切换即释放旧监视（Q88）。
-        // 把发起时的激活代号带给后端：迟到进入的旧请求会被拒绝，不会装成最新监视。
-        // 启动监视不挡文件列表：失败或迟到都按激活代号丢弃（M9 任务 06）。
-        void ipc.watchWorktree(id, myToken.activation)
-          .then((watch) => {
-            if (gateRef.current.token().activation === myToken.activation && watch
-              && watch.target === infoRef.current?.worktreePath) {
-              setWatchState({ active: watch.active, error: watch.error });
-            }
-          })
-          .catch(() => undefined);
+        // 监视登记绑定在激活代号上；不挡文件列表，失败或迟到都按代号丢弃（Q88、M9 任务 06）。
+        void refreshModule.ensureWatch();
 
         const startedAt = performance.now();
-        // 重开仓库（再次添加当前仓库会走到这里）同样要按请求前分界合并，
-        // 不能把 rawSnapshot 直接发布而回退期间的审阅变更（SP07-R7-4）。
-        const openRead = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(id));
+        openTimingRef.current = { startedAt, triggerMs, targetPath: options.targetPath ?? null, trace };
+        // 统一读取入口：审阅分界、激活归属与版本判定都在 module 内完成（M10 任务 01）。
+        // 重开仓库同样按请求前分界合并，不能回退期间的审阅变更（SP07-R7-4）。
+        const openRead = await refreshModule.readOpened();
+        openTimingRef.current = null;
         if (!openRead.ok) {
-          // 读取不可信（叠加层容量淘汰后信息不足）：必须按**原目标**重新核对，
-          // 不能拿旧快照冒充成功（ST07-R15-1）。
-          debugLog(`重开读取不可信，重新核对：${openRead.worktreeId}`);
-          await scheduleReviewRecovery(openRead.worktreeId);
+          if (openRead.reason === "untrusted") debugLog(`重开读取不可信：${id}`);
           return null;
         }
-        const rawSnapshot = openRead.snapshot;
-        if (!gateRef.current.accept(myToken, { worktreeId: rawSnapshot.worktreeId, revision: rawSnapshot.revision })) {
-          debugLog(`丢弃非当前激活或过期的快照：${rawSnapshot.worktreeId}@${rawSnapshot.revision}`);
-          return null;
-        }
-        const next = applySnapshot(rawSnapshot);
+        const openedSnapshot = openedRef.current;
+        if (!openedSnapshot || openedSnapshot.worktreeId !== id) return null;
+        const next = openedSnapshot.next;
         const listChangesMs = performance.now() - startedAt;
         debugLog(`list_changes 完成：${Math.round(listChangesMs)} ms，${next.entries.length} 个文件`);
-        const entry = pickFirstEntry(next, options.targetPath ?? null);
-        if (!entry) {
-          setSelected(null);
-          setStatus(messages.changes.empty);
-          trace.listReady(listChangesMs, 0, triggerMs);
-          return null;
-        }
-        setStatus(messages.changes.fileCount(next.entries.length));
-        // 文件列表已可用：记下绘制时刻，日志与首屏 diff 随后补（Q211）。
-        trace.listReady(listChangesMs, next.entries.length, triggerMs);
+        // 文件列表已由发布回调画出：日志与首屏 diff 随后补（Q211）。
+        const entry = openedSnapshot.entry;
+        if (!entry) return null;
         const firstRowsStart = performance.now();
         debugLog(`选中文件：${entry.path}（${entry.changes}）`);
         if (progressive) {
@@ -1081,7 +1117,7 @@ export function App() {
         if (gateRef.current.token().activation === myToken.activation) setBusy(false);
       }
     },
-    [applySnapshot, openEntry, pickFirstEntry, resetMergeTabs, setAppError, view],
+    [openEntry, refreshModule, resetMergeTabs, setAppError, view],
   );
 
   /**
@@ -1105,6 +1141,9 @@ export function App() {
     },
     [applyRefreshedSnapshot],
   );
+  acceptSnapshotRef.current = (snap) => {
+    acceptSnapshot(gateRef.current.token(), snap);
+  };
 
   /**
    * 不可信读取的**重新核对**调度（ST07-R15-2 / SP07-R15-1）。
@@ -1158,53 +1197,29 @@ export function App() {
     return outcome;
   }, [setAppError]);
 
-  /** 读取并接收一次快照；自动刷新、手动刷新与回到前台共用同一条路径。 */
-  const readAndAccept = useCallback(
-    async (targetWorktreeId: string): Promise<boolean> => {
-      const token = gateRef.current.token();
-      // 共享生产入口：先取分界再发请求，交付时合并（ST07-R7-1）。
-      const read = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
-      if (!read.ok) {
-        // 不可信读取：明确拒收并按**原目标**重新核对，不返回旧快照。
-        debugLog(`读取不可信，重新核对：${read.worktreeId}@${read.observedSeq}`);
-        await scheduleReviewRecovery(read.worktreeId);
-        return false;
-      }
-      return acceptSnapshot(token, read.snapshot);
-    },
-    [acceptSnapshot],
-  );
-
   /** 当前 worktree 的完整登录环境是否还在后台加载（Q222）。 */
   const [environmentLoading, setEnvironmentLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!worktreeId) return;
-    const targetWorktreeId = worktreeId;
-    gateRef.current.activate(targetWorktreeId);
+    refreshModule.activate(worktreeId);
     setM6State(null);
     setHistoryAction(null);
     setExternalTool(null);
     const token = gateRef.current.token();
     setBusy(true);
     try {
-      await readAndAccept(targetWorktreeId);
-    } catch (caught) {
-      // 旧请求的错误只归属它自己的 worktree。
-      if (gateRef.current.token().activation === token.activation) {
-        setAppError(toAppError(caught), targetWorktreeId);
-      }
+      // 读取与错误资格都在 module 内判定；这里只负责界面忙碌状态。
+      await refreshModule.refresh();
     } finally {
       if (gateRef.current.token().activation === token.activation) setBusy(false);
     }
-  }, [readAndAccept, setAppError, worktreeId]);
+  }, [refreshModule, worktreeId]);
 
   /**
    * 环境在后台就绪（Q222）：Git 路径变了就重读一次，并收起“正在加载环境”的提示。
    * 迟到的结果只对当前激活的 worktree 生效。
    */
-  const refreshRef = useRef(refresh);
-  refreshRef.current = refresh;
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
   useEffect(() => {
@@ -1227,7 +1242,7 @@ export function App() {
           });
         }
         // 用完整环境重读一次：Git 路径变了要换新 Git，就绪前失败的读取（如缺 git-lfs）也借此重试（Q222）。
-        void refreshRef.current();
+        void refreshModule.refresh();
       },
     )
       .then((unlisten) => {
@@ -1239,7 +1254,7 @@ export function App() {
       disposed = true;
       stop?.();
     };
-  }, []);
+  }, [refreshModule]);
 
   /**
    * 对**指定** worktree 做一次真实重读（Q90、Q91）。
@@ -1247,29 +1262,8 @@ export function App() {
    * 写操作的结果归属原目标：即使已经切走，也要对原目标真实读一次，
    * 不能因为当前选择变了就跳过核对；但只有它仍是激活目标时才更新界面。
    */
-  const refreshTarget = useCallback(async (targetWorktreeId: string): Promise<boolean> => {
-    const token = gateRef.current.token();
-    try {
-      const read = await readThroughReview(reviewOverlayRef.current, () => ipc.listChanges(targetWorktreeId));
-      if (!read.ok) {
-        // 原目标归属不变：按 read.worktreeId 重新核对（不是当前界面目标）。
-        debugLog(`原目标读取不可信，重新核对：${read.worktreeId}@${read.observedSeq}`);
-        await scheduleReviewRecovery(read.worktreeId);
-        return false;
-      }
-      if (token.activation === gateRef.current.token().activation
-        && gateRef.current.current().worktreeId === targetWorktreeId) {
-        acceptSnapshot(token, read.snapshot);
-      }
-      return true;
-    } catch (caught) {
-      if (token.activation === gateRef.current.token().activation
-        && gateRef.current.current().worktreeId === targetWorktreeId) {
-        setAppError(toAppError(caught), targetWorktreeId);
-      }
-      return false;
-    }
-  }, [acceptSnapshot, scheduleReviewRecovery, setAppError]);
+  const refreshTarget = useCallback(async (targetWorktreeId: string): Promise<boolean> =>
+    refreshModule.verifyWrite(targetWorktreeId), [refreshModule]);
 
   /**
    * 单次恢复读取（ST07-R16-1）：只做一次真实 listChanges，报告可信度或失败。
@@ -1299,65 +1293,26 @@ export function App() {
   // 真实转发：getRows 等早于 scheduleReviewRecovery 定义的调用点经这里到达同一编排入口。
   scheduleRecoveryRef.current = scheduleReviewRecovery;
 
-  // 自动刷新协调器：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
+  // 自动刷新协调器（module 内实现）：事件合并 + 单飞，执行期间的变化只补一轮（Q88）。
   const refreshCoordinator = useMemo(
-    () => new RefreshCoordinator(async () => {
-      const active = gateRef.current.current().worktreeId;
-      if (!active) return;
-      try {
-        await readAndAccept(active);
-      } catch (caught) {
-        if (gateRef.current.current().worktreeId === active) {
-          setAppError(toAppError(caught), active);
-        }
-      }
-    }, () => {
-      const active = gateRef.current.current().worktreeId;
-      return !active || !writingWorktreesRef.current.has(active);
+    () => ({
+      request: () => refreshModule.requestRefresh(),
+      resume: () => refreshModule.resume(),
+      whenIdle: () => refreshModule.whenIdle(),
+      dispose: () => undefined,
     }),
-    [readAndAccept, setAppError],
+    [refreshModule],
   );
   const refreshCoordinatorRef = useRef(refreshCoordinator);
   refreshCoordinatorRef.current = refreshCoordinator;
-
-  useEffect(() => () => refreshCoordinator.dispose(), [refreshCoordinator]);
 
   // 监视状态与变化通知：轮询后端，失败持续展示（Q95）。
   // 只接受属于当前激活目标的状态与变化，迟到的状态响应不会画到别的目标上。
   useEffect(() => {
     if (!worktreeId) return;
-    let cancelled = false;
-    const notifications = new WatchEventGate();
-    const poll = async () => {
-      const token = gateRef.current.token();
-      try {
-        const snapshot = await ipc.watchStatus();
-        if (cancelled) return;
-        // 目标或激活代号已变：这一份状态属于旧目标，丢弃。
-        if (gateRef.current.token().activation !== token.activation) return;
-        if (snapshot.status.activation !== token.activation) return;
-        const expectedTarget = infoRef.current?.worktreePath ?? null;
-        if (expectedTarget && snapshot.status.target !== expectedTarget) return;
-        // 轮询结果没变时保持原对象：整棵界面不因一次空轮询重渲染（M9 任务 04）。
-        const nextActive = snapshot.status.active;
-        const nextError = snapshot.status.error;
-        setWatchState((current) =>
-          current.active === nextActive
-          && (current.error === nextError
-            || (current.error && nextError && formatAppError(current.error) === formatAppError(nextError)))
-            ? current
-            : { active: nextActive, error: nextError },
-        );
-        if (notifications.consume(token.activation, snapshot)) {
-          refreshCoordinator.request();
-        }
-      } catch {
-        // 状态查询失败不改变监视结论，等下一轮。
-      }
-    };
-    void poll();
-    // 轮询必须让开滚动取数：连续滚动期间暂停，滚动停下后再核对一次。
-    // 这样既保留生产环境的自动刷新，也不会与行数据争用 IPC 造成未覆盖帧。
+    // 轮询交给 module：只接受属于当前激活代号的 状态 / 变化序号（Q95）。
+    // 轮询让开滚动取数：连续滚动期间暂停，滚动停下后再核对一次。
+    void refreshModule.pollWatch();
     let timer = 0;
     let lastInteraction = performance.now();
     const noteInteraction = () => {
@@ -1368,18 +1323,17 @@ export function App() {
     window.addEventListener("keydown", noteInteraction);
     const tick = () => {
       const idle = performance.now() - lastInteraction >= 250;
-      if (idle && !document.hidden) void poll();
+      if (idle && !document.hidden) void refreshModule.pollWatch();
       timer = window.setTimeout(tick, idle ? 1000 : 300);
     };
     timer = window.setTimeout(tick, 1000);
     return () => {
-      cancelled = true;
       window.clearTimeout(timer);
       window.removeEventListener("scroll", noteInteraction, { capture: true });
       window.removeEventListener("wheel", noteInteraction);
       window.removeEventListener("keydown", noteInteraction);
     };
-  }, [refreshCoordinator, worktreeId]);
+  }, [refreshModule, worktreeId]);
 
   // 回到前台（窗口重新可见）必须重新核对真实状态（Q88）。
   useEffect(() => {
@@ -2530,7 +2484,8 @@ export function App() {
   }
   const draftPersistence = draftPersistenceRef.current;
 
-  const queueCommitDraft = useCallback((targetWorktreeId: string, input: ComposerInput) => {
+  const queueCommitDraft = useCallback((targetWorktreeId: string, input: ComposerInput,
+    generation = commitStateRef.current.current().generation) => {
     const revision = newCommitNonce();
     const context = commitContextRef.current;
     const identity = context?.worktreeId === targetWorktreeId ? context.draftIdentity : null;
@@ -2539,12 +2494,79 @@ export function App() {
       worktreeId: targetWorktreeId,
       input,
       revision,
-      generation: commitStateRef.current.current().generation,
+      generation,
     });
   }, [draftPersistence]);
 
   // 编辑、提交和关闭共用持久化顺序；关闭处不再读取内部队列或失败表。
   flushCommitDraftRef.current = (target) => draftPersistence.flush(target);
+
+  /**
+   * M10 任务 03：生成请求的生命周期与目标资格由模块持有。
+   * App 只镜像界面、保存草稿，并在切换 worktree 时让旧请求失效。
+   */
+  const [generationView, setGenerationView] = useState<GenerationView>({
+    requestId: null,
+    generating: false,
+    error: null,
+    canUndo: false,
+  });
+  const applyGeneratedInput = useCallback((write: GeneratedInput) => {
+    // 切换 render 可能已显示 B，而取消仍在恢复 A；保存只使用 module 携带的归属。
+    queueCommitDraft(write.worktreeId, write.input, write.generation);
+    if (worktreeIdRef.current !== write.worktreeId) return;
+    // 模块已经推进了输入代次，这里只镜像到界面，不再 edit 一次。
+    commitInputRef.current = write.input;
+    setCommitInput(write.input);
+    setAmendConfirm(null);
+  }, [queueCommitDraft]);
+  const generationRef = useRef<CommitMessageGeneration | null>(null);
+  if (generationRef.current === null) {
+    generationRef.current = new CommitMessageGeneration({
+      state: commitStateRef.current,
+      transport: {
+        generate: ({ requestId, worktreeId, mode }) => ipc.aiGenerate({ requestId, worktreeId, mode }),
+        cancel: (requestId) => ipc.aiCancel(requestId),
+      },
+      events: {
+        attach: (handlers) => {
+          const unlisteners: Array<() => void> = [];
+          let disposed = false;
+          const keep = (un: () => void) => {
+            if (disposed) un();
+            else unlisteners.push(un);
+          };
+          void listen<{ requestId: string; text: string }>("revia://ai-delta", (event) =>
+            handlers.onDelta(event.payload)).then(keep);
+          void listen<{ requestId: string; text: string; cancelled: boolean }>("revia://ai-done", (event) =>
+            handlers.onDone(event.payload)).then(keep);
+          void listen<{ requestId: string; error: AppErrorPayload }>("revia://ai-error", (event) =>
+            handlers.onError(event.payload)).then(keep);
+          return () => {
+            disposed = true;
+            for (const un of unlisteners.splice(0)) un();
+          };
+        },
+      },
+      onInput: applyGeneratedInput,
+      onChange: () => {
+        const module = generationRef.current;
+        if (module) setGenerationView(module.view());
+      },
+    });
+  }
+  useEffect(() => {
+    const detach = generationRef.current?.attach();
+    return () => {
+      detach?.();
+      generationRef.current?.dispose();
+    };
+  }, []);
+  // 控制面只建一次（M10 返修 SP1）：界面重新渲染不会换引用，取消只由切换与显式意图触发。
+  const generationControl = useMemo(
+    () => generationRef.current!.control(() => worktreeIdRef.current),
+    [],
+  );
 
   /**
    * 读取提交上下文（预期、模板、最近信息、草稿、上游、门禁）。
@@ -2637,10 +2659,11 @@ export function App() {
 
   /** 切换 worktree / 重新打开会话时重置提交区（每个 worktree 各自独立，F02.5）。 */
   const resetCommitComposer = useCallback((targetWorktreeId: string | null) => {
+    // 共同入口先恢复并保存生成的原目标，再重置输入；不能把半截生成稿留给旧 worktree。
+    generationRef.current?.resetTarget(targetWorktreeId);
     // 先把上一个 worktree 尚未落盘的输入排队写出去（不 await：切换不阻塞界面，
     // 但写入仍在它自己的队列里，稍后加载该 worktree 时会等这个队列）。
     void draftPersistence.flush().catch(() => undefined);
-    commitStateRef.current.reset(targetWorktreeId);
     commitStateRef.current.setSubmitting(targetWorktreeId !== null && commitSubmittingRef.current.has(targetWorktreeId));
     commitInputRef.current = resetInput();
     commitContextRef.current = null;
@@ -4824,7 +4847,7 @@ export function App() {
   /** 重新加载登录 shell 环境与 Git 程序（F08）。 */
   const reloadEnvironment = useCallback(async (): Promise<AppErrorPayload | null> => {
     try {
-      if (worktreeId) gateRef.current.activate(worktreeId);
+      if (worktreeId) refreshModule.activate(worktreeId);
       setM6State(null); setHistoryAction(null); setExternalTool(null);
       await ipc.reloadEnvironment();
       if (worktreeId) {
@@ -4883,7 +4906,7 @@ export function App() {
       await ipc.removeRepo(repo.id);
       setRepos((current) => current.filter((entry) => entry.id !== repo.id));
       if (activeRepo?.id === repo.id) {
-        gateRef.current.activate(null);
+        refreshModule.activate(null);
         selectionEpochRef.current += 1;
         selectionGateRef.current.clear();
         worktreeIdRef.current = null;
@@ -6195,6 +6218,8 @@ export function App() {
                     onAmendCancel={() => setAmendConfirm(null)}
                     worktreeId={worktreeId}
                     changelistSelection={changelistMode && changelistRef.current ? selectionOf(changelistRef.current) : null}
+                    generationView={generationView}
+                    generation={generationControl}
                   />
                 ) : null}
               </>

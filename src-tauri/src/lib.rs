@@ -37,6 +37,7 @@ pub mod stash_archive;
 pub mod stash_transaction;
 pub mod watch;
 pub mod worktree_status;
+pub mod worktree_environment;
 pub mod write_guard;
 
 use commands::AppState;

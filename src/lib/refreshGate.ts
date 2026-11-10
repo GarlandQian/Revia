@@ -72,6 +72,19 @@ export class SnapshotGate {
     return true;
   }
 
+  /**
+   * 写后核对**原目标**的接收（M10 返修 SP7）：只按该 worktree 自己的版本单调性判定。
+   *
+   * 写后核对的目标可以是已经切走的 worktree，界面切换不影响「真实读取是否核对成功」；
+   * 是否画到当前界面由调用方另判（`WorktreeRefresh` 的发布资格）。
+   */
+  acceptTarget(envelope: SnapshotEnvelope): boolean {
+    const previous = this.accepted.get(envelope.worktreeId) ?? 0;
+    if (envelope.revision < previous) return false;
+    this.accepted.set(envelope.worktreeId, envelope.revision);
+    return true;
+  }
+
   /** 已接受的最大版本（诊断与测试用）。 */
   acceptedRevision(worktreeId: string): number {
     return this.accepted.get(worktreeId) ?? 0;

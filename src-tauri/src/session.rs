@@ -27,6 +27,8 @@ use crate::review::{self, ReviewMarks, ReviewStore, ReviewVersions};
 use crate::shell::{self, ShellEnv};
 
 static NEXT_SESSION_INSTANCE: AtomicU64 = AtomicU64::new(1);
+// 前端在同一进程内保留已接受的快照版本；重载环境或替换 Git 会重建会话，版本不能归零。
+static SNAPSHOT_GENERATION: Mutex<u64> = Mutex::new(0);
 
 /// 高亮取的是哪个版本：旧版本（HEAD 或暂存区）还是新版本（暂存区或工作区）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -278,7 +280,6 @@ pub struct WorktreeSession {
     highlighter: Highlighter,
     /// 已经发给高亮线程的文件内容代际，避免重复传输内容（按稳定文档键 + 版本）。
     highlight_generations: Mutex<HashMap<String, HighlightStamp>>,
-    generation_counter: Mutex<u64>,
     instance_id: u64,
     changelist_mode: std::sync::atomic::AtomicBool,
     confirmation_epoch: AtomicU64,
@@ -335,7 +336,7 @@ impl<'a> Drop for WriteGuard<'a> {
 /// 等待完整环境就绪；超时返回结构化错误。
 pub type EnvGate = Arc<dyn Fn() -> Result<()> + Send + Sync>;
 
-fn environment_reloaded() -> AppError {
+pub(crate) fn environment_reloaded() -> AppError {
     AppError::coded(
         ErrorKind::Rejected,
         "errors.environment.reloaded",
@@ -478,7 +479,6 @@ impl WorktreeSession {
             read_lock: Mutex::new(()),
             highlighter: Highlighter::start(),
             highlight_generations: Mutex::new(HashMap::new()),
-            generation_counter: Mutex::new(0),
             changelist_mode: std::sync::atomic::AtomicBool::new(false),
             instance_id: NEXT_SESSION_INSTANCE.fetch_add(1, Ordering::Relaxed),
             confirmation_epoch: AtomicU64::new(0),
@@ -508,12 +508,21 @@ impl WorktreeSession {
     /// 读取与发布在 `read_lock` 内成对完成：早开始的读取不会晚于较新的读取发布，
     /// 因此发布出的 generation 始终与内容同步递增（Q88、T05）。
     pub fn refresh(&self) -> Result<ChangesSnapshot> {
+        self.refresh_with_hook(|| {})
+    }
+
+    /// 受控读取接缝：真实 Git 取数后、发布前通知，用于验证环境替换时的迟到读取。
+    pub fn refresh_with_hook(&self, before_publish: impl FnOnce()) -> Result<ChangesSnapshot> {
         self.confirmation_epoch.fetch_add(1, Ordering::AcqRel);
-        self.read_for_write()
+        self.read_with_hook(before_publish)
     }
 
     /// Internal revalidation does not create a new user confirmation epoch.
     pub(crate) fn read_for_write(&self) -> Result<ChangesSnapshot> {
+        self.read_with_hook(|| {})
+    }
+
+    fn read_with_hook(&self, before_publish: impl FnOnce()) -> Result<ChangesSnapshot> {
         let _read = self.read_lock.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -522,12 +531,27 @@ impl WorktreeSession {
                 &[],
             )
         })?;
-        self.refresh_locked()
+        self.refresh_locked(before_publish)
     }
 
-    fn refresh_locked(&self) -> Result<ChangesSnapshot> {
+    fn refresh_locked(&self, before_publish: impl FnOnce()) -> Result<ChangesSnapshot> {
         let mut timing = crate::commands::MeasureSpan::new("session.refresh");
         let started = std::time::Instant::now();
+        // 在开始取数时分配版本，并与会话失效互斥。旧会话即使迟到返回，版本也低于新会话。
+        // 两把锁都在 Git 取数前释放，不把不同 worktree 的读取串行化。
+        let generation = {
+            let _writing = self.writing.lock().map_err(|_| {
+                AppError::coded(ErrorKind::Internal, "errors.session.writeOperationLockFailed", "写操作锁失败", &[])
+            })?;
+            if self.superseded.load(Ordering::Acquire) {
+                return Err(environment_reloaded());
+            }
+            let mut counter = SNAPSHOT_GENERATION.lock().map_err(|_| {
+                AppError::coded(ErrorKind::Internal, "errors.session.generationLockFailed", "代际锁失败", &[])
+            })?;
+            *counter += 1;
+            *counter
+        };
         let changelist_mode = self.changelist_mode.load(Ordering::Acquire);
         let status = status::read(&self.git)?;
         timing.mark("status");
@@ -676,6 +700,10 @@ impl WorktreeSession {
             }
         }
 
+        before_publish();
+        if self.superseded.load(Ordering::Acquire) {
+            return Err(environment_reloaded());
+        }
         let mut guard = self.snapshot.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -684,18 +712,6 @@ impl WorktreeSession {
                 &[],
             )
         })?;
-        let generation = {
-            let mut counter = self.generation_counter.lock().map_err(|_| {
-                AppError::coded(
-                    ErrorKind::Internal,
-                    "errors.session.generationLockFailed",
-                    "代际锁失败",
-                    &[],
-                )
-            })?;
-            *counter += 1;
-            *counter
-        };
         timing.mark("entries_and_snapshot_lock");
         let revision = generation.to_string();
         for entry in &mut entries {

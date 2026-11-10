@@ -2,6 +2,8 @@
 
 状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；0.0.1 Release 的误删已恢复，0.0.2 保持 latest，两个版本的标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。M9（Windows 与 macOS 性能、生成提交信息）已于 2026-11-08 压成一个提交合入 main，按用户要求发布 0.0.3（Q223）；Windows 第一轮实测（任务 10）与验收（任务 11）尚未完成，未验收项写在[发布说明](./milestones/m9/release-0.0.3-notes.md)中。更新日期：2026-11-08。
 
+M10 三项架构深化（Q224）已于 2026-11-10 完成实现、两轴审查、自动检查与 macOS 桌面验收，见 [M10 报告](./milestones/m10/report.md)。M8/M9 的 Windows 待验项保持原状态。
+
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
 ## 文档导航
@@ -261,6 +263,8 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 | Q221 | 同一时间只配置一个 AI 服务。改了服务地址视为换了服务，第一次使用前重新弹出发送确认（Q214） | 用户于 2026-11-08 对第三轮 Q26 回答“按推荐” |
 | Q222 | 两个平台第一次打开 worktree 时，都不再等待登录 shell 环境（macOS 的登录 shell、Windows 的 PowerShell 与 profile）。手动指定的 Git（Q27）始终直接使用；否则先用已经找到过的 Git 及其环境的 PATH（本次运行中其他 worktree 解析出的，或上次运行记住的），立即读取状态、diff 和日志。该 worktree 的完整环境在后台加载，执行 hooks、提交、fetch/pull/push、打开内置终端时，如果尚未加载完就等待。后台结果显示 Git 路径变了，就切换并重读一次。从未找到过 Git 时照旧等待。环境内容仍按 worktree 解析，失败与超时的提示沿用 Q205；本条调整 Q21、Q27 的加载时机，并把 Q212 的后台加载扩展到 macOS | 规划方写规格时发现 Q212 未覆盖 Git 查找与 macOS（在本机实测登录 shell 约 0.12–0.19 秒），补问访谈 Q27；用户于 2026-11-08 回复“按推进按”，按“按推荐”理解 |
 | Q223 | 将 m9 压成一个提交合入 main，版本改为 0.0.3，通过现有 Actions 构建并公开 Release；本轮授权正常推送 main 和 `v0.0.3` 标签。Windows 第一轮实测（任务 10）与验收（任务 11）尚未完成，按用户判断先发布，未验收项写进发布说明；两项任务保留，发布后继续。不删除、不改写旧版本 Release 与标签，不强推 | 用户于 2026-11-08 在规划方补测 macOS 切换耗时后回复“应该没问题 合并到main 发布0.0.3版本” |
+
+| Q224 | 本轮对 Worktree 激活与刷新、Worktree 运行环境、生成提交信息三项既有 module 做架构深化；沿用 Node 生产 interface 行为测试和 Rust 真实 Git 临时仓库 / 受控 shell 解析 seam，保持既有产品行为。规格、任务和实施见 [M10](./milestones/m10/spec.md) | 用户于 2026-11-09 在架构报告后选择“全部”，并对推荐方案回复“按推荐” |
 
 各项的完整说明见对应的方向文档。
 

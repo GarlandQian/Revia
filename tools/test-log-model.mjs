@@ -632,19 +632,15 @@ test("日志不再定期轮询 history_refs，可信重读后核对引用", () =
   assert.match(source, /refsWatchRevision/);
   assert.match(source, /refsWatchRef\.current\.observe\(next\)/);
 
-  // 所有可信快照共享门禁后的通知，包括提交/amend 写后重读与恢复路径。
+  // 快照接收与监视事件消费集中在生产 module：打开 / 刷新 / 写后核对共享同一道门。
   const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-  const acceptance = app.slice(app.indexOf("const acceptSnapshot ="), app.indexOf("const reviewRecoverySchedulerRef ="));
-  assert.match(acceptance, /return false;[\s\S]*applyRefreshedSnapshot\(snap\);[\s\S]*setWatchRevision/);
+  const refreshModule = readFileSync(new URL("../src/lib/worktreeRefresh.ts", import.meta.url), "utf8");
+  assert.match(refreshModule, /this\.gate\.accept\(token, envelope\)/);
+  // 写后核对走原目标接收门；行为（切换后仍算核对成功、不发布到新界面）由
+  // tools/test-worktree-refresh.mjs 经生产 module 覆盖。
+  assert.match(refreshModule, /this\.gate\.acceptTarget\(envelope\)/);
+  assert.match(refreshModule, /if \(this\.notifications\.consume\(token\.activation, snapshot\)\) this\.coordinator\.request\(\)/);
   assert.equal((app.match(/setWatchRevision\(\(value\) => value \+ 1\)/g) ?? []).length, 1);
-  for (const [start, end] of [
-    ["const readAndAccept =", "const refresh ="],
-    ["const refreshTarget =", "const recoveryReadOnce ="],
-    ["const recoveryReadOnce =", "recoveryReadOnceRef.current ="],
-  ]) {
-    assert.match(app.slice(app.indexOf(start), app.indexOf(end)), /acceptSnapshot\(token, read\.snapshot\)/);
-  }
-  assert.match(app, /if \(notifications\.consume\(token\.activation, snapshot\)\) \{\s*refreshCoordinator\.request\(\)/);
   assert.match(app, /refsWatchRevision=\{watchRevision\}/);
   assert.match(app, /refreshKey: refsRevision \+ watchRevision/);
   assert.match(source, /\[firstParent, filter, headCommit, key, pager, refreshKey, resetLog, targetId\]/);

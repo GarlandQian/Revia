@@ -20,6 +20,7 @@ const imports = registerHooks({
 const { CommitDraftPersistence } = await import("../src/lib/commitDraftPersistence.ts");
 const { CommitComposerState, draftToInput } = await import("../src/lib/commitDraft.ts");
 const { CommitOutputStore } = await import("../src/lib/commitOutput.ts");
+const { CommitMessageGeneration } = await import("../src/lib/commitMessageGeneration.ts");
 imports.deregister();
 
 globalThis.window = { setTimeout, clearTimeout, crypto: globalThis.crypto };
@@ -35,6 +36,66 @@ const write = (worktreeId, message, revision = message, generation = 1) => ({
 });
 const event = (worktreeId, clientNonce, line) => ({
   worktreeId, clientNonce, line, operationId: "operation", stderr: false,
+});
+
+test("生成期间切换：恢复草稿按原目标保存，A→B→A 不留下半截生成稿", async () => {
+  const drafts = new Map([
+    ["A", { message: "A 原文", amend: false, skipHooks: false, revision: "a", savedAtMs: 0 }],
+    ["B", { message: "B 原文", amend: false, skipHooks: false, revision: "b", savedAtMs: 0 }],
+  ]);
+  mockIPC((command, args) => {
+    if (command === "save_commit_draft") {
+      drafts.set(args.request.worktreeId, args.request.draft);
+    } else if (command === "clear_commit_draft") {
+      drafts.delete(args.request.worktreeId);
+    } else assert.fail(`unexpected IPC: ${command}`);
+  });
+  const queue = new CommitDraftPersistence(() => {});
+  const state = new CommitComposerState();
+  state.reset("A");
+  state.edit(draftToInput(drafts.get("A")));
+  let visibleWorktree = "A";
+  let mirror = state.current().input;
+  const writes = [];
+  const generation = new CommitMessageGeneration({
+    state,
+    transport: { generate: async () => {}, cancel: async () => true },
+    events: { attach: () => () => {} },
+    onInput: (write) => {
+      writes.push(write);
+      queue.schedule({ ...write, revision: `generation-${write.generation}` });
+      if (visibleWorktree === write.worktreeId) mirror = write.input;
+    },
+    onChange: () => {},
+    newRequestId: () => "switch-request",
+  });
+  const requestId = generation.begin({ target: generation.captureTarget("A"), mode: { kind: "staged" } });
+  generation.delta(requestId, "半截");
+  await queue.flush("A");
+  assert.equal(drafts.get("A").message, "半截");
+
+  // React 已 render B，旧输入状态仍是 A：生产 resetTarget 必须恢复 A 后才重置。
+  visibleWorktree = "B";
+  mirror = draftToInput(drafts.get("B"));
+  generation.resetTarget("B");
+  await queue.flush();
+  assert.equal(writes.at(-1).worktreeId, "A");
+  assert.equal(writes.at(-1).input.message, "A 原文");
+  assert.equal(mirror.message, "B 原文");
+  assert.equal(drafts.get("A").message, "A 原文");
+  assert.equal(drafts.get("B").message, "B 原文");
+  state.edit(mirror);
+  generation.delta(requestId, "迟到");
+  generation.done(requestId, "迟到完成", false);
+  generation.fail(requestId, { kind: "rejected", message: "迟到失败" });
+  assert.equal(state.current().input.message, "B 原文");
+
+  visibleWorktree = "A";
+  generation.resetTarget("A");
+  const loaded = state.applyLoaded(state.ticket("A", 3), 3, drafts.get("A"));
+  assert.equal(loaded.applied, true);
+  assert.equal(loaded.input.message, "A 原文");
+  assert.equal(generation.view().canUndo, false);
 });
 
 test("draft flush with no writes terminates without invoking IPC", async () => {

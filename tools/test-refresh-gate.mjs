@@ -574,9 +574,11 @@ test("不同 worktree 的本地记录互不影响", () => {
 test("生产入口真的接入了分界与记账（辅助定位，不当作时序证明）", async () => {
   const { readFile } = await import("node:fs/promises");
   const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
-  // 三个读取入口都经同一个共享函数（分界与请求的先后由它固定）。
-  const reads = app.match(/readThroughReview\(/g) ?? [];
-  assert.ok(reads.length >= 3, `读取入口都要经共享函数，实际 ${reads.length} 处`);
+  // 打开 / 刷新 / 写后核对三个读取入口集中在 module 里，都经同一个共享函数
+  // （分界与请求的先后由它固定）；App 不再自己发起真实读取。
+  const refreshModule = await readFile(new URL("../src/lib/worktreeRefresh.ts", import.meta.url), "utf8");
+  assert.match(refreshModule, /readThroughReview\(this\.deps\.overlay/, "打开 / 刷新 / 写后核对都要经共享函数");
+  assert.match(app, /readThroughReview\(reviewOverlayRef\.current/, "恢复读取也要经共享函数");
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
   assert.match(app, /publishReviewSuccess\(/, "成功回执必须经唯一发布入口");
   // 发布判定在共享入口里，只取 worktree/activation/revision；epoch 只用于错误清理。
@@ -741,8 +743,9 @@ test("生产入口真的接入：版本取后端 marks、先后取后端 seq（�
   assert.match(app, /seq: marks\.seq/, "先后必须来自后端返回的 seq");
   assert.doesNotMatch(app, /entriesAtRequest/, "不能再用请求时快照推版本");
   assert.doesNotMatch(app, /beginMark\(\)/, "不能再用点击次序推先后");
-  const reads = app.match(/readThroughReview\(/g) ?? [];
-  assert.ok(reads.length >= 3, `四个读取入口都要经共享函数，实际 ${reads.length} 处`);
+  const refreshModule = await readFile(new URL("../src/lib/worktreeRefresh.ts", import.meta.url), "utf8");
+  assert.match(refreshModule, /readThroughReview\(this\.deps\.overlay/, "打开 / 刷新 / 写后核对都要经共享函数");
+  assert.match(app, /readThroughReview\(reviewOverlayRef\.current/, "恢复读取也要经共享函数");
   assert.match(app, /overlay\.mergeEntry\(/, "未跟踪元数据必须逐条合并");
   const recordIndex = app.indexOf("publishReviewSuccess({");
   const gateIndex = app.indexOf("if (!published.view) {");
