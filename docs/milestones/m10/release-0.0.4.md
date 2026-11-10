@@ -27,3 +27,7 @@ Status: 返修验证中，尚未公开
 返修的完整 Rust 默认并发检查覆盖 35 个目标，956 通过、1 失败、1 忽略；唯一失败是 `m6_flows` 中等待 hook 就绪超过 15 秒，尚未进入用户刷新与历史写入断言。未改代码或超时门槛，单独复跑该用例通过（5.35 秒），随后仅重跑受影响的 `m6_flows` 整个目标，默认并发 133 项全部通过（146.30 秒）。原始失败保留，不能单凭复跑成功确定原因为调度迟到。修复证据在 `/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-004-git-output-fix-7jw7vev1`。
 
 本次保留既有 100ms 管道排空上限；极端调度停顿下的截断风险未在本轮扩大处理。第一轮打包成功与 macOS 桌面通过不代表首轮 CI 通过，也不代替返修后的发布验证。
+
+输出读取修复压成 `b832854` 正常推送 main；[对应 CI](https://github.com/GarlandQian/Revia/actions/runs/42822614141) 的 macOS Rust 与 release 编译通过。新推送按已有 concurrency 规则取消旧 main 运行，取得 Windows 原始日志后确认：编译仅用 2 分 58 秒，两个环境并发测试随后挂起约 44 分钟。规划方因此取消同样挂起且 macOS 已失败的旧标签运行；两次原失败和取消原因均留档。
+
+Windows 夹具返修 `ecbcee0` 仅改 `environment_concurrency.rs`：规范化慢 worktree 的比较；保留完整 Git 安装，用两条等价不同路径测试替换，并预检实际执行；两个测试改为有限阶段与完成等待，保留原 3 秒 / 2 秒业务门槛。本地该目标 13 项全部通过，两轴审查均 0 项代码意见；真实 Windows 分支待 CI，见[夹具返修记录](release-0.0.4-windows-fixture.md)。

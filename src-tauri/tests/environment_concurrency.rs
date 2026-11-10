@@ -17,6 +17,8 @@ use revia_lib::environment::EnvCoordinator;
 use revia_lib::shell::ShellEnv;
 
 const MARKER: &str = "REVIA_TEST_MARKER";
+// 只给夹具建立/收尾设置看门狗，不改变业务断言的 3 秒 / 2 秒门槛。
+const FIXTURE_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn make_repo(parent: &Path, name: &str) -> PathBuf {
     let repo = parent.join(name);
@@ -81,12 +83,61 @@ fn app(data: &Path, repo: &Path, resolver: ShellResolver) -> (AppState, String) 
 }
 
 /// 在独立目录里放一份 Git，用于模拟「解析出的 Git 路径变了」。
+#[cfg(not(windows))]
 fn git_in(dir: &Path, repo: &Path) -> PathBuf {
     fs::create_dir_all(dir).unwrap();
-    let name = if cfg!(windows) { "git.exe" } else { "git" };
-    let target = dir.join(name);
+    let target = dir.join("git");
     fs::copy(real_git(repo), &target).unwrap();
     target
+}
+
+#[cfg(not(windows))]
+fn replacement_git_paths(dir: &Path, repo: &Path) -> (PathBuf, PathBuf) {
+    (git_in(&dir.join("bin-a"), repo), git_in(&dir.join("bin-b"), repo))
+}
+
+#[cfg(windows)]
+fn replacement_git_paths(_dir: &Path, repo: &Path) -> (PathBuf, PathBuf) {
+    // Git for Windows 的 cmd/git.exe 依赖完整安装布局，不能只复制一个 exe。
+    // 去掉 verbatim 前缀，让系统处理 ..；PathBuf 比较仍保留 ParentDir，触发路径变更。
+    let old = revia_lib::platform::external_path(&fs::canonicalize(real_git(repo)).unwrap());
+    let bin = old.parent().expect("Git binary directory");
+    let new = bin.join("..").join(bin.file_name().expect("Git directory name"))
+        .join(old.file_name().expect("Git executable name"));
+    assert_eq!(fs::canonicalize(&old).unwrap(), fs::canonicalize(&new).unwrap());
+    (old, new)
+}
+
+fn assert_git_usable(program: &Path, repo: &Path, env: &ShellEnv) {
+    let output = Command::new(program).arg("--version").current_dir(repo)
+        .env_clear().envs(&env.vars).output()
+        .unwrap_or_else(|error| panic!("fixture Git {} could not start: {error}", program.display()));
+    assert!(output.status.success(),
+        "fixture Git {} --version failed: status={}, stdout={}, stderr={}",
+        program.display(), output.status, String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr));
+}
+
+/// 主线程丢弃 release sender（含断言失败时）就放行解析器，避免遗留无限等待。
+fn resolver_pause() -> (mpsc::Receiver<()>, mpsc::Sender<()>, impl Fn() + Send + Sync) {
+    let (entered, entering) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let released = Mutex::new(released);
+    let pause = move || {
+        let _ = entered.send(());
+        match released.lock().unwrap().recv_timeout(FIXTURE_TIMEOUT) {
+            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => {}
+            Err(mpsc::RecvTimeoutError::Timeout) => panic!("fixture resolver was never released"),
+        }
+    };
+    (entering, release, pause)
+}
+
+/// 观察实际完成或线程 panic；调用方用 recv_timeout，不能无界 join 一个可能阻塞的操作。
+fn observed_thread<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> mpsc::Receiver<T> {
+    let (finished, completed) = mpsc::channel();
+    std::thread::spawn(move || { let _ = finished.send(work()); });
+    completed
 }
 
 /// 只含指定 Git 目录的完整环境。
@@ -399,42 +450,49 @@ fn replaced_session_rejects_waiting_write() {
     let repo = make_repo(dir.path(), "repo");
     let data = dir.path().join("data");
     fs::create_dir_all(&data).unwrap();
-    let old_git = git_in(&dir.path().join("bin-a"), &repo);
-    let new_git = git_in(&dir.path().join("bin-b"), &repo);
+    let (old_git, new_git) = replacement_git_paths(dir.path(), &repo);
+    assert_ne!(old_git, new_git, "fixture must change the Git program path");
     remember(&data, &repo, &old_git);
 
-    let entered = Arc::new(Barrier::new(2));
-    let release = Arc::new(Barrier::new(2));
-    let (entered_r, release_r) = (Arc::clone(&entered), Arc::clone(&release));
-    let bin_b = dir.path().join("bin-b");
+    let (entered, release, pause) = resolver_pause();
+    let new_bin = new_git.parent().unwrap().to_path_buf();
+    let resolved = env_with_git(&repo, &new_bin, "replaced");
+    assert_eq!(resolved.which("git").as_deref(), Some(new_git.as_path()));
+    assert_git_usable(&new_git, &repo, &resolved);
     let resolver: ShellResolver = Arc::new(move |path| {
-        entered_r.wait();
-        release_r.wait();
-        env_with_git(path, &bin_b, "replaced")
+        pause();
+        env_with_git(path, &new_bin, "replaced")
     });
     let (state, id) = app(&data, &repo, resolver);
+    assert_git_usable(&old_git, &repo, &state.env.provisional(&repo).env);
+    let state = Arc::new(state);
 
-    let session = state.worktree_session(&id).expect("opens with remembered git");
+    // 无效记忆会走同步解析；即使夹具前提退化，也不能让主线程在自己的暂停点中死锁。
+    let opened = {
+        let state = Arc::clone(&state);
+        let id = id.clone();
+        observed_thread(move || state.worktree_session(&id))
+    };
+    let session = opened.recv_timeout(FIXTURE_TIMEOUT)
+        .expect("remembered Git must open before the resolver is released")
+        .expect("opens with remembered git");
     assert_eq!(session.git.program, old_git);
-    entered.wait(); // 后台解析已经开始，ready 尚未发布
+    entered.recv_timeout(FIXTURE_TIMEOUT).expect("background resolver must enter its pause");
 
     // 旧会话上的写操作在环境门里等待；会话被替换后必须被拒绝。
     let waiter = {
         let session = Arc::clone(&session);
-        std::thread::spawn(move || {
-            let result = session.acquire_write_lock().map(|guard| {
-                drop(guard);
-            });
-            result
-        })
+        observed_thread(move || session.acquire_write_lock().map(drop))
     };
     // 等写者真正进入生产等待点，再放行后台解析。
     assert!(
         wait_until(Duration::from_secs(3), || state.env.waiters(&id) == 1),
         "writer never entered the environment wait"
     );
-    release.wait();
-    let error = waiter.join().unwrap().expect_err("superseded session must reject the write");
+    drop(release);
+    let error = waiter.recv_timeout(FIXTURE_TIMEOUT)
+        .expect("waiting write must finish after the resolver is released")
+        .expect_err("superseded session must reject the write");
     assert_eq!(error.code, Some("errors.environment.reloaded"));
 
     let current = state.worktree_session(&id).unwrap();
@@ -591,11 +649,11 @@ fn slow_open_does_not_block_an_existing_worktree() {
     let existing_repo = make_repo(dir.path(), "existing");
     let slow_repo = make_repo(dir.path(), "slow");
     let data = dir.path().join("data");
-    let entered = Arc::new(Barrier::new(2));
-    let release = Arc::new(Barrier::new(2));
-    let (entered_r, release_r, slow) = (Arc::clone(&entered), Arc::clone(&release), slow_repo.clone());
+    let (entered, release, pause) = resolver_pause();
+    let slow = slow_repo.clone();
     let resolver: ShellResolver = Arc::new(move |path| {
-        if path == slow { entered_r.wait(); release_r.wait(); }
+        // Windows 的 registry 路径来自 Git，可能不带 canonicalize 的 verbatim 前缀。
+        if fs::canonicalize(path).expect("resolver worktree exists") == slow { pause(); }
         full_env(path, "complete")
     });
     let state = Arc::new(AppState::new(data).with_shell_resolver(resolver));
@@ -606,18 +664,16 @@ fn slow_open_does_not_block_an_existing_worktree() {
     let slow_id = register(&state, &slow_repo);
     let opener = {
         let state = Arc::clone(&state);
-        std::thread::spawn(move || state.worktree_session(&slow_id))
+        observed_thread(move || state.worktree_session(&slow_id))
     };
-    entered.wait();
-    let (finished, completed) = mpsc::channel();
-    let reader = {
+    entered.recv_timeout(FIXTURE_TIMEOUT).expect("slow worktree resolver must enter its pause");
+    let completed = {
         let state = Arc::clone(&state);
-        std::thread::spawn(move || { finished.send(state.worktree_session(&existing_id)).unwrap(); })
+        observed_thread(move || state.worktree_session(&existing_id))
     };
     let result = completed.recv_timeout(Duration::from_secs(2));
-    release.wait();
-    opener.join().unwrap().unwrap();
-    reader.join().unwrap();
+    drop(release);
+    opener.recv_timeout(FIXTURE_TIMEOUT).expect("slow open must finish after releasing its resolver").unwrap();
     let loaded = result.expect("existing worktree must remain readable while another resolver waits").unwrap();
     assert!(Arc::ptr_eq(&existing, &loaded));
 }
