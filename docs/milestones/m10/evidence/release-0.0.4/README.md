@@ -11,4 +11,7 @@
 - `desktop-package.json`：新 DMG 内应用、独立应用数据和启动进程；此文件只证明包与启动来源，桌面验收结论以发布记录为准。
 - `retained-ci-log-index.json`：已保留的原始 CI 日志位置及 SHA256。
 - `pre-publication-old-tags.txt`：公开前的旧版标签对象与固定源码。
-- `draft-preparation.json`：草稿说明更新后的版本、状态与资产一致性；尚未公开。
+- `draft-preparation.json`：公开前的草稿说明、状态与资产一致性快照。
+- `desktop-verification.json`、`desktop-first-screen.png`、`desktop-update-observation.png`：最终新包的可见首屏、版本与手动更新检查。
+- `preflight.json`、`public-release.json`、`post-publication.json`：公开前复核、正式 Release 身份与发布后匿名下载 / latest 验证。
+- `worktree-cleanup.json`、`desktop-cleanup.json`：临时 worktree、验收进程和挂载镜像的清理结果。

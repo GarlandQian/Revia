@@ -1,7 +1,7 @@
 # Revia 0.0.4 发布记录
 
-Status: 构建与产物核验通过，待解锁完成桌面复验；尚未公开
-日期：2026-11-10
+Status: 已公开为 latest 稳定版；文档推送待 SSH 授权
+日期：2026-11-10—2026-11-11
 依据：Q225
 
 ## 授权与范围
@@ -51,12 +51,16 @@ Windows 夹具修正压成 `97211abb1ea0c5398eee3fe6f08c567801a8119b` 正常推�
 
 下载时的三次 EOF 和日志 GET 中断保留原件，只补取缺失文件；残片隔离，摘要通过后才归入最终资产目录。检查脚本最初把 NSIS 的结构版本字段当成应用版本前提，因其值为 0 而失败；改为读取真实资源树后通过，文件及产品版本要求不变。NSIS 官方源码明确初始化该结构为零、另外设置应用版本，来源和原始失败见[产物核验摘要](evidence/release-0.0.4/artifact-task-summary.json)。此次只修正验证器，没有重建应用或重复已通过的验签。
 
-## 桌面与公开前状态
+## 桌面复验与公开
 
-已将新 DMG 只读挂载，复制应用至最终证据目录的 `desktop/Revia.app`，以独立的 `desktop-app-data` 启动；PID 为 `94616`，启动日志为空，进程仍在运行。电脑操控工具报告 Mac 已锁定，已请求用户手动解锁。**新包的首屏和手动更新检查尚未完成，不能用首轮旧包的桌面结果替代。**
+新 DMG 只读挂载后，应用复制至最终证据目录的 `desktop/Revia.app`，以独立的 `desktop-app-data` 启动，PID 为 `94616`。此前两次桌面检查因 Mac 锁定未完成；用户于 2026-11-11 解锁后，规划方用电脑操控确认新包正常显示「添加仓库」首屏，手动执行更新检查，界面显示当前版本 0.0.4、「已是最新版本」，检查时间更新。截图与原始 AX、固定二进制摘要见[桌面证据](evidence/release-0.0.4/desktop-verification.json)。该结果对应最终新包，不沿用首轮旧包结果。
 
 最终发布说明已通过 Release ID `440358262` 的 API 更新到草稿。按标签的 `gh release edit` 返回 `release not found`；API 更新时显式传入 `tag_name: v0.0.4` 与固定源码，确认 `draft: true`、`prerelease: false`、说明内容正确，以及 11 项资产的 ID、大小、摘要全部未变。原始 CLI 失败、API 返回的临时草稿标签及显式标签修正均保留；后续公开时仍显式传入版本标签。
 
-准备文档推送时，现有 SSH origin 的只读复核返回 `sign_and_send_pubkey` / `communication with agent failed`。API 仍能核对固定标签和编辑本轮草稿；文档提交的正常推送待 SSH 签名代理恢复，继续使用现有 SSH origin。该失败记录位于最终证据目录的 `pre-notes-tag.*`。
+公开前再次核对三个工作流、草稿正文与 11 项资产的 ID、大小和摘要，以及旧版三个 Release 的 28 项资产和标签，全部一致。2026-11-11 12:08:31（Asia/Shanghai），以固定版本标签和源码将 Release `440358262` 设为 `draft: false`、`prerelease: false`、`make_latest: true`，得到公开链接 [Revia 0.0.4](https://github.com/GarlandQian/Revia/releases/tag/v0.0.4)。发布前后的资产身份和摘要一致，应用标签继续固定于 `97211ab`。
 
-后续：用户解锁后完成新包首屏与手动更新检查；再次核对草稿资产 ID、大小和 digest；公开为 stable / latest；匿名核对公开清单和下载入口；更新发布状态、正常推送文档提交并清理本轮两个返修 worktree。旧版标签与 Release 保留，主目录原有 `.gitignore` 改动保留。
+发布后匿名读取公共 latest API，确认 0.0.4 为 latest，11 项公开资产与已验草稿一致。匿名下载的 `latest.json` 和 `latest-prerelease.json` 均为 1270 字节，与已验清单逐字节相同；DMG、Windows 安装器和便携 ZIP 的公开入口均返回 HTTP 200。旧版 0.0.1–0.0.3 的元数据、28 项资产和标签对象在公开后仍未变；10 次匿名请求全部成功，见[发布后核验](evidence/release-0.0.4/post-publication.json)。
+
+验收进程已退出，DMG 已卸载；两个本轮返修 worktree 已删除，分支历史和 `.pi` 原件保留。没有改动 `.gitignore`；上轮未提交状态与本轮开始时的干净状态均按当时实况留档。
+
+现有 SSH origin 曾返回 `sign_and_send_pubkey` / `communication with agent failed`；本轮解锁后只读复核仍返回 `agent refused operation`。已请求用户解锁 SSH 密钥所在的密码管理器并允许签名，最后的文档正常推送待该授权完成，继续使用现有 SSH origin。原失败位于最终证据目录的 `pre-notes-tag.*` 与 `preflight-rgxqx8gz/ssh-refs.*`。

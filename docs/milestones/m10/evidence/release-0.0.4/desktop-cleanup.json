@@ -1,0 +1,13 @@
+{
+  "pid": 94616,
+  "process_exited": true,
+  "detach_command": [
+    "hdiutil",
+    "detach",
+    "/Volumes/Revia"
+  ],
+  "detach_exit_code": 0,
+  "stdout": "\"disk9\" ejected.\n",
+  "stderr": "hdiutil: WARNING: 'hdiutil detach ...' is deprecated. Please use 'diskutil eject ...' instead.\n",
+  "observed_utc": "2026-11-11T04:12:11.543298+00:00"
+}

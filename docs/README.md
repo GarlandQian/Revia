@@ -1,8 +1,8 @@
 # Revia 设计文档
 
-状态：M0–M8 代码已合入 main，[Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2) 已于 2026-11-02 公开；0.0.1 Release 的误删已恢复，0.0.2 保持 latest，两个版本的标签保留。双平台 CI、安装版/便携版打包及更新签名校验通过；Windows 真实桌面验收继续 ready-for-human，M7 和旧里程碑遗留保留。应用源码固定为 v0.0.2（main 历史 `4c384ed`），完整来源、执行与证据见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)。M9（Windows 与 macOS 性能、生成提交信息）已于 2026-11-08 压成一个提交合入 main，按用户要求发布 0.0.3（Q223）；Windows 第一轮实测（任务 10）与验收（任务 11）尚未完成，未验收项写在[发布说明](./milestones/m9/release-0.0.3-notes.md)中。更新日期：2026-11-08。
+状态：M0–M10 代码已合入 main，[Revia 0.0.4](https://github.com/GarlandQian/Revia/releases/tag/v0.0.4) 已于 2026-11-11 公开为 latest 稳定版（Q225），应用源码固定为 `v0.0.4` / `97211ab`。双平台 CI、安装版/便携版打包、更新签名与 macOS 新包桌面复验通过，执行与证据见 [0.0.4 发布记录](./milestones/m10/release-0.0.4.md)。M8/M9 的 Windows 真实桌面与性能验收仍为 ready-for-human，真实 AI 服务尚未验收，旧里程碑遗留保留，范围见[发布说明](./milestones/m10/release-0.0.4-notes.md)。更新日期：2026-11-11。
 
-M10 三项架构深化（Q224）已于 2026-11-10 完成实现、两轴审查、自动检查与 macOS 桌面验收，见 [M10 报告](./milestones/m10/report.md)。M8/M9 的 Windows 待验项保持原状态。
+M10 三项架构深化（Q224）已于 2026-11-10 完成实现、两轴审查、自动检查与 macOS 桌面验收，见 [M10 报告](./milestones/m10/report.md)。0.0.1 恢复与 0.0.2 发布的历史见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)，0.0.3 的发布见 [M9 发布记录](./milestones/m9/release-0.0.3.md)；旧版 Release、资产和标签均保留。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -22,6 +22,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 - [M7 开始前确认清单](./milestones/m7/confirmation.md)：前面已确认的访谈结论、仍未收口事项与最终候选。
 - [M8 规格](./milestones/m8/spec.md)、[任务图](./milestones/m8/issues/)与[Pi 交接](./milestones/m8/paseo-batch.md)：Windows 安装版、便携版、运行环境和验证边界；[规划记录](./milestones/m8/planning.md)保留用户确认与事实。
 - [M9 规格](./milestones/m9/spec.md)、[任务图](./milestones/m9/issues/)、[Pi 交接](./milestones/m9/paseo-batch.md)与 [Windows 测量步骤](./milestones/m9/windows-measure.md)：性能与生成提交信息的实施契约（Q208–Q222）；[卡顿排查](./milestones/m9/perf-facts.md)保留嫌疑、代码位置与真机确认顺序。[第一轮实测](./milestones/m9/measure-round1.md)记录 macOS 数据；[0.0.3 发布说明](./milestones/m9/release-0.0.3-notes.md)与[发布记录](./milestones/m9/release-0.0.3.md)记录合并与发布。
+- [M10 报告](./milestones/m10/report.md)、[0.0.4 发布记录](./milestones/m10/release-0.0.4.md)与[发布说明](./milestones/m10/release-0.0.4-notes.md)：三项架构深化及发布返修的固定源码、验收与遗留范围。
 - [术语表](../GLOSSARY.md)：已确认的领域术语和应避免的说法。
 - [里程碑](./milestones/)：每个里程碑的计划、评审意见与报告（`m<N>/`）。
 - [Agent 配置](./agents/)：任务记录与领域文档的约定，供工程类技能读取。

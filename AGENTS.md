@@ -11,15 +11,17 @@ M0 原型（[M0 报告](docs/milestones/m0/report.md)）与 M1 只读界面（[M
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：0.0.3 已发布，M9 的 Windows 实测与验收待完成
+## 当前阶段：0.0.4 已发布，Windows 实测与验收待完成
 
-M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压成 `7c97fd6` 合入 main，随后补上仓库列表移除、读取失败时保留工具栏和 Windows 回归隔离。已公开 [Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2)，应用标签固定于 main 历史的 `4c384ed`；0.0.1 Release 曾因规划方误读删除范围而误删，现已恢复原说明和全部资产；0.0.2 保持 latest，两个版本的标签与源码保留。
+M7 已于 2026-11-02 压成一个提交合入 main（`b9cf807`）；M8 本体压成 `7c97fd6` 合入 main，随后补上仓库列表移除、读取失败时保留工具栏和 Windows 回归隔离。已公开 [Revia 0.0.2](https://github.com/GarlandQian/Revia/releases/tag/v0.0.2)，应用标签固定于 main 历史的 `4c384ed`；0.0.1 Release 曾因规划方误读删除范围而误删，现已恢复原说明和全部资产；两个历史版本的标签与源码保留。
 
 双平台 CI、安装版/便携版打包、产物摘要与正式更新签名均通过。完整来源、发布工具修正与原始证据见 [发布记录](docs/milestones/m8/release-0.0.2-readiness.md)。Windows 真实桌面仍为 `ready-for-human`，下一步按 [Windows 验收清单](docs/milestones/m8/windows-acceptance.md) 验收发布版本；CI 与发布不代替这些验收。此前本机默认并发 Rust 失败记录及历史里程碑未达标项保留，不自动扩大本轮范围。
 
 2026-11-05 用户要求把其他分支的成果归入 main 后删除其他分支，并确认纳入 m7 的 6 个未提交文件；随后又要求删除三个附属 worktree 和本轮备份，现仅保留主目录的 main。执行与清理结果见 [分支归并记录](docs/branch-consolidation-2026-11-05.md)。后续从 main 继续验收。Pi 的一次正式返修已使用（Q113）；后续 M8 修正由规划方接管，审查只针对新增量（Q174）。需求与已确认取舍见 [M8 规格](docs/milestones/m8/spec.md)、[任务图](docs/milestones/m8/issues/)和 [Paseo / Pi 交接](docs/milestones/m8/paseo-batch.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
 M9（Windows 与 macOS 性能、生成提交信息，决策 Q208–Q222）已于 2026-11-08 压成一个提交合入 main，并按用户要求发布 0.0.3（Q223），见 [发布记录](docs/milestones/m9/release-0.0.3.md)。macOS 打开与切换的实测见 [第一轮实测](docs/milestones/m9/measure-round1.md)；Windows 第一轮实测（[任务 10](docs/milestones/m9/issues/10-measure-round1.md)）与验收（[任务 11](docs/milestones/m9/issues/11-acceptance.md)）仍为 `ready-for-human`，下一步请用户用测量版（带对照外观开关，正式版没有）按 [Windows 测量步骤](docs/milestones/m9/windows-measure.md) 发回诊断信息。
+
+0.0.4 已于 2026-11-11 公开为 latest 稳定版（Q225），应用源码固定为 `v0.0.4` / `97211ab`。双平台 CI、正式包摘要与更新签名、macOS 新包首屏与手动更新检查通过；发布、Git 输出读取返修和 Windows 环境并发夹具的来源与证据见 [0.0.4 发布记录](docs/milestones/m10/release-0.0.4.md)。Windows 真实桌面、真实 AI 与历史性能待验范围保持不变。
 
 ## 工作流程
 

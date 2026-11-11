@@ -1,0 +1,71 @@
+{
+  "observed_utc": "2026-11-11T04:14:34.321801+00:00",
+  "release_url": "https://github.com/GarlandQian/Revia/releases/tag/v0.0.4",
+  "release_id": 440358262,
+  "tag": "v0.0.4",
+  "published_at": "2026-11-11T04:08:31Z",
+  "latest_confirmed_by_anonymous_api": true,
+  "draft": false,
+  "prerelease": false,
+  "checks": {
+    "release_id": true,
+    "tag": true,
+    "published": true,
+    "stable": true,
+    "assets_match_verified": true,
+    "asset_count": true,
+    "public_asset_urls": true
+  },
+  "asset_count": 11,
+  "manifests": [
+    {
+      "name": "latest.json",
+      "bytes": 1270,
+      "sha256": "c8929b68b1e511fa1d7c32b13d8814a31d05bafa016113c41863ec85bc8e58ce",
+      "matches_verified_bytes": true
+    },
+    {
+      "name": "latest-prerelease.json",
+      "bytes": 1270,
+      "sha256": "c8929b68b1e511fa1d7c32b13d8814a31d05bafa016113c41863ec85bc8e58ce",
+      "matches_verified_bytes": true
+    }
+  ],
+  "download_endpoints": [
+    {
+      "name": "dmg-head",
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "redirects": 1,
+      "full_package_downloaded": false,
+      "authentication": "none"
+    },
+    {
+      "name": "setup-head",
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "redirects": 1,
+      "full_package_downloaded": false,
+      "authentication": "none"
+    },
+    {
+      "name": "portable-zip-head",
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "redirects": 1,
+      "full_package_downloaded": false,
+      "authentication": "none"
+    }
+  ],
+  "old_releases_and_tags_unchanged": true,
+  "old_versions": [
+    "v0.0.1",
+    "v0.0.2",
+    "v0.0.3"
+  ],
+  "retries": 0,
+  "evidence_directory": "/private/var/folders/1h/cc658t3j6cb51lr_q807z5v40000gn/T/revia-0.0.4-release-w15h4prr/final-ohi4188q/publication-l07rr0pz/post-publication-zxcn_xtt",
+  "ssh_or_remote_mutation_performed": false,
+  "anonymous_curl_invocations": 10,
+  "failed_invocations": 0
+}
