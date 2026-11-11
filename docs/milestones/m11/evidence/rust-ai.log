@@ -1,0 +1,51 @@
+   Compiling revia v0.0.4 (/Volumes/T7 Shield/project/Revia-m11/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.13s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/revia_lib-f873caa34a167e65)
+
+running 40 tests
+test ai::commands::tests::request_ids_are_validated ... ok
+test ai::commands::tests::cancel_before_register_prevents_request ... ok
+test ai::commands::tests::early_cancels_are_bounded ... ok
+test ai::models::tests::endpoint_appends_models_once ... ok
+test ai::commands::tests::ai_manager_registers_and_cancels_before_response ... ok
+test ai::commands::tests::ai_set_key_holds_settings_lock_while_writing_credentials ... ok
+test ai::models::tests::fetch_limits_response_size ... ok
+test ai::commands::tests::stream_sse_success_with_think_stripped ... ok
+test ai::commands::tests::stream_without_key_omits_authorization ... ok
+test ai::models::tests::fetch_gets_models_with_optional_bearer ... ok
+test ai::commands::tests::stream_cancel_triggers_cancellation ... ok
+test ai::commands::tests::ai_list_models_reads_models_with_saved_key ... ok
+test ai::models::tests::parse_dedupes_sorts_and_filters ... ok
+test ai::models::tests::parse_rejects_malformed_shapes ... ok
+test ai::models::tests::fetch_maps_status_and_never_leaks_key ... ok
+test ai::models::tests::fetch_reports_malformed_json_without_body ... ok
+test ai::models::tests::fetch_uses_base_of_chat_completions_without_authorization ... ok
+test ai::payload::tests::non_utf8_paths_in_git_output_are_classified ... ok
+test ai::commands::tests::ai_set_key_rejects_stale_address_without_writing_credentials ... ok
+test ai::commands::tests::stream_status_error_mappings ... ok
+test ai::commands::tests::ai_clear_key_rejects_stale_address ... ok
+test ai::commands::tests::ai_list_models_rejects_stale_address_without_network ... ok
+test ai::tests::endpoint_appends_once ... ok
+test ai::tests::insecure_only_for_remote_plain_http ... ok
+test ai::tests::normalize_rejects_non_http ... ok
+test ai::tests::sanitize_strips_think_and_fences ... ok
+test ai::tests::sse_lines_and_delta ... ok
+test ai::tests::status_errors_map_and_redact ... ok
+test ai::tests::stream_filter_emits_growth_only ... ok
+test ai::tests::credential_mock_write_clear_and_url_swap ... ok
+test ai::payload::tests::non_utf8_file_name_is_listed ... ok
+test ai::payload::tests::staged_mode_includes_staged_changes_and_diff_not_in_log ... ok
+test ai::models::tests::fetch_does_not_follow_redirects ... ok
+test ai::commands::tests::stream_chunk_timeout ... ok
+[master (root-commit) 945239f] sub init
+ 1 file changed, 1 insertion(+)
+ create mode 100644 sub.txt
+test ai::models::tests::fetch_times_out ... ok
+test ai::payload::tests::truncation_and_listed_files_limit_and_recent_subject ... ok
+test ai::payload::tests::special_files_binary_lock_submodule_rename_non_utf8 ... ok
+test ai::payload::tests::changelist_partial_hunk_selection_sends_only_selected_hunk ... ok
+test ai::models::tests::fetch_times_out_while_waiting_for_headers ... ok
+test ai::payload::tests::changelist_mode_preserves_user_index_and_supports_amend ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 411 filtered out; finished in 0.73s
+

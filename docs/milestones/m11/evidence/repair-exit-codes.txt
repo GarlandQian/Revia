@@ -1,0 +1,8 @@
+node-m11 exit=0
+node-commit-state exit=0
+tsc exit=0
+lint exit=0
+i18n-check exit=0
+i18n-extract exit=0
+build exit=0
+git-diff-check exit=0

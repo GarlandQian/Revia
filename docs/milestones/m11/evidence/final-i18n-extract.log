@@ -1,0 +1,2 @@
+$ node tools/check-i18n-extract.mjs
+硬编码中文提取：78 个候选，0 个含中文。

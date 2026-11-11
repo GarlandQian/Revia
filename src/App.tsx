@@ -36,6 +36,7 @@ import { CommitComposerState, EMPTY_INPUT, resetInput, type ComposerInput } from
 import { CommitDraftPersistence } from "@/lib/commitDraftPersistence";
 import { CommitMessageGeneration, type GeneratedInput, type GenerationView } from "@/lib/commitMessageGeneration";
 import { CommitOutputStore } from "@/lib/commitOutput";
+import { useAiSettings } from "@/lib/useAiSettings";
 import { changelistEntriesForView, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
 import { UpdateInstallConfirmation } from "@/lib/m7/updateState";
 import { Changelists, selectionOf, type ChangelistControls } from "@/features/m7/Changelists";
@@ -4714,58 +4715,7 @@ export function App() {
 
   const updateSettings = useCallback(async (patch: SettingsPatch): Promise<AppErrorPayload | null> => {
     try {
-      const next = await ipc.updateSettings({
-        themeLight: patch.themeLight,
-        themeDark: patch.themeDark,
-        codeFontFamily: patch.codeFontFamily,
-        diffFontSize: patch.diffFontSize,
-        gitPath: patch.gitPath,
-        mergeTool: patch.mergeTool,
-        diffTool: patch.diffTool,
-        language: patch.language,
-        cherryPickKeepEmpty: patch.cherryPickKeepEmpty,
-        cherryPickIncludeSource: patch.cherryPickIncludeSource,
-        sidebarWidth: patch.sidebarWidth,
-        viewMode: patch.viewMode,
-        uiZoom: patch.uiZoom,
-        treeGroupByDirectory: patch.treeGroupByDirectory,
-        diffContextLines: patch.diffContextLines,
-        diffFoldUnchanged: patch.diffFoldUnchanged,
-        diffSyncScroll: patch.diffSyncScroll,
-        diffHighlight: patch.diffHighlight,
-        diffShowWhitespace: patch.diffShowWhitespace,
-        diffSoftWrap: patch.diffSoftWrap,
-        diffJumpToNextFile: patch.diffJumpToNextFile,
-        diffIgnoreWhitespace: patch.diffIgnoreWhitespace,
-        changelistMode: patch.changelistMode,
-        commitSubjectLimit: patch.commitSubjectLimit,
-        commitBlankLineRequired: patch.commitBlankLineRequired,
-        commitBodyLineLimit: patch.commitBodyLineLimit,
-        commitShowRuler: patch.commitShowRuler,
-        commitWarnCrlf: patch.commitWarnCrlf,
-        commitWarnDetached: patch.commitWarnDetached,
-        commitWarnLargeFileBytes: patch.commitWarnLargeFileBytes,
-        commitWarnInvalidFilename: patch.commitWarnInvalidFilename,
-        notify: patch.notify,
-        mergeAutoApply: patch.mergeAutoApply,
-        logColumns: patch.logColumns,
-        fileHistoryShowNames: patch.fileHistoryShowNames,
-        stashCompareLocal: patch.stashCompareLocal,
-        logLongEdges: patch.logLongEdges,
-        logFirstParent: patch.logFirstParent,
-        logPreviewPosition: patch.logPreviewPosition,
-        updateMode: patch.updateMode,
-        fetchTagMode: patch.fetchTagMode,
-        fetchAutomatically: patch.fetchAutomatically,
-        checkRemote: patch.checkRemote,
-        autoUpdateOnPushRejection: patch.autoUpdateOnPushRejection,
-        pushDialogOnCommit: patch.pushDialogOnCommit,
-        pushDialogProtectedOnly: patch.pushDialogProtectedOnly,
-        protectedBranches: patch.protectedBranches,
-        appUpdateMode: patch.appUpdateMode,
-        allowPrerelease: patch.allowPrerelease,
-        shortcuts: patch.shortcuts,
-      });
+      const next = await ipc.updateSettings(patch);
       if (patch.shortcuts) {
         setShortcutsSnapshot(patch.shortcuts);
         applyShortcutOverrides(patch.shortcuts);
@@ -4843,6 +4793,9 @@ export function App() {
       return toAppError(caught);
     }
   }, [refresh, acceptChangelistView]);
+
+  // 设置对话框关闭时会被卸载；AI 控制器与写入队列必须留在 App。
+  const aiSettings = useAiSettings(updateSettings);
 
   /** 重新加载登录 shell 环境与 Git 程序（F08）。 */
   const reloadEnvironment = useCallback(async (): Promise<AppErrorPayload | null> => {
@@ -5991,6 +5944,7 @@ export function App() {
             values={settingsValues}
             onClose={() => setSettingsOpen(false)}
             onChange={updateSettings}
+            aiSettings={aiSettings}
             onReloadEnvironment={reloadEnvironment}
             worktreeId={worktreeId}
             updateStatus={updateStatus}
@@ -6866,6 +6820,7 @@ export function App() {
           values={settingsValues}
           onClose={() => setSettingsOpen(false)}
           onChange={updateSettings}
+          aiSettings={aiSettings}
           onReloadEnvironment={reloadEnvironment}
           worktreeId={worktreeId}
           updateStatus={updateStatus}

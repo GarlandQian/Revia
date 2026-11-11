@@ -1,8 +1,10 @@
 # Revia 设计文档
 
-状态：M0–M10 代码已合入 main，[Revia 0.0.4](https://github.com/GarlandQian/Revia/releases/tag/v0.0.4) 已于 2026-11-11 公开为 latest 稳定版（Q225），应用源码固定为 `v0.0.4` / `97211ab`。双平台 CI、安装版/便携版打包、更新签名与 macOS 新包桌面复验通过，执行与证据见 [0.0.4 发布记录](./milestones/m10/release-0.0.4.md)。M8/M9 的 Windows 真实桌面与性能验收仍为 ready-for-human，真实 AI 服务尚未验收，旧里程碑遗留保留，范围见[发布说明](./milestones/m10/release-0.0.4-notes.md)。更新日期：2026-11-11。
+状态：M0–M11 代码已合入本地 main，[Revia 0.0.4](https://github.com/GarlandQian/Revia/releases/tag/v0.0.4) 已于 2026-11-11 公开为 latest 稳定版（Q225），应用源码固定为 `v0.0.4` / `97211ab`。双平台 CI、安装版/便携版打包、更新签名与 macOS 新包桌面复验通过，执行与证据见 [0.0.4 发布记录](./milestones/m10/release-0.0.4.md)。M8/M9 的 Windows 真实桌面与性能验收仍为 ready-for-human，真实 AI 服务尚未验收，旧里程碑遗留保留，范围见[发布说明](./milestones/m10/release-0.0.4-notes.md)。更新日期：2026-11-11。
 
 M10 三项架构深化（Q224）已于 2026-11-10 完成实现、两轴审查、自动检查与 macOS 桌面验收，见 [M10 报告](./milestones/m10/report.md)。0.0.1 恢复与 0.0.2 发布的历史见 [M8 发布记录](./milestones/m8/release-0.0.2-readiness.md)，0.0.3 的发布见 [M9 发布记录](./milestones/m9/release-0.0.3.md)；旧版 Release、资产和标签均保留。
+
+M11 已完成 AI 配置保存修复与自动模型列表（Q226），通过两轴审查、相关自动检查和 macOS 桌面验收，并更新本机应用。修复尚未推送或发布；见 [M11 报告](./milestones/m11/report.md)。
 
 Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能，M7 起采用 Liquid Glass 外观，保留清晰的代码表面与 VS Code 颜色主题，做一个不依赖 JVM 的轻量 Git 客户端，并多出审阅标记、回收区和写前校验（Q118、Q189、Q190）。本目录区分已确认选择、建议和待确认问题；文档中的功能方向不代表已经实现。
 
@@ -266,6 +268,7 @@ Revia 照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和
 | Q223 | 将 m9 压成一个提交合入 main，版本改为 0.0.3，通过现有 Actions 构建并公开 Release；本轮授权正常推送 main 和 `v0.0.3` 标签。Windows 第一轮实测（任务 10）与验收（任务 11）尚未完成，按用户判断先发布，未验收项写进发布说明；两项任务保留，发布后继续。不删除、不改写旧版本 Release 与标签，不强推 | 用户于 2026-11-08 在规划方补测 macOS 切换耗时后回复“应该没问题 合并到main 发布0.0.3版本” |
 | Q224 | 本轮对 Worktree 激活与刷新、Worktree 运行环境、生成提交信息三项既有 module 做架构深化；沿用 Node 生产 interface 行为测试和 Rust 真实 Git 临时仓库 / 受控 shell 解析 seam，保持既有产品行为。规格、任务和实施见 [M10](./milestones/m10/spec.md) | 用户于 2026-11-09 在架构报告后选择“全部”，并对推荐方案回复“按推荐” |
 | Q225 | 将已合入 main 的 M10 发布为 0.0.4，正常推送 main 与新标签 `v0.0.4`，通过现有 Actions 构建、校验后公开为稳定版。首轮验证后的返修允许仅更新本轮尚未公开的 `v0.0.4` 标签，使用精确旧标签对象的 `--force-with-lease`，重建草稿再发布；旧版 Release 与标签保留。M8/M9 的 Windows 待验项、真实 AI 与历史性能未验证范围如实保留 | 用户于 2026-11-10 明确要求“推送到远端，发布 0.0.4 版本”，随后对标签更新问题回复“允许更新本轮标签并继续发布（推荐）” |
+| Q226 | 修复 AI 设置无法保存的问题，并自动从当前 AI 服务获取模型名，允许从返回列表选择。取代 M9 暂不拉取模型列表的排除项；单服务、系统凭据库、地址绑定和生成提交信息的既有边界继续有效。实施见 [M11](./milestones/m11/spec.md) | 用户于 2026-11-11 反馈“ai的配置填入不进去”，随后明确要求“模型名应该自动获取” |
 
 各项的完整说明见对应的方向文档。
 

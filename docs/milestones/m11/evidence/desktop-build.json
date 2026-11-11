@@ -1,0 +1,36 @@
+{
+  "source": "8587039eba83b305215d405a5ae610c666a3d8aa",
+  "command": [
+    "/opt/homebrew/bin/cargo",
+    "build",
+    "--manifest-path",
+    "src-tauri/Cargo.toml",
+    "--release"
+  ],
+  "CARGO_TARGET_DIR": "/Volumes/T7 Shield/project/Revia/src-tauri/target",
+  "frontendFiles": {
+    "dist/index.html": "0af8c2f754bbd2f709cc9d3a0b8d35a89e1873aa6f701ab22afab37c08c808a5",
+    "dist/assets/travis-CAxkeomb.svg": "a950543ca17850db5908b8312e91aec2ad6a16d6bf6890fb7e3c419f63d7358c",
+    "dist/assets/foxpro-Btdm5--r.svg": "51c8c84e40a49a9c8ea0db2693ef640a17bcefb960df46b1a78bac03de25925c",
+    "dist/assets/jenkins-DVxqAfpp.svg": "11e1429bdbb4d1e1ca219b04ca5fc30f7594fdcf1d8e2c1df8c9e9f2ed4a9720",
+    "dist/assets/image-CRMO_iRH.js": "a5182b3a6f1e304f3e4fb63e44b7b6e4e2642f628add0a2c3632ebea91898a7d",
+    "dist/assets/aurelia-tU1uCks4.svg": "9b36e28fc5fad1db622216907cf2d9c9141393195fe9029ee4038325d843880d",
+    "dist/assets/editorconfig-pGlPAdhs.svg": "199762cbea98d7859fedd037feb98093ed712b15942dd3850054e8ce40e8bbbe",
+    "dist/assets/codicon-CMYWzYni.ttf": "3819e4ae4b87350e7c37a5d8f24e71ada2f1f2ee58f7ce5ebc1f88e3c8c38c80",
+    "dist/assets/helm-Db4yKtJs.svg": "992edbb02af65a046ef5abe8a694b172ee13b11a4a63b52a03c03ba9e1be937a",
+    "dist/assets/nest-CPqvKoYS.svg": "da6aeadb8822d0394eaa76e58af7d773c0aa21af793390ee6167944fef7e68b2",
+    "dist/assets/dinophp-CQDCxPta.svg": "f9f2a01d591a73b02be9f88f8470b63010d1ae55e8d6e0ad868c570410b29661",
+    "dist/assets/nix-B4Y-u9vY.svg": "795acf01e2c47121dde2268d6ecf9424f24ef198e126b57a09b612a722409b65",
+    "dist/assets/jetbrains-mono-latin-400-normal-V6pRDFza.woff2": "14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb",
+    "dist/assets/grunt-C7Ff529N.svg": "f6bd442ff7e2f3a09a78a1fb0a1e80786c6749e788c7b265aac3632d648bcdef",
+    "dist/assets/pug-BIbhOJge.svg": "410165b9a03507ba7664fcbe1252ef9ea923ad170f89ce66e6e3837060cc5a64",
+    "dist/assets/concourse-Bt-txRgW.svg": "164b73ec6eff8310b3a01296ef6c27277aae71f9de3595ae0fc5143f802a9c8d",
+    "dist/assets/index-B27AMZde.js": "6bf29f2595ecc0d11db9bfe8127f4684545462aee1e73cb09ea94d23d90b6ce6",
+    "dist/assets/idris-C6pFOd_c.svg": "3149f87d9bdcb854e4407c0b22635df73170d6ef779c268772806fb37f51d6dd",
+    "dist/assets/restql-BN8DNxn7.svg": "27cf49a4fbc7c22c0888f60a05556112eb37b13808c953e14f3f7e2c704a025a",
+    "dist/assets/menu-CRvVDswE.js": "19ef1f7ea06690cbbe0b0c361b625db46deb201f792b21ca134a5cc0d8ed6140",
+    "dist/assets/jetbrains-mono-latin-400-normal-6-qcROiO.woff": "658b9ee07b0249cf910a8d6f3d812d46c962bae81d7379a0355b1db35c61586f",
+    "dist/assets/index-C4NWgJAY.css": "eb603e48a11fa89f8343ed4f472e4d9947ba3d10c4ac719dc9cf11de33a4384a"
+  },
+  "exitCode": 0
+}

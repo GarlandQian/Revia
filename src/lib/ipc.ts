@@ -216,8 +216,14 @@ export type LogPreviewPosition = "right" | "bottom";
 export type UpdateMode = "merge" | "rebase" | "branchDefault";
 export type FetchTagMode = "auto" | "sync" | "always" | "never";
 
+/** 从当前服务读取到的模型列表（M11）。 */
+export interface AiModelList {
+  baseUrl: string;
+  models: string[];
+}
+
 /** 与 Rust 侧 `SettingsPatch` 对应：只传要改的字段。 */
-export interface SettingsPatchPayload {
+export interface SettingsPatch {
   themeLight?: string;
   themeDark?: string;
   codeFontFamily?: string;
@@ -328,11 +334,15 @@ export const ipc = {
       request: { repoId, worktreeId: worktreeId ?? null },
     }),
   setDiffFontSize: (size: number) => invoke<SettingsPayload>("set_diff_font_size", { size }),
-  updateSettings: (request: SettingsPatchPayload) => invoke<SettingsPayload>("update_settings", { request }),
+  updateSettings: (request: SettingsPatch) => invoke<SettingsPayload>("update_settings", { request }),
   /** M9：AI 服务配置状态（密钥只报是否已设置）。 */
   aiStatus: () => invoke<AiStatus>("ai_status"),
-  aiSetKey: (key: string) => invoke<AiStatus>("ai_set_key", { key }),
-  aiClearKey: () => invoke<AiStatus>("ai_clear_key"),
+  aiSetKey: (key: string, baseUrl: string) =>
+    invoke<AiStatus>("ai_set_key", { request: { key, baseUrl } }),
+  aiClearKey: (baseUrl: string) =>
+    invoke<AiStatus>("ai_clear_key", { request: { baseUrl } }),
+  aiListModels: (baseUrl: string) =>
+    invoke<AiModelList>("ai_list_models", { request: { baseUrl } }),
   /** 记下当前服务地址已经确认发送。 */
   aiConfirm: () => invoke<AiStatus>("ai_confirm"),
   /** 开始生成提交信息；结果经 revia://ai-* 事件流式返回。 */

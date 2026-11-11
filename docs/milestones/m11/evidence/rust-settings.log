@@ -1,0 +1,17 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/revia_lib-f873caa34a167e65)
+
+running 10 tests
+test settings::tests::missing_settings_use_defaults ... ok
+test settings::tests::failed_removal_save_keeps_registration_and_last_selection ... ok
+test settings::tests::settings_roundtrip ... ok
+test settings::tests::old_settings_files_get_theme_defaults ... ok
+test settings::tests::update_settings_validates_theme_and_clamps_font ... ok
+test settings::tests::missing_registration_can_be_removed_and_other_selection_is_preserved ... ok
+test settings::tests::font_size_is_clamped ... ok
+test settings::tests::ai_settings_persist_and_reload ... ok
+test settings::tests::unassigned_shortcut_override_survives_settings_save_and_reload ... ok
+test settings::tests::removing_registration_persists_without_changing_repository_or_recovery ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 441 filtered out; finished in 0.01s
+

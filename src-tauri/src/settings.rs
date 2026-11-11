@@ -1232,4 +1232,31 @@ mod tests {
         assert_eq!(registry.update_font_size(100).unwrap().diff_font_size, 24);
         assert_eq!(registry.update_font_size(1).unwrap().diff_font_size, 9);
     }
+
+    #[test]
+    fn ai_settings_persist_and_reload() {
+        let _credentials = crate::ai::test_credentials::TestCredentials::install();
+        let dir = tempfile::tempdir().unwrap();
+        let mut registry =
+            Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        let updated = registry
+            .update_settings(&SettingsPatch {
+                ai_base_url: Some("  https://api.example.com/v1/  ".into()),
+                ai_model: Some("  gpt-4o  ".into()),
+                ai_language: Some(crate::ai::AiLanguage::English),
+                ai_prompt: Some("自定义提示词".into()),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert_eq!(updated.ai_base_url, "https://api.example.com/v1");
+        assert_eq!(updated.ai_model, "gpt-4o");
+        assert_eq!(updated.ai_language, crate::ai::AiLanguage::English);
+        assert_eq!(updated.ai_prompt, "自定义提示词");
+
+        let reloaded = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        assert_eq!(reloaded.settings().ai_base_url, "https://api.example.com/v1");
+        assert_eq!(reloaded.settings().ai_model, "gpt-4o");
+        assert_eq!(reloaded.settings().ai_language, crate::ai::AiLanguage::English);
+        assert_eq!(reloaded.settings().ai_prompt, "自定义提示词");
+    }
 }

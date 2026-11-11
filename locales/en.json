@@ -967,7 +967,9 @@
       "payload": "Could not prepare the content to send.",
       "unavailable": "AI requests are temporarily unavailable.",
       "credentialStore": "Could not access the system credential store.",
-      "settingsLock": "Could not read settings."
+      "settingsLock": "Could not read settings.",
+      "serviceChanged": "The service address changed. Try again.",
+      "modelsUnavailable": "Could not fetch the model list."
     }
   },
   "app": {
@@ -1726,7 +1728,12 @@
       "promptHint": "You can rewrite the whole prompt. Language, subject limit, blank line and \"output only the message\" rules are always appended after it.",
       "resetPrompt": "Restore default",
       "unconfigured": "Both the service address and model are required.",
-      "keyBinding": "Changing the service address deletes the old key, so it must be entered again."
+      "keyBinding": "Changing the service address deletes the old key, so it must be entered again.",
+      "modelsLoading": "Fetching models…",
+      "modelsChoose": "Choose from list…",
+      "modelsEmpty": "The service returned no models; you can still type one.",
+      "modelsRetry": "Retry",
+      "modelsRefresh": "Refresh list"
     }
   },
   "log": {

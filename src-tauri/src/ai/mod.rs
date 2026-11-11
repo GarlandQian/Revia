@@ -5,6 +5,7 @@
 //! 不进 Git 命令日志和诊断信息。
 
 pub mod commands;
+pub mod models;
 pub mod payload;
 
 use std::collections::BTreeMap;
@@ -33,19 +34,79 @@ pub const CHUNK_TIMEOUT: Duration = Duration::from_secs(60);
 const KEYRING_SERVICE: &str = "io.github.garlandqian.revia.ai";
 
 #[cfg(test)]
-static TEST_CREDENTIALS: std::sync::Mutex<Option<std::collections::HashMap<String, String>>> =
-    std::sync::Mutex::new(None);
+pub mod test_credentials {
+    //! 独占的模拟凭据库（M11）。
+    //!
+    //! 同一时刻只允许一个测试使用，`Drop` 时恢复真实凭据库路径；
+    //! 新增与既有的凭据测试都通过 `TestCredentials::install()` 取得这个守卫，
+    //! 避免并行测试互相覆盖全局状态。
 
-#[cfg(test)]
-pub fn enable_test_credentials() {
-    let mut guard = TEST_CREDENTIALS.lock().unwrap();
-    *guard = Some(std::collections::HashMap::new());
-}
+    use std::collections::HashMap;
+    use std::sync::{Mutex, MutexGuard};
 
-#[cfg(test)]
-pub fn disable_test_credentials() {
-    let mut guard = TEST_CREDENTIALS.lock().unwrap();
-    *guard = None;
+    static LOCK: Mutex<()> = Mutex::new(());
+    static STORE: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+    static HOOK: Mutex<Option<Box<dyn FnOnce() + Send + 'static>>> = Mutex::new(None);
+
+    fn store() -> MutexGuard<'static, Option<HashMap<String, String>>> {
+        STORE.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    fn hook() -> MutexGuard<'static, Option<Box<dyn FnOnce() + Send + 'static>>> {
+        HOOK.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    pub struct TestCredentials {
+        _lock: MutexGuard<'static, ()>,
+    }
+
+    impl TestCredentials {
+        pub fn install() -> Self {
+            let lock = LOCK.lock().unwrap_or_else(|error| error.into_inner());
+            *store() = Some(HashMap::new());
+            *hook() = None;
+            Self { _lock: lock }
+        }
+
+        /// 凭据操作真正执行时运行一次；调用方此时仍持有设置锁（测试接缝）。
+        pub fn set_hook(&self, action: impl FnOnce() + Send + 'static) {
+            *hook() = Some(Box::new(action));
+        }
+    }
+
+    impl Drop for TestCredentials {
+        fn drop(&mut self) {
+            *store() = None;
+            *hook() = None;
+        }
+    }
+
+    pub(super) fn active() -> bool {
+        store().is_some()
+    }
+
+    pub(super) fn run_hook() {
+        let action = hook().take();
+        if let Some(action) = action {
+            action();
+        }
+    }
+
+    pub(super) fn get(base_url: &str) -> Option<String> {
+        store().as_ref().and_then(|map| map.get(base_url).cloned())
+    }
+
+    pub(super) fn insert(base_url: &str, key: &str) {
+        if let Some(map) = store().as_mut() {
+            map.insert(base_url.to_string(), key.to_string());
+        }
+    }
+
+    pub(super) fn remove(base_url: &str) {
+        if let Some(map) = store().as_mut() {
+            map.remove(base_url);
+        }
+    }
 }
 
 /// 生成语言（Q213）。
@@ -171,13 +232,10 @@ pub fn save_key(base_url: &str, key: &str) -> Result<()> {
         return Ok(());
     }
     #[cfg(test)]
-    {
-        if let Ok(mut guard) = TEST_CREDENTIALS.lock() {
-            if let Some(map) = guard.as_mut() {
-                map.insert(base_url.to_string(), key.to_string());
-                return Ok(());
-            }
-        }
+    if test_credentials::active() {
+        test_credentials::run_hook();
+        test_credentials::insert(base_url, key);
+        return Ok(());
     }
     keyring_entry(base_url)?
         .set_password(key)
@@ -189,12 +247,9 @@ pub fn key(base_url: &str) -> Result<Option<String>> {
         return Ok(None);
     }
     #[cfg(test)]
-    {
-        if let Ok(guard) = TEST_CREDENTIALS.lock() {
-            if let Some(map) = guard.as_ref() {
-                return Ok(map.get(base_url).cloned());
-            }
-        }
+    if test_credentials::active() {
+        test_credentials::run_hook();
+        return Ok(test_credentials::get(base_url));
     }
     match keyring_entry(base_url)?.get_password() {
         Ok(value) if value.is_empty() => Ok(None),
@@ -209,13 +264,10 @@ pub fn clear_key(base_url: &str) -> Result<()> {
         return Ok(());
     }
     #[cfg(test)]
-    {
-        if let Ok(mut guard) = TEST_CREDENTIALS.lock() {
-            if let Some(map) = guard.as_mut() {
-                map.remove(base_url);
-                return Ok(());
-            }
-        }
+    if test_credentials::active() {
+        test_credentials::run_hook();
+        test_credentials::remove(base_url);
+        return Ok(());
     }
     match keyring_entry(base_url)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
@@ -231,6 +283,25 @@ fn credential_error(cause: String) -> AppError {
         &[],
     )
     .cause(AppError::internal(cause))
+}
+
+pub fn service_changed() -> AppError {
+    AppError::coded(
+        ErrorKind::Rejected,
+        "errors.ai.serviceChanged",
+        "服务地址已变化，请重新操作",
+        &[],
+    )
+}
+
+pub fn models_unavailable(cause: impl Into<String>) -> AppError {
+    AppError::coded(
+        ErrorKind::Rejected,
+        "errors.ai.modelsUnavailable",
+        "无法获取模型列表",
+        &[],
+    )
+    .cause(AppError::internal(cause.into()))
 }
 
 pub fn not_configured() -> AppError {
@@ -473,7 +544,7 @@ mod tests {
 
     #[test]
     fn credential_mock_write_clear_and_url_swap() {
-        enable_test_credentials();
+        let _credentials = test_credentials::TestCredentials::install();
         let url_a = "https://api.a.com/v1";
         let url_b = "https://api.b.com/v1";
 
@@ -507,7 +578,5 @@ mod tests {
         assert_eq!(key(url_a).unwrap(), None);
         assert_eq!(key(url_b).unwrap(), None);
         assert!(registry.settings().ai_confirmed_urls.is_empty());
-
-        disable_test_credentials();
     }
 }

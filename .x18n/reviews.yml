@@ -215,6 +215,8 @@ sources:
     en: 1b2b72755e696e
   errors.ai.modelMissing:
     en: 16f0e527b2785
+  errors.ai.modelsUnavailable:
+    en: 66e89a83a714b
   errors.ai.network:
     en: ab834efa98718
   errors.ai.notConfigured:
@@ -225,6 +227,8 @@ sources:
     en: "2e36768112167"
   errors.ai.server:
     en: 1d50c14ede998a
+  errors.ai.serviceChanged:
+    en: 55adbcf4792a5
   errors.ai.settingsLock:
     en: 32b3de64595f
   errors.ai.timeout:
@@ -791,6 +795,16 @@ sources:
     en: f5a36c11fedf8
   settings.ai.modelHint:
     en: 5021f16d8ae72
+  settings.ai.modelsChoose:
+    en: ce6846b66cbc0
+  settings.ai.modelsEmpty:
+    en: 17568a0780d00c
+  settings.ai.modelsLoading:
+    en: 36518bd46d8be
+  settings.ai.modelsRefresh:
+    en: 1d3dbc508f99bb
+  settings.ai.modelsRetry:
+    en: 6dfcea9b4c1ed
   settings.ai.prompt:
     en: 1dd9536be189c4
   settings.ai.promptHint:

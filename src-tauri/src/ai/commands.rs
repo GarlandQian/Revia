@@ -15,7 +15,6 @@ use crate::error::{AppError, AppErrorPayload, ErrorKind, Result};
 use super::payload::AiCommitMode;
 use super::{delta_content, sanitize, sse_data, StreamFilter};
 
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiStatus {
@@ -75,28 +74,91 @@ pub fn ai_status(state: State<'_, AppState>) -> Result<AiStatus> {
     })
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiKeyRequest {
+    pub key: String,
+    /// 界面操作时看到并已提交的服务地址；与已保存地址不一致时拒绝。
+    pub base_url: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiServiceRequest {
+    pub base_url: String,
+}
+
 /// 写入密钥；空字符串等于清除。只存系统凭据库，并绑定当前服务地址。
+///
+/// 校验地址与凭据写入都在设置锁内完成：并发的地址更新不会让密钥落到旧地址。
 #[tauri::command]
-pub fn ai_set_key(state: State<'_, AppState>, key: String) -> Result<AiStatus> {
-    let base_url = current_base_url(&state)?;
-    if base_url.is_empty() {
-        return Err(super::not_configured());
-    }
-    if key.trim().is_empty() {
-        super::clear_key(&base_url)?;
-    } else {
-        super::save_key(&base_url, key.trim())?;
+pub fn ai_set_key(state: State<'_, AppState>, request: AiKeyRequest) -> Result<AiStatus> {
+    {
+        let registry = registry_lock(&state)?;
+        let base_url = registry.settings().ai_base_url.clone();
+        if base_url.is_empty() {
+            return Err(super::not_configured());
+        }
+        if base_url != request.base_url {
+            return Err(super::service_changed());
+        }
+        if request.key.trim().is_empty() {
+            super::clear_key(&base_url)?;
+        } else {
+            super::save_key(&base_url, request.key.trim())?;
+        }
     }
     notify_config_changed(&state);
     ai_status(state)
 }
 
 #[tauri::command]
-pub fn ai_clear_key(state: State<'_, AppState>) -> Result<AiStatus> {
-    let base_url = current_base_url(&state)?;
-    super::clear_key(&base_url)?;
+pub fn ai_clear_key(state: State<'_, AppState>, request: AiServiceRequest) -> Result<AiStatus> {
+    {
+        let registry = registry_lock(&state)?;
+        let base_url = registry.settings().ai_base_url.clone();
+        if base_url.is_empty() {
+            return Err(super::not_configured());
+        }
+        if base_url != request.base_url {
+            return Err(super::service_changed());
+        }
+        super::clear_key(&base_url)?;
+    }
     notify_config_changed(&state);
     ai_status(state)
+}
+
+/// 读取当前服务提供的模型列表。
+///
+/// 只依赖已保存的非空服务地址，不要求已选模型或已配置；地址必须与界面看到的一致，
+/// 避免把密钥发往刚被其他操作改掉的地址。
+#[tauri::command]
+pub async fn ai_list_models(
+    state: State<'_, AppState>,
+    request: AiServiceRequest,
+) -> Result<super::models::AiModelList> {
+    let expected = super::normalize_base_url(&request.base_url)?;
+    let (base_url, key) = {
+        let registry = registry_lock(&state)?;
+        let saved = registry.settings().ai_base_url.clone();
+        if saved.is_empty() {
+            return Err(super::not_configured());
+        }
+        if saved != expected {
+            return Err(super::service_changed());
+        }
+        let key = super::key(&saved)?;
+        (saved, key)
+    };
+    let models = super::models::fetch(&super::models::ModelListConfig {
+        base_url: base_url.clone(),
+        key,
+        timeout: super::models::MODELS_TIMEOUT,
+        max_bytes: super::models::MAX_MODELS_BYTES,
+    })
+    .await?;
+    Ok(super::models::AiModelList { base_url, models })
 }
 
 /// 记下当前服务地址已经确认发送（第一次使用前由界面弹窗确认）。
@@ -108,10 +170,6 @@ pub fn ai_confirm(state: State<'_, AppState>) -> Result<AiStatus> {
     }
     notify_config_changed(&state);
     ai_status(state)
-}
-
-fn current_base_url(state: &State<'_, AppState>) -> Result<String> {
-    Ok(registry_lock(state)?.settings().ai_base_url.clone())
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -411,6 +469,8 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::Arc;
 
+    use tauri::Manager;
+
     #[tokio::test]
     async fn stream_sse_success_with_think_stripped() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -686,5 +746,194 @@ mod tests {
         assert!(!super::super::valid_request_id(""));
         assert!(!super::super::valid_request_id("../etc"));
         assert!(!super::super::valid_request_id(&"a".repeat(65)));
+    }
+
+    fn test_app(dir: &std::path::Path) -> tauri::App<tauri::test::MockRuntime> {
+        tauri::test::mock_builder()
+            .manage(AppState::new(dir.to_path_buf()))
+            .invoke_handler(tauri::generate_handler![
+                super::ai_status,
+                super::ai_set_key,
+                super::ai_clear_key,
+                super::ai_list_models
+            ])
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap()
+    }
+
+    fn test_webview(
+        app: &tauri::App<tauri::test::MockRuntime>,
+    ) -> tauri::WebviewWindow<tauri::test::MockRuntime> {
+        tauri::WebviewWindowBuilder::new(app, "main", Default::default())
+            .build()
+            .unwrap()
+    }
+
+    fn invoke(
+        webview: &tauri::WebviewWindow<tauri::test::MockRuntime>,
+        cmd: &str,
+        body: serde_json::Value,
+    ) -> std::result::Result<serde_json::Value, serde_json::Value> {
+        tauri::test::get_ipc_response(
+            webview,
+            tauri::webview::InvokeRequest {
+                cmd: cmd.into(),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: "tauri://localhost".parse().unwrap(),
+                body: tauri::ipc::InvokeBody::Json(body),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        )
+        .map(|body| body.deserialize::<serde_json::Value>().unwrap())
+    }
+
+    fn seed_settings(dir: &std::path::Path, base_url: &str) {
+        let log = std::sync::Arc::new(crate::git::CommandLog::default());
+        let mut registry = crate::settings::Registry::load(dir.to_path_buf(), log);
+        registry
+            .update_settings(&crate::settings::SettingsPatch {
+                ai_base_url: Some(base_url.to_string()),
+                ai_model: Some("model-a".into()),
+                ..Default::default()
+            })
+            .unwrap();
+    }
+
+    fn error_code(value: &serde_json::Value) -> Option<&str> {
+        value.get("code").and_then(|code| code.as_str())
+    }
+
+    #[test]
+    fn ai_set_key_rejects_stale_address_without_writing_credentials() {
+        let _credentials = super::super::test_credentials::TestCredentials::install();
+        let dir = tempfile::tempdir().unwrap();
+        let url_a = "https://api.stale.test/v1";
+        let url_b = "https://api.other.test/v1";
+        seed_settings(dir.path(), url_a);
+        super::super::save_key(url_a, "sk-old").unwrap();
+        let app = test_app(dir.path());
+        let webview = test_webview(&app);
+
+        let response = invoke(
+            &webview,
+            "ai_set_key",
+            serde_json::json!({ "request": { "key": "sk-new", "baseUrl": url_b } }),
+        );
+        let error = response.unwrap_err();
+        assert_eq!(error_code(&error), Some("errors.ai.serviceChanged"));
+        assert_eq!(super::super::key(url_a).unwrap().as_deref(), Some("sk-old"));
+        assert_eq!(super::super::key(url_b).unwrap(), None);
+    }
+
+    #[test]
+    fn ai_clear_key_rejects_stale_address() {
+        let _credentials = super::super::test_credentials::TestCredentials::install();
+        let dir = tempfile::tempdir().unwrap();
+        let url_a = "https://api.clear.test/v1";
+        seed_settings(dir.path(), url_a);
+        super::super::save_key(url_a, "sk-old").unwrap();
+        let app = test_app(dir.path());
+        let webview = test_webview(&app);
+
+        let response = invoke(
+            &webview,
+            "ai_clear_key",
+            serde_json::json!({ "request": { "baseUrl": "https://api.other.test/v1" } }),
+        );
+        let error = response.unwrap_err();
+        assert_eq!(error_code(&error), Some("errors.ai.serviceChanged"));
+        assert_eq!(super::super::key(url_a).unwrap().as_deref(), Some("sk-old"));
+    }
+
+    #[test]
+    fn ai_list_models_rejects_stale_address_without_network() {
+        let _credentials = super::super::test_credentials::TestCredentials::install();
+        let dir = tempfile::tempdir().unwrap();
+        let url_a = "https://api.list.test/v1";
+        seed_settings(dir.path(), url_a);
+        let app = test_app(dir.path());
+        let webview = test_webview(&app);
+
+        let response = invoke(
+            &webview,
+            "ai_list_models",
+            serde_json::json!({ "request": { "baseUrl": "https://api.other.test/v1" } }),
+        );
+        let error = response.unwrap_err();
+        assert_eq!(error_code(&error), Some("errors.ai.serviceChanged"));
+    }
+
+    #[test]
+    fn ai_list_models_reads_models_with_saved_key() {
+        let _credentials = super::super::test_credentials::TestCredentials::install();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let base_url = format!("http://127.0.0.1:{port}/v1");
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0u8; 2048];
+            let read = stream.read(&mut request).unwrap();
+            let request = String::from_utf8_lossy(&request[..read]);
+            assert!(request.starts_with("GET /v1/models "), "{request}");
+            assert!(request.to_lowercase().contains("authorization: bearer sk-list"));
+            let body = r#"{"data":[{"id":"m1"},{"id":"m2"},{"id":"m1"}]}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+            stream.flush().unwrap();
+        });
+
+        let dir = tempfile::tempdir().unwrap();
+        seed_settings(dir.path(), &base_url);
+        super::super::save_key(&base_url, "sk-list").unwrap();
+        let app = test_app(dir.path());
+        let webview = test_webview(&app);
+
+        let response = invoke(
+            &webview,
+            "ai_list_models",
+            serde_json::json!({ "request": { "baseUrl": base_url } }),
+        )
+        .unwrap();
+        assert_eq!(response["baseUrl"], base_url);
+        assert_eq!(response["models"], serde_json::json!(["m1", "m2"]));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn ai_set_key_holds_settings_lock_while_writing_credentials() {
+        let credentials = super::super::test_credentials::TestCredentials::install();
+        let dir = tempfile::tempdir().unwrap();
+        let base_url = "https://api.lock.test/v1";
+        seed_settings(dir.path(), base_url);
+        let app = test_app(dir.path());
+        let webview = test_webview(&app);
+
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        credentials.set_hook(move || {
+            started_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+        });
+
+        let request = serde_json::json!({ "request": { "key": "sk-lock", "baseUrl": base_url } });
+        let handle = std::thread::spawn(move || invoke(&webview, "ai_set_key", request));
+        started_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("credential write did not start");
+        let state = app.state::<AppState>();
+        match state.registry.try_lock() {
+            Err(std::sync::TryLockError::WouldBlock) => {}
+            other => panic!("settings lock not held during credential write: {}", other.is_ok()),
+        }
+        release_tx.send(()).unwrap();
+        let response = handle.join().unwrap();
+        assert!(response.is_ok(), "{response:?}");
+        assert_eq!(super::super::key(base_url).unwrap().as_deref(), Some("sk-lock"));
     }
 }

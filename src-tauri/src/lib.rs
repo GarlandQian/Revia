@@ -294,6 +294,7 @@ pub fn run() {
             ai::commands::ai_status,
             ai::commands::ai_set_key,
             ai::commands::ai_clear_key,
+            ai::commands::ai_list_models,
             ai::commands::ai_confirm,
             ai::commands::ai_generate,
             ai::commands::ai_cancel,

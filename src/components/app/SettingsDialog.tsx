@@ -1,5 +1,5 @@
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { formatAppError, toAppError } from "@/lib/error";
+import { formatAppError } from "@/lib/error";
 /**
  * 设置对话框（M4 F08、返修 E/Q139）：左上角搜索、左侧分类可展开、右侧顶部
  * 显示“分类 › 页名”，外观照 VS Code。
@@ -12,13 +12,14 @@ import { formatAppError, toAppError } from "@/lib/error";
 import {
   ipc,
   type AiLanguage,
-  type AiStatus,
   type FetchTagMode,
   type LogColumns,
   type LogPreviewPosition,
   type NotifyKinds,
+  type SettingsPatch,
   type UpdateMode,
 } from "@/lib/ipc";
+import type { AiSettings } from "@/lib/aiSettings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { messages, t } from "@/lib/i18n/index";
 import { highlightLevelText, notifyKindText } from "@/lib/i18n/text";
@@ -91,63 +92,7 @@ export interface SettingsValues {
   shortcuts: Record<string, string>;
 }
 
-export interface SettingsPatch {
-  themeLight?: string;
-  themeDark?: string;
-  codeFontFamily?: string;
-  diffFontSize?: number;
-  gitPath?: string;
-  mergeTool?: string;
-  diffTool?: string;
-  language?: string;
-  cherryPickKeepEmpty?: boolean;
-  cherryPickIncludeSource?: boolean;
-  sidebarWidth?: number;
-  viewMode?: "split" | "unified";
-  uiZoom?: number;
-  treeGroupByDirectory?: boolean;
-  diffContextLines?: number;
-  diffFoldUnchanged?: boolean;
-  diffSyncScroll?: boolean;
-  diffHighlight?: "word" | "line" | "char" | "none";
-  diffShowWhitespace?: boolean;
-  diffSoftWrap?: boolean;
-  diffJumpToNextFile?: boolean;
-  diffIgnoreWhitespace?: number;
-  changelistMode?: boolean;
-  commitSubjectLimit?: number;
-  commitBlankLineRequired?: boolean;
-  commitBodyLineLimit?: number;
-  commitShowRuler?: boolean;
-  commitWarnCrlf?: boolean;
-  commitWarnDetached?: boolean;
-  commitWarnLargeFileBytes?: number;
-  commitWarnInvalidFilename?: boolean;
-  notify?: NotifyKinds;
-  mergeAutoApply?: boolean;
-  logColumns?: LogColumns;
-  fileHistoryShowNames?: boolean;
-  stashCompareLocal?: boolean;
-  logLongEdges?: boolean;
-  logFirstParent?: boolean;
-  logPreviewPosition?: LogPreviewPosition;
-  updateMode?: UpdateMode;
-  fetchTagMode?: FetchTagMode;
-  fetchAutomatically?: boolean;
-  checkRemote?: boolean;
-  autoUpdateOnPushRejection?: boolean;
-  pushDialogOnCommit?: boolean;
-  pushDialogProtectedOnly?: boolean;
-  protectedBranches?: string[];
-  appUpdateMode?: AppUpdateMode;
-  allowPrerelease?: boolean;
-  shortcuts?: Record<string, string>;
-  /** M9：AI 服务配置（密钥走单独的 ai_set_key）。 */
-  aiBaseUrl?: string;
-  aiModel?: string;
-  aiLanguage?: AiLanguage;
-  aiPrompt?: string;
-}
+export type { SettingsPatch } from "@/lib/ipc";
 
 type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "extensions" | "about";
 type Page =
@@ -342,6 +287,7 @@ export function SettingsDialog({
   onUpdateStatus,
   onThemesChanged,
   onAccountChanged,
+  aiSettings,
 }: {
   open: boolean;
   values: SettingsValues;
@@ -354,6 +300,8 @@ export function SettingsDialog({
   onUpdateStatus?: (status: AppUpdateStatus) => void;
   onThemesChanged?: () => Promise<void> | void;
   onAccountChanged?: () => void;
+  /** App 持有的控制器；关闭设置页时组件卸载，队列仍留在 App。 */
+  aiSettings: AiSettings;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -374,14 +322,22 @@ export function SettingsDialog({
   const [protectedBranches, setProtectedBranches] = useState(values.protectedBranches);
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState(false);
-  // M9：AI 服务配置（密钥只保存到系统凭据库，读不回原文）。
-  const [ai, setAi] = useState<AiStatus | null>(null);
-  const [aiBaseUrl, setAiBaseUrl] = useState("");
-  const [aiModel, setAiModel] = useState("");
+  // M11：AI 服务配置。密钥只保存到系统凭据库，读不回原文；
+  // 状态、草稿与模型列表由 AiSettings 统一管理，避免迟到读取覆盖新输入。
   const [aiKey, setAiKey] = useState("");
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [aiLanguage, setAiLanguage] = useState<AiLanguage>("repo");
-  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  // 密钥输入不进入控制器：保存完成时只有仍属于本页面、本输入代次且内容
+  // 仍是本次提交值才清空，避免旧回调清掉重开后重新输入的同一密钥。
+  const aiKeyRef = useRef("");
+  const aiKeyEpochRef = useRef(0);
+  const updateAiKey = (value: string) => {
+    aiKeyRef.current = value;
+    aiKeyEpochRef.current += 1;
+    setAiKey(value);
+  };
+  const [aiRevision, setAiRevision] = useState(0);
+  useEffect(() => aiSettings.subscribe(() => setAiRevision((value) => value + 1)), [aiSettings]);
+  // aiRevision 只用来触发重渲染，view() 每次返回新的快照。
+  const aiView = useMemo(() => aiSettings.view(), [aiSettings, aiRevision]);
   // M9 测量版：关于页显示构建来源（Q216）。
   const [measure, setMeasure] = useState<{ measure: boolean; commit: string } | null>(null);
   useEffect(() => {
@@ -439,45 +395,27 @@ export function SettingsDialog({
     return result;
   }, [categories, trimmedQuery]);
 
-  const loadAi = async () => {
-    try {
-      const status = await ipc.aiStatus();
-      setAi(status);
-      setAiBaseUrl(status.baseUrl);
-      setAiModel(status.model);
-      setAiPrompt(status.prompt);
-      setAiLanguage(status.language);
-      setAiKey("");
-    } catch (caught) {
-      setError(toAppError(caught));
-    }
-  };
-
   useEffect(() => {
-    if (open && page === "ai") void loadAi();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, page]);
+    if (!(open && page === "ai")) return;
+    updateAiKey("");
+    aiSettings.open();
+    return () => aiSettings.close();
+  }, [open, page, aiSettings]);
 
   if (!open) return null;
 
-  const saveAiKey = async () => {
-    try {
-      setAi(await ipc.aiSetKey(aiKey));
-      setAiKey("");
-      setAiNotice(t("settings.ai.keySet"));
-    } catch (caught) {
-      setError(toAppError(caught));
-    }
-  };
-
-  const clearAiKey = async () => {
-    try {
-      setAi(await ipc.aiClearKey());
-      setAiKey("");
-      setAiNotice(t("settings.ai.keyUnset"));
-    } catch (caught) {
-      setError(toAppError(caught));
-    }
+  const runAiKeyChange = (action: () => Promise<boolean>) => {
+    const submitted = aiKey;
+    const session = aiSettings.sessionToken();
+    const keyEpoch = aiKeyEpochRef.current;
+    void action().then((ok) => {
+      if (
+        ok
+        && aiSettings.sessionToken() === session
+        && aiKeyEpochRef.current === keyEpoch
+        && aiKeyRef.current === submitted
+      ) updateAiKey("");
+    });
   };
 
   const commit = async (patch: SettingsPatch) => {
@@ -826,35 +764,73 @@ export function SettingsDialog({
                 <Field label={t("settings.ai.baseUrl")} hint={t("settings.ai.baseUrlHint")}>
                   <input
                     className="settings-input w-full"
-                    value={aiBaseUrl}
+                    value={aiView.draft.baseUrl}
                     spellCheck={false}
-                    onChange={(event) => setAiBaseUrl(event.target.value)}
+                    onChange={(event) => aiSettings.edit("baseUrl", event.target.value)}
                     onBlur={() => {
-                      if (aiBaseUrl.trim() !== (ai?.baseUrl ?? "")) {
-                        void commit({ aiBaseUrl: aiBaseUrl.trim() }).then((ok) => { if (ok) void loadAi(); });
-                      }
+                      void aiSettings.save("baseUrl");
                     }}
                   />
                 </Field>
                 <Field label={t("settings.ai.model")} hint={t("settings.ai.modelHint")}>
                   <input
                     className="settings-input w-full"
-                    value={aiModel}
+                    value={aiView.draft.model}
                     spellCheck={false}
-                    onChange={(event) => setAiModel(event.target.value)}
+                    onChange={(event) => aiSettings.edit("model", event.target.value)}
                     onBlur={() => {
-                      if (aiModel.trim() !== (ai?.model ?? "")) void commit({ aiModel: aiModel.trim() });
+                      void aiSettings.save("model");
                     }}
                   />
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-descriptionforeground">
+                    {aiView.models.state === "loading" ? (
+                      <span role="status">{t("settings.ai.modelsLoading")}</span>
+                    ) : null}
+                    {aiView.models.state === "ready" ? (
+                      <>
+                        <select
+                          className="settings-input"
+                          aria-label={t("settings.ai.modelsChoose")}
+                          value=""
+                          onChange={(event) => {
+                            if (event.target.value) void aiSettings.selectModel(event.target.value);
+                          }}
+                        >
+                          <option value="">{t("settings.ai.modelsChoose")}</option>
+                          {aiView.models.items.map((model) => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                          onClick={() => aiSettings.retryModels()}
+                        >
+                          {t("settings.ai.modelsRefresh")}
+                        </button>
+                      </>
+                    ) : null}
+                    {aiView.models.state === "empty" ? <span>{t("settings.ai.modelsEmpty")}</span> : null}
+                    {aiView.models.state === "error" && aiView.models.error ? (
+                      <span role="alert">{formatAppError(aiView.models.error)}</span>
+                    ) : null}
+                    {aiView.models.state === "empty" || aiView.models.state === "error" ? (
+                      <button
+                        type="button"
+                        className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                        onClick={() => aiSettings.retryModels()}
+                      >
+                        {t("settings.ai.modelsRetry")}
+                      </button>
+                    ) : null}
+                  </div>
                 </Field>
                 <Field label={t("settings.ai.language")}>
                   <select
                     className="settings-input"
-                    value={aiLanguage}
+                    value={aiView.draft.language}
                     onChange={(event) => {
-                      const value = event.target.value as AiLanguage;
-                      setAiLanguage(value);
-                      void commit({ aiLanguage: value });
+                      void aiSettings.selectLanguage(event.target.value as AiLanguage);
                     }}
                   >
                     <option value="repo">{t("settings.ai.languageRepo")}</option>
@@ -871,47 +847,61 @@ export function SettingsDialog({
                       autoComplete="off"
                       spellCheck={false}
                       value={aiKey}
-                      placeholder={ai?.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")}
-                      onChange={(event) => setAiKey(event.target.value)}
+                      placeholder={aiView.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")}
+                      onChange={(event) => updateAiKey(event.target.value)}
                     />
-                    <button type="button" className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50" disabled={!aiKey.trim()} onClick={() => void saveAiKey()}>
+                    <button
+                      type="button"
+                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                      disabled={!aiKey.trim()}
+                      onClick={() => runAiKeyChange(() => aiSettings.saveKey(aiKey))}
+                    >
                       {t("settings.ai.saveKey")}
                     </button>
-                    <button type="button" className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50" disabled={!ai?.keySet} onClick={() => void clearAiKey()}>
+                    <button
+                      type="button"
+                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                      disabled={!aiView.keySet}
+                      onClick={() => runAiKeyChange(() => aiSettings.clearKey())}
+                    >
                       {t("settings.ai.clearKey")}
                     </button>
                   </div>
                   <span className="mt-1 block text-[11.5px] leading-relaxed text-descriptionforeground">
-                    {ai?.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")} · {t("settings.ai.keyHint")} {t("settings.ai.keyBinding")}
+                    {aiView.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")} · {t("settings.ai.keyHint")} {t("settings.ai.keyBinding")}
                   </span>
                 </div>
                 <div>
                   <span className="mb-1 block text-[12.5px] font-semibold">{t("settings.ai.prompt")}</span>
                   <textarea
                     className="settings-input min-h-40 w-full font-mono text-[12px] leading-relaxed"
-                    value={aiPrompt}
+                    value={aiView.draft.prompt}
                     spellCheck={false}
-                    onChange={(event) => setAiPrompt(event.target.value)}
+                    onChange={(event) => aiSettings.edit("prompt", event.target.value)}
                     onBlur={() => {
-                      if (aiPrompt !== (ai?.prompt ?? "")) void commit({ aiPrompt });
+                      void aiSettings.save("prompt");
                     }}
                   />
                   <div className="mt-1 flex items-center gap-2">
                     <button
                       type="button"
                       className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
-                      onClick={() => {
-                        setAiPrompt(ai?.defaultPrompt ?? "");
-                        void commit({ aiPrompt: "" }).then((ok) => { if (ok) void loadAi(); });
-                      }}
+                      onClick={() => void aiSettings.resetPrompt()}
                     >
                       {t("settings.ai.resetPrompt")}
                     </button>
                     <span className="text-[11.5px] leading-relaxed text-descriptionforeground">{t("settings.ai.promptHint")}</span>
                   </div>
                 </div>
-                {!ai?.configured ? <p className="text-[12px] text-descriptionforeground">{t("settings.ai.unconfigured")}</p> : null}
-                {aiNotice ? <p role="status" className="text-[12px] text-descriptionforeground">{aiNotice}</p> : null}
+                {!aiView.configured ? <p className="text-[12px] text-descriptionforeground">{t("settings.ai.unconfigured")}</p> : null}
+                {aiView.notice ? (
+                  <p role="status" className="text-[12px] text-descriptionforeground">
+                    {t(aiView.notice === "keySet" ? "settings.ai.keySet" : "settings.ai.keyUnset")}
+                  </p>
+                ) : null}
+                {aiView.error ? (
+                  <p role="alert" className="text-[12px] text-[color:var(--vscode-errorForeground)]">{formatAppError(aiView.error)}</p>
+                ) : null}
               </div>
             ) : null}
 
