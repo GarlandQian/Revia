@@ -27,6 +27,8 @@ sources:
     en: 1795cd4b49629d
   changelists.wholeFile:
     en: dc5e5222b98a3
+  changes.selectedCount:
+    en: 123035e471ed84
   clone.advanced:
     en: 8bd39d98eefb9
   clone.branch:

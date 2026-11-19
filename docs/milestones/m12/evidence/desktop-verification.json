@@ -1,0 +1,110 @@
+{
+  "result": "passed",
+  "launch": {
+    "source": "674b438cd91a31a7b572e2a3c1bcf19312bb6e60",
+    "executable": "/Users/garland/.codex/worktrees/selection-design/Revia/src-tauri/target/release/bundle/macos/Revia.app/Contents/MacOS/revia",
+    "sha256": "73641208dde9b369010be438a1f41d9b2d1f732cb5726e3619cf44d2f495a3bf",
+    "pid": 46815,
+    "env": {
+      "REVIA_ACCEPTANCE": "1",
+      "REVIA_ACCEPTANCE_DIR": "/private/tmp/revia-m12-evidence.Xvl6wb3v/desktop-tzwkh5ah/app-data"
+    },
+    "startedAtMs": 1795015842411
+  },
+  "fixture": "/private/tmp/revia-m12-evidence.Xvl6wb3v/desktop-tzwkh5ah/selection-and-history",
+  "afterFirstThreeSelected": [
+    "A.txt",
+    "B.txt",
+    "C.txt"
+  ],
+  "afterDeselectB": [
+    "A.txt",
+    "C.txt"
+  ],
+  "preview": "B preview marker, unstaged",
+  "staged": [
+    "A.txt",
+    "C.txt"
+  ],
+  "worktree": [
+    "B.txt"
+  ],
+  "history": {
+    "visibleCount": 40,
+    "openedAtMs": 1795091482021,
+    "beforeSwitch": {
+      "subject": "B history 40",
+      "diff": [
+        "B history version 39",
+        "B history version 40"
+      ],
+      "patchCommands": [
+        {
+          "sequence": 1794,
+          "startedAtMs": 1795091482205,
+          "worktreeId": "55e20c61e42f3478",
+          "program": "git",
+          "exitCode": 0,
+          "timedOut": false,
+          "errorClass": "ok",
+          "summary": "ok",
+          "elapsedMs": 10,
+          "args": [
+            "show",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv"
+          ]
+        }
+      ]
+    },
+    "switchedAtMs": 1795091502897,
+    "afterSwitch": {
+      "subject": "B history 38",
+      "diff": [
+        "B history version 37",
+        "B history version 38"
+      ],
+      "additionalPatchCommands": [
+        {
+          "sequence": 1966,
+          "startedAtMs": 1795091503023,
+          "worktreeId": "55e20c61e42f3478",
+          "program": "git",
+          "exitCode": 0,
+          "timedOut": false,
+          "errorClass": "ok",
+          "summary": "ok",
+          "elapsedMs": 11,
+          "args": [
+            "show",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv"
+          ]
+        }
+      ]
+    },
+    "commandCriteria": [
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "show"
+    ],
+    "source": "time-bounded command snapshots, including both click times and process exit"
+  },
+  "exit": {
+    "exitCode": 0,
+    "exitedAtMs": 1795091529255
+  },
+  "screenshotSHA256": {
+    "history-first.png": "fd880b23af4d9ad2940044c320f6f2b0603468e9e368111a39d7c7449d54df24",
+    "history-third.png": "cac139d484c21aa36148c2e465e9c26a7a60d6b1b15c18c8257f671e711ded24",
+    "more-menu.png": "447a2b44a8c7eb95bceff22933e5caee28cbadbaa157f64956cdf6a7e158afc0",
+    "preview-b.png": "ed368d3b382f4ab901d510439df677a8db461a02c56499dcd572a0a1e60602c1",
+    "staged.png": "43f5a457ebbc0bb18ebf2912d8c6bd987afbdd01b4c9b8b6ae18a814be9e9d76",
+    "three-selected.png": "b451ad6a3a690f8992c45f80071213a9ead3c6f434d08b2136d05b5263ab21b6",
+    "unlocked-opening.png": "5b90988fe34cad60069648c1ba63e944b8ddf10c5abfa3b0aba81c3b39b2be13"
+  },
+  "linuxOrWindowsDesktopTested": false
+}

@@ -798,6 +798,11 @@ export const ipc = {
   }) => invoke<import("@/types/bindings/FileHistoryPage").FileHistoryPage>("file_history", {
     worktreeId, request,
   }),
+  fileHistoryPatch: (
+    worktreeId: string, request: import("@/types/bindings/FileHistoryPatchRequest").FileHistoryPatchRequest,
+  ) => invoke<import("@/types/bindings/FileHistoryPatch").FileHistoryPatch>("file_history_patch", {
+    worktreeId, request,
+  }),
   fileBlame: (worktreeId: string, request: {
     path: string; revision?: string | null; ignoreWhitespace: boolean;
     detectMoves: boolean; detectCopies: boolean;

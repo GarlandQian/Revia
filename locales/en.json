@@ -1103,7 +1103,8 @@
     "renamedFromOnly": "originally {original}",
     "renamed": "Renamed",
     "copied": "Copied",
-    "typeChanged": "Type changed"
+    "typeChanged": "Type changed",
+    "selectedCount": "{count} selected"
   },
   "review": {
     "mark": "Mark as Reviewed",

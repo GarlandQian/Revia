@@ -17,6 +17,7 @@ const FUNCTIONS: Record<string, readonly string[]> = {
   "changes.hunkCount": ["count"],
   "changes.segmentAt": ["action", "line"],
   "changes.fileCount": ["count"],
+  "changes.selectedCount": ["count"],
   "changes.batchStaged": ["count"],
   "changes.batchUnstaged": ["count"],
   "changes.batchDiscarded": ["count"],

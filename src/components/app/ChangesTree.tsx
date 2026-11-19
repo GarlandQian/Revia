@@ -6,62 +6,39 @@
  * 支持 Shift 连续选择、⌘ 增减选择、⇧↑ / ⇧↓ 扩展与 ⌘A 全选。
  */
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
-import type { ChangesKind } from "@/types/bindings/ChangesKind";
-import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
+import { entryKey, type TreeGroupKey, type TreeGroupOpen, type TreeItem } from "@/hooks/changesTreeState";
 import { messages } from "@/lib/i18n/index";
 import { readonlyReasonText, renamedFrom } from "@/lib/i18n/text";
 import { isAltModifier, isPrimaryClick, isPrimaryModifier } from "@/lib/platform";
+import { matchShortcut } from "@/lib/shortcuts";
 import { Codicon } from "@/components/ui/codicon";
 import { FileTypeIcon } from "./FileTypeIcon";
 
 export const TREE_ROW_HEIGHT = 22;
 const OVERSCAN = 8;
 
-/** 分组：冲突组在最上方（返修 F10，Q143），其余三组照旧。 */
-export type TreeGroupKey = Exclude<ChangesKind, "changelist"> | "conflicts";
-export type TreeGroupOpen = Record<TreeGroupKey, boolean>;
-
-export function entryKey(entry: Pick<ChangeEntry, "path" | "changes">): string {
-  return `${entry.changes}:${entry.path}`;
-}
-
-/** 改动树的展示顺序：已暂存 → 未暂存 → 未跟踪（M4 F03.2）。 */
-export function treeOrder(snapshot: ChangesSnapshot): ChangeEntry[] {
-  const conflicts = snapshot.entries.filter((entry) => entry.unmerged);
-  const staged = snapshot.entries.filter((entry) => entry.changes === "staged" && !entry.unmerged);
-  const unstaged = snapshot.entries.filter((entry) => entry.changes === "unstaged" && !entry.unmerged);
-  const untracked = snapshot.entries.filter((entry) => entry.changes === "untracked");
-  return [...conflicts, ...staged, ...unstaged, ...untracked];
-}
-
-const GROUPS: Array<{ kind: TreeGroupKey; title: () => string }> = [
-  { kind: "conflicts", title: () => messages.merge.conflictsGroup },
-  { kind: "staged", title: () => messages.changes.staged },
-  { kind: "unstaged", title: () => messages.changes.unstaged },
-  { kind: "untracked", title: () => messages.changes.untracked },
-];
-
-/** 条目属于哪个显示分组：冲突文件不再出现在已暂存、未暂存组里（Q143）。 */
-function groupOf(entry: ChangeEntry): TreeGroupKey {
-  return entry.unmerged ? "conflicts" : entry.changes === "changelist" ? "unstaged" : entry.changes;
-}
+const groupTitle: Record<TreeGroupKey, () => string> = {
+  conflicts: () => messages.merge.conflictsGroup,
+  staged: () => messages.changes.staged,
+  unstaged: () => messages.changes.unstaged,
+  untracked: () => messages.changes.untracked,
+};
 
 interface ChangesTreeProps {
-  snapshot: ChangesSnapshot;
-  active: { path: string; changes: ChangesKind } | null;
+  items: TreeItem[];
+  directoryCounts: Map<string, number>;
+  active: ChangeEntry | null;
   selectedKeys: Set<string>;
   open: TreeGroupOpen;
-  /** 按目录分组（返修 A2，Q139）：false 是平铺。 */
-  groupByDirectory: boolean;
-  /** 已展开的目录（按目录名）；仅在 groupByDirectory 时使用。 */
   dirOpen: Set<string>;
   isWriting: boolean;
   onActivate: (entry: ChangeEntry, modifiers: { toggle: boolean; extend: boolean }) => void;
   onPin: (entry: ChangeEntry) => void;
   onMove: (direction: 1 | -1, extend: boolean) => void;
   onSelectAll: () => void;
+  onStageSelection: () => void;
   onToggleGroup: (kind: TreeGroupKey) => void;
   /** 冲突组标题右侧的“解决…”按钮（返修 F10）。 */
   onResolveConflicts: () => void;
@@ -73,58 +50,18 @@ interface ChangesTreeProps {
   onDiscardEntry: (entry: ChangeEntry) => void;
 }
 
-type TreeItem =
-  | { type: "header"; kind: TreeGroupKey; title: () => string; entries: ChangeEntry[] }
-  | { type: "dir"; kind: TreeGroupKey; dir: string }
-  | { type: "row"; entry: ChangeEntry };
-
-/** 按目录把同组条目分层（返修 A2，Q139）：目录节点之间用 `/` 分隔，逐级展开。 */
-function buildDirectoryItems(
-  entries: ChangeEntry[],
-  kind: TreeGroupKey,
-  dirOpen: Set<string>,
-  push: (item: TreeItem) => void,
-): void {
-  interface Node { children: Map<string, Node>; rows: ChangeEntry[] }
-  const root: Node = { children: new Map(), rows: [] };
-  for (const entry of entries) {
-    const parts = entry.path.split("/");
-    let node = root;
-    for (let index = 0; index < parts.length - 1; index += 1) {
-      let child = node.children.get(parts[index]);
-      if (!child) {
-        child = { children: new Map(), rows: [] };
-        node.children.set(parts[index], child);
-      }
-      node = child;
-    }
-    node.rows.push(entry);
-  }
-  const walk = (node: Node, prefix: string, depth: number) => {
-    const dirs = [...node.children.entries()].sort(([a], [b]) => a.localeCompare(b));
-    for (const [name, child] of dirs) {
-      const dir = prefix ? `${prefix}/${name}` : name;
-      push({ type: "dir", kind, dir });
-      if (dirOpen.has(dir)) walk(child, dir, depth + 1);
-    }
-    for (const entry of node.rows) push({ type: "row", entry });
-  };
-  walk(root, "", 0);
-}
-
 export function ChangesTree(props: ChangesTreeProps) {
   const {
-    snapshot,
+    items, directoryCounts,
     active,
     selectedKeys,
     open,
-    groupByDirectory,
     dirOpen,
     isWriting,
     onActivate,
     onPin,
     onMove,
-    onSelectAll,
+    onSelectAll, onStageSelection,
     onToggleGroup,
     onResolveConflicts,
     onToggleDir,
@@ -138,22 +75,6 @@ export function ChangesTree(props: ChangesTreeProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(0);
 
-  const items = useMemo(() => {
-    const list: TreeItem[] = [];
-    for (const group of GROUPS) {
-      const entries = snapshot.entries.filter((entry) => groupOf(entry) === group.kind);
-      if (entries.length === 0) continue;
-      list.push({ type: "header", kind: group.kind, title: group.title, entries });
-      if (!open[group.kind]) continue;
-      if (groupByDirectory) {
-        buildDirectoryItems(entries, group.kind, dirOpen, (item) => list.push(item));
-      } else {
-        for (const entry of entries) list.push({ type: "row", entry });
-      }
-    }
-    return list;
-  }, [dirOpen, groupByDirectory, open, snapshot.entries]);
-
   useLayoutEffect(() => {
     const element = scrollerRef.current;
     if (!element) return;
@@ -165,10 +86,6 @@ export function ChangesTree(props: ChangesTreeProps) {
 
   const first = Math.max(0, Math.floor(scrollTop / TREE_ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(items.length, Math.ceil((scrollTop + Math.max(viewport, TREE_ROW_HEIGHT)) / TREE_ROW_HEIGHT) + OVERSCAN);
-
-  const activeEntry = active
-    ? snapshot.entries.find((entry) => entry.path === active.path && entry.changes === active.changes) ?? null
-    : null;
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -187,19 +104,20 @@ export function ChangesTree(props: ChangesTreeProps) {
       onMove(event.key === "ArrowDown" ? 1 : -1, event.shiftKey);
       return;
     }
-    if (event.key === "Enter" && activeEntry) {
+    if (event.key === "Enter" && active) {
       event.preventDefault();
-      onPin(activeEntry);
+      onPin(active);
       return;
     }
-    if (event.key === " " && activeEntry && !isWriting && !activeEntry.readonlyReason) {
+    if (event.key === " " && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !isWriting) {
+      if (matchShortcut(event.nativeEvent)) return;
       event.preventDefault();
-      if (activeEntry.changes === "staged") onUnstageEntry(activeEntry);
-      else onStageEntry(activeEntry);
+      event.stopPropagation();
+      onStageSelection();
     }
   };
 
-  if (snapshot.entries.length === 0) {
+  if (items.length === 0) {
     return <div className="px-3 py-3 text-[12.5px] text-descriptionforeground">{messages.changes.empty}</div>;
   }
 
@@ -222,7 +140,7 @@ export function ChangesTree(props: ChangesTreeProps) {
               <GroupHeader
                 key={`header-${item.kind}`}
                 kind={item.kind}
-                title={item.title()}
+                title={groupTitle[item.kind]()}
                 entries={item.entries}
                 open={open[item.kind]}
                 top={index * TREE_ROW_HEIGHT}
@@ -236,6 +154,7 @@ export function ChangesTree(props: ChangesTreeProps) {
           }
           if (item.type === "dir") {
             const open_ = dirOpen.has(item.dir);
+            const count = directoryCounts.get(`${item.kind}:${item.dir}`) ?? 0;
             return (
               <div
                 key={`dir-${item.kind}-${item.dir}`}
@@ -247,11 +166,11 @@ export function ChangesTree(props: ChangesTreeProps) {
                   className="flex min-w-0 flex-1 items-center gap-0.5 text-left outline-none"
                   onClick={() => onToggleDir(item.dir)}
                   aria-expanded={open_}
-                  aria-label={`${item.dir}：${open_ ? messages.changes.collapse : messages.changes.expand}`}
                 >
                   <Codicon name={open_ ? "chevron-down" : "chevron-right"} size={14} />
                   <Codicon name={open_ ? "folder-opened" : "folder"} size={14} />
                   <span className="truncate text-[12px] font-normal">{item.dir}</span>
+                  {!open_ && count > 0 && <span className="count-badge ml-1 shrink-0">{messages.changes.selectedCount(count)}</span>}
                 </button>
               </div>
             );

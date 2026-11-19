@@ -41,6 +41,19 @@ export function visibleChangelistPaths(groups: readonly {id: string}[], items: r
 export function changelistEntryForPath(snapshot: Pick<ChangesSnapshot, "entries">, path: string): ChangeEntry | undefined {
   return snapshot.entries.find((entry) => entry.path === path && entry.changes === "changelist") ?? snapshot.entries.find((entry) => entry.path === path && entry.changes === "untracked");
 }
+
+export function changelistShortcutEntries(
+  snapshot: Pick<ChangesSnapshot, "worktreeId" | "entries">,
+  selection: { worktreeId: string; paths: string[] },
+  previewPath: string | undefined,
+): ChangeEntry[] {
+  const paths = selection.worktreeId === snapshot.worktreeId && selection.paths.length
+    ? selection.paths : previewPath ? [previewPath] : [];
+  return paths.flatMap((path) => {
+    const entry = changelistEntryForPath(snapshot, path);
+    return entry ? [entry] : [];
+  });
+}
 export function changelistEntriesForView(snapshot: Pick<ChangesSnapshot, "worktreeId" | "entries">, view: Pick<ChangelistView, "worktreeId" | "groups" | "items"> | null): ChangeEntry[] {
   const available = snapshot.entries.filter((entry) => entry.changes === "changelist" || entry.changes === "untracked");
   const paths = view?.worktreeId === snapshot.worktreeId ? visibleChangelistPaths(view.groups, view.items) : [];

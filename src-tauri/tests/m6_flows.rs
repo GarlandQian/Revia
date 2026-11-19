@@ -13,7 +13,7 @@ use std::sync::Arc;
 use revia_lib::autostash::AutostashStore;
 use revia_lib::commit::DraftStore;
 use revia_lib::external_tools::{self, ExternalToolKind, ExternalToolRequest};
-use revia_lib::file_history::{self, BlameRequest, FileHistoryRequest};
+use revia_lib::file_history::{self, BlameRequest, FileHistoryEntry, FileHistoryPatch, FileHistoryPatchRequest, FileHistoryRequest};
 use revia_lib::git::CommandLog;
 use revia_lib::operation::{self, OperationKind};
 use revia_lib::operation_flow::{self, OperationAction, OperationActionRequest};
@@ -222,6 +222,18 @@ fn recovery_sources(store: &RecoveryStore) -> Vec<RecoverySource> {
         .into_iter()
         .map(|record| record.source)
         .collect()
+}
+
+fn patch_request(entry: &FileHistoryEntry) -> FileHistoryPatchRequest {
+    FileHistoryPatchRequest {
+        oid: entry.oid.clone(),
+        path: entry.path.clone(),
+        old_path: entry.old_path.clone(),
+    }
+}
+
+fn selected_patch(session: &WorktreeSession, entry: &FileHistoryEntry) -> FileHistoryPatch {
+    file_history::history_patch(&session.git, &patch_request(entry)).unwrap()
 }
 
 #[test]
@@ -1251,9 +1263,9 @@ fn file_history_keeps_control_characters_in_paths_and_commit_fields() {
         assert_eq!(entry.path, path);
         assert_eq!(entry.author, "Author\u{1e}Name");
         assert!(entry.subject.contains('\u{1e}'));
-        assert!(entry.patch_error.is_none());
-        assert!(!entry.patch.is_empty());
-        assert!(!entry.patch.contains("unrelated alias bytes"));
+        let patch = selected_patch(&session, entry).patch;
+        assert!(!patch.is_empty());
+        assert!(!patch.contains("unrelated alias bytes"));
         if path == renamed {
             assert_eq!(entry.oid, tip);
             assert_eq!(entry.old_path.as_deref(), Some(paths[0].as_str()));
@@ -1264,7 +1276,7 @@ fn file_history_keeps_control_characters_in_paths_and_commit_fields() {
             }).unwrap();
             assert_eq!(old.entries[0].oid, root);
             assert_eq!(old.entries[0].path, paths[0]);
-            assert!(old.entries[0].patch.contains("+real object"));
+            assert!(selected_patch(&session, &old.entries[0]).patch.contains("+real object"));
         }
     }
     assert_eq!(f.read("before"), b"unrelated alias bytes\n");
@@ -1285,7 +1297,7 @@ fn all_branch_file_history_keeps_both_paths_when_commit_oids_match() {
     }).unwrap();
     for (path, content) in [("a.txt", "+content A"), ("b.txt", "+content B")] {
         let entry = page.entries.iter().find(|entry| entry.oid == root && entry.path == path).unwrap();
-        assert!(entry.patch.contains(content)); assert!(entry.patch_error.is_none());
+        assert!(selected_patch(&session, entry).patch.contains(content));
     }
     let mut paged = Vec::new();
     let mut skip = 0;
@@ -1301,7 +1313,11 @@ fn all_branch_file_history_keeps_both_paths_when_commit_oids_match() {
     }
     assert_eq!(paged, page.entries.iter().map(|entry| (entry.oid.clone(), entry.path.clone())).collect::<Vec<_>>());
     if let Ok(path) = std::env::var("REVIA_M6_ERROR_FIXTURE") {
-        fs::write(format!("{path}.history-collision.json"), serde_json::to_vec_pretty(&page).unwrap()).unwrap();
+        let patches: Vec<_> = page.entries.iter().map(|entry| serde_json::json!({
+            "request": patch_request(entry), "result": selected_patch(&session, entry),
+        })).collect();
+        let fixture = serde_json::json!({ "page": page, "patches": patches });
+        fs::write(format!("{path}.history-collision.json"), serde_json::to_vec_pretty(&fixture).unwrap()).unwrap();
     }
 }
 
@@ -1403,6 +1419,9 @@ fn file_history_follows_renames_across_all_branches_and_blame_reports_lines() {
     assert_eq!(rename_entry.path, "重命名 文件.txt");
     assert_eq!(rename_entry.old_path.as_deref(), Some("旧 文件.txt"));
     assert_eq!(rename_entry.status, "R");
+    let patch = selected_patch(&session, rename_entry).patch;
+    assert!(patch.contains("rename from 旧 文件.txt") && patch.contains("rename to 重命名 文件.txt"));
+    assert!(patch.contains("+four"));
 
     let previous = file_history::previous_revision(&session.git, &rename_commit, "重命名 文件.txt")
         .unwrap()
@@ -1704,6 +1723,74 @@ fn blame_options_keep_native_attribution_for_component_requests() {
 }
 
 #[test]
+fn file_history_full_page_reads_only_the_selected_patch() {
+    let f = Fixture::new();
+    for revision in 1..=41 {
+        f.write("paged.txt", format!("revision {revision}\n").as_bytes());
+        f.commit_all(&format!("commit {revision}"));
+    }
+    let session = f.session();
+    let request = FileHistoryRequest {
+        path: "paged.txt".into(), all_branches: false, skip: 0, limit: 40, anchor: None,
+    };
+    let shows = || session.git.log.snapshot().into_iter()
+        .filter(|command| command.args.iter().any(|arg| arg == "show"))
+        .collect::<Vec<_>>();
+    let first = file_history::history(&session.git, &request).unwrap();
+    assert_eq!(first.entries.len(), 40);
+    assert!(first.has_more && shows().is_empty());
+    let selected = &first.entries[0];
+    assert_eq!(selected.oid, f.head());
+    let patch = selected_patch(&session, selected);
+    assert!(patch.patch.contains("+revision 41") && !patch.patch_truncated);
+    let second = file_history::history(&session.git, &FileHistoryRequest {
+        skip: first.next_skip, anchor: Some(first.anchor.clone()), ..request
+    }).unwrap();
+    assert_eq!(second.entries.len(), 1);
+    assert!(!second.has_more);
+    let commands = shows();
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].exit_code, 0);
+    assert!(commands[0].args.ends_with(&[format!("{}^{{commit}}", selected.oid), "--".into(), selected.path.clone()]));
+    if let Ok(path) = std::env::var("REVIA_M6_ERROR_FIXTURE") {
+        let fixture = serde_json::json!({
+            "page": first, "nextPage": second, "patch": patch,
+            "commands": session.git.log.snapshot(),
+        });
+        fs::write(format!("{path}.history-full-page.json"), serde_json::to_vec_pretty(&fixture).unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn file_history_patch_requires_a_commit_and_literal_file_paths() {
+    let f = Fixture::new();
+    f.write("file", b"fixture\n");
+    let oid = f.commit_all("base");
+    let session = f.session();
+    let request = FileHistoryPatchRequest { oid, path: "file".into(), old_path: None };
+    let commands_before = session.git.log.snapshot().len();
+    for oid in ["HEAD", "abc123"] {
+        let error = file_history::history_patch(&session.git, &FileHistoryPatchRequest {
+            oid: oid.into(), ..request.clone()
+        }).unwrap_err();
+        assert_eq!(error.code.as_deref(), Some("errors.history.notFullObjectId"));
+    }
+    for path in ["", ".", "..", "dir/../file", "/file", "bad\0path"] {
+        for invalid in [
+            FileHistoryPatchRequest { path: path.into(), ..request.clone() },
+            FileHistoryPatchRequest { old_path: Some(path.into()), ..request.clone() },
+        ] {
+            let error = file_history::history_patch(&session.git, &invalid).unwrap_err();
+            assert_eq!(error.code.as_deref(), Some("errors.fileHistory.invalidPath"));
+        }
+    }
+    assert_eq!(session.git.log.snapshot().len(), commands_before);
+    let blob = FileHistoryPatchRequest { oid: f.oid("HEAD:file"), ..request };
+    let error = file_history::history_patch(&session.git, &blob).unwrap_err();
+    assert_eq!(error.code.as_deref(), Some("errors.mod.failedExitCode"));
+}
+
+#[test]
 fn file_history_paginates_and_handles_root_and_binary_patches() {
     let f = Fixture::new();
     f.write("paged.txt", b"one\n");
@@ -1761,8 +1848,9 @@ fn file_history_paginates_and_handles_root_and_binary_patches() {
     )
     .unwrap();
     assert_eq!(binary.entries.len(), 1);
-    assert!(binary.entries[0].patch.to_lowercase().contains("binary"));
-    assert!(binary.entries[0].patch.len() <= 2 * 1024 * 1024);
+    let patch = selected_patch(&session, &binary.entries[0]).patch;
+    assert!(patch.to_lowercase().contains("binary"));
+    assert!(patch.len() <= 2 * 1024 * 1024);
 }
 
 #[test]
@@ -3725,18 +3813,17 @@ fn file_history_invalid_content_has_a_readonly_reason_and_valid_truncation_is_lo
     let request = |path: &str| FileHistoryRequest { path: path.into(), all_branches: false, skip: 0, limit: 10, anchor: None };
     let page = file_history::history(&session.git, &request("invalid.txt")).unwrap();
     assert_eq!(page.entries.len(), 1);
-    let entry = &page.entries[0];
-    assert!(entry.patch.is_empty() && !entry.patch_truncated);
-    assert_eq!(entry.patch_error.as_ref().unwrap().code.as_deref(), Some("errors.fileHistory.patchUnavailable"));
+    let error = file_history::history_patch(&session.git, &patch_request(&page.entries[0])).unwrap_err().payload();
+    assert_eq!(error.code.as_deref(), Some("errors.fileHistory.patchUnavailable"));
     assert_eq!(f.read("invalid.txt"), b"bad byte: \xff\n");
     if let Some(path) = std::env::var_os("REVIA_M6_ERROR_FIXTURE") {
-        fs::write(format!("{}.patch.json", PathBuf::from(path).display()), serde_json::to_vec_pretty(entry).unwrap()).unwrap();
+        fs::write(format!("{}.patch.json", PathBuf::from(path).display()), serde_json::to_vec_pretty(&error).unwrap()).unwrap();
     }
     f.write("large.txt", format!("x{}\n", "界".repeat(800_000)).as_bytes()); f.commit_all("large text");
     let page = file_history::history(&session.git, &request("large.txt")).unwrap();
-    let entry = &page.entries[0];
-    assert!(entry.patch_truncated && entry.patch_error.is_none());
-    assert!(!entry.patch.contains('\u{fffd}')); assert!(entry.patch.len() <= 2 * 1024 * 1024);
+    let result = selected_patch(&session, &page.entries[0]);
+    assert!(result.patch_truncated);
+    assert!(!result.patch.contains('\u{fffd}')); assert!(result.patch.len() <= 2 * 1024 * 1024);
 }
 
 #[cfg(unix)]
@@ -4298,7 +4385,8 @@ fn all_branch_file_history_excludes_stash_only_commits_and_keeps_other_branches(
     let history = file_history::history(&session.git, &request).unwrap();
     let mut actual = history.entries.iter().map(|entry| entry.oid.clone()).collect::<Vec<_>>(); actual.sort();
     let mut expected = vec![base, other]; expected.sort(); assert_eq!(actual, expected);
-    assert!(history.entries.iter().all(|entry| entry.oid != stash_oid && entry.oid != stash_index && !entry.patch.contains("stash-only content")));
+    assert!(history.entries.iter().all(|entry| entry.oid != stash_oid && entry.oid != stash_index
+        && !selected_patch(&session, entry).patch.contains("stash-only content")));
     assert_eq!(f.index(), index); assert_eq!(f.read("file"), bytes);
 }
 
@@ -4394,7 +4482,8 @@ fn file_history_and_stash_patches_keep_non_ascii_paths_readable() {
     let page = file_history::history(&session.git, &FileHistoryRequest {
         path: "文档 目录/说明 文件.txt".into(), all_branches: false, skip: 0, limit: 40, anchor: None,
     }).unwrap();
-    assert!(page.entries[0].patch.contains("文档 目录/说明 文件.txt"), "{}", page.entries[0].patch);
+    let patch = selected_patch(&session, &page.entries[0]).patch;
+    assert!(patch.contains("文档 目录/说明 文件.txt"), "{patch}");
     f.write("文档 目录/说明 文件.txt", b"three\n"); f.git(&["stash", "push", "--quiet"]);
     let oid = stash::list(&session.git).unwrap()[0].oid.clone();
     for compare_local in [false, true] {

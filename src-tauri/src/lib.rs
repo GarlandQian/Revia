@@ -359,6 +359,7 @@ pub fn run() {
             commands::rewrite_reword,
             commands::rewrite_interactive,
             commands::file_history,
+            commands::file_history_patch,
             commands::file_blame,
             commands::file_previous_revision,
             commands::external_tool_choices,

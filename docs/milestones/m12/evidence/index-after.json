@@ -1,0 +1,12 @@
+{
+  "index": [
+    "A.txt",
+    "C.txt"
+  ],
+  "worktree": [
+    "B.txt"
+  ],
+  "status": "M  A.txt\n M B.txt\nM  C.txt\n",
+  "indexPatch": "diff --git a/A.txt b/A.txt\nindex f4e2880..50ad4aa 100644\n--- a/A.txt\n+++ b/A.txt\n@@ -1 +1,2 @@\n A committed baseline\n+A preview marker, unstaged\ndiff --git a/C.txt b/C.txt\nindex 6a5a992..4cc1c2b 100644\n--- a/C.txt\n+++ b/C.txt\n@@ -1 +1,2 @@\n C committed baseline\n+C preview marker, unstaged\n",
+  "worktreePatch": "diff --git a/B.txt b/B.txt\nindex 1622610..252a1b7 100644\n--- a/B.txt\n+++ b/B.txt\n@@ -1 +1,2 @@\n B history version 40\n+B preview marker, unstaged\n"
+}

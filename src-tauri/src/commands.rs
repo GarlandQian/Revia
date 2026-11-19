@@ -4084,14 +4084,30 @@ pub async fn file_history(
         crate::file_history::history(&session.git, &request)
     })
     .await
-    .map_err(|error| {
-        AppError::coded(
-            ErrorKind::Internal,
-            "errors.commands.fileHistoryInterrupted",
-            "读取文件历史时中断：{error}",
-            &[("error", error.to_string())],
-        )
-    })?
+    .map_err(file_history_interrupted)?
+}
+
+#[tauri::command]
+pub async fn file_history_patch(
+    state: State<'_, AppState>,
+    worktree_id: String,
+    request: crate::file_history::FileHistoryPatchRequest,
+) -> Result<crate::file_history::FileHistoryPatch> {
+    let session = state.session(&worktree_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::file_history::history_patch(&session.git, &request)
+    })
+    .await
+    .map_err(file_history_interrupted)?
+}
+
+fn file_history_interrupted(error: tauri::Error) -> AppError {
+    AppError::coded(
+        ErrorKind::Internal,
+        "errors.commands.fileHistoryInterrupted",
+        "读取文件历史时中断：{error}",
+        &[("error", error.to_string())],
+    )
 }
 
 #[tauri::command]

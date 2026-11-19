@@ -1,143 +1,81 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { entryKey, treeOrder, type TreeGroupKey, type TreeGroupOpen } from "@/components/app/ChangesTree";
+import { useCallback, useMemo, useState } from "react";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesSnapshot } from "@/types/bindings/ChangesSnapshot";
+import {
+  allGroupsOpen, entryKey, initialSelection, inlineTargets, nextTreeRow, retainSelection,
+  selectTreeRow, selectedDirectoryCounts, treeLayout, treeOrder,
+  type TreeGroupKey, type TreeGroupOpen, type TreeModifiers, type TreeSelection,
+} from "./changesTreeState";
 
-interface TreeSelectionOptions {
-  snapshot: ChangesSnapshot | null;
-  snapshotRef: RefObject<ChangesSnapshot | null>;
-  selectedRef: RefObject<Pick<ChangeEntry, "path" | "changes"> | null>;
-  openEntry: (entry: ChangeEntry) => void;
-  order?: (snapshot: ChangesSnapshot) => ChangeEntry[];
-}
+const emptyKeys = new Set<string>();
 
-export function useTreeSelection({ snapshot, snapshotRef, selectedRef, openEntry, order }: TreeSelectionOptions) {
-  const orderOf = useCallback((current: ChangesSnapshot) => order ? order(current) : treeOrder(current), [order]);
-  const [treeSelection, setTreeSelection] = useState<Set<string>>(new Set());
-  const treeSelectionRef = useRef(treeSelection);
-  treeSelectionRef.current = treeSelection;
-  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
-  const selectionAnchorRef = useRef(selectionAnchor);
-  selectionAnchorRef.current = selectionAnchor;
-  const [groupOpen, setGroupOpen] = useState<TreeGroupOpen>({
-    conflicts: true, staged: true, unstaged: true, untracked: false,
-  });
+export function useTreeSelection(
+  snapshot: ChangesSnapshot | null,
+  groupByDirectory: boolean,
+  openEntry: (entry: ChangeEntry) => void,
+) {
+  const [selection, setSelection] = useState<TreeSelection | null>(null);
+  const [groupOpen, setGroupOpen] = useState<TreeGroupOpen>({ ...allGroupsOpen, untracked: false });
   const [dirOpen, setDirOpen] = useState<Set<string>>(new Set());
+  const { items, rows } = useMemo(
+    () => treeLayout(snapshot?.entries ?? [], groupOpen, groupByDirectory, dirOpen),
+    [snapshot?.entries, groupOpen, groupByDirectory, dirOpen],
+  );
+  const keys = selection && selection.worktreeId === snapshot?.worktreeId ? selection.keys : emptyKeys;
+  const allEntries = useMemo(() => snapshot ? treeOrder(snapshot) : [], [snapshot]);
+  const selectedEntries = useMemo(() => allEntries.filter((entry) => keys.has(entryKey(entry))), [allEntries, keys]);
+  const directoryCounts = useMemo(() => selectedDirectoryCounts(groupByDirectory ? selectedEntries : []), [groupByDirectory, selectedEntries]);
 
-  useEffect(() => {
+  // 只有打开仓库或首次出现改动时初始化；刷新只能淘汰已消失的条目。
+  const receiveTreeSnapshot = useCallback((next: ChangesSnapshot | null, first: ChangeEntry | null, opened = false) => {
+    setSelection((current) => {
+      if (!next) return null;
+      if (!opened && current?.worktreeId === next.worktreeId) return retainSelection(current, next.entries);
+      return first ? initialSelection(next.worktreeId, first) : null;
+    });
+  }, []);
+
+  const activateTreeEntry = useCallback((entry: ChangeEntry, modifiers: TreeModifiers) => {
     if (!snapshot) return;
-    setTreeSelection((current) => {
-      const next = new Set(
-        [...current].filter((key) => snapshot.entries.some((entry) => entryKey(entry) === key)),
-      );
-      return next.size === current.size ? current : next;
-    });
-  }, [orderOf, snapshot]);
-
-  const followActiveEntry = useCallback((entry: ChangeEntry, replace: boolean) => {
-    const key = entryKey(entry);
-    if (replace) {
-      setTreeSelection(new Set([key]));
-      setSelectionAnchor(key);
-    } else {
-      // 页签、刷新与导航跟随当前文件，原有多选仍保留。
-      setTreeSelection((current) => (current.has(key) ? current : new Set([key])));
-      setSelectionAnchor((current) => current ?? key);
-    }
-  }, [orderOf, ]);
-
-  const expandToSelection = useCallback((entry: ChangeEntry): ChangeEntry[] => {
-    const selection = treeSelectionRef.current;
-    const current = snapshotRef.current;
-    if (selection.size <= 1 || !selection.has(entryKey(entry)) || !current) return [entry];
-    return orderOf(current).filter(
-      (item) => selection.has(entryKey(item)) && item.changes === entry.changes,
-    );
-  }, [orderOf, snapshotRef]);
-
-  const treeSelectedEntries = useCallback((): ChangeEntry[] => {
-    const current = snapshotRef.current;
-    if (!current || treeSelectionRef.current.size === 0) return [];
-    return orderOf(current).filter((entry) => treeSelectionRef.current.has(entryKey(entry)));
-  }, [orderOf, snapshotRef]);
-
-  const activateTreeEntry = useCallback((entry: ChangeEntry, modifiers: { toggle: boolean; extend: boolean }) => {
-    const key = entryKey(entry);
-    setTreeSelection((current) => {
-      if (modifiers.extend) {
-        const snapshotNow = snapshotRef.current;
-        if (!snapshotNow) return new Set([key]);
-        const order = orderOf(snapshotNow);
-        const anchor = selectionAnchorRef.current ?? key;
-        const from = order.findIndex((candidate) => entryKey(candidate) === anchor);
-        const to = order.findIndex((candidate) => entryKey(candidate) === key);
-        if (from < 0 || to < 0) return new Set([key]);
-        const [start, end] = from <= to ? [from, to] : [to, from];
-        return new Set(order.slice(start, end + 1).map(entryKey));
-      }
-      if (modifiers.toggle) {
-        const next = new Set(current);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      }
-      return new Set([key]);
-    });
-    if (!modifiers.extend) setSelectionAnchor(key);
-    else setSelectionAnchor((previous) => previous ?? key);
+    setSelection((current) => selectTreeRow(
+      current?.worktreeId === snapshot.worktreeId ? current : initialSelection(snapshot.worktreeId, null),
+      entry, modifiers, rows,
+    ));
     openEntry(entry);
-  }, [orderOf, openEntry, snapshotRef]);
+  }, [snapshot, rows, openEntry]);
 
-  const moveTreeSelection = useCallback((direction: 1 | -1, extend: boolean) => {
-    const snapshotNow = snapshotRef.current;
-    if (!snapshotNow) return;
-    const order = orderOf(snapshotNow);
-    if (order.length === 0) return;
-    const currentKey = selectedRef.current ? entryKey(selectedRef.current) : null;
-    const index = currentKey ? order.findIndex((entry) => entryKey(entry) === currentKey) : -1;
-    const nextIndex = Math.min(order.length - 1, Math.max(0, index + direction));
-    const next = order[nextIndex];
-    if (!next) return;
-    const key = entryKey(next);
-    const group = next.changes === "changelist" ? "unstaged" : next.changes;
-    setGroupOpen((current) => (current[group] ? current : { ...current, [group]: true }));
-    if (extend) {
-      const anchor = selectionAnchorRef.current ?? currentKey ?? key;
-      const from = order.findIndex((entry) => entryKey(entry) === anchor);
-      const to = nextIndex;
-      const [start, end] = from <= to ? [from, to] : [to, from];
-      setTreeSelection(new Set(order.slice(start, end + 1).map(entryKey)));
-      setSelectionAnchor(anchor);
-    } else {
-      setTreeSelection(new Set([key]));
-      setSelectionAnchor(key);
-    }
-    openEntry(next);
-  }, [orderOf, openEntry, selectedRef, snapshotRef]);
+  const moveTreeSelection = (direction: 1 | -1, extend: boolean) => {
+    const next = nextTreeRow(rows, selection?.focus ?? null, direction);
+    if (next) activateTreeEntry(next, { toggle: false, extend });
+  };
 
-  const selectAllEntries = useCallback(() => {
-    const snapshotNow = snapshotRef.current;
-    if (!snapshotNow) return;
-    setTreeSelection(new Set(orderOf(snapshotNow).map(entryKey)));
-    setGroupOpen({ conflicts: true, staged: true, unstaged: true, untracked: true });
-  }, [orderOf, snapshotRef]);
+  const selectAllEntries = () => {
+    if (!snapshot) return;
+    setSelection((current) => ({
+      ...(current?.worktreeId === snapshot.worktreeId ? current : initialSelection(snapshot.worktreeId, allEntries[0] ?? null)),
+      keys: new Set(allEntries.map(entryKey)),
+    }));
+    setGroupOpen(allGroupsOpen);
+  };
 
-  const toggleGroup = useCallback((kind: TreeGroupKey) => {
+  const toggleGroup = (kind: TreeGroupKey) => {
     setGroupOpen((current) => ({ ...current, [kind]: !current[kind] }));
-  }, [orderOf, ]);
+  };
 
-  const toggleDir = useCallback((dir: string) => {
+  const toggleDir = (dir: string) => {
     setDirOpen((current) => {
       const next = new Set(current);
       if (next.has(dir)) next.delete(dir);
       else next.add(dir);
       return next;
     });
-  }, [orderOf, ]);
+  };
+
+  const expandToSelection = useCallback((entry: ChangeEntry) => inlineTargets(entry, selectedEntries), [selectedEntries]);
 
   return {
-    treeSelection, groupOpen, setGroupOpen, dirOpen, followActiveEntry,
-    expandToSelection, treeSelectedEntries, activateTreeEntry, moveTreeSelection,
+    items, keys, directoryCounts, selectedEntries, receiveTreeSnapshot,
+    groupOpen, setGroupOpen, dirOpen, expandToSelection, activateTreeEntry, moveTreeSelection,
     selectAllEntries, toggleGroup, toggleDir,
   };
 }

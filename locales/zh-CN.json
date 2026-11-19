@@ -130,7 +130,8 @@
     "renamedFromOnly": "原 {original}",
     "renamed": "已改名",
     "copied": "已复制",
-    "typeChanged": "类型已改变"
+    "typeChanged": "类型已改变",
+    "selectedCount": "已选 {count}"
   },
   "review": {
     "mark": "标记为已审阅",

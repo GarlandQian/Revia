@@ -12,6 +12,9 @@ import test from "node:test";
 const sourceRoot = new URL("../src/", import.meta.url);
 const imports = registerHooks({
   load(url, context, nextLoad) {
+    if (url.startsWith(sourceRoot.href) && url.endsWith(".css")) {
+      return { format: "module", shortCircuit: true, source: "" };
+    }
     // Decorative icons use Vite's asset glob; they are outside this SSR text
     // check. Keep the production banner/dialog and formatting implementations.
     if (url === new URL("components/app/FileTypeIcon.tsx", sourceRoot).href) {
@@ -427,16 +430,16 @@ test("真实提交失败同时保留快照收尾原因并随语言呈现", () =>
 });
 
 test("真实历史编码限制与stash部分结果保留结构化说明", () => {
-  const entry = JSON.parse(readFileSync(fixture + ".patch.json", "utf8"));
-  assert.equal(entry.patch, ""); assert.equal(entry.patchError.code, "errors.fileHistory.patchUnavailable");
+  const patchError = JSON.parse(readFileSync(fixture + ".patch.json", "utf8"));
+  assert.equal(patchError.code, "errors.fileHistory.patchUnavailable");
   const association = JSON.parse(readFileSync(fixture + ".association.json", "utf8"));
   const checkout = JSON.parse(readFileSync(fixture + ".checkout.json", "utf8"));
   assert.equal(resultNeedsVerification({ error: checkout }), true);
   setLocale("en");
-  assert.match(formatAppError(entry.patchError), /lossless UTF-8/);
+  assert.match(formatAppError(patchError), /lossless UTF-8/);
   assert.match(formatAppError(association), /not automatically restored/);
   assert.match(formatAppError(checkout), /cleanup of stash/);
-  for (const payload of [entry.patchError, association, checkout]) {
+  for (const payload of [patchError, association, checkout]) {
     assert.doesNotMatch(formatAppError(payload), /[\u3400-\u4dbf\u4e00-\u9fff]/u);
   }
   setLocale("zh-CN"); assert.match(formatAppError(association), /未自动恢复/);

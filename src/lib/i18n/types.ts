@@ -17,6 +17,7 @@ type FunctionSignatures = {
   "changes.hunkCount": [count: number];
   "changes.segmentAt": [action: string, line: number];
   "changes.fileCount": [count: number];
+  "changes.selectedCount": [count: number];
   "changes.batchStaged": [count: number];
   "changes.batchUnstaged": [count: number];
   "changes.batchDiscarded": [count: number];

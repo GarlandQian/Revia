@@ -5,9 +5,11 @@ import type { NoticeText } from "@/components/app/Notifications";
  * 历史只读取 Git 的 --follow 路径；Blame 的路径与版本都带进请求，
  * 不把行号当身份。上一版本由 Rust 解析父提交，前端不假设第一父提交。
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FileHistoryEntry } from "@/types/bindings/FileHistoryEntry";
 import type { FileHistoryPage } from "@/types/bindings/FileHistoryPage";
+import type { FileHistoryPatch } from "@/types/bindings/FileHistoryPatch";
+import type { FileHistoryPatchRequest } from "@/types/bindings/FileHistoryPatchRequest";
 import type { BlameResult } from "@/types/bindings/BlameResult";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import { ipc } from "@/lib/ipc";
@@ -23,9 +25,18 @@ const FILE_STATUS_CLASS: Record<string, string> = {
   R: "status-renamed", C: "status-added", T: "status-typeChanged",
 };
 
-function errorText(caught: unknown): AppErrorPayload {
-  return toAppError(caught);
-}
+type HistoryList = {
+  view: string;
+  page: FileHistoryPage | null;
+  loading: boolean;
+  error: AppErrorPayload | null;
+};
+
+type PatchResponse = {
+  request: FileHistoryPatchRequest;
+  result?: FileHistoryPatch;
+  error?: AppErrorPayload;
+};
 
 function entryKey(entry: FileHistoryEntry): string {
   return `${entry.oid}:${entry.path}`;
@@ -51,12 +62,10 @@ export function FileHistoryDialog({
 }) {
   const [tab, setTab] = useState<"history" | "blame">("history");
   const [allBranches, setAllBranches] = useState(false);
-  const [entries, setEntries] = useState<FileHistoryEntry[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextSkip, setNextSkip] = useState(0);
+  const [list, setList] = useState<HistoryList | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<AppErrorPayload | null>(null);
+  const [patchResponse, setPatchResponse] = useState<PatchResponse | null>(null);
+  const [blameError, setBlameError] = useState<AppErrorPayload | null>(null);
   const [blameResult, setBlame] = useState<BlameResult | null>(null);
   const [blameTarget, setBlameTarget] = useState<{ view: string; path: string; revision: string | null } | null>(null);
   const [ignoreWhitespace, setIgnoreWhitespace] = useState(true);
@@ -65,44 +74,64 @@ export function FileHistoryDialog({
   const [blameLoading, setBlameLoading] = useState(false);
   const historySeq = useRef(0);
   const blameSeq = useRef(0);
-  const anchorRef = useRef<string | null>(null);
   const viewIdentity = JSON.stringify([worktreeId, path, revision]);
+  const listIdentity = JSON.stringify([worktreeId, path, revision, allBranches]);
+  const history = list?.view === listIdentity ? list : null;
+  const entries = history?.page?.entries ?? [];
+  const loading = history?.loading ?? true;
   const activeBlameTarget = blameTarget?.view === viewIdentity ? blameTarget : null;
   const blame = activeBlameTarget ? blameResult : null;
   const blamePath = activeBlameTarget?.path ?? path;
   const blameRevision = activeBlameTarget ? activeBlameTarget.revision : revision;
 
-  const load = async (all: boolean, skip: number, append: boolean) => {
+  const load = async (append: boolean) => {
     const sequence = ++historySeq.current;
-    setLoading(true);
+    const previous = history?.page ?? null;
+    setList({ view: listIdentity, page: previous, loading: true, error: null });
     try {
-      const page: FileHistoryPage = await ipc.fileHistory(worktreeId, {
-        path, allBranches: all, skip, limit: PAGE_SIZE,
-        anchor: append ? anchorRef.current ?? undefined : all ? undefined : revision ?? undefined,
+      const page = await ipc.fileHistory(worktreeId, {
+        path, allBranches, skip: append && previous ? previous.nextSkip : 0, limit: PAGE_SIZE,
+        anchor: append ? previous?.anchor : allBranches ? undefined : revision ?? undefined,
       });
       if (sequence !== historySeq.current) return;
-      anchorRef.current = page.anchor;
-      setEntries((current) => append ? [...current, ...page.entries] : page.entries);
-      setHasMore(page.hasMore);
-      setNextSkip(page.nextSkip);
-      setSelected((current) =>
-        current && page.entries.some((entry) => entryKey(entry) === current)
-          ? current
-          : (append ? current : page.entries[0] ? entryKey(page.entries[0]) : null),
-      );
-      setError(null);
+      setList({
+        view: listIdentity, loading: false, error: null,
+        page: append && previous ? { ...page, entries: [...previous.entries, ...page.entries] } : page,
+      });
+      if (!append) {
+        setSelected(current => page.entries.some(entry => entryKey(entry) === current)
+          ? current : page.entries[0] ? entryKey(page.entries[0]) : null);
+      }
     } catch (caught) {
-      if (sequence === historySeq.current) setError(errorText(caught));
-    } finally {
-      if (sequence === historySeq.current) setLoading(false);
+      if (sequence === historySeq.current) {
+        setList({ view: listIdentity, page: previous, loading: false, error: toAppError(caught) });
+      }
     }
   };
 
   useEffect(() => {
-    anchorRef.current = null;
-    void load(allBranches, 0, false);
+    void load(false);
+    return () => { ++historySeq.current; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [worktreeId, path, revision, allBranches]);
+  }, [listIdentity]);
+
+  const selectedEntry = entries.find(entry => entryKey(entry) === selected);
+  const patchRequest = useMemo(() => {
+    if (tab !== "history" || !selectedEntry) return null;
+    const { oid, path, oldPath } = selectedEntry;
+    return { oid, path, oldPath };
+  }, [tab, selectedEntry]);
+  const preview = patchResponse?.request === patchRequest ? patchResponse : null;
+
+  useEffect(() => {
+    if (!patchRequest) return;
+    let current = true;
+    void ipc.fileHistoryPatch(worktreeId, patchRequest).then(
+      result => { if (current) setPatchResponse({ request: patchRequest, result }); },
+      caught => { if (current) setPatchResponse({ request: patchRequest, error: toAppError(caught) }); },
+    );
+    return () => { current = false; };
+  }, [worktreeId, patchRequest]);
 
   const runBlame = (revision: string | null, nextPath: string) => {
     ++blameSeq.current;
@@ -122,6 +151,7 @@ export function FileHistoryDialog({
   useEffect(() => {
     const sequence = ++blameSeq.current;
     setBlame(null);
+    setBlameError(null);
     if (!blameTarget || blameTarget.view !== viewIdentity) {
       setBlameLoading(false);
       return;
@@ -141,11 +171,10 @@ export function FileHistoryDialog({
         });
         if (!isCurrent()) return;
         setBlame(result);
-        setError(null);
       } catch (caught) {
         if (isCurrent()) {
           const failure = toAppError(caught);
-          setError(failure);
+          setBlameError(failure);
           onNotify({ tone: "error", title: () => formatAppError(failure) });
         }
       } finally {
@@ -165,7 +194,7 @@ export function FileHistoryDialog({
     runBlame(target.oid, target.path);
   };
 
-  const selectedEntry = entries.find((entry) => entryKey(entry) === selected) ?? null;
+  const error = tab === "history" ? history?.error : activeBlameTarget ? blameError : null;
 
   return (
     <Modal title={messages.fileHistory.title(path)} onClose={onClose} width={960}>
@@ -194,7 +223,7 @@ export function FileHistoryDialog({
             title={messages.fileHistory.refresh}
             onClick={() => {
               if (tab === "blame") void runBlame(blameRevision, blamePath);
-              else void load(allBranches, 0, false);
+              else void load(false);
             }}
           >
             <Codicon name="refresh" size={14} />
@@ -239,12 +268,12 @@ export function FileHistoryDialog({
                   </div>
                 ))}
               </div>
-              {hasMore ? (
+              {history?.page?.hasMore ? (
                 <button
                   type="button"
                   className="border-t border-panel-border py-1 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
                   disabled={loading}
-                  onClick={() => void load(allBranches, nextSkip, true)}
+                  onClick={() => void load(true)}
                 >
                   {loading ? messages.fileHistory.loading : messages.fileHistory.loadMore}
                 </button>
@@ -255,7 +284,7 @@ export function FileHistoryDialog({
                 <>
                   <div className="flex items-center gap-2 border-b border-panel-border px-2 py-1 text-[11.5px]">
                     <span className="truncate font-semibold">{selectedEntry.subject}</span>
-                    {selectedEntry.patchTruncated ? (
+                    {preview?.result?.patchTruncated ? (
                       <span className="text-warningforeground">{messages.fileHistory.patchTruncated}</span>
                     ) : null}
                     <span className="ml-auto flex gap-1">
@@ -268,9 +297,10 @@ export function FileHistoryDialog({
                     </span>
                   </div>
                   <div className="min-h-0 flex-1">
-                    {selectedEntry.patchError ? <p role="alert" className="p-2 text-[11px] text-descriptionforeground">{formatAppError(selectedEntry.patchError)}</p>
-                      : selectedEntry.patch ? <PatchDiffView patch={selectedEntry.patch} path={selectedEntry.path}
-                      identity={`${worktreeId}:${selectedEntry.oid}:${selectedEntry.path}`} />
+                    {!preview ? <p role="status" className="p-2 text-[11px] text-descriptionforeground">{messages.fileHistory.loading}</p>
+                      : preview.error ? <p role="alert" className="p-2 text-[11px] text-descriptionforeground">{formatAppError(preview.error)}</p>
+                      : preview.result?.patch ? <PatchDiffView patch={preview.result.patch} path={selectedEntry.path}
+                        identity={JSON.stringify([worktreeId, selectedEntry.oid, selectedEntry.path])} />
                       : <p className="p-2 text-[11px] text-descriptionforeground">{messages.fileHistory.noPatch}</p>}
                   </div>
                 </>

@@ -10,6 +10,7 @@ use ts_rs::TS;
 
 use crate::error::{AppError, ErrorKind, Result};
 use crate::git::Git;
+use crate::git::history::is_full_oid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -25,13 +26,24 @@ pub struct FileHistoryEntry {
     /// Path at this commit (the new path for a rename).
     pub path: String,
     pub old_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FileHistoryPatchRequest {
+    pub oid: String,
+    pub path: String,
+    pub old_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FileHistoryPatch {
     pub patch: String,
-    /// The patch was cut at the 2 MiB safety cap.
+    // The patch was cut at the 2 MiB safety cap.
     pub patch_truncated: bool,
-    /// A read-only limitation or Git failure, never a lossy replacement patch.
-    #[serde(default)]
-    #[ts(optional)]
-    pub patch_error: Option<crate::error::AppErrorPayload>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -118,8 +130,12 @@ fn short(oid: &str) -> String {
     oid.chars().take(8).collect()
 }
 
-pub fn history(git: &Git, request: &FileHistoryRequest) -> Result<FileHistoryPage> {
-    if request.path.is_empty() || request.path.contains('\0') {
+fn validate_history_path(path: &str) -> Result<()> {
+    if path.contains('\0')
+        || path.split('/').any(|part| matches!(part, "" | "." | ".."))
+        || (cfg!(windows) && path.contains('\\'))
+        || std::path::Path::new(path).components().any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
         return Err(AppError::coded(
             ErrorKind::Rejected,
             "errors.fileHistory.invalidPath",
@@ -127,19 +143,24 @@ pub fn history(git: &Git, request: &FileHistoryRequest) -> Result<FileHistoryPag
             &[],
         ));
     }
+    Ok(())
+}
+
+pub fn history(git: &Git, request: &FileHistoryRequest) -> Result<FileHistoryPage> {
+    validate_history_path(&request.path)?;
     let limit = request.limit.clamp(1, 200);
     let skip = request.skip;
     // Freeze every start commit once. Re-expanding --all on later pages
     // would introduce newly moved branch tips and shift the pagination.
     let mut starts: Vec<String> = if let Some(anchor) = request.anchor.as_deref() {
         let parsed: Vec<String> = serde_json::from_str(anchor).or_else(|_| {
-            if matches!(anchor.len(), 40 | 64) && anchor.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            if is_full_oid(anchor) {
                 Ok(vec![anchor.to_string()])
             } else {
                 Err(<serde_json::Error as serde::de::Error>::custom("invalid history anchor"))
             }
         }).map_err(|_| AppError::coded(ErrorKind::Rejected, "errors.fileHistory.invalidAnchor", "文件历史起点无效，请重新打开", &[]))?;
-        if parsed.iter().any(|oid| !matches!(oid.len(), 40 | 64) || !oid.bytes().all(|byte| byte.is_ascii_hexdigit())) {
+        if parsed.iter().any(|oid| !is_full_oid(oid)) {
             return Err(AppError::coded(ErrorKind::Rejected, "errors.fileHistory.invalidAnchor", "文件历史起点无效，请重新打开", &[]));
         }
         parsed
@@ -178,29 +199,38 @@ pub fn history(git: &Git, request: &FileHistoryRequest) -> Result<FileHistoryPag
     let start = (skip as usize).min(total);
     let end = start.saturating_add(limit as usize).min(total);
     let has_more = end < total;
-    let mut page_entries: Vec<_> = rows.drain(start..end).map(|row| row.0).collect();
-    for entry in &mut page_entries {
-        let mut patch_args = vec![
-            "-c", "core.quotePath=false", "--literal-pathspecs", "show", "--format=", "--no-color",
-            "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/", "--find-renames",
-            &entry.oid, "--", &entry.path,
-        ];
-        if let Some(old) = &entry.old_path { patch_args.push(old); }
-        let patch = (|| -> Result<()> {
-            let output = git.run(&patch_args)?.into_success("读取文件历史差异")?;
-            let (patch, truncated) = crate::git::readonly_patch(&output.stdout, 2 * 1024 * 1024)
-                .ok_or_else(|| AppError::coded(ErrorKind::Rejected,
-                    "errors.fileHistory.patchUnavailable", "该文件差异不是可无损显示的 UTF-8 文本，仅保留历史记录", &[]))?;
-            entry.patch_truncated = truncated;
-            entry.patch = patch;
-            Ok(())
-        })();
-        if let Err(error) = patch { entry.patch_error = Some(error.payload()); }
-    }
+    let page_entries: Vec<_> = rows.drain(start..end).map(|row| row.0).collect();
     Ok(FileHistoryPage {
         next_skip: skip.saturating_add(page_entries.len() as u32), has_more,
         path: request.path.clone(), anchor, entries: page_entries,
     })
+}
+
+pub fn history_patch(git: &Git, request: &FileHistoryPatchRequest) -> Result<FileHistoryPatch> {
+    if !is_full_oid(&request.oid) {
+        return Err(AppError::coded(
+            ErrorKind::Rejected, "errors.history.notFullObjectId", "不是完整的对象 ID：{oid}",
+            &[("oid", request.oid.clone())],
+        ));
+    }
+    validate_history_path(&request.path)?;
+    let commit = format!("{}^{{commit}}", request.oid);
+    let mut args = vec![
+        "-c", "core.quotePath=false", "--literal-pathspecs", "show", "--format=", "--no-color",
+        "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/", "--find-renames",
+        &commit, "--", &request.path,
+    ];
+    if let Some(old_path) = &request.old_path {
+        validate_history_path(old_path)?;
+        args.push(old_path);
+    }
+    let output = git.run_ok(&args, "读取文件历史差异")?;
+    let (patch, patch_truncated) = crate::git::readonly_patch(&output.stdout, 2 * 1024 * 1024)
+        .ok_or_else(|| AppError::coded(
+            ErrorKind::Rejected, "errors.fileHistory.patchUnavailable",
+            "该文件差异不是可无损显示的 UTF-8 文本，仅保留历史记录", &[],
+        ))?;
+    Ok(FileHistoryPatch { patch, patch_truncated })
 }
 
 /// Merge only the exposed heads of fixed Git history streams. Commit dates
@@ -264,7 +294,7 @@ fn history_rows(git: &Git, path: &str, start: &str, max_count: &str) -> Result<V
         // Paths, authors and subjects may themselves contain U+001E. Consume
         // each NUL field by its role before looking for another header.
         let oid = header.trim_start_matches('\n').strip_prefix('\u{1e}')
-            .filter(|oid| matches!(oid.len(), 40 | 64) && oid.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .filter(|oid| is_full_oid(oid))
             .ok_or_else(invalid_history_output)?.to_string();
         let short_oid = fields.next().ok_or_else(invalid_history_output)?.to_string();
         let author = fields.next().ok_or_else(invalid_history_output)?.to_string();
@@ -303,9 +333,6 @@ fn history_rows(git: &Git, path: &str, start: &str, max_count: &str) -> Result<V
             status: file_status,
             path,
             old_path,
-            patch: String::new(),
-            patch_truncated: false,
-            patch_error: None,
         }, commit_time));
         if creation { break; }
     }
