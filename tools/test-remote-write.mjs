@@ -761,7 +761,7 @@ test("Git 命令日志只有状态栏入口，顶栏没有“视图”下拉", (
   assert.match(shell, /messages\.commandLog\.open/);
   const app = readFileSync(new URL("App.tsx", sourceRoot), "utf8");
   assert.doesNotMatch(app, /viewMenu/);
-  assert.match(app, /onOpenCommandLog=\{\(\) => setCommandLogOpen/);
+  assert.match(app, /onOpenCommandLog=\{openCommandLogDrawer\}/);
 });
 
 test("共用写编排的注释指向实际存在的回归文件", () => {

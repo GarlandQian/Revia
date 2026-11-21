@@ -14,7 +14,7 @@ import { ipc } from "@/lib/ipc";
 import { formatAppError, toAppError } from "@/lib/error";
 import { getLocale, messages } from "@/lib/i18n/index";
 import { stashFileStatusText } from "@/lib/i18n/text";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "@/components/app/Dialogs";
 import type { NoticeText } from "@/components/app/Notifications";
 import { PatchDiffView } from "@/features/diff/PatchDiffView";
@@ -240,14 +240,14 @@ export function StashPanel({
   };
 
   if (!worktreeId) {
-    return <p className="px-3 py-2 text-[12px] text-descriptionforeground">{messages.stash.noWorktree}</p>;
+    return <p className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">{messages.stash.noWorktree}</p>;
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b border-panel-border px-2 py-1">
+      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--border-subtle)] px-2 py-1">
         <button type="button" className="icon-action size-[22px]" title={messages.stash.refresh} onClick={() => void load()}>
-          <Codicon name="refresh" size={15} />
+          <AppIcon name="refresh" size={15} />
         </button>
         <span className="flex-1 text-[12px] font-semibold">{messages.stash.title}</span>
         <button
@@ -257,10 +257,10 @@ export function StashPanel({
           disabled={busy || entries.length === 0}
           onClick={() => setConfirmClear(entries.map((entry) => entry.oid))}
         >
-          <Codicon name="clear-all" size={15} />
+          <AppIcon name="clear-all" size={15} />
         </button>
       </div>
-      <div className="shrink-0 space-y-1 border-b border-panel-border p-2">
+      <div className="shrink-0 space-y-1 border-b border-[var(--border-subtle)] p-2">
         <input
           className="settings-input w-full text-[12px]"
           value={message}
@@ -274,13 +274,13 @@ export function StashPanel({
           }}
         />
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[11.5px] text-descriptionforeground">
+          <label className="flex items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)]">
             <input type="checkbox" checked={keepIndex} onChange={(event) => setKeepIndex(event.target.checked)} />
             {messages.stash.keepIndex}
           </label>
           <button
             type="button"
-            className="ml-auto rounded-[4px] bg-[var(--button-background)] px-2.5 py-0.5 text-[12px] text-[var(--button-foreground)] disabled:opacity-50"
+            className="ml-auto rounded-[4px] bg-[var(--accent)] px-2.5 py-0.5 text-[12px] text-[var(--accent-fg)] disabled:opacity-50"
             disabled={busy || !saveState}
             onClick={() => void run(async () => { if (!saveState) return; await onSave(message, keepIndex, saveState); if (mounted.current) setMessage(""); }, () => messages.stash.saved)}
           >
@@ -291,22 +291,22 @@ export function StashPanel({
       {error ? <p role="alert" className="shrink-0 px-2 py-1 text-[11.5px] text-destructive">{formatAppError(error)}</p> : null}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading && entries.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] text-descriptionforeground">{messages.stash.loading}</p>
+          <p className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">{messages.stash.loading}</p>
         ) : entries.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] text-descriptionforeground">{messages.stash.empty}</p>
+          <p className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">{messages.stash.empty}</p>
         ) : (
           entries.map((entry) => {
             const active = entry.key === selected;
             return (
               <div
                 key={entry.key}
-                className={`group flex cursor-default items-start gap-1 px-2 py-1 ${active ? "bg-[var(--list-inactiveselectionbackground)]" : "hover:bg-toolbar-hoverbackground"}`}
+                className={`group flex cursor-default items-start gap-1 px-2 py-1 ${active ? "bg-[var(--surface-active-neutral)]" : "hover:bg-[var(--surface-hover)]"}`}
                 onClick={() => setSelected(entry.key)}
               >
-                <Codicon name="archive" size={14} className="mt-0.5 shrink-0" />
+                <AppIcon name="archive" size={14} className="mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[12px]" title={entry.message}>{entry.message}</p>
-                  <p className="truncate text-[11px] text-descriptionforeground">
+                  <p className="truncate text-[11px] text-[var(--text-secondary)]">
                     {entry.branch ? `${entry.branch} · ` : ""}{new Date(entry.timeMs).toLocaleString(getLocale())}
                   </p>
                 </div>
@@ -330,7 +330,7 @@ export function StashPanel({
                       setNewBranch("");
                     }}
                   >
-                    <Codicon name="check" size={13} />
+                    <AppIcon name="check" size={13} />
                   </button>
                   <button
                     type="button"
@@ -342,7 +342,7 @@ export function StashPanel({
                       setConfirmDrop(entry);
                     }}
                   >
-                    <Codicon name="trash" size={13} />
+                    <AppIcon name="trash" size={13} />
                   </button>
                 </div>
               </div>
@@ -350,54 +350,54 @@ export function StashPanel({
           })
         )}
         {inspection ? (
-          <div className="border-t border-panel-border p-2">
-            <label className="mb-1 flex items-center gap-1.5 text-[11px] text-descriptionforeground">
+          <div className="border-t border-[var(--border-subtle)] p-2">
+            <label className="mb-1 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
               <input type="checkbox" checked={compareLocal} onChange={(event) => {
                 void onCompareLocal(event.target.checked).then((failure) => { if (failure && mounted.current) setError(failure); });
               }} />
               {messages.stash.compareLocal}
             </label>
-            <div className="mb-1 flex items-center gap-1 text-[11px] text-descriptionforeground">
+            <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
               <span>{messages.stash.files(inspection.files.length)}</span>
               {inspection.truncated ? <span>· {messages.stash.truncated}</span> : null}
             </div>
             <ul className="max-h-28 overflow-y-auto">
               {inspection.files.map((file) => (
                 <li key={file.path} className="flex items-center gap-1 text-[11px]">
-                  <span className="shrink-0 text-descriptionforeground">{stashFileStatusText(file.status)}</span>
+                  <span className="shrink-0 text-[var(--text-secondary)]">{stashFileStatusText(file.status)}</span>
                   <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>{file.path}</span>
-                  <span className="shrink-0 tabular-nums text-descriptionforeground">+{file.added} −{file.deleted}</span>
+                  <span className="shrink-0 tabular-nums text-[var(--text-secondary)]">+{file.added} −{file.deleted}</span>
                 </li>
               ))}
             </ul>
-            <div className="mt-1 h-56 min-h-0 rounded border border-panel-border">
-              {inspection.patchError ? <p role="alert" className="p-2 text-[11px] text-descriptionforeground">{formatAppError(inspection.patchError)}</p>
+            <div className="mt-1 h-56 min-h-0 rounded border border-[var(--border-subtle)]">
+              {inspection.patchError ? <p role="alert" className="p-2 text-[11px] text-[var(--text-secondary)]">{formatAppError(inspection.patchError)}</p>
                 : <PatchDiffView patch={inspection.patch} path={inspection.entry.message}
                   identity={`${worktreeId}:${inspection.entry.oid}:${compareLocal}`} fontSize={10.5} />}
             </div>
           </div>
         ) : null}
       </div>
-      <div className="shrink-0 border-t border-panel-border">
+      <div className="shrink-0 border-t border-[var(--border-subtle)]">
         <button
           type="button"
-          className="flex w-full items-center gap-1 px-2 py-1 text-left text-[12px] hover:bg-toolbar-hoverbackground"
+          className="flex w-full items-center gap-1 px-2 py-1 text-left text-[12px] hover:bg-[var(--surface-hover)]"
           onClick={() => setArchivesOpen((value) => !value)}
         >
-          <Codicon name={archivesOpen ? "chevron-down" : "chevron-right"} size={12} />
+          <AppIcon name={archivesOpen ? "chevron-down" : "chevron-right"} size={12} />
           {messages.stash.archives(ownArchives.length)}
         </button>
         {archivesOpen ? (
           ownArchives.length === 0 ? (
-            <p className="px-4 pb-2 text-[11.5px] text-descriptionforeground">{messages.stash.archiveEmpty}</p>
+            <p className="px-4 pb-2 text-[11.5px] text-[var(--text-secondary)]">{messages.stash.archiveEmpty}</p>
           ) : (
             <ul ref={archiveListRef} className="max-h-40 overflow-y-auto pb-1">
               {ownArchives.map((archive) => (
                 <li key={archive.id} aria-current={archive.id === focusedArchive ? "true" : undefined}
-                  className={`flex items-center gap-1 px-2 py-0.5 text-[11.5px] ${archive.id === focusedArchive ? "bg-[var(--list-inactiveselectionbackground)]" : "hover:bg-toolbar-hoverbackground"}`}>
+                  className={`flex items-center gap-1 px-2 py-0.5 text-[11.5px] ${archive.id === focusedArchive ? "bg-[var(--surface-active-neutral)]" : "hover:bg-[var(--surface-hover)]"}`}>
                   <div className="min-w-0 flex-1">
                     <p className="truncate" title={archive.message}>{archive.message}</p>
-                    <p className="truncate text-[10.5px] text-descriptionforeground">
+                    <p className="truncate text-[10.5px] text-[var(--text-secondary)]">
                       {new Date(archive.createdAtMs).toLocaleString(getLocale())} · {messages.stash.expires(new Date(archive.expiresAtMs).toLocaleDateString(getLocale()))}
                     </p>
                   </div>
@@ -408,7 +408,7 @@ export function StashPanel({
                     disabled={busy || !archive.identityConfirmed}
                     onClick={() => setConfirmArchive(archive)}
                   >
-                    <Codicon name="history" size={13} />
+                    <AppIcon name="history" size={13} />
                   </button>
                 </li>
               ))}
@@ -420,16 +420,16 @@ export function StashPanel({
           <>
             <button
               type="button"
-              className="flex w-full items-center gap-1 px-4 py-0.5 text-left text-[11.5px] text-descriptionforeground hover:bg-toolbar-hoverbackground"
+              className="flex w-full items-center gap-1 px-4 py-0.5 text-left text-[11.5px] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
               onClick={() => setOtherArchivesOpen((value) => !value)}
             >
-              <Codicon name={otherArchivesOpen ? "chevron-down" : "chevron-right"} size={12} />
+              <AppIcon name={otherArchivesOpen ? "chevron-down" : "chevron-right"} size={12} />
               {messages.stash.otherArchives(otherArchives.length)}
             </button>
             {otherArchivesOpen ? (
               <ul className="max-h-32 overflow-y-auto pb-1">
                 {otherArchives.map((archive) => (
-                  <li key={archive.id} className="px-6 py-0.5 text-[11.5px] text-descriptionforeground">
+                  <li key={archive.id} className="px-6 py-0.5 text-[11.5px] text-[var(--text-secondary)]">
                     <p className="truncate" title={archive.message}>{archive.message}</p>
                     <p className="truncate text-[10.5px]" title={archive.worktreePath}>
                       {archive.worktreePath} · {messages.stash.expires(new Date(archive.expiresAtMs).toLocaleDateString(getLocale()))}
@@ -450,7 +450,7 @@ export function StashPanel({
               <input type="checkbox" className="mt-0.5" checked={restoreIndex} onChange={(event) => setRestoreIndex(event.target.checked)} />
               <span>
                 <span className="block">{messages.stash.restoreIndex}</span>
-                <span className="block text-[11.5px] text-descriptionforeground">{messages.stash.restoreIndexHint}</span>
+                <span className="block text-[11.5px] text-[var(--text-secondary)]">{messages.stash.restoreIndexHint}</span>
               </span>
             </label>
             <label className="flex items-start gap-2 text-[12.5px]">
@@ -467,15 +467,15 @@ export function StashPanel({
                 onChange={(event) => setNewBranch(event.target.value)}
               />
             </label>
-            <p className="text-[11.5px] text-descriptionforeground">{messages.stash.applyConflictHint}</p>
+            <p className="text-[11.5px] text-[var(--text-secondary)]">{messages.stash.applyConflictHint}</p>
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1" onClick={() => setApplyTarget(null)}>
+            <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1" onClick={() => setApplyTarget(null)}>
               {messages.stash.cancel}
             </button>
             <button
               type="button"
-              className="rounded-[4px] bg-[var(--button-background)] px-3 py-1 text-[var(--button-foreground)] disabled:opacity-50"
+              className="rounded-[4px] bg-[var(--accent)] px-3 py-1 text-[var(--accent-fg)] disabled:opacity-50"
               disabled={busy}
               onClick={() => {
                 const entry = applyTarget;
@@ -509,10 +509,10 @@ export function StashPanel({
       {confirmDrop ? (
         <Modal title={messages.stash.drop} onClose={() => setConfirmDrop(null)} width={460}>
           <p>{messages.stash.dropConfirm}</p>
-          <p className="mt-1 truncate font-mono text-[11.5px] text-descriptionforeground">{confirmDrop.message}</p>
-          <p className="mt-2 text-[12px] text-descriptionforeground">{messages.stash.dropSafety}</p>
+          <p className="mt-1 truncate font-mono text-[11.5px] text-[var(--text-secondary)]">{confirmDrop.message}</p>
+          <p className="mt-2 text-[12px] text-[var(--text-secondary)]">{messages.stash.dropSafety}</p>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1" onClick={() => setConfirmDrop(null)}>
+            <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1" onClick={() => setConfirmDrop(null)}>
               {messages.stash.cancel}
             </button>
             <button
@@ -535,9 +535,9 @@ export function StashPanel({
       {confirmClear ? (
         <Modal title={messages.stash.clear} onClose={() => setConfirmClear(null)} width={460}>
           <p>{messages.stash.clearConfirm(confirmClear.length)}</p>
-          <p className="mt-2 text-[12px] text-descriptionforeground">{messages.stash.dropSafety}</p>
+          <p className="mt-2 text-[12px] text-[var(--text-secondary)]">{messages.stash.dropSafety}</p>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1" onClick={() => setConfirmClear(null)}>
+            <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1" onClick={() => setConfirmClear(null)}>
               {messages.stash.cancel}
             </button>
             <button
@@ -560,15 +560,15 @@ export function StashPanel({
       {confirmArchive ? (
         <Modal title={messages.stash.restoreArchive} onClose={() => setConfirmArchive(null)} width={460}>
           <p>{messages.stash.restoreArchiveConfirm}</p>
-          <p className="mt-1 truncate font-mono text-[11.5px] text-descriptionforeground">{confirmArchive.message}</p>
-          <p className="mt-2 text-[12px] text-descriptionforeground">{messages.stash.restoreArchiveHint}</p>
+          <p className="mt-1 truncate font-mono text-[11.5px] text-[var(--text-secondary)]">{confirmArchive.message}</p>
+          <p className="mt-2 text-[12px] text-[var(--text-secondary)]">{messages.stash.restoreArchiveHint}</p>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1" onClick={() => setConfirmArchive(null)}>
+            <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1" onClick={() => setConfirmArchive(null)}>
               {messages.stash.cancel}
             </button>
             <button
               type="button"
-              className="rounded-[4px] bg-[var(--button-background)] px-3 py-1 text-[var(--button-foreground)] disabled:opacity-50"
+              className="rounded-[4px] bg-[var(--accent)] px-3 py-1 text-[var(--accent-fg)] disabled:opacity-50"
               disabled={busy || !confirmState}
               onClick={() => {
                 if (!confirmState) return;

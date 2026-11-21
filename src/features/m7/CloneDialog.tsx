@@ -9,13 +9,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { CloneFinished } from "@/types/bindings/CloneFinished";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
-import { Codicon } from "@/components/ui/codicon";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { AppIcon } from "@/components/ui/app-icon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7, onM7Events } from "@/lib/m7/api";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { useModalDialog } from "@/features/m7/glass/nativeGlass";
+import { useModalDialog } from "@/hooks/useDialogOpen";
 
 export interface CloneDialogProps {
   open: boolean;
@@ -120,13 +119,12 @@ export function CloneDialog({ open, onClose, onRegistered }: CloneDialogProps) {
   const busy = phase === "running";
 
   return (
-    <dialog ref={ref} className="app-dialog glass-isolate flex max-h-[80vh] w-[min(640px,calc(100vw-48px))] flex-col overflow-hidden p-0 text-[13px]" onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}>
-      <GlassLayer variant="popover" />
-      <div className="flex h-9 items-center gap-2 border-b border-panel-border px-3 text-[13px] font-semibold">
-        <Codicon name="cloud-download" size={15} />
+    <dialog ref={ref} className="app-dialog flex max-h-[80vh] w-[min(640px,calc(100vw-48px))] flex-col overflow-hidden p-0 text-[13px]" onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}>
+      <div className="flex h-11 items-center gap-2 border-b border-[var(--border-subtle)] px-4 text-[13.5px] font-semibold">
+        <AppIcon name="cloud-download" size={15} />
         {t("clone.title")}
         <button type="button" className="icon-action ml-auto size-[22px]" aria-label={t("common.close")} onClick={onClose} disabled={busy}>
-          <Codicon name="close" size={14} />
+          <AppIcon name="close" size={14} />
         </button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 text-[12.5px]">
@@ -152,24 +150,24 @@ export function CloneDialog({ open, onClose, onRegistered }: CloneDialogProps) {
               onChange={(event) => setTarget(event.target.value)}
               disabled={busy}
             />
-            <button type="button" className="toolbar-widget h-7 px-2" onClick={() => void pickTarget()} disabled={busy}>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-2" onClick={() => void pickTarget()} disabled={busy}>
               {t("clone.pickTarget")}
             </button>
           </div>
-          <span className="mt-1 block text-[11.5px] text-descriptionforeground">{t("clone.targetHint")}</span>
+          <span className="mt-1 block text-[11.5px] text-[var(--text-secondary)]">{t("clone.targetHint")}</span>
         </label>
-        <button type="button" className="flex items-center gap-1 text-left text-[12px] text-descriptionforeground" onClick={() => setAdvanced(!advanced)}>
-          <Codicon name={advanced ? "chevron-down" : "chevron-right"} size={12} />
+        <button type="button" className="flex items-center gap-1 text-left text-[12px] text-[var(--text-secondary)]" onClick={() => setAdvanced(!advanced)}>
+          <AppIcon name={advanced ? "chevron-down" : "chevron-right"} size={12} />
           {t("clone.advanced")}
         </button>
         {advanced ? (
-          <div className="space-y-3 rounded border border-panel-border p-3">
+          <div className="space-y-3 rounded border border-[var(--border-subtle)] p-3">
             <label className="block">
               <span className="mb-1 block font-semibold">{t("clone.branch")}</span>
               <input className="settings-input w-full" value={branch} spellCheck={false} placeholder={t("clone.branchPlaceholder")} onChange={(event) => setBranch(event.target.value)} disabled={busy} />
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" className="accent-[var(--focusborder)]" checked={shallow} onChange={(event) => setShallow(event.target.checked)} disabled={busy} />
+              <input type="checkbox" className="accent-[var(--accent)]" checked={shallow} onChange={(event) => setShallow(event.target.checked)} disabled={busy} />
               {t("clone.shallow")}
             </label>
             {shallow ? (
@@ -179,21 +177,21 @@ export function CloneDialog({ open, onClose, onRegistered }: CloneDialogProps) {
               </label>
             ) : null}
             <label className="flex items-center gap-2">
-              <input type="checkbox" className="accent-[var(--focusborder)]" checked={submodules} onChange={(event) => setSubmodules(event.target.checked)} disabled={busy} />
+              <input type="checkbox" className="accent-[var(--accent)]" checked={submodules} onChange={(event) => setSubmodules(event.target.checked)} disabled={busy} />
               {t("clone.submodules")}
             </label>
           </div>
         ) : null}
 
         {error ? (
-          <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1">
+          <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] px-2 py-1">
             {formatAppError(error)}
           </p>
         ) : null}
 
         {phase !== "form" ? (
           <div className="space-y-2">
-            <p className="text-[12px] text-descriptionforeground">
+            <p className="text-[12px] text-[var(--text-secondary)]">
               {phase === "running"
                 ? t("clone.running", { target: result?.target ?? target })
                 : phase === "finished"
@@ -203,25 +201,25 @@ export function CloneDialog({ open, onClose, onRegistered }: CloneDialogProps) {
                     : t("clone.failed", { target: result?.target ?? target })}
             </p>
             {phase !== "finished" && phase !== "running" && result?.message ? (
-              <pre className="max-h-40 overflow-auto rounded border border-panel-border bg-[var(--side-bar-background)] p-2 text-[11.5px] whitespace-pre-wrap">{result.message}</pre>
+              <pre className="max-h-40 overflow-auto rounded border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2 text-[11.5px] whitespace-pre-wrap">{result.message}</pre>
             ) : null}
-            <pre ref={logRef} className="max-h-48 overflow-auto rounded border border-panel-border bg-[var(--side-bar-background)] p-2 text-[11.5px] whitespace-pre-wrap">{lines.join("\n")}</pre>
+            <pre ref={logRef} className="max-h-48 overflow-auto rounded border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2 text-[11.5px] whitespace-pre-wrap">{lines.join("\n")}</pre>
           </div>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-panel-border px-3 py-2">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-3 py-2">
         {busy ? (
-          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => void cancel()}>
+          <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => void cancel()}>
             {t("clone.cancel")}
           </button>
         ) : (
-          <button type="button" className="toolbar-widget h-7 px-3" onClick={onClose}>
+          <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={onClose}>
             {t("common.close")}
           </button>
         )}
         <button
           type="button"
-          className="toolbar-widget h-7 px-3 font-semibold"
+          className="revia-btn revia-btn-secondary h-7 px-3 font-semibold"
           disabled={busy || url.trim().length === 0 || target.trim().length === 0}
           onClick={() => void start()}
         >

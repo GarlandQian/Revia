@@ -21,7 +21,7 @@ import type { PullRequestSummary } from "@/types/bindings/PullRequestSummary";
 import type { RateLimit } from "@/types/bindings/RateLimit";
 import type { RemoteInfo } from "@/types/bindings/RemoteInfo";
 import type { ReviewEvent } from "@/types/bindings/ReviewEvent";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7, type PrCheckoutPayload } from "@/lib/m7/api";
@@ -481,61 +481,63 @@ export function GithubPanel({
   }, [detail, protection]);
 
   return (
-    <div className="github-panel absolute inset-0 z-20 flex flex-col bg-[var(--editor-background)]">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-panel-border px-3 text-[12.5px]">
-        <Codicon name="github" size={15} />
+    <div className="github-panel flex h-full min-h-0 flex-col bg-[var(--surface-bg)]">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3.5 text-[12.5px]">
+        <AppIcon name="git-pull-request" size={15} className="text-[var(--git-a)]" />
         <span className="shrink-0 font-semibold whitespace-nowrap">{t("github.title")}</span>
-        <span className="min-w-0 truncate text-descriptionforeground" title={worktreePath}>{worktreePath}</span>
-        {login ? <span className="shrink-0 text-descriptionforeground">{t("github.account", { login })}</span> : null}
+        <span className="min-w-0 truncate text-[12px] text-[var(--text-muted)]" title={worktreePath}>{worktreePath}</span>
+        {login ? <span className="shrink-0 text-[12px] text-[var(--text-secondary)]">{t("github.account", { login })}</span> : null}
         {rateLimit && rateLimit.remaining !== null ? (
-          <span className="shrink-0 text-descriptionforeground">{t("github.rateLimit", { remaining: rateLimit.remaining })}</span>
+          <span className="shrink-0 text-[11.5px] text-[var(--text-muted)]">{t("github.rateLimit", { remaining: rateLimit.remaining })}</span>
         ) : null}
-        <div className="ml-auto flex items-center gap-1">
-          <button type="button" className={`toolbar-widget h-6 px-2 ${tab === "pulls" ? "is-active" : ""}`} onClick={() => setTab("pulls")}>
-            {t("github.tabPulls")}
-          </button>
-          <button type="button" className={`toolbar-widget h-6 px-2 ${tab === "create" ? "is-active" : ""}`} onClick={() => setTab("create")}>
-            {t("github.tabCreate")}
-          </button>
-          <button type="button" className={`toolbar-widget h-6 px-2 ${tab === "receipts" ? "is-active" : ""}`} onClick={() => setTab("receipts")}>
-            {t("github.tabReceipts")}
-          </button>
-          <button type="button" className="icon-action size-[22px]" aria-label={t("common.close")} onClick={onClose}>
-            <Codicon name="close" size={14} />
+        <div className="ml-auto flex items-center gap-1.5">
+          <div className="seg-switch">
+            <button type="button" aria-pressed={tab === "pulls"} onClick={() => setTab("pulls")}>
+              {t("github.tabPulls")}
+            </button>
+            <button type="button" aria-pressed={tab === "create"} onClick={() => setTab("create")}>
+              {t("github.tabCreate")}
+            </button>
+            <button type="button" aria-pressed={tab === "receipts"} onClick={() => setTab("receipts")}>
+              {t("github.tabReceipts")}
+            </button>
+          </div>
+          <button type="button" className="mini-icon-btn" aria-label={t("common.close")} onClick={onClose}>
+            <AppIcon name="close" size={13} />
           </button>
         </div>
       </div>
 
       {error ? (
-        <div role="alert" className="flex items-start gap-2 border-b border-panel-border bg-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_10%,var(--editor-background))] px-3 py-2 text-[12px]">
+        <div role="alert" className="flex items-start gap-2 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--editor-background))] px-3 py-2 text-[12px]">
           <span className="min-w-0 flex-1 whitespace-pre-wrap">{formatAppError(error)}</span>
           <button type="button" className="icon-action size-5" aria-label={t("common.dismiss")} onClick={() => setError(null)}>
-            <Codicon name="close" size={12} />
+            <AppIcon name="close" size={12} />
           </button>
         </div>
       ) : null}
       {notice ? (
-        <div className="flex items-start gap-2 border-b border-panel-border bg-[var(--side-bar-background)] px-3 py-2 text-[12px]">
+        <div className="flex items-start gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-[12px]">
           <span className="min-w-0 flex-1 whitespace-pre-wrap">{notice}</span>
           <button type="button" className="icon-action size-5" aria-label={t("common.dismiss")} onClick={() => setNotice(null)}>
-            <Codicon name="close" size={12} />
+            <AppIcon name="close" size={12} />
           </button>
         </div>
       ) : null}
 
       {login && remote ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-panel-border px-3 py-1 text-[12px]">
-          <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void syncProtection()}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1 text-[12px]">
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" onClick={() => void syncProtection()}>
             {t("github.syncProtection")}
           </button>
-          <span className="text-descriptionforeground">{protectionSourceText(protection?.source ?? "unknown")}</span>
+          <span className="text-[var(--text-secondary)]">{protectionSourceText(protection?.source ?? "unknown")}</span>
         </div>
       ) : null}
 
       {status && status.accounts.length === 0 ? (
         <div className="mx-auto mt-10 w-[520px] space-y-3 text-[12.5px]">
           <h2 className="text-[14px] font-semibold">{t("github.loginTitle")}</h2>
-          <p className="text-descriptionforeground">{t("github.loginHint")}</p>
+          <p className="text-[var(--text-secondary)]">{t("github.loginHint")}</p>
           {status.deviceFlowConfigured ? (
             <GithubDeviceLogin
               key={worktreeId}
@@ -547,9 +549,9 @@ export function GithubPanel({
               }}
             />
           ) : (
-            <p className="text-descriptionforeground">{t("github.deviceUnconfigured")}</p>
+            <p className="text-[var(--text-secondary)]">{t("github.deviceUnconfigured")}</p>
           )}
-          <div className="space-y-2 rounded border border-panel-border p-3">
+          <div className="space-y-2 rounded border border-[var(--border-subtle)] p-3">
             <p className="font-semibold">{t("github.tokenTitle")}</p>
             <input
               className="settings-input w-full"
@@ -559,15 +561,15 @@ export function GithubPanel({
               placeholder={t("github.tokenPlaceholder")}
               onChange={(event) => setToken(event.target.value)}
             />
-            <button type="button" className="toolbar-widget h-7 px-3" disabled={tokenBusy || deviceBusy || token.trim().length === 0} onClick={() => void loginWithToken()}>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" disabled={tokenBusy || deviceBusy || token.trim().length === 0} onClick={() => void loginWithToken()}>
               {t("github.tokenLogin")}
             </button>
           </div>
         </div>
       ) : tab === "pulls" ? (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,34%)_1fr] divide-x divide-panel-border">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,34%)_1fr] divide-x divide-[var(--border-subtle)]">
           <div className="flex min-h-0 flex-col">
-            <div className="flex h-8 shrink-0 items-center gap-1 border-b border-panel-border px-2 text-[12px]">
+            <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--border-subtle)] px-2 text-[12px]">
               <select
                 className="settings-select h-6 w-auto min-w-0 flex-1"
                 value={remote ?? ""}
@@ -588,30 +590,30 @@ export function GithubPanel({
                 <option value="all">{t("github.filterAll")}</option>
               </select>
               <button type="button" className="icon-action size-[22px]" aria-label={t("common.refresh")} onClick={() => void loadList(1)}>
-                <Codicon name="refresh" size={13} />
+                <AppIcon name="refresh" size={13} />
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {busy === "list" && items.length === 0 ? (
-                <p className="p-3 text-[12px] text-descriptionforeground">{t("common.loading")}</p>
+                <p className="p-3 text-[12px] text-[var(--text-secondary)]">{t("common.loading")}</p>
               ) : items.length === 0 ? (
-                <p className="p-3 text-[12px] text-descriptionforeground">{t("github.empty")}</p>
+                <p className="p-3 text-[12px] text-[var(--text-secondary)]">{t("github.empty")}</p>
               ) : (
                 items.map((item) => (
                   <button
                     key={item.number}
                     type="button"
                     onClick={() => void openDetail(item)}
-                    className={`block w-full border-b border-panel-border px-2 py-1.5 text-left text-[12px] ${
-                      selected?.number === item.number ? "bg-[var(--list-activeSelectionBackground)] text-[var(--list-activeSelectionForeground)]" : "hover:bg-[var(--list-hoverBackground)]"
+                    className={`block w-full border-b border-[var(--border-subtle)] px-2 py-1.5 text-left text-[12px] ${
+                      selected?.number === item.number ? "bg-[var(--surface-active)] text-[var(--text-primary)]" : "hover:bg-[var(--surface-hover)]"
                     }`}
                   >
                     <div className="flex items-center gap-1">
-                      <span className="shrink-0 text-descriptionforeground">#{item.number}</span>
+                      <span className="shrink-0 text-[var(--text-secondary)]">#{item.number}</span>
                       <span className="truncate font-semibold">{item.title}</span>
-                      {item.draft ? <span className="shrink-0 text-descriptionforeground">{t("github.draftBadge")}</span> : null}
+                      {item.draft ? <span className="shrink-0 text-[var(--text-secondary)]">{t("github.draftBadge")}</span> : null}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-descriptionforeground">
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
                       <span className="truncate">{item.author}</span>
                       <span>{item.headRef} → {item.baseRef}</span>
                       <span className="ml-auto shrink-0">+{item.additions} −{item.deletions}</span>
@@ -620,12 +622,12 @@ export function GithubPanel({
                 ))
               )}
             </div>
-            <div className="flex h-8 shrink-0 items-center justify-between border-t border-panel-border px-2 text-[11.5px]">
-              <button type="button" className="toolbar-widget h-6 px-2" disabled={page <= 1 || busy !== null} onClick={() => void loadList(page - 1)}>
+            <div className="flex h-8 shrink-0 items-center justify-between border-t border-[var(--border-subtle)] px-2 text-[11.5px]">
+              <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={page <= 1 || busy !== null} onClick={() => void loadList(page - 1)}>
                 {t("github.prevPage")}
               </button>
-              <span className="text-descriptionforeground">{t("github.page", { page })}</span>
-              <button type="button" className="toolbar-widget h-6 px-2" disabled={!hasMore || busy !== null} onClick={() => void loadList(page + 1)}>
+              <span className="text-[var(--text-secondary)]">{t("github.page", { page })}</span>
+              <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={!hasMore || busy !== null} onClick={() => void loadList(page + 1)}>
                 {t("github.nextPage")}
               </button>
             </div>
@@ -633,16 +635,16 @@ export function GithubPanel({
 
           <div className="min-h-0 overflow-y-auto">
             {selected === null ? (
-              <p className="p-4 text-[12px] text-descriptionforeground">{t("github.pickOne")}</p>
+              <p className="p-4 text-[12px] text-[var(--text-secondary)]">{t("github.pickOne")}</p>
             ) : detail === null ? (
-              <p className="p-4 text-[12px] text-descriptionforeground">{t("common.loading")}</p>
+              <p className="p-4 text-[12px] text-[var(--text-secondary)]">{t("common.loading")}</p>
             ) : (
               <div className="space-y-4 p-3 text-[12px]">
                 <header className="space-y-1">
                   <h2 className="text-[14px] font-semibold">
                     #{detail.summary.number} {detail.summary.title}
                   </h2>
-                  <p className="text-descriptionforeground">
+                  <p className="text-[var(--text-secondary)]">
                     {t("github.detailMeta", {
                       author: detail.summary.author,
                       state: detail.summary.state,
@@ -650,34 +652,34 @@ export function GithubPanel({
                       files: detail.summary.changedFiles,
                     })}
                   </p>
-                  <p className="text-descriptionforeground">
+                  <p className="text-[var(--text-secondary)]">
                     {detail.summary.headRef} → {detail.summary.baseRef} · {detail.summary.headSha.slice(0, 8)}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     {protection ? (
-                      <span className={`rounded px-1.5 py-0.5 ${protection.protected ? "bg-[color-mix(in_srgb,var(--gitdecoration-modifiedresourceforeground)_18%,transparent)]" : "bg-[var(--side-bar-background)]"}`}>
+                      <span className={`rounded px-1.5 py-0.5 ${protection.protected ? "bg-[color-mix(in_srgb,var(--git-m)_18%,transparent)]" : "bg-[var(--surface-subtle)]"}`}>
                         {protection.source === "unknown" ? protectionSourceText(protection.source) : <>
                           {protection.protected ? t("github.protected", { branch: protection.branch }) : t("github.notProtected", { branch: protection.branch })}
                           {protection.source === "stale" ? <span className="ml-1">{protectionSourceText(protection.source)}</span> : null}
                         </>}
                       </span>
                     ) : null}
-                    <span className="text-descriptionforeground">
+                    <span className="text-[var(--text-secondary)]">
                       {t("github.mergeable", { state: detail.mergeableState, checks: detail.checksState || t("github.checksNone") })}
                     </span>
-                    <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null} onClick={() => void checkout()}>
+                    <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={busy !== null} onClick={() => void checkout()}>
                       {t("github.checkout")}
                     </button>
                   </div>
                 </header>
 
                 {detail.body.trim().length > 0 ? (
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-panel-border bg-[var(--side-bar-background)] p-2">{detail.body}</pre>
+                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2">{detail.body}</pre>
                 ) : null}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="toolbar-widget h-6 px-2"
+                    className="revia-btn revia-btn-secondary h-6 px-2"
                     disabled={busy !== null}
                     onClick={() => {
                       // F19：完整 diff 走 GitHub diff 媒体类型，不受 files 补丁裁剪影响。
@@ -688,24 +690,24 @@ export function GithubPanel({
                   </button>
                 </div>
                 {fullDiff !== null ? (
-                  <pre className="max-h-96 overflow-auto rounded border border-panel-border bg-[var(--editor-background)] p-2 font-mono text-[11.5px]">{fullDiff}</pre>
+                  <pre className="max-h-96 overflow-auto rounded border border-[var(--border-subtle)] bg-[var(--editor-background)] p-2 font-mono text-[11.5px]">{fullDiff}</pre>
                 ) : null}
 
                 <section className="space-y-1">
                   <h3 className="font-semibold">{t("github.files", { count: files.length })}</h3>
                   {files.map((file) => (
-                    <div key={file.filename} className="rounded border border-panel-border">
+                    <div key={file.filename} className="rounded border border-[var(--border-subtle)]">
                       <button
                         type="button"
                         className="flex w-full items-center gap-2 px-2 py-1 text-left"
                         onClick={() => setExpanded(expanded === file.filename ? null : file.filename)}
                       >
-                        <Codicon name={expanded === file.filename ? "chevron-down" : "chevron-right"} size={12} />
+                        <AppIcon name={expanded === file.filename ? "chevron-down" : "chevron-right"} size={12} />
                         <span className="truncate font-mono text-[11.5px]">{file.filename}</span>
-                        <span className="ml-auto shrink-0 text-descriptionforeground">+{file.additions} −{file.deletions}</span>
+                        <span className="ml-auto shrink-0 text-[var(--text-secondary)]">+{file.additions} −{file.deletions}</span>
                       </button>
                       {expanded === file.filename ? (
-                        <div className="border-t border-panel-border">
+                        <div className="border-t border-[var(--border-subtle)]">
                           {file.patch ? (
                             <pre className="max-h-72 overflow-auto bg-[var(--editor-background)] p-2 font-mono text-[11.5px]">
                               {patchLines(file.patch).map((line, index) => (
@@ -720,11 +722,11 @@ export function GithubPanel({
                               ))}
                             </pre>
                           ) : (
-                            <p className="p-2 text-descriptionforeground">{t("github.patchTooLarge")}</p>
+                            <p className="p-2 text-[var(--text-secondary)]">{t("github.patchTooLarge")}</p>
                           )}
                           <button
                             type="button"
-                            className="toolbar-widget m-2 h-6 px-2"
+                            className="revia-btn revia-btn-secondary m-2 h-6 px-2"
                             onClick={() => {
                               setDraftPath(file.filename);
                               setDraftLine("1");
@@ -740,10 +742,10 @@ export function GithubPanel({
 
                 <section className="space-y-2">
                   <h3 className="font-semibold">{t("github.comments", { count: comments.length })}</h3>
-                  {comments.length === 0 ? <p className="text-descriptionforeground">{t("github.noComments")}</p> : null}
+                  {comments.length === 0 ? <p className="text-[var(--text-secondary)]">{t("github.noComments")}</p> : null}
                   {comments.map((comment) => (
-                    <div key={comment.id} className="rounded border border-panel-border p-2">
-                      <p className="text-[11.5px] text-descriptionforeground">
+                    <div key={comment.id} className="rounded border border-[var(--border-subtle)] p-2">
+                      <p className="text-[11.5px] text-[var(--text-secondary)]">
                         {comment.author} · {comment.createdAt}
                         {comment.path ? ` · ${comment.path}${comment.line ? `:${comment.line}` : ""}` : ""}
                       </p>
@@ -756,27 +758,27 @@ export function GithubPanel({
                     placeholder={t("github.commentPlaceholder")}
                     onChange={(event) => setCommentBody(event.target.value)}
                   />
-                  <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || !reviewSession || error?.kind === "needsVerification" || commentBody.trim().length === 0} onClick={() => void submitComment()}>
+                  <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={busy !== null || !reviewSession || error?.kind === "needsVerification" || commentBody.trim().length === 0} onClick={() => void submitComment()}>
                     {t("github.commentSend")}
                   </button>
                 </section>
 
-                <section className="space-y-2 rounded border border-panel-border p-2">
+                <section className="space-y-2 rounded border border-[var(--border-subtle)] p-2">
                   <h3 className="font-semibold">{t("github.reviewTitle")}</h3>
-                  <p className="text-descriptionforeground">{t("github.reviewHint")}</p>
+                  <p className="text-[var(--text-secondary)]">{t("github.reviewHint")}</p>
                   {reviewState?.error ? <p role="alert">{formatAppError(toAppError(reviewState.error))}</p> : null}
-                  {reviewState && reviewState.older.length > 0 ? <details className="rounded border border-panel-border p-2">
+                  {reviewState && reviewState.older.length > 0 ? <details className="rounded border border-[var(--border-subtle)] p-2">
                     <summary>{t("github.olderDrafts")}</summary>
                     {reviewState.older.filter((draft) => draft.body.length > 0).map((draft) => <div key={draft.id} className="mt-2">
                       <p className="font-mono text-[11px]">{draft.headSha?.slice(0, 8)} {draft.path}</p>
                       <pre className="select-text whitespace-pre-wrap">{draft.body}</pre>
                     </div>)}
                   </details> : null}
-                  {drafts.length === 0 ? <p className="text-descriptionforeground">{t("github.noDrafts")}</p> : null}
+                  {drafts.length === 0 ? <p className="text-[var(--text-secondary)]">{t("github.noDrafts")}</p> : null}
                   {drafts.map((draft) => (
-                    <div key={draft.id} className="flex items-start gap-2 rounded bg-[var(--side-bar-background)] p-2">
+                    <div key={draft.id} className="flex items-start gap-2 rounded bg-[var(--surface-subtle)] p-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-mono text-[11.5px] text-descriptionforeground">{draft.path}:{draft.line}</p>
+                        <p className="font-mono text-[11.5px] text-[var(--text-secondary)]">{draft.path}:{draft.line}</p>
                         <pre className="whitespace-pre-wrap">{draft.body}</pre>
                       </div>
                       <button
@@ -786,7 +788,7 @@ export function GithubPanel({
                         disabled={busy !== null}
                         onClick={() => void deleteDraft(draft.id)}
                       >
-                        <Codicon name="trash" size={12} />
+                        <AppIcon name="trash" size={12} />
                       </button>
                     </div>
                   ))}
@@ -795,10 +797,10 @@ export function GithubPanel({
                     <input className="settings-input" value={draftLine} inputMode="numeric" placeholder={t("github.draftLine")} onChange={(event) => setDraftLine(event.target.value)} />
                   </div>
                   <textarea className="settings-input h-14 w-full resize-y py-1" value={draftBody} placeholder={t("github.draftBody")} onChange={(event) => setDraftBody(event.target.value)} />
-                  <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || !reviewSession} onClick={() => void addDraft()}>
+                  <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={busy !== null || !reviewSession} onClick={() => void addDraft()}>
                     {t("github.draftAdd")}
                   </button>
-                  <div className="flex flex-wrap items-center gap-2 border-t border-panel-border pt-2">
+                  <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-2">
                     <select className="settings-select h-6 w-auto" value={reviewEvent} onChange={(event) => setReviewEvent(event.target.value as ReviewEvent)}>
                       {REVIEW_EVENTS.map((event) => (
                         <option key={event} value={event}>
@@ -807,13 +809,13 @@ export function GithubPanel({
                       ))}
                     </select>
                     <input className="settings-input h-6 min-w-0 flex-1" value={reviewBody} placeholder={t("github.reviewBody")} onChange={(event) => setReviewBody(event.target.value)} />
-                    <button type="button" className="toolbar-widget h-6 px-2" disabled={busy !== null || !reviewSession || error?.kind === "needsVerification"} onClick={() => void submitReview()}>
+                    <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={busy !== null || !reviewSession || error?.kind === "needsVerification"} onClick={() => void submitReview()}>
                       {t("github.reviewSubmit")}
                     </button>
                   </div>
                 </section>
 
-                <section className="space-y-2 rounded border border-panel-border p-2">
+                <section className="space-y-2 rounded border border-[var(--border-subtle)] p-2">
                   <h3 className="font-semibold">{t("github.mergeTitle")}</h3>
                   <div className="flex flex-wrap items-center gap-2">
                     <select className="settings-select h-6 w-auto" value={mergeMethod} onChange={(event) => setMergeMethod(event.target.value as MergeMethod)}>
@@ -824,19 +826,19 @@ export function GithubPanel({
                       ))}
                     </select>
                     <label className="flex items-center gap-1.5">
-                      <input type="checkbox" className="accent-[var(--focusborder)]" checked={mergeConfirmed} onChange={(event) => setMergeConfirmed(event.target.checked)} />
+                      <input type="checkbox" className="accent-[var(--accent)]" checked={mergeConfirmed} onChange={(event) => setMergeConfirmed(event.target.checked)} />
                       {t("github.mergeConfirm")}
                     </label>
                     <button
                       type="button"
-                      className="toolbar-widget h-6 px-2 font-semibold"
+                      className="revia-btn revia-btn-secondary h-6 px-2 font-semibold"
                       disabled={busy !== null || (needConfirm && !mergeConfirmed)}
                       onClick={() => void merge()}
                     >
                       {t("github.mergeSubmit")}
                     </button>
                   </div>
-                  {needConfirm ? <p className="text-descriptionforeground">{t("github.mergeNeedConfirm")}</p> : null}
+                  {needConfirm ? <p className="text-[var(--text-secondary)]">{t("github.mergeNeedConfirm")}</p> : null}
                 </section>
               </div>
             )}
@@ -858,7 +860,7 @@ export function GithubPanel({
             <textarea className="settings-input h-32 w-full resize-y py-1" value={createBody} onChange={(event) => setCreateBody(event.target.value)} />
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" className="accent-[var(--focusborder)]" checked={createDraft} onChange={(event) => setCreateDraft(event.target.checked)} />
+            <input type="checkbox" className="accent-[var(--accent)]" checked={createDraft} onChange={(event) => setCreateDraft(event.target.checked)} />
             {t("github.createDraft")}
           </label>
           <label className="block">
@@ -875,10 +877,10 @@ export function GithubPanel({
               ))}
             </select>
           </label>
-          <p className="text-descriptionforeground">{t("github.createHead", { head: currentBranch ?? "?" })}</p>
+          <p className="text-[var(--text-secondary)]">{t("github.createHead", { head: currentBranch ?? "?" })}</p>
           <button
             type="button"
-            className="toolbar-widget h-7 px-3 font-semibold"
+            className="revia-btn revia-btn-secondary h-7 px-3 font-semibold"
             disabled={busy !== null || createTitle.trim().length === 0 || !currentBranch}
             onClick={() => void createPr()}
           >
@@ -888,15 +890,15 @@ export function GithubPanel({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
           <h2 className="mb-2 text-[14px] font-semibold">{t("github.receiptsTitle")}</h2>
-          {receipts.length === 0 ? <p className="text-descriptionforeground">{t("github.noReceipts")}</p> : null}
+          {receipts.length === 0 ? <p className="text-[var(--text-secondary)]">{t("github.noReceipts")}</p> : null}
           <div className="space-y-1">
             {receipts.map((receipt) => (
-              <div key={receipt.id} className="rounded border border-panel-border px-2 py-1">
+              <div key={receipt.id} className="rounded border border-[var(--border-subtle)] px-2 py-1">
                 <p>
                   #{receipt.number} · {receipt.action} · {receipt.resultSha?.slice(0, 8) ?? "—"}
                   {receipt.protectedBranch ? ` · ${t("github.protectedShort")}` : ""}
                 </p>
-                <p className="text-descriptionforeground">
+                <p className="text-[var(--text-secondary)]">
                   {new Date(receipt.createdAtMs).toLocaleString()} · {protectionSourceText(receipt.protectionSource)}
                   {receipt.notes.length > 0 ? ` · ${receipt.notes.join("; ")}` : ""}
                 </p>
@@ -908,15 +910,15 @@ export function GithubPanel({
       {divergedBranch ? (
         // H4：覆盖本地分支的独有提交前必须由用户确认。
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30">
-          <div role="dialog" aria-modal="true" className="w-[420px] rounded-md border border-panel-border bg-[var(--editor-background)] p-4 text-[12.5px]">
+          <div role="dialog" aria-modal="true" className="w-[420px] rounded-md border border-[var(--border-subtle)] bg-[var(--editor-background)] p-4 text-[12.5px]">
             <p className="mb-3">{t("github.divergedConfirm", { branch: `pr/${selected?.number ?? ""}` })}</p>
             <div className="flex justify-end gap-2">
-              <button type="button" className="toolbar-widget h-7 px-3" onClick={() => setDivergedBranch(false)}>
+              <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => setDivergedBranch(false)}>
                 {t("common.cancel")}
               </button>
               <button
                 type="button"
-                className="toolbar-widget h-7 px-3 font-semibold"
+                className="revia-btn revia-btn-secondary h-7 px-3 font-semibold"
                 onClick={() => {
                   setDivergedBranch(false);
                   void checkout(true);

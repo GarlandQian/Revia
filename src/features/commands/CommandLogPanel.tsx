@@ -12,18 +12,12 @@ import { useEffect, useRef, useState } from "react";
 import type { CommandRecordPayload } from "@/lib/ipc";
 import { ipc } from "@/lib/ipc";
 import { getLocale, messages } from "@/lib/i18n/index";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 
 /** 面板打开时的刷新间隔（毫秒）。 */
 export const COMMAND_LOG_POLL_MS = 800;
 
-export function CommandLogPanel({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function CommandLogPanel({ open }: { open: boolean }) {
   const [records, setRecords] = useState<CommandRecordPayload[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,30 +72,25 @@ export function CommandLogPanel({
   return (
     <section
       aria-label={messages.commandLog.title}
-      className="flex h-[260px] shrink-0 flex-col overflow-hidden border-t border-panel-border bg-[var(--panel-background)]"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--surface-bg)]"
     >
-      <div className="flex h-[26px] shrink-0 items-center gap-2 border-b border-panel-border px-2 text-[11.5px]">
-        <Codicon name="terminal" size={13} />
-        <span className="font-medium">{messages.commandLog.title}</span>
-        <span className="text-descriptionforeground">{messages.commandLog.count(records.length)}</span>
+      <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2.5 text-[11.5px]">
+        <span className="text-[var(--text-muted)]">{messages.commandLog.count(records.length)}</span>
         <span className="flex-1" />
         <button
           type="button"
-          className="icon-action size-[20px]"
+          className="mini-icon-btn"
           title={messages.commandLog.copyAll}
           onClick={() => copy(records.map(recordText).join("\n\n"))}
         >
-          <Codicon name="copy" size={12} />
-        </button>
-        <button type="button" className="icon-action size-[20px]" title={messages.recovery.close} onClick={onClose}>
-          <Codicon name="close" size={12} />
+          <AppIcon name="copy" size={12} />
         </button>
       </div>
       {error ? <p className="px-2 py-1 text-[11.5px] text-destructive">{error}</p> : null}
       <div className="flex min-h-0 flex-1">
         <div ref={listRef} className="min-h-0 w-[58%] shrink-0 overflow-auto">
           {records.length === 0 ? (
-            <p className="px-2 py-2 text-[11.5px] text-descriptionforeground">{messages.commandLog.empty}</p>
+            <p className="px-2 py-2 text-[11.5px] text-[var(--text-secondary)]">{messages.commandLog.empty}</p>
           ) : null}
           {[...records].reverse().map((record) => {
             const activeRow = active?.sequence === record.sequence;
@@ -113,29 +102,29 @@ export function CommandLogPanel({
                 onClick={() => setSelected(record.sequence)}
                 title={record.directory}
               >
-                <span className={`w-[16px] shrink-0 ${record.exitCode === 0 ? "text-[var(--gitdecoration-addedresourceforeground)]" : "text-destructive"}`}>
-                  <Codicon name={record.exitCode === 0 ? "pass" : record.timedOut ? "watch" : "error"} size={11} />
+                <span className={`w-[16px] shrink-0 ${record.exitCode === 0 ? "text-[var(--git-a)]" : "text-destructive"}`}>
+                  <AppIcon name={record.exitCode === 0 ? "pass" : record.timedOut ? "watch" : "error"} size={11} />
                 </span>
-                <span className="w-[54px] shrink-0 text-descriptionforeground tabular-nums">
+                <span className="w-[54px] shrink-0 text-[var(--text-secondary)] tabular-nums">
                   {new Date(record.startedAtMs).toLocaleTimeString(getLocale())}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
                   {record.args.join(" ")}
                 </span>
-                <span className="w-[44px] shrink-0 text-right text-descriptionforeground tabular-nums">
+                <span className="w-[44px] shrink-0 text-right text-[var(--text-secondary)] tabular-nums">
                   {record.elapsedMs}ms
                 </span>
-                <span className="w-[36px] shrink-0 text-right text-descriptionforeground tabular-nums">
+                <span className="w-[36px] shrink-0 text-right text-[var(--text-secondary)] tabular-nums">
                   {record.exitCode}
                 </span>
               </button>
             );
           })}
         </div>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-panel-border">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-[var(--border-subtle)]">
           {active ? (
             <>
-              <div className="flex shrink-0 items-center gap-2 border-b border-panel-border px-2 py-1 text-[11px] text-descriptionforeground">
+              <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)]">
                 <span className="min-w-0 flex-1 truncate" title={active.directory}>
                   {active.worktreeId ? `${active.worktreeId} · ` : ""}
                   {active.directory}
@@ -147,16 +136,16 @@ export function CommandLogPanel({
                   title={messages.commandLog.copyOne}
                   onClick={() => copy(recordText(active))}
                 >
-                  <Codicon name="copy" size={12} />
+                  <AppIcon name="copy" size={12} />
                 </button>
               </div>
               <pre className="min-h-0 flex-1 overflow-auto px-2 py-1 font-mono text-[11px] whitespace-pre-wrap break-words">
-                <span className="text-descriptionforeground">{`${active.program} ${active.args.join(" ")}\n`}</span>
+                <span className="text-[var(--text-secondary)]">{`${active.program} ${active.args.join(" ")}\n`}</span>
                 {active.output || messages.commandLog.noOutput}
               </pre>
             </>
           ) : (
-            <p className="px-2 py-2 text-[11.5px] text-descriptionforeground">{messages.commandLog.selectRecord}</p>
+            <p className="px-2 py-2 text-[11.5px] text-[var(--text-secondary)]">{messages.commandLog.selectRecord}</p>
           )}
         </div>
       </div>

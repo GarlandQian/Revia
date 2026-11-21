@@ -375,8 +375,6 @@ pub fn run() {
             m7::commands::m7_save_editable,
             m7::commands::m7_save_edit_draft,
             m7::commands::m7_load_edit_draft,
-            m7::commands::m7_glass_support,
-            m7::commands::m7_glass_layout,
             m7::commands::m7_clear_edit_draft,
             m7::commands::m7_list_edit_drafts,
             m7::commands::m7_terminal_open,

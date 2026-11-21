@@ -59,6 +59,7 @@ const { t } = i18n;
 afterEach(() => clearMocks());
 
 const valuesFixture = {
+  appearanceMode: "system",
   themeLight: "light-2026",
   themeDark: "dark-2026",
   codeFontFamily: "",
@@ -151,6 +152,7 @@ function loadUpdateSettings() {
     setUpdateStatus: noop,
     setUpdateBannerVersion: noop,
     setAppError: noop,
+    setAppearanceMode: noop,
     setThemeLight: noop,
     setThemeDark: noop,
     setCodeFontFamily: noop,
@@ -397,10 +399,8 @@ function createDialogInstance(env, aiSettings, onChange) {
         return { highlightLevelText: (value) => value, notifyKindText: (value) => value };
       case "@/lib/theme":
         return { themesOfKind: () => [] };
-      case "@/components/ui/codicon":
-        return { Codicon: () => null };
-      case "@/features/m7/glass/GlassLayer":
-        return { GlassLayer: () => null };
+      case "@/components/ui/app-icon":
+        return { AppIcon: () => null };
       case "@/features/m7/settings":
         return {
           M7GithubSettings: () => null,
@@ -408,10 +408,8 @@ function createDialogInstance(env, aiSettings, onChange) {
           M7ThemeSettings: () => null,
           M7UpdateSettings: () => null,
         };
-      case "@/features/m7/glass/nativeGlass":
+      case "@/hooks/useDialogOpen":
         return { useModalDialog: () => {} };
-      case "@/features/m7/glass/glassLens":
-        return { useGlassLens: () => {} };
       case "@/lib/aiSettings":
         return aiSettingsModule;
       default:
@@ -455,16 +453,15 @@ function createDialogInstance(env, aiSettings, onChange) {
     return found;
   };
   const inputs = () => nodes().filter((node) => node.type === "input");
-  const textInputs = () => inputs().filter((node) => node.props.className === "settings-input w-full");
-  const baseInput = () => textInputs()[0];
-  const modelInput = () => textInputs()[1];
+  const baseInput = () => inputs().find((node) => node.props?.["data-ai-field"] === "baseUrl");
+  const modelInput = () => inputs().find((node) => node.props?.["data-ai-field"] === "model");
   const keyInput = () => inputs().find((node) => node.props.type === "password");
   const promptInput = () => nodes().find((node) => node.type === "textarea");
-  const languageSelect = () => nodes().find((node) => node.type === "select" && node.props.className === "settings-input" && !node.props["aria-label"]);
+  const languageSelect = () => nodes().find((node) => node.type === "select" && node.props?.["data-ai-field"] === "language");
   const listSelect = () => nodes().find((node) => node.type === "select" && node.props["aria-label"] === t("settings.ai.modelsChoose"));
   const button = (text) => nodes().find((node) => node.type === "button" && textOf(node) === text);
-  const aiButton = () => nodes().find((node) => node.type === "button" && node.props?.["data-lens-key"] === "ai");
-  const navButton = (key) => nodes().find((node) => node.type === "button" && node.props?.["data-lens-key"] === key);
+  const aiButton = () => nodes().find((node) => node.type === "button" && node.props?.["data-settings-page"] === "ai");
+  const navButton = (key) => nodes().find((node) => node.type === "button" && node.props?.["data-settings-page"] === key);
   const openAi = async () => {
     assert.ok(aiButton(), "AI settings navigation button missing");
     aiButton().props.onClick();
@@ -981,7 +978,7 @@ test("切页再返回后重新输入同一密钥，旧完成回调不清空新�
   await fixture.flush();
   assert.equal(fixture.keyCalls.length, 1);
 
-  await fixture.openPage("theme");
+  await fixture.openPage("appearance");
   await fixture.openPage("ai");
   fixture.keyInput().props.onChange({ target: { value: "sk-same" } });
   await fixture.flush();
@@ -1028,7 +1025,7 @@ test("密钥意图也使队列等待期间到达的旧状态错误失效", async
   const fixture = dialogFixture({ baseUrl: "https://a.example/v1" });
   await fixture.flush();
   await fixture.openAi();
-  await fixture.openPage("theme");
+  await fixture.openPage("appearance");
   const status = fixture.deferStatus();
   await fixture.openPage("ai");
 

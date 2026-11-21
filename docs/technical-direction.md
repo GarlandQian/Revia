@@ -1,6 +1,6 @@
 # 技术方向
 
-更新日期：2026-10-30。状态：M6 已合入 main；M7 访谈已确认，进入实施准备，已核对 GitHub 登录、Actions 打包与 Liquid Glass 材质候选；尚未实施这些功能。
+更新日期：2026-11-21。状态：M0–M13 均已合入本地 `main`；M13 已彻底移除 Liquid Glass 与旧版 VS Code 外壳样式兼容层，落地实色现代桌面设计系统（[ADR-0016](./adr/0016-decoupled-design-system-and-solid-surfaces.md)）。
 
 ## 已确认的选择
 
@@ -8,8 +8,9 @@
 桌面框架：Tauri 2
 前端框架：React
 语言与构建：TypeScript + Vite
-基础组件：shadcn/ui（Base UI 基座）
-样式工具：Tailwind CSS
+弹层与对话框：Base UI（@base-ui/react Popover）+ 原生 <dialog>
+图标：Lucide（lucide-react 1.65px AppIcon）+ Material Icon Theme（文件类型图标）
+样式方案：Tailwind CSS + 模块化 Design Tokens（src/styles/{tokens,shell,workspace,diff,overlays}.css）
 Git 执行：Rust 层调用系统 Git CLI
 语法高亮：Rust 侧 syntect
 ```
@@ -35,13 +36,14 @@ Git 执行：Rust 层调用系统 Git CLI
 - 组件源码进入项目后需要自行维护；升级依赖不等于自动同步所有本地组件源码的上游修复。
 - 组件选型不构成性能或可访问性保证，完整交互仍需在实际 Tauri WebView 中验证。
 
-## M7 Liquid Glass 材质
+## M13 实色设计系统与主题解耦（ADR-0016）
 
-Q189、Q190 确认新的外观方向与代码清晰度要求。材质变量与编辑器颜色分别管理：玻璃背景只影响装饰层，不能把文字、行号、选区或 diff 标记一起送入滤镜；代码区保留稳定的底色。Base UI 继续负责既有弹层定位、焦点与键盘行为。
+M13（Q234–Q245）彻底移除 M7–M12 的 Liquid Glass、React Bits 材质层、SVG 玻璃镜片、AppKit 原生玻璃与旧版 VS Code 外壳变量，收敛为单一的实色现代桌面设计系统：
 
-Q199 确认优先复用 React Bits 的 Glass Surface、Specular Button 与 Glass Icons；第四版已实际接入这三种组件，产品实现沿该外观。当前源码有 SVG、WebGL2 和磨砂降级路径；WebGL 的 backdrop 只接受图片、视频或 canvas，不能自动折射任意 DOM。实际 WKWebView 与 Windows WebView2 的效果、滚动性能和降级状态分别验证，不以 Chromium 预览或标题栏 Overlay 作为证明。接入点、源码散列与许可说明见 [M7 Liquid Glass 核对](./milestones/m7/liquid-glass.md)；本轮未添加产品依赖。
-
-Q191 在设计阶段就要求考虑 Windows。共享语义颜色、信息密度与业务组件；窗口按钮、菜单、字体、修饰键、系统缩放和材质能力由平台适配层处理。当前 Windows 使用原生标题栏，不能为了玻璃外观直接移除它而丢失系统拖动、最大化或贴靠行为。Mica / Acrylic 是 Windows 原生材质的参照，不把 CSS 预览称为这些原生效果已接入；透明关闭与高对比度下的稳定底色也须验证。
+- **样式分层**：全站 CSS 按职责拆分为 `src/styles/{tokens,shell,workspace,diff,overlays}.css`，外壳颜色完全由 `:root[data-kind="light"]` / `:root[data-kind="dark"]` 的语义令牌驱动，不接受 VS Code 颜色主题染色。
+- **代码颜色主题解耦**：`src/themes/themes.css`（由 `tools/gen-themes.mjs` 生成）与用户导入的 VS Code 主题（`src/lib/theme.ts` 白名单过滤）仅提供编辑器 / diff / 合并 / 语法高亮色键（`--editor-*`、`--diffeditor-*`、`--syn-*`）。
+- **无额外 UI 样板依赖**：移除未使用的 shadcn 样板文件与依赖（`class-variance-authority`、`cn`、`shadcn`、`tw-animate-css`）以及 `@vscode/codicons`；弹层由 `@base-ui/react`（Popover）承担，对话框使用原生 `<dialog>` + `useModalDialog`，图标统一由 `src/components/ui/app-icon.tsx` 映射到 `lucide-react`。
+- **跨平台外壳**：窗口恢复标准不透明原生窗口（macOS Overlay 标题栏融入 40px 顶栏，Windows `transparent: false` 保留标准原生标题栏与系统窗口行为）；前端零昂贵背景模糊滤镜，性能采样上报 `windowMaterial: "solid"`。
 
 ## Git 执行边界
 

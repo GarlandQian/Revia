@@ -23,7 +23,7 @@ function componentFixture() {
   const PatchDiffView = () => null;
   const require = id => id === "react" ? hooks : id === "react/jsx-runtime" ? { jsx, jsxs: jsx } : id === "@/lib/ipc" ? { ipc: api }
     : id === "@/lib/i18n/index" ? { messages: texts(""), getLocale: () => "en" } : id === "@/lib/error" ? { formatAppError: () => "", toAppError: e => e }
-      : id.includes("PatchDiffView") ? { PatchDiffView } : id.includes("codicon") ? { Codicon: () => null } : id.includes("Dialogs") ? { Modal: () => null } : {};
+      : id.includes("PatchDiffView") ? { PatchDiffView } : id.includes("app-icon") ? { AppIcon: () => null } : id.includes("Dialogs") ? { Modal: () => null } : {};
   const module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(new URL("../src/features/m6/StashPanel.tsx", import.meta.url), "utf8"), {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -65,7 +65,7 @@ test("相同OID的两行按具体出现项选择，比较方式由持久设置�
   assert.equal(rows.length, 2);
   rows[1].props.onClick(); await f.flush();
   assert.equal(f.inspected.key, "v:1");
-  assert.equal(f.nodes().filter(n => n.type === "div" && n.props.onClick && n.props.className.includes("bg-[var(--list-inactiveselectionbackground)]")).length, 1);
+  assert.equal(f.nodes().filter(n => n.type === "div" && n.props.onClick && n.props.className.includes("bg-[var(--surface-active-neutral)]")).length, 1);
   const label = f.nodes().find(n => n.type === "label" && n.props.children.some(child => typeof child === "function" && child() === "stash.compareLocal"));
   await label.props.children.find(n => n?.type === "input").props.onChange({ target: { checked: true } });
   await f.flush(); assert.equal(f.props.compareLocal, true);

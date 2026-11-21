@@ -1,23 +1,34 @@
 /**
- * 改动树（M4 F03、Q8、Q30、Q120、Q121、Q128）。
+ * 改动树（M4 F03、M12 Q227–Q231、M13 Q237/Q243）。
  *
- * 三组依次是已暂存、未暂存、未跟踪；未跟踪默认收起。同一文件可以同时出现在两组。
- * 每行是文件类型图标、按状态上色的文件名、灰色的所在目录；已审阅文件在行尾显示小图标。
- * 支持 Shift 连续选择、⌘ 增减选择、⇧↑ / ⇧↓ 扩展与 ⌘A 全选。
+ * - 26px 平衡行高，中性清晰文件名（删除文件带淡删除线）、淡灰目录路径、已审阅小对勾；
+ * - 行尾右侧显示等宽语义单字母状态徽标（M / A / D / R / ? / !），悬停平滑切换为行内快捷操作；
+ * - 完整保留 Shift 连续选择、⌘/Ctrl 增减选择、折叠目录选中计数与空格暂存语义。
  */
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
+import type { FileStatus } from "@/types/bindings/FileStatus";
 import { entryKey, type TreeGroupKey, type TreeGroupOpen, type TreeItem } from "@/hooks/changesTreeState";
 import { messages } from "@/lib/i18n/index";
 import { readonlyReasonText, renamedFrom } from "@/lib/i18n/text";
 import { isAltModifier, isPrimaryClick, isPrimaryModifier } from "@/lib/platform";
 import { matchShortcut } from "@/lib/shortcuts";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { FileTypeIcon } from "./FileTypeIcon";
 
-export const TREE_ROW_HEIGHT = 22;
+export const TREE_ROW_HEIGHT = 26;
 const OVERSCAN = 8;
+
+const STATUS_LETTER: Record<FileStatus, string> = {
+  modified: "M",
+  added: "A",
+  deleted: "D",
+  renamed: "R",
+  untracked: "?",
+  conflict: "!",
+  typeChanged: "T",
+};
 
 const groupTitle: Record<TreeGroupKey, () => string> = {
   conflicts: () => messages.merge.conflictsGroup,
@@ -40,7 +51,6 @@ interface ChangesTreeProps {
   onSelectAll: () => void;
   onStageSelection: () => void;
   onToggleGroup: (kind: TreeGroupKey) => void;
-  /** 冲突组标题右侧的“解决…”按钮（返修 F10）。 */
   onResolveConflicts: () => void;
   onToggleDir: (dir: string) => void;
   onStageEntries: (entries: ChangeEntry[]) => void;
@@ -52,7 +62,8 @@ interface ChangesTreeProps {
 
 export function ChangesTree(props: ChangesTreeProps) {
   const {
-    items, directoryCounts,
+    items,
+    directoryCounts,
     active,
     selectedKeys,
     open,
@@ -61,7 +72,8 @@ export function ChangesTree(props: ChangesTreeProps) {
     onActivate,
     onPin,
     onMove,
-    onSelectAll, onStageSelection,
+    onSelectAll,
+    onStageSelection,
     onToggleGroup,
     onResolveConflicts,
     onToggleDir,
@@ -90,10 +102,8 @@ export function ChangesTree(props: ChangesTreeProps) {
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target && target.tagName === "INPUT") return;
-    // 按钮保留自己的空格 / 回车行为，不穿透成整文件操作（Q93）。
     const onButton = target?.closest("button") != null;
     if (onButton && (event.key === " " || event.key === "Enter")) return;
-    // ⌥⌘A 是暂存文件的快捷键，不能当成 ⌘A 全选（返修 C4）。
     if (isPrimaryModifier(event) && !isAltModifier(event) && event.code === "KeyA") {
       event.preventDefault();
       onSelectAll();
@@ -118,13 +128,13 @@ export function ChangesTree(props: ChangesTreeProps) {
   };
 
   if (items.length === 0) {
-    return <div className="px-3 py-3 text-[12.5px] text-descriptionforeground">{messages.changes.empty}</div>;
+    return <div className="px-3.5 py-4 text-[12.5px] text-[var(--text-muted)]">{messages.changes.empty}</div>;
   }
 
   return (
     <div
       ref={scrollerRef}
-      className="changes-tree min-h-0 flex-1 overflow-auto pb-2 outline-none"
+      className="changes-tree min-h-0 flex-1 overflow-auto py-1.5 outline-none"
       tabIndex={0}
       onKeyDown={onKeyDown}
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
@@ -158,19 +168,19 @@ export function ChangesTree(props: ChangesTreeProps) {
             return (
               <div
                 key={`dir-${item.kind}-${item.dir}`}
-                className="section-header group absolute left-0 right-0"
-                style={{ top: index * TREE_ROW_HEIGHT, height: TREE_ROW_HEIGHT, paddingLeft: 16 }}
+                className="section-header group absolute left-1.5 right-1.5"
+                style={{ top: index * TREE_ROW_HEIGHT, height: TREE_ROW_HEIGHT, paddingLeft: 14 }}
               >
                 <button
                   type="button"
-                  className="flex min-w-0 flex-1 items-center gap-0.5 text-left outline-none"
+                  className="flex min-w-0 flex-1 items-center gap-1 text-left outline-none"
                   onClick={() => onToggleDir(item.dir)}
                   aria-expanded={open_}
                 >
-                  <Codicon name={open_ ? "chevron-down" : "chevron-right"} size={14} />
-                  <Codicon name={open_ ? "folder-opened" : "folder"} size={14} />
-                  <span className="truncate text-[12px] font-normal">{item.dir}</span>
-                  {!open_ && count > 0 && <span className="count-badge ml-1 shrink-0">{messages.changes.selectedCount(count)}</span>}
+                  <AppIcon name={open_ ? "chevron-down" : "chevron-right"} size={12} />
+                  <AppIcon name={open_ ? "folder-opened" : "folder"} size={13} className="text-[var(--text-muted)]" />
+                  <span className="truncate text-[12px] font-normal text-[var(--text-secondary)]">{item.dir}</span>
+                  {!open_ && count > 0 ? <span className="count-pill ml-1 shrink-0">{messages.changes.selectedCount(count)}</span> : null}
                 </button>
               </div>
             );
@@ -221,24 +231,24 @@ function GroupHeader({
   onUnstageEntries: (entries: ChangeEntry[]) => void;
   onResolveConflicts: () => void;
 }) {
-  // 全部条目都交给批量入口：只读条目由后端逐个返回跳过原因，不再静默过滤（返修 C6）。
   const label = kind === "staged" ? messages.changes.unstageAll : messages.changes.stageAll;
   if (kind === "conflicts") {
     return (
-      <div className="section-header group absolute left-0 right-0" style={{ top, height: TREE_ROW_HEIGHT }}>
+      <div className="section-header group absolute left-1.5 right-1.5" style={{ top, height: TREE_ROW_HEIGHT }}>
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-0.5 text-left outline-none"
+          className="flex min-w-0 flex-1 items-center gap-1 text-left outline-none"
           onClick={onToggle}
           aria-expanded={open}
           aria-label={`${title}：${open ? messages.changes.collapse : messages.changes.expand}`}
         >
-          <Codicon name={open ? "chevron-down" : "chevron-right"} size={16} />
-          <span className="truncate">{title}</span>
+          <AppIcon name={open ? "chevron-down" : "chevron-right"} size={12} />
+          <span className="truncate text-[var(--danger)]">{title}</span>
+          <span className="count-pill ml-0.5">{entries.length}</span>
         </button>
         <button
           type="button"
-          className="h-[18px] shrink-0 rounded-[3px] px-1 text-[11px] text-descriptionforeground hover:bg-toolbar-hoverbackground hover:text-foreground"
+          className="h-[20px] shrink-0 rounded-[4px] border border-[var(--border-subtle)] bg-[var(--surface-bg)] px-1.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
           title={messages.merge.resolveButton}
           aria-label={messages.merge.resolveButton}
           disabled={isWriting}
@@ -246,33 +256,32 @@ function GroupHeader({
         >
           {messages.merge.resolveButton}
         </button>
-        <span className="count-badge ml-1">{entries.length}</span>
       </div>
     );
   }
   return (
-    <div className="section-header group absolute left-0 right-0" style={{ top, height: TREE_ROW_HEIGHT }}>
+    <div className="section-header group absolute left-1.5 right-1.5" style={{ top, height: TREE_ROW_HEIGHT }}>
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-0.5 text-left outline-none"
+        className="flex min-w-0 flex-1 items-center gap-1 text-left outline-none"
         onClick={onToggle}
         aria-expanded={open}
         aria-label={`${title}：${open ? messages.changes.collapse : messages.changes.expand}`}
       >
-        <Codicon name={open ? "chevron-down" : "chevron-right"} size={16} />
+        <AppIcon name={open ? "chevron-down" : "chevron-right"} size={12} />
         <span className="truncate">{title}</span>
+        <span className="count-pill ml-0.5">{entries.length}</span>
       </button>
       <button
         type="button"
-        className="icon-action size-[18px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        className="mini-icon-btn opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         title={label}
         aria-label={label}
         disabled={isWriting || entries.length === 0}
         onClick={() => (kind === "staged" ? onUnstageEntries(entries) : onStageEntries(entries))}
       >
-        <Codicon name={kind === "staged" ? "remove" : "add"} size={15} />
+        <AppIcon name={kind === "staged" ? "remove" : "add"} size={13} />
       </button>
-      <span className="count-badge ml-1">{entries.length}</span>
     </div>
   );
 }
@@ -309,14 +318,16 @@ function ChangeRow({
       ? `${dir ? `${dir} · ` : ""}${messages.changes.collapsed}`
       : dir;
   const readonlyDesc = entry.readonlyReason ? readonlyReasonText(entry.readonlyReason) : null;
-  // 未跟踪文件只能整文件操作：行内提供丢弃（先存回收区再删除）与暂存（F03.4、Q120）。
   const showDiscard = (entry.changes === "unstaged" || entry.changes === "untracked") && !entry.readonlyReason;
+  const letter = STATUS_LETTER[entry.status] ?? "M";
+
   return (
     <div
-      className="change-row group absolute left-0 right-0 flex items-center gap-1.5 pr-2 pl-6"
+      className="change-row group absolute left-0 right-0 flex items-center gap-1.5 pl-4 pr-2"
       style={{ top, height: TREE_ROW_HEIGHT }}
       data-selected={selected}
       data-active={active}
+      data-status={entry.status}
       role="treeitem"
       aria-selected={selected}
       aria-label={entry.path}
@@ -331,54 +342,60 @@ function ChangeRow({
         title={readonlyDesc ? `${entry.path}（${readonlyDesc}）` : entry.originalPath ? `${entry.originalPath} → ${entry.path}` : entry.path}
       >
         <FileTypeIcon path={entry.path} symlink={entry.readonlyReason === "symlink"} />
-        <span className={`min-w-0 shrink truncate status-${entry.status}`}>{name}</span>
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-descriptionforeground">{detail}</span>
+        <span className="change-file-name min-w-0 shrink truncate">{name}</span>
+        <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--text-muted)]">{detail}</span>
       </button>
+
+      {entry.reviewed ? (
+        <span className="shrink-0 text-[var(--reviewed)]" title={messages.review.marked} aria-label={messages.review.marked}>
+          <AppIcon name="check" size={13} />
+        </span>
+      ) : null}
+
       {entry.readonlyReason ? (
-        <span className="shrink-0 text-descriptionforeground" title={readonlyDesc ?? undefined} aria-label={messages.changes.readonly}>
-          <Codicon name="lock" size={14} />
+        <span className="shrink-0 text-[var(--text-muted)]" title={readonlyDesc ?? undefined} aria-label={messages.changes.readonly}>
+          <AppIcon name="lock" size={13} />
         </span>
       ) : (
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-data-[selected=true]:opacity-100">
-          {showDiscard ? (
+        <div className="change-tail">
+          <span className={`change-status-badge status-${entry.status}`} aria-hidden>
+            {letter}
+          </span>
+          <div className="change-hover-actions">
             <button
               type="button"
               tabIndex={-1}
               disabled={isWriting}
-              className="icon-action size-[18px]"
-              aria-label={messages.changes.discardShort}
-              title={messages.changes.shortcuts.discardFile}
+              className="mini-icon-btn"
+              aria-label={entry.changes === "staged" ? messages.changes.unstage : messages.changes.stage}
+              title={entry.changes === "staged" ? messages.changes.shortcuts.unstage : messages.changes.shortcuts.stage}
               onClick={(event) => {
                 event.stopPropagation();
-                // 已多选时行内按钮作用于全部选中项（返修 C7，F03.4）。
-                onDiscard(entry);
+                if (entry.changes === "staged") onUnstage(entry);
+                else onStage(entry);
               }}
             >
-              <Codicon name="discard" size={14} />
+              <AppIcon name={entry.changes === "staged" ? "remove" : "add"} size={13} />
             </button>
-          ) : null}
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={isWriting}
-            className="icon-action size-[18px]"
-            aria-label={entry.changes === "staged" ? messages.changes.unstage : messages.changes.stage}
-            title={entry.changes === "staged" ? messages.changes.shortcuts.unstage : messages.changes.shortcuts.stage}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (entry.changes === "staged") onUnstage(entry);
-              else onStage(entry);
-            }}
-          >
-            <Codicon name={entry.changes === "staged" ? "remove" : "add"} size={14} />
-          </button>
-        </span>
+            {showDiscard ? (
+              <button
+                type="button"
+                tabIndex={-1}
+                disabled={isWriting}
+                className="mini-icon-btn danger"
+                aria-label={messages.changes.discardShort}
+                title={messages.changes.shortcuts.discardFile}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDiscard(entry);
+                }}
+              >
+                <AppIcon name="discard" size={12} />
+              </button>
+            ) : null}
+          </div>
+        </div>
       )}
-      {entry.reviewed ? (
-        <span className="shrink-0 text-descriptionforeground" title={messages.review.marked} aria-label={messages.review.marked}>
-          <Codicon name="pass" size={14} />
-        </span>
-      ) : null}
     </div>
   );
 }

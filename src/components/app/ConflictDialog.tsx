@@ -16,7 +16,7 @@ import { useMountedRef } from "@/hooks/useMountedRef";
 import { messages } from "@/lib/i18n/index";
 import { conflictCountText, mergeUnavailableText } from "@/lib/i18n/text";
 import { formatAppError, toAppError } from "@/lib/error";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "./Dialogs";
 import { FileTypeIcon } from "./FileTypeIcon";
 
@@ -90,21 +90,21 @@ export function ConflictDialog({
 
   return (
     <Modal title={messages.merge.conflictDialogTitle} onClose={onClose} width={720}>
-      <p className="text-[12.5px] text-descriptionforeground">{messages.merge.conflictDialogHint}</p>
+      <p className="text-[12.5px] text-[var(--text-secondary)]">{messages.merge.conflictDialogHint}</p>
       {error ? (
-        <p role="alert" className="mt-2 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] bg-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_10%,var(--editor-background))] px-2 py-1 text-[12px]">
+        <p role="alert" className="mt-2 rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--editor-background))] px-2 py-1 text-[12px]">
           {formatAppError(error)}
         </p>
       ) : null}
       <div className="mt-2 flex min-h-[220px] gap-3">
-        <ul className="min-w-0 flex-1 overflow-y-auto rounded border border-panel-border" data-conflict-list>
-          {files === null ? <li className="px-2 py-1 text-[12px] text-descriptionforeground">{messages.changes.loading}</li> : null}
-          {files?.length === 0 ? <li className="px-2 py-1 text-[12px] text-descriptionforeground">{conflictCountText(0)}</li> : null}
+        <ul className="min-w-0 flex-1 overflow-y-auto rounded border border-[var(--border-subtle)]" data-conflict-list>
+          {files === null ? <li className="px-2 py-1 text-[12px] text-[var(--text-secondary)]">{messages.changes.loading}</li> : null}
+          {files?.length === 0 ? <li className="px-2 py-1 text-[12px] text-[var(--text-secondary)]">{conflictCountText(0)}</li> : null}
           {(files ?? []).map((file) => (
             <li key={file.path}>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-2 py-1 text-left hover:bg-toolbar-hoverbackground"
+                className="flex w-full items-center gap-2 px-2 py-1 text-left hover:bg-[var(--surface-hover)]"
                 aria-pressed={selected.has(file.path)}
                 onClick={() => {
                   setSelected((current) => {
@@ -117,18 +117,18 @@ export function ConflictDialog({
                 onDoubleClick={() => onOpenMerge(file.path)}
               >
                 <span className="w-4 shrink-0">
-                  {selected.has(file.path) ? <Codicon name="check" size={12} /> : null}
+                  {selected.has(file.path) ? <AppIcon name="check" size={12} /> : null}
                 </span>
                 <FileTypeIcon path={file.path} />
                 <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]">{file.path}</span>
-                <span className="shrink-0 text-[11px] text-descriptionforeground">
+                <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">
                   {messages.merge.ourVersion}: {sideLabel(file.ours)}
                 </span>
-                <span className="shrink-0 text-[11px] text-descriptionforeground">
+                <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">
                   {messages.merge.theirVersion}: {sideLabel(file.theirs)}
                 </span>
                 {file.unavailable ? (
-                  <span className="shrink-0 text-[11px] text-descriptionforeground" title={mergeUnavailableText(file.unavailable)}>
+                  <span className="shrink-0 text-[11px] text-[var(--text-secondary)]" title={mergeUnavailableText(file.unavailable)}>
                     {messages.merge.onlyAcceptSide}
                   </span>
                 ) : null}
@@ -139,7 +139,7 @@ export function ConflictDialog({
         <div className="flex w-[150px] shrink-0 flex-col gap-1.5">
           <button
             type="button"
-            className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+            className="rounded-[4px] border border-[var(--border-strong)] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)] disabled:opacity-50"
             disabled={busy || chosen.length === 0}
             onClick={() => void accept("ours")}
           >
@@ -147,7 +147,7 @@ export function ConflictDialog({
           </button>
           <button
             type="button"
-            className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+            className="rounded-[4px] border border-[var(--border-strong)] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)] disabled:opacity-50"
             disabled={busy || chosen.length === 0}
             onClick={() => void accept("theirs")}
           >
@@ -155,7 +155,7 @@ export function ConflictDialog({
           </button>
           <button
             type="button"
-            className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+            className="rounded-[4px] border border-[var(--border-strong)] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)] disabled:opacity-50"
             disabled={busy || chosen.length === 0}
             onClick={() => {
               const target = chosen[0];

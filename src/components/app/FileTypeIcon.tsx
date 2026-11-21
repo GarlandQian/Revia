@@ -8,7 +8,7 @@
  */
 
 import manifest from "@/assets/material-icons/manifest.json";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 
 const iconModules = import.meta.glob<string>("../../assets/material-icons/icons/*.svg", {
   eager: true,
@@ -42,7 +42,7 @@ export function materialIconName(path: string): string {
 
 export function FileTypeIcon({ path, symlink, className }: { path: string; symlink?: boolean; className?: string }) {
   if (symlink) {
-    return <Codicon name="link" size={16} className={`shrink-0 ${className ?? ""}`} />;
+    return <AppIcon name="link" size={16} className={`shrink-0 ${className ?? ""}`} />;
   }
   const name = materialIconName(path);
   const url = iconUrls.get(name) ?? iconUrls.get(defaultIcon);

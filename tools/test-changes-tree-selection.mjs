@@ -14,7 +14,7 @@ const modules = registerHooks({
     if (specifier.startsWith("@/")) source = new URL(specifier.slice(2), src);
     else if (specifier.startsWith(".") && context.parentURL?.startsWith(src.href)) source = new URL(specifier, context.parentURL);
     if (!source) return next(specifier, context);
-    if (!/\.[^/]+$/.test(source.pathname)) source.pathname += source.pathname.endsWith("/codicon") ? ".tsx" : ".ts";
+    if (!/\.[^/]+$/.test(source.pathname)) source.pathname += source.pathname.endsWith("/app-icon") ? ".tsx" : ".ts";
     return next(source.href, context);
   },
   load(url, context, next) {
@@ -25,7 +25,7 @@ const modules = registerHooks({
     return { format: "module", source, shortCircuit: true };
   },
 });
-const { ChangesTree } = await import("../src/components/app/ChangesTree.tsx");
+const { ChangesTree, TREE_ROW_HEIGHT } = await import("../src/components/app/ChangesTree.tsx");
 const { useTreeSelection } = await import("../src/hooks/useTreeSelection.ts");
 const { runFileSelectionAction } = await import("../src/hooks/changesTreeState.ts");
 const { changelistShortcutEntries } = await import("../src/lib/m7/visibleChangelistSelection.ts");
@@ -65,11 +65,23 @@ function exercise(initial, byDirectory, steps) {
       assert.ok(element, `rendered row ${path}`);
       return element.type(element.props);
     };
+    const findButton = (node, className) => {
+      if (!node || typeof node !== "object") return null;
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          const hit = findButton(item, className);
+          if (hit) return hit;
+        }
+        return null;
+      }
+      if (node.type === "button" && String(node.props?.className ?? "").includes(className)) return node;
+      return findButton(node.props?.children, className);
+    };
     const directory = (path) => nodes.find((node) => node.key === `dir-unstaged-${path}`).props.children;
     steps[step]({
       writes, confirms, preview, model,
       click: (path, modifiers = {}) => row(path).props.children[0].props.onClick(modifiers),
-      stageInline: (path) => row(path).props.children[1].props.children[1].props.onClick({ stopPropagation: noop }),
+      stageInline: (path) => findButton(row(path).props.children.slice(1), "mini-icon-btn").props.onClick({ stopPropagation: noop }),
       selection: () => paths(model.selectedEntries),
       directory,
       key: (key, modifiers = {}) => {
@@ -82,7 +94,7 @@ function exercise(initial, byDirectory, steps) {
         open(first);
         model.receiveTreeSnapshot(next, first, opened);
       },
-      scroll: (rowIndex) => tree.props.onScroll({ currentTarget: { scrollTop: rowIndex * 22 } }),
+      scroll: (rowIndex) => tree.props.onScroll({ currentTarget: { scrollTop: rowIndex * TREE_ROW_HEIGHT } }),
     });
     advance(step + 1);
     return null;

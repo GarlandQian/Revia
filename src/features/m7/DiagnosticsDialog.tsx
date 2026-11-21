@@ -9,12 +9,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type { DiagnosticsPreview } from "@/types/bindings/DiagnosticsPreview";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { Codicon } from "@/components/ui/codicon";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { AppIcon } from "@/components/ui/app-icon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7 } from "@/lib/m7/api";
-import { useModalDialog } from "@/features/m7/glass/nativeGlass";
+import { useModalDialog } from "@/hooks/useDialogOpen";
 
 export interface DiagnosticsDialogProps {
   open: boolean;
@@ -104,36 +103,35 @@ export function DiagnosticsDialog({ open, worktreeId, onClose }: DiagnosticsDial
   return (
     <dialog
       ref={ref}
-      className="app-dialog glass-isolate flex h-[min(680px,calc(100vh-96px))] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden p-0 text-[13px]"
+      className="app-dialog flex h-[min(680px,calc(100vh-96px))] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden p-0 text-[13px]"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      <GlassLayer variant="popover" />
-      <div className="flex items-center gap-2 border-b border-panel-border px-3 py-2">
-        <Codicon name="output" size={15} />
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+        <AppIcon name="output" size={15} />
         <h2 className="flex-1 text-[13.5px] font-semibold">{t("diagnostics.title")}</h2>
         <button type="button" className="icon-action size-[22px]" aria-label={t("common.close")} onClick={onClose}>
-          <Codicon name="close" size={14} />
+          <AppIcon name="close" size={14} />
         </button>
       </div>
-      <div className="space-y-2 border-b border-panel-border px-3 py-2 text-[12px]">
-        <p className="text-descriptionforeground">{t("diagnostics.hint")}</p>
-        <p className="text-descriptionforeground">{t("diagnostics.redactions", { count: redactions })}</p>
+      <div className="space-y-2 border-b border-[var(--border-subtle)] px-3 py-2 text-[12px]">
+        <p className="text-[var(--text-secondary)]">{t("diagnostics.hint")}</p>
+        <p className="text-[var(--text-secondary)]">{t("diagnostics.redactions", { count: redactions })}</p>
         <div className="flex items-center gap-2">
-          <button type="button" className="toolbar-widget h-6 px-2" disabled={loading || busy} onClick={() => void loadPreview()}>
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={loading || busy} onClick={() => void loadPreview()}>
             {loading ? t("common.loading") : t("diagnostics.refresh")}
           </button>
-          <button type="button" className="toolbar-widget h-6 px-2" disabled={!preview || loading || busy} onClick={() => void navigator.clipboard.writeText(text).catch((caught) => setError(toAppError(caught)))}>
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={!preview || loading || busy} onClick={() => void navigator.clipboard.writeText(text).catch((caught) => setError(toAppError(caught)))}>
             {t("diagnostics.copy")}
           </button>
-          <button type="button" className="toolbar-widget h-6 px-2 font-semibold" disabled={!preview || loading || busy} onClick={() => void exportFile()}>
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2 font-semibold" disabled={!preview || loading || busy} onClick={() => void exportFile()}>
             {t("diagnostics.export")}
           </button>
           <button
             type="button"
-            className="toolbar-widget h-6 px-2"
+            className="revia-btn revia-btn-secondary h-6 px-2"
             disabled={loading || busy}
             onClick={() => void clear()}
           >
@@ -141,7 +139,7 @@ export function DiagnosticsDialog({ open, worktreeId, onClose }: DiagnosticsDial
           </button>
         </div>
         {error ? (
-          <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1">
+          <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] px-2 py-1">
             {formatAppError(error)}
           </p>
         ) : null}

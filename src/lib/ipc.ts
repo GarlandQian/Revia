@@ -115,10 +115,13 @@ export interface NotifyKinds {
 export type SoakFocus = "idle" | "ipc" | "highlight" | "channel" | "open" | "remount" | "switch" | "scroll" | "jump"
   | "view";
 
+export type AppearanceMode = "system" | "light" | "dark";
+
 export interface SettingsPayload {
   repos: string[];
   lastWorktreeId: string | null;
   diffFontSize: number;
+  appearanceMode?: AppearanceMode;
   themeLight: string;
   themeDark: string;
   codeFontFamily: string | null;
@@ -224,6 +227,7 @@ export interface AiModelList {
 
 /** 与 Rust 侧 `SettingsPatch` 对应：只传要改的字段。 */
 export interface SettingsPatch {
+  appearanceMode?: AppearanceMode;
   themeLight?: string;
   themeDark?: string;
   codeFontFamily?: string;

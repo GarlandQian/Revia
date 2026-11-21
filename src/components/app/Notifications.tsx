@@ -8,8 +8,7 @@
 
 import { messages } from "@/lib/i18n/index";
 import { useEffect, useRef, useState } from "react";
-import { Codicon } from "@/components/ui/codicon";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { AppIcon } from "@/components/ui/app-icon";
 
 export type NoticeTone = "info" | "success" | "warning" | "error";
 export type NoticeText = string | (() => string | null | undefined);
@@ -38,10 +37,10 @@ const TONE_ICON: Record<NoticeTone, string> = {
 };
 
 const TONE_COLOR: Record<NoticeTone, string> = {
-  info: "var(--editorinfo-foreground)",
-  success: "var(--gitdecoration-addedresourceforeground)",
-  warning: "var(--editorwarning-foreground)",
-  error: "var(--gitdecoration-conflictingresourceforeground)",
+  info: "var(--accent)",
+  success: "var(--git-a)",
+  warning: "var(--warn)",
+  error: "var(--danger)",
 };
 
 /** 单条通知卡片；成功/信息类在 10 秒后自动关闭。 */
@@ -74,18 +73,17 @@ export function NotificationCard({
   return (
     <article
       role={notice.tone === "error" ? "alert" : "status"}
-      className="notification glass-isolate pointer-events-auto flex gap-2 p-3"
+      className="notification pointer-events-auto flex gap-2.5 p-3"
       data-tone={notice.tone}
     >
-      <GlassLayer variant="popover" />
-      <Codicon
+      <AppIcon
         name={TONE_ICON[notice.tone]}
         size={16}
         className="mt-0.5"
         style={{ color: TONE_COLOR[notice.tone] }}
       />
       <div className="min-w-0 flex-1">
-        {notice.worktreePath ? <p className="mb-1 truncate text-[11px] text-descriptionforeground" title={notice.worktreePath}>{notice.worktreePath}</p> : null}
+        {notice.worktreePath ? <p className="mb-1 truncate text-[11px] text-[var(--text-secondary)]" title={notice.worktreePath}>{notice.worktreePath}</p> : null}
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 text-[12.5px] font-semibold break-words">{title}</p>
           <button
@@ -95,11 +93,11 @@ export function NotificationCard({
             title={messages.notices.close}
             onClick={onClose}
           >
-            <Codicon name="close" size={14} />
+            <AppIcon name="close" size={14} />
           </button>
         </div>
         {detail ? (
-          <p className="mt-1 text-[12px] leading-relaxed break-words whitespace-pre-wrap text-descriptionforeground">
+          <p className="mt-1 text-[12px] leading-relaxed break-words whitespace-pre-wrap text-[var(--text-secondary)]">
             {detail}
           </p>
         ) : null}

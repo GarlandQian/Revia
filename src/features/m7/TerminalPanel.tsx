@@ -10,13 +10,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { formatAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7 } from "@/lib/m7/api";
 import { codeFontStack } from "@/lib/theme";
 import { TerminalSessions } from "@/lib/m7/terminalSessions";
-import { nativeGlassActive } from "@/features/m7/glass/nativeGlass";
 
 interface Instance {
   terminal: Terminal;
@@ -40,11 +39,9 @@ export interface TerminalPanelProps {
   worktreePath: string;
   fontSize: number;
   fontFamily: string | null;
-  height: number;
-  onHeightChange: (height: number) => void;
   registry: TerminalSessions;
   busy: boolean;
-  onClose: () => void;
+  visible?: boolean;
 }
 
 function terminalTheme(): Record<string, string> {
@@ -54,11 +51,10 @@ function terminalTheme(): Record<string, string> {
     return value.length > 0 ? value : fallback;
   };
   return {
-    // 系统材质下终端和 diff 一样放在玻璃上：画布不画底色。
-    background: nativeGlassActive() ? "rgba(0, 0, 0, 0)" : read("--editor-background", "#1e1e1e"),
-    foreground: read("--ui-foreground", "#dddddd"),
-    cursor: read("--ui-foreground", "#dddddd"),
-    selectionBackground: read("--editor-selectionbackground", "#264f78"),
+    background: read("--surface-bg", "#1a1c20"),
+    foreground: read("--text-primary", "#f1f3f6"),
+    cursor: read("--accent", "#3b82f6"),
+    selectionBackground: read("--accent-soft", "rgba(59, 130, 246, 0.25)"),
   };
 }
 
@@ -67,22 +63,20 @@ export function TerminalPanel({
   worktreePath,
   fontSize,
   fontFamily,
-  height,
-  onHeightChange,
   registry,
   busy,
-  onClose,
+  visible = true,
 }: TerminalPanelProps) {
   const revision = useSyncExternalStore(registry.subscribe, registry.snapshot);
   const tabs = registry.list(worktreeId);
   const error = registry.errorFor(worktreeId);
   const starting = registry.isStarting(worktreeId);
   const [active, setActive] = useState<number | null>(null);
+  const [themeRev, setThemeRev] = useState(0);
   const instances = useRef(new Map<number, Instance>());
   const fontOptions = useRef({ fontFamily, fontSize });
   fontOptions.current = { fontFamily, fontSize };
   const ownerRef = useRef<string | null>(worktreeId); ownerRef.current = worktreeId;
-  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   useEffect(() => {
     ownerRef.current = worktreeId;
     setActive(null);
@@ -122,7 +116,7 @@ export function TerminalPanel({
         fontSize: fontOptions.current.fontSize,
         cursorBlink: true,
         theme: terminalTheme(),
-        allowTransparency: nativeGlassActive(),
+        allowTransparency: false,
         scrollback: 2000,
         allowProposedApi: false,
       });
@@ -162,9 +156,17 @@ export function TerminalPanel({
     [registry],
   );
 
-  // 只有真正激活页签才聚焦；输出、刷新及其他输入不会重新夺取焦点。
+  // 监听外观模式 / 主题切换，立即刷新已打开终端的颜色（M13）。
   useEffect(() => {
-    if (active === null) return;
+    if (typeof MutationObserver === "undefined") return;
+    const observer = new MutationObserver(() => setThemeRev((value) => value + 1));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-kind", "data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+
+  // 只有真正激活页签且面板可见时才聚焦；输出、刷新及其他输入不会重新夺取焦点。
+  useEffect(() => {
+    if (active === null || !visible) return;
     const frame = requestAnimationFrame(() => {
       const instance = instances.current.get(active);
       if (!instance) return;
@@ -176,22 +178,24 @@ export function TerminalPanel({
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [active, worktreeId]);
+  }, [active, visible, worktreeId]);
 
-  // 字号或主题变化时更新所有实例。
+  // 字号、外观模式或主题变化时更新所有实例。
   useEffect(() => {
     for (const instance of instances.current.values()) {
       instance.terminal.options.disableStdin = busy || registry.isClosing;
       instance.terminal.options.fontSize = fontSize;
       instance.terminal.options.fontFamily = codeFontStack(fontFamily);
       instance.terminal.options.theme = terminalTheme();
-      try {
-        instance.fit.fit();
-      } catch {
-        // 忽略。
+      if (visible) {
+        try {
+          instance.fit.fit();
+        } catch {
+          // 忽略。
+        }
       }
     }
-  }, [fontSize, fontFamily, busy, registry, revision]);
+  }, [fontSize, fontFamily, busy, registry, revision, themeRev, visible]);
 
   // F06/H9：关闭运行中进程前先确认；确认后由用户动作触发真正关闭。
   const [confirmCloseSession, setConfirmCloseSession] = useState<number | null>(null);
@@ -205,49 +209,22 @@ export function TerminalPanel({
     await registry.close(sessionId, confirmed).catch(() => { /* 原目标已有错误。 */ });
   }, [registry, worktreeId]);
 
-  const startDrag = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      dragRef.current = { startY: event.clientY, startHeight: height };
-      event.currentTarget.setPointerCapture(event.pointerId);
-    },
-    [height],
-  );
-
-  const moveDrag = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const next = Math.min(Math.max(drag.startHeight + (drag.startY - event.clientY), 120), window.innerHeight * 0.7);
-      onHeightChange(Math.round(next));
-    },
-    [onHeightChange],
-  );
-
   const activeTab = useMemo(() => tabs.find((tab) => tab.sessionId === active) ?? null, [tabs, active]);
 
   return (
-    <div className="terminal-panel flex min-h-0 shrink-0 flex-col border-t border-panel-border bg-[var(--editor-background)]" style={{ height }}>
-      <div
-        className="h-1 shrink-0 cursor-row-resize bg-transparent hover:bg-[var(--focus-border)]"
-        onPointerDown={startDrag}
-        onPointerMove={moveDrag}
-        onPointerUp={(event) => {
-          dragRef.current = null;
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        }}
-      />
-      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-panel-border px-2 text-[12px]">
-        <Codicon name="terminal" size={14} />
-        <span className="shrink-0 font-semibold">{t("terminal.title")}</span>
-        <span className="max-w-[40%] truncate text-descriptionforeground" title={worktreePath}>
+    <div className="terminal-panel flex min-h-0 flex-1 flex-col bg-[var(--surface-bg)]">
+      <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2.5 text-[12px]">
+        <span className="max-w-[36%] truncate text-[11.5px] text-[var(--text-muted)]" title={worktreePath}>
           {worktreePath}
         </span>
-        <div className="ml-2 flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+        <div className="ml-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {tabs.map((tab) => (
             <div
               key={tab.sessionId}
-              className={`group flex h-6 shrink-0 items-center gap-1 rounded px-2 ${
-                tab.sessionId === active ? "bg-[var(--list-activeSelectionBackground)] text-[var(--list-activeSelectionForeground)]" : "text-descriptionforeground hover:bg-[var(--list-hoverBackground)]"
+              className={`group flex h-5 shrink-0 items-center gap-1 rounded-[5px] px-2 text-[11.5px] ${
+                tab.sessionId === active
+                  ? "bg-[var(--surface-bg)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
               }`}
             >
               <button
@@ -266,15 +243,15 @@ export function TerminalPanel({
                 aria-label={t("terminal.closeTab")}
                 onClick={() => void closeTab(tab.sessionId)}
               >
-                <Codicon name="close" size={12} />
+                <AppIcon name="close" size={11} />
               </button>
               {confirmCloseSession === tab.sessionId ? (
-                <span className="ml-1 flex items-center gap-1 text-[10.5px] text-[var(--editorwarning-foreground)]">
+                <span className="ml-1 flex items-center gap-1 text-[10.5px] text-[var(--warn)]">
                   {t("terminal.closeRunningConfirm")}
-                  <button type="button" className="toolbar-widget h-4 px-1" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId, true); }}>
+                  <button type="button" className="revia-btn revia-btn-secondary h-4 px-1" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId, true); }}>
                     {t("terminal.closeRunningYes")}
                   </button>
-                  <button type="button" className="toolbar-widget h-4 px-1" onClick={() => setConfirmCloseSession(null)}>
+                  <button type="button" className="revia-btn revia-btn-secondary h-4 px-1" onClick={() => setConfirmCloseSession(null)}>
                     {t("common.cancel")}
                   </button>
                 </span>
@@ -284,27 +261,18 @@ export function TerminalPanel({
         </div>
         <button
           type="button"
-          className="icon-action size-[22px]"
+          className="mini-icon-btn"
           title={t("terminal.new")}
           aria-label={t("terminal.new")}
           disabled={starting || busy || registry.isClosing}
           onClick={() => void openSession(activeTab?.cwd ?? null)}
         >
-          <Codicon name="add" size={14} />
-        </button>
-        <button
-          type="button"
-          className="icon-action size-[22px]"
-          title={t("terminal.closePanel")}
-          aria-label={t("terminal.closePanel")}
-          onClick={onClose}
-        >
-          <Codicon name="close" size={14} />
+          <AppIcon name="add" size={13} />
         </button>
       </div>
-      {busy ? <p role="status" className="px-3 py-1 text-[12px] text-descriptionforeground">{t("errors.m7.terminalWorktreeBusy")}</p> : null}
+      {busy ? <p role="status" className="px-3 py-1 text-[12px] text-[var(--text-secondary)]">{t("errors.m7.terminalWorktreeBusy")}</p> : null}
       {error ? (
-        <div role="alert" className="mx-2 mt-1 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1 text-[12px]">
+        <div role="alert" className="mx-2 mt-1 rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] px-2 py-1 text-[12px]">
           {formatAppError(error)}
         </div>
       ) : null}
@@ -318,9 +286,9 @@ export function TerminalPanel({
           />
         ))}
         {tabs.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-[12px] text-descriptionforeground">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-[12px] text-[var(--text-secondary)]">
             <span>{t("terminal.empty")}</span>
-            <button type="button" className="toolbar-widget h-6 px-2" disabled={starting || busy || registry.isClosing} onClick={() => void openSession(null)}>
+            <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={starting || busy || registry.isClosing} onClick={() => void openSession(null)}>
               {t("terminal.new")}
             </button>
           </div>

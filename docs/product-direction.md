@@ -1,10 +1,10 @@
 # 产品方向
 
-更新日期：2026-10-30。状态：布局和功能照 Rebased，M7 外观改为 Liquid Glass、代码清晰度优先，并同步设计 macOS / Windows 外壳；M6 已合入 main，M7 访谈已确认，进入实施准备，已确认 Q176–Q199；既有遗留项仍在 backlog。
+更新日期：2026-11-21。状态：M0–M13 均已合入本地 `main`；M13 松绑与 Rebased 的一比一布局约束并告别 Liquid Glass，采用克制清晰的实色现代桌面设计系统，外壳与代码颜色主题解耦，完整保留既有 Git 工作流与安全边界（Q234–Q245，[ADR-0011](./adr/0011-rebuild-like-rebased-not-fork.md)、[ADR-0016](./adr/0016-decoupled-design-system-and-solid-surfaces.md)）。
 
 ## 定位
 
-Revia 是一个照 Rebased（基于 IntelliJ 平台的开源 Git 客户端）的布局和功能、采用 Liquid Glass 外观的轻量桌面 Git 客户端：不依赖 JVM，在 Rebased 的功能之上多出审阅标记、回收区和写前校验（Q118、Q189）。最终提供 macOS Apple Silicon 版、Windows x64 安装版和 Windows x64 便携版；首版只做 macOS，Windows 放在首版验证之后（Q55）。布局、功能和交互照本机安装的 Rebased 1.1.22；保留 VS Code 颜色主题、系统界面字体和可配置代码字体，玻璃效果不得牺牲代码与 diff 可读性（Q117、Q132、Q133、Q190）。
+Revia 是一个不依赖 JVM 的轻量跨平台桌面 Git 客户端，覆盖日常 Git 提交与审阅工作流，并在其上提供审阅标记、回收区和写前校验等核心安全能力（Q118）。目标平台为 macOS Apple Silicon、Windows x64 安装版和 Windows x64 便携版（Q55、[ADR-0007](./adr/0007-target-platforms.md)）。M13 起采用实色现代桌面设计系统：外壳由 Revia 自研浅/深色令牌驱动，代码 diff / 三方合并 / blame 表面继续支持内置与导入的 VS Code 颜色主题、系统界面字体与可配置代码字体（Q132、Q133、Q234–Q238）。
 
 明确不做：
 
@@ -213,7 +213,7 @@ Rebased 安装资源与 x18n 官方工作流的事实、来源和未确认边界
 | 诊断导出 | 默认当前仓库；路径、远端地址、作者邮箱等默认脱敏；导出前预览（Q180）。脱敏操作摘要和错误信息跨重启保留 7 天，可手动清空；排除文件正文、diff、终端输入输出（Q187） |
 | 应用更新 | 稳定版为默认，预发布版主动开启；确认后下载与安装，处理未保存编辑、Git 写入和终端会话后再确认重启（Q181） |
 | 打包分发 | 用 GitHub Actions 打包，版本标签触发；先生成带安装包的 Release 草稿，确认后公开，公开后客户端才收到更新（Q188）。首版只发布 macOS Apple Silicon，暂不做 Apple 开发者代码签名和公证，更新包使用独立生成的签名密钥（Q182；沿 Q62、Q63） |
-| 外观 | 改为 Liquid Glass，可以按需使用 React Bits；偏强透明、折射和悬浮感，代码与 diff 的清晰度优先（Q189、Q190）。设计时同时考虑 macOS 与 Windows；第二版整体可用，第四版接入实际组件并修正按钮配色，已确认（Q191、Q199）。见 [UI 方向](./ui-direction.md#视觉风格) 与 [预览](./milestones/m7/mockups/) |
+| 外观 | M7–M12 曾采用 Liquid Glass（Q189–Q199）；M13 起已彻底替换为实色现代桌面设计系统，外壳与代码颜色主题解耦（Q234–Q245，[ADR-0016](./adr/0016-decoupled-design-system-and-solid-surfaces.md)），见 [UI 方向](./ui-direction.md#视觉风格) 与 [M13 视觉稿 v1](./milestones/m13/mockups/revia-ui-v1.html) |
 
 GitHub API 登录用于 PR 与保护状态等协作功能，本地查看改动、提交和历史不要求该登录（Q184）。Git 传输认证分别处理：克隆、fetch、pull、push 仍沿用已配置的 credential helper / ssh-agent，不修改用户 Git 配置；需要交互输入时按 Q153 提示到终端配置。
 
@@ -259,11 +259,16 @@ Q78 补充 Q53 的验收口径，不把历史报告中的卡住记录当成当�
 | M1 只读 | 先改造 diff 传输并消除快速滚动时的空白（Q46）；然后初始化正式工程，实现添加仓库、读取状态、文件列表、显示 diff | **已完成**，见 [M1 报告](./milestones/m1/report.md) |
 | M2 暂存 | 先复现并验证长期运行问题，发现故障先修复，未复现时按 Q78 留证验收（Q53、Q78）；然后按 Q79–Q83 的范围做暂存、取消暂存、丢弃与回收区、diff 指纹校验；审阅标记（Q48）；文件监视；平台相关代码集中管理，GitHub Actions 上 Windows 编译检查（Q55、Q62） | **已合入 main**（2026-10-26），部分桌面验收未完成，界面验收在 M4 重做（Q127） |
 | M3 提交 | 提交信息框、hooks、amend、提交前快照；识别进行中的操作并禁用提交 | **已合入 main**（2026-10-26），桌面验收未做，界面验收在 M4 重做（Q127） |
-| M4 界面重做 | 现有功能按 Rebased 的布局与交互、VS Code 的外观重做（Q119–Q121、Q131–Q133），含颜色主题与代码字体设置：提交工具窗口两种模式中的暂存区模式、多选与全部暂存、diff 编辑器页签、提交区、回收区页签、通知、设置；顶栏仓库与 worktree 组件，worktree 下拉每行显示分支、未提交改动、进行中的操作、领先和落后数，取代原 M4 的 worktree 侧栏；内置三方合并：冲突组、三栏合并页签、应用并标记为已解决（Q143） | 开始自用，推送先在终端中做 |
-| M5 日常一圈 | 主区域提交日志（分支图、筛选、提交详情）；分支组件（切换、新建）；fetch、pull、push 与“提交并推送”；Git 控制台日志 | — |
-| M6 冲突与历史 | stash；继续、中止、跳过；在日志中 cherry-pick、revert、reset、改提交信息、交互式 rebase；文件历史与 blame；外部 diff / 合并工具保留为可选；简体中文 / English 与 x18n（Q163）；日志日期列折行修复 | **已合入 main**（2026-10-30）；收尾小改动真机补查见 [backlog 14](./milestones/backlog/14-m6-final-desktop-recheck.md) |
-| M7 扩展 | 更改列表模式；diff 工作区一侧可编辑；内置终端；克隆；GitHub PR 与保护规则同步；导出诊断信息；应用更新与 Actions 打包；Liquid Glass 外观与清晰代码表面（Q189、Q190）；颜色主题导入（Q132）、自定义快捷键（Q139）；日志索引仅在大仓库筛选确实慢时实施（Q151） | 规格与实施准备，第四版已确认；完成后开始试用（无 Apple 开发者签名和公证，Q63、Q182） |
-| M8 Windows | Windows x64 安装版与便携版（Q55–Q58）；平台外壳与 Windows 快捷键（Q60、Q61）；Windows 上的 hooks 环境、换行符、路径、Git for Windows、WebView2 性能 | 首版验证通过后开始 |
+| M4 界面重做 | 提交工具窗口、多选与全部暂存、diff 编辑器页签、提交区、回收区页签、通知、设置、顶栏仓库/worktree 切换、内置三方合并（Q119–Q143） | **已合入 main**（2026-10-28） |
+| M5 日常一圈 | 主区域提交日志（分支图、筛选、提交详情）；分支组件（切换、新建）；fetch、pull、push 与“提交并推送”；Git 命令日志 | **已合入 main**（2026-10-28） |
+| M6 冲突与历史 | stash；继续、中止、跳过；在日志中 cherry-pick、revert、reset、改提交信息、交互式 rebase；文件历史与 blame；外部 diff / 合并工具保留为可选；简体中文 / English 与 x18n（Q163）；日志日期列折行修复 | **已合入 main**（2026-10-30） |
+| M7 扩展 | 更改列表模式；diff 工作区一侧可编辑；内置终端；克隆；GitHub PR 与保护规则同步；导出诊断信息；应用更新与 Actions 打包；颜色主题导入（Q132）、自定义快捷键（Q139） | **已合入 main** |
+| M8 Windows | Windows x64 安装版与便携版（Q55–Q58）；平台外壳与 Windows 快捷键（Q60、Q61）；Windows 上的 hooks 环境、Credential Manager、PowerShell profile | **已合入 main**（Windows 真实桌面待验） |
+| M9 性能与 AI | 性能测量框架与 AI 生成提交信息（Q208–Q222）；发布 0.0.3 | **已合入 main**（真实 AI 与 Windows 性能待验） |
+| M10 架构深化 | worktree 刷新归属、登录环境与 AI 生成生命周期收口；发布 0.0.4（Q224、Q225） | **已合入 main**，见 [M10 报告](./milestones/m10/report.md) |
+| M11 AI 配置修复 | 修复 AI 配置保存时序与自动拉取模型列表（Q226） | **已合入 main**，见 [M11 报告](./milestones/m11/report.md) |
+| M12 改动树与历史 | 改动树选区与折叠目录计数、文件历史按需读取 diff（Q227–Q233） | **已合入 main**，见 [M12 报告](./milestones/m12/report.md) |
+| M13 UI 全面重构 | 实色现代桌面设计系统、外壳与代码颜色主题解耦、外观模式、Lucide `AppIcon`、精简顶栏/两栏卡片设置/底部统一抽屉/PR 主区页签，全面清理历史兼容层（Q234–Q245，ADR-0016） | **已合入本地 main**，见 [M13 报告](./milestones/m13/report.md) |
 
 M4 完成就开始自用，之后边用边做；M7 完成后开始试用（Q126，取代 Q43 的“M3 完成后开始自用”）。识别进行中的操作放在 M3，因为自用前必须防止在 rebase 等操作中途误提交。
 

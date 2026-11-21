@@ -14,7 +14,7 @@ import type { HistoryMergeView } from "@/types/bindings/HistoryMergeView";
 import { ipc } from "@/lib/ipc";
 import { messages } from "@/lib/i18n/index";
 import { formatAppError, toAppError } from "@/lib/error";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 
 export interface CommitMergeViewProps {
   targetId: string;
@@ -68,20 +68,20 @@ export function CommitMergeView(props: CommitMergeViewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col" style={{ fontSize, fontFamily: fontFamily ?? undefined }}>
-      <div className="flex h-[24px] shrink-0 items-center gap-2 border-b border-panel-border px-2 text-[11.5px] text-descriptionforeground">
-        <Codicon name="git-merge" size={12} />
+      <div className="flex h-[24px] shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-2 text-[11.5px] text-[var(--text-secondary)]">
+        <AppIcon name="git-merge" size={12} />
         <span className="shrink-0">{messages.history.mergeReadonly}</span>
         <span className="min-w-0 flex-1 truncate" title={props.title}>{props.title}</span>
         <button type="button" className="icon-action size-[20px]" title={messages.recovery.close} onClick={props.onClose}>
-          <Codicon name="close" size={12} />
+          <AppIcon name="close" size={12} />
         </button>
       </div>
       {unavailable ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-[12.5px] text-descriptionforeground">
+        <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-[12.5px] text-[var(--text-secondary)]">
           {unavailable}
         </div>
       ) : !layout ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-[12.5px] text-descriptionforeground">
+        <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-[12.5px] text-[var(--text-secondary)]">
           {messages.history.loadingMerge}
         </div>
       ) : (
@@ -144,9 +144,9 @@ function MergePane({
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
-      <div className="flex h-[22px] shrink-0 items-center gap-1.5 border-b border-panel-border px-2 font-sans text-[11px] text-descriptionforeground">
+      <div className="flex h-[22px] shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 font-sans text-[11px] text-[var(--text-secondary)]">
         <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
-        {readonly ? <Codicon name="lock" size={11} /> : null}
+        {readonly ? <AppIcon name="lock" size={11} /> : null}
       </div>
       <div
         ref={registerRef}
@@ -154,9 +154,9 @@ function MergePane({
         className="min-h-0 flex-1 overflow-auto bg-[var(--diff-bg)] font-mono"
       >
         {binary ? (
-          <p className="p-3 font-sans text-[12px] text-descriptionforeground">{messages.history.binary}</p>
+          <p className="p-3 font-sans text-[12px] text-[var(--text-secondary)]">{messages.history.binary}</p>
         ) : missing ? (
-          <p className="p-3 font-sans text-[12px] text-descriptionforeground">{messages.history.missingSide}</p>
+          <p className="p-3 font-sans text-[12px] text-[var(--text-secondary)]">{messages.history.missingSide}</p>
         ) : (
           <table className="border-collapse">
             <tbody>

@@ -22,7 +22,9 @@ pub struct Settings {
     pub last_worktree_id: Option<String>,
     /// diff / 代码字号（⌘+ / ⌘-，Q39、Q133）。
     pub diff_font_size: u32,
-    /// 浅色颜色主题（Q132）。
+    /// M13：外观模式（跟随系统 / 浅色 / 深色，默认跟随系统，Q237）。
+    pub appearance_mode: AppearanceMode,
+    /// 浅色颜色主题（Q132、Q237）。
     pub theme_light: String,
     /// 深色颜色主题（Q132）。
     pub theme_dark: String,
@@ -131,6 +133,16 @@ pub struct Settings {
     pub allow_prerelease: bool,
     /// 用户自定义快捷键（动作 id → 加速键）；未列出的动作用默认快捷键（Q199）。
     pub shortcuts: BTreeMap<String, String>,
+}
+
+/// 外观模式（M13、Q237）：控制界面外壳深浅色，并与对应的浅/深色代码颜色主题联动。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum AppearanceMode {
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 /// 应用更新方式（M7 任务 10）。与拉取时的 `update_mode`（merge / rebase）不是同一件事。
@@ -375,6 +387,7 @@ impl Default for Settings {
             repos: Vec::new(),
             last_worktree_id: None,
             diff_font_size: 12,
+            appearance_mode: AppearanceMode::System,
             theme_light: DEFAULT_LIGHT_THEME.into(),
             theme_dark: DEFAULT_DARK_THEME.into(),
             code_font_family: None,
@@ -446,6 +459,7 @@ pub const DEFAULT_DARK_THEME: &str = "one-dark-pro";
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SettingsPatch {
+    pub appearance_mode: Option<AppearanceMode>,
     pub theme_light: Option<String>,
     pub theme_dark: Option<String>,
     pub code_font_family: Option<String>,
@@ -675,6 +689,9 @@ impl Registry {
     /// 应用一次设置修改；取值不合法时拒绝并保留原设置。
     pub fn update_settings(&mut self, patch: &SettingsPatch) -> Result<Settings> {
         let mut next = self.settings.clone();
+        if let Some(mode) = patch.appearance_mode {
+            next.appearance_mode = mode;
+        }
         if let Some(theme) = &patch.theme_light {
             if !self.theme_allowed(theme, true) {
                 return Err(AppError::coded(
@@ -1258,5 +1275,26 @@ mod tests {
         assert_eq!(reloaded.settings().ai_model, "gpt-4o");
         assert_eq!(reloaded.settings().ai_language, crate::ai::AiLanguage::English);
         assert_eq!(reloaded.settings().ai_prompt, "自定义提示词");
+    }
+
+    #[test]
+    fn appearance_mode_defaults_to_system_and_persists() {
+        let dir = tempfile::tempdir().unwrap();
+        // 旧版 settings.json 不含 appearanceMode 字段时应默认回退到 System。
+        fs::write(dir.path().join("settings.json"), r#"{"diffFontSize":13}"#).unwrap();
+        let mut registry =
+            Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        assert_eq!(registry.settings().appearance_mode, AppearanceMode::System);
+
+        let updated = registry
+            .update_settings(&SettingsPatch {
+                appearance_mode: Some(AppearanceMode::Dark),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        assert_eq!(updated.appearance_mode, AppearanceMode::Dark);
+
+        let reloaded = Registry::load(dir.path().to_path_buf(), Arc::new(CommandLog::default()));
+        assert_eq!(reloaded.settings().appearance_mode, AppearanceMode::Dark);
     }
 }

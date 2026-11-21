@@ -1,0 +1,718 @@
+/* ==========================================================================
+   Revia M13 Shell — Titlebar, Sidebar, Changes Tree, Commit Card, Drawer, Statusbar
+   ========================================================================== */
+
+@layer components {
+  .app-shell {
+    display: grid;
+    height: 100%;
+    grid-template-rows: var(--titlebar-height) minmax(0, 1fr) var(--statusbar-height);
+    overflow: hidden;
+    background: var(--surface-bg);
+    color: var(--text-primary);
+  }
+
+  /* ---------- Top Titlebar (40px) ---------- */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--titlebar-height);
+    padding-right: 12px;
+    background: var(--shell-bg);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-subtle);
+    user-select: none;
+  }
+
+  .tb-divider {
+    width: 1px;
+    height: 16px;
+    flex: none;
+    background: var(--border-subtle);
+    margin: 0 2px;
+  }
+
+  .tb-icon-btn,
+  .icon-action {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    transition: background-color 110ms ease, color 110ms ease, border-color 110ms ease;
+  }
+
+  .icon-action {
+    width: 26px;
+    height: 26px;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .tb-icon-btn:hover:not(:disabled),
+  .icon-action:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .tb-icon-btn[aria-pressed="true"],
+  .icon-action[aria-pressed="true"] {
+    background: var(--surface-active-neutral);
+    color: var(--text-primary);
+  }
+
+  .tb-icon-btn:focus-visible,
+  .icon-action:focus-visible,
+  .ctx-btn:focus-visible,
+  .tb-sync-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .tb-icon-btn:disabled,
+  .icon-action:disabled,
+  .ctx-btn:disabled,
+  .tb-sync-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .update-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--shell-bg);
+  }
+
+  /* Compact Hierarchical Context Switcher (Repo / Worktree / Branch) */
+  .context-chain {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .ctx-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    transition: background-color 110ms ease, color 110ms ease;
+  }
+
+  .ctx-btn:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+
+  .ctx-btn.ctx-subtle {
+    color: var(--text-secondary);
+    font-weight: 450;
+  }
+
+  .ctx-btn.ctx-subtle:hover:not(:disabled) {
+    color: var(--text-primary);
+  }
+
+  .ctx-slash {
+    color: var(--text-muted);
+    font-size: 13px;
+    opacity: 0.65;
+    padding: 0 1px;
+    user-select: none;
+  }
+
+  .repo-badge {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: var(--accent);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+
+  .branch-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  /* High-frequency Sync Buttons (Update / Push) */
+  .tb-sync-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tb-sync-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 9px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-bg);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    outline: none;
+    transition: background-color 110ms ease, border-color 110ms ease;
+  }
+
+  .tb-sync-btn:hover:not(:disabled) {
+    background: var(--surface-subtle);
+    border-color: var(--border-strong);
+  }
+
+  .sync-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* ---------- Left Sidebar ---------- */
+  .changes-sidebar {
+    background: var(--shell-bg);
+    border-right: 1px solid var(--border-subtle);
+    max-width: calc(100% - var(--editor-min-width));
+  }
+
+  .sidebar-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -3px;
+    width: 6px;
+    z-index: 10;
+    cursor: col-resize;
+  }
+
+  .sidebar-resizer:hover,
+  .sidebar-resizer[data-dragging="true"] {
+    background: var(--accent);
+    opacity: 0.45;
+  }
+
+  .sidebar-header {
+    height: var(--tab-height);
+    padding: 0 8px 0 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .side-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .side-tab {
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    outline: none;
+    transition: background-color 110ms ease, color 110ms ease, border-color 110ms ease;
+  }
+
+  .side-tab:hover {
+    color: var(--text-primary);
+    background: var(--surface-hover);
+  }
+
+  .side-tab[aria-selected="true"] {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+    font-weight: 560;
+  }
+
+  .count-pill,
+  .count-badge {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    min-width: 17px;
+    height: 16px;
+    line-height: 16px;
+    padding: 0 5px;
+    border-radius: 999px;
+    text-align: center;
+    background: var(--surface-hover);
+    color: var(--text-secondary);
+  }
+
+  .side-tab[aria-selected="true"] .count-pill {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  /* ---------- Changes Tree (Q243: Neutral Filename + Right Status Badge <-> Hover Actions) ---------- */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: var(--radius-xs);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    outline: none;
+    user-select: none;
+    transition: background-color 100ms ease, color 100ms ease;
+  }
+
+  .section-header:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .change-row {
+    position: relative;
+    height: var(--row-height);
+    border-radius: var(--radius-sm);
+    margin: 0 6px;
+    padding: 0 8px;
+    background: transparent;
+    transition: background-color 100ms ease;
+  }
+
+  .change-row:hover {
+    background: var(--surface-hover);
+  }
+
+  .change-row[data-selected="true"] {
+    background: var(--surface-active-neutral);
+  }
+
+  .changes-tree:focus-within .change-row[data-selected="true"] {
+    background: var(--surface-active);
+  }
+
+  .changes-tree:focus-within .change-row[data-active="true"] {
+    outline: 1px solid var(--accent-border);
+    outline-offset: -1px;
+  }
+
+  .change-file-name {
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-weight: 480;
+  }
+
+  .change-row[data-status="deleted"] .change-file-name {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+  }
+
+  .change-tail {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 18px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .change-status-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 650;
+    width: 16px;
+    text-align: center;
+    transition: opacity 100ms ease;
+  }
+
+  .change-hover-actions {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    pointer-events: none;
+    padding-left: 8px;
+    background: linear-gradient(90deg, transparent 0%, var(--surface-hover) 26%);
+    transition: opacity 100ms ease;
+  }
+
+  .change-row[data-selected="true"] .change-hover-actions {
+    background: linear-gradient(90deg, transparent 0%, var(--surface-active-neutral) 26%);
+  }
+
+  .changes-tree:focus-within .change-row[data-selected="true"] .change-hover-actions {
+    background: linear-gradient(90deg, transparent 0%, var(--surface-active) 26%);
+  }
+
+  .change-row:hover .change-status-badge,
+  .change-row:focus-within .change-status-badge {
+    opacity: 0;
+  }
+
+  .change-row:hover .change-hover-actions,
+  .change-row:focus-within .change-hover-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mini-icon-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-xs);
+    display: inline-grid;
+    place-items: center;
+    color: var(--text-secondary);
+    transition: background-color 100ms ease, color 100ms ease;
+  }
+
+  .mini-icon-btn:hover:not(:disabled) {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+  }
+
+  .mini-icon-btn.danger:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .mini-icon-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* Git 语义状态色（用于行尾状态徽标、提交日志状态字母等） */
+  .status-modified,
+  .status-typeChanged { color: var(--git-m); }
+  .status-added { color: var(--git-a); }
+  .status-deleted { color: var(--git-d); }
+  .status-renamed { color: var(--git-r); }
+  .status-conflict { color: var(--danger); }
+  .status-untracked { color: var(--git-u); }
+
+  /* ---------- Commit Composer Card & Resizer (Q244) ---------- */
+  .commit-resizer {
+    height: 6px;
+    cursor: row-resize;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .commit-resizer::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 2px;
+    height: 1px;
+    background: var(--border-subtle);
+    transition: background-color 120ms ease, height 120ms ease;
+  }
+
+  .commit-resizer:hover::after,
+  .commit-resizer[data-dragging="true"]::after {
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .commit-composer {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior-y: contain;
+    padding: 8px 10px 10px;
+    background: var(--shell-bg);
+  }
+
+  .commit-card {
+    background: var(--surface-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 148px;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .commit-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--surface-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .commit-ai-btn {
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-soft);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: filter 110ms ease;
+  }
+
+  .commit-ai-btn:hover:not(:disabled) {
+    filter: brightness(0.95);
+  }
+
+  .commit-ai-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .commit-message {
+    display: block;
+    width: 100%;
+    min-height: 76px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+  }
+
+  .commit-message::placeholder {
+    color: var(--text-muted);
+  }
+
+  .commit-message:disabled {
+    color: var(--text-muted);
+    cursor: default;
+  }
+
+  .commit-footer {
+    padding: 7px 8px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .review-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Unified Buttons */
+  .revia-btn {
+    height: 28px;
+    padding: 0 11px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 550;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    white-space: nowrap;
+    outline: none;
+    transition: background-color 110ms ease, border-color 110ms ease, color 110ms ease;
+  }
+
+  .revia-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .revia-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .revia-btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: 1px solid transparent;
+  }
+
+  .revia-btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .revia-btn-secondary {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+  }
+
+  .revia-btn-secondary:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+
+  /* ---------- Bottom Collapsible Drawer (Terminal + Git Command Log, Q241) ---------- */
+  .bottom-drawer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-bg);
+    min-height: 120px;
+  }
+
+  .drawer-resizer {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 6px;
+    z-index: 10;
+    cursor: row-resize;
+  }
+
+  .drawer-resizer:hover,
+  .drawer-resizer[data-dragging="true"] {
+    background: var(--accent);
+    opacity: 0.45;
+  }
+
+  .drawer-hdr {
+    height: 32px;
+    padding: 0 10px;
+    background: var(--shell-bg);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .drawer-tab {
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background-color 110ms ease, color 110ms ease;
+  }
+
+  .drawer-tab:hover {
+    color: var(--text-primary);
+    background: var(--surface-hover);
+  }
+
+  .drawer-tab[aria-selected="true"] {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* ---------- Status Bar (24px) ---------- */
+  .window-status {
+    height: var(--statusbar-height);
+    background: var(--shell-bg);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    user-select: none;
+  }
+
+  .status-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-xs);
+    color: var(--text-secondary);
+    transition: background-color 100ms ease, color 100ms ease;
+  }
+
+  button.status-item:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  /* ---------- Welcome Screen ---------- */
+  .welcome-shell {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+  }
+
+  .welcome-card {
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+}

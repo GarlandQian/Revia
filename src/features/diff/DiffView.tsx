@@ -23,7 +23,7 @@ import { ipc } from "@/lib/ipc";
 import { formatAppError } from "@/lib/error";
 import { getLocale, messages, type Locale } from "@/lib/i18n/index";
 import { codeFontStack } from "@/lib/theme";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { logToBackend } from "./log";
 import type { DiffHighlights } from "./highlightStore";
 import type { DiffRows } from "./rowWindowStore";
@@ -638,7 +638,7 @@ const RowView = memo(function RowView({
             onFocus={() => onHunkFocus(top)}
             onClick={() => onHunkAction(action)}
           >
-            <Codicon name={action.changes === "staged" ? "remove" : "add"} size={13} />
+            <AppIcon name={action.changes === "staged" ? "remove" : "add"} size={13} />
             {label}
           </button>
         ) : null}
@@ -646,7 +646,7 @@ const RowView = memo(function RowView({
           <button type="button" className="hunk-action" disabled={hunkDisabled}
             aria-label={`${messages.changes.discardHunk}：${row.section ?? ""}`}
             onFocus={() => onHunkFocus(top)} onClick={() => onHunkDiscard(action, row.section ?? "")}>
-            <Codicon name="discard" size={13} />
+            <AppIcon name="discard" size={13} />
             {messages.changes.discardHunk}
           </button>
         ) : null}
@@ -674,7 +674,7 @@ const RowView = memo(function RowView({
               onFocus={() => onHunkFocus(top)}
               onClick={() => onSegmentAction(segmentAction)}
             >
-              <Codicon name={segmentAction.changes === "staged" ? "chevron-right" : "chevron-left"} size={11} />
+              <AppIcon name={segmentAction.changes === "staged" ? "chevron-right" : "chevron-left"} size={11} />
             </button>
           ) : null}
           {row.oldLine ?? ""}
@@ -690,7 +690,7 @@ const RowView = memo(function RowView({
               onFocus={() => onHunkFocus(top)}
               onClick={() => onSegmentDiscard(segmentAction)}
             >
-              <Codicon name="discard" size={11} />
+              <AppIcon name="discard" size={11} />
             </button>
           ) : null}
           {row.newLine ?? ""}

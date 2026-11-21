@@ -30,7 +30,7 @@ function historyFixture(revision = "a".repeat(40)) {
   const PatchDiffView = () => null;
   const require = id => id === "react" ? hooks : id === "react/jsx-runtime" ? { jsx, jsxs: jsx } : id === "@/lib/ipc" ? { ipc: api }
     : id === "@/lib/i18n/index" ? { messages: texts(""), getLocale: () => "en" } : id === "@/lib/error" ? { formatAppError: error => error.code, toAppError: e => e }
-      : id.includes("PatchDiffView") ? { PatchDiffView } : id.includes("codicon") ? { Codicon: () => null } : id.includes("Dialogs") ? { Modal: () => null } : {};
+      : id.includes("PatchDiffView") ? { PatchDiffView } : id.includes("app-icon") ? { AppIcon: () => null } : id.includes("Dialogs") ? { Modal: () => null } : {};
   const module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(new URL("../src/features/m6/FileHistoryDialog.tsx", import.meta.url), "utf8"), {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -201,7 +201,7 @@ test("同OID不同历史路径逐行选中、刷新保留和blame使用被点击
     const row = f.nodes().find(n => n.type === "div" && n.props.onClick && n.props.children.some?.(n => n?.props?.title === entry.path));
     assert.ok(row); row.props.onClick(); await f.flush();
     assert.equal(f.preview.path, entry.path); assert.equal(f.preview.patch, patchFor(entry).patch);
-    assert.equal(f.nodes().filter(n => n.type === "div" && n.props.onClick && n.props.className.includes("bg-[var(--list-inactiveselectionbackground)]")).length, 1);
+    assert.equal(f.nodes().filter(n => n.type === "div" && n.props.onClick && n.props.className.includes("bg-[var(--surface-active-neutral)]")).length, 1);
     f.nodes().find(n => n.type === "button" && n.props.title?.() === "fileHistory.refresh").props.onClick(); await f.flush();
     assert.equal(f.preview.path, entry.path);
     f.button("fileHistory.blameThis").props.onClick(); await f.flush();

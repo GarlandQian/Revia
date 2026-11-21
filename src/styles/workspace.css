@@ -1,0 +1,519 @@
+/* ==========================================================================
+   Revia M13 Workspace — Editor Tabs, Unified Diff Context Bar, Commit Log, Banners
+   ========================================================================== */
+
+@layer components {
+  /* ---------- Main Workspace Tabs (36px) ---------- */
+  .editor-tabs {
+    container: editor-tabs / inline-size;
+    height: var(--tab-height);
+    background: var(--shell-bg);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: flex-end;
+    padding: 0 8px;
+    gap: 2px;
+  }
+
+  .editor-tab-list {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1 1 0%;
+    min-width: 0;
+    height: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .editor-tab {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    height: 31px;
+    padding: 0 10px 0 11px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 7px 7px 0 0;
+    margin-bottom: -1px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 240px;
+    outline: none;
+    transition: background-color 110ms ease, color 110ms ease;
+  }
+
+  .editor-tab:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .editor-tab[data-active="true"] {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
+    border-bottom: 1px solid var(--surface-bg);
+  }
+
+  .editor-tab[data-preview="true"] .tab-title {
+    font-style: italic;
+  }
+
+  /* ---------- Unified Single Diff Context Bar (38px, Q244) ---------- */
+  .diff-context-bar {
+    min-height: 38px;
+    padding: 4px 12px;
+    background: var(--surface-bg);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .diff-sides-tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .diff-nav-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .seg-switch {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--shell-bg);
+    border: 1px solid var(--border-subtle);
+    gap: 2px;
+  }
+
+  .seg-switch button {
+    height: 22px;
+    padding: 0 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    border-radius: var(--radius-xs);
+    color: var(--text-secondary);
+    transition: background-color 110ms ease, color 110ms ease;
+  }
+
+  .seg-switch button:hover {
+    color: var(--text-primary);
+  }
+
+  .seg-switch button[aria-pressed="true"] {
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .reviewed-toggle-btn {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-bg);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background-color 110ms ease, border-color 110ms ease, color 110ms ease;
+  }
+
+  .reviewed-toggle-btn:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .reviewed-toggle-btn[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--reviewed) 12%, transparent);
+    border-color: color-mix(in srgb, var(--reviewed) 34%, transparent);
+    color: var(--reviewed);
+  }
+
+  /* ---------- Editor Banners & Warn Chips ---------- */
+  .editor-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 6px 12px;
+    padding: 8px 11px;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    line-height: 18px;
+    background: var(--banner-bg);
+    border: 1px solid var(--banner-edge);
+  }
+
+  .editor-banner[data-tone="info"] {
+    --banner-bg: var(--surface-subtle);
+    --banner-edge: var(--border-subtle);
+    --banner-icon: var(--accent);
+  }
+
+  .editor-banner[data-tone="warn"] {
+    --banner-bg: color-mix(in srgb, var(--warn) 10%, var(--surface-bg));
+    --banner-edge: color-mix(in srgb, var(--warn) 30%, transparent);
+    --banner-icon: var(--warn);
+  }
+
+  .editor-banner[data-tone="error"] {
+    --banner-bg: color-mix(in srgb, var(--danger) 10%, var(--surface-bg));
+    --banner-edge: color-mix(in srgb, var(--danger) 30%, transparent);
+    --banner-icon: var(--danger);
+  }
+
+  .editor-banner > .app-icon {
+    margin-top: 1px;
+    color: var(--banner-icon);
+  }
+
+  .banner-link {
+    color: var(--accent);
+    white-space: nowrap;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .banner-link:hover {
+    text-decoration: underline;
+  }
+
+  .warn-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--warn) 10%, var(--surface-bg));
+    border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  }
+
+  .review-check {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border-radius: 3px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-bg);
+    color: transparent;
+  }
+
+  .review-check[aria-checked="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+}
+
+/* ---------- Commit Log (Q201 + Q244) ---------- */
+
+.log-input,
+.log-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-bg);
+  color: var(--text-secondary);
+  font: 12px/24px var(--font-sans);
+  white-space: nowrap;
+  transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+
+.log-input {
+  display: block;
+  height: 28px;
+  padding: 0 9px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.log-input-search {
+  padding-left: 28px;
+}
+
+.log-filter-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.log-filter-button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.log-filter-button:focus-visible,
+.log-input:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-bg);
+  outline: none;
+}
+
+.log-view {
+  container: revia-log / inline-size;
+  background: var(--surface-bg);
+}
+
+@container revia-log (max-width: 1120px) {
+  .log-main-with-preview {
+    flex-direction: column;
+  }
+
+  .log-main-with-preview > .log-details {
+    width: 100%;
+    flex: 0 1 44%;
+    min-height: 160px;
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
+.log-table-head {
+  font-family: var(--font-sans);
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.log-row {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  cursor: default;
+  contain: layout paint style;
+  transition: background-color 80ms ease;
+}
+
+.log-row:hover {
+  background: var(--surface-hover);
+}
+
+.log-row.selected {
+  background: var(--surface-active);
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.log-graph-col {
+  position: relative;
+  height: 100%;
+  display: inline-block;
+  padding: 0;
+}
+
+.log-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+}
+
+.log-rail.collapsed {
+  border-left: 1px dashed color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.log-arm {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+}
+
+.log-node {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  margin-left: -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface-bg);
+}
+
+.log-long-edge {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  margin-top: -6.5px;
+  margin-left: -6.5px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--surface-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.log-long-edge:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+/* 精致小圆角引用胶囊（Q201：独立列不省略，Q244 重绘） */
+.log-ref-chip {
+  --ref: var(--ref-branch);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid color-mix(in srgb, var(--ref) 26%, transparent);
+  background: color-mix(in srgb, var(--ref) 11%, transparent);
+  color: var(--ref);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.log-ref-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+}
+
+.log-ref-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  height: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+.log-ref-chip.remoteBranch { --ref: var(--ref-remote); }
+.log-ref-chip.tag { --ref: var(--ref-tag); }
+.log-ref-chip.other { --ref: var(--ref-other); }
+.log-ref-chip.head { --ref: var(--ref-head); }
+
+.log-ref-chip:is(.head, .current) {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.log-ref-chip.path {
+  --ref: var(--text-primary);
+  background: var(--surface-subtle);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.log-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: var(--row-height);
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-align: left;
+  cursor: default;
+}
+
+.log-file-row:hover {
+  background: var(--surface-hover);
+}
+
+.log-status {
+  flex: none;
+  width: 15px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--git-m);
+}
+
+.log-status-added { color: var(--git-a); }
+.log-status-deleted { color: var(--git-d); }
+.log-status-renamed { color: var(--git-r); }
+
+.log-parent-link {
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--accent);
+}
+
+.log-parent-link:hover {
+  background: var(--accent-soft);
+}
+
+/* Git 命令日志行（位于底部抽屉中） */
+.command-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-align: left;
+  border-left: 2px solid transparent;
+}
+
+.command-row:hover {
+  background: var(--surface-hover);
+}
+
+.command-row.selected {
+  background: var(--surface-active);
+  border-left-color: var(--accent);
+}

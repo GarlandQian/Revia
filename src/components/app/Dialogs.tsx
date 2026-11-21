@@ -8,10 +8,9 @@ import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { messages, t } from "@/lib/i18n/index";
 import { commitWarningText } from "@/lib/i18n/text";
-import { Codicon } from "@/components/ui/codicon";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { AppIcon } from "@/components/ui/app-icon";
 import { FileTypeIcon } from "./FileTypeIcon";
-import { useModalDialog } from "@/features/m7/glass/nativeGlass";
+import { useModalDialog } from "@/hooks/useDialogOpen";
 
 export function Modal({
   title,
@@ -30,18 +29,17 @@ export function Modal({
     <dialog
       ref={ref}
       aria-label={title}
-      className="app-dialog glass-isolate overflow-auto p-0 text-[13px]"
+      className="app-dialog overflow-auto p-0 text-[13px]"
       style={{ width: `min(${width ?? 520}px, calc(100vw - 40px))`, maxHeight: "calc(100vh - 40px)" }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      <GlassLayer variant="popover" />
-      <div className="flex items-center gap-2 border-b border-panel-border px-4 py-2.5">
-        <h2 className="flex-1 text-[13.5px] font-semibold">{title}</h2>
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+        <h2 className="flex-1 text-[14px] font-semibold text-[var(--text-primary)]">{title}</h2>
         <button type="button" className="icon-action" aria-label={messages.recovery.close} onClick={onClose}>
-          <Codicon name="close" size={16} />
+          <AppIcon name="close" size={15} />
         </button>
       </div>
       <div className="p-4">{children}</div>
@@ -75,7 +73,7 @@ export function DiscardDialog({
   return (
     <Modal title={messages.recovery.discardTitle} onClose={onClose} width={560}>
       <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-3">
-        <Codicon name="warning" size={26} className="text-[var(--editorwarning-foreground)]" />
+        <AppIcon name="warning" size={26} className="text-[var(--warn)]" />
         <div className="min-w-0 space-y-2">
           <p className="font-semibold">
             {hunk
@@ -84,15 +82,15 @@ export function DiscardDialog({
                 ? messages.recovery.confirmFile
                 : messages.recovery.confirmFiles(targets.length)}
           </p>
-          <p className="truncate font-mono text-[11.5px] text-descriptionforeground" title={worktree}>
+          <p className="truncate font-mono text-[11.5px] text-[var(--text-secondary)]" title={worktree}>
             {worktree}
           </p>
-          <ul className="max-h-56 overflow-y-auto rounded border border-panel-border">
+          <ul className="max-h-56 overflow-y-auto rounded border border-[var(--border-subtle)]">
             {targets.map((target) => (
               <li key={`${target.changes}:${target.path}`} className="flex items-center gap-1.5 px-2 py-1">
                 <FileTypeIcon path={target.path} />
                 <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]">{target.path}</span>
-                <span className="shrink-0 text-[11px] text-descriptionforeground">
+                <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">
                   {target.changes === "untracked" ? messages.changes.untracked : messages.changes.unstaged}
                 </span>
               </li>
@@ -103,7 +101,7 @@ export function DiscardDialog({
               {targets[0].section}
             </pre>
           ) : null}
-          <p className="text-[12.5px] leading-relaxed text-descriptionforeground">{messages.recovery.safety}</p>
+          <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{messages.recovery.safety}</p>
           {!valid ? (
             <p role="alert" className="text-[12.5px] text-destructive">
               {messages.recovery.changed}
@@ -112,7 +110,7 @@ export function DiscardDialog({
         </div>
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" autoFocus className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground" onClick={onClose}>
+        <button type="button" autoFocus className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]" onClick={onClose}>
           {messages.recovery.cancel}
         </button>
         <button
@@ -155,7 +153,7 @@ export function CloseRequestDialog({
       <div className="space-y-3 text-[12.5px]">
         <p className="leading-relaxed">{intent === "installUpdate" || intent === "restartUpdate" ? t("update.lifecycleExplain") : hasPending ? messages.close.pendingExplain : messages.close.explain}</p>
         {writing.length > 0 ? (
-          <p className="break-all text-descriptionforeground">{messages.close.writing(writing.length)}</p>
+          <p className="break-all text-[var(--text-secondary)]">{messages.close.writing(writing.length)}</p>
         ) : null}
         {hasPending ? (
           <p role="alert" className="break-all text-destructive">
@@ -164,7 +162,7 @@ export function CloseRequestDialog({
         ) : null}
       </div>
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" autoFocus className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground" onClick={onStay}>
+        <button type="button" autoFocus className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]" onClick={onStay}>
           {messages.close.pendingStay}
         </button>
         {hasPending ? (
@@ -193,17 +191,17 @@ export function CommitWarningDialog({
 }) {
   return (
     <Modal title={messages.commit.warningsTitle} onClose={onCancel} width={560}>
-      <p className="text-[12.5px] leading-relaxed text-descriptionforeground">{messages.commit.warningsDetail}</p>
+      <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{messages.commit.warningsDetail}</p>
       <ul className="mt-2 max-h-[280px] space-y-1 overflow-y-auto text-[12.5px]">
         {warnings.map((warning, index) => (
           <li key={`${warning.kind}-${index}`} className="flex items-start gap-1.5">
-            <Codicon name="warning" size={13} className="mt-0.5 shrink-0 text-[var(--editorwarning-foreground)]" />
+            <AppIcon name="warning" size={13} className="mt-0.5 shrink-0 text-[var(--warn)]" />
             <span className="min-w-0 break-words">{commitWarningText(warning)}</span>
           </li>
         ))}
       </ul>
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground" onClick={onCancel}>
+        <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]" onClick={onCancel}>
           {messages.commit.warningsCancel}
         </button>
         <button type="button" className="rounded-[4px] bg-primary px-3 py-1 text-primary-foreground" onClick={onContinue}>

@@ -1,17 +1,19 @@
-import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { formatAppError } from "@/lib/error";
 /**
- * 设置对话框（M4 F08、返修 E/Q139）：左上角搜索、左侧分类可展开、右侧顶部
- * 显示“分类 › 页名”，外观照 VS Code。
- *
- * 分类与设置项以 UI 方向的“设置”一节为准，只实现标为 M4 的项；M5 及以后
- * 的项不做，也不放入口。修改立即保存；输入框在失焦或回车时提交，避免每次
- * 按键都写设置。所有设置都存在 Rust 的 settings.rs 里，前端不用 localStorage。
+ * 设置模态弹窗（M13 Q237、Q242）：
+ * - 居中宽敞两栏结构：左侧搜索 + 精简分组 Lucide 图标导航（合并原 17 项碎片页为 11 个清晰页面）；
+ * - 右侧全站统一采用分组卡片（`.setting-card-list`）、左右对齐行（`.setting-row`）与现代 Switch 开关；
+ * - 所有修改立即通过 Rust `settings.rs` 持久化，前端不写 localStorage。
  */
 
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
+import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
+import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
+import { formatAppError } from "@/lib/error";
 import {
   ipc,
   type AiLanguage,
+  type AppearanceMode,
   type FetchTagMode,
   type LogColumns,
   type LogPreviewPosition,
@@ -20,24 +22,26 @@ import {
   type UpdateMode,
 } from "@/lib/ipc";
 import type { AiSettings } from "@/lib/aiSettings";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { messages, t } from "@/lib/i18n/index";
 import { highlightLevelText, notifyKindText } from "@/lib/i18n/text";
+import { themesOfKind } from "@/lib/theme";
+import { AppIcon } from "@/components/ui/app-icon";
+import { M7GithubSettings, M7ShortcutSettings, M7ThemeSettings, M7UpdateSettings } from "@/features/m7/settings";
+import { useModalDialog } from "@/hooks/useDialogOpen";
 
-/** 搜索关键词在资源里以 `|` 分隔，避免运行期拼接翻译键（Q171）。 */
 function keywordList(value: string): string[] {
   return value.split("|");
 }
-import { themesOfKind } from "@/lib/theme";
-import { Codicon } from "@/components/ui/codicon";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
-import { M7GithubSettings, M7ShortcutSettings, M7ThemeSettings, M7UpdateSettings } from "@/features/m7/settings";
-import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
-import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
-import { useModalDialog } from "@/features/m7/glass/nativeGlass";
-import { useGlassLens } from "@/features/m7/glass/glassLens";
+
+const THEME_SWATCHES: Record<string, readonly string[]> = {
+  "one-light": ["#FAFAFA", "#A626A4", "#4078F2", "#50A14F"],
+  "light-2026": ["#FFFFFF", "#CF222E", "#8250DF", "#0A3069"],
+  "one-dark-pro": ["#282C34", "#C678DD", "#61AFEF", "#98C379"],
+  "dark-2026": ["#1F1F1F", "#569CD6", "#DCDCAA", "#CE9178"],
+};
 
 export interface SettingsValues {
+  appearanceMode: AppearanceMode;
   themeLight: string;
   themeDark: string;
   codeFontFamily: string;
@@ -83,9 +87,7 @@ export interface SettingsValues {
   autoUpdateOnPushRejection: boolean;
   pushDialogOnCommit: boolean;
   pushDialogProtectedOnly: boolean;
-  /** 受保护分支（每行一个）。 */
   protectedBranches: string;
-  /** 当前会话实际使用的 Git 程序（只读展示）。 */
   detectedGitPath: string | null;
   appUpdateMode: AppUpdateMode;
   allowPrerelease: boolean;
@@ -94,187 +96,141 @@ export interface SettingsValues {
 
 export type { SettingsPatch } from "@/lib/ipc";
 
-type Category = "appearance" | "commit" | "diff" | "log" | "notifications" | "git" | "extensions" | "about";
+type GroupId = "general" | "workflow" | "integrations";
 type Page =
-  | "theme"
+  | "appearance"
   | "language"
-  | "font"
-  | "commitMessage"
-  | "commitWarnings"
-  | "ai"
-  | "diffDisplay"
-  | "logSettings"
-  | "fileHistory"
-  | "notifications"
-  | "gitTools"
-  | "updatePush"
-  | "themeColors"
   | "shortcuts"
-  | "githubAccounts"
-  | "appUpdate"
+  | "notifications"
+  | "commit"
+  | "diff"
+  | "log"
+  | "git"
+  | "ai"
+  | "github"
+  | "updates"
   | "about";
 
 interface PageDef {
   id: Page;
   title: string;
-  /** 搜索用的关键词（设置项文字）。 */
+  icon: string;
   keywords: readonly string[];
 }
 
-interface CategoryDef {
-  id: Category;
+interface NavGroup {
+  id: GroupId;
   title: string;
   pages: PageDef[];
 }
 
-function buildCategories(): CategoryDef[] {
+function buildNavGroups(): NavGroup[] {
   return [
-  {
-    id: "appearance",
-    title: messages.settings.appearance,
-    pages: [
-      { id: "theme", title: messages.settings.pages.theme, keywords: keywordList(messages.settings.keywords.theme) },
-      { id: "language", title: messages.settings.pages.language, keywords: keywordList(messages.settings.keywords.language) },
-      { id: "font", title: messages.settings.pages.font, keywords: keywordList(messages.settings.keywords.font) },
-    ],
-  },
-  {
-    id: "commit",
-    title: messages.settings.commit,
-    pages: [
-      {
-        id: "commitMessage",
-        title: messages.settings.pages.commitMessage,
-        keywords: keywordList(messages.settings.keywords.commitMessage),
-      },
-      {
-        id: "commitWarnings",
-        title: messages.settings.pages.commitWarnings,
-        keywords: keywordList(messages.settings.keywords.commitWarnings),
-      },
-      {
-        id: "ai",
-        title: messages.settings.pages.ai,
-        keywords: keywordList(messages.settings.keywords.ai),
-      },
-    ],
-  },
-  {
-    id: "diff",
-    title: messages.settings.diff,
-    pages: [
-      {
-        id: "diffDisplay",
-        title: messages.settings.pages.diffDisplay,
-        keywords: keywordList(messages.settings.keywords.diffDisplay),
-      },
-    ],
-  },
-  {
-    id: "log",
-    title: messages.log.title,
-    pages: [
-      { id: "logSettings", title: messages.settings.pages.log, keywords: keywordList(messages.settings.keywords.log) },
-      { id: "fileHistory", title: messages.settings.pages.fileHistory, keywords: keywordList(messages.settings.keywords.fileHistory) },
-    ],
-  },
-  {
-    id: "notifications",
-    title: messages.settings.notifications,
-    pages: [
-      { id: "notifications", title: messages.settings.pages.notifications, keywords: keywordList(messages.settings.keywords.notifications) },
-    ],
-  },
-  {
-    id: "git",
-    title: messages.settings.git,
-    pages: [
-      {
-        id: "gitTools",
-        title: messages.settings.pages.gitTools,
-        keywords: keywordList(messages.settings.keywords.gitTools),
-      },
-      {
-        id: "updatePush",
-        title: messages.settings.pages.updatePush,
-        keywords: keywordList(messages.settings.keywords.updatePush),
-      },
-    ],
-  },
-  {
-    id: "extensions",
-    title: t("settings.m7.title"),
-    pages: [
-      {
-        id: "themeColors",
-        title: t("settings.m7.theme.title"),
-        keywords: keywordList(t("settings.m7.theme.keywords")),
-      },
-      {
-        id: "shortcuts",
-        title: t("settings.m7.shortcuts.title"),
-        keywords: keywordList(t("settings.m7.shortcuts.keywords")),
-      },
-      {
-        id: "githubAccounts",
-        title: t("settings.m7.github.title"),
-        keywords: keywordList(t("settings.m7.github.keywords")),
-      },
-      {
-        id: "appUpdate",
-        title: t("settings.m7.update.title"),
-        keywords: keywordList(t("settings.m7.update.keywords")),
-      },
-    ],
-  },
-  {
-    id: "about",
-    title: messages.settings.about,
-    pages: [{ id: "about", title: messages.settings.about, keywords: keywordList(messages.settings.keywords.about) }],
-  },
+    {
+      id: "general",
+      title: messages.settings.appearance,
+      pages: [
+        {
+          id: "appearance",
+          title: messages.settings.pages.theme,
+          icon: "symbol-color",
+          keywords: [
+            ...keywordList(messages.settings.keywords.theme),
+            ...keywordList(messages.settings.keywords.font),
+            ...keywordList(t("settings.m7.theme.keywords")),
+          ],
+        },
+        {
+          id: "language",
+          title: messages.settings.pages.language,
+          icon: "globe",
+          keywords: keywordList(messages.settings.keywords.language),
+        },
+        {
+          id: "shortcuts",
+          title: t("settings.m7.shortcuts.title"),
+          icon: "keyboard",
+          keywords: keywordList(t("settings.m7.shortcuts.keywords")),
+        },
+        {
+          id: "notifications",
+          title: messages.settings.pages.notifications,
+          icon: "bell",
+          keywords: keywordList(messages.settings.keywords.notifications),
+        },
+      ],
+    },
+    {
+      id: "workflow",
+      title: messages.settings.git,
+      pages: [
+        {
+          id: "commit",
+          title: messages.settings.commit,
+          icon: "comment-draft",
+          keywords: [
+            ...keywordList(messages.settings.keywords.commitMessage),
+            ...keywordList(messages.settings.keywords.commitWarnings),
+          ],
+        },
+        {
+          id: "diff",
+          title: messages.settings.pages.diffDisplay,
+          icon: "diff",
+          keywords: keywordList(messages.settings.keywords.diffDisplay),
+        },
+        {
+          id: "log",
+          title: messages.log.title,
+          icon: "list-unordered",
+          keywords: [
+            ...keywordList(messages.settings.keywords.log),
+            ...keywordList(messages.settings.keywords.fileHistory),
+          ],
+        },
+        {
+          id: "git",
+          title: messages.settings.pages.gitTools,
+          icon: "tools",
+          keywords: [
+            ...keywordList(messages.settings.keywords.gitTools),
+            ...keywordList(messages.settings.keywords.updatePush),
+          ],
+        },
+      ],
+    },
+    {
+      id: "integrations",
+      title: t("settings.m7.title"),
+      pages: [
+        {
+          id: "ai",
+          title: messages.settings.pages.ai,
+          icon: "sparkle",
+          keywords: keywordList(messages.settings.keywords.ai),
+        },
+        {
+          id: "github",
+          title: t("settings.m7.github.title"),
+          icon: "github",
+          keywords: keywordList(t("settings.m7.github.keywords")),
+        },
+        {
+          id: "updates",
+          title: t("settings.m7.update.title"),
+          icon: "cloud-download",
+          keywords: keywordList(t("settings.m7.update.keywords")),
+        },
+        {
+          id: "about",
+          title: messages.settings.about,
+          icon: "info",
+          keywords: keywordList(messages.settings.keywords.about),
+        },
+      ],
+    },
   ];
 }
-
-/** 导航行的图标（Q202，参照 Loop 侧栏）。 */
-const PAGE_ICONS: Record<Page, string> = {
-  theme: "symbol-color",
-  language: "globe",
-  font: "text-size",
-  commitMessage: "comment-draft",
-  commitWarnings: "warning",
-  ai: "sparkle",
-  diffDisplay: "diff",
-  logSettings: "list-unordered",
-  fileHistory: "history",
-  notifications: "bell",
-  gitTools: "tools",
-  updatePush: "repo-push",
-  themeColors: "paintcan",
-  shortcuts: "keyboard",
-  githubAccounts: "github",
-  appUpdate: "cloud-download",
-  about: "info",
-};
-
-const CATEGORY_OF_PAGE: Record<Page, Category> = {
-  theme: "appearance",
-  language: "appearance",
-  font: "appearance",
-  commitMessage: "commit",
-  commitWarnings: "commit",
-  ai: "commit",
-  diffDisplay: "diff",
-  logSettings: "log",
-  fileHistory: "log",
-  notifications: "notifications",
-  gitTools: "git",
-  updatePush: "git",
-  themeColors: "extensions",
-  shortcuts: "extensions",
-  githubAccounts: "extensions",
-  appUpdate: "extensions",
-  about: "about",
-};
 
 export function SettingsDialog({
   open,
@@ -287,6 +243,8 @@ export function SettingsDialog({
   onUpdateStatus,
   onThemesChanged,
   onAccountChanged,
+  onOpenDiagnostics,
+  onOpenUpdatePanel,
   aiSettings,
 }: {
   open: boolean;
@@ -294,21 +252,17 @@ export function SettingsDialog({
   onClose: () => void;
   onChange: (patch: SettingsPatch) => Promise<AppErrorPayload | null>;
   onReloadEnvironment: () => Promise<AppErrorPayload | null>;
-  /** M7：GitHub 账号页要按当前仓库读取绑定关系。 */
   worktreeId?: string | null;
   updateStatus?: AppUpdateStatus | null;
   onUpdateStatus?: (status: AppUpdateStatus) => void;
-  onThemesChanged?: () => Promise<void> | void;
+  onThemesChanged?: (updated?: { themeLight?: string; themeDark?: string }) => Promise<void> | void;
   onAccountChanged?: () => void;
-  /** App 持有的控制器；关闭设置页时组件卸载，队列仍留在 App。 */
+  onOpenDiagnostics?: () => void;
+  onOpenUpdatePanel?: () => void;
   aiSettings: AiSettings;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const navRef = useRef<HTMLElement>(null);
-  const pageListRef = useRef<HTMLDivElement>(null);
-  const [page, setPage] = useState<Page>("theme");
-  // 切换设置页时的玻璃镜片（Q202）。
-  useGlassLens({ host: navRef, track: pageListRef, selected: page });
+  const [page, setPage] = useState<Page>("appearance");
   const [query, setQuery] = useState("");
   const [font, setFont] = useState(values.codeFontFamily);
   const [size, setSize] = useState(String(values.fontSize));
@@ -322,11 +276,8 @@ export function SettingsDialog({
   const [protectedBranches, setProtectedBranches] = useState(values.protectedBranches);
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [notice, setNotice] = useState(false);
-  // M11：AI 服务配置。密钥只保存到系统凭据库，读不回原文；
-  // 状态、草稿与模型列表由 AiSettings 统一管理，避免迟到读取覆盖新输入。
+
   const [aiKey, setAiKey] = useState("");
-  // 密钥输入不进入控制器：保存完成时只有仍属于本页面、本输入代次且内容
-  // 仍是本次提交值才清空，避免旧回调清掉重开后重新输入的同一密钥。
   const aiKeyRef = useRef("");
   const aiKeyEpochRef = useRef(0);
   const updateAiKey = (value: string) => {
@@ -336,9 +287,8 @@ export function SettingsDialog({
   };
   const [aiRevision, setAiRevision] = useState(0);
   useEffect(() => aiSettings.subscribe(() => setAiRevision((value) => value + 1)), [aiSettings]);
-  // aiRevision 只用来触发重渲染，view() 每次返回新的快照。
   const aiView = useMemo(() => aiSettings.view(), [aiSettings, aiRevision]);
-  // M9 测量版：关于页显示构建来源（Q216）。
+
   const [measure, setMeasure] = useState<{ measure: boolean; commit: string } | null>(null);
   useEffect(() => {
     let active = true;
@@ -377,23 +327,22 @@ export function SettingsDialog({
     values.protectedBranches,
   ]);
 
-  // 系统材质下设置页铺满整窗，放在整窗玻璃上。
-  useModalDialog(ref, open, "page");
+  useModalDialog(ref, open);
 
-  const categories = buildCategories();
+  const navGroups = buildNavGroups();
   const trimmedQuery = query.trim();
-  const matches = useMemo(() => {
-    if (!trimmedQuery) return null;
+  const visibleGroups = useMemo(() => {
+    if (!trimmedQuery) return navGroups;
     const text = trimmedQuery.toLowerCase();
-    const result: PageDef[] = [];
-    for (const category of categories) {
-      for (const candidate of category.pages) {
-        const haystack = [category.title, candidate.title, ...candidate.keywords].join(" ").toLowerCase();
-        if (haystack.includes(text)) result.push(candidate);
-      }
-    }
-    return result;
-  }, [categories, trimmedQuery]);
+    return navGroups
+      .map((group) => ({
+        ...group,
+        pages: group.pages.filter((candidate) =>
+          [group.title, candidate.title, ...candidate.keywords].join(" ").toLowerCase().includes(text),
+        ),
+      }))
+      .filter((group) => group.pages.length > 0);
+  }, [navGroups, trimmedQuery]);
 
   useEffect(() => {
     if (!(open && page === "ai")) return;
@@ -435,36 +384,40 @@ export function SettingsDialog({
     else reset(String(current));
   };
 
-  const activePage = categories.find((category) => category.id === CATEGORY_OF_PAGE[page]);
-  const activePageTitle = activePage?.pages.find((candidate) => candidate.id === page)?.title ?? "";
-  const activeCategoryTitle = activePage?.title ?? "";
-
-  // 导航平铺（Q202）：多页的分类只留一行小标题，单页分类直接是一行；搜索时只留命中的页。
-  const visibleCategories = categories
-    .map((category) => ({
-      ...category,
-      pages: trimmedQuery && matches ? category.pages.filter((candidate) => matches.includes(candidate)) : category.pages,
-    }))
-    .filter((category) => category.pages.length > 0);
+  const activeGroup = navGroups.find((group) => group.pages.some((candidate) => candidate.id === page));
+  const activePageDef = activeGroup?.pages.find((candidate) => candidate.id === page);
+  const lightThemes = themesOfKind("light");
+  const darkThemes = themesOfKind("dark");
+  const resolvedLightTheme = lightThemes.some((theme) => theme.id === values.themeLight)
+    ? values.themeLight
+    : lightThemes[0]?.id ?? values.themeLight;
+  const resolvedDarkTheme = darkThemes.some((theme) => theme.id === values.themeDark)
+    ? values.themeDark
+    : darkThemes[0]?.id ?? values.themeDark;
+  const lightSwatches = THEME_SWATCHES[resolvedLightTheme] ?? THEME_SWATCHES["one-light"];
+  const darkSwatches = THEME_SWATCHES[resolvedDarkTheme] ?? THEME_SWATCHES["one-dark-pro"];
 
   return (
     <dialog
       ref={ref}
       aria-label={messages.settings.title}
-      className="settings-dialog app-dialog glass-isolate w-[min(900px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]"
+      className="settings-dialog app-dialog text-[13px]"
+      onClick={(event) => {
+        if (event.target === ref.current) onClose();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      <GlassLayer variant="popover" />
-      <div className="settings-body flex h-[min(560px,calc(100vh-140px))]">
-        <nav ref={navRef} className="settings-nav glass-lens-host flex w-[220px] shrink-0 flex-col border-r border-panel-border bg-[var(--glass-side-tint)]" aria-label={messages.settings.title}>
-          <div className="settings-nav-head px-3 pt-3 pb-1" data-tauri-drag-region>
-            <h2 className="text-[14px] font-semibold" data-tauri-drag-region>{messages.settings.title}</h2>
+      <div className="flex h-full">
+        {/* 左侧搜索 + 分组图标导航 */}
+        <nav className="settings-nav flex w-[226px] shrink-0 flex-col" aria-label={messages.settings.title}>
+          <div className="px-3.5 pt-3.5 pb-1">
+            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{messages.settings.title}</h2>
           </div>
-          <div className="relative px-2 py-2">
-            <Codicon name="search" size={13} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-descriptionforeground" />
+          <div className="relative px-2.5 py-2">
+            <AppIcon name="search" size={13} className="pointer-events-none absolute top-1/2 left-5 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               className="settings-input w-full pl-7"
               value={query}
@@ -474,95 +427,213 @@ export function SettingsDialog({
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <div ref={pageListRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-            {visibleCategories.map((category) => (
-              <div key={category.id} className="settings-nav-group">
-                {category.pages.length > 1 ? (
-                  <div className="settings-nav-caption truncate px-2 pt-2 pb-1 text-[11px] text-descriptionforeground">{category.title}</div>
-                ) : null}
-                {category.pages.map((candidate) => (
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {visibleGroups.map((group) => (
+              <div key={group.id} className="mb-1.5">
+                <div className="truncate px-2.5 pt-2 pb-1 text-[11px] font-semibold text-[var(--text-muted)]">{group.title}</div>
+                {group.pages.map((candidate) => (
                   <button
                     key={candidate.id}
                     type="button"
-                    className={`settings-nav-item flex h-7 w-full items-center gap-2 rounded-[3px] px-2 text-left text-[12.5px] outline-none hover:bg-toolbar-hoverbackground focus-visible:bg-toolbar-hoverbackground ${
-                      page === candidate.id ? "bg-[var(--list-inactiveselectionbackground)]" : ""
-                    }`}
-                    aria-pressed={page === candidate.id}
-                    data-lens-key={candidate.id}
+                    data-settings-page={candidate.id}
+                    className="settings-nav-item w-full"
+                    aria-current={page === candidate.id ? "page" : undefined}
                     onClick={() => setPage(candidate.id)}
                   >
-                    <Codicon name={PAGE_ICONS[candidate.id]} size={15} className="shrink-0" />
+                    <AppIcon name={candidate.icon} size={14} className="shrink-0" />
                     <span className="min-w-0 truncate">{candidate.title}</span>
                   </button>
                 ))}
               </div>
             ))}
-            {trimmedQuery && matches && matches.length === 0 ? (
-              <p className="px-2 py-2 text-[12px] text-descriptionforeground">{messages.settings.searchEmpty}</p>
+            {trimmedQuery && visibleGroups.length === 0 ? (
+              <p className="px-2.5 py-2 text-[12px] text-[var(--text-muted)]">{messages.settings.searchEmpty}</p>
             ) : null}
           </div>
         </nav>
-        <div className="settings-main flex min-w-0 flex-1 flex-col">
-          <div className="settings-header flex shrink-0 items-start gap-3 border-b border-panel-border px-5 pt-3 pb-2.5" data-tauri-drag-region>
-            <div className="min-w-0 flex-1" data-tauri-drag-region>
-              {activeCategoryTitle !== activePageTitle ? (
-                <p className="settings-crumb truncate text-[11.5px] text-descriptionforeground" data-tauri-drag-region>{activeCategoryTitle}</p>
+
+        {/* 右侧设置内容区 */}
+        <div className="flex min-w-0 flex-1 flex-col bg-[var(--surface-bg)]">
+          <div className="flex h-[54px] shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-6">
+            <div className="min-w-0 flex-1">
+              {activeGroup && activePageDef && activeGroup.title !== activePageDef.title ? (
+                <p className="truncate text-[11px] text-[var(--text-muted)]">{activeGroup.title}</p>
               ) : null}
-              <h3 className="settings-title truncate text-[15px] font-semibold" data-tauri-drag-region>{activePageTitle}</h3>
+              <h3 className="truncate text-[15px] font-semibold text-[var(--text-primary)]">{activePageDef?.title ?? ""}</h3>
             </div>
             <button type="button" className="icon-action shrink-0" aria-label={messages.recovery.close} title={messages.recovery.close} onClick={onClose}>
-              <Codicon name="close" size={16} />
+              <AppIcon name="close" size={15} />
             </button>
           </div>
-          <div className="settings-scroll min-h-0 flex-1 overflow-y-auto p-5">
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {error ? (
-              <p role="alert" className="mb-3 rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] bg-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_10%,var(--editor-background))] px-3 py-2 text-[12px]">
+              <p role="alert" className="mb-4 rounded-[6px] border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)]">
                 {formatAppError(error)}
               </p>
             ) : null}
             {notice ? (
-              <p role="status" className="mb-3 text-[12px] text-descriptionforeground">
+              <p role="status" className="mb-4 rounded-[6px] border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
                 {messages.settings.reloaded}
               </p>
             ) : null}
 
-            {page === "theme" ? (
-              <div className="space-y-5">
-                <p className="text-[12px] text-descriptionforeground">{messages.settings.themeHint}</p>
-                <Field label={messages.settings.lightTheme}>
-                  <select
-                    className="settings-select"
-                    value={values.themeLight}
-                    onChange={(event) => void commit({ themeLight: event.target.value })}
-                  >
-                    {themesOfKind("light").map((theme) => (
-                      <option key={theme.id} value={theme.id}>
-                        {theme.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={messages.settings.darkTheme}>
-                  <select
-                    className="settings-select"
-                    value={values.themeDark}
-                    onChange={(event) => void commit({ themeDark: event.target.value })}
-                  >
-                    {themesOfKind("dark").map((theme) => (
-                      <option key={theme.id} value={theme.id}>
-                        {theme.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+            {/* 1. 外观、代码颜色主题与字体缩放 */}
+            {page === "appearance" ? (
+              <div className="space-y-4">
+                <div className="setting-card space-y-3">
+                  <div>
+                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">{messages.settings.appearanceMode}</p>
+                    <p className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.appearanceModeHint}</p>
+                  </div>
+                  <div className="mode-grid">
+                    {(["system", "light", "dark"] as AppearanceMode[]).map((mode) => {
+                      const label =
+                        mode === "system"
+                          ? messages.settings.appearanceSystem
+                          : mode === "light"
+                            ? messages.settings.appearanceLight
+                            : messages.settings.appearanceDark;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          className="mode-option"
+                          aria-pressed={values.appearanceMode === mode}
+                          onClick={() => void commit({ appearanceMode: mode })}
+                        >
+                          <div className="mode-preview" aria-hidden>
+                            {mode === "system" ? (
+                              <>
+                                <div className="flex-1 bg-[#F5F6F8] border-r border-[#E4E7EC]" />
+                                <div className="flex-1 bg-[#1A1C20]" />
+                              </>
+                            ) : mode === "light" ? (
+                              <div className="flex flex-1 bg-[#FFFFFF]">
+                                <div className="w-[30%] bg-[#F5F6F8] border-r border-[#E4E7EC]" />
+                                <div className="flex-1 p-2"><div className="h-1.5 w-3/5 rounded bg-[#2563EB]" /></div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-1 bg-[#1A1C20]">
+                                <div className="w-[30%] bg-[#141518] border-r border-[#262931]" />
+                                <div className="flex-1 p-2"><div className="h-1.5 w-3/5 rounded bg-[#3B82F6]" /></div>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[12px] font-medium text-[var(--text-primary)]">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.codeThemesTitle}</p>
+                    <p className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.themeHint}</p>
+                  </div>
+                  <SettingRow label={messages.settings.lightTheme}>
+                    <div className="flex items-center gap-2">
+                      <span className="swatch-strip" aria-hidden>
+                        {lightSwatches.map((hex) => <span key={hex} className="swatch-dot" style={{ background: hex }} />)}
+                      </span>
+                      <select
+                        className="settings-select w-[200px]"
+                        value={resolvedLightTheme}
+                        onChange={(event) => void commit({ themeLight: event.target.value })}
+                      >
+                        {lightThemes.map((theme) => (
+                          <option key={theme.id} value={theme.id}>{theme.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </SettingRow>
+                  <SettingRow label={messages.settings.darkTheme}>
+                    <div className="flex items-center gap-2">
+                      <span className="swatch-strip" aria-hidden>
+                        {darkSwatches.map((hex) => <span key={hex} className="swatch-dot" style={{ background: hex }} />)}
+                      </span>
+                      <select
+                        className="settings-select w-[200px]"
+                        value={resolvedDarkTheme}
+                        onChange={(event) => void commit({ themeDark: event.target.value })}
+                      >
+                        {darkThemes.map((theme) => (
+                          <option key={theme.id} value={theme.id}>{theme.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </SettingRow>
+                </div>
+
+                <M7ThemeSettings onThemesChanged={(updated) => onThemesChanged?.(updated)} />
+
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.pages.font}</p>
+                  </div>
+                  <SettingRow label={messages.settings.codeFont} hint={messages.settings.codeFontHint}>
+                    <input
+                      className="settings-input w-[210px] font-mono text-[12px]"
+                      value={font}
+                      placeholder="JetBrains Mono"
+                      spellCheck={false}
+                      onChange={(event) => setFont(event.target.value)}
+                      onBlur={() => { if (font !== values.codeFontFamily) void commit({ codeFontFamily: font }); }}
+                      onKeyDown={(event) => { if (event.key === "Enter" && font !== values.codeFontFamily) void commit({ codeFontFamily: font }); }}
+                    />
+                  </SettingRow>
+                  <SettingRow label={messages.settings.fontSize} hint={messages.settings.fontSizeHint}>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        className="settings-input w-20 text-center font-mono"
+                        type="number"
+                        min={9}
+                        max={24}
+                        value={size}
+                        onChange={(event) => setSize(event.target.value)}
+                        onBlur={() => void commitNumber(size, values.fontSize, (value) => ({ diffFontSize: value }), setSize, 9, 24)}
+                        onKeyDown={(event) => { if (event.key === "Enter") void commitNumber(size, values.fontSize, (value) => ({ diffFontSize: value }), setSize, 9, 24); }}
+                      />
+                      <span className="text-[12px] text-[var(--text-muted)]">px</span>
+                    </div>
+                  </SettingRow>
+                  <SettingRow label={messages.settings.uiZoom} hint={messages.settings.uiZoomHint}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="settings-input w-20 text-center font-mono"
+                        type="number"
+                        min={80}
+                        max={150}
+                        step={10}
+                        value={zoom}
+                        onChange={(event) => setZoom(event.target.value)}
+                        onBlur={() => void commitNumber(zoom, values.uiZoom, (value) => ({ uiZoom: value }), setZoom, 80, 150)}
+                        onKeyDown={(event) => { if (event.key === "Enter") void commitNumber(zoom, values.uiZoom, (value) => ({ uiZoom: value }), setZoom, 80, 150); }}
+                      />
+                      <span className="text-[12px] text-[var(--text-muted)]">%</span>
+                      <button
+                        type="button"
+                        className="revia-btn revia-btn-secondary h-7 px-2.5"
+                        onClick={() => {
+                          setZoom("100");
+                          void commit({ uiZoom: 100 });
+                        }}
+                      >
+                        {messages.settings.uiZoomReset}
+                      </button>
+                    </div>
+                  </SettingRow>
+                </div>
               </div>
             ) : null}
 
+            {/* 2. 界面语言 */}
             {page === "language" ? (
-              <div className="space-y-5">
-                <Field label={messages.settings.language} hint={messages.settings.languageHint}>
+              <div className="setting-card-list">
+                <SettingRow label={messages.settings.language} hint={messages.settings.languageHint}>
                   <select
-                    className="settings-select"
+                    className="settings-select w-[200px]"
                     value={values.language}
                     onChange={(event) => void commit({ language: event.target.value === "auto" ? "" : event.target.value })}
                   >
@@ -570,177 +641,130 @@ export function SettingsDialog({
                     <option value="zh-CN">{messages.settings.languageChinese}</option>
                     <option value="en">{messages.settings.languageEnglish}</option>
                   </select>
-                </Field>
+                </SettingRow>
               </div>
             ) : null}
 
-            {page === "font" ? (
-              <div className="space-y-5">
-                <Field label={messages.settings.codeFont} hint={messages.settings.codeFontHint}>
-                  <input
-                    className="settings-input"
-                    value={font}
-                    placeholder="JetBrains Mono"
-                    spellCheck={false}
-                    onChange={(event) => setFont(event.target.value)}
-                    onBlur={() => {
-                      if (font !== values.codeFontFamily) void commit({ codeFontFamily: font });
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && font !== values.codeFontFamily) void commit({ codeFontFamily: font });
-                    }}
-                  />
-                </Field>
-                <Field label={messages.settings.fontSize} hint={messages.settings.fontSizeHint}>
-                  <input
-                    className="settings-input w-24"
-                    type="number"
-                    min={9}
-                    max={24}
-                    value={size}
-                    onChange={(event) => setSize(event.target.value)}
-                    onBlur={() => void commitNumber(size, values.fontSize, (value) => ({ diffFontSize: value }), setSize, 9, 24)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") void commitNumber(size, values.fontSize, (value) => ({ diffFontSize: value }), setSize, 9, 24);
-                    }}
-                  />
-                </Field>
-                <Field label={messages.settings.uiZoom} hint={messages.settings.uiZoomHint}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      className="settings-input w-24"
-                      type="number"
-                      min={80}
-                      max={150}
-                      step={10}
-                      value={zoom}
-                      onChange={(event) => setZoom(event.target.value)}
-                      onBlur={() => void commitNumber(zoom, values.uiZoom, (value) => ({ uiZoom: value }), setZoom, 80, 150)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") void commitNumber(zoom, values.uiZoom, (value) => ({ uiZoom: value }), setZoom, 80, 150);
-                      }}
-                    />
-                    <span className="text-[12px] text-descriptionforeground">%</span>
-                    <button
-                      type="button"
-                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground"
-                      onClick={() => {
-                        setZoom("100");
-                        void commit({ uiZoom: 100 });
-                      }}
-                    >
-                      {messages.settings.uiZoomReset}
-                    </button>
-                  </div>
-                </Field>
-              </div>
+            {/* 3. 快捷键 */}
+            {page === "shortcuts" ? (
+              <M7ShortcutSettings
+                shortcuts={values.shortcuts ?? {}}
+                onChange={(next) => commit({ shortcuts: next })}
+              />
             ) : null}
 
-            {page === "commitMessage" ? (
-              <div className="space-y-5">
-                <Toggle
-                  label={messages.settings.cherryPickKeepEmpty}
-                  hint={messages.settings.cherryPickKeepEmptyHint}
-                  checked={values.cherryPickKeepEmpty}
-                  onChange={(value) => void commit({ cherryPickKeepEmpty: value })}
-                />
-                <Toggle
-                  label={messages.settings.cherryPickIncludeSource}
-                  hint={messages.settings.cherryPickIncludeSourceHint}
-                  checked={values.cherryPickIncludeSource}
-                  onChange={(value) => void commit({ cherryPickIncludeSource: value })}
-                />
-                <Toggle label={t("changelists.mode")} checked={values.changelistMode} onChange={(value) => void commit({ changelistMode: value })} />
-                <Field label={messages.settings.commitSubjectLimit} hint={messages.settings.commitSubjectLimitHint}>
-                  <input
-                    className="settings-input w-24"
-                    type="number"
-                    min={0}
-                    max={200}
-                    value={subjectLimit}
-                    onChange={(event) => setSubjectLimit(event.target.value)}
-                    onBlur={() =>
-                      void commitNumber(subjectLimit, values.commitSubjectLimit, (value) => ({ commitSubjectLimit: value }), setSubjectLimit, 0, 200)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        void commitNumber(subjectLimit, values.commitSubjectLimit, (value) => ({ commitSubjectLimit: value }), setSubjectLimit, 0, 200);
-                      }
-                    }}
-                  />
-                </Field>
-                <Field label={messages.settings.commitBodyLineLimit} hint={messages.settings.commitBodyLineLimitHint}>
-                  <input
-                    className="settings-input w-24"
-                    type="number"
-                    min={0}
-                    max={200}
-                    value={bodyLimit}
-                    onChange={(event) => setBodyLimit(event.target.value)}
-                    onBlur={() =>
-                      void commitNumber(bodyLimit, values.commitBodyLineLimit, (value) => ({ commitBodyLineLimit: value }), setBodyLimit, 0, 200)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        void commitNumber(bodyLimit, values.commitBodyLineLimit, (value) => ({ commitBodyLineLimit: value }), setBodyLimit, 0, 200);
-                      }
-                    }}
-                  />
-                </Field>
-                <Toggle
-                  label={messages.settings.commitBlankLineRequired}
-                  hint={messages.settings.commitBlankLineRequiredHint}
-                  checked={values.commitBlankLineRequired}
-                  onChange={(value) => void commit({ commitBlankLineRequired: value })}
-                />
-                <Toggle
-                  label={messages.settings.commitShowRuler}
-                  hint={messages.settings.commitShowRulerHint}
-                  checked={values.commitShowRuler}
-                  onChange={(value) => void commit({ commitShowRuler: value })}
-                />
-              </div>
-            ) : null}
-
-            {page === "commitWarnings" ? (
+            {/* 4. 通知 */}
+            {page === "notifications" ? (
               <div className="space-y-3">
-                <p className="text-[12px] text-descriptionforeground">{messages.settings.commitWarningsHint}</p>
-                <Toggle
-                  label={messages.settings.commitWarnCrlf}
-                  checked={values.commitWarnCrlf}
-                  onChange={(value) => void commit({ commitWarnCrlf: value })}
-                />
-                <Toggle
-                  label={messages.settings.commitWarnDetached}
-                  checked={values.commitWarnDetached}
-                  onChange={(value) => void commit({ commitWarnDetached: value })}
-                />
-                <Toggle
-                  label={messages.settings.commitWarnInvalidFilename}
-                  checked={values.commitWarnInvalidFilename}
-                  onChange={(value) => void commit({ commitWarnInvalidFilename: value })}
-                />
-                <Field label={messages.settings.commitWarnLargeFile} hint={messages.settings.commitWarnLargeFileHint}>
-                  <div className="flex items-center gap-2">
+                <p className="text-[12px] text-[var(--text-secondary)]">{messages.settings.notifyHint}</p>
+                <div className="setting-card-list">
+                  {(["stage", "discard", "commit", "recovery"] as const).map((kind) => (
+                    <SwitchRow
+                      key={kind}
+                      label={notifyKindText(kind)}
+                      checked={values.notify[kind]}
+                      onChange={(value) => void commit({ notify: { ...values.notify, [kind]: value } })}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 5. 提交（工作模式 + 提交信息检查 + 提交前警告） */}
+            {page === "commit" ? (
+              <div className="space-y-4">
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.pages.commitMessage}</p>
+                  </div>
+                  <SwitchRow
+                    label={t("changelists.mode")}
+                    checked={values.changelistMode}
+                    onChange={(value) => void commit({ changelistMode: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.cherryPickKeepEmpty}
+                    hint={messages.settings.cherryPickKeepEmptyHint}
+                    checked={values.cherryPickKeepEmpty}
+                    onChange={(value) => void commit({ cherryPickKeepEmpty: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.cherryPickIncludeSource}
+                    hint={messages.settings.cherryPickIncludeSourceHint}
+                    checked={values.cherryPickIncludeSource}
+                    onChange={(value) => void commit({ cherryPickIncludeSource: value })}
+                  />
+                </div>
+
+                <div className="setting-card-list">
+                  <SettingRow label={messages.settings.commitSubjectLimit} hint={messages.settings.commitSubjectLimitHint}>
                     <input
-                      className="settings-input w-24"
+                      className="settings-input w-20 text-center font-mono"
                       type="number"
                       min={0}
-                      max={10240}
-                      value={largeFileMb}
-                      onChange={(event) => setLargeFileMb(event.target.value)}
-                      onBlur={() =>
-                        void commitNumber(
-                          largeFileMb,
-                          Math.round(values.commitWarnLargeFileBytes / (1024 * 1024)),
-                          (value) => ({ commitWarnLargeFileBytes: value * 1024 * 1024 }),
-                          setLargeFileMb,
-                          0,
-                          10240,
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
+                      max={200}
+                      value={subjectLimit}
+                      onChange={(event) => setSubjectLimit(event.target.value)}
+                      onBlur={() => void commitNumber(subjectLimit, values.commitSubjectLimit, (value) => ({ commitSubjectLimit: value }), setSubjectLimit, 0, 200)}
+                      onKeyDown={(event) => { if (event.key === "Enter") void commitNumber(subjectLimit, values.commitSubjectLimit, (value) => ({ commitSubjectLimit: value }), setSubjectLimit, 0, 200); }}
+                    />
+                  </SettingRow>
+                  <SettingRow label={messages.settings.commitBodyLineLimit} hint={messages.settings.commitBodyLineLimitHint}>
+                    <input
+                      className="settings-input w-20 text-center font-mono"
+                      type="number"
+                      min={0}
+                      max={200}
+                      value={bodyLimit}
+                      onChange={(event) => setBodyLimit(event.target.value)}
+                      onBlur={() => void commitNumber(bodyLimit, values.commitBodyLineLimit, (value) => ({ commitBodyLineLimit: value }), setBodyLimit, 0, 200)}
+                      onKeyDown={(event) => { if (event.key === "Enter") void commitNumber(bodyLimit, values.commitBodyLineLimit, (value) => ({ commitBodyLineLimit: value }), setBodyLimit, 0, 200); }}
+                    />
+                  </SettingRow>
+                  <SwitchRow
+                    label={messages.settings.commitBlankLineRequired}
+                    hint={messages.settings.commitBlankLineRequiredHint}
+                    checked={values.commitBlankLineRequired}
+                    onChange={(value) => void commit({ commitBlankLineRequired: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.commitShowRuler}
+                    hint={messages.settings.commitShowRulerHint}
+                    checked={values.commitShowRuler}
+                    onChange={(value) => void commit({ commitShowRuler: value })}
+                  />
+                </div>
+
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.pages.commitWarnings}</p>
+                    <p className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.commitWarningsHint}</p>
+                  </div>
+                  <SwitchRow
+                    label={messages.settings.commitWarnCrlf}
+                    checked={values.commitWarnCrlf}
+                    onChange={(value) => void commit({ commitWarnCrlf: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.commitWarnDetached}
+                    checked={values.commitWarnDetached}
+                    onChange={(value) => void commit({ commitWarnDetached: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.commitWarnInvalidFilename}
+                    checked={values.commitWarnInvalidFilename}
+                    onChange={(value) => void commit({ commitWarnInvalidFilename: value })}
+                  />
+                  <SettingRow label={messages.settings.commitWarnLargeFile} hint={messages.settings.commitWarnLargeFileHint}>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        className="settings-input w-24 text-center font-mono"
+                        type="number"
+                        min={0}
+                        max={10240}
+                        value={largeFileMb}
+                        onChange={(event) => setLargeFileMb(event.target.value)}
+                        onBlur={() =>
                           void commitNumber(
                             largeFileMb,
                             Math.round(values.commitWarnLargeFileBytes / (1024 * 1024)),
@@ -748,98 +772,381 @@ export function SettingsDialog({
                             setLargeFileMb,
                             0,
                             10240,
-                          );
+                          )
                         }
-                      }}
-                    />
-                    <span className="text-[12px] text-descriptionforeground">MB</span>
-                  </div>
-                </Field>
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            void commitNumber(
+                              largeFileMb,
+                              Math.round(values.commitWarnLargeFileBytes / (1024 * 1024)),
+                              (value) => ({ commitWarnLargeFileBytes: value * 1024 * 1024 }),
+                              setLargeFileMb,
+                              0,
+                              10240,
+                            );
+                          }
+                        }}
+                      />
+                      <span className="text-[12px] text-[var(--text-muted)]">MB</span>
+                    </div>
+                  </SettingRow>
+                </div>
               </div>
             ) : null}
 
-            {page === "ai" ? (
-              <div className="space-y-5">
-                <p className="text-[12px] leading-relaxed text-descriptionforeground">{t("settings.ai.description")}</p>
-                <Field label={t("settings.ai.baseUrl")} hint={t("settings.ai.baseUrlHint")}>
-                  <input
-                    className="settings-input w-full"
-                    value={aiView.draft.baseUrl}
-                    spellCheck={false}
-                    onChange={(event) => aiSettings.edit("baseUrl", event.target.value)}
-                    onBlur={() => {
-                      void aiSettings.save("baseUrl");
-                    }}
+            {/* 6. Diff 与合并 */}
+            {page === "diff" ? (
+              <div className="space-y-4">
+                <div className="setting-card-list">
+                  <SettingRow label={messages.settings.diffContextLines} hint={messages.settings.diffContextLinesHint}>
+                    <input
+                      className="settings-input w-20 text-center font-mono"
+                      type="number"
+                      min={0}
+                      max={64}
+                      value={values.diffContextLines}
+                      onChange={(event) => {
+                        const parsed = Number.parseInt(event.target.value, 10);
+                        if (Number.isFinite(parsed)) void commit({ diffContextLines: Math.min(64, Math.max(0, parsed)) });
+                      }}
+                    />
+                  </SettingRow>
+                  <SettingRow label={messages.diff.highlightLabel}>
+                    <select
+                      className="settings-select w-[190px]"
+                      value={values.diffHighlight}
+                      onChange={(event) => void commit({ diffHighlight: event.target.value as SettingsValues["diffHighlight"] })}
+                    >
+                      {(["word", "line", "char", "none"] as const).map((level) => (
+                        <option key={level} value={level}>{highlightLevelText(level)}</option>
+                      ))}
+                    </select>
+                  </SettingRow>
+                  <SettingRow label={messages.diff.ignoreWhitespace} hint={messages.diff.ignoreWhitespaceReadonly}>
+                    <select
+                      className="settings-select w-[190px]"
+                      value={values.diffIgnoreWhitespace}
+                      onChange={(event) => void commit({ diffIgnoreWhitespace: Number(event.target.value) })}
+                    >
+                      <option value={0}>{messages.diff.ignoreWhitespaceLevels.off}</option>
+                      <option value={1}>{messages.diff.ignoreWhitespaceLevels.eol}</option>
+                      <option value={2}>{messages.diff.ignoreWhitespaceLevels.all}</option>
+                      <option value={3}>{messages.diff.ignoreWhitespaceLevels.allBlank}</option>
+                    </select>
+                  </SettingRow>
+                </div>
+
+                <div className="setting-card-list">
+                  <SwitchRow label={messages.diff.foldUnchanged} checked={values.diffFoldUnchanged} onChange={(value) => void commit({ diffFoldUnchanged: value })} />
+                  <SwitchRow label={messages.diff.syncScroll} checked={values.diffSyncScroll} onChange={(value) => void commit({ diffSyncScroll: value })} />
+                  <SwitchRow label={messages.diff.showWhitespace} checked={values.diffShowWhitespace} onChange={(value) => void commit({ diffShowWhitespace: value })} />
+                  <SwitchRow label={messages.diff.softWrap} checked={values.diffSoftWrap} onChange={(value) => void commit({ diffSoftWrap: value })} />
+                  <SwitchRow label={messages.diff.jumpToNextFile} checked={values.diffJumpToNextFile} onChange={(value) => void commit({ diffJumpToNextFile: value })} />
+                  <SwitchRow
+                    label={messages.settings.mergeAutoApply}
+                    hint={messages.settings.mergeAutoApplyHint}
+                    checked={values.mergeAutoApply}
+                    onChange={(value) => void commit({ mergeAutoApply: value })}
                   />
-                </Field>
-                <Field label={t("settings.ai.model")} hint={t("settings.ai.modelHint")}>
-                  <input
-                    className="settings-input w-full"
-                    value={aiView.draft.model}
-                    spellCheck={false}
-                    onChange={(event) => aiSettings.edit("model", event.target.value)}
-                    onBlur={() => {
-                      void aiSettings.save("model");
-                    }}
-                  />
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-descriptionforeground">
-                    {aiView.models.state === "loading" ? (
-                      <span role="status">{t("settings.ai.modelsLoading")}</span>
-                    ) : null}
-                    {aiView.models.state === "ready" ? (
-                      <>
-                        <select
-                          className="settings-input"
-                          aria-label={t("settings.ai.modelsChoose")}
-                          value=""
-                          onChange={(event) => {
-                            if (event.target.value) void aiSettings.selectModel(event.target.value);
-                          }}
-                        >
-                          <option value="">{t("settings.ai.modelsChoose")}</option>
-                          {aiView.models.items.map((model) => (
-                            <option key={model} value={model}>{model}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
-                          onClick={() => aiSettings.retryModels()}
-                        >
-                          {t("settings.ai.modelsRefresh")}
-                        </button>
-                      </>
-                    ) : null}
-                    {aiView.models.state === "empty" ? <span>{t("settings.ai.modelsEmpty")}</span> : null}
-                    {aiView.models.state === "error" && aiView.models.error ? (
-                      <span role="alert">{formatAppError(aiView.models.error)}</span>
-                    ) : null}
-                    {aiView.models.state === "empty" || aiView.models.state === "error" ? (
-                      <button
-                        type="button"
-                        className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
-                        onClick={() => aiSettings.retryModels()}
-                      >
-                        {t("settings.ai.modelsRetry")}
-                      </button>
-                    ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 7. 提交日志与文件历史 */}
+            {page === "log" ? (
+              <div className="space-y-4">
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.logColumns}</p>
+                    <p className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.logColumnsHint}</p>
                   </div>
-                </Field>
-                <Field label={t("settings.ai.language")}>
-                  <select
-                    className="settings-input"
-                    value={aiView.draft.language}
-                    onChange={(event) => {
-                      void aiSettings.selectLanguage(event.target.value as AiLanguage);
-                    }}
-                  >
-                    <option value="repo">{t("settings.ai.languageRepo")}</option>
-                    <option value="chinese">{t("settings.ai.languageChinese")}</option>
-                    <option value="english">{t("settings.ai.languageEnglish")}</option>
-                  </select>
-                </Field>
-                <div>
-                  <span className="mb-1 block text-[12.5px] font-semibold">{t("settings.ai.key")}</span>
+                  {([
+                    ["author", messages.settings.logColumnAuthor],
+                    ["date", messages.settings.logColumnDate],
+                    ["hash", messages.settings.logColumnHash],
+                  ] as const).map(([key, label]) => (
+                    <SwitchRow
+                      key={key}
+                      label={label}
+                      checked={values.logColumns[key]}
+                      onChange={(value) => void commit({ logColumns: { ...values.logColumns, [key]: value } })}
+                    />
+                  ))}
+                </div>
+
+                <div className="setting-card-list">
+                  <SwitchRow
+                    label={messages.settings.logLongEdges}
+                    hint={messages.settings.logLongEdgesHint}
+                    checked={values.logLongEdges}
+                    onChange={(value) => void commit({ logLongEdges: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.logFirstParent}
+                    hint={messages.settings.logFirstParentHint}
+                    checked={values.logFirstParent}
+                    onChange={(value) => void commit({ logFirstParent: value })}
+                  />
+                  <SettingRow label={messages.settings.logPreviewPosition}>
+                    <select
+                      className="settings-select w-[190px]"
+                      value={values.logPreviewPosition}
+                      onChange={(event) => void commit({ logPreviewPosition: event.target.value as LogPreviewPosition })}
+                    >
+                      <option value="right">{messages.settings.logPreviewRight}</option>
+                      <option value="bottom">{messages.settings.logPreviewBottom}</option>
+                    </select>
+                  </SettingRow>
+                  <SwitchRow
+                    label={messages.settings.fileHistoryShowNames}
+                    hint={messages.settings.fileHistoryShowNamesHint}
+                    checked={values.fileHistoryShowNames}
+                    onChange={(value) => void commit({ fileHistoryShowNames: value })}
+                  />
+                </div>
+                <p className="text-[11.5px] text-[var(--text-muted)]">{messages.settings.logHint}</p>
+              </div>
+            ) : null}
+
+            {/* 8. Git、外部工具与更新/推送 */}
+            {page === "git" ? (
+              <div className="space-y-4">
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.pages.updatePush}</p>
+                  </div>
+                  <SettingRow label={messages.settings.updateMode} hint={messages.settings.updateModeHint}>
+                    <select
+                      className="settings-select w-[190px]"
+                      value={values.updateMode}
+                      onChange={(event) => void commit({ updateMode: event.target.value as UpdateMode })}
+                    >
+                      <option value="merge">{messages.settings.updateModeMerge}</option>
+                      <option value="rebase">{messages.settings.updateModeRebase}</option>
+                      <option value="branchDefault">{messages.settings.updateModeBranchDefault}</option>
+                    </select>
+                  </SettingRow>
+                  <SettingRow label={messages.settings.fetchTagMode}>
+                    <select
+                      className="settings-select w-[190px]"
+                      value={values.fetchTagMode}
+                      onChange={(event) => void commit({ fetchTagMode: event.target.value as FetchTagMode })}
+                    >
+                      <option value="auto">{messages.settings.fetchTagModeAuto}</option>
+                      <option value="sync">{messages.settings.fetchTagModeSync}</option>
+                      <option value="always">{messages.settings.fetchTagModeAlways}</option>
+                      <option value="never">{messages.settings.fetchTagModeNever}</option>
+                    </select>
+                  </SettingRow>
+                  <SwitchRow
+                    label={messages.settings.fetchAutomatically}
+                    hint={messages.settings.fetchAutomaticallyHint}
+                    checked={values.fetchAutomatically}
+                    onChange={(value) => void commit({ fetchAutomatically: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.checkRemote}
+                    hint={messages.settings.checkRemoteHint}
+                    checked={values.checkRemote}
+                    onChange={(value) => void commit({ checkRemote: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.autoUpdateOnPushRejection}
+                    hint={messages.settings.autoUpdateOnPushRejectionHint}
+                    checked={values.autoUpdateOnPushRejection}
+                    onChange={(value) => void commit({ autoUpdateOnPushRejection: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.pushDialogOnCommit}
+                    checked={values.pushDialogOnCommit}
+                    onChange={(value) => void commit({ pushDialogOnCommit: value })}
+                  />
+                  <SwitchRow
+                    label={messages.settings.pushDialogProtectedOnly}
+                    checked={values.pushDialogProtectedOnly}
+                    onChange={(value) => void commit({ pushDialogProtectedOnly: value })}
+                  />
+                  <div className="setting-row-stack">
+                    <div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{messages.settings.protectedBranches}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.protectedBranchesHint}</div>
+                    </div>
+                    <textarea
+                      className="settings-input min-h-[72px] w-full py-2 font-mono text-[12px]"
+                      value={protectedBranches}
+                      spellCheck={false}
+                      onChange={(event) => setProtectedBranches(event.target.value)}
+                      onBlur={() =>
+                        void commit({
+                          protectedBranches: protectedBranches
+                            .split(/\r?\n/)
+                            .map((line) => line.trim())
+                            .filter((line) => line.length > 0),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="setting-card-list">
+                  <div className="setting-card-head">
+                    <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{messages.settings.pages.gitTools}</p>
+                  </div>
+                  <SwitchRow
+                    label={messages.stash.compareLocal}
+                    hint={messages.settings.stashComparisonHint}
+                    checked={values.stashCompareLocal}
+                    onChange={(value) => void commit({ stashCompareLocal: value })}
+                  />
+                  <div className="setting-row-stack">
+                    <div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{messages.settings.gitPath}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+                        {values.detectedGitPath ? `${messages.settings.detectedGit}${values.detectedGitPath}` : messages.settings.gitPathHint}
+                      </div>
+                    </div>
+                    <input
+                      className="settings-input font-mono text-[12px]"
+                      value={gitPath}
+                      placeholder={messages.settings.gitPathPlaceholder}
+                      spellCheck={false}
+                      onChange={(event) => setGitPath(event.target.value)}
+                      onBlur={() => { if (gitPath !== values.gitPath) void commit({ gitPath }); }}
+                      onKeyDown={(event) => { if (event.key === "Enter" && gitPath !== values.gitPath) void commit({ gitPath }); }}
+                    />
+                  </div>
+                  <div className="setting-row-stack">
+                    <div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{messages.settings.mergeTool}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.mergeToolHint}</div>
+                    </div>
+                    <input
+                      className="settings-input font-mono text-[12px]"
+                      value={mergeTool}
+                      placeholder={messages.settings.toolPlaceholder}
+                      spellCheck={false}
+                      onChange={(event) => setMergeTool(event.target.value)}
+                      onBlur={() => { if (mergeTool !== values.mergeTool) void commit({ mergeTool }); }}
+                      onKeyDown={(event) => { if (event.key === "Enter" && mergeTool !== values.mergeTool) void commit({ mergeTool }); }}
+                    />
+                  </div>
+                  <div className="setting-row-stack">
+                    <div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{messages.settings.diffTool}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{messages.settings.diffToolHint}</div>
+                    </div>
+                    <input
+                      className="settings-input font-mono text-[12px]"
+                      value={diffTool}
+                      placeholder={messages.settings.toolPlaceholder}
+                      spellCheck={false}
+                      onChange={(event) => setDiffTool(event.target.value)}
+                      onBlur={() => { if (diffTool !== values.diffTool) void commit({ diffTool }); }}
+                      onKeyDown={(event) => { if (event.key === "Enter" && diffTool !== values.diffTool) void commit({ diffTool }); }}
+                    />
+                  </div>
+                  <SettingRow label={messages.settings.reload} hint={messages.settings.reloadHint}>
+                    <button
+                      type="button"
+                      className="revia-btn revia-btn-secondary shrink-0"
+                      onClick={() => {
+                        void onReloadEnvironment().then((failure) => {
+                          setError(failure);
+                          setNotice(!failure);
+                        });
+                      }}
+                    >
+                      <AppIcon name="refresh" size={13} />
+                      <span>{messages.settings.reload}</span>
+                    </button>
+                  </SettingRow>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 9. AI 生成提交信息 */}
+            {page === "ai" ? (
+              <div className="space-y-4">
+                <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">{t("settings.ai.description")}</p>
+
+                <div className="setting-card-list">
+                  <div className="setting-row-stack">
+                    <div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{t("settings.ai.baseUrl")}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("settings.ai.baseUrlHint")}</div>
+                    </div>
+                    <input
+                      data-ai-field="baseUrl"
+                      className="settings-input font-mono text-[12px]"
+                      value={aiView.draft.baseUrl}
+                      spellCheck={false}
+                      onChange={(event) => aiSettings.edit("baseUrl", event.target.value)}
+                      onBlur={() => { void aiSettings.save("baseUrl"); }}
+                    />
+                  </div>
+
+                  <div className="setting-row-stack">
+                    <div>
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{t("settings.ai.model")}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("settings.ai.modelHint")}</div>
+                    </div>
+                    <input
+                      data-ai-field="model"
+                      className="settings-input font-mono text-[12px]"
+                      value={aiView.draft.model}
+                      spellCheck={false}
+                      onChange={(event) => aiSettings.edit("model", event.target.value)}
+                      onBlur={() => { void aiSettings.save("model"); }}
+                    />
+                    <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-[var(--text-secondary)]">
+                      {aiView.models.state === "loading" ? <span role="status">{t("settings.ai.modelsLoading")}</span> : null}
+                      {aiView.models.state === "ready" ? (
+                        <>
+                          <select
+                            className="settings-select w-[240px]"
+                            aria-label={t("settings.ai.modelsChoose")}
+                            value=""
+                            onChange={(event) => { if (event.target.value) void aiSettings.selectModel(event.target.value); }}
+                          >
+                            <option value="">{t("settings.ai.modelsChoose")}</option>
+                            {aiView.models.items.map((model) => (
+                              <option key={model} value={model}>{model}</option>
+                            ))}
+                          </select>
+                          <button type="button" className="revia-btn revia-btn-secondary h-7 px-2.5" onClick={() => aiSettings.retryModels()}>
+                            <AppIcon name="refresh" size={12} />
+                            <span>{t("settings.ai.modelsRefresh")}</span>
+                          </button>
+                        </>
+                      ) : null}
+                      {aiView.models.state === "empty" ? <span>{t("settings.ai.modelsEmpty")}</span> : null}
+                      {aiView.models.state === "error" && aiView.models.error ? (
+                        <span role="alert" className="text-[var(--danger)]">{formatAppError(aiView.models.error)}</span>
+                      ) : null}
+                      {aiView.models.state === "empty" || aiView.models.state === "error" ? (
+                        <button type="button" className="revia-btn revia-btn-secondary h-7 px-2.5" onClick={() => aiSettings.retryModels()}>
+                          {t("settings.ai.modelsRetry")}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <SettingRow label={t("settings.ai.language")}>
+                    <select
+                      data-ai-field="language"
+                      className="settings-select w-[190px]"
+                      value={aiView.draft.language}
+                      onChange={(event) => { void aiSettings.selectLanguage(event.target.value as AiLanguage); }}
+                    >
+                      <option value="repo">{t("settings.ai.languageRepo")}</option>
+                      <option value="chinese">{t("settings.ai.languageChinese")}</option>
+                      <option value="english">{t("settings.ai.languageEnglish")}</option>
+                    </select>
+                  </SettingRow>
+                </div>
+
+                <div className="setting-card space-y-2">
+                  <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("settings.ai.key")}</div>
                   <div className="flex items-center gap-2">
                     <input
                       className="settings-input min-w-0 flex-1"
@@ -852,7 +1159,7 @@ export function SettingsDialog({
                     />
                     <button
                       type="button"
-                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                      className="revia-btn revia-btn-primary shrink-0"
                       disabled={!aiKey.trim()}
                       onClick={() => runAiKeyChange(() => aiSettings.saveKey(aiKey))}
                     >
@@ -860,430 +1167,116 @@ export function SettingsDialog({
                     </button>
                     <button
                       type="button"
-                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                      className="revia-btn revia-btn-secondary shrink-0"
                       disabled={!aiView.keySet}
                       onClick={() => runAiKeyChange(() => aiSettings.clearKey())}
                     >
                       {t("settings.ai.clearKey")}
                     </button>
                   </div>
-                  <span className="mt-1 block text-[11.5px] leading-relaxed text-descriptionforeground">
+                  <p className="text-[11.5px] leading-relaxed text-[var(--text-muted)]">
                     {aiView.keySet ? t("settings.ai.keySet") : t("settings.ai.keyUnset")} · {t("settings.ai.keyHint")} {t("settings.ai.keyBinding")}
-                  </span>
+                  </p>
                 </div>
-                <div>
-                  <span className="mb-1 block text-[12.5px] font-semibold">{t("settings.ai.prompt")}</span>
+
+                <div className="setting-card space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("settings.ai.prompt")}</span>
+                    <button type="button" className="revia-btn revia-btn-secondary h-7 px-2.5" onClick={() => void aiSettings.resetPrompt()}>
+                      {t("settings.ai.resetPrompt")}
+                    </button>
+                  </div>
                   <textarea
-                    className="settings-input min-h-40 w-full font-mono text-[12px] leading-relaxed"
+                    className="settings-input min-h-36 w-full py-2 font-mono text-[12px] leading-relaxed"
                     value={aiView.draft.prompt}
                     spellCheck={false}
                     onChange={(event) => aiSettings.edit("prompt", event.target.value)}
-                    onBlur={() => {
-                      void aiSettings.save("prompt");
-                    }}
+                    onBlur={() => { void aiSettings.save("prompt"); }}
                   />
-                  <div className="mt-1 flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
-                      onClick={() => void aiSettings.resetPrompt()}
-                    >
-                      {t("settings.ai.resetPrompt")}
-                    </button>
-                    <span className="text-[11.5px] leading-relaxed text-descriptionforeground">{t("settings.ai.promptHint")}</span>
-                  </div>
+                  <p className="text-[11.5px] leading-relaxed text-[var(--text-muted)]">{t("settings.ai.promptHint")}</p>
                 </div>
-                {!aiView.configured ? <p className="text-[12px] text-descriptionforeground">{t("settings.ai.unconfigured")}</p> : null}
+
+                {!aiView.configured ? <p className="text-[12px] text-[var(--text-muted)]">{t("settings.ai.unconfigured")}</p> : null}
                 {aiView.notice ? (
-                  <p role="status" className="text-[12px] text-descriptionforeground">
+                  <p role="status" className="text-[12px] text-[var(--reviewed)]">
                     {t(aiView.notice === "keySet" ? "settings.ai.keySet" : "settings.ai.keyUnset")}
                   </p>
                 ) : null}
                 {aiView.error ? (
-                  <p role="alert" className="text-[12px] text-[color:var(--vscode-errorForeground)]">{formatAppError(aiView.error)}</p>
+                  <p role="alert" className="rounded-[6px] border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)]">
+                    {formatAppError(aiView.error)}
+                  </p>
                 ) : null}
               </div>
             ) : null}
 
-            {page === "diffDisplay" ? (
-              <div className="space-y-3">
-                <Field label={messages.settings.diffContextLines} hint={messages.settings.diffContextLinesHint}>
-                  <input
-                    className="settings-input w-24"
-                    type="number"
-                    min={0}
-                    max={64}
-                    value={values.diffContextLines}
-                    onChange={(event) => {
-                      const parsed = Number.parseInt(event.target.value, 10);
-                      if (Number.isFinite(parsed)) void commit({ diffContextLines: Math.min(64, Math.max(0, parsed)) });
-                    }}
-                  />
-                </Field>
-                <Toggle
-                  label={messages.diff.foldUnchanged}
-                  checked={values.diffFoldUnchanged}
-                  onChange={(value) => void commit({ diffFoldUnchanged: value })}
-                />
-                <Toggle
-                  label={messages.diff.syncScroll}
-                  checked={values.diffSyncScroll}
-                  onChange={(value) => void commit({ diffSyncScroll: value })}
-                />
-                <Toggle
-                  label={messages.diff.showWhitespace}
-                  checked={values.diffShowWhitespace}
-                  onChange={(value) => void commit({ diffShowWhitespace: value })}
-                />
-                <Toggle
-                  label={messages.diff.softWrap}
-                  checked={values.diffSoftWrap}
-                  onChange={(value) => void commit({ diffSoftWrap: value })}
-                />
-                <Toggle
-                  label={messages.diff.jumpToNextFile}
-                  checked={values.diffJumpToNextFile}
-                  onChange={(value) => void commit({ diffJumpToNextFile: value })}
-                />
-                <Field label={messages.diff.highlightLabel}>
-                  <select
-                    className="settings-select"
-                    value={values.diffHighlight}
-                    onChange={(event) => void commit({ diffHighlight: event.target.value as SettingsValues["diffHighlight"] })}
-                  >
-                    {(["word", "line", "char", "none"] as const).map((level) => (
-                      <option key={level} value={level}>
-                        {highlightLevelText(level)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={messages.diff.ignoreWhitespace} hint={messages.diff.ignoreWhitespaceReadonly}>
-                  <select
-                    className="settings-select"
-                    value={values.diffIgnoreWhitespace}
-                    onChange={(event) => void commit({ diffIgnoreWhitespace: Number(event.target.value) })}
-                  >
-                    <option value={0}>{messages.diff.ignoreWhitespaceLevels.off}</option>
-                    <option value={1}>{messages.diff.ignoreWhitespaceLevels.eol}</option>
-                    <option value={2}>{messages.diff.ignoreWhitespaceLevels.all}</option>
-                    <option value={3}>{messages.diff.ignoreWhitespaceLevels.allBlank}</option>
-                  </select>
-                </Field>
-              </div>
-            ) : null}
-
-            {page === "fileHistory" ? (
-              <div className="space-y-5">
-                <Field
-                  label={messages.settings.fileHistoryShowNames}
-                  hint={messages.settings.fileHistoryShowNamesHint}
-                >
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input
-                      type="checkbox"
-                      checked={values.fileHistoryShowNames}
-                      onChange={(event) => void commit({ fileHistoryShowNames: event.target.checked })}
-                    />
-                    {messages.settings.fileHistoryShowNames}
-                  </label>
-                </Field>
-              </div>
-            ) : null}
-
-            {page === "logSettings" ? (
-              <div className="space-y-5">
-                <Field label={messages.settings.logColumns} hint={messages.settings.logColumnsHint}>
-                  <div className="space-y-1.5">
-                    {([
-                      ["author", messages.settings.logColumnAuthor],
-                      ["date", messages.settings.logColumnDate],
-                      ["hash", messages.settings.logColumnHash],
-                    ] as const).map(([key, label]) => (
-                      <label key={key} className="flex items-center gap-2 text-[12.5px]">
-                        <input
-                          type="checkbox"
-                          checked={values.logColumns[key]}
-                          onChange={(event) =>
-                            void commit({ logColumns: { ...values.logColumns, [key]: event.target.checked } })
-                          }
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </Field>
-                <Field label={messages.settings.logLongEdges} hint={messages.settings.logLongEdgesHint}>
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input
-                      type="checkbox"
-                      checked={values.logLongEdges}
-                      onChange={(event) => void commit({ logLongEdges: event.target.checked })}
-                    />
-                    {messages.settings.logLongEdges}
-                  </label>
-                </Field>
-                <Field label={messages.settings.logFirstParent} hint={messages.settings.logFirstParentHint}>
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input
-                      type="checkbox"
-                      checked={values.logFirstParent}
-                      onChange={(event) => void commit({ logFirstParent: event.target.checked })}
-                    />
-                    {messages.settings.logFirstParent}
-                  </label>
-                </Field>
-                <Field label={messages.settings.logPreviewPosition}>
-                  <select
-                    className="settings-select"
-                    value={values.logPreviewPosition}
-                    onChange={(event) => void commit({ logPreviewPosition: event.target.value as LogPreviewPosition })}
-                  >
-                    <option value="right">{messages.settings.logPreviewRight}</option>
-                    <option value="bottom">{messages.settings.logPreviewBottom}</option>
-                  </select>
-                </Field>
-                <p className="text-[11.5px] text-descriptionforeground">{messages.settings.logHint}</p>
-              </div>
-            ) : null}
-
-            {page === "updatePush" ? (
-              <div className="space-y-5">
-                <Field label={messages.settings.updateMode} hint={messages.settings.updateModeHint}>
-                  <select
-                    className="settings-select"
-                    value={values.updateMode}
-                    onChange={(event) => void commit({ updateMode: event.target.value as UpdateMode })}
-                  >
-                    <option value="merge">{messages.settings.updateModeMerge}</option>
-                    <option value="rebase">{messages.settings.updateModeRebase}</option>
-                    <option value="branchDefault">{messages.settings.updateModeBranchDefault}</option>
-                  </select>
-                </Field>
-                <Field label={messages.settings.fetchTagMode}>
-                  <select
-                    className="settings-select"
-                    value={values.fetchTagMode}
-                    onChange={(event) => void commit({ fetchTagMode: event.target.value as FetchTagMode })}
-                  >
-                    <option value="auto">{messages.settings.fetchTagModeAuto}</option>
-                    <option value="sync">{messages.settings.fetchTagModeSync}</option>
-                    <option value="always">{messages.settings.fetchTagModeAlways}</option>
-                    <option value="never">{messages.settings.fetchTagModeNever}</option>
-                  </select>
-                </Field>
-                <Field label={messages.settings.fetchAutomatically} hint={messages.settings.fetchAutomaticallyHint}>
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input
-                      type="checkbox"
-                      checked={values.fetchAutomatically}
-                      onChange={(event) => void commit({ fetchAutomatically: event.target.checked })}
-                    />
-                    {messages.settings.fetchAutomatically}
-                  </label>
-                </Field>
-                <Field label={messages.settings.checkRemote} hint={messages.settings.checkRemoteHint}>
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input
-                      type="checkbox"
-                      checked={values.checkRemote}
-                      onChange={(event) => void commit({ checkRemote: event.target.checked })}
-                    />
-                    {messages.settings.checkRemote}
-                  </label>
-                </Field>
-                <Field label={messages.settings.autoUpdateOnPushRejection} hint={messages.settings.autoUpdateOnPushRejectionHint}>
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input
-                      type="checkbox"
-                      checked={values.autoUpdateOnPushRejection}
-                      onChange={(event) => void commit({ autoUpdateOnPushRejection: event.target.checked })}
-                    />
-                    {messages.settings.autoUpdateOnPushRejection}
-                  </label>
-                </Field>
-                <Field label={messages.settings.pushDialogOnCommit}>
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-2 text-[12.5px]">
-                      <input
-                        type="checkbox"
-                        checked={values.pushDialogOnCommit}
-                        onChange={(event) => void commit({ pushDialogOnCommit: event.target.checked })}
-                      />
-                      {messages.settings.pushDialogOnCommit}
-                    </label>
-                    <label className="flex items-center gap-2 text-[12.5px]">
-                      <input
-                        type="checkbox"
-                        checked={values.pushDialogProtectedOnly}
-                        onChange={(event) => void commit({ pushDialogProtectedOnly: event.target.checked })}
-                      />
-                      {messages.settings.pushDialogProtectedOnly}
-                    </label>
-                  </div>
-                </Field>
-                <Field label={messages.settings.protectedBranches} hint={messages.settings.protectedBranchesHint}>
-                  <textarea
-                    className="settings-input min-h-[72px] w-full font-mono"
-                    value={protectedBranches}
-                    spellCheck={false}
-                    onChange={(event) => setProtectedBranches(event.target.value)}
-                    onBlur={() =>
-                      void commit({
-                        protectedBranches: protectedBranches
-                          .split(/\r?\n/)
-                          .map((line) => line.trim())
-                          .filter((line) => line.length > 0),
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-            ) : null}
-
-            {page === "notifications" ? (
-              <div className="space-y-3">
-                <p className="text-[12px] text-descriptionforeground">{messages.settings.notifyHint}</p>
-                {(["stage", "discard", "commit", "recovery"] as const).map((kind) => (
-                  <Toggle
-                    key={kind}
-                    label={notifyKindText(kind)}
-                    checked={values.notify[kind]}
-                    onChange={(value) => void commit({ notify: { ...values.notify, [kind]: value } })}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {page === "gitTools" ? (
-              <div className="space-y-5">
-                <Toggle
-                  label={messages.stash.compareLocal}
-                  hint={messages.settings.stashComparisonHint}
-                  checked={values.stashCompareLocal}
-                  onChange={(value) => void commit({ stashCompareLocal: value })}
-                />
-                <Field
-                  label={messages.settings.gitPath}
-                  hint={
-                    values.detectedGitPath
-                      ? `${messages.settings.detectedGit}${values.detectedGitPath}`
-                      : messages.settings.gitPathHint
-                  }
-                >
-                  <input
-                    className="settings-input font-mono text-[12px]"
-                    value={gitPath}
-                    placeholder={messages.settings.gitPathPlaceholder}
-                    spellCheck={false}
-                    onChange={(event) => setGitPath(event.target.value)}
-                    onBlur={() => {
-                      if (gitPath !== values.gitPath) void commit({ gitPath });
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && gitPath !== values.gitPath) void commit({ gitPath });
-                    }}
-                  />
-                </Field>
-                <Field label={messages.settings.mergeTool} hint={messages.settings.mergeToolHint}>
-                  <input
-                    className="settings-input font-mono text-[12px]"
-                    value={mergeTool}
-                    placeholder={messages.settings.toolPlaceholder}
-                    spellCheck={false}
-                    onChange={(event) => setMergeTool(event.target.value)}
-                    onBlur={() => {
-                      if (mergeTool !== values.mergeTool) void commit({ mergeTool });
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && mergeTool !== values.mergeTool) void commit({ mergeTool });
-                    }}
-                  />
-                </Field>
-                <Field label={messages.settings.diffTool} hint={messages.settings.diffToolHint}>
-                  <input
-                    className="settings-input font-mono text-[12px]"
-                    value={diffTool}
-                    placeholder={messages.settings.toolPlaceholder}
-                    spellCheck={false}
-                    onChange={(event) => setDiffTool(event.target.value)}
-                    onBlur={() => {
-                      if (diffTool !== values.diffTool) void commit({ diffTool });
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && diffTool !== values.diffTool) void commit({ diffTool });
-                    }}
-                  />
-                </Field>
-                <Toggle
-                  label={messages.settings.mergeAutoApply}
-                  hint={messages.settings.mergeAutoApplyHint}
-                  checked={values.mergeAutoApply}
-                  onChange={(value) => void commit({ mergeAutoApply: value })}
-                />
-                <div>
-                  <button
-                    type="button"
-                    className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground"
-                    onClick={() => {
-                      void onReloadEnvironment().then((failure) => {
-                        setError(failure);
-                        setNotice(!failure);
-                      });
-                    }}
-                  >
-                    {messages.settings.reload}
-                  </button>
-                  <p className="mt-1.5 text-[11.5px] text-descriptionforeground">{messages.settings.reloadHint}</p>
-                </div>
-              </div>
-            ) : null}
-
-            {page === "themeColors" ? (
-              <M7ThemeSettings
-                themeLight={values.themeLight}
-                themeDark={values.themeDark}
-                onChange={(patch) => commit(patch)}
-                onThemesChanged={() => onThemesChanged?.()}
-              />
-            ) : null}
-
-            {page === "shortcuts" ? (
-              <M7ShortcutSettings
-                shortcuts={values.shortcuts ?? {}}
-                onChange={(next) => commit({ shortcuts: next })}
-              />
-            ) : null}
-
-            {page === "githubAccounts" ? (
+            {/* 10. GitHub 账号 */}
+            {page === "github" ? (
               <M7GithubSettings worktreeId={worktreeId} onChangeAccount={() => onAccountChanged?.()} />
             ) : null}
 
-            {page === "appUpdate" ? (
-              <M7UpdateSettings
-                mode={values.appUpdateMode ?? "notify"}
-                onChangeMode={(mode) => commit({ appUpdateMode: mode })}
-                allowPrerelease={values.allowPrerelease ?? false}
-                onChangeAllowPrerelease={(value) => commit({ allowPrerelease: value })}
-                status={updateStatus}
-                onStatusChange={(status) => onUpdateStatus?.(status)}
-              />
+            {/* 11. 应用更新与诊断 */}
+            {page === "updates" ? (
+              <div className="space-y-4">
+                <M7UpdateSettings
+                  mode={values.appUpdateMode ?? "notify"}
+                  onChangeMode={(mode) => commit({ appUpdateMode: mode })}
+                  allowPrerelease={values.allowPrerelease ?? false}
+                  onChangeAllowPrerelease={(value) => commit({ allowPrerelease: value })}
+                  status={updateStatus}
+                  onStatusChange={(status) => onUpdateStatus?.(status)}
+                  onOpenUpdatePanel={
+                    onOpenUpdatePanel
+                      ? () => {
+                          onClose();
+                          onOpenUpdatePanel();
+                        }
+                      : undefined
+                  }
+                />
+                {onOpenDiagnostics ? (
+                  <div className="setting-card flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("diagnostics.title")}</p>
+                      <p className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("diagnostics.hint")}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="revia-btn revia-btn-secondary shrink-0"
+                      onClick={() => {
+                        onClose();
+                        onOpenDiagnostics();
+                      }}
+                    >
+                      <AppIcon name="output" size={14} />
+                      <span>{messages.settings.openDiagnostics}</span>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
 
+            {/* 12. 关于 Revia */}
             {page === "about" ? (
-              <div className="space-y-3 text-[12.5px] leading-relaxed">
-                <p className="text-[15px] font-semibold">Revia</p>
-                <p className="text-descriptionforeground">{messages.settings.aboutText}</p>
-                {measure?.measure ? (
-                  <p className="text-descriptionforeground">{t("settings.measureBuild", { commit: measure.commit })}</p>
-                ) : null}
-                <div>
-                  <p className="font-semibold">{messages.settings.licenses}</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-descriptionforeground">
-                    <li>{messages.settings.licenseCodicons}</li>
+              <div className="space-y-4 text-[12.5px] leading-relaxed">
+                <div className="setting-card flex items-start gap-3.5">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-[9px] bg-[var(--accent)] text-[17px] font-bold text-white shadow-sm">
+                    R
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">Revia</p>
+                    <p className="text-[var(--text-secondary)]">{messages.settings.aboutText}</p>
+                    {measure?.measure ? (
+                      <p className="text-[var(--text-muted)]">{t("settings.measureBuild", { commit: measure.commit })}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="setting-card space-y-2">
+                  <p className="font-semibold text-[var(--text-primary)]">{messages.settings.licenses}</p>
+                  <ul className="list-disc space-y-1 pl-5 text-[var(--text-secondary)]">
+                    <li>{messages.settings.licenseLucide}</li>
                     <li>{messages.settings.licenseMaterial}</li>
                     <li>{messages.settings.licenseThemes}</li>
-                    <li>{messages.settings.licenseReactBits}</li>
                   </ul>
                 </div>
               </div>
@@ -1295,18 +1288,19 @@ export function SettingsDialog({
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-[12.5px] font-semibold">{label}</span>
-      {children}
-      {hint ? <span className="mt-1 block text-[11.5px] text-descriptionforeground">{hint}</span> : null}
-    </label>
+    <div className="setting-row">
+      <div className="min-w-0 flex-1">
+        <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{label}</div>
+        {hint ? <div className="mt-0.5 text-[11.5px] leading-relaxed text-[var(--text-muted)]">{hint}</div> : null}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
   );
 }
 
-/** 勾选框：自绘照效果图（返修 B12），标签与说明分两行。 */
-function Toggle({
+function SwitchRow({
   label,
   hint,
   checked,
@@ -1318,12 +1312,19 @@ function Toggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2 py-0.5">
-      <input type="checkbox" className="vs-checkbox mt-0.5" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-      <span className="min-w-0">
-        <span className="block text-[12.5px]">{label}</span>
-        {hint ? <span className="block text-[11.5px] text-descriptionforeground">{hint}</span> : null}
-      </span>
-    </label>
+    <div className="setting-row">
+      <div className="min-w-0 flex-1">
+        <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{label}</div>
+        {hint ? <div className="mt-0.5 text-[11.5px] leading-relaxed text-[var(--text-muted)]">{hint}</div> : null}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        className="setting-switch"
+        onClick={() => onChange(!checked)}
+      />
+    </div>
   );
 }

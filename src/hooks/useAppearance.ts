@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ipc } from "@/lib/ipc";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ipc, type AppearanceMode } from "@/lib/ipc";
 import {
   DEFAULT_DARK_THEME,
   DEFAULT_LIGHT_THEME,
@@ -13,6 +13,7 @@ import {
 import { m7 } from "@/lib/m7/api";
 
 export function useAppearance() {
+  const [appearanceMode, setAppearanceMode] = useState<AppearanceMode>("system");
   const [themeLight, setThemeLight] = useState(DEFAULT_LIGHT_THEME);
   const [themeDark, setThemeDark] = useState(DEFAULT_DARK_THEME);
   const [codeFontFamily, setCodeFontFamily] = useState<string | null>(null);
@@ -21,21 +22,26 @@ export function useAppearance() {
   const uiZoomRef = useRef(uiZoom);
   uiZoomRef.current = uiZoom;
   const [prefersDark, setPrefersDark] = useState(() => systemPrefersDark());
-  /** 导入主题的版本号：重新读取后强制再应用一次（M7 任务 02）。 */
   const [importedRevision, setImportedRevision] = useState(0);
 
-  useEffect(() => {
-    applyTheme(resolveTheme(themeLight, themeDark, prefersDark));
-  }, [themeLight, themeDark, prefersDark, importedRevision]);
+  const activeTheme = useMemo(
+    () => resolveTheme(themeLight, themeDark, prefersDark, appearanceMode),
+    [themeLight, themeDark, prefersDark, appearanceMode, importedRevision],
+  );
 
-  /** 从 Rust 读取导入主题；失败时只保留内置主题，不阻塞界面。 */
-  const reloadImportedThemes = useCallback(async () => {
+  useEffect(() => {
+    applyTheme(activeTheme);
+  }, [activeTheme]);
+
+  const reloadImportedThemes = useCallback(async (updated?: { themeLight?: string; themeDark?: string }) => {
     try {
       const list = await m7.listImportedThemes();
       setImportedThemes(list);
     } catch {
       setImportedThemes([]);
     }
+    if (updated?.themeLight) setThemeLight(updated.themeLight);
+    if (updated?.themeDark) setThemeDark(updated.themeDark);
     setImportedRevision((value) => value + 1);
   }, []);
 
@@ -64,7 +70,9 @@ export function useAppearance() {
   }, [fontSize]);
 
   return {
+    appearanceMode, setAppearanceMode,
     themeLight, setThemeLight, themeDark, setThemeDark,
+    activeCodeThemeLabel: activeTheme.label,
     codeFontFamily, setCodeFontFamily, fontSize, setFontSize, changeFontSize,
     uiZoom, setUiZoom, uiZoomRef,
     reloadImportedThemes,

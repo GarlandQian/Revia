@@ -17,11 +17,10 @@ import { formatAppError, toAppError } from "@/lib/error";
 import { ipc, type AiCommitMode, type AiStatus } from "@/lib/ipc";
 import type { GenerationControl, GenerationIntent, GenerationView } from "@/lib/commitMessageGeneration";
 import { acceleratorOf, formatAccelerator, matchesAccelerator } from "@/lib/shortcuts";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import type { NoticeText } from "./Notifications";
 import { Popover } from "@/components/ui/popover";
 import { Modal } from "@/components/app/Dialogs";
-import { GlassButton } from "@/features/m7/glass/GlassButton";
 
 /** 首行字符数建议上限（按字符计数，不按 UTF-8 字节，F02.2）。 */
 export const FIRST_LINE_LIMIT = 72;
@@ -276,285 +275,289 @@ export function CommitArea({
   };
 
   return (
-    <section aria-label={messages.commit.section} data-commit-composer className="commit-composer mt-auto shrink-0 border-t border-panel-border px-3 pt-2 pb-2.5">
+    <section aria-label={messages.commit.section} data-commit-composer className="commit-composer">
       {templateError ? (
-        <p role="status" className="mb-1.5 text-[11.5px] leading-relaxed text-[var(--editorwarning-foreground)]">
+        <p role="status" className="mb-1.5 text-[11.5px] leading-relaxed text-[var(--warn)]">
           {messages.commit.templateFailed(templateError)}
         </p>
       ) : null}
       {hint ? (
-        <p role="status" className="mb-1.5 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-[var(--editorwarning-foreground)]">
-          <Codicon name="warning" size={14} className="mt-0.5" />
+        <p role="status" className="mb-1.5 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-[var(--warn)]">
+          <AppIcon name="warning" size={13} className="mt-0.5" />
           <span className="min-w-0">{hint}</span>
         </p>
       ) : null}
 
-      <div className="mb-1.5 flex items-center gap-2 text-[12.5px]">
-        <label
-          className="inline-flex min-w-0 items-center gap-1.5"
-          title={
-            amendBlocked
-              ? gates?.operationBlocksAmend
-                ? messages.commit.amendUnavailableOperation
-                : gates?.amendAvailable === false && !gates.hasConflicts
-                  ? messages.commit.amendUnavailableNoHead
-                  : messages.commit.amendUnavailable
-              : messages.commit.amend
-          }
-        >
-          <input
-            type="checkbox"
-            className="size-3.5 accent-[var(--checkbox-border)]"
-            checked={amend}
-            disabled={amendBlocked || submitting}
-            onChange={(event) => onAmend(event.target.checked)}
-          />
-          <span className="truncate">{messages.commit.amend}</span>
-        </label>
-        <span className="flex-1" />
-        {aiStatus?.configured ? (
-          <div className="flex items-center gap-1.5 shrink-0">
-            {canUndo ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-[11px] text-descriptionforeground hover:text-foreground"
-                title={messages.commit.ai.undoHint}
-                onClick={handleUndo}
-              >
-                <Codicon name="discard" size={12} />
-                <span>{messages.commit.ai.undo}</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-1.5 py-0.5 text-[11px] hover:bg-toolbar-hoverbackground disabled:opacity-50"
-              disabled={(!hasCommittableContent && !aiGenerating) || submitting}
-              title={
-                !aiStatus?.configured
-                  ? messages.commit.ai.notConfigured
-                  : !hasCommittableContent && !aiGenerating
-                    ? messages.commit.ai.noContent
-                    : aiGenerating
-                      ? messages.commit.ai.running
-                      : messages.commit.ai.generate
-              }
-              aria-label={aiGenerating ? messages.commit.ai.cancel : messages.commit.ai.generate}
-              onClick={() => void handleGenerateClick()}
-            >
-              <Codicon name={aiGenerating ? "loading" : "sparkle"} size={12} spin={aiGenerating} />
-              <span>{aiGenerating ? messages.commit.ai.cancel : messages.commit.ai.generate}</span>
-            </button>
-          </div>
-        ) : null}
-        <div className="relative">
-          <Popover
-            open={recentOpen}
-            onOpen={() => setRecentOpen(true)}
-            onClose={() => setRecentOpen(false)}
-            align="right"
-            width={380}
-            trigger={
-              <button
-                type="button"
-                className="icon-action size-5"
-                title={messages.commit.recent}
-                aria-label={messages.commit.recent}
-                disabled={recent.length === 0}
-              >
-                <Codicon name="history" size={15} />
-              </button>
+      <div className="commit-card">
+        <div className="commit-tools">
+          <label
+            className="inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)]"
+            title={
+              amendBlocked
+                ? gates?.operationBlocksAmend
+                  ? messages.commit.amendUnavailableOperation
+                  : gates?.amendAvailable === false && !gates.hasConflicts
+                    ? messages.commit.amendUnavailableNoHead
+                    : messages.commit.amendUnavailable
+                : messages.commit.amend
             }
           >
-            <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.commit.recent}</p>
-            {recent.length === 0 ? (
-              <p className="px-2 py-1 text-descriptionforeground">{messages.commit.recentEmpty}</p>
-            ) : (
-              recent.map((value, index) => (
+            <input
+              type="checkbox"
+              checked={amend}
+              disabled={amendBlocked || submitting}
+              onChange={(event) => onAmend(event.target.checked)}
+            />
+            <span className="truncate">{messages.commit.amend}</span>
+          </label>
+          <span className="flex-1" />
+          {aiStatus?.configured ? (
+            <div className="flex shrink-0 items-center gap-1">
+              {canUndo ? (
                 <button
-                  key={`${index}-${value.slice(0, 24)}`}
                   type="button"
-                  role="menuitem"
-                  title={messages.commit.recentPick}
-                  className="w-full rounded-[3px] px-2 py-1 text-left font-mono text-[11.5px] whitespace-pre-wrap break-words hover:bg-toolbar-hoverbackground"
-                  onClick={() => {
-                    setRecentOpen(false);
-                    onPickRecent(value);
-                  }}
+                  className="mini-icon-btn w-auto px-1.5 text-[11px]"
+                  title={messages.commit.ai.undoHint}
+                  onClick={handleUndo}
                 >
-                  {value.split("\n")[0]}
+                  <AppIcon name="discard" size={11} />
                 </button>
-              ))
-            )}
-          </Popover>
+              ) : null}
+              <button
+                type="button"
+                className="commit-ai-btn"
+                disabled={(!hasCommittableContent && !aiGenerating) || submitting}
+                title={
+                  !aiStatus?.configured
+                    ? messages.commit.ai.notConfigured
+                    : !hasCommittableContent && !aiGenerating
+                      ? messages.commit.ai.noContent
+                      : aiGenerating
+                        ? messages.commit.ai.running
+                        : messages.commit.ai.generate
+                }
+                aria-label={aiGenerating ? messages.commit.ai.cancel : messages.commit.ai.generate}
+                onClick={() => void handleGenerateClick()}
+              >
+                <AppIcon name={aiGenerating ? "loading" : "sparkle"} size={12} spin={aiGenerating} />
+                <span>{aiGenerating ? messages.commit.ai.cancel : messages.commit.ai.generate}</span>
+              </button>
+            </div>
+          ) : null}
+          <div className="relative">
+            <Popover
+              open={recentOpen}
+              onOpen={() => setRecentOpen(true)}
+              onClose={() => setRecentOpen(false)}
+              align="right"
+              side="top"
+              width={360}
+              trigger={
+                <button
+                  type="button"
+                  className="mini-icon-btn"
+                  title={messages.commit.recent}
+                  aria-label={messages.commit.recent}
+                  disabled={recent.length === 0}
+                >
+                  <AppIcon name="history" size={13} />
+                </button>
+              }
+            >
+              <p className="px-2 py-1 text-[11px] font-medium text-[var(--text-muted)]">{messages.commit.recent}</p>
+              {recent.length === 0 ? (
+                <p className="px-2 py-1 text-[var(--text-muted)]">{messages.commit.recentEmpty}</p>
+              ) : (
+                recent.map((value, index) => (
+                  <button
+                    key={`${index}-${value.slice(0, 24)}`}
+                    type="button"
+                    role="menuitem"
+                    title={messages.commit.recentPick}
+                    className="w-full rounded-[6px] px-2 py-1.5 text-left font-mono text-[11.5px] whitespace-pre-wrap break-words hover:bg-[var(--surface-hover)]"
+                    onClick={() => {
+                      setRecentOpen(false);
+                      onPickRecent(value);
+                    }}
+                  >
+                    {value.split("\n")[0]}
+                  </button>
+                ))
+              )}
+            </Popover>
+          </div>
+          <div className="relative">
+            <Popover
+              open={optionsOpen}
+              onOpen={() => setOptionsOpen(true)}
+              onClose={() => setOptionsOpen(false)}
+              align="right"
+              side="top"
+              width={260}
+              trigger={
+                <button
+                  type="button"
+                  className="mini-icon-btn"
+                  title={messages.commit.options}
+                  aria-label={messages.commit.options}
+                >
+                  <AppIcon name="sliders" size={13} />
+                </button>
+              }
+            >
+              <label className="flex items-start gap-2 rounded-[6px] px-2 py-1.5 text-[12px] hover:bg-[var(--surface-hover)]">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={skipHooks}
+                  disabled={submitting}
+                  onChange={(event) => onSkipHooks(event.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="block">{messages.commit.skipHooks}</span>
+                  <span className="block text-[11px] text-[var(--text-muted)]">{messages.commit.skipHooksDetail}</span>
+                  {skipHooks ? (
+                    <span className="mt-0.5 block text-[11px] text-[var(--text-muted)]">{messages.commit.skipHooksOnce}</span>
+                  ) : null}
+                </span>
+              </label>
+            </Popover>
+          </div>
         </div>
-      </div>
 
-      {aiReplaceConfirmOpen ? (
-        <div
-          role="dialog"
-          aria-label={messages.commit.ai.replaceTitle}
-          className="mb-1.5 rounded border border-[var(--editorwarning-foreground)]/40 bg-[var(--editorwidget-background)] p-2 text-xs"
-        >
-          <p className="font-semibold">{messages.commit.ai.replaceTitle}</p>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-descriptionforeground">{messages.commit.ai.replaceBody}</p>
-          <div className="mt-2 flex justify-end gap-2">
+        {aiReplaceConfirmOpen ? (
+          <div
+            role="dialog"
+            aria-label={messages.commit.ai.replaceTitle}
+            className="mx-2 mt-2 rounded-[6px] border border-[var(--warn)]/35 bg-[var(--surface-subtle)] p-2 text-xs"
+          >
+            <p className="font-semibold">{messages.commit.ai.replaceTitle}</p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--text-secondary)]">{messages.commit.ai.replaceBody}</p>
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                className="banner-link text-[11.5px]"
+                onClick={() => {
+                  setAiReplaceConfirmOpen(false);
+                  setPendingIntent(null);
+                }}
+              >
+                {messages.recovery.cancel}
+              </button>
+              <button
+                type="button"
+                className="revia-btn revia-btn-primary h-6 px-2.5 text-[11.5px]"
+                onClick={() => {
+                  setAiReplaceConfirmOpen(false);
+                  if (!aiStatus?.confirmed) {
+                    setAiConfirmOpen(true);
+                    return;
+                  }
+                  confirmAndStart();
+                }}
+              >
+                {messages.commit.ai.replaceConfirm}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <label className="sr-only" htmlFor="commit-message">
+            {messages.commit.messageLabel}
+          </label>
+          <textarea
+            id="commit-message"
+            data-commit-message
+            className="commit-message flex-1"
+            style={
+              checks.showRuler && subjectLimit > 0
+                ? { backgroundImage: `linear-gradient(to right, transparent calc(${subjectLimit}ch + 10px), var(--border-subtle) calc(${subjectLimit}ch + 10px), var(--border-subtle) calc(${subjectLimit}ch + 11px), transparent calc(${subjectLimit}ch + 11px))` }
+                : undefined
+            }
+            rows={3}
+            spellCheck={false}
+            placeholder={messages.commit.placeholder}
+            value={message}
+            disabled={submitting}
+            onChange={(event) => onMessage(event.target.value)}
+            onKeyDown={(event) => {
+              if (matchesAccelerator(event.nativeEvent, acceleratorOf("commit"))) {
+                event.preventDefault();
+                if (!disabled && !document.querySelector("[role='dialog'], dialog[open]")) onSubmit();
+              }
+            }}
+          />
+          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5 text-[10.5px] text-[var(--text-muted)]">
+            {draftNotice ? (
+              <span role="status" className="min-w-0 flex-1 truncate" title={draftNotice}>
+                {draftNotice}
+              </span>
+            ) : (
+              <span className="flex-1" />
+            )}
+            <span className={`font-mono ${overLimit ? "text-[var(--warn)] font-medium" : ""}`}>
+              {subjectLimit > 0
+                ? overLimit
+                  ? messages.commit.firstLineHint(firstLine)
+                  : `${firstLine} / ${subjectLimit}`
+                : `${firstLine}`}
+            </span>
+          </div>
+        </div>
+
+        <div className="commit-footer">
+          <span className="review-pill tabular-nums" title={messages.commit.progressDetail}>
+            <AppIcon
+              name={submitting ? "loading" : "check"}
+              size={12}
+              spin={submitting}
+              className={submitting ? undefined : "text-[var(--reviewed)]"}
+            />
+            <span>{submitting ? messages.commit.running : messages.commit.progress(reviewedCount, totalFiles)}</span>
+          </span>
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              className="banner-link text-[11.5px]"
-              onClick={() => {
-                setAiReplaceConfirmOpen(false);
-                setPendingIntent(null);
-              }}
+              className="revia-btn revia-btn-secondary"
+              disabled={disabled}
+              title={`${messages.commit.submitHint} (${formatAccelerator(acceleratorOf("commit"))})`}
+              aria-label={messages.commit.submitHint}
+              onClick={onSubmit}
             >
-              {messages.recovery.cancel}
+              {submitting ? <AppIcon name="loading" size={13} spin /> : null}
+              <span>{submitting ? messages.commit.submitting : messages.commit.submit}</span>
             </button>
             <button
               type="button"
-              className="rounded-[3px] bg-primary px-2 py-0.5 text-[11.5px] text-primaryforeground hover:opacity-90"
-              onClick={() => {
-                setAiReplaceConfirmOpen(false);
-                if (!aiStatus?.confirmed) {
-                  setAiConfirmOpen(true);
-                  return;
-                }
-                confirmAndStart();
-              }}
+              className="revia-btn revia-btn-primary"
+              disabled={disabled}
+              title={messages.branches.commitAndPush}
+              aria-label={messages.branches.commitAndPush}
+              onClick={onSubmitAndPush}
             >
-              {messages.commit.ai.replaceConfirm}
+              <span>{messages.branches.commitAndPush}</span>
             </button>
           </div>
         </div>
-      ) : null}
-
-      <label className="sr-only" htmlFor="commit-message">
-        {messages.commit.messageLabel}
-      </label>
-      <textarea
-        id="commit-message"
-        data-commit-message
-        className="commit-message"
-        style={
-          checks.showRuler && subjectLimit > 0
-            ? { backgroundImage: `linear-gradient(to right, transparent calc(${subjectLimit}ch + 6px), var(--panel-border) calc(${subjectLimit}ch + 6px), var(--panel-border) calc(${subjectLimit}ch + 7px), transparent calc(${subjectLimit}ch + 7px))` }
-            : undefined
-        }
-        rows={4}
-        spellCheck={false}
-        placeholder={messages.commit.placeholder}
-        value={message}
-        disabled={submitting}
-        onChange={(event) => onMessage(event.target.value)}
-        onKeyDown={(event) => {
-          // F17：提交框跟随用户自定义的提交快捷键（acceleratorOf 读实时 overrides）。
-          if (matchesAccelerator(event.nativeEvent, acceleratorOf("commit"))) {
-            event.preventDefault();
-            if (!disabled && !document.querySelector("[role='dialog'], dialog[open]")) onSubmit();
-          }
-        }}
-      />
-
-      <div className="mt-1 flex items-center gap-2 text-[11px] text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]">
-        <span className={overLimit ? "text-[var(--editorwarning-foreground)]" : undefined}>
-          {subjectLimit > 0
-            ? overLimit
-              ? messages.commit.firstLineHint(firstLine)
-              : `${firstLine} / ${subjectLimit}`
-            : `${firstLine}`}
-        </span>
-        {draftNotice ? (
-          <span role="status" className="min-w-0 flex-1 truncate" title={draftNotice}>
-            {draftNotice}
-          </span>
-        ) : null}
       </div>
 
       {issues.length > 0 ? (
-        <ul data-commit-issues className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-[var(--editorwarning-foreground)]">
+        <ul data-commit-issues className="mt-1.5 space-y-0.5 text-[11px] leading-relaxed text-[var(--warn)]">
           {issues.map((issue, index) => (
             <li key={index} className="flex items-start gap-1">
-              <Codicon name="warning" size={11} className="mt-0.5 shrink-0" />
+              <AppIcon name="warning" size={11} className="mt-0.5 shrink-0" />
               <span className="min-w-0">{issue}</span>
             </li>
           ))}
         </ul>
       ) : null}
 
-      <div className="mt-2 flex items-center gap-1.5">
-        {/* 主提交按钮：GlassButton 统一到第四版低饱和透明配色与状态（M7 任务 01）。 */}
-        <GlassButton
-          variant="primary"
-          specular
-          className="m7-commit-button"
-          radius={5}
-          disabled={disabled}
-          title={messages.commit.submitHint}
-          aria-label={messages.commit.submitHint}
-          onClick={onSubmit}
-        >
-          {submitting ? <Codicon name="loading" size={14} spin /> : <Codicon name="check" size={14} />}
-          {submitting ? messages.commit.submitting : messages.commit.submit}
-          {!submitting ? <span className="text-[11px] opacity-70">{formatAccelerator(acceleratorOf("commit"))}</span> : null}
-        </GlassButton>
-        <button
-          type="button"
-          className="icon-action size-7"
-          disabled={disabled}
-          title={messages.branches.commitAndPush}
-          aria-label={messages.branches.commitAndPush}
-          onClick={onSubmitAndPush}
-        >
-          <Codicon name="cloud-upload" size={15} />
-        </button>
-        <div className="relative">
-          <Popover
-            open={optionsOpen}
-            onOpen={() => setOptionsOpen(true)}
-            onClose={() => setOptionsOpen(false)}
-            align="right"
-            // 按钮在侧栏最下面：往上弹，不贴着窗口底边（返修 B2 曾被底部裁掉）。
-            side="top"
-            width={260}
-            trigger={
-              <button
-                type="button"
-                className="icon-action size-7"
-                title={messages.commit.options}
-                aria-label={messages.commit.options}
-              >
-                <Codicon name="gear" size={15} />
-              </button>
-            }
-          >
-            <label className="flex items-start gap-2 rounded-[3px] px-2 py-1.5 text-[12px] hover:bg-toolbar-hoverbackground">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={skipHooks}
-                disabled={submitting}
-                onChange={(event) => onSkipHooks(event.target.checked)}
-              />
-              <span className="min-w-0">
-                <span className="block">{messages.commit.skipHooks}</span>
-                <span className="block text-[11px] text-descriptionforeground">{messages.commit.skipHooksDetail}</span>
-                {skipHooks ? (
-                  <span className="mt-0.5 block text-[11px] text-descriptionforeground">{messages.commit.skipHooksOnce}</span>
-                ) : null}
-              </span>
-            </label>
-          </Popover>
-        </div>
-      </div>
-
-      <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-descriptionforeground" title={messages.commit.progressDetail}>
-        <Codicon name={submitting ? "loading" : "pass"} size={13} className={submitting ? "animate-spin" : undefined} />
-        <span className="tabular-nums">{submitting ? messages.commit.running : messages.commit.progress(reviewedCount, totalFiles)}</span>
-      </div>
-
       {liveOutput !== null ? <LiveCommitOutput lines={liveOutput} /> : null}
 
       {upstream ? (
         <p
-          className={`mt-1 text-[11px] leading-relaxed ${upstream.warn ? "text-[var(--editorwarning-foreground)]" : "text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]"}`}
+          className={`mt-1 text-[11px] leading-relaxed ${upstream.warn ? "text-[var(--warn)]" : "text-[var(--text-muted)]"}`}
           title={upstream.text}
         >
           {upstream.text}
@@ -562,14 +565,14 @@ export function CommitArea({
       ) : null}
 
       {!submittable ? (
-        <p className="mt-1 text-[11px] text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]">{messages.commit.emptyMessage}</p>
+        <p className="mt-1 text-[11px] text-[var(--text-muted)]">{messages.commit.emptyMessage}</p>
       ) : blockedByInput ? (
-        <p className="mt-1 text-[11px] text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]">{amend ? messages.commit.amendUnavailable : messages.commit.noStaged}</p>
+        <p className="mt-1 text-[11px] text-[var(--text-muted)]">{amend ? messages.commit.amendUnavailable : messages.commit.noStaged}</p>
       ) : context && !context.gates.hasStagedChanges
         && context.expectation.index.some((entry) => entry.intentToAdd) ? (
-        <p className="mt-1 text-[11px] text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]">{messages.commit.intentOnly}</p>
+        <p className="mt-1 text-[11px] text-[var(--text-muted)]">{messages.commit.intentOnly}</p>
       ) : submitting ? (
-        <p className="mt-1 text-[11px] text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]">{messages.commit.blockedWriting}</p>
+        <p className="mt-1 text-[11px] text-[var(--text-muted)]">{messages.commit.blockedWriting}</p>
       ) : null}
 
       {amendConfirm ? (
@@ -582,8 +585,8 @@ export function CommitArea({
       ) : null}
 
       {displayedError ? (
-        <p role="status" className="mt-1 flex items-start gap-1 text-[11px] leading-relaxed text-[var(--editorerror-foreground)]">
-          <Codicon name="error" size={13} className="mt-0.5 shrink-0" />
+        <p role="status" className="mt-1 flex items-start gap-1 text-[11px] leading-relaxed text-[var(--danger)]">
+          <AppIcon name="error" size={13} className="mt-0.5 shrink-0" />
           <span className="min-w-0">{displayedError}</span>
         </p>
       ) : null}
@@ -607,8 +610,8 @@ export function CommitArea({
                 : t("commit.ai.confirmBody", { url: aiStatus.baseUrl })}
             </p>
             {aiStatus.insecure ? (
-              <div className="flex items-start gap-1.5 rounded-[4px] bg-[var(--editorwarning-foreground)]/10 p-2 text-[11.5px] text-[var(--editorwarning-foreground)]">
-                <Codicon name="warning" size={14} className="mt-0.5 shrink-0" />
+              <div className="flex items-start gap-1.5 rounded-[4px] bg-[var(--warn)]/10 p-2 text-[11.5px] text-[var(--warn)]">
+                <AppIcon name="warning" size={14} className="mt-0.5 shrink-0" />
                 <span>{messages.commit.ai.confirmInsecure}</span>
               </div>
             ) : null}
@@ -625,7 +628,7 @@ export function CommitArea({
               </button>
               <button
                 type="button"
-                className="rounded-[3px] bg-primary px-3 py-1 text-[12px] font-medium text-primaryforeground hover:opacity-90"
+                className="revia-btn revia-btn-primary h-7 px-3"
                 onClick={async () => {
                   try {
                     const updated = await ipc.aiConfirm();
@@ -671,11 +674,11 @@ function AmendConfirm({
       ref={ref}
       role="dialog"
       aria-label={title}
-      className="mt-2 rounded border border-[var(--editorwarning-foreground)]/40 p-2 text-xs"
+      className="mt-2 rounded border border-[var(--warn)]/40 p-2 text-xs"
     >
       <p className="font-semibold">{title}</p>
-      <p className="mt-1 text-descriptionforeground">{body}</p>
-      <p className="mt-1 text-[color:color-mix(in_srgb,var(--descriptionforeground)_55%,var(--editor-background))]">{messages.commit.upstreamBoundary}</p>
+      <p className="mt-1 text-[var(--text-secondary)]">{body}</p>
+      <p className="mt-1 text-[var(--text-muted)]">{messages.commit.upstreamBoundary}</p>
       <div className="mt-2 flex justify-end gap-2">
         <button type="button" className="banner-link" onClick={onCancel}>
           {messages.recovery.cancel}
@@ -721,20 +724,20 @@ function LiveCommitOutput({ lines }: { lines: string[] }) {
     if (expanded) preRef.current?.scrollTo({ top: preRef.current.scrollHeight });
   }, [expanded, lines.length]);
   return (
-    <div className="mt-1 rounded border border-panel-border text-[11px]" data-commit-live-output>
+    <div className="mt-1 rounded border border-[var(--border-subtle)] text-[11px]" data-commit-live-output>
       <button
         type="button"
-        className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-descriptionforeground hover:bg-toolbar-hoverbackground"
+        className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
         onClick={() => setExpanded((value) => !value)}
       >
-        <Codicon name={expanded ? "chevron-down" : "chevron-right"} size={12} />
+        <AppIcon name={expanded ? "chevron-down" : "chevron-right"} size={12} />
         {messages.commit.outputLive}
         {lines.length > 0 ? <span className="ml-auto tabular-nums">{lines.length}</span> : null}
       </button>
       {expanded ? (
         <pre
           ref={preRef}
-          className="max-h-32 overflow-auto border-t border-panel-border bg-muted/40 px-2 py-1 font-mono leading-relaxed whitespace-pre-wrap break-words"
+          className="max-h-32 overflow-auto border-t border-[var(--border-subtle)] bg-muted/40 px-2 py-1 font-mono leading-relaxed whitespace-pre-wrap break-words"
         >
           {lines.length > 0 ? lines.join("\n") : messages.commit.outputWaiting}
         </pre>

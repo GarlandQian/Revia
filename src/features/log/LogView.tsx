@@ -25,7 +25,7 @@ import { messages } from "@/lib/i18n/index";
 import { columnLabel, dateLabel } from "@/lib/i18n/text";
 import { formatAppError, toAppError } from "@/lib/error";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Dropdown, MenuItem, MenuSeparator } from "@/components/ui/popover";
 import { FileTypeIcon } from "@/components/app/FileTypeIcon";
 import type { LogFilterState, DatePreset } from "./logModel";
@@ -155,7 +155,7 @@ function commitRefChips(commit: HistoryCommit, currentBranch: string | null, hea
 function LogRefChips({ chips }: { chips: ReturnType<typeof refChips> }) {
   return chips.map((chip) => (
     <span key={chip.fullName} className={refChipClass(chip)} title={chip.fullName}>
-      <Codicon name={chip.kind === "tag" ? "tag" : chip.kind === "remoteBranch" ? "cloud" : "git-branch"} size={10} />
+      <AppIcon name={chip.kind === "tag" ? "tag" : chip.kind === "remoteBranch" ? "cloud" : "git-branch"} size={10} />
       {chip.label}
     </span>
   ));
@@ -690,9 +690,9 @@ export function LogView(props: LogViewProps) {
         {refGroups.map((group) => <span key={group.oid} className="log-ref-group"><LogRefChips chips={group.chips} /></span>)}
       </div>
       {/* 工具栏：文字、分支、作者、日期、路径（L04），以及列与预览开关。 */}
-      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-panel-border px-2 py-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] px-2 py-1">
         <div className="relative">
-          <Codicon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-descriptionforeground" />
+          <AppIcon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-[var(--text-secondary)]" />
           <input
             ref={filterInputRef}
             className="log-input log-input-search w-[220px]"
@@ -709,11 +709,11 @@ export function LogView(props: LogViewProps) {
           width={280}
           trigger={
             <button type="button" className={`log-filter-button${filter.branches.length ? " active" : ""}`}>
-              <Codicon name="git-branch" size={13} />
+              <AppIcon name="git-branch" size={13} />
               <span className="max-w-[130px] truncate">
                 {filter.branches.length ? messages.log.branchCount(filter.branches.length) : messages.log.branchAll}
               </span>
-              <Codicon name="chevron-down" size={11} />
+              <AppIcon name="chevron-down" size={11} />
             </button>
           }
         >
@@ -727,11 +727,11 @@ export function LogView(props: LogViewProps) {
           width={260}
           trigger={
             <button type="button" className={`log-filter-button${filter.authors.length ? " active" : ""}`}>
-              <Codicon name="person" size={13} />
+              <AppIcon name="person" size={13} />
               <span className="max-w-[110px] truncate">
                 {filter.authors.length ? messages.log.authorCount(filter.authors.length) : messages.log.authorAll}
               </span>
-              <Codicon name="chevron-down" size={11} />
+              <AppIcon name="chevron-down" size={11} />
             </button>
           }
         >
@@ -746,9 +746,9 @@ export function LogView(props: LogViewProps) {
           width={260}
           trigger={
             <button type="button" className={`log-filter-button${filter.date !== "all" ? " active" : ""}`}>
-              <Codicon name="calendar" size={13} />
+              <AppIcon name="calendar" size={13} />
               <span>{dateLabel(filter.date)}</span>
-              <Codicon name="chevron-down" size={11} />
+              <AppIcon name="chevron-down" size={11} />
             </button>
           }
         >
@@ -761,11 +761,11 @@ export function LogView(props: LogViewProps) {
           width={320}
           trigger={
             <button type="button" className={`log-filter-button${filter.paths.length ? " active" : ""}`}>
-              <Codicon name="file" size={13} />
+              <AppIcon name="file" size={13} />
               <span className="max-w-[110px] truncate">
                 {filter.paths.length ? messages.log.pathCount(filter.paths.length) : messages.log.pathAll}
               </span>
-              <Codicon name="chevron-down" size={11} />
+              <AppIcon name="chevron-down" size={11} />
             </button>
           }
         >
@@ -783,21 +783,21 @@ export function LogView(props: LogViewProps) {
           aria-pressed={previewOpen}
           onClick={() => onPreviewOpen(!previewOpen)}
         >
-          <Codicon name="open-preview" size={13} />
+          <AppIcon name="open-preview" size={13} />
           {messages.log.preview}
         </button>
         <Dropdown
           width={220}
           trigger={
             <button type="button" className="log-filter-button" title={messages.log.columns}>
-              <Codicon name="settings" size={13} />
-              <Codicon name="chevron-down" size={11} />
+              <AppIcon name="settings" size={13} />
+              <AppIcon name="chevron-down" size={11} />
             </button>
           }
         >
-          <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.log.columns}</p>
+          <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{messages.log.columns}</p>
           {(["author", "date", "hash"] as const).map((column) => (
-            <label key={column} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+            <label key={column} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
               <input
                 type="checkbox"
                 checked={settings.columns[column]}
@@ -807,7 +807,7 @@ export function LogView(props: LogViewProps) {
             </label>
           ))}
           <MenuSeparator />
-          <label className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+          <label className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
             <input
               type="checkbox"
               checked={settings.longEdges}
@@ -815,7 +815,7 @@ export function LogView(props: LogViewProps) {
             />
             {messages.log.longEdges}
           </label>
-          <label className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+          <label className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
             <input
               type="checkbox"
               checked={settings.firstParent}
@@ -831,7 +831,7 @@ export function LogView(props: LogViewProps) {
             title={messages.log.resetFilter}
             onClick={() => onState({ filter: defaultFilter() })}
           >
-            <Codicon name="clear-all" size={13} />
+            <AppIcon name="clear-all" size={13} />
             {messages.log.resetFilter}
           </button>
         ) : null}
@@ -849,7 +849,7 @@ export function LogView(props: LogViewProps) {
             onScroll={onScroll}
           >
             <div style={{ minWidth: tableMinWidth }}>
-              <div className="log-table-head sticky top-0 z-[1] grid h-[24px] items-center border-b border-panel-border bg-[var(--editor-background)] text-[11px] text-descriptionforeground" style={{ gridTemplateColumns: tableGridColumns }}>
+              <div className="log-table-head sticky top-0 z-[1] grid h-[24px] items-center border-b border-[var(--border-subtle)] bg-[var(--editor-background)] text-[11px] text-[var(--text-secondary)]" style={{ gridTemplateColumns: tableGridColumns }}>
                 {/* 分支图列只有几条轨道宽，表头文字放不下；同 Rebased 不显示列名，只保留可读标签。 */}
                 <span className="log-graph-col shrink-0" style={{ width: graphColumnWidth }} title={messages.log.graph} aria-label={messages.log.graph} />
                 <span className="px-2">{messages.log.refsLabel}</span>
@@ -895,13 +895,13 @@ export function LogView(props: LogViewProps) {
                       <span className="log-ref-group px-2"><LogRefChips chips={chips} /></span>
                       <span className="min-w-0 truncate px-2" title={commit.subject}>{commit.subject}</span>
                       {settings.columns.author ? (
-                        <span className="min-w-0 truncate px-2 text-[11.5px] text-descriptionforeground" title={authorKey(commit)}>
+                        <span className="min-w-0 truncate px-2 text-[11.5px] text-[var(--text-secondary)]" title={authorKey(commit)}>
                           {authorLabel(commit)}
                         </span>
                       ) : null}
                       {settings.columns.date ? (
                         <span
-                          className="shrink-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-[11.5px] text-descriptionforeground tabular-nums"
+                          className="shrink-0 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-[11.5px] text-[var(--text-secondary)] tabular-nums"
                           style={{ width: DATE_COLUMN_WIDTH }}
                           title={formatCommitDate(commit.author.time)}
                         >
@@ -909,7 +909,7 @@ export function LogView(props: LogViewProps) {
                         </span>
                       ) : null}
                       {settings.columns.hash ? (
-                        <span className="min-w-0 truncate px-2 font-mono text-[11.5px] text-descriptionforeground" title={commit.oid}>
+                        <span className="min-w-0 truncate px-2 font-mono text-[11.5px] text-[var(--text-secondary)]" title={commit.oid}>
                           {shortOid(commit.oid)}
                         </span>
                       ) : null}
@@ -918,11 +918,11 @@ export function LogView(props: LogViewProps) {
                 })}
               </div>
               {snapshot.loading ? (
-                <div className="px-3 py-2 text-[12px] text-descriptionforeground">{messages.log.loading}</div>
+                <div className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">{messages.log.loading}</div>
               ) : null}
               {snapshot.error ? (
                 <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-destructive">
-                  <Codicon name="warning" size={13} />
+                  <AppIcon name="warning" size={13} />
                   <span className="min-w-0 flex-1">{formatAppError(snapshot.error)}</span>
                   <button type="button" className="log-filter-button" onClick={() => resetLog(`${key}|retry`)}>
                     {messages.log.retry}
@@ -930,7 +930,7 @@ export function LogView(props: LogViewProps) {
                 </div>
               ) : null}
               {!snapshot.loading && !snapshot.error && total === 0 ? (
-                <div className="flex flex-col items-start gap-2 px-3 py-4 text-[12.5px] text-descriptionforeground">
+                <div className="flex flex-col items-start gap-2 px-3 py-4 text-[12.5px] text-[var(--text-secondary)]">
                   <span>{hasActiveFilter(filter) ? messages.log.noMatches : messages.log.empty}</span>
                   {hasActiveFilter(filter) ? (
                     <button type="button" className="log-filter-button" onClick={() => onState({ filter: defaultFilter() })}>
@@ -940,7 +940,7 @@ export function LogView(props: LogViewProps) {
                 </div>
               ) : null}
               {snapshot.exhausted && !snapshot.spanExceeded && total > 0 && !snapshot.loading ? (
-                <div className="px-3 py-2 text-[11.5px] text-descriptionforeground">{messages.log.endOfHistory}</div>
+                <div className="px-3 py-2 text-[11.5px] text-[var(--text-secondary)]">{messages.log.endOfHistory}</div>
               ) : null}
             </div>
           </div>
@@ -974,15 +974,15 @@ export function LogView(props: LogViewProps) {
           />
         </div>
         {previewOpen && selectedPreview && targetId ? (
-          <div className={`min-h-0 min-w-0 shrink-0 border-panel-border ${settings.previewPosition === "bottom" ? "h-[45%] border-t" : "w-[45%] border-l"}`}>
-            <div className="flex h-[24px] items-center gap-2 border-b border-panel-border px-2 text-[11.5px] text-descriptionforeground">
-              <Codicon name="open-preview" size={12} />
+          <div className={`min-h-0 min-w-0 shrink-0 border-[var(--border-subtle)] ${settings.previewPosition === "bottom" ? "h-[45%] border-t" : "w-[45%] border-l"}`}>
+            <div className="flex h-[24px] items-center gap-2 border-b border-[var(--border-subtle)] px-2 text-[11.5px] text-[var(--text-secondary)]">
+              <AppIcon name="open-preview" size={12} />
               <span className="min-w-0 flex-1 truncate" title={selectedPreview.title}>{selectedPreview.title}</span>
               <button type="button" className="icon-action size-[20px]" title={messages.log.openInTab} onClick={() => activateFile(selectedPreview.target, selectedPreview.title)}>
-                <Codicon name="link-external" size={12} />
+                <AppIcon name="link-external" size={12} />
               </button>
               <button type="button" className="icon-action size-[20px]" title={messages.log.closePreview} onClick={() => onPreviewOpen(false)}>
-                <Codicon name="close" size={12} />
+                <AppIcon name="close" size={12} />
               </button>
             </div>
             <div className="h-[calc(100%-24px)] min-h-0">
@@ -1086,7 +1086,7 @@ function GraphCell({
             onJump(marker.targetRow);
           }}
         >
-          <Codicon name={marker.direction === "down" ? "chevron-down" : "chevron-up"} size={9} />
+          <AppIcon name={marker.direction === "down" ? "chevron-down" : "chevron-up"} size={9} />
         </button>
       ))}
     </span>
@@ -1120,13 +1120,13 @@ function CommitDetails({
   const [toggledNodes, setToggledNodes] = useState<Set<string>>(new Set());
   const detail = details.detail;
   if (details.loading && !detail) {
-    return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-descriptionforeground">{messages.log.loadingDetails}</div>;
+    return <div className="log-details w-[360px] shrink-0 border-l border-[var(--border-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">{messages.log.loadingDetails}</div>;
   }
   if (details.error) {
-    return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-destructive">{formatAppError(details.error)}</div>;
+    return <div className="log-details w-[360px] shrink-0 border-l border-[var(--border-subtle)] p-3 text-[12px] text-destructive">{formatAppError(details.error)}</div>;
   }
   if (!detail) {
-    return <div className="log-details w-[360px] shrink-0 border-l border-panel-border p-3 text-[12px] text-descriptionforeground">{messages.log.noSelection}</div>;
+    return <div className="log-details w-[360px] shrink-0 border-l border-[var(--border-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">{messages.log.noSelection}</div>;
   }
   const isMerge = detail.parents.length > 1;
   const groups = details.merge
@@ -1157,13 +1157,13 @@ function CommitDetails({
       >
         <FileTypeIcon path={file.path} />
         <span className="min-w-0 flex-1 truncate">{file.path}</span>
-        {file.originalPath ? <span className="shrink-0 text-[11px] text-descriptionforeground">← {file.originalPath}</span> : null}
+        {file.originalPath ? <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">← {file.originalPath}</span> : null}
         <span className={`log-status log-status-${file.status}`}>{status}</span>
-        <span className="shrink-0 font-mono text-[10.5px] text-descriptionforeground">
+        <span className="shrink-0 font-mono text-[10.5px] text-[var(--text-secondary)]">
           {file.added ? `+${file.added}` : ""}
           {file.deleted ? ` -${file.deleted}` : ""}
         </span>
-        {!file.openable ? <Codicon name="lock" size={11} className="shrink-0 text-descriptionforeground" /> : null}
+        {!file.openable ? <AppIcon name="lock" size={11} className="shrink-0 text-[var(--text-secondary)]" /> : null}
       </div>
     );
   };
@@ -1181,19 +1181,19 @@ function CommitDetails({
             else next.add(node.key);
             return next;
           })}>
-          <Codicon name={open ? "chevron-down" : "chevron-right"} size={12} />
-          <Codicon name={node.kind === "parent" ? "git-commit" : "folder"} size={13} />
+          <AppIcon name={open ? "chevron-down" : "chevron-right"} size={12} />
+          <AppIcon name={node.kind === "parent" ? "git-commit" : "folder"} size={13} />
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
         </button>
         {open ? <div className="pl-3">{node.children.length
           ? node.children.map(renderNode)
-          : <p className="px-3 py-1 text-[11.5px] text-descriptionforeground">{messages.log.noFiles}</p>}</div> : null}
+          : <p className="px-3 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.log.noFiles}</p>}</div> : null}
       </div>
     );
   };
   return (
-    <div className="log-details flex w-[360px] shrink-0 flex-col overflow-hidden border-l border-panel-border">
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-panel-border px-2 py-1 text-[11.5px] text-descriptionforeground">
+    <div className="log-details flex w-[360px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-subtle)]">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">
         <span className="min-w-0 flex-1 truncate">
           {messages.log.changedFiles} · {messages.log.fileCount(groups.reduce((total, group) => total + group.files.length, 0))}
         </span>
@@ -1206,25 +1206,25 @@ function CommitDetails({
       </div>
       <div className="max-h-[45%] min-h-[90px] overflow-auto py-1">
         {tree.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] text-descriptionforeground">{messages.log.noFiles}</p>
+          <p className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">{messages.log.noFiles}</p>
         ) : (
           tree.map(renderNode)
         )}
         {details.files?.truncated || details.merge?.truncated ? (
-          <p className="px-3 py-1 text-[11.5px] text-[var(--editorwarning-foreground)]">{messages.log.filesTruncated}</p>
+          <p className="px-3 py-1 text-[11.5px] text-[var(--warn)]">{messages.log.filesTruncated}</p>
         ) : null}
         {details.merge?.mode === "combined" ? (
-          <p className="px-3 py-1 text-[11.5px] text-descriptionforeground">{messages.log.mergeCombinedHint}</p>
+          <p className="px-3 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.log.mergeCombinedHint}</p>
         ) : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto border-t border-panel-border px-3 py-2 text-[12px]">
+      <div className="min-h-0 flex-1 overflow-auto border-t border-[var(--border-subtle)] px-3 py-2 text-[12px]">
         <div className="flex items-start gap-2">
           <span className="min-w-0 flex-1 whitespace-pre-wrap break-words font-medium">{detail.message.trim() || messages.log.emptyMessage}</span>
           <button type="button" className="icon-action size-[20px]" title={messages.log.copyHash} onClick={() => onCopy(detail.oid)}>
-            <Codicon name="copy" size={12} />
+            <AppIcon name="copy" size={12} />
           </button>
         </div>
-        <dl className="mt-2 space-y-1 text-[11.5px] text-descriptionforeground">
+        <dl className="mt-2 space-y-1 text-[11.5px] text-[var(--text-secondary)]">
           <div className="flex gap-2">
             <dt className="w-[64px] shrink-0">{messages.log.author}</dt>
             <dd className="min-w-0 flex-1 break-words">
@@ -1280,7 +1280,7 @@ function CommitDetails({
           ) : null}
         </dl>
         {detail.messageLossy ? (
-          <p className="mt-2 text-[11.5px] text-[var(--editorwarning-foreground)]">{messages.log.messageLossy}</p>
+          <p className="mt-2 text-[11.5px] text-[var(--warn)]">{messages.log.messageLossy}</p>
         ) : null}
       </div>
     </div>
@@ -1431,7 +1431,7 @@ function BranchFilterMenu({
     <div className="max-h-[320px] overflow-auto">
       <MenuItem onClick={() => onChange([])}>
         <span className="flex items-center gap-2">
-          {selected.length === 0 ? <Codicon name="check" size={12} /> : <span className="w-3" />}
+          {selected.length === 0 ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
           {messages.log.branchAll}
         </span>
       </MenuItem>
@@ -1441,11 +1441,11 @@ function BranchFilterMenu({
         if (items.length === 0) return null;
         return (
           <div key={group.key}>
-            <p className="px-2 py-1 text-[11px] text-descriptionforeground">{group.label}</p>
+            <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{group.label}</p>
             {items.map((option) => {
               const active = selected.includes(option.fullName);
               return (
-                <label key={option.fullName} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+                <label key={option.fullName} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
                   <input
                     type="checkbox"
                     checked={active}
@@ -1490,7 +1490,7 @@ function AuthorFilterMenu({
     <div className="max-h-[320px] overflow-auto">
       <MenuItem onClick={() => onChange([])}>
         <span className="flex items-center gap-2">
-          {selected.length === 0 ? <Codicon name="check" size={12} /> : <span className="w-3" />}
+          {selected.length === 0 ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
           {messages.log.authorAll}
         </span>
       </MenuItem>
@@ -1499,17 +1499,17 @@ function AuthorFilterMenu({
           onClick={() => onChange(selected.includes(meKey) ? selected.filter((item) => item !== meKey) : [...selected, meKey])}
         >
           <span className="flex items-center gap-2">
-            {selected.includes(meKey) ? <Codicon name="check" size={12} /> : <span className="w-3" />}
+            {selected.includes(meKey) ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
             {messages.log.me}（{meKey}）
           </span>
         </MenuItem>
       ) : null}
       <MenuSeparator />
-      {authors.length === 0 ? <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.log.noAuthors}</p> : null}
+      {authors.length === 0 ? <p className="px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.log.noAuthors}</p> : null}
       {authors.map(([key, label]) => {
         const active = selected.includes(key);
         return (
-          <label key={key} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+          <label key={key} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
             <input
               type="checkbox"
               checked={active}
@@ -1536,7 +1536,7 @@ function DateFilterMenu({
       {presets.map((preset) => (
         <MenuItem key={preset} onClick={() => onChange({ date: preset })}>
           <span className="flex items-center gap-2">
-            {filter.date === preset ? <Codicon name="check" size={12} /> : <span className="w-3" />}
+            {filter.date === preset ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
             {dateLabel(preset)}
           </span>
         </MenuItem>
@@ -1549,7 +1549,7 @@ function DateFilterMenu({
             value={filter.since}
             onChange={(event) => onChange({ since: event.target.value })}
           />
-          <span className="text-descriptionforeground">–</span>
+          <span className="text-[var(--text-secondary)]">–</span>
           <input
             className="log-input w-[110px]"
             placeholder="2026-10-31"
@@ -1609,30 +1609,30 @@ function PathFilterMenu({
           {selected.map((path) => (
             <button key={path} type="button" className="log-ref-chip path" onClick={() => toggle(path)} title={messages.log.removePath}>
               {path}
-              <Codicon name="close" size={10} />
+              <AppIcon name="close" size={10} />
             </button>
           ))}
         </div>
       ) : null}
       <div className="max-h-[280px] overflow-auto">
         {directories.length > 0 ? (
-          <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.log.directories}</p>
+          <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{messages.log.directories}</p>
         ) : null}
         {directories.map((directory) => (
-          <label key={`dir:${directory}`} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+          <label key={`dir:${directory}`} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
             <input type="checkbox" checked={selected.includes(directory)} onChange={() => toggle(directory)} />
-            <Codicon name="folder" size={12} />
+            <AppIcon name="folder" size={12} />
             <span className="min-w-0 flex-1 truncate" title={directory}>{directory}</span>
           </label>
         ))}
         {options.length === 0 && directories.length === 0 ? (
-          <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.log.noPaths}</p>
+          <p className="px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.log.noPaths}</p>
         ) : null}
         {options.length > 0 ? (
-          <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.log.filesLabel}</p>
+          <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{messages.log.filesLabel}</p>
         ) : null}
         {options.map((path) => (
-          <label key={path} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-toolbar-hoverbackground">
+          <label key={path} className="flex items-center gap-2 rounded-[3px] px-2 py-1 text-[12px] hover:bg-[var(--surface-hover)]">
             <input type="checkbox" checked={selected.includes(path)} onChange={() => toggle(path)} />
             <FileTypeIcon path={path} />
             <span className="min-w-0 flex-1 truncate" title={path}>{path}</span>

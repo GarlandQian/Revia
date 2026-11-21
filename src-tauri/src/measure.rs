@@ -3,8 +3,7 @@
 //! 只有打开 `measure` 编译特性时才存在对照开关与构建来源。正式构建里
 //! [`IS_MEASURE`] 为 false，菜单入口与命令都不注册，窗口外观也不读这个开关。
 //!
-//! 对照外观（朴素外观）在下次启动时生效：窗口不透明、不用 Mica / 原生玻璃，
-//! 前端也不挂 `window-material`，所以没有模糊、镜片和半透明。
+//! 对照外观标志在下次启动时生效（仅用于 `measure` 测量构建的兼容保留）。
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};

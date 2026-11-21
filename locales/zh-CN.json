@@ -5,7 +5,6 @@
   },
   "toolbar": {
     "chooseRepo": "选择仓库文件夹…",
-    "toolWindows": "工具窗口",
     "repositories": "仓库",
     "addRepository": "添加仓库…",
     "worktrees": "worktree",
@@ -15,9 +14,7 @@
     "inaccessible": "路径不可访问",
     "terminal": "终端",
     "clone": "克隆仓库…",
-    "pullRequests": "拉取请求",
-    "diagnostics": "导出诊断信息…",
-    "update": "应用更新"
+    "pullRequests": "拉取请求"
   },
   "statusBar": {
     "upstreamHint": "领先和落后数按本地记录，截至上次 fetch；不会联网核对。",
@@ -1495,7 +1492,7 @@
     "about": "关于 Revia",
     "lightTheme": "浅色颜色主题",
     "darkTheme": "深色颜色主题",
-    "themeHint": "浅色、深色各选一套，随系统深浅色切换。",
+    "themeHint": "界面外壳使用 Revia 中性灰阶设计系统；浅色与深色代码颜色主题独立控制代码底色、语法高亮与增删色。",
     "search": "搜索设置",
     "searchEmpty": "没有匹配的设置项",
     "commit": "提交",
@@ -1510,9 +1507,7 @@
       "notifications": "通知",
       "gitTools": "Git 程序与工具",
       "updatePush": "更新与推送",
-      "log": "日志",
       "language": "语言",
-      "fileHistory": "文件历史",
       "ai": "AI"
     },
     "uiZoom": "界面缩放",
@@ -1588,7 +1583,6 @@
     "reloaded": "已重新加载环境",
     "aboutText": "照 Rebased 的布局与交互、配上 VS Code 外观的轻量 Git 客户端。",
     "licenses": "随应用打包的素材与许可",
-    "licenseCodicons": "界面图标：Codicons（Microsoft），CC BY 4.0",
     "licenseMaterial": "文件类型图标：Material Icon Theme（Philipp Kief），MIT",
     "licenseThemes": "颜色主题：VS Code Light / Dark 2026、Atom One Light、One Dark Pro，MIT",
     "gitPathPlaceholder": "例如 {path}",
@@ -1627,16 +1621,12 @@
     "m7": {
       "title": "扩展",
       "theme": {
-        "title": "颜色主题",
         "keywords": "主题|导入|VS Code",
         "hint": "可以导入 VS Code 的颜色主题；代码与 diff 的背景保持不透明。",
-        "light": "浅色主题",
-        "dark": "深色主题",
         "imported": "导入的主题",
         "import": "导入主题…",
         "filter": "VS Code 主题",
         "none": "还没有导入主题。",
-        "importedActive": "当前使用导入主题。",
         "kindLight": "浅色",
         "kindDark": "深色"
       },
@@ -1682,12 +1672,10 @@
         "receiptValue": "{version} · {time}",
         "modeManual": "手动检查",
         "modeNotify": "有新版本时提示",
-        "modeAutomatic": "自动下载（不自动安装）",
         "prerelease": "预发布渠道",
         "prereleaseHint": "开启后同时检查预发布版本（默认只查稳定版）"
       }
     },
-    "licenseReactBits": "React Bits 玻璃组件（MIT + Commons Clause，见 src/components/m7/glass/LICENSE.md）",
     "measureBuild": "测量构建 m9 · {commit}",
     "ai": {
       "title": "AI 生成提交信息",
@@ -1716,7 +1704,15 @@
       "modelsEmpty": "服务没有返回模型，可以继续手动填写。",
       "modelsRetry": "重试",
       "modelsRefresh": "刷新列表"
-    }
+    },
+    "appearanceMode": "外观模式",
+    "appearanceModeHint": "控制界面外壳深浅色，并与下方对应的浅色 / 深色代码颜色主题联动切换。",
+    "appearanceSystem": "跟随系统",
+    "appearanceLight": "浅色",
+    "appearanceDark": "深色",
+    "codeThemesTitle": "代码颜色主题（仅作用于 Diff、合并与 Blame 表面）",
+    "openDiagnostics": "导出诊断信息…",
+    "licenseLucide": "界面图标：Lucide（ISC 许可）"
   },
   "log": {
     "title": "日志",
@@ -1917,7 +1913,6 @@
   },
   "commandLog": {
     "title": "Git",
-    "tab": "控制台",
     "count": "{count} 条命令",
     "empty": "本次运行还没有执行 Git 命令",
     "copyAll": "复制全部",
@@ -1926,8 +1921,7 @@
     "truncatedShort": "输出已截断",
     "noOutput": "（没有输出）",
     "selectRecord": "选择一条命令查看输出",
-    "open": "打开 Git 命令日志",
-    "close": "关闭 Git 命令日志"
+    "open": "打开 Git 命令日志"
   },
   "measure": {
     "title": "测量",
@@ -2233,7 +2227,6 @@
     "ended": "已结束",
     "closeTab": "关闭页签",
     "new": "新建终端",
-    "closePanel": "关闭终端面板",
     "empty": "还没有终端页签",
     "closeRunningConfirm": "进程仍在运行，关闭会终止它。",
     "closeRunningYes": "终止并关闭",
@@ -2375,7 +2368,6 @@
     "unconfigured": "这个构建没有配置更新通道。",
     "modeManual": "手动检查",
     "modeNotify": "有新版本时提示",
-    "modeAutomatic": "自动下载（不自动安装）",
     "check": "检查更新",
     "checking": "检查中…",
     "available": "可更新到 {version}",

@@ -1,10 +1,11 @@
 /**
- * 颜色主题（M4 F01、Q132、Q134）。
+ * 外观模式与代码颜色主题（M4 Q132、M13 Q237、ADR-0016）。
  *
- * 四套内置主题由 `tools/gen-themes.mjs` 从 VS Code 主题文件生成到
- * `src/themes/themes.css`，每套一个 `[data-theme="<id>"]` 块。
- * 浅色、深色各选一套，随系统深浅色切换；默认 Atom One Light 与 One Dark Pro。
+ * 界面外壳采用 Revia 精调的中性浅/深色 Design Tokens（随外观模式切换）；
+ * 代码 diff、三方合并与 blame 表面跟随所选内置或导入的 VS Code 颜色主题。
  */
+
+import type { AppearanceMode } from "@/lib/ipc";
 
 export type ThemeKind = "light" | "dark";
 
@@ -24,7 +25,22 @@ export const THEMES: readonly ThemeInfo[] = [
 export const DEFAULT_LIGHT_THEME = "one-light";
 export const DEFAULT_DARK_THEME = "one-dark-pro";
 
-/** 导入的 VS Code 主题（M7 任务 02）：颜色以 CSS 变量内联写入，不改内置主题块。 */
+/** 导入的 VS Code 主题（M7 任务 02）：M13 起仅允许覆盖代码、diff 与语法高亮色键（ADR-0016）。 */
+const CODE_THEME_VAR_PREFIXES = [
+  "editor-background",
+  "editor-foreground",
+  "editor-linehighlightbackground",
+  "editorgutter-",
+  "editorlinenumber-",
+  "diffeditor-",
+  "diffeditorgutter-",
+  "syn-",
+] as const;
+
+function isCodeThemeVar(name: string): boolean {
+  return CODE_THEME_VAR_PREFIXES.some((prefix) => name === prefix || name.startsWith(prefix));
+}
+
 interface ImportedThemeInfo extends ThemeInfo {
   colors: Record<string, string>;
 }
@@ -54,7 +70,7 @@ export function themeById(id: string | null | undefined): ThemeInfo | null {
   return imported ? { id: imported.id, label: imported.label, kind: imported.kind } : null;
 }
 
-/** 浅色主题候选（设置里的“浅色”下拉）：内置 + 导入。 */
+/** 浅色或深色代码颜色主题候选：内置 + 导入。 */
 export function themesOfKind(kind: ThemeKind): ThemeInfo[] {
   return [
     ...THEMES.filter((theme) => theme.kind === kind),
@@ -67,27 +83,40 @@ export function systemPrefersDark(): boolean {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches === true;
 }
 
-/** 按系统深浅色选出要应用的主题；未知 id 回退到该外观的默认主题。 */
-export function resolveTheme(lightId: string, darkId: string, prefersDark: boolean): ThemeInfo {
-  const preferred = themeById(prefersDark ? darkId : lightId);
-  if (preferred && preferred.kind === (prefersDark ? "dark" : "light")) return preferred;
-  return themeById(prefersDark ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME)!;
+/** 解析最终生效的深浅外观（M13 Q237）。 */
+export function resolveEffectiveDark(appearanceMode: AppearanceMode | undefined, prefersDark: boolean): boolean {
+  if (appearanceMode === "dark") return true;
+  if (appearanceMode === "light") return false;
+  return prefersDark;
+}
+
+/** 按最终深浅色选出要应用的代码颜色主题；未知 id 回退到默认主题。 */
+export function resolveTheme(
+  lightId: string,
+  darkId: string,
+  prefersDark: boolean,
+  appearanceMode: AppearanceMode = "system",
+): ThemeInfo {
+  const isDark = resolveEffectiveDark(appearanceMode, prefersDark);
+  const preferred = themeById(isDark ? darkId : lightId);
+  if (preferred && preferred.kind === (isDark ? "dark" : "light")) return preferred;
+  return themeById(isDark ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME)!;
 }
 
 /**
- * 把主题写到 `<html>` 上。主题块只定义变量，切换不重排组件树。
- * 代码字体与字号同时写入 CSS 变量（Q133）；字体本机没有时由 CSS 回退到 JetBrains Mono。
+ * 把外观深浅色与代码颜色主题写到 `<html>` 上。
+ * 外壳由 `[data-kind]` 驱动，代码表面由 `[data-theme]`（或导入主题的代码内联色键）驱动。
  */
 export function applyTheme(theme: ThemeInfo): void {
   const root = document.documentElement;
   for (const name of appliedImportedVars) root.style.removeProperty(`--${name}`);
   appliedImportedVars.clear();
   const imported = importedThemes.find((candidate) => candidate.id === theme.id);
-  // 导入主题没有内置 CSS 块：先落到同外观的基础块，再覆盖它自己的变量。
   root.dataset.theme = imported ? (theme.kind === "dark" ? "dark-2026" : "light-2026") : theme.id;
   root.dataset.kind = theme.kind;
   if (imported) {
     for (const [name, value] of Object.entries(imported.colors)) {
+      if (!isCodeThemeVar(name)) continue;
       root.style.setProperty(`--${name}`, value);
       appliedImportedVars.add(name);
     }

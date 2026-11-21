@@ -48,32 +48,32 @@ export function GithubDeviceLogin({
   };
 
   return (
-    <div className="space-y-2 rounded border border-panel-border p-3 text-[12.5px]">
+    <div className="space-y-2 rounded border border-[var(--border-subtle)] p-3 text-[12.5px]">
       <p className="font-semibold">{t("github.deviceTitle")}</p>
-      {error ? <p role="alert" className="whitespace-pre-wrap text-[var(--editorwarning-foreground)]">{formatAppError(error)}</p> : null}
+      {error ? <p role="alert" className="whitespace-pre-wrap text-[var(--warn)]">{formatAppError(error)}</p> : null}
       {ended ? <p role="alert">{ended === "expired" ? t("github.deviceExpired") : t("github.deviceDenied")}</p> : null}
       {view.phase === "waiting" ? (
         <div className="space-y-2">
           <p>{t("github.deviceCode")}</p>
           <p className="select-all font-mono text-[18px] tracking-widest">{view.device.userCode}</p>
-          <p className="text-descriptionforeground">https://github.com/login/device</p>
+          <p className="text-[var(--text-secondary)]">https://github.com/login/device</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="toolbar-widget h-7 px-3" onClick={() => void copyCode(view.device.userCode)}>{t("github.deviceCopy")}</button>
-            <button type="button" className="toolbar-widget h-7 px-3" onClick={() => {
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => void copyCode(view.device.userCode)}>{t("github.deviceCopy")}</button>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => {
               setError(null);
               void flow.openBrowser();
             }}>{t("github.deviceOpen")}</button>
-            <button type="button" className="toolbar-widget h-7 px-3" onClick={() => flow.cancel()}>{t("github.deviceCancel")}</button>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => flow.cancel()}>{t("github.deviceCancel")}</button>
           </div>
         </div>
       ) : (
         <div className="flex gap-2">
-          <button type="button" className="toolbar-widget h-7 px-3" disabled={disabled || view.phase === "starting"} onClick={() => {
+          <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" disabled={disabled || view.phase === "starting"} onClick={() => {
             setError(null);
             setEnded(null);
             void flow.start();
           }}>{view.phase === "starting" ? t("github.deviceStarting") : t("github.deviceStart")}</button>
-          {view.phase === "starting" ? <button type="button" className="toolbar-widget h-7 px-3" onClick={() => flow.cancel()}>{t("github.deviceCancel")}</button> : null}
+          {view.phase === "starting" ? <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => flow.cancel()}>{t("github.deviceCancel")}</button> : null}
         </div>
       )}
     </div>

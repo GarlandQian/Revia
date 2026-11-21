@@ -13,7 +13,6 @@
  */
 
 import { ipc } from "@/lib/ipc";
-import { defaultCssMaterial } from "@/lib/platform";
 
 export type FrameScenario = "diff-scroll" | "log-scroll" | "window-resize" | "other";
 export type InteractionCategory = "tab" | "file" | "popover" | "other";
@@ -259,17 +258,11 @@ class PerfRecorder {
   }
 
   private displayInfo() {
-    const root = document.documentElement;
-    const material = !root.classList.contains("window-material")
-      ? "solid"
-      : root.classList.contains("native-glass")
-        ? "native"
-        : defaultCssMaterial();
     return {
       screenWidth: Math.round(window.screen?.width ?? 0),
       screenHeight: Math.round(window.screen?.height ?? 0),
       devicePixelRatio: Math.round(window.devicePixelRatio * 100) / 100,
-      windowMaterial: material,
+      windowMaterial: "solid",
       webviewPlatform: (navigator.platform || navigator.userAgent).slice(0, 32),
     };
   }
@@ -366,7 +359,7 @@ class PerfRecorder {
     if (!element) return "other";
     if (element.closest(".editor-tab, .settings-nav, .log-view, .main-view-tabs, [role='tab']")) return "tab";
     if (element.closest(".changes-sidebar, .tree-row, .file-row, .changes-tree")) return "file";
-    if (element.closest("[role='menu'], .revia-popper, .glass-popover, [role='dialog'], .app-dialog")) return "popover";
+    if (element.closest("[role='menu'], .revia-popper, [role='dialog'], .app-dialog")) return "popover";
     return "other";
   }
 }

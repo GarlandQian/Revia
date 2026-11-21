@@ -44,7 +44,7 @@ import type { ChangelistView } from "@/types/bindings/ChangelistView";
 import { invoke } from "@tauri-apps/api/core";
 import { ChangesTree } from "@/components/app/ChangesTree";
 import { entryKey, runFileSelectionAction, treeOrder } from "@/hooks/changesTreeState";
-import { Breadcrumbs, EditorTabs, mergeTabKey, tabKey, type DiffToolbarOptions } from "@/components/app/EditorTabs";
+import { EditorTabs, mergeTabKey, tabKey, type DiffToolbarOptions } from "@/components/app/EditorTabs";
 import { MergeView } from "@/features/diff/MergeView";
 import { ConflictDialog } from "@/components/app/ConflictDialog";
 import { CloseRequestDialog, CommitWarningDialog, DiscardDialog, Modal, type DiscardDialogTarget } from "@/components/app/Dialogs";
@@ -52,8 +52,10 @@ import type { CommitWarning } from "@/types/bindings/CommitWarning";
 import { NotificationStack } from "@/components/app/Notifications";
 import { RecoveryPanel } from "@/components/app/RecoveryPanel";
 import { SettingsDialog, type SettingsPatch } from "@/components/app/SettingsDialog";
-import { ActivityBar, StatusBar, TitleBar, ToolbarGroup, WelcomeScreen } from "@/components/app/Shell";
-import { Codicon } from "@/components/ui/codicon";
+import { StatusBar, TitleBar, WelcomeScreen } from "@/components/app/Shell";
+import { SidebarIconButton, SidebarShell } from "@/components/app/SidebarShell";
+import { BottomDrawer, type BottomDrawerTab } from "@/components/app/BottomDrawer";
+import { AppIcon } from "@/components/ui/app-icon";
 import { MenuItem, MenuSeparator, Popover } from "@/components/ui/popover";
 import { beginSynchronousMeasurement, flushSynchronousMeasurements, logToBackend, setLoggingEnabled } from "@/features/diff/log";
 import { ErrorBoundary } from "@/components/app/ErrorBoundary";
@@ -127,7 +129,6 @@ import { subscribeToForeground } from "@/lib/foregroundRefresh";
 import { formatAppError, resultNeedsVerification, getErrorMessage, toAppError } from "@/lib/error";
 import { useAppearance } from "@/hooks/useAppearance";
 import { matchShortcut, setShortcutOverrides as applyShortcutOverrides } from "@/lib/shortcuts";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
 import { reviewDraftSessions } from "@/lib/m7/reviewDrafts";
 import { mergeBufferGuards } from "@/lib/m7/mergeBuffers";
 import { flushM7State, registerM7Flusher } from "@/lib/m7/flush";
@@ -269,10 +270,7 @@ export function App() {
 
   // ---------- 返修 E：Q139/Q140 设置状态（存 Rust 设置，不用 localStorage） ----------
   /** 提交工具窗口宽度（可拖动分隔条，B4）。 */
-  const [sidebarWidth, setSidebarWidth] = useState(330);
-  const sidebarDragRef = useRef<{
-    pointerId: number; clientX: number; width: number; scale: number; maxWidth: number; latestWidth: number;
-  } | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(312);
   /** 改动树按目录分组（false 为平铺，Q139/A2）。 */
   const [treeGroupByDirectory, setTreeGroupByDirectory] = useState(false);
   /** diff 显示选项（Q139）。 */
@@ -367,13 +365,15 @@ export function App() {
   const historyTargetId = currentHistorySession?.targetId ?? null;
   const historyRefs = currentHistorySession?.refs;
   /** 主区域当前显示：日志、改动 diff 或提交 diff。 */
-  const [mainView, setMainView] = useState<"log" | "diff" | "commit">("log");
+  const [mainView, setMainView] = useState<"log" | "diff" | "commit" | "pr">("log");
   const mainViewRef = useRef(mainView);
   mainViewRef.current = mainView;
   /** diff 预览开关（L05，默认关；不持久化）。 */
   const [logPreviewOpen, setLogPreviewOpen] = useState(false);
-  /** Git 命令日志面板（B07，默认隐藏；入口在状态栏，菜单入口随原生菜单一起做）。 */
+  /** 底部抽屉状态（M13 Q241）：统一承载终端与 Git 命令日志。 */
   const [commandLogOpen, setCommandLogOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<BottomDrawerTab>("terminal");
+  const openTerminalDrawerRef = useRef<() => void>(() => undefined);
   /** 新建分支 / 检出确认 / 推送对话框的界面状态。 */
   const [newBranchStart, setNewBranchStart] = useState<{ origin: RemoteTarget; start: BranchStart } | null>(null);
   const newBranchDialogRef = useRef(newBranchStart);
@@ -396,7 +396,8 @@ export function App() {
   selectedRef.current = selected;
 
   const {
-    themeLight, setThemeLight, themeDark, setThemeDark, codeFontFamily, setCodeFontFamily,
+    appearanceMode, setAppearanceMode,
+    themeLight, setThemeLight, themeDark, setThemeDark, activeCodeThemeLabel, codeFontFamily, setCodeFontFamily,
     fontSize, setFontSize, changeFontSize, uiZoom, setUiZoom, uiZoomRef, reloadImportedThemes,
   } = useAppearance();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -1481,6 +1482,7 @@ export function App() {
         ]);
         if (systemLanguage) setSystemLanguage(systemLanguage);
         setFontSize(settings.diffFontSize);
+        setAppearanceMode(settings.appearanceMode ?? "system");
         setThemeLight(settings.themeLight);
         setThemeDark(settings.themeDark);
         setCodeFontFamily(settings.codeFontFamily);
@@ -3480,7 +3482,10 @@ export function App() {
           return;
         case "pullRequests":
           event.preventDefault();
-          if (!busy && worktreeId) setGithubOpen(true);
+          if (!busy && worktreeId) {
+            setGithubOpen(true);
+            setMainView("pr");
+          }
           return;
         case "refresh":
           event.preventDefault();
@@ -3511,7 +3516,7 @@ export function App() {
           return;
         case "toggleTerminal":
           event.preventDefault();
-          if (worktreeId) setTerminalOpen((value) => !value);
+          if (worktreeId) openTerminalDrawerRef.current();
           return;
         default:
           return;
@@ -4014,26 +4019,13 @@ export function App() {
           sidebarVisible: !!document.querySelector(".changes-tree"),
           commitArea: !!document.querySelector("[data-commit-composer]"),
           commitMessage: !!document.querySelector("[data-commit-message]"),
-          activityBadge: document.querySelector(".activity-badge")?.textContent ?? null,
-          // 玻璃材质（M7 任务 01）：确认三个组件真的挂载，而不是只写了 CSS。
-          glass: {
+          surfaces: {
             rootChildren: document.getElementById("root")?.childElementCount ?? -1,
-            bodyText: document.body.innerText.replace(/\s+/g, " ").slice(0, 120),
-            windowLayer: !!document.querySelector(".glass-host > .glass-layer--window"),
-            popoverLayer: document.querySelectorAll(".glass-layer--popover").length,
-            panelLayers: {
-              sidebar: !!document.querySelector(".changes-sidebar"),
-              status: !!document.querySelector(".window-status"),
-              toolbar: !!document.querySelector(".titlebar"),
-            },
-            glassButtons: document.querySelectorAll(".glass-button").length,
-            specularButtons: document.querySelectorAll(".specular-button").length,
-            refractionEnabled: Array.from(document.querySelectorAll(".glass-surface")).filter(
-              (node) => !node.classList.contains("glass-surface--fallback") && !node.classList.contains("glass-layer--flat"),
-            ).length,
-            tools: document.querySelectorAll(".toolbar-group .toolbar-group-item").length,
-            nativeGlass: document.documentElement.classList.contains("native-glass"),
-            commitButton: !!document.querySelector(".m7-commit-button"),
+            sidebar: !!document.querySelector(".changes-sidebar"),
+            status: !!document.querySelector(".window-status"),
+            toolbar: !!document.querySelector(".titlebar"),
+            diffContextBar: !!document.querySelector(".diff-context-bar"),
+            bottomDrawer: !!document.querySelector(".bottom-drawer"),
           },
           statusBar: document.querySelector("footer")?.textContent?.slice(0, 120) ?? null,
         };
@@ -4062,9 +4054,9 @@ export function App() {
         };
         ui.layout = {
           titlebar: rect(".titlebar"),
-          activityBar: rect(".activity-bar"),
           sidebar: rect("aside"),
           tab: rect(".editor-tab"),
+          diffContextBar: rect(".diff-context-bar"),
           statusBar: rect("footer"),
           commitArea: rect("[data-commit-composer]"),
           treeRow: rect(".change-row"),
@@ -4727,6 +4719,7 @@ export function App() {
           setUpdateStatus(status); setUpdateBannerVersion(status.available?.version ?? null);
         }).catch((caught) => setAppError(toAppError(caught), null));
       }
+      setAppearanceMode(next.appearanceMode ?? "system");
       setThemeLight(next.themeLight);
       setThemeDark(next.themeDark);
       setCodeFontFamily(next.codeFontFamily);
@@ -4868,7 +4861,9 @@ export function App() {
         setSelected(null);
         setWorktreeStatuses([]);
         setTerminalOpen(false);
+        setCommandLogOpen(false);
         setGithubOpen(false);
+        setMainView("log");
         resetMergeTabs();
         await ipc.stopWatch().catch((caught) => setAppError(toAppError(caught), null));
       }
@@ -5678,7 +5673,7 @@ export function App() {
   }, []);
 
   if (!bootstrapDone) {
-    return <div className="flex h-full items-center justify-center text-descriptionforeground">{messages.app.loading}</div>;
+    return <div className="flex h-full items-center justify-center text-[var(--text-secondary)]">{messages.app.loading}</div>;
   }
 
   const activeKey = mergeTabPath ? mergeTabKey(mergeTabPath) : selected ? tabKey(selected.path, selected.changes) : null;
@@ -5722,6 +5717,7 @@ export function App() {
   };
 
   const settingsValues = {
+    appearanceMode,
     themeLight,
     themeDark,
     codeFontFamily: codeFontFamily ?? "",
@@ -5778,13 +5774,13 @@ export function App() {
     <>
       {repoToRemove ? (
         <Modal title={t("repository.remove", { name: repoToRemove.name })} onClose={() => { if (!busy) setRepoToRemove(null); }} width={460}>
-          <p className="mb-2 break-all text-descriptionforeground">{repoToRemove.path}</p>
+          <p className="mb-2 break-all text-[var(--text-secondary)]">{repoToRemove.path}</p>
           <p>{t("repository.removeHint")}</p>
-          {repoRemovalBlocked ? <p role="alert" className="mt-3 text-descriptionforeground">{t("repository.removeBlocked")}</p> : null}
+          {repoRemovalBlocked ? <p role="alert" className="mt-3 text-[var(--text-secondary)]">{t("repository.removeBlocked")}</p> : null}
           {repoRemovalError ? <p role="alert" className="mt-3">{formatAppError(repoRemovalError)}</p> : null}
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="toolbar-widget h-7 px-3" disabled={busy} onClick={() => setRepoToRemove(null)}>{t("common.cancel")}</button>
-            <button type="button" className="toolbar-widget h-7 px-3" disabled={busy || repoRemovalBlocked} onClick={() => void removeRepo(repoToRemove)}>{t("repository.removeAction")}</button>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" disabled={busy} onClick={() => setRepoToRemove(null)}>{t("common.cancel")}</button>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" disabled={busy || repoRemovalBlocked} onClick={() => void removeRepo(repoToRemove)}>{t("repository.removeAction")}</button>
           </div>
         </Modal>
       ) : null}
@@ -5793,8 +5789,8 @@ export function App() {
         <p>{t("terminal.shutdownConfirm", { count: terminalConfirmation.length })}</p>
         <ul className="my-3 max-h-48 overflow-auto text-[12px]">{terminalConfirmation.map((session) => <li key={session.sessionId} className="truncate" title={session.cwd}>{session.worktreePath} · {session.title}</li>)}</ul>
         <div className="flex justify-end gap-2">
-          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => finishTerminalConfirmation(false)}>{t("common.cancel")}</button>
-          <button type="button" className="toolbar-widget h-7 px-3" onClick={() => finishTerminalConfirmation(true)}>{t("terminal.shutdownYes")}</button>
+          <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => finishTerminalConfirmation(false)}>{t("common.cancel")}</button>
+          <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => finishTerminalConfirmation(true)}>{t("terminal.shutdownYes")}</button>
         </div>
       </Modal> : null}
       <CloneDialog
@@ -5829,10 +5825,10 @@ export function App() {
           <div className="space-y-3 text-[12.5px]">
             <p>{t("update.installAndRestartBody")}</p>
             <div className="flex justify-end gap-2">
-              <button type="button" className="toolbar-widget h-7 px-3" onClick={cancelUpdateInstallAndRestart}>
+              <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={cancelUpdateInstallAndRestart}>
                 {t("common.cancel")}
               </button>
-              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" onClick={confirmUpdateInstallAndRestart}>
+              <button type="button" className="revia-btn revia-btn-secondary h-7 px-3 font-semibold" onClick={confirmUpdateInstallAndRestart}>
                 {t("update.installAndRestartConfirm")}
               </button>
             </div>
@@ -5843,6 +5839,37 @@ export function App() {
   );
 
   const hasActiveWorktree = !!worktreeId && !!activeRepo?.worktrees.some((entry) => entry.id === worktreeId);
+  const bottomDrawerOpen = (terminalOpen && hasActiveWorktree) || commandLogOpen;
+  const openTerminalDrawer = () => {
+    if (!hasActiveWorktree) return;
+    if (bottomDrawerOpen && drawerTab === "terminal" && terminalOpen) {
+      setTerminalOpen(false);
+      setCommandLogOpen(false);
+    } else {
+      setTerminalOpen(true);
+      setDrawerTab("terminal");
+    }
+  };
+  openTerminalDrawerRef.current = openTerminalDrawer;
+  const openCommandLogDrawer = () => {
+    if (bottomDrawerOpen && drawerTab === "commandLog" && commandLogOpen) {
+      setCommandLogOpen(false);
+      setTerminalOpen(false);
+    } else {
+      setCommandLogOpen(true);
+      setDrawerTab("commandLog");
+    }
+  };
+  const togglePrTab = () => {
+    if (!hasActiveWorktree) return;
+    if (githubOpen && mainView === "pr") {
+      setGithubOpen(false);
+      setMainView(tabs.length > 0 && activeKey ? "diff" : "log");
+    } else {
+      setGithubOpen(true);
+      setMainView("pr");
+    }
+  };
   const titleBar = (
       <TitleBar
         repo={activeRepo}
@@ -5851,9 +5878,13 @@ export function App() {
         statuses={worktreeStatuses}
         activeWorktreeId={worktreeId}
         busy={busy}
+        hasActiveWorktree={hasActiveWorktree}
+        sidebarVisible={sidebarVisible}
+        onToggleSidebar={() => setSidebarVisible((value) => !value)}
         onSelectRepo={(repo) => void openRepo(repo)}
         onRemoveRepo={(repo) => { setRepoRemovalError(null); setRepoToRemove(repo); }}
         onChooseRepo={() => void chooseRepo()}
+        onCloneRepo={() => setCloneOpen(true)}
         onWorktree={(id) => void switchWorktree(id)}
         onSettings={() => setSettingsOpen(true)}
         onRefreshWorktrees={() => void refreshWorktreeStatuses()}
@@ -5870,59 +5901,26 @@ export function App() {
             onFetch={() => { if (worktreeId) void runFetch(worktreeId, "user"); }}
           />
         ) : null}
-        extra={(
-          <>
-          <SyncActions busy={busy || isWriting || !hasActiveWorktree} onUpdate={() => { if (worktreeId) void runUpdate(worktreeId); }} onPush={() => void openPushDialog()} />
-          <ToolbarGroup
-            id="tools"
-            label={messages.toolbar.toolWindows}
-            actions={[
-              {
-                id: "terminal",
-                icon: "terminal",
-                label: t("toolbar.terminal"),
-                pressed: terminalOpen,
-                disabled: busy || !hasActiveWorktree,
-                onClick: () => setTerminalOpen((value) => !value),
-              },
-              {
-                id: "clone",
-                icon: "repo-clone",
-                label: t("toolbar.clone"),
-                disabled: busy,
-                onClick: () => setCloneOpen(true),
-              },
-              {
-                id: "github",
-                icon: "git-pull-request",
-                label: t("toolbar.pullRequests"),
-                pressed: githubOpen,
-                disabled: busy || !hasActiveWorktree,
-                onClick: () => setGithubOpen(true),
-              },
-              {
-                id: "diagnostics",
-                icon: "debug-alt",
-                label: t("toolbar.diagnostics"),
-                onClick: () => setDiagnosticsOpen(true),
-              },
-              {
-                id: "update",
-                icon: "cloud-download",
-                label: t("toolbar.update"),
-                attention: !!updateBannerVersion,
-                onClick: () => setUpdateOpen(true),
-              },
-            ]}
+        syncActions={activeRepo ? (
+          <SyncActions
+            busy={busy || isWriting || !hasActiveWorktree}
+            ahead={activeStatus?.ahead ?? 0}
+            behind={activeStatus?.behind ?? 0}
+            onUpdate={() => { if (worktreeId) void runUpdate(worktreeId); }}
+            onPush={() => void openPushDialog()}
           />
-          </>
-        )}
+        ) : null}
+        prOpen={githubOpen && mainView === "pr"}
+        onTogglePr={togglePrTab}
+        terminalOpen={bottomDrawerOpen && drawerTab === "terminal"}
+        onToggleTerminal={openTerminalDrawer}
+        updateAvailable={!!updateBannerVersion}
       />
   );
 
   if (!activeRepo) {
     return (
-      <div className="welcome-shell flex h-full flex-col overflow-hidden bg-[var(--editor-background)]">
+      <div className="welcome-shell flex h-full flex-col overflow-hidden">
         {titleBar}
         <WelcomeScreen
           repos={repos}
@@ -5947,6 +5945,8 @@ export function App() {
             updateStatus={updateStatus}
             onUpdateStatus={setUpdateStatus}
             onThemesChanged={reloadImportedThemes}
+            onOpenDiagnostics={() => setDiagnosticsOpen(true)}
+            onOpenUpdatePanel={() => setUpdateOpen(true)}
           />
         ) : null}
         {closeRequest && closeRequest.action !== "proceed" ? (
@@ -5964,281 +5964,184 @@ export function App() {
   }
 
   return (
-    <div className="glass-host grid h-full grid-rows-[var(--titlebar-height)_minmax(0,1fr)_var(--statusbar-height)] overflow-hidden">
-      <GlassLayer variant="window" />
+    <div className="app-shell">
       {titleBar}
 
       <div className="shell-body flex min-h-0 overflow-hidden">
-        {/* 原生玻璃下侧栏占满左列（红绿灯在它顶上），顶部留白可以拖动窗口。 */}
-        <div className="sidebar-pane" data-tauri-drag-region>
-        <ActivityBar
-          pressed={sidebarVisible}
-          count={new Set((snapshot?.entries ?? []).map((entry) => entry.path)).size}
-          onToggle={() => setSidebarVisible((value) => !value)}
-        />
-        {sidebarVisible ? (
-          <aside className="changes-sidebar relative flex min-h-0 shrink-0 flex-col border-r border-[var(--sidebar-border)]" style={{ width: sidebarWidth }}>
-            <div
-              className="sidebar-resizer"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label={messages.changes.resizeSidebar}
-              onPointerDown={(event) => {
-                const sidebar = event.currentTarget.parentElement;
-                // 侧栏包在 .sidebar-pane 里，原生玻璃下外层行是 display: contents：按整个窗口外壳算可用宽度。
-                const pane = sidebar?.closest<HTMLElement>(".sidebar-pane");
-                const row = pane?.closest<HTMLElement>(".glass-host");
-                if (!sidebar?.offsetWidth || !pane || !row) return;
-                const activityWidth = sidebar.previousElementSibling?.getBoundingClientRect().width ?? 0;
-                const scale = sidebar.getBoundingClientRect().width / sidebar.offsetWidth;
-                const editorMinWidth = Number.parseFloat(getComputedStyle(sidebar).getPropertyValue("--editor-min-width"));
-                const paneStyle = getComputedStyle(pane);
-                const paneMargins = (Number.parseFloat(paneStyle.marginLeft) || 0) + (Number.parseFloat(paneStyle.marginRight) || 0);
-                sidebarDragRef.current = {
-                  pointerId: event.pointerId, clientX: event.clientX, width: sidebar.offsetWidth, scale,
-                  maxWidth: Math.min(720, row.clientWidth - paneMargins - activityWidth / scale - editorMinWidth),
-                  latestWidth: sidebar.offsetWidth,
-                };
-                event.currentTarget.setPointerCapture(event.pointerId);
-                event.currentTarget.dataset.dragging = "true";
-                event.preventDefault();
-              }}
-              onPointerMove={(event) => {
-                const drag = sidebarDragRef.current;
-                if (!drag || drag.pointerId !== event.pointerId) return;
-                // clientX 是缩放后的坐标；用拖动起点的实际比例换回布局宽度。
-                drag.latestWidth = Math.round(Math.min(drag.maxWidth, Math.max(220,
-                  drag.width + (event.clientX - drag.clientX) / drag.scale,
-                )));
-                setSidebarWidth(drag.latestWidth);
-              }}
-              onPointerUp={(event) => {
-                const drag = sidebarDragRef.current;
-                if (!drag || drag.pointerId !== event.pointerId) return;
-                sidebarDragRef.current = null;
-                delete event.currentTarget.dataset.dragging;
-                event.currentTarget.releasePointerCapture(event.pointerId);
-                void ipc.updateSettings({ sidebarWidth: drag.latestWidth }).catch(() => {});
-              }}
-              onLostPointerCapture={(event) => {
-                sidebarDragRef.current = null;
-                delete event.currentTarget.dataset.dragging;
-              }}
-            />
-            <div className="flex h-[var(--tab-height)] shrink-0 items-center gap-3 pr-2 pl-3">
-              <button
-                type="button"
-                className="side-tab"
-                aria-selected={sideTab === "commit"}
-                onClick={() => setSideTab("commit")}
-              >
-                {messages.commit.tab}
-              </button>
-              <button
-                type="button"
-                className="side-tab"
-                aria-selected={sideTab === "stash"}
-                onClick={() => {
-                  setStashFocusOid(null);
-                  setSideTab("stash");
+        <SidebarShell
+          visible={sidebarVisible}
+          width={sidebarWidth}
+          onWidthChange={setSidebarWidth}
+          onWidthCommit={(next) => { void ipc.updateSettings({ sidebarWidth: next }).catch(() => {}); }}
+          sideTab={sideTab}
+          onSelectSideTab={(next) => {
+            if (next === "stash") setStashFocusOid(null);
+            setSideTab(next);
+          }}
+          changesCount={new Set((snapshot?.entries ?? []).map((entry) => entry.path)).size}
+          commitActions={(
+            <>
+              <SidebarIconButton icon="refresh" title={messages.changes.refresh} disabled={busy} onClick={() => void refresh()} />
+              <SidebarIconButton
+                icon="discard"
+                title={messages.changes.discardSelected}
+                disabled={isWriting || discardableSelected.length === 0}
+                onClick={() => requestDiscardEntries(discardableSelected)}
+              />
+              <SidebarIconButton
+                icon="expand-all"
+                title={messages.changes.expandAll}
+                onClick={() => setGroupOpen({ conflicts: true, staged: true, unstaged: true, untracked: true })}
+              />
+              <SidebarIconButton
+                icon="collapse-all"
+                title={messages.changes.collapseAll}
+                onClick={() => setGroupOpen({ conflicts: false, staged: false, unstaged: false, untracked: false })}
+              />
+              <SidebarMore
+                onSelectAll={() => changelistMode ? changelistControls.current?.selectAll() : selectAllEntries()}
+                onRefresh={() => void refresh()}
+                onCloseAll={closeAllTabs}
+                groupByDirectory={treeGroupByDirectory}
+                onToggleGroupByDirectory={() => {
+                  const next = !treeGroupByDirectory;
+                  setTreeGroupByDirectory(next);
+                  void ipc.updateSettings({ treeGroupByDirectory: next }).catch(() => {});
                 }}
-              >
-                {messages.stash.title}
-              </button>
-              <button
-                type="button"
-                className="side-tab"
-                aria-selected={sideTab === "recovery"}
-                onClick={() => setSideTab("recovery")}
-              >
-                {messages.recovery.title}
-              </button>
-              {sideTab === "commit" ? (
-                <div className="ml-auto flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    className="icon-action size-[22px]"
-                    title={messages.changes.refresh}
-                    aria-label={messages.changes.refresh}
-                    disabled={busy}
-                    onClick={() => void refresh()}
-                  >
-                    <Codicon name="refresh" size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-action size-[22px]"
-                    title={messages.changes.discardSelected}
-                    aria-label={messages.changes.discardSelected}
-                    disabled={isWriting || discardableSelected.length === 0}
-                    onClick={() => requestDiscardEntries(discardableSelected)}
-                  >
-                    <Codicon name="discard" size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-action size-[22px]"
-                    title={messages.changes.expandAll}
-                    aria-label={messages.changes.expandAll}
-                    onClick={() => setGroupOpen({ conflicts: true, staged: true, unstaged: true, untracked: true })}
-                  >
-                    <Codicon name="expand-all" size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-action size-[22px]"
-                    title={messages.changes.collapseAll}
-                    aria-label={messages.changes.collapseAll}
-                    onClick={() => setGroupOpen({ conflicts: false, staged: false, unstaged: false, untracked: false })}
-                  >
-                    <Codicon name="collapse-all" size={15} />
-                  </button>
-                  <SidebarMore
-                    onSelectAll={() => changelistMode ? changelistControls.current?.selectAll() : selectAllEntries()}
-                    onRefresh={() => void refresh()}
-                    onCloseAll={closeAllTabs}
-                    groupByDirectory={treeGroupByDirectory}
-                    onToggleGroupByDirectory={() => {
-                      const next = !treeGroupByDirectory;
-                      setTreeGroupByDirectory(next);
-                      void ipc.updateSettings({ treeGroupByDirectory: next }).catch(() => {});
-                    }}
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            {sideTab === "commit" ? (
-              <>
-                {changelistMode && worktreeId && snapshot ? (
-                  <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} controls={changelistControls} onSelection={acceptChangelistSelection} snapshot={snapshot} onActivate={navigateEntry} onPin={pinEntry} onDiscard={(paths) => requestDiscardEntries(snapshot.entries.filter((entry) => paths.includes(entry.path) && (entry.changes === "unstaged" || entry.changes === "untracked")))} />
-                ) : snapshot ? (
-                  <ChangesTree
-                    items={treeItems}
-                    directoryCounts={directoryCounts}
-                    active={selectedEntry}
-                    selectedKeys={treeSelection}
-                    open={groupOpen}
-                    dirOpen={dirOpen}
-                    isWriting={isWriting}
-                    onActivate={activateTreeEntry}
-                    onPin={pinEntry}
-                    onMove={moveTreeSelection}
-                    onSelectAll={selectAllEntries}
-                    onStageSelection={() => actOnFileSelection("stageFile")}
-                    onToggleGroup={toggleGroup}
-                    onResolveConflicts={() => setConflictDialogOpen(true)}
-                    onToggleDir={toggleDir}
-                    onStageEntries={(entries) => void performBatchWrite("stage", entries)}
-                    onUnstageEntries={(entries) => void performBatchWrite("unstage", entries)}
-                    onStageEntry={(entry) => void stageFile(entry)}
-                    onUnstageEntry={(entry) => void unstageFile(entry)}
-                    onDiscardEntry={(entry) => requestDiscardEntries(expandToSelection(entry))}
-                  />
-                ) : (
-                  <div className="px-3 py-2 text-descriptionforeground">{messages.changes.loading}</div>
-                )}
-                {worktreeId ? (
-                  <CommitArea
-                    context={changelistMode && commitContext ? { ...commitContext, gates: { ...commitContext.gates, hasStagedChanges: changelistView?.worktreeId === worktreeId && changelistView.items.some((item) => item.selected && !item.stale) === true } } : commitContext}
-                    message={commitInput.message}
-                    amend={commitInput.amend}
-                    skipHooks={commitInput.skipHooks}
-                    busy={busy || isWriting}
-                    submitting={commitSubmitting}
-                    reviewedCount={reviewedCount}
-                    totalFiles={reviewTotal}
-                    draftNotice={commitContextError ? formatAppError(commitContextError) : typeof commitDraftNotice === "function" ? commitDraftNotice() ?? null : commitDraftNotice}
-                    templateError={commitContext?.templateError ? formatAppError(commitContext.templateError) : null}
-                    amendConfirm={amendConfirm}
-                    liveOutput={
-                      commitLiveOutput && commitLiveOutput.worktreeId === worktreeId
-                        ? commitLiveOutput.output
-                        : null
-                    }
-                    checks={commitChecks}
-                    onMessage={(value) => updateCommitInput({ ...commitInputRef.current, message: value })}
-                    onAmend={toggleAmend}
-                    onSkipHooks={(value) => updateCommitInput(
-                      { ...commitInputRef.current, skipHooks: value },
-                      { persist: false },
-                    )}
-                    onSubmit={() => void performCommit()}
-                    onSubmitAndPush={() => void performCommit(null, { pushAfter: true })}
-                    onPickRecent={pickRecentMessage}
-                    onAmendConfirm={confirmAmend}
-                    onAmendCancel={() => setAmendConfirm(null)}
-                    worktreeId={worktreeId}
-                    changelistSelection={changelistMode && changelistRef.current ? selectionOf(changelistRef.current) : null}
-                    generationView={generationView}
-                    generation={generationControl}
-                  />
-                ) : null}
-              </>
-            ) : sideTab === "stash" ? (
-              <StashPanel
-                key={`${worktreeId}:${gateRef.current.token().activation}`}
-                worktreeId={worktreeId}
-                busy={isWriting || m6Busy}
-                activation={gateRef.current.token().activation}
-                refreshKey={`${stashRevision}:${watchRevision}:${refsRevision}`}
-                focusOid={stashFocusOid}
-                compareLocal={stashCompareLocal}
-                onCompareLocal={(value) => updateSettings({ stashCompareLocal: value })}
-                onSave={(message, keepIndex, expectedState) => {
-                  if (!worktreeId) return Promise.resolve();
-                  return performM6Write(worktreeId, () => ipc.stashSave(worktreeId, { message, keepIndex, expectedState })).then(() => undefined);
-                }}
-                onApply={async (entry, options) => {
-                  if (!worktreeId) return;
-                  const origin = captureRemoteTarget(gateRef.current.token(), worktreeId);
-                  if (!origin) return;
-                  const outcome = await performM6Write(worktreeId, () => ipc.stashApply(worktreeId, {
-                    oid: entry.oid,
-                    entryKey: entry.key,
-                    restoreIndex: options.restoreIndex,
-                    deleteAfter: options.deleteAfter,
-                    newBranch: options.newBranch,
-                    expectedState: options.expectedState,
-                  }));
-                  if (outcome?.conflicted && remoteTargetIsCurrent(origin, gateRef.current.token())) {
-                    setSideTab("commit");
-                    setConflictDialogOpen(true);
-                  }
-                  return outcome;
-                }}
-                onDrop={(entry, expectedState) => {
-                  if (!worktreeId) return Promise.resolve();
-                  return performM6Write(worktreeId, () => ipc.stashDrop(worktreeId, entry, expectedState)).then(() => undefined);
-                }}
-                onClear={(oids, expectedState) => {
-                  if (!worktreeId) return Promise.resolve();
-                  return performM6Write(worktreeId, () => ipc.stashClear(worktreeId, oids, expectedState)).then(() => undefined);
-                }}
-                onRestoreArchive={(archive, expectedState) => {
-                  if (!worktreeId) return Promise.resolve();
-                  return performM6Write(worktreeId, () => ipc.stashArchiveRestore(worktreeId, archive.id, expectedState)).then(() => undefined);
-                }}
-                onRefresh={() => setStashRevision((value) => value + 1)}
-                onNotify={(notice) => notifyM6(worktreeId ?? "", notice)}
+              />
+            </>
+          )}
+          commitTree={
+            changelistMode && worktreeId && snapshot ? (
+              <Changelists key={`${worktreeId}:${gateRef.current.token().activation}`} worktreeId={worktreeId} revision={snapshot.revision} busy={isWriting || busy} onView={acceptChangelistView} controls={changelistControls} onSelection={acceptChangelistSelection} snapshot={snapshot} onActivate={navigateEntry} onPin={pinEntry} onDiscard={(paths) => requestDiscardEntries(snapshot.entries.filter((entry) => paths.includes(entry.path) && (entry.changes === "unstaged" || entry.changes === "untracked")))} />
+            ) : snapshot ? (
+              <ChangesTree
+                items={treeItems}
+                directoryCounts={directoryCounts}
+                active={selectedEntry}
+                selectedKeys={treeSelection}
+                open={groupOpen}
+                dirOpen={dirOpen}
+                isWriting={isWriting}
+                onActivate={activateTreeEntry}
+                onPin={pinEntry}
+                onMove={moveTreeSelection}
+                onSelectAll={selectAllEntries}
+                onStageSelection={() => actOnFileSelection("stageFile")}
+                onToggleGroup={toggleGroup}
+                onResolveConflicts={() => setConflictDialogOpen(true)}
+                onToggleDir={toggleDir}
+                onStageEntries={(entries) => void performBatchWrite("stage", entries)}
+                onUnstageEntries={(entries) => void performBatchWrite("unstage", entries)}
+                onStageEntry={(entry) => void stageFile(entry)}
+                onUnstageEntry={(entry) => void unstageFile(entry)}
+                onDiscardEntry={(entry) => requestDiscardEntries(expandToSelection(entry))}
               />
             ) : (
-              <RecoveryPanel
+              <div className="px-3.5 py-3 text-[12.5px] text-[var(--text-muted)]">{messages.changes.loading}</div>
+            )
+          }
+          commitComposer={
+            worktreeId ? (
+              <CommitArea
+                context={changelistMode && commitContext ? { ...commitContext, gates: { ...commitContext.gates, hasStagedChanges: changelistView?.worktreeId === worktreeId && changelistView.items.some((item) => item.selected && !item.stale) === true } } : commitContext}
+                message={commitInput.message}
+                amend={commitInput.amend}
+                skipHooks={commitInput.skipHooks}
+                busy={busy || isWriting}
+                submitting={commitSubmitting}
+                reviewedCount={reviewedCount}
+                totalFiles={reviewTotal}
+                draftNotice={commitContextError ? formatAppError(commitContextError) : typeof commitDraftNotice === "function" ? commitDraftNotice() ?? null : commitDraftNotice}
+                templateError={commitContext?.templateError ? formatAppError(commitContext.templateError) : null}
+                amendConfirm={amendConfirm}
+                liveOutput={
+                  commitLiveOutput && commitLiveOutput.worktreeId === worktreeId
+                    ? commitLiveOutput.output
+                    : null
+                }
+                checks={commitChecks}
+                onMessage={(value) => updateCommitInput({ ...commitInputRef.current, message: value })}
+                onAmend={toggleAmend}
+                onSkipHooks={(value) => updateCommitInput(
+                  { ...commitInputRef.current, skipHooks: value },
+                  { persist: false },
+                )}
+                onSubmit={() => void performCommit()}
+                onSubmitAndPush={() => void performCommit(null, { pushAfter: true })}
+                onPickRecent={pickRecentMessage}
+                onAmendConfirm={confirmAmend}
+                onAmendCancel={() => setAmendConfirm(null)}
                 worktreeId={worktreeId}
-                isWriting={isWriting}
-                snapshotRevision={snapshot?.revision ?? 0}
-                activation={gateRef.current.token().activation}
-                isWritingFor={(id) => writingWorktrees.has(id)}
-                onRestore={performRestore}
-                onSaveAs={performSaveAs}
-                onNotify={(notice) => notify({ ...notice, kind: "recovery" })}
+                changelistSelection={changelistMode && changelistRef.current ? selectionOf(changelistRef.current) : null}
+                generationView={generationView}
+                generation={generationControl}
               />
-            )}
-          </aside>
-        ) : null}
-        </div>
+            ) : null
+          }
+          stashContent={(
+            <StashPanel
+              key={`${worktreeId}:${gateRef.current.token().activation}`}
+              worktreeId={worktreeId}
+              busy={isWriting || m6Busy}
+              activation={gateRef.current.token().activation}
+              refreshKey={`${stashRevision}:${watchRevision}:${refsRevision}`}
+              focusOid={stashFocusOid}
+              compareLocal={stashCompareLocal}
+              onCompareLocal={(value) => updateSettings({ stashCompareLocal: value })}
+              onSave={(message, keepIndex, expectedState) => {
+                if (!worktreeId) return Promise.resolve();
+                return performM6Write(worktreeId, () => ipc.stashSave(worktreeId, { message, keepIndex, expectedState })).then(() => undefined);
+              }}
+              onApply={async (entry, options) => {
+                if (!worktreeId) return;
+                const origin = captureRemoteTarget(gateRef.current.token(), worktreeId);
+                if (!origin) return;
+                const outcome = await performM6Write(worktreeId, () => ipc.stashApply(worktreeId, {
+                  oid: entry.oid,
+                  entryKey: entry.key,
+                  restoreIndex: options.restoreIndex,
+                  deleteAfter: options.deleteAfter,
+                  newBranch: options.newBranch,
+                  expectedState: options.expectedState,
+                }));
+                if (outcome?.conflicted && remoteTargetIsCurrent(origin, gateRef.current.token())) {
+                  setSideTab("commit");
+                  setConflictDialogOpen(true);
+                }
+                return outcome;
+              }}
+              onDrop={(entry, expectedState) => {
+                if (!worktreeId) return Promise.resolve();
+                return performM6Write(worktreeId, () => ipc.stashDrop(worktreeId, entry, expectedState)).then(() => undefined);
+              }}
+              onClear={(oids, expectedState) => {
+                if (!worktreeId) return Promise.resolve();
+                return performM6Write(worktreeId, () => ipc.stashClear(worktreeId, oids, expectedState)).then(() => undefined);
+              }}
+              onRestoreArchive={(archive, expectedState) => {
+                if (!worktreeId) return Promise.resolve();
+                return performM6Write(worktreeId, () => ipc.stashArchiveRestore(worktreeId, archive.id, expectedState)).then(() => undefined);
+              }}
+              onRefresh={() => setStashRevision((value) => value + 1)}
+              onNotify={(notice) => notifyM6(worktreeId ?? "", notice)}
+            />
+          )}
+          recoveryContent={(
+            <RecoveryPanel
+              worktreeId={worktreeId}
+              isWriting={isWriting}
+              snapshotRevision={snapshot?.revision ?? 0}
+              activation={gateRef.current.token().activation}
+              isWritingFor={(id) => writingWorktrees.has(id)}
+              onRestore={performRestore}
+              onSaveAs={performSaveAs}
+              onNotify={(notice) => notify({ ...notice, kind: "recovery" })}
+            />
+          )}
+        />
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--editor-background)]">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--surface-bg)]">
           {updateBannerVersion ? (
             <UpdateBanner version={updateBannerVersion} onOpen={() => setUpdateOpen(true)} onDismiss={() => setUpdateBannerVersion(null)} />
           ) : null}
@@ -6293,22 +6196,19 @@ export function App() {
               setMainView("commit");
             }}
             onCloseCommit={(tab) => commitTabs.close(tab.key)}
-          />
-          {mainView === "diff" && selectedEntry && !mergeEntry ? (
-            <div className="flex min-w-0 items-center gap-1">
-              <div className="min-w-0 flex-1">
-                <Breadcrumbs
-                  entry={selectedEntry}
-                  view={view}
-                  changeCount={displayChangeCount}
-                />
-              </div>
-              {/* F20：编辑只作用于 split 视图的工作区侧（unstaged）。
-               * 统一视图 / 暂存区 / 历史保持只读；统一视图点编辑先切到同文件的并排视图。 */}
-              {!selectedEntry.unmerged && !selectedEntry.binary && (selectedEntry.changes === "unstaged" || selectedEntry.changes === "changelist") ? (
+            prOpen={githubOpen && hasActiveWorktree}
+            prActive={mainView === "pr" && githubOpen && hasActiveWorktree}
+            isMerge={Boolean(mergeEntry)}
+            onActivatePr={() => setMainView("pr")}
+            onClosePr={() => {
+              setGithubOpen(false);
+              if (mainView === "pr") setMainView(tabs.length > 0 && activeKey ? "diff" : "log");
+            }}
+            editAction={
+              mainView === "diff" && selectedEntry && !mergeEntry && !selectedEntry.unmerged && !selectedEntry.binary && (selectedEntry.changes === "unstaged" || selectedEntry.changes === "changelist") ? (
                 <button
                   type="button"
-                  className="toolbar-widget mr-1 shrink-0"
+                  className="reviewed-toggle-btn shrink-0"
                   aria-pressed={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split"}
                   title={
                     view !== "split"
@@ -6327,12 +6227,12 @@ export function App() {
                     setEditingPath(selectedEntry.path);
                   }}
                 >
-                  <Codicon name={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? "close" : "edit"} size={13} />
+                  <AppIcon name={editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? "close" : "edit"} size={13} />
                   <span>{editingWorktreeId === worktreeId && editingPath === selectedEntry.path && view === "split" ? t("common.close") : t("workspace.edit")}</span>
                 </button>
-              ) : null}
-            </div>
-          ) : null}
+              ) : null
+            }
+          />
           {mainView === "diff" && error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
           {mainView === "diff" && allReviewed && !mergeEntry ? (
             <EditorBanner tone="info" icon="pass-filled">
@@ -6545,40 +6445,56 @@ export function App() {
                   onClose={() => commitTabs.close(commitTabs.active?.key ?? "")}
                 />
               )
+            ) : mainView === "pr" && githubOpen && worktreeId ? (
+              <GithubPanel
+                key={worktreeId}
+                worktreeId={worktreeId}
+                worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
+                currentBranch={snapshot?.branch ?? null}
+                onClose={() => {
+                  setGithubOpen(false);
+                  setMainView(tabs.length > 0 && activeKey ? "diff" : "log");
+                }}
+                onCheckout={(request) => performM6Write(request.worktreeId, () => m7.prCheckout(request))}
+                onCheckedOut={() => void refresh()}
+                onWorkspaceTouched={() => void refresh()}
+              />
             ) : null}
           </div>
 
-          {terminalOpen && worktreeId ? (
-            <TerminalPanel
-              worktreeId={worktreeId}
-              worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
-              fontSize={fontSize}
-              fontFamily={codeFontFamily}
-              height={terminalHeight}
-              onHeightChange={setTerminalHeight}
-              registry={terminalSessions}
-              busy={isWriting}
-              onClose={() => setTerminalOpen(false)}
-            />
-          ) : null}
-
-          {githubOpen && worktreeId ? (
-            <GithubPanel
-              key={worktreeId}
-              worktreeId={worktreeId}
-              worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
-              currentBranch={snapshot?.branch ?? null}
-              onClose={() => setGithubOpen(false)}
-              onCheckout={(request) => performM6Write(request.worktreeId, () => m7.prCheckout(request))}
-              onCheckedOut={() => void refresh()}
-              onWorkspaceTouched={() => void refresh()}
-            />
-          ) : null}
-
-          {/* Git 命令日志（B07）：底部面板，默认隐藏。 */}
-          {commandLogOpen ? (
-            <CommandLogPanel open={commandLogOpen} onClose={() => setCommandLogOpen(false)} />
-          ) : null}
+          <BottomDrawer
+            open={bottomDrawerOpen}
+            activeTab={drawerTab}
+            height={terminalHeight}
+            canShowTerminal={hasActiveWorktree}
+            terminalMounted={terminalOpen}
+            onSelectTab={(next) => {
+              setDrawerTab(next);
+              if (next === "terminal") setTerminalOpen(true);
+              else setCommandLogOpen(true);
+            }}
+            onHeightChange={setTerminalHeight}
+            onClose={() => {
+              setTerminalOpen(false);
+              setCommandLogOpen(false);
+            }}
+            terminalContent={
+              worktreeId ? (
+                <TerminalPanel
+                  visible={bottomDrawerOpen && drawerTab === "terminal"}
+                  worktreeId={worktreeId}
+                  worktreePath={activeRepo?.worktrees.find((entry) => entry.id === worktreeId)?.path ?? ""}
+                  fontSize={fontSize}
+                  fontFamily={codeFontFamily}
+                  registry={terminalSessions}
+                  busy={isWriting}
+                />
+              ) : null
+            }
+            commandLogContent={
+              <CommandLogPanel open={bottomDrawerOpen && drawerTab === "commandLog"} />
+            }
+          />
 
           {measurementMode ? (
             <MeasurePanel
@@ -6599,8 +6515,9 @@ export function App() {
         watchError={watchState.error}
         reviewed={reviewedCount}
         total={reviewTotal}
+        codeThemeLabel={activeCodeThemeLabel}
         onRefresh={() => void refresh()}
-        onOpenCommandLog={() => setCommandLogOpen((value) => !value)}
+        onOpenCommandLog={openCommandLogDrawer}
         autoFetchError={autoFetchError ? formatAppError(autoFetchError) : null}
         environmentLoading={environmentLoading}
       />
@@ -6824,6 +6741,8 @@ export function App() {
           updateStatus={updateStatus}
           onUpdateStatus={setUpdateStatus}
           onThemesChanged={reloadImportedThemes}
+          onOpenDiagnostics={() => setDiagnosticsOpen(true)}
+          onOpenUpdatePanel={() => setUpdateOpen(true)}
         />
       ) : null}
 
@@ -6871,7 +6790,7 @@ function SidebarMore({
             title={messages.changes.more}
             aria-label={messages.changes.more}
           >
-            <Codicon name="ellipsis" size={15} />
+            <AppIcon name="ellipsis" size={15} />
           </button>
         }
       >
@@ -6925,7 +6844,7 @@ function selectViewInUi(view: ViewMode): boolean {
 /** 编辑区中央的一句提示（VS Code 的空状态写法）：标题、可选说明、可选链接。 */
 function Hint({ title, detail, action }: { title: string; detail?: string; action?: { label: string; run: () => void } }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center text-descriptionforeground">
+    <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center text-[var(--text-secondary)]">
       <span className="text-foreground">{title}</span>
       {detail ? <span className="max-w-md">{detail}</span> : null}
       {action ? (
@@ -6946,7 +6865,7 @@ function EditorBanner({ tone, icon, action, children }: {
 }) {
   return (
     <div role={tone === "error" ? "alert" : "status"} className="editor-banner shrink-0" data-tone={tone}>
-      <Codicon name={icon} size={16} />
+      <AppIcon name={icon} size={16} />
       <div className="min-w-0 flex-1">{children}</div>
       {action ? (
         <button type="button" className="banner-link" onClick={action.run}>
@@ -6997,9 +6916,9 @@ function MeasurePanel({
   onClear: () => void;
 }) {
   const latest = measurements[0];
-  const smallButton = "rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground disabled:opacity-50";
+  const smallButton = "rounded-[3px] border border-[var(--border-strong)] px-2 py-0.5 text-[11.5px] hover:bg-[var(--surface-hover)] disabled:opacity-50";
   return (
-    <section className="border-t border-panel-border">
+    <section className="border-t border-[var(--border-subtle)]">
       <header className="flex items-center gap-3 px-3 py-1.5 text-xs">
         <button type="button" className={smallButton} onClick={onToggle}>
           {open ? "▾" : "▸"} {messages.measure.title}（{measurements.length}）

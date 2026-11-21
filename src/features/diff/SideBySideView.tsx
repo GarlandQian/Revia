@@ -461,16 +461,16 @@ export function SideBySideView(props: SideBySideViewProps) {
     return <div role="status" className="p-3 text-[12px] text-destructive">{formatAppError(layoutError)}</div>;
   }
   if (!layout) {
-    return <div className="p-3 text-[12px] text-descriptionforeground">{messages.changes.loading}</div>;
+    return <div className="p-3 text-[12px] text-[var(--text-secondary)]">{messages.changes.loading}</div>;
   }
   if (layout.binary) {
-    return <div className="p-3 text-[12px] text-descriptionforeground">{messages.diff.binaryNotCompared}</div>;
+    return <div className="p-3 text-[12px] text-[var(--text-secondary)]">{messages.diff.binaryNotCompared}</div>;
   }
   if (history && "targetId" in layout && layout.modeOnly) {
-    return <div className="p-3 text-[12px] text-descriptionforeground">{messages.history.modeOnly}</div>;
+    return <div className="p-3 text-[12px] text-[var(--text-secondary)]">{messages.history.modeOnly}</div>;
   }
   if (history && "targetId" in layout && layout.emptyReason === "emptyFile") {
-    return <div className="p-3 text-[12px] text-descriptionforeground">{messages.history.emptyFile}</div>;
+    return <div className="p-3 text-[12px] text-[var(--text-secondary)]">{messages.history.emptyFile}</div>;
   }
   const labels = history
     ? { left: history.file.parent ? messages.history.parent(history.file.parent) : messages.log.rootCommit,
@@ -487,7 +487,7 @@ export function SideBySideView(props: SideBySideViewProps) {
 
   return (
     <div className="sbs flex h-full min-h-0 flex-col" style={{ "--font-mono": codeFontStack(fontFamily ?? null) } as React.CSSProperties}>
-      <div className="sbs-header flex shrink-0 items-center text-[11.5px] text-descriptionforeground">
+      <div className="sbs-header flex shrink-0 items-center text-[11.5px] text-[var(--text-secondary)]">
         <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
           <span className="shrink-0 font-semibold">{labels.left}</span>
           <span className="truncate">{path}</span>
@@ -916,7 +916,7 @@ function SideColumn(props: SideColumnProps) {
           );
         })}
       </div>
-      {props.emptyText ? <div className="absolute inset-x-0 top-0 p-3 text-[12px] text-descriptionforeground">{props.emptyText}</div> : null}
+      {props.emptyText ? <div className="absolute inset-x-0 top-0 p-3 text-[12px] text-[var(--text-secondary)]">{props.emptyText}</div> : null}
       <div ref={trackRef} className="diff-scrollbar" onPointerDown={onTrackPointerDown}>
         <div ref={thumbRef} className="diff-scrollbar-thumb" />
       </div>

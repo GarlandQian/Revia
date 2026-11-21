@@ -16,9 +16,8 @@ import type { CheckoutTarget } from "@/types/bindings/CheckoutTarget";
 import type { BranchStart } from "@/types/bindings/BranchStart";
 import { messages } from "@/lib/i18n/index";
 import { MOD_SYMBOLS } from "@/lib/platform";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
-import { glassPane } from "@/features/m7/glass/nativeGlass";
 
 export interface BranchWidgetProps {
   overview: BranchOverview | null;
@@ -70,25 +69,25 @@ export function BranchWidget(props: BranchWidgetProps) {
         trigger={
           <button
             type="button"
-            className="toolbar-widget min-w-0"
+            className="ctx-btn min-w-0"
             disabled={busy}
             title={error ? formatAppError(error) : messages.branches.open}
           >
-            <Codicon name="git-branch" size={14} />
-            <span className="max-w-[220px] truncate">{label ?? messages.changes.detachedHead}</span>
+            <span className="branch-dot" aria-hidden />
+            <span className="max-w-[200px] truncate">{label ?? messages.changes.detachedHead}</span>
             {incoming ? (
               <span
-                className="size-1.5 shrink-0 rounded-full bg-[var(--gitdecoration-modifiedresourceforeground)]"
+                className="size-1.5 shrink-0 rounded-full bg-[var(--git-m)]"
                 title={messages.branches.incoming}
               />
             ) : null}
-            <Codicon name="chevron-down" size={12} />
+            <AppIcon name="chevron-down" size={12} className="text-[var(--text-muted)]" />
           </button>
         }
       >
         <div className="px-1 pb-1">
           <div className="relative">
-            <Codicon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-descriptionforeground" />
+            <AppIcon name="search" size={12} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
               className="settings-input w-full pl-6"
               placeholder={messages.branches.search}
@@ -106,7 +105,7 @@ export function BranchWidget(props: BranchWidgetProps) {
           }}
         >
           <span className="flex items-center gap-1.5">
-            <Codicon name="add" size={13} />
+            <AppIcon name="add" size={13} />
             {messages.branches.newBranch}
           </span>
         </MenuItem>
@@ -118,50 +117,50 @@ export function BranchWidget(props: BranchWidgetProps) {
           }}
         >
           <span className="flex items-center gap-1.5">
-            <Codicon name="cloud-download" size={13} />
+            <AppIcon name="cloud-download" size={13} />
             {messages.branches.fetch}
           </span>
         </MenuItem>
         <MenuSeparator />
         {loading && !overview ? (
-          <p className="px-2 py-1.5 text-[11.5px] text-descriptionforeground">{messages.branches.loading}</p>
+          <p className="px-2 py-1.5 text-[11.5px] text-[var(--text-secondary)]">{messages.branches.loading}</p>
         ) : null}
         {error ? <p className="px-2 py-1.5 text-[11.5px] text-destructive">{formatAppError(error)}</p> : null}
-        <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.local}</p>
+        <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{messages.branches.local}</p>
         {local.length === 0 ? (
-          <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noLocal}</p>
+          <p className="px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.branches.noLocal}</p>
         ) : null}
         {local.map((branch) => (
           <div key={branch.fullName} className="relative">
             <button
               type="button"
               role="menuitem"
-              className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left hover:bg-toolbar-hoverbackground"
+              className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left hover:bg-[var(--surface-hover)]"
               onClick={() => setSubmenu(submenu === branch.fullName ? null : branch.fullName)}
             >
               <span className="flex w-4 shrink-0 justify-center">
-                {branch.isCurrent ? <Codicon name="check" size={12} /> : null}
+                {branch.isCurrent ? <AppIcon name="check" size={12} /> : null}
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-1.5">
                 <span className="min-w-0 truncate">{branch.name}</span>
                 {branch.upstreamGone ? (
-                  <span className="shrink-0 rounded bg-[var(--badge-background)] px-1 text-[10px] text-[var(--editorwarning-foreground)]">
+                  <span className="shrink-0 rounded bg-[var(--surface-subtle)] px-1 text-[10px] text-[var(--warn)]">
                     {messages.branches.upstreamGone}
                   </span>
                 ) : null}
               </span>
               {branch.ahead || branch.behind ? (
-                <span className="flex shrink-0 items-center gap-1 text-[11px] text-descriptionforeground tabular-nums" title={messages.statusBar.upstreamHint}>
-                  <Codicon name="arrow-up" size={10} />
+                <span className="flex shrink-0 items-center gap-1 text-[11px] text-[var(--text-secondary)] tabular-nums" title={messages.statusBar.upstreamHint}>
+                  <AppIcon name="arrow-up" size={10} />
                   {branch.ahead}
-                  <Codicon name="arrow-down" size={10} />
+                  <AppIcon name="arrow-down" size={10} />
                   {branch.behind}
                 </span>
               ) : null}
-              <Codicon name="chevron-right" size={11} />
+              <AppIcon name="chevron-right" size={11} />
             </button>
             {submenu === branch.fullName ? (
-              <div className="ml-6 border-l border-panel-border pl-1">
+              <div className="ml-6 border-l border-[var(--border-subtle)] pl-1">
                 <MenuItem
                   disabled={branch.isCurrent || busy}
                   onClick={() => runCheckout({ kind: "local", name: branch.name })}
@@ -182,14 +181,14 @@ export function BranchWidget(props: BranchWidgetProps) {
           </div>
         ))}
         <MenuSeparator />
-        <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.branches.remote}</p>
+        <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{messages.branches.remote}</p>
         {remotes.length === 0 ? (
-          <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noRemote}</p>
+          <p className="px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.branches.noRemote}</p>
         ) : null}
         {remotes.map((group) => (
           <div key={group.name}>
-            <p className="flex items-center gap-1 px-2 py-1 text-[11px] text-descriptionforeground">
-              <Codicon name="cloud" size={11} />
+            <p className="flex items-center gap-1 px-2 py-1 text-[11px] text-[var(--text-secondary)]">
+              <AppIcon name="cloud" size={11} />
               {group.name}
             </p>
             {group.branches.map((branch) => (
@@ -212,29 +211,43 @@ export function BranchWidget(props: BranchWidgetProps) {
   );
 }
 
-/** 更新与推送共用一块胶囊（M5 B02 的两个按钮）。 */
-export function SyncActions({ busy, onUpdate, onPush }: { busy: boolean; onUpdate: () => void; onPush: () => void }) {
+/** 更新与推送高频操作组（M13 Q240）。 */
+export function SyncActions({
+  busy,
+  ahead = 0,
+  behind = 0,
+  onUpdate,
+  onPush,
+}: {
+  busy: boolean;
+  ahead?: number;
+  behind?: number;
+  onUpdate: () => void;
+  onPush: () => void;
+}) {
   return (
-    <div ref={glassPane({ id: "toolbar-sync" })} className="toolbar-capsule" role="group">
+    <div className="tb-sync-group" role="group">
       <button
         type="button"
-        className="toolbar-widget"
+        className="tb-sync-btn"
         title={messages.branches.updateHint(`${MOD_SYMBOLS.primary}T`)}
         disabled={busy}
         onClick={onUpdate}
       >
-        <Codicon name="cloud-download" size={14} />
-        <span className="max-w-[120px] truncate">{messages.branches.update}</span>
+        <AppIcon name="arrow-down" size={13} />
+        <span className="max-w-[110px] truncate">{messages.branches.update}</span>
+        {behind > 0 ? <span className="sync-count">{behind}</span> : null}
       </button>
       <button
         type="button"
-        className="toolbar-widget"
+        className="tb-sync-btn"
         title={messages.branches.pushHint(`${MOD_SYMBOLS.primary}${MOD_SYMBOLS.shift}K`)}
         disabled={busy}
         onClick={onPush}
       >
-        <Codicon name="cloud-upload" size={14} />
-        <span className="max-w-[120px] truncate">{messages.branches.push}</span>
+        <AppIcon name="arrow-up" size={13} />
+        <span className="max-w-[110px] truncate">{messages.branches.push}</span>
+        {ahead > 0 ? <span className="sync-count">{ahead}</span> : null}
       </button>
     </div>
   );
@@ -257,30 +270,30 @@ function RemoteBranchRow({
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left hover:bg-toolbar-hoverbackground"
+        className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left hover:bg-[var(--surface-hover)]"
         onClick={() => setOpen((value) => !value)}
       >
         <span className="flex w-4 shrink-0 justify-center">
-          {branch.trackingLocal ? <Codicon name="link" size={11} /> : null}
+          {branch.trackingLocal ? <AppIcon name="link" size={11} /> : null}
         </span>
         <span className="min-w-0 flex-1 truncate">{branch.branch}</span>
         {branch.ahead || branch.behind ? (
-          <span className="flex shrink-0 items-center gap-1 text-[11px] text-descriptionforeground tabular-nums">
-            <Codicon name="arrow-up" size={10} />
+          <span className="flex shrink-0 items-center gap-1 text-[11px] text-[var(--text-secondary)] tabular-nums">
+            <AppIcon name="arrow-up" size={10} />
             {branch.ahead}
-            <Codicon name="arrow-down" size={10} />
+            <AppIcon name="arrow-down" size={10} />
             {branch.behind}
           </span>
         ) : null}
-        <Codicon name="chevron-right" size={11} />
+        <AppIcon name="chevron-right" size={11} />
       </button>
       {open ? (
-        <div className="ml-6 border-l border-panel-border pl-1">
+        <div className="ml-6 border-l border-[var(--border-subtle)] pl-1">
           <MenuItem onClick={onCheckout}>
             {branch.trackingLocal ? messages.branches.checkoutTracked(branch.trackingLocal) : messages.branches.checkoutAsLocal(branch.branch)}
           </MenuItem>
           <MenuItem onClick={onNewBranch}>{messages.branches.newFromBranch}</MenuItem>
-          <p className="px-2 py-0.5 text-[10.5px] text-descriptionforeground">{`${remote}/${branch.branch}`}</p>
+          <p className="px-2 py-0.5 text-[10.5px] text-[var(--text-secondary)]">{`${remote}/${branch.branch}`}</p>
         </div>
       ) : null}
     </div>

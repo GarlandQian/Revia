@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { t, messages } from "@/lib/i18n";
 import { readonlyReasonText } from "@/lib/i18n/text";
 import { isPrimaryClick, isPrimaryModifier, isAltModifier } from "@/lib/platform";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { FileTypeIcon } from "@/components/app/FileTypeIcon";
 import { VisibleChangelistSelection, changelistEntryForPath } from "@/lib/m7/visibleChangelistSelection";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
@@ -111,7 +111,7 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
         <div className="flex items-center gap-1">
           <input type="checkbox" aria-label={group.name || t("changelists.default")} checked={active.length > 0 && active.every((item) => item.selected)} disabled={busy || pending || !active.length} onChange={(event) => void change({ kind: "select", items: active.map((i) => i.id), selected: event.target.checked })} />
           <input key={`${group.id}:${group.name}`} className="min-w-0 flex-1 bg-transparent font-semibold" aria-label={t("changelists.rename")} defaultValue={group.name} placeholder={t("changelists.default")} maxLength={256} disabled={busy || pending} onBlur={(event) => { if (event.target.value.trim() && event.target.value !== group.name) void change({ kind: "rename", group: group.id, name: event.target.value }); }} />
-          <button className="toolbar-button" disabled={busy || pending || group.id === view.defaultGroup} onClick={() => void change({ kind: "default", group: group.id })} title={t("changelists.makeDefault")}><Codicon name={group.id === view.defaultGroup ? "star-full" : "star-empty"} size={13} /></button>
+          <button className="toolbar-button" disabled={busy || pending || group.id === view.defaultGroup} onClick={() => void change({ kind: "default", group: group.id })} title={t("changelists.makeDefault")}><AppIcon name={group.id === view.defaultGroup ? "star-full" : "star-empty"} size={13} /></button>
           <button className="toolbar-button" disabled={busy || pending || view.groups.length === 1} onClick={() => void change({ kind: "delete", group: group.id })}>{t("changelists.delete")}</button>
         </div>
         {paths.map((path) => {
@@ -127,18 +127,18 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
           return <div key={path} className="ml-2 py-1">
             <div className="flex items-center gap-1">
               <input type="checkbox" aria-label={path} checked={usable.length > 0 && usable.every((i) => i.selected)} disabled={busy || pending || !usable.length} onChange={(event) => void change({ kind: "select", items: usable.map((i) => i.id), selected: event.target.checked })} />
-              <button className={`flex min-w-0 flex-1 items-center gap-1 text-left ${fileEntry && rowSelected ? "bg-list-activeselectionbackground" : ""}`} title={path} aria-selected={fileEntry ? rowSelected : false}
+              <button className={`flex min-w-0 flex-1 items-center gap-1 text-left ${fileEntry && rowSelected ? "bg-[var(--surface-active)]" : ""}`} title={path} aria-selected={fileEntry ? rowSelected : false}
                 onClick={(event) => { if (fileEntry) activateRow(rowId, isPrimaryClick(event), event.shiftKey); }}
                 onDoubleClick={() => { if (fileEntry) onPin(fileEntry); }}
                 onKeyDown={(event) => { if (event.key === "Enter" && fileEntry) { event.preventDefault(); onPin(fileEntry); } }}>
                 <FileTypeIcon path={path} symlink={readonly === "symlink"} /><span className={`min-w-0 truncate status-${fileEntry?.status ?? "modified"}`}>{path}</span>
               </button>
-              {fileEntry && (fileEntry.changes === "changelist" || fileEntry.changes === "untracked") && !readonly && <button className="icon-action" disabled={busy || pending} title={messages.changes.discardSelected} onClick={() => onDiscard(rowSelected ? selectedPaths() : [path])}><Codicon name="discard" size={13} /></button>}
+              {fileEntry && (fileEntry.changes === "changelist" || fileEntry.changes === "untracked") && !readonly && <button className="icon-action" disabled={busy || pending} title={messages.changes.discardSelected} onClick={() => onDiscard(rowSelected ? selectedPaths() : [path])}><AppIcon name="discard" size={13} /></button>}
               <select className="min-w-0 max-w-24 bg-dropdownbackground" aria-label={t("changelists.moveFile")} value={group.id} disabled={busy || pending} onChange={(event) => void change({ kind: "move", items: allFileItems.map((i) => i.id), group: event.target.value })}>
                 {view.groups.map((g) => <option value={g.id} key={g.id}>{g.name || t("changelists.default")}</option>)}
               </select>
             </div>
-            {readonly && <div className="ml-4 text-descriptionforeground">{readonlyReasonText(readonly)}</div>}
+            {readonly && <div className="ml-4 text-[var(--text-secondary)]">{readonlyReasonText(readonly)}</div>}
             {entries.map((item) => {
               const entry = entryFor();
               return <div key={item.id} className="ml-3 mt-1 flex items-center gap-1">

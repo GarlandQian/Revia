@@ -206,10 +206,10 @@ test("历史统一视图换目标后旧数据不复活，大文件不做全文�
 
 test("集成页签保留自动露出且历史页签没有工作区写工具条", () => {
   const tabs = readFileSync(new URL("../src/components/app/EditorTabs.tsx", import.meta.url), "utf8");
-  assert.match(tabs, /ref=\{logActive \? activeTabRef : null\}/);
+  assert.match(tabs, /ref=\{logActive && !prActive \? activeTabRef : null\}/);
   assert.equal((tabs.match(/ref=\{active \? activeTabRef : null\}/g) ?? []).length, 2);
-  assert.match(tabs, /\[activeKey, activeCommitKey, logActive, tabs, commitTabs\]/);
-  assert.match(tabs, /editor-tabs-toolbar \$\{logActive \|\| activeCommitKey \? "hidden" : "flex"\}/);
+  assert.match(tabs, /\[activeKey, activeCommitKey, logActive, prActive, prOpen, tabs, commitTabs\]/);
+  assert.match(tabs, /const showDiffContextBar = !logActive && !activeCommitKey && !prActive && !isMerge && Boolean\(entry\)/);
   const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   assert.match(app, /activeKey=\{mainView === "diff" \? activeKey : null\}/);
   assert.match(app, /if \(mainView !== "diff"\) pendingAnchor\.current = null/);

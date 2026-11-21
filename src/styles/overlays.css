@@ -1,0 +1,390 @@
+/* ==========================================================================
+   Revia M13 Overlays — Modals, Settings Dialog, Popovers, Notifications, Form Controls
+   ========================================================================== */
+
+@layer components {
+  /* Crisp Custom Checkbox */
+  input[type="checkbox"] {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    margin: 0;
+    border-radius: 3.5px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-bg);
+    color: transparent;
+    display: inline-grid;
+    place-items: center;
+    outline: none;
+    cursor: pointer;
+    transition: background-color 100ms ease, border-color 100ms ease;
+  }
+
+  input[type="checkbox"]:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+
+  input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  input[type="checkbox"]:checked::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    background: #FFFFFF;
+    clip-path: polygon(14% 44%, 0 62%, 40% 100%, 100% 16%, 84% 3%, 38% 68%);
+  }
+
+  input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  input[type="checkbox"]:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  /* Standard Modal Dialogs */
+  .app-dialog {
+    margin: auto;
+    border-radius: var(--radius-lg);
+    background: var(--surface-bg);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-modal);
+    color: var(--text-primary);
+    animation: revia-pop-in 120ms ease;
+  }
+
+  .app-dialog::backdrop {
+    background: var(--overlay);
+  }
+
+  /* Centered Spacious Two-Column Settings Modal (Q242) */
+  .settings-dialog {
+    width: min(920px, calc(100vw - 48px));
+    height: min(640px, calc(100vh - 56px));
+    max-width: 920px;
+    max-height: calc(100vh - 48px);
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .settings-nav {
+    background: var(--shell-bg);
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  .settings-nav-item {
+    height: 30px;
+    padding: 0 9px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 480;
+    color: var(--text-secondary);
+    text-align: left;
+    transition: background-color 100ms ease, color 100ms ease;
+  }
+
+  .settings-nav-item:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .settings-nav-item[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 560;
+  }
+
+  .setting-card {
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+
+  .setting-card-list {
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .setting-card-head {
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 11px 16px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .setting-row:first-child {
+    border-top: none;
+  }
+
+  .setting-row-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .setting-row-stack:first-child {
+    border-top: none;
+  }
+
+  /* Modern Toggle Switch for Settings */
+  .setting-switch {
+    position: relative;
+    width: 34px;
+    height: 19px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-hover);
+    flex-shrink: 0;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+
+  .setting-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--surface-bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+    transition: transform 140ms ease;
+  }
+
+  .setting-switch[aria-checked="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .setting-switch[aria-checked="true"]::after {
+    background: #FFFFFF;
+    transform: translateX(15px);
+  }
+
+  .setting-switch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .setting-switch:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .kbd-cap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 88px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    transition: border-color 110ms ease, background-color 110ms ease, color 110ms ease;
+  }
+
+  .kbd-cap:hover {
+    background: var(--surface-hover);
+  }
+
+  .kbd-cap[data-capturing="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .swatch-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .swatch-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    border: 1px solid rgba(128, 128, 128, 0.26);
+  }
+
+  .mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mode-option {
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-subtle);
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .mode-option:hover {
+    border-color: var(--border-strong);
+  }
+
+  .mode-option[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  .mode-preview {
+    height: 44px;
+    border-radius: 5px;
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* Settings Form Controls */
+  .settings-input,
+  .settings-select {
+    display: block;
+    height: 30px;
+    padding: 0 9px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color 110ms ease;
+  }
+
+  .settings-select {
+    width: 240px;
+  }
+
+  .settings-input {
+    width: 100%;
+  }
+
+  textarea.settings-input {
+    height: auto;
+    padding: 8px 9px;
+  }
+
+  .settings-input:focus-visible,
+  .settings-select:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  /* Dialog Action Buttons */
+  .dialog-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-bg);
+    color: var(--text-primary);
+    font: 500 12.5px/26px var(--font-sans);
+    outline: none;
+    transition: background-color 110ms ease, border-color 110ms ease;
+  }
+
+  .dialog-button:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+
+  .dialog-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .dialog-button.primary {
+    border-color: transparent;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 550;
+  }
+
+  .dialog-button.primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .dialog-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  /* Notifications Toast */
+  .notification {
+    width: min(400px, calc(100vw - 32px));
+    border-radius: var(--radius-md);
+    background: var(--surface-bg);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-popover);
+    color: var(--text-primary);
+    animation: revia-pop-in 120ms ease;
+  }
+
+  @keyframes revia-pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Base UI Popover Portal & Popup */
+.revia-popover-host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.revia-popper {
+  max-height: min(70vh, var(--available-height));
+  max-width: var(--available-width);
+  z-index: 60;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-bg);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-popover);
+  animation: revia-pop-in 110ms ease;
+}

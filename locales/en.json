@@ -978,7 +978,6 @@
   },
   "toolbar": {
     "chooseRepo": "Choose Repository Folder…",
-    "toolWindows": "Tool Windows",
     "repositories": "Repositories",
     "addRepository": "Add Repository…",
     "worktrees": "worktree",
@@ -988,9 +987,7 @@
     "inaccessible": "Path inaccessible",
     "terminal": "Terminal",
     "clone": "Clone repository…",
-    "pullRequests": "Pull requests",
-    "diagnostics": "Export diagnostics…",
-    "update": "App update"
+    "pullRequests": "Pull requests"
   },
   "statusBar": {
     "upstreamHint": "Ahead and behind counts come from local records as of the last fetch; Revia does not check online.",
@@ -1514,7 +1511,7 @@
     "about": "About Revia",
     "lightTheme": "Light color theme",
     "darkTheme": "Dark color theme",
-    "themeHint": "Choose one light and one dark theme; they follow the system appearance.",
+    "themeHint": "The app shell uses Revia neutral design tokens; light and dark color themes control code surface, syntax highlighting, and diff colors.",
     "search": "Search settings",
     "searchEmpty": "No settings match",
     "commit": "Commit",
@@ -1529,9 +1526,7 @@
       "notifications": "Notifications",
       "gitTools": "Git Program and Tools",
       "updatePush": "Update and Push",
-      "log": "Commit Log",
       "language": "Language",
-      "fileHistory": "File History",
       "ai": "AI"
     },
     "uiZoom": "Interface Zoom",
@@ -1607,7 +1602,6 @@
     "reloaded": "Environment reloaded",
     "aboutText": "A lightweight Git client with Rebased's layout and workflow and VS Code's appearance.",
     "licenses": "Bundled Assets and Licenses",
-    "licenseCodicons": "UI icons: Codicons (Microsoft), CC BY 4.0",
     "licenseMaterial": "File type icons: Material Icon Theme (Philipp Kief), MIT",
     "licenseThemes": "Color themes: VS Code Light / Dark 2026, Atom One Light, One Dark Pro, MIT",
     "gitPathPlaceholder": "for example {path}",
@@ -1646,16 +1640,12 @@
     "m7": {
       "title": "Extensions",
       "theme": {
-        "title": "Color themes",
         "keywords": "theme|import|VS Code",
         "hint": "You can import VS Code color themes; code and diff backgrounds stay opaque.",
-        "light": "Light theme",
-        "dark": "Dark theme",
         "imported": "Imported themes",
         "import": "Import theme…",
         "filter": "VS Code theme",
         "none": "No imported themes yet.",
-        "importedActive": "An imported theme is active.",
         "kindLight": "light",
         "kindDark": "dark"
       },
@@ -1701,12 +1691,10 @@
         "receiptValue": "{version} · {time}",
         "modeManual": "Check manually",
         "modeNotify": "Notify when available",
-        "modeAutomatic": "Download automatically (never install)",
         "prerelease": "Prerelease channel",
         "prereleaseHint": "Also check prerelease versions when enabled (stable only by default)"
       }
     },
-    "licenseReactBits": "React Bits glass components (MIT + Commons Clause, see src/components/m7/glass/LICENSE.md)",
     "measureBuild": "Measure build m9 · {commit}",
     "ai": {
       "title": "AI commit messages",
@@ -1735,7 +1723,15 @@
       "modelsEmpty": "The service returned no models; you can still type one.",
       "modelsRetry": "Retry",
       "modelsRefresh": "Refresh list"
-    }
+    },
+    "appearanceMode": "Appearance mode",
+    "appearanceModeHint": "Controls shell light/dark appearance and switches the paired light or dark code color theme.",
+    "appearanceSystem": "Follow system",
+    "appearanceLight": "Light",
+    "appearanceDark": "Dark",
+    "codeThemesTitle": "Code color themes (Diff, Merge, and Blame surfaces only)",
+    "openDiagnostics": "Export diagnostics...",
+    "licenseLucide": "UI icons: Lucide (ISC License)"
   },
   "log": {
     "title": "Commit Log",
@@ -1936,7 +1932,6 @@
   },
   "commandLog": {
     "title": "Git",
-    "tab": "Console",
     "count": "{count} {count, plural, one {command} other {commands}}",
     "empty": "No Git command has run in this session",
     "copyAll": "Copy All",
@@ -1945,8 +1940,7 @@
     "truncatedShort": "Output truncated",
     "noOutput": "(no output)",
     "selectRecord": "Select a command to view its output",
-    "open": "Open Git Command Log",
-    "close": "Close Git Command Log"
+    "open": "Open Git Command Log"
   },
   "measure": {
     "title": "Measurements",
@@ -2233,7 +2227,6 @@
     "ended": "ended",
     "closeTab": "Close tab",
     "new": "New terminal",
-    "closePanel": "Close terminal panel",
     "empty": "No terminal tabs yet",
     "closeRunningConfirm": "Process still running — closing terminates it.",
     "closeRunningYes": "Terminate & close",
@@ -2375,7 +2368,6 @@
     "unconfigured": "This build has no update channel configured.",
     "modeManual": "Check manually",
     "modeNotify": "Notify when available",
-    "modeAutomatic": "Download automatically (never install)",
     "check": "Check for updates",
     "checking": "Checking…",
     "available": "Update to {version} available",

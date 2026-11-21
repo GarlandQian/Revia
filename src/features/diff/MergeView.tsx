@@ -26,7 +26,7 @@ import {
   mergeUnavailableText,
 } from "@/lib/i18n/text";
 import { formatAppError, toAppError } from "@/lib/error";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "@/components/app/Dialogs";
 import { mapLine, type SyncSegment } from "./syncScroll";
 import { bandVisible, drawBand, prepareCanvas, type BandEnds } from "./bands";
@@ -92,14 +92,14 @@ export function MergeView({ worktreeId, path, fontSize, fontFamily, softWrap, on
     return (
       <div className="merge-message">
         <p className="font-medium">{messages.merge.loadFailed}</p>
-        <p className="text-descriptionforeground">{formatAppError(loadError)}</p>
+        <p className="text-[var(--text-secondary)]">{formatAppError(loadError)}</p>
         <button type="button" className="merge-button" onClick={reload}>
           {messages.merge.reload}
         </button>
       </div>
     );
   }
-  if (!layout) return <div className="merge-message text-descriptionforeground">{messages.changes.loading}</div>;
+  if (!layout) return <div className="merge-message text-[var(--text-secondary)]">{messages.changes.loading}</div>;
   if (layout.unavailable) {
     return <AcceptOnly layout={layout} onWrite={onWrite} onClose={onClose} onReload={reload} onExternalMerge={onExternalMerge} />;
   }
@@ -648,7 +648,7 @@ function MergeEditor({
           disabled={conflicts === 0}
           onClick={() => jump(-1)}
         >
-          <Codicon name="arrow-up" size={16} />
+          <AppIcon name="arrow-up" size={16} />
         </button>
         <button
           type="button"
@@ -658,7 +658,7 @@ function MergeEditor({
           disabled={conflicts === 0}
           onClick={() => jump(1)}
         >
-          <Codicon name="arrow-down" size={16} />
+          <AppIcon name="arrow-down" size={16} />
         </button>
         <span className="merge-toolbar-separator" />
         <button type="button" className="merge-button" disabled={busy || !hasPendingNonConflicts(chunks)} onClick={applyNonConflicting}>
@@ -674,7 +674,7 @@ function MergeEditor({
       </div>
       {error ? (
         <div role="alert" className="editor-banner shrink-0" data-tone="error">
-          <Codicon name="error" size={16} />
+          <AppIcon name="error" size={16} />
           <div className="min-w-0 flex-1">{formatAppError(error.payload)}</div>
           {error.stale ? (
             <button type="button" className="banner-link" onClick={onReload}>
@@ -708,7 +708,7 @@ function MergeEditor({
         <button type="button" className="merge-button" disabled={busy} onClick={() => (touched ? setConfirm("theirs") : acceptSide("theirs"))}>
           {messages.merge.acceptRight}
         </button>
-        <span className="min-w-0 flex-1 truncate px-2 text-descriptionforeground">{messages.merge.applyHint}</span>
+        <span className="min-w-0 flex-1 truncate px-2 text-[var(--text-secondary)]">{messages.merge.applyHint}</span>
         <button type="button" className="merge-button" disabled={busy} onClick={() => (touched ? setConfirm("cancel") : onClose())}>
           {messages.merge.cancel}
         </button>
@@ -858,7 +858,7 @@ function MergeConfirm({
     <Modal title={text.title} onClose={onCancel} width={460}>
       <p className="text-[12.5px] leading-relaxed">{text.body}</p>
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" autoFocus className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground" onClick={onCancel}>
+        <button type="button" autoFocus className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]" onClick={onCancel}>
           {text.stay}
         </button>
         <button type="button" className="rounded-[4px] bg-primary px-3 py-1 text-primary-foreground" onClick={onConfirm}>
@@ -907,7 +907,7 @@ function AcceptOnly({
   return (
     <div className="merge-message">
       <p className="font-medium">{messages.merge.cannotMerge}</p>
-      <p className="text-descriptionforeground">{layout.unavailable ? mergeUnavailableText(layout.unavailable) : null}</p>
+      <p className="text-[var(--text-secondary)]">{layout.unavailable ? mergeUnavailableText(layout.unavailable) : null}</p>
       {error ? (
         <p role="alert" className="text-destructive">
           {formatAppError(error.payload)}

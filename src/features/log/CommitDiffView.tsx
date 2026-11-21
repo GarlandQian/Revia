@@ -8,7 +8,7 @@ import type { DiffOptions } from "@/features/diff/SideBySideView";
 import { DiffView } from "@/features/diff/DiffView";
 import { ipc } from "@/lib/ipc";
 import { messages } from "@/lib/i18n/index";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { HistoryRowsStore, historyRowsKey } from "./historyRows";
 import { HistoryHighlightStore } from "./historyHighlightStore";
 import { HistorySideDiffView } from "./HistorySideDiffView";
@@ -31,13 +31,13 @@ export function CommitDiffView(props: CommitDiffViewProps) {
   const identityKey = historyRowsKey(props);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[24px] shrink-0 items-center gap-2 border-b border-panel-border px-2 text-[11.5px] text-descriptionforeground">
-        <Codicon name="eye" size={12} />
+      <div className="flex h-[24px] shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-2 text-[11.5px] text-[var(--text-secondary)]">
+        <AppIcon name="eye" size={12} />
         <span className="shrink-0">{messages.history.readonly}</span>
         <span className="min-w-0 flex-1 truncate" title={props.title}>{props.title}</span>
         <span className="shrink-0">{view === "split" ? messages.history.split : messages.history.unified}</span>
         <button type="button" className="icon-action size-[20px]" title={messages.recovery.close} onClick={props.onClose}>
-          <Codicon name="close" size={12} />
+          <AppIcon name="close" size={12} />
         </button>
       </div>
       <div className="min-h-0 flex-1">
@@ -72,7 +72,7 @@ function UnifiedHistoryDiff(props: CommitDiffViewProps) {
         : state?.emptyReason === "emptyFile" ? messages.history.emptyFile
           : state && state.rowCount === 0 ? messages.history.noRows : null);
   if (emptyText) {
-    return <div className="flex h-full items-center justify-center p-6 text-center text-[12.5px] text-descriptionforeground">{emptyText}</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-center text-[12.5px] text-[var(--text-secondary)]">{emptyText}</div>;
   }
   return <DiffView history={{ key: identityKey, path: file.path }} view="unified" rows={rows}
     highlights={highlights} fontSize={fontSize} fontFamily={fontFamily} softWrap={softWrap} />;

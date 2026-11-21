@@ -82,11 +82,11 @@ export function ExternalToolDialog({
       width={520}
     >
       <p className="truncate font-mono text-[12px]">{target.path}</p>
-      {target.revision ? <p className="mt-0.5 font-mono text-[11px] text-descriptionforeground">{target.revision.slice(0, 12)}</p> : null}
+      {target.revision ? <p className="mt-0.5 font-mono text-[11px] text-[var(--text-secondary)]">{target.revision.slice(0, 12)}</p> : null}
       {loading ? (
-        <p className="mt-3 text-[12px] text-descriptionforeground">{messages.externalTools.loading}</p>
+        <p className="mt-3 text-[12px] text-[var(--text-secondary)]">{messages.externalTools.loading}</p>
       ) : available.length === 0 ? (
-        <p className="mt-3 text-[12px] text-descriptionforeground">{messages.externalTools.none}</p>
+        <p className="mt-3 text-[12px] text-[var(--text-secondary)]">{messages.externalTools.none}</p>
       ) : (
         <label className="mt-3 block text-[12.5px]">
           <span className="mb-1 block">{messages.externalTools.tool}</span>
@@ -95,21 +95,21 @@ export function ExternalToolDialog({
           </select>
         </label>
       )}
-      <p className="mt-3 text-[11.5px] leading-relaxed text-descriptionforeground">
+      <p className="mt-3 text-[11.5px] leading-relaxed text-[var(--text-secondary)]">
         {target.kind === "diff" ? messages.externalTools.diffHint : messages.externalTools.mergeHint}
       </p>
       {target.kind === "merge" ? (
-        <p className="mt-1 text-[11.5px] text-[var(--editorwarning-foreground)]">{messages.externalTools.mergeRecovery}</p>
+        <p className="mt-1 text-[11.5px] text-[var(--warn)]">{messages.externalTools.mergeRecovery}</p>
       ) : null}
       {error ? <p role="alert" className="mt-2 text-[12px] text-destructive">{formatAppError(error)}</p> : null}
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1" onClick={onClose}>
+        <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1" onClick={onClose}>
           {messages.externalTools.cancel}
         </button>
         <button
           type="button"
           autoFocus
-          className="rounded-[4px] bg-[var(--button-background)] px-3 py-1 text-[var(--button-foreground)] disabled:opacity-50"
+          className="rounded-[4px] bg-[var(--accent)] px-3 py-1 text-[var(--accent-fg)] disabled:opacity-50"
           disabled={busy || loading || !tool || !context}
           onClick={() => {
             if (!context) return;

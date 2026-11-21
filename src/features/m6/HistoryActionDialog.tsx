@@ -18,7 +18,7 @@ import type { RemoteTarget } from "@/features/branches/remoteContinuation";
 import { ipc } from "@/lib/ipc";
 import { formatAppError, toAppError } from "@/lib/error";
 import { messages, t } from "@/lib/i18n/index";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "@/components/app/Dialogs";
 
 export type HistoryAction = "cherryPick" | "revert" | "reset" | "reword" | "interactive";
@@ -257,39 +257,39 @@ export function HistoryActionDialog({
     <Modal title={actionText(action)} onClose={onClose} width={710}>
       <div className="space-y-3">
         {orderedSelection.length > 1 ? null : (
-          <div className="rounded border border-panel-border bg-muted/30 px-2 py-1.5">
+          <div className="rounded border border-[var(--border-subtle)] bg-muted/30 px-2 py-1.5">
             <p className="truncate font-semibold">{commit.subject}</p>
-            <p className="font-mono text-[11px] text-descriptionforeground">{commit.oid.slice(0, 12)}</p>
+            <p className="font-mono text-[11px] text-[var(--text-secondary)]">{commit.oid.slice(0, 12)}</p>
           </div>
         )}
 
         {(action === "reword" || action === "interactive" || action === "reset") && preflight?.published ? (
-          <p className="rounded border border-[var(--editorwarning-foreground)]/50 px-2 py-1.5 text-[12px] text-[var(--editorwarning-foreground)]">
+          <p className="rounded border border-[var(--warn)]/50 px-2 py-1.5 text-[12px] text-[var(--warn)]">
             {messages.historyActions.publishedWarning}
           </p>
         ) : null}
 
         {(action === "reword" || action === "interactive" || action === "reset") && preflight?.protectedBranch ? (
-          <p className="rounded border border-[var(--editorwarning-foreground)]/50 px-2 py-1.5 text-[12px] text-[var(--editorwarning-foreground)]">
+          <p className="rounded border border-[var(--warn)]/50 px-2 py-1.5 text-[12px] text-[var(--warn)]">
             {t("historyActions.protectedWarning", { branch: preflight.protectedBranch })}
           </p>
         ) : null}
 
         {action === "cherryPick" || action === "revert" ? (
           <>
-            <p className="text-[12.5px] leading-relaxed text-descriptionforeground">
+            <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
               {orderedSelection.length > 1
                 ? (action === "cherryPick" ? messages.historyActions.cherryPickHintMany : messages.historyActions.revertHintMany)
                 : (action === "cherryPick" ? messages.historyActions.cherryPickHint : messages.historyActions.revertHint)}
             </p>
             {orderedSelection.length > 1 ? (
-              <p className="text-[11.5px] text-descriptionforeground">
+              <p className="text-[11.5px] text-[var(--text-secondary)]">
                 {messages.historyActions.selectedCount(orderedSelection.length)}
               </p>
             ) : null}
-            <div className="rounded border border-panel-border bg-muted/20 px-2 py-1">
+            <div className="rounded border border-[var(--border-subtle)] bg-muted/20 px-2 py-1">
               <p className="mb-1 text-[11.5px] font-semibold">{messages.historyActions.selectedCommits}</p>
-              <ul className="max-h-24 overflow-y-auto font-mono text-[11px] text-descriptionforeground">
+              <ul className="max-h-24 overflow-y-auto font-mono text-[11px] text-[var(--text-secondary)]">
                 {orderedSelection.map((entry) => (
                   <li key={entry.oid} className="truncate" title={entry.subject}>
                     {entry.oid.slice(0, 10)} {entry.subject}
@@ -298,49 +298,49 @@ export function HistoryActionDialog({
               </ul>
             </div>
             {action === "cherryPick" ? (
-              <p className="text-[11.5px] text-descriptionforeground">
+              <p className="text-[11.5px] text-[var(--text-secondary)]">
                 {cherryPickKeepEmpty ? messages.historyActions.emptyKeepHint : messages.historyActions.emptySkipHint}
               </p>
             ) : null}
-            {loading ? <p className="text-[12px] text-descriptionforeground">{messages.historyActions.checking}</p> : null}
+            {loading ? <p className="text-[12px] text-[var(--text-secondary)]">{messages.historyActions.checking}</p> : null}
             {dirty ? (
-              <div className="space-y-2 rounded border border-[var(--editorwarning-foreground)]/50 p-2">
+              <div className="space-y-2 rounded border border-[var(--warn)]/50 p-2">
                 <p className="font-semibold text-[12.5px]">{messages.historyActions.dirtyTitle}</p>
-                <ul className="max-h-28 overflow-y-auto font-mono text-[11px] text-descriptionforeground">
+                <ul className="max-h-28 overflow-y-auto font-mono text-[11px] text-[var(--text-secondary)]">
                   {preflight?.hasStagedChanges ? <li>{messages.historyActions.indexDirty}</li> : null}
                   {preflight?.paths.map((path) => <li key={path} className="truncate" title={path}>{path}</li>)}
                 </ul>
-                {preflight?.hasStagedChanges ? <p className="text-[11.5px] text-descriptionforeground">{messages.historyActions.indexDirtyHint}</p> : null}
+                {preflight?.hasStagedChanges ? <p className="text-[11.5px] text-[var(--text-secondary)]">{messages.historyActions.indexDirtyHint}</p> : null}
                 <label className="flex items-start gap-2 text-[12.5px]">
                   <input type="radio" className="mt-0.5" checked={strategy === "stash"} onChange={() => setStrategy("stash")} />
                   <span>
                     <span className="block">{messages.historyActions.strategyStash}</span>
-                    <span className="block text-[11.5px] text-descriptionforeground">{messages.historyActions.strategyStashHint}</span>
+                    <span className="block text-[11.5px] text-[var(--text-secondary)]">{messages.historyActions.strategyStashHint}</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-2 text-[12.5px]">
                   <input type="radio" className="mt-0.5" checked={strategy === "force"} onChange={() => setStrategy("force")} />
                   <span>
                     <span className="block">{messages.historyActions.strategyForce}</span>
-                    <span className="block text-[11.5px] text-descriptionforeground">{messages.historyActions.strategyForceHint}</span>
+                    <span className="block text-[11.5px] text-[var(--text-secondary)]">{messages.historyActions.strategyForceHint}</span>
                   </span>
                 </label>
               </div>
             ) : preflight ? (
-              <p className="text-[12px] text-descriptionforeground">{messages.historyActions.cleanWorktree}</p>
+              <p className="text-[12px] text-[var(--text-secondary)]">{messages.historyActions.cleanWorktree}</p>
             ) : null}
           </>
         ) : null}
 
         {action === "reset" ? (
           <>
-            <p className="text-[12.5px] leading-relaxed text-descriptionforeground">{messages.historyActions.resetHint}</p>
+            <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{messages.historyActions.resetHint}</p>
             {(["soft", "mixed", "hard", "keep"] as ResetMode[]).map((mode) => (
               <label key={mode} className="flex items-start gap-2 text-[12.5px]">
                 <input type="radio" className="mt-0.5" checked={resetMode === mode} onChange={() => setResetMode(mode)} />
                 <span>
                   <span className="block font-mono">{mode}</span>
-                  <span className="block text-[11.5px] text-descriptionforeground">
+                  <span className="block text-[11.5px] text-[var(--text-secondary)]">
                     {mode === "soft" ? messages.historyActions.resetSoft
                       : mode === "mixed" ? messages.historyActions.resetMixed
                         : mode === "hard" ? messages.historyActions.resetHard
@@ -367,14 +367,14 @@ export function HistoryActionDialog({
 
         {action === "interactive" ? (
           <div className="space-y-2">
-            <p className="text-[12.5px] text-descriptionforeground">{messages.historyActions.interactiveHint}</p>
-            <p className="text-[11.5px] text-descriptionforeground">{messages.historyActions.interactiveOldestFirst}</p>
-            <div className="max-h-64 overflow-y-auto rounded border border-panel-border">
+            <p className="text-[12.5px] text-[var(--text-secondary)]">{messages.historyActions.interactiveHint}</p>
+            <p className="text-[11.5px] text-[var(--text-secondary)]">{messages.historyActions.interactiveOldestFirst}</p>
+            <div className="max-h-64 overflow-y-auto rounded border border-[var(--border-subtle)]">
               {rangeEntries.map((entry, index) => {
                 const source = range.find((commit) => commit.oid === entry.oid);
                 return (
-                  <div key={entry.oid} className="flex flex-wrap items-center gap-1 border-b border-panel-border px-2 py-1 last:border-b-0">
-                    <span className="w-5 shrink-0 text-right font-mono text-[10.5px] text-descriptionforeground">{index + 1}</span>
+                  <div key={entry.oid} className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] px-2 py-1 last:border-b-0">
+                    <span className="w-5 shrink-0 text-right font-mono text-[10.5px] text-[var(--text-secondary)]">{index + 1}</span>
                     <select
                       className="settings-input h-6 text-[11.5px]"
                       value={entry.action}
@@ -388,12 +388,12 @@ export function HistoryActionDialog({
                       ))}
                     </select>
                     <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={source?.subject}>{source?.subject}</span>
-                    <span className="font-mono text-[10.5px] text-descriptionforeground">{entry.oid.slice(0, 8)}</span>
+                    <span className="font-mono text-[10.5px] text-[var(--text-secondary)]">{entry.oid.slice(0, 8)}</span>
                     <button type="button" className="icon-action size-[20px]" title={messages.historyActions.moveUp} disabled={index === 0} onClick={() => move(index, -1)}>
-                      <Codicon name="arrow-up" size={12} />
+                      <AppIcon name="arrow-up" size={12} />
                     </button>
                     <button type="button" className="icon-action size-[20px]" title={messages.historyActions.moveDown} disabled={index === rangeEntries.length - 1} onClick={() => move(index, 1)}>
-                      <Codicon name="arrow-down" size={12} />
+                      <AppIcon name="arrow-down" size={12} />
                     </button>
                     {entry.action === "reword" ? (
                       <input
@@ -412,13 +412,13 @@ export function HistoryActionDialog({
 
         {error ? <p role="alert" className="text-[12px] text-destructive">{"validation" in error ? ({ messageRequired: messages.historyActions.messageRequired, emptyRange: messages.historyActions.emptyRange, rewordMessageRequired: messages.historyActions.rewordMessageRequired, firstCannotSquash: messages.historyActions.firstCannotSquash, rootCommitUnsupported: messages.historyActions.rootCommitUnsupported })[error.validation] : formatAppError(error)}</p> : null}
         <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1" onClick={onClose}>
+          <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1" onClick={onClose}>
             {messages.historyActions.cancel}
           </button>
           <button
             type="button"
             autoFocus
-            className={`rounded-[4px] px-3 py-1 disabled:opacity-50 ${destructive ? "bg-destructive text-destructive-foreground" : "bg-[var(--button-background)] text-[var(--button-foreground)]"}`}
+            className={`rounded-[4px] px-3 py-1 disabled:opacity-50 ${destructive ? "bg-destructive text-destructive-foreground" : "bg-[var(--accent)] text-[var(--accent-fg)]"}`}
             disabled={busy || loading || (action !== "interactive" && action !== "reword" && action !== "reset" && !preflight)}
             onClick={submit}
           >

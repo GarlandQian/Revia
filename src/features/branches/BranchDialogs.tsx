@@ -16,7 +16,7 @@ import type { PushForce } from "@/types/bindings/PushForce";
 import { messages } from "@/lib/i18n/index";
 import { formatAppError } from "@/lib/error";
 import { formatCommitDate, shortOid } from "@/features/log/logModel";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "@/components/app/Dialogs";
 import { quickBranchNameProblem } from "./useBranches";
 import { branchStartLabel } from "./BranchWidget";
@@ -46,7 +46,7 @@ export function NewBranchDialog({
     <Modal title={messages.branches.newBranch} onClose={onCancel} width={460}>
       <div className="space-y-3">
         <label className="block">
-          <span className="mb-1 block text-[12px] text-descriptionforeground">{messages.branches.name}</span>
+          <span className="mb-1 block text-[12px] text-[var(--text-secondary)]">{messages.branches.name}</span>
           <input
             className="settings-input w-full"
             autoFocus
@@ -59,7 +59,7 @@ export function NewBranchDialog({
             }}
           />
         </label>
-        <p className="text-[11.5px] text-descriptionforeground">
+        <p className="text-[11.5px] text-[var(--text-secondary)]">
           {branchStartLabel(start, overview?.currentBranch ?? null, overview?.shortHead ?? null)}
         </p>
         <label className="flex items-center gap-2 text-[12.5px]">
@@ -108,15 +108,15 @@ export function CheckoutConflictDialog({
         <p className="text-[12.5px]">
           {messages.branches.checkoutBlockedDetail(target)}
         </p>
-        <ul className="max-h-[220px] overflow-auto rounded border border-panel-border bg-[var(--sidebar-background)] px-2 py-1 font-mono text-[11.5px]">
+        <ul className="max-h-[220px] overflow-auto rounded border border-[var(--border-subtle)] bg-[var(--shell-bg)] px-2 py-1 font-mono text-[11.5px]">
           {files.map((file) => (
             <li key={file} className="truncate" title={file}>{file}</li>
           ))}
         </ul>
-        <p className="text-[11.5px] text-descriptionforeground">
+        <p className="text-[11.5px] text-[var(--text-secondary)]">
           {messages.branches.smartDetail}
         </p>
-        <p className="text-[11.5px] text-[var(--editorwarning-foreground)]">
+        <p className="text-[11.5px] text-[var(--warn)]">
           {messages.branches.forceDetail}
         </p>
         <div className="flex justify-end gap-2 pt-1">
@@ -175,9 +175,9 @@ export function PushDialog({
     <Modal title={messages.branches.pushTitle} onClose={onCancel} width={640}>
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-[12.5px]">
-          <Codicon name="git-branch" size={13} />
+          <AppIcon name="git-branch" size={13} />
           <span className="font-medium">{preview.branch}</span>
-          <Codicon name="arrow-right" size={13} />
+          <AppIcon name="arrow-right" size={13} />
           {preview.remotes.length > 1 ? (
             <select className="settings-select" value={remote} onChange={(event) => setRemote(event.target.value)}>
               {preview.remotes.map((name) => (
@@ -187,7 +187,7 @@ export function PushDialog({
           ) : (
             <span>{remote}</span>
           )}
-          <span className="text-descriptionforeground">/</span>
+          <span className="text-[var(--text-secondary)]">/</span>
           <input
             className="settings-input w-[180px]"
             value={branch}
@@ -195,24 +195,24 @@ export function PushDialog({
             onChange={(event) => setBranch(event.target.value)}
           />
           {preview.hasUpstream ? null : (
-            <span className="text-[11px] text-descriptionforeground">{messages.branches.pushSetsUpstream}</span>
+            <span className="text-[11px] text-[var(--text-secondary)]">{messages.branches.pushSetsUpstream}</span>
           )}
         </div>
-        <div className="rounded border border-panel-border">
-          <div className="flex items-center gap-2 border-b border-panel-border px-2 py-1 text-[11.5px] text-descriptionforeground">
+        <div className="rounded border border-[var(--border-subtle)]">
+          <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">
             <span className="flex-1">{messages.branches.commitsToPush(preview.commitCount)}</span>
             {preview.truncated ? <span>{messages.branches.truncated}</span> : null}
           </div>
           <div className="max-h-[220px] overflow-auto py-1">
             {commits.length === 0 ? (
-              <p className="px-2 py-1 text-[11.5px] text-descriptionforeground">{messages.branches.noCommitsToPush}</p>
+              <p className="px-2 py-1 text-[11.5px] text-[var(--text-secondary)]">{messages.branches.noCommitsToPush}</p>
             ) : null}
             {commits.map((commit) => (
               <div key={commit.oid} className="flex items-center gap-2 px-2 py-[3px] text-[12px]">
-                <span className="w-[64px] shrink-0 font-mono text-[11px] text-descriptionforeground">{shortOid(commit.oid)}</span>
+                <span className="w-[64px] shrink-0 font-mono text-[11px] text-[var(--text-secondary)]">{shortOid(commit.oid)}</span>
                 <span className="min-w-0 flex-1 truncate" title={commit.subject}>{commit.subject}</span>
-                <span className="w-[120px] shrink-0 truncate text-[11px] text-descriptionforeground">{commit.author.name}</span>
-                <span className="w-[96px] shrink-0 text-[11px] text-descriptionforeground tabular-nums">
+                <span className="w-[120px] shrink-0 truncate text-[11px] text-[var(--text-secondary)]">{commit.author.name}</span>
+                <span className="w-[96px] shrink-0 text-[11px] text-[var(--text-secondary)] tabular-nums">
                   {formatCommitDate(commit.author.time)}
                 </span>
               </div>
@@ -224,7 +224,7 @@ export function PushDialog({
           {messages.branches.pushTags}
         </label>
         {forceProblem ? (
-          <p className="text-[11.5px] text-[var(--editorwarning-foreground)]">{forceProblem}</p>
+          <p className="text-[11.5px] text-[var(--warn)]">{forceProblem}</p>
         ) : null}
         {error ? <p className="text-[11.5px] text-destructive">{error}</p> : null}
         <div className="flex items-center justify-end gap-2 pt-1">
@@ -247,25 +247,25 @@ export function PushDialog({
               disabled={busy}
               onClick={() => setMenuOpen((value) => !value)}
             >
-              <Codicon name="chevron-down" size={12} />
+              <AppIcon name="chevron-down" size={12} />
             </button>
             {menuOpen ? (
               <div className="revia-popper absolute right-0 bottom-[calc(100%+4px)] z-10 p-1 text-[12.5px]">
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left whitespace-nowrap hover:bg-toolbar-hoverbackground disabled:opacity-50"
+                  className="flex w-full items-center gap-2 rounded-[3px] px-2 py-1 text-left whitespace-nowrap hover:bg-[var(--surface-hover)] disabled:opacity-50"
                   disabled={!preview.forceAllowed}
                   onClick={() => {
                     setMenuOpen(false);
                     setForceConfirmed(true);
                   }}
                 >
-                  <Codicon name="warning" size={12} />
+                  <AppIcon name="warning" size={12} />
                   {messages.branches.forceWithLease}
                 </button>
                 {forceConfirmed && !forceProblem ? (
-                  <div className="px-2 py-1 text-[11px] text-[var(--editorwarning-foreground)]">
+                  <div className="px-2 py-1 text-[11px] text-[var(--warn)]">
                     {messages.branches.forceConfirmHint(remote, branch)}
                     <button
                       type="button"

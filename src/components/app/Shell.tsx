@@ -1,11 +1,12 @@
 /**
- * 主窗口框架（M4 F02、Q119、Q126）：主工具栏、工具窗口图标条、状态栏与欢迎界面。
- *
- * 主工具栏左侧是 macOS 红绿灯留白；仓库组件与 worktree 组件点开是下拉列表；
- * 右侧是设置按钮。状态栏显示当前分支、领先和落后数、自动刷新提示与审阅进度。
+ * 主窗口框架（M13、Q240–Q242）：
+ * - 40px 顶部主工具栏：侧栏开关、紧凑的 仓库 / Worktree / 分支 层级切换器、
+ *   右侧高频同步（更新 / 推送）、PR / 终端开关与设置按钮（有新版本时亮提示点）；
+ * - 克隆入口归入仓库下拉底部、欢迎页与命令面板；
+ * - 24px 底部状态栏与现代卡片式欢迎页。
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { RepoEntry } from "@/types/bindings/RepoEntry";
 import type { WorktreeEntry } from "@/types/bindings/WorktreeEntry";
 import type { WorktreeStatusEntry } from "@/types/bindings/WorktreeStatusEntry";
@@ -13,9 +14,8 @@ import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import { messages, t } from "@/lib/i18n/index";
 import { formatAppError } from "@/lib/error";
 import { MAIN_TOOLBAR_INSET } from "@/lib/platform";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Popover, MenuItem, MenuSeparator } from "@/components/ui/popover";
-import { glassPane } from "@/features/m7/glass/nativeGlass";
 
 export function TitleBar({
   repo,
@@ -24,14 +24,23 @@ export function TitleBar({
   statuses,
   activeWorktreeId,
   busy,
+  hasActiveWorktree,
+  sidebarVisible,
+  onToggleSidebar,
   onSelectRepo,
   onRemoveRepo,
   onChooseRepo,
+  onCloneRepo,
   onWorktree,
   onSettings,
   onRefreshWorktrees,
   branchWidget,
-  extra,
+  syncActions,
+  prOpen,
+  onTogglePr,
+  terminalOpen,
+  onToggleTerminal,
+  updateAvailable = false,
 }: {
   repo: RepoEntry | null;
   repos: RepoEntry[];
@@ -39,29 +48,54 @@ export function TitleBar({
   statuses: WorktreeStatusEntry[];
   activeWorktreeId: string | null;
   busy: boolean;
+  hasActiveWorktree: boolean;
+  sidebarVisible: boolean;
+  onToggleSidebar: () => void;
   onSelectRepo: (repo: RepoEntry) => void;
   onRemoveRepo: (repo: RepoEntry) => void;
   onChooseRepo: () => void;
+  onCloneRepo: () => void;
   onWorktree: (worktreeId: string) => void;
   onSettings: () => void;
   onRefreshWorktrees: () => void;
-  /** 分支组件：和仓库、worktree 放在同一块胶囊里。 */
-  branchWidget?: React.ReactNode;
-  /** 胶囊之后的工具按钮（更新 / 推送、工具组，M5 B02、M7）。 */
-  extra?: React.ReactNode;
+  branchWidget?: ReactNode;
+  syncActions?: ReactNode;
+  prOpen: boolean;
+  onTogglePr: () => void;
+  terminalOpen: boolean;
+  onToggleTerminal: () => void;
+  updateAvailable?: boolean;
 }) {
   const [repoOpen, setRepoOpen] = useState(false);
   const [worktreeOpen, setWorktreeOpen] = useState(false);
   const active = worktrees.find((worktree) => worktree.id === activeWorktreeId);
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   const activeStatus = activeWorktreeId ? statusById.get(activeWorktreeId) : undefined;
-  const branch = activeStatus?.branch ?? active?.branch ?? null;
+  const worktreeLabel = active?.isMain
+    ? messages.changes.worktreeMain
+    : active?.path.split(/[\\/]/).filter(Boolean).pop() ?? activeStatus?.branch ?? active?.branch ?? "";
   const name = repo?.name ?? messages.app.name;
 
   return (
     <header className="titlebar relative" data-tauri-drag-region style={{ paddingLeft: MAIN_TOOLBAR_INSET }}>
-      {/* 仓库、worktree、分支是同一件事的三层：共用一块胶囊。 */}
-      <div ref={glassPane({ id: "toolbar-context" })} className="toolbar-capsule min-w-0" role="group">
+      {repo ? (
+        <>
+          <button
+            type="button"
+            className="tb-icon-btn"
+            aria-pressed={sidebarVisible}
+            title={messages.changes.toolWindow}
+            aria-label={messages.changes.toolWindow}
+            onClick={onToggleSidebar}
+          >
+            <AppIcon name="panel-left" size={15} />
+          </button>
+          <span className="tb-divider" aria-hidden />
+        </>
+      ) : null}
+
+      {/* 紧凑层级切换器：仓库 / Worktree / 分支（Q240） */}
+      <div className="context-chain" role="group">
         <div className="relative">
           <Popover
             open={repoOpen}
@@ -71,19 +105,19 @@ export function TitleBar({
             trigger={
               <button
                 type="button"
-                className="toolbar-widget"
+                className="ctx-btn"
                 disabled={busy}
                 title={repo ? `${repo.path}\n${messages.toolbar.chooseRepo}` : messages.toolbar.chooseRepo}
               >
-                <span aria-hidden className="grid size-[18px] shrink-0 place-items-center rounded-[4px] bg-[var(--badge-background)] text-[11px] font-bold text-[var(--badge-foreground)]">
+                <span aria-hidden className="repo-badge">
                   {name.slice(0, 1).toUpperCase()}
                 </span>
-                <span className="max-w-[220px] truncate">{name}</span>
-                <Codicon name="chevron-down" size={12} />
+                <span className="max-w-[200px] truncate">{name}</span>
+                <AppIcon name="chevron-down" size={12} className="text-[var(--text-muted)]" />
               </button>
             }
           >
-            <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.repositories}</p>
+            <p className="px-2 py-1 text-[11px] font-medium text-[var(--text-muted)]">{messages.toolbar.repositories}</p>
             {repos.map((entry) => (
               <RepositoryListItem
                 key={entry.id}
@@ -102,169 +136,159 @@ export function TitleBar({
               }}
             >
               <span className="flex items-center gap-1.5">
-                <Codicon name="add" size={14} />
+                <AppIcon name="add" size={14} />
                 {messages.toolbar.addRepository}
+              </span>
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setRepoOpen(false);
+                onCloneRepo();
+              }}
+            >
+              <span className="flex items-center gap-1.5">
+                <AppIcon name="repo-clone" size={14} />
+                {t("toolbar.clone")}
               </span>
             </MenuItem>
           </Popover>
         </div>
 
         {active ? (
-          <div className="relative min-w-0">
-            <Popover
-              open={worktreeOpen}
-              onOpen={() => setWorktreeOpen(true)}
-              onClose={() => setWorktreeOpen(false)}
-              width={420}
-              trigger={
-                <button
-                  type="button"
-                  className="toolbar-widget min-w-0"
-                  disabled={busy || worktrees.length === 0}
-                  title={active.path}
-                  onClick={() => {
-                    if (!worktreeOpen) onRefreshWorktrees();
-                  }}
-                >
-                  <Codicon name="git-branch" size={14} />
-                  <span className="max-w-[260px] truncate">{branch ?? messages.changes.detachedHead}</span>
-                  <Codicon name="chevron-down" size={12} />
-                </button>
-              }
-            >
-              <p className="px-2 py-1 text-[11px] text-descriptionforeground">{messages.toolbar.worktrees}</p>
-              {worktrees.map((worktree) => {
-                const status = statusById.get(worktree.id);
-                const activeRow = worktree.id === activeWorktreeId;
-                return (
+          <>
+            <span className="ctx-slash" aria-hidden>/</span>
+            <div className="relative min-w-0">
+              <Popover
+                open={worktreeOpen}
+                onOpen={() => setWorktreeOpen(true)}
+                onClose={() => setWorktreeOpen(false)}
+                width={420}
+                trigger={
                   <button
-                    key={worktree.id}
                     type="button"
-                    role="menuitem"
-                    title={worktree.path}
-                    className="flex w-full items-start gap-2 rounded-[3px] px-2 py-1.5 text-left hover:bg-toolbar-hoverbackground"
+                    className="ctx-btn ctx-subtle min-w-0"
+                    disabled={busy || worktrees.length === 0}
+                    title={active.path}
                     onClick={() => {
-                      setWorktreeOpen(false);
-                      onWorktree(worktree.id);
+                      if (!worktreeOpen) onRefreshWorktrees();
                     }}
                   >
-                    <span className="mt-0.5 flex w-4 shrink-0 justify-center">
-                      {activeRow ? <Codicon name="check" size={13} /> : null}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="truncate font-medium">{status?.branch ?? worktree.branch ?? messages.changes.detachedHead}</span>
-                        {worktree.isMain ? (
-                          <span className="shrink-0 rounded bg-[var(--badge-background)] px-1 text-[10px] text-[var(--badge-foreground)]">
-                            {messages.changes.worktreeMain}
-                          </span>
-                        ) : null}
-                        {status?.dirty ? (
-                          <span className="size-1.5 shrink-0 rounded-full bg-[var(--gitdecoration-modifiedresourceforeground)]" title={messages.toolbar.dirty} />
-                        ) : null}
+                    <AppIcon name="folder" size={13} />
+                    <span className="max-w-[160px] truncate">{worktreeLabel}</span>
+                    <AppIcon name="chevron-down" size={12} className="text-[var(--text-muted)]" />
+                  </button>
+                }
+              >
+                <p className="px-2 py-1 text-[11px] font-medium text-[var(--text-muted)]">{messages.toolbar.worktrees}</p>
+                {worktrees.map((worktree) => {
+                  const status = statusById.get(worktree.id);
+                  const activeRow = worktree.id === activeWorktreeId;
+                  return (
+                    <button
+                      key={worktree.id}
+                      type="button"
+                      role="menuitem"
+                      title={worktree.path}
+                      className="flex w-full items-start gap-2 rounded-[6px] px-2 py-1.5 text-left hover:bg-[var(--surface-hover)]"
+                      onClick={() => {
+                        setWorktreeOpen(false);
+                        onWorktree(worktree.id);
+                      }}
+                    >
+                      <span className="mt-0.5 flex w-4 shrink-0 justify-center text-[var(--accent)]">
+                        {activeRow ? <AppIcon name="check" size={13} /> : null}
                       </span>
-                      <span className="block truncate text-[11px] text-descriptionforeground">{worktree.path}</span>
-                      {status ? (
-                        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-descriptionforeground">
-                          <span>{status.dirty ? messages.toolbar.dirty : messages.toolbar.clean}</span>
-                          {status.operationLabel ? (
-                            <span className="text-[var(--editorwarning-foreground)]">
-                              {messages.toolbar.operation(status.operationLabel)}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate font-medium">{status?.branch ?? worktree.branch ?? messages.changes.detachedHead}</span>
+                          {worktree.isMain ? (
+                            <span className="count-pill shrink-0">
+                              {messages.changes.worktreeMain}
                             </span>
                           ) : null}
-                          <span className="inline-flex items-center gap-1 tabular-nums">
-                            <Codicon name="arrow-up" size={11} />
-                            {status.ahead}
-                            <Codicon name="arrow-down" size={11} />
-                            {status.behind}
-                          </span>
-                          {status.error ? <span className="text-destructive">{formatAppError(status.error)}</span> : null}
-                          {!status.accessible ? <span>{messages.toolbar.inaccessible}</span> : null}
+                          {status?.dirty ? (
+                            <span className="size-1.5 shrink-0 rounded-full bg-[var(--git-m)]" title={messages.toolbar.dirty} />
+                          ) : null}
                         </span>
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </Popover>
-          </div>
+                        <span className="block truncate text-[11px] text-[var(--text-muted)]">{worktree.path}</span>
+                        {status ? (
+                          <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-secondary)]">
+                            <span>{status.dirty ? messages.toolbar.dirty : messages.toolbar.clean}</span>
+                            {status.operationLabel ? (
+                              <span className="text-[var(--warn)]">
+                                {messages.toolbar.operation(status.operationLabel)}
+                              </span>
+                            ) : null}
+                            <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                              <AppIcon name="arrow-up" size={11} />
+                              {status.ahead}
+                              <AppIcon name="arrow-down" size={11} />
+                              {status.behind}
+                            </span>
+                            {status.error ? <span className="text-[var(--danger)]">{formatAppError(status.error)}</span> : null}
+                            {!status.accessible ? <span>{messages.toolbar.inaccessible}</span> : null}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </Popover>
+            </div>
+          </>
         ) : null}
-        {branchWidget}
+
+        {branchWidget ? (
+          <>
+            <span className="ctx-slash" aria-hidden>/</span>
+            {branchWidget}
+          </>
+        ) : null}
       </div>
 
-      {extra}
       <span className="flex-1 self-stretch" data-tauri-drag-region />
+
+      {/* 右侧高频同步、PR / 终端、设置 */}
+      {syncActions}
+      {syncActions ? <span className="tb-divider" aria-hidden /> : null}
+      {repo ? (
+        <>
+          <button
+            type="button"
+            className="tb-icon-btn"
+            aria-pressed={prOpen}
+            disabled={busy || !hasActiveWorktree}
+            title={t("toolbar.pullRequests")}
+            aria-label={t("toolbar.pullRequests")}
+            onClick={onTogglePr}
+          >
+            <AppIcon name="git-pull-request" size={14} />
+            <span>PR</span>
+          </button>
+          <button
+            type="button"
+            className="tb-icon-btn"
+            aria-pressed={terminalOpen}
+            disabled={busy || !hasActiveWorktree}
+            title={t("toolbar.terminal")}
+            aria-label={t("toolbar.terminal")}
+            onClick={onToggleTerminal}
+          >
+            <AppIcon name="terminal" size={15} />
+          </button>
+        </>
+      ) : null}
       <button
-        ref={glassPane({ id: "toolbar-settings", x: "end" })}
         type="button"
-        className="icon-action"
+        className="tb-icon-btn"
         title={messages.settings.open}
         aria-label={messages.settings.open}
         onClick={onSettings}
       >
-        <Codicon name="settings-gear" size={16} />
+        <AppIcon name="gear" size={15} />
+        {updateAvailable ? <span className="update-dot" aria-hidden /> : null}
       </button>
     </header>
-  );
-}
-
-export type ToolbarAction = {
-  id: string;
-  icon: string;
-  label: string;
-  pressed?: boolean;
-  disabled?: boolean;
-  /** 有待处理的事（例如有新版本）：图标旁一个强调色圆点。 */
-  attention?: boolean;
-  onClick: () => void;
-};
-
-/** 一组图标按钮共用一块胶囊（macOS 26 工具栏的分组写法）。 */
-export function ToolbarGroup({ id, label, actions }: { id: string; label: string; actions: ToolbarAction[] }) {
-  return (
-    <div ref={glassPane({ id: `toolbar-${id}` })} className="toolbar-group" role="group" aria-label={label}>
-      {actions.map((action) => (
-        <button
-          key={action.id}
-          type="button"
-          className="toolbar-group-item"
-          aria-pressed={action.pressed}
-          disabled={action.disabled}
-          title={action.label}
-          aria-label={action.label}
-          onClick={action.onClick}
-        >
-          <Codicon name={action.icon} size={16} />
-          {action.attention ? <span className="toolbar-attention" aria-hidden /> : null}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function ActivityBar({
-  pressed,
-  count,
-  onToggle,
-}: {
-  pressed: boolean;
-  count: number;
-  onToggle: () => void;
-}) {
-  return (
-    <nav className="activity-bar" aria-label={messages.toolbar.toolWindows}>
-      <button
-        type="button"
-        className="activity-item"
-        aria-pressed={pressed}
-        title={messages.changes.toolWindow}
-        aria-label={messages.changes.toolWindow}
-        onClick={onToggle}
-      >
-        <Codicon name="source-control" size={22} />
-        {count > 0 ? <span className="activity-badge">{count > 99 ? "99+" : count}</span> : null}
-      </button>
-    </nav>
   );
 }
 
@@ -275,6 +299,7 @@ export function StatusBar({
   watchError,
   reviewed,
   total,
+  codeThemeLabel,
   onRefresh,
   onOpenCommandLog,
   autoFetchError,
@@ -286,72 +311,70 @@ export function StatusBar({
   watchError: AppErrorPayload | null;
   reviewed: number;
   total: number;
+  codeThemeLabel?: string;
   onRefresh: () => void;
-  /** 打开 Git 命令日志面板（B07）。 */
   onOpenCommandLog: () => void;
-  /** 自动 fetch 失败的提示（只在状态栏，不弹通知）。 */
   autoFetchError: string | null;
-  /** 完整登录环境仍在后台加载：提交、fetch/push 与终端会等它就绪（Q222）。 */
   environmentLoading?: boolean;
 }) {
   return (
-    <footer className="window-status flex h-[var(--statusbar-height)] shrink-0 items-center gap-0.5 overflow-hidden px-1.5 text-[12px] whitespace-nowrap text-[var(--statusbar-foreground)]">
-      <span className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5">
-        <Codicon name="git-branch" size={14} />
-        <span className="max-w-[260px] truncate">{branch ?? messages.changes.detachedHead}</span>
+    <footer className="window-status flex shrink-0 items-center gap-1 overflow-hidden px-2.5 whitespace-nowrap">
+      <span className="status-item">
+        <AppIcon name="git-branch" size={12} />
+        <span className="max-w-[240px] truncate">{branch ?? messages.changes.detachedHead}</span>
       </span>
-      <span className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5 tabular-nums" title={messages.statusBar.upstreamHint}>
-        <Codicon name="arrow-up" size={13} />
+      <span className="status-item font-mono tabular-nums" title={messages.statusBar.upstreamHint}>
+        <AppIcon name="arrow-up" size={11} />
         {ahead}
-        <Codicon name="arrow-down" size={13} />
+        <AppIcon name="arrow-down" size={11} />
         {behind}
-        <span className="ml-1">{messages.statusBar.asOfLastFetch}</span>
+        <span className="ml-1 font-sans text-[var(--text-muted)]">{messages.statusBar.asOfLastFetch}</span>
       </span>
       {environmentLoading ? (
-        <span
-          className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5"
-          title={messages.statusBar.environmentLoadingHint}
-        >
-          <Codicon name="sync" size={13} />
+        <span className="status-item" title={messages.statusBar.environmentLoadingHint}>
+          <AppIcon name="sync" size={12} spin />
           {messages.statusBar.environmentLoading}
         </span>
       ) : null}
       {watchError ? (
         <button
           type="button"
-          className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5 text-[var(--editorwarning-foreground)]"
+          className="status-item text-[var(--warn)]"
           title={formatAppError(watchError)}
           onClick={onRefresh}
         >
-          <Codicon name="refresh" size={13} />
+          <AppIcon name="refresh" size={12} />
           {messages.changes.watchUnavailable}
         </button>
       ) : null}
       <button
         type="button"
-        className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5"
+        className="status-item"
         title={messages.commandLog.open}
         onClick={onOpenCommandLog}
       >
-        <Codicon name="terminal" size={13} />
+        <AppIcon name="terminal" size={12} />
         {messages.commandLog.title}
       </button>
       {autoFetchError ? (
         <button
           type="button"
-          className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5 text-[var(--editorwarning-foreground)]"
+          className="status-item text-[var(--warn)]"
           title={autoFetchError}
           onClick={onOpenCommandLog}
         >
-          <Codicon name="cloud-offline" size={13} />
+          <AppIcon name="cloud-offline" size={12} />
           {messages.remote.autoFetchFailed}
         </button>
       ) : null}
       <span className="flex-1" />
-      <span className="inline-flex h-[var(--statusbar-height)] items-center gap-1 px-1.5 tabular-nums">
-        <Codicon name="pass" size={13} />
+      <span className="status-item tabular-nums">
+        <AppIcon name="pass" size={12} className="text-[var(--reviewed)]" />
         {messages.review.progress(reviewed, total)}
       </span>
+      {codeThemeLabel ? (
+        <span className="status-item text-[var(--text-muted)]">{codeThemeLabel}</span>
+      ) : null}
     </footer>
   );
 }
@@ -365,17 +388,35 @@ function RepositoryListItem({ repo, selected, disabled, onSelect, onRemove }: {
   onRemove: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-[3px] hover:bg-toolbar-hoverbackground">
-      <button type="button" role="menuitem" className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left disabled:opacity-50" title={repo.path} disabled={disabled} onClick={onSelect}>
-        <span className="flex w-4 shrink-0 justify-center"><Codicon name={selected ? "check" : "repo"} size={14} /></span>
+    <div className="flex items-center gap-1 rounded-[6px] hover:bg-[var(--surface-hover)]">
+      <button
+        type="button"
+        role="menuitem"
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left disabled:opacity-50"
+        title={repo.path}
+        disabled={disabled}
+        onClick={onSelect}
+      >
+        <span className={`flex w-4 shrink-0 justify-center ${selected ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
+          <AppIcon name={selected ? "check" : "repo"} size={14} />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate">{repo.name}</span>
-          <span className="block truncate text-[11px] text-descriptionforeground">{repo.path}</span>
-          {!repo.exists || repo.worktrees.length === 0 ? <span className="block text-[11px] text-descriptionforeground">{messages.toolbar.inaccessible}</span> : null}
+          <span className="block truncate font-medium">{repo.name}</span>
+          <span className="block truncate text-[11px] text-[var(--text-muted)]">{repo.path}</span>
+          {!repo.exists || repo.worktrees.length === 0 ? (
+            <span className="block text-[11px] text-[var(--warn)]">{messages.toolbar.inaccessible}</span>
+          ) : null}
         </span>
       </button>
-      <button type="button" className="icon-action mr-1 shrink-0" title={t("repository.removeHint")} aria-label={t("repository.remove", { name: repo.name })} disabled={disabled} onClick={onRemove}>
-        <Codicon name="close" size={14} />
+      <button
+        type="button"
+        className="mini-icon-btn mr-1 shrink-0"
+        title={t("repository.removeHint")}
+        aria-label={t("repository.remove", { name: repo.name })}
+        disabled={disabled}
+        onClick={onRemove}
+      >
+        <AppIcon name="close" size={13} />
       </button>
     </div>
   );
@@ -396,33 +437,38 @@ export function WelcomeScreen({
   onSelectRepo: (repo: RepoEntry) => void;
   onCloneRepo: () => void;
   onRemoveRepo: (repo: RepoEntry) => void;
-  error: React.ReactNode;
+  error: ReactNode;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto p-8" data-tauri-drag-region>
-      <div className="w-full max-w-lg">
-        <h1 className="text-center text-[18px] font-semibold">{messages.firstRun.title}</h1>
-        <p className="mt-2 text-center text-[12.5px] text-descriptionforeground">{messages.firstRun.description}</p>
-        <div className="mt-5 flex justify-center gap-2">
+      <div className="w-full max-w-[520px]">
+        <div className="mx-auto mb-4 grid size-11 place-items-center rounded-[10px] bg-[var(--accent)] text-[18px] font-bold text-white shadow-sm">
+          R
+        </div>
+        <h1 className="text-center text-[19px] font-semibold tracking-tight text-[var(--text-primary)]">{messages.firstRun.title}</h1>
+        <p className="mt-2 text-center text-[13px] text-[var(--text-secondary)]">{messages.firstRun.description}</p>
+        <div className="mt-5 flex justify-center gap-2.5">
           <button
             type="button"
-            className="rounded-[4px] bg-primary px-4 py-1.5 text-primary-foreground disabled:opacity-50"
+            className="revia-btn revia-btn-primary h-9 px-4"
             disabled={busy}
             onClick={onChooseRepo}
           >
+            <AppIcon name="add" size={14} />
             {messages.firstRun.addButton}
           </button>
           <button
             type="button"
-            className="rounded-[4px] border border-panel-border px-4 py-1.5 hover:bg-toolbar-hoverbackground disabled:opacity-50"
+            className="revia-btn revia-btn-secondary h-9 px-4"
             disabled={busy}
             onClick={onCloneRepo}
           >
+            <AppIcon name="repo-clone" size={14} />
             {t("toolbar.clone")}
           </button>
         </div>
         {repos.length > 0 ? (
-          <ul className="mt-6 overflow-hidden rounded border border-panel-border bg-[var(--sidebar-background)]">
+          <ul className="welcome-card mt-6 divide-y divide-[var(--border-subtle)] overflow-hidden p-1.5">
             {repos.map((repo) => (
               <li key={repo.id}>
                 <RepositoryListItem repo={repo} disabled={busy} onSelect={() => onSelectRepo(repo)} onRemove={() => onRemoveRepo(repo)} />

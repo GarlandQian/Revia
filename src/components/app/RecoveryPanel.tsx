@@ -20,7 +20,7 @@ import type { RestoreOutcome } from "@/types/bindings/RestoreOutcome";
 import { getLocale, messages } from "@/lib/i18n/index";
 import { getErrorMessage, formatAppError, toAppError } from "@/lib/error";
 import { ipc } from "@/lib/ipc";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "./Dialogs";
 import type { NoticeTone } from "./Notifications";
 
@@ -309,7 +309,7 @@ export function RecoveryPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col text-[12px]">
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-descriptionforeground">{messages.recovery.viewOnly}</p>
+        <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-[var(--text-secondary)]">{messages.recovery.viewOnly}</p>
         {maintenance?.error ? (
           <p role="alert" className="mb-2 px-1 text-[11.5px] text-destructive">
             {`${messages.recovery.maintenanceFailed}：${formatAppError(maintenance.error)}`}
@@ -324,42 +324,42 @@ export function RecoveryPanel({
         {selected ? (
           <div className="space-y-2 px-1">
             <button type="button" className="banner-link inline-flex items-center gap-1" onClick={() => { setSelected(null); setDiff(null); }}>
-              <Codicon name="arrow-left" size={13} />
+              <AppIcon name="arrow-left" size={13} />
               {messages.recovery.back}
             </button>
             <h3 className="break-all font-mono text-[12px] font-semibold">{selected.target}</h3>
-            <p className="text-descriptionforeground">
+            <p className="text-[var(--text-secondary)]">
               {new Date(selected.createdAtMs).toLocaleString(getLocale())} · {selected.worktreePath}
             </p>
             <p>{sourceLabel(selected.source)}</p>
             <p role="status" className="font-semibold">{stateLabel(selected.state)}</p>
-            <p className="text-descriptionforeground">{messages.recovery.restoreFullFile}</p>
+            <p className="text-[var(--text-secondary)]">{messages.recovery.restoreFullFile}</p>
             {selected.restore ? (
-              <p role="status" className={selected.restore.state === "needsVerification" ? "text-destructive" : "text-descriptionforeground"}>
+              <p role="status" className={selected.restore.state === "needsVerification" ? "text-destructive" : "text-[var(--text-secondary)]"}>
                 {`${messages.recovery.attemptLabel}：${attemptLabel(selected.restore)} · ${new Date(selected.restore.atMs).toLocaleString(getLocale())}`}
                 {selected.restore.error ? ` · ${formatAppError(selected.restore.error)}` : selected.restore.message ? ` · ${messages.recovery.legacyDiagnostic}` : ""}
               </p>
             ) : null}
             <div className="space-y-2">
               {selected.files.map((file) => (
-                <section key={file.path} className="rounded border border-panel-border p-2">
+                <section key={file.path} className="rounded border border-[var(--border-subtle)] p-2">
                   <h4 className="break-all font-mono text-[11.5px] font-semibold">{file.path}</h4>
-                  <p className="text-[11.5px] text-descriptionforeground">
+                  <p className="text-[11.5px] text-[var(--text-secondary)]">
                     {messages.recovery.savedVersion}：{file.saved.exists
                       ? `${file.saved.bytes} ${messages.recovery.bytes}${file.saved.executable ? ` · ${messages.recovery.executable}` : ""}`
                       : messages.recovery.noContent}
                   </p>
                   {file.currentUnavailable || !file.current ? (
-                    <p className="text-[11.5px] text-descriptionforeground">{messages.recovery.currentUnavailable}</p>
+                    <p className="text-[11.5px] text-[var(--text-secondary)]">{messages.recovery.currentUnavailable}</p>
                   ) : (
-                    <p className="text-[11.5px] text-descriptionforeground">
+                    <p className="text-[11.5px] text-[var(--text-secondary)]">
                       {messages.recovery.currentVersion}：{file.current.exists
                         ? `${file.current.bytes} ${messages.recovery.bytes}${file.current.executable ? ` · ${messages.recovery.executable}` : ""}`
                         : messages.recovery.noContent}
                     </p>
                   )}
                   {file.saved.binary || file.current?.binary ? (
-                    <p className="text-[11.5px] text-descriptionforeground">{messages.recovery.binaryInfo}</p>
+                    <p className="text-[11.5px] text-[var(--text-secondary)]">{messages.recovery.binaryInfo}</p>
                   ) : (
                     <div className="mt-1 space-y-1">
                       <button
@@ -374,7 +374,7 @@ export function RecoveryPanel({
                         diff.error ? (
                           <p role="alert" className="text-destructive">{`${messages.recovery.diffUnavailable}：${formatAppError(diff.error)}`}</p>
                         ) : diff.text === null ? (
-                          <p className="text-descriptionforeground">{messages.recovery.loading}</p>
+                          <p className="text-[var(--text-secondary)]">{messages.recovery.loading}</p>
                         ) : (
                           <pre className="max-h-52 overflow-auto rounded bg-muted/50 p-2 font-mono text-[11px] whitespace-pre-wrap break-all">
                             {diff.text}
@@ -389,7 +389,7 @@ export function RecoveryPanel({
                   {file.saved.exists ? (
                     <button
                       type="button"
-                      className="mt-1 rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground"
+                      className="mt-1 rounded-[3px] border border-[var(--border-strong)] px-2 py-0.5 text-[11.5px] hover:bg-[var(--surface-hover)]"
                       disabled={busy}
                       onClick={() => void saveAs(file.path)}
                     >
@@ -400,7 +400,7 @@ export function RecoveryPanel({
               ))}
             </div>
             {selected.state === "laterChanges" ? (
-              <p className="text-[11.5px] text-descriptionforeground">{messages.recovery.laterChangesHint}</p>
+              <p className="text-[11.5px] text-[var(--text-secondary)]">{messages.recovery.laterChangesHint}</p>
             ) : null}
             <div className="flex justify-end gap-2 pt-1">
               <button
@@ -417,29 +417,29 @@ export function RecoveryPanel({
         ) : (
           <>
             {!records && !error ? <p className="px-1">{messages.recovery.loading}</p> : null}
-            {records?.length === 0 ? <p className="px-1 text-descriptionforeground">{messages.recovery.empty}</p> : null}
+            {records?.length === 0 ? <p className="px-1 text-[var(--text-secondary)]">{messages.recovery.empty}</p> : null}
             <div className="space-y-2">
               {records?.map((record) => (
-                <article key={record.id} className="rounded border border-panel-border p-2">
+                <article key={record.id} className="rounded border border-[var(--border-subtle)] p-2">
                   <h3 className="break-all font-mono text-[11.5px] font-semibold">{record.target}</h3>
-                  <p className="text-[11px] text-descriptionforeground">
+                  <p className="text-[11px] text-[var(--text-secondary)]">
                     {new Date(record.createdAtMs).toLocaleString(getLocale())} · {record.bytes} {messages.recovery.bytes}
                   </p>
                   <p className="text-[11px]">{sourceLabel(record.source)}</p>
                   <p className="text-[11px]">{statusLabel(record.source, record.status)}</p>
                   {record.restore ? (
-                    <p className={`text-[11px] ${record.restore.state === "needsVerification" ? "text-destructive" : "text-descriptionforeground"}`}>
+                    <p className={`text-[11px] ${record.restore.state === "needsVerification" ? "text-destructive" : "text-[var(--text-secondary)]"}`}>
                       {`${messages.recovery.attemptLabel}：${attemptLabel(record.restore)} · ${new Date(record.restore.atMs).toLocaleString(getLocale())}`}
                     </p>
                   ) : null}
-                  <p className="break-all text-[11px] text-descriptionforeground">{record.worktreePath}</p>
-                  <p className="break-all font-mono text-[11px] text-descriptionforeground">{record.paths.join(" · ")}</p>
+                  <p className="break-all text-[11px] text-[var(--text-secondary)]">{record.worktreePath}</p>
+                  <p className="break-all font-mono text-[11px] text-[var(--text-secondary)]">{record.paths.join(" · ")}</p>
                   {!record.identityConfirmed ? (
-                    <p className="text-[11px] text-descriptionforeground">{messages.recovery.otherWorktree}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)]">{messages.recovery.otherWorktree}</p>
                   ) : null}
                   <button
                     type="button"
-                    className="mt-1 rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground"
+                    className="mt-1 rounded-[3px] border border-[var(--border-strong)] px-2 py-0.5 text-[11.5px] hover:bg-[var(--surface-hover)]"
                     disabled={busy}
                     onClick={() => inspect(record.id)}
                   >
@@ -448,14 +448,14 @@ export function RecoveryPanel({
                 </article>
               ))}
             </div>
-            <p className="mt-2 px-1 text-[11px] text-descriptionforeground">{messages.recovery.keepDays}</p>
+            <p className="mt-2 px-1 text-[11px] text-[var(--text-secondary)]">{messages.recovery.keepDays}</p>
             <div className="mt-2 flex flex-wrap justify-end gap-2 px-1">
               <button type="button" className="banner-link text-[11.5px]" disabled={busy} onClick={purge}>
                 {messages.recovery.purge}
               </button>
               <button
                 type="button"
-                className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground"
+                className="rounded-[3px] border border-[var(--border-strong)] px-2 py-0.5 text-[11.5px] hover:bg-[var(--surface-hover)]"
                 disabled={busy}
                 onClick={() => setConfirmClear(true)}
               >
@@ -463,7 +463,7 @@ export function RecoveryPanel({
               </button>
               <button
                 type="button"
-                className="rounded-[3px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-2 py-0.5 text-[11.5px] hover:bg-toolbar-hoverbackground"
+                className="rounded-[3px] border border-[var(--border-strong)] px-2 py-0.5 text-[11.5px] hover:bg-[var(--surface-hover)]"
                 onClick={() => setReload((value) => value + 1)}
               >
                 {messages.recovery.refresh}
@@ -477,7 +477,7 @@ export function RecoveryPanel({
         <Modal title={messages.recovery.confirmRestore} onClose={() => setConfirmRestore(false)} width={420}>
           <p className="text-[12.5px]">{messages.recovery.confirmRestore}</p>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground" onClick={() => setConfirmRestore(false)}>
+            <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]" onClick={() => setConfirmRestore(false)}>
               {messages.recovery.cancel}
             </button>
             <button
@@ -495,7 +495,7 @@ export function RecoveryPanel({
         <Modal title={messages.recovery.confirmClear} onClose={() => setConfirmClear(false)} width={420}>
           <p className="text-[12.5px]">{messages.recovery.confirmClear}</p>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground" onClick={() => setConfirmClear(false)}>
+            <button type="button" className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]" onClick={() => setConfirmClear(false)}>
               {messages.recovery.cancel}
             </button>
             <button

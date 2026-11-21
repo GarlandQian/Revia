@@ -13,7 +13,7 @@ import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import { formatAppError } from "@/lib/error";
 import { messages } from "@/lib/i18n/index";
 import { operationKindText } from "@/lib/i18n/text";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Modal } from "@/components/app/Dialogs";
 
 export function OperationBanner({
@@ -59,26 +59,26 @@ export function OperationBanner({
   return (
     <>
       {readErrors.map((error, index) => (
-        <div key={index} role="alert" className="shrink-0 border-b border-panel-border px-3 py-1.5 text-[12px] text-errorforeground">
+        <div key={index} role="alert" className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-errorforeground">
           {formatAppError(error)}
         </div>
       ))}
       {state ? (
         <div
           role="status"
-          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--editorwarning-foreground)] bg-[color-mix(in_srgb,var(--editorwarning-foreground)_12%,var(--editor-background))] px-3 py-1.5 text-[12.5px]"
+          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_12%,var(--editor-background))] px-3 py-1.5 text-[12.5px]"
         >
-          <Codicon name="warning" size={15} className="text-[var(--editorwarning-foreground)]" />
+          <AppIcon name="warning" size={15} className="text-[var(--warn)]" />
           <span className="font-semibold">{state.continuationOnly ? messages.operation.sequencePending : messages.operation.inProgress(kind)}</span>
           {state.conflictCount > 0 ? (
-            <span className="text-descriptionforeground">{messages.operation.conflicts(state.conflictCount)}</span>
+            <span className="text-[var(--text-secondary)]">{messages.operation.conflicts(state.conflictCount)}</span>
           ) : (
-            <span className="text-descriptionforeground">{messages.operation.noConflicts}</span>
+            <span className="text-[var(--text-secondary)]">{messages.operation.noConflicts}</span>
           )}
           <span className="ml-auto flex items-center gap-1.5">
             <button
               type="button"
-              className="toolbar-widget h-6 px-2 text-[12px]"
+              className="revia-btn revia-btn-secondary h-6 px-2 text-[12px]"
               disabled={busy || state.conflictCount > 0 || state.needsVerification}
               title={state.conflictCount > 0 ? messages.operation.resolveFirst : messages.operation.continue}
               onClick={() => { if (origin) onAction("continue", origin, state); }}
@@ -88,7 +88,7 @@ export function OperationBanner({
             {state.kind === "merge" || state.continuationOnly ? null : (
               <button
                 type="button"
-                className="toolbar-widget h-6 px-2 text-[12px]"
+                className="revia-btn revia-btn-secondary h-6 px-2 text-[12px]"
                 disabled={busy}
                 onClick={() => { if (origin) setConfirm({ action: "skip", origin: { ...origin }, operation: { ...state } }); } }
               >
@@ -97,7 +97,7 @@ export function OperationBanner({
             )}
             <button
               type="button"
-              className="toolbar-widget h-6 px-2 text-[12px]"
+              className="revia-btn revia-btn-secondary h-6 px-2 text-[12px]"
               disabled={busy}
               onClick={() => { if (origin) setConfirm({ action: "abort", origin: { ...origin }, operation: { ...state } }); } }
             >
@@ -107,14 +107,14 @@ export function OperationBanner({
         </div>
       ) : null}
       {autostash ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-panel-border bg-[var(--statusbar-background)] px-3 py-1.5 text-[12px]">
-          <Codicon name="history" size={14} />
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--shell-bg)] px-3 py-1.5 text-[12px]">
+          <AppIcon name="history" size={14} />
           <span className="font-semibold">{autostash.restoration === "pending" ? messages.operation.autostashPending : messages.operation.autostashNeedsCheck}</span>
-          <span className="text-descriptionforeground">{messages.operation.autostashSaved(autostashKind)}</span>
+          <span className="text-[var(--text-secondary)]">{messages.operation.autostashSaved(autostashKind)}</span>
           {autostashError ? <span role="alert" className="text-errorforeground">{formatAppError(autostashError)}</span> : null}
           <button
             type="button"
-            className="toolbar-widget ml-auto h-6 px-2 text-[12px]"
+            className="revia-btn revia-btn-secondary ml-auto h-6 px-2 text-[12px]"
             disabled={busy}
             onClick={onViewStash}
           >
@@ -122,13 +122,13 @@ export function OperationBanner({
           </button>
           <button
             type="button"
-            className="toolbar-widget h-6 px-2 text-[12px]"
+            className="revia-btn revia-btn-secondary h-6 px-2 text-[12px]"
             disabled={busy || !!state || !canRestoreAutostash || autostash.restoration !== "pending"}
             onClick={onRestoreAutostash}
           >
             {messages.operation.restoreAutostash}
           </button>
-          <button type="button" className="toolbar-widget h-6 px-2 text-[12px]" disabled={busy || !!state} onClick={onKeepStash}>
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2 text-[12px]" disabled={busy || !!state} onClick={onKeepStash}>
             {messages.operation.keepStash}
           </button>
         </div>
@@ -142,13 +142,13 @@ export function OperationBanner({
           <p className="font-semibold">
             {confirm.operation.continuationOnly ? messages.operation.confirmEndSequence : confirm.action === "abort" ? messages.operation.confirmAbort(confirmedKind) : messages.operation.confirmSkip(confirmedKind)}
           </p>
-          <p className="mt-2 text-[12.5px] leading-relaxed text-descriptionforeground">
+          <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
             {confirm.operation.continuationOnly ? messages.operation.endSequenceHint : messages.operation.confirmSafety}
           </p>
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"
-              className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--icon-foreground)_28%,transparent)] px-3 py-1 hover:bg-toolbar-hoverbackground"
+              className="rounded-[4px] border border-[var(--border-strong)] px-3 py-1 hover:bg-[var(--surface-hover)]"
               onClick={() => setConfirm(null)}
             >
               {messages.operation.cancel}

@@ -9,15 +9,14 @@ import { useEffect, useRef, useState } from "react";
 import type { AppErrorPayload } from "@/types/bindings/AppErrorPayload";
 import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
 import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
-import { Codicon } from "@/components/ui/codicon";
-import { GlassLayer } from "@/features/m7/glass/GlassLayer";
+import { AppIcon } from "@/components/ui/app-icon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { updateReasonText } from "@/lib/i18n/text";
 import { isWindows } from "@/lib/platform";
 import { updateCandidate } from "@/lib/m7/updateState";
 import { m7, onM7Events } from "@/lib/m7/api";
-import { useModalDialog } from "@/features/m7/glass/nativeGlass";
+import { useModalDialog } from "@/hooks/useDialogOpen";
 
 export interface UpdatePanelProps {
   open: boolean;
@@ -104,25 +103,24 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
   const percent = progress && progress.total && progress.total > 0 ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100)) : null;
 
   return (
-    <dialog ref={ref} className="app-dialog glass-isolate w-[min(560px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]" onCancel={(event) => { event.preventDefault(); if (operation !== "install" && operation !== "restart") onClose(); }}>
-      <GlassLayer variant="popover" />
-      <div className="flex items-center gap-2 border-b border-panel-border px-3 py-2">
-        <Codicon name="cloud-download" size={15} />
+    <dialog ref={ref} className="app-dialog w-[min(560px,calc(100vw-48px))] overflow-hidden p-0 text-[13px]" onCancel={(event) => { event.preventDefault(); if (operation !== "install" && operation !== "restart") onClose(); }}>
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+        <AppIcon name="cloud-download" size={15} />
         <h2 className="flex-1 text-[13.5px] font-semibold">{t("update.title")}</h2>
         <button type="button" className="icon-action size-[22px]" aria-label={t("common.close")} disabled={operation === "install" || operation === "restart"} onClick={onClose}>
-          <Codicon name="close" size={14} />
+          <AppIcon name="close" size={14} />
         </button>
       </div>
       <div className="space-y-3 p-4 text-[12.5px]">
         {error ? (
-          <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1">
+          <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] px-2 py-1">
             {formatAppError(error)}
           </p>
         ) : null}
         {notice ? <p role="status">{notice}</p> : null}
-        <p className="text-descriptionforeground">{t("update.current", { version: status?.currentVersion ?? "—" })}</p>
+        <p className="text-[var(--text-secondary)]">{t("update.current", { version: status?.currentVersion ?? "—" })}</p>
         {status && !status.configured ? (
-          <p className="rounded border border-panel-border bg-[var(--side-bar-background)] px-2 py-1 text-descriptionforeground">
+          <p className="rounded border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-[var(--text-secondary)]">
             {status.unconfiguredReason ? updateReasonText(status.unconfiguredReason) : t("update.unconfigured")}
           </p>
         ) : null}
@@ -131,47 +129,47 @@ export function UpdatePanel({ open, status, mode, onStatusChange, onModeChange, 
             <option value="manual">{t("update.modeManual")}</option>
             <option value="notify">{t("update.modeNotify")}</option>
           </select>
-          <button type="button" className="toolbar-widget h-6 px-2" disabled={busy} onClick={() => void check(true)}>
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={busy} onClick={() => void check(true)}>
             {busy ? t("update.checking") : t("update.check")}
           </button>
         </div>
         {status?.portable ? (
-          <p className="rounded border border-panel-border bg-[var(--side-bar-background)] px-2 py-1 text-descriptionforeground">
+          <p className="rounded border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-[var(--text-secondary)]">
             {t("update.portableNotice")}
           </p>
         ) : null}
         {candidate.pending ? (
-          <p role="status" className="rounded border border-panel-border px-2 py-1">
+          <p role="status" className="rounded border border-[var(--border-subtle)] px-2 py-1">
             {t("update.pendingInstall")}
           </p>
         ) : null}
         {!status?.portable && candidate.restartVersion ? (
-          <div className="space-y-2 rounded border border-panel-border p-2">
+          <div className="space-y-2 rounded border border-[var(--border-subtle)] p-2">
             <p className="font-semibold">{t("update.installed", { version: candidate.restartVersion })}</p>
-            <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy} onClick={() => void restart()}>{t("update.restart")}</button>
+            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3 font-semibold" disabled={busy} onClick={() => void restart()}>{t("update.restart")}</button>
           </div>
         ) : null}
         {candidate.version ? (
-          <div className="space-y-2 rounded border border-panel-border p-2">
+          <div className="space-y-2 rounded border border-[var(--border-subtle)] p-2">
             <p className="font-semibold">{t("update.available", { version: candidate.version })}</p>
-            {status?.available?.publishedAt ? <p className="text-descriptionforeground">{t("update.published", { time: status.available.publishedAt })}</p> : null}
+            {status?.available?.publishedAt ? <p className="text-[var(--text-secondary)]">{t("update.published", { time: status.available.publishedAt })}</p> : null}
             {status?.available?.notes ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-[11.5px]">{status.available.notes}</pre> : null}
             {!status?.portable && candidate.downloaded ? <p>{t("update.downloaded")}</p> : null}
-            {percent !== null && operation === "download" ? <div className="h-1.5 w-full overflow-hidden rounded bg-[var(--progressbar-background)]"><div className="h-full bg-[var(--progressbar-foreground)]" style={{ width: `${percent}%` }} /></div> : null}
+            {percent !== null && operation === "download" ? <div className="h-1.5 w-full overflow-hidden rounded bg-[var(--surface-hover)]"><div className="h-full bg-[var(--accent)]" style={{ width: `${percent}%` }} /></div> : null}
             {status?.portable ? (
-              <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy || !status.portableDownloadUrl} onClick={() => void openPortableDownload()}>
+              <button type="button" className="revia-btn revia-btn-secondary h-7 px-3 font-semibold" disabled={busy || !status.portableDownloadUrl} onClick={() => void openPortableDownload()}>
                 {t("update.portableDownload")}
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <button type="button" className="toolbar-widget h-7 px-3 font-semibold" disabled={busy || status?.restartRequired || error?.kind === "needsVerification"} onClick={() => void install()}>{candidate.downloaded ? (isWindows ? t("update.installAndRestart") : t("update.installNow")) : t("update.downloadConfirm")}</button>
-                {operation === "download" ? <span className="text-descriptionforeground">{t("update.downloading")}</span> : null}
+                <button type="button" className="revia-btn revia-btn-secondary h-7 px-3 font-semibold" disabled={busy || status?.restartRequired || error?.kind === "needsVerification"} onClick={() => void install()}>{candidate.downloaded ? (isWindows ? t("update.installAndRestart") : t("update.installNow")) : t("update.downloadConfirm")}</button>
+                {operation === "download" ? <span className="text-[var(--text-secondary)]">{t("update.downloading")}</span> : null}
               </div>
             )}
           </div>
-        ) : !candidate.restartVersion && !candidate.pending ? <p className="text-descriptionforeground">{t("update.upToDate")}</p> : null}
+        ) : !candidate.restartVersion && !candidate.pending ? <p className="text-[var(--text-secondary)]">{t("update.upToDate")}</p> : null}
         {status?.lastCheckedAtMs ? (
-          <p className="text-[11.5px] text-descriptionforeground">{t("update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}</p>
+          <p className="text-[11.5px] text-[var(--text-secondary)]">{t("update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}</p>
         ) : null}
       </div>
     </dialog>
@@ -189,14 +187,14 @@ export function UpdateBanner({
   onDismiss: () => void;
 }) {
   return (
-    <div role="status" className="flex items-center gap-2 border-b border-panel-border bg-[var(--side-bar-background)] px-3 py-1 text-[12px]">
-      <Codicon name="cloud-download" size={13} />
+    <div role="status" className="flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1 text-[12px]">
+      <AppIcon name="cloud-download" size={13} />
       <span className="min-w-0 flex-1 truncate">{t("update.banner", { version })}</span>
-      <button type="button" className="toolbar-widget h-5 px-2" onClick={onOpen}>
+      <button type="button" className="revia-btn revia-btn-secondary h-5 px-2" onClick={onOpen}>
         {t("update.bannerOpen")}
       </button>
       <button type="button" className="icon-action size-5" aria-label={t("common.dismiss")} onClick={onDismiss}>
-        <Codicon name="close" size={12} />
+        <AppIcon name="close" size={12} />
       </button>
     </div>
   );

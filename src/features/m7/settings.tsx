@@ -1,8 +1,6 @@
 /**
- * M7 设置页（主题、快捷键、GitHub、更新）。
- *
- * 这些页面挂在既有设置对话框里，仍走 `onChange` 的补丁保存，
- * 不在前端写 localStorage；主题与账号数据从 Rust 读取。
+ * M7 设置页（自定义代码颜色主题、快捷键、GitHub 账号、应用更新）。
+ * M13 重构为统一的卡片行、现代 Switch 开关、键帽快捷键捕获与 revia-btn 按钮。
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,7 +10,7 @@ import type { AppUpdateMode } from "@/types/bindings/AppUpdateMode";
 import type { GithubStatus } from "@/types/bindings/GithubStatus";
 import type { ImportedTheme } from "@/types/bindings/ImportedTheme";
 import type { AppUpdateStatus } from "@/types/bindings/AppUpdateStatus";
-import { Codicon } from "@/components/ui/codicon";
+import { AppIcon } from "@/components/ui/app-icon";
 import { formatAppError, toAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { updateReasonText } from "@/lib/i18n/text";
@@ -29,30 +27,12 @@ import {
   replaceShortcut,
 } from "@/lib/shortcuts";
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[minmax(140px,220px)_1fr] items-start gap-3">
-      <div>
-        <div className="text-[12.5px] font-semibold">{label}</div>
-        {hint ? <div className="text-[11.5px] text-descriptionforeground">{hint}</div> : null}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
-}
-
-// ---------------- 颜色主题 ----------------
+// ---------------- 导入的 VS Code 代码颜色主题 ----------------
 
 export function M7ThemeSettings({
-  themeLight,
-  themeDark,
-  onChange,
   onThemesChanged,
 }: {
-  themeLight: string;
-  themeDark: string;
-  onChange: (patch: { themeLight?: string; themeDark?: string }) => Promise<boolean>;
-  onThemesChanged: () => Promise<void> | void;
+  onThemesChanged: (updated?: { themeLight?: string; themeDark?: string }) => Promise<void> | void;
 }) {
   const [themes, setThemes] = useState<ImportedTheme[]>([]);
   const [error, setError] = useState<AppErrorPayload | null>(null);
@@ -89,9 +69,9 @@ export function M7ThemeSettings({
   const remove = useCallback(
     async (id: string) => {
       try {
-        await m7.removeImportedTheme(id);
+        const updated = await m7.removeImportedTheme(id);
         await reload();
-        await onThemesChanged();
+        await onThemesChanged({ themeLight: updated.themeLight, themeDark: updated.themeDark });
         setError(null);
       } catch (caught) {
         setError(toAppError(caught));
@@ -100,73 +80,53 @@ export function M7ThemeSettings({
     [onThemesChanged, reload],
   );
 
-  const currentLight = themeLight.startsWith("imported-");
-  const currentDark = themeDark.startsWith("imported-");
-
   return (
-    <div className="space-y-4">
-      <p className="text-[12px] text-descriptionforeground">{t("settings.m7.theme.hint")}</p>
-      {error ? (
-        <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1 text-[12px]">
-          {formatAppError(error)}
-        </p>
-      ) : null}
-      <Row label={t("settings.m7.theme.light")}>
-        <select className="settings-select" value={themeLight} onChange={(event) => void onChange({ themeLight: event.target.value })}>
-          {themes
-            .filter((theme) => theme.kind === "light")
-            .map((theme) => (
-              <option key={theme.id} value={theme.id}>
-                {theme.label}
-              </option>
-            ))}
-        </select>
-        {currentLight ? <p className="mt-1 text-[11.5px] text-descriptionforeground">{t("settings.m7.theme.importedActive")}</p> : null}
-      </Row>
-      <Row label={t("settings.m7.theme.dark")}>
-        <select className="settings-select" value={themeDark} onChange={(event) => void onChange({ themeDark: event.target.value })}>
-          {themes
-            .filter((theme) => theme.kind === "dark")
-            .map((theme) => (
-              <option key={theme.id} value={theme.id}>
-                {theme.label}
-              </option>
-            ))}
-        </select>
-        {currentDark ? <p className="mt-1 text-[11.5px] text-descriptionforeground">{t("settings.m7.theme.importedActive")}</p> : null}
-      </Row>
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-semibold">{t("settings.m7.theme.imported")}</span>
-          <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void importTheme()}>
-            {t("settings.m7.theme.import")}
-          </button>
+    <div className="setting-card-list">
+      <div className="setting-row">
+        <div className="min-w-0">
+          <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{t("settings.m7.theme.imported")}</div>
+          <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("settings.m7.theme.hint")}</div>
         </div>
-        {themes.length === 0 ? (
-          <p className="text-[11.5px] text-descriptionforeground">{t("settings.m7.theme.none")}</p>
-        ) : (
-          <ul className="space-y-1">
-            {themes.map((theme) => (
-              <li key={theme.id} className="flex items-center gap-2 rounded border border-panel-border px-2 py-1 text-[12px]">
-                <span className="min-w-0 flex-1 truncate">
-                  {theme.label} · {theme.sourceName}
-                </span>
-                <span className="shrink-0 text-descriptionforeground">
-                  {theme.kind === "light" ? t("settings.m7.theme.kindLight") : t("settings.m7.theme.kindDark")}
-                </span>
-                <button
-                  type="button"
-                  className="icon-action size-5"
-                  aria-label={t("common.delete")}
-                  onClick={() => void remove(theme.id)}
-                >
-                  <Codicon name="trash" size={12} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <button type="button" className="revia-btn revia-btn-secondary shrink-0" onClick={() => void importTheme()}>
+          <AppIcon name="add" size={13} />
+          <span>{t("settings.m7.theme.import")}</span>
+        </button>
       </div>
+      {error ? (
+        <div className="setting-row-stack">
+          <p role="alert" className="rounded-[6px] border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-2.5 py-1.5 text-[12px] text-[var(--danger)]">
+            {formatAppError(error)}
+          </p>
+        </div>
+      ) : null}
+      {themes.length === 0 ? (
+        <div className="setting-row">
+          <span className="text-[12px] text-[var(--text-muted)]">{t("settings.m7.theme.none")}</span>
+        </div>
+      ) : (
+        themes.map((theme) => (
+          <div key={theme.id} className="setting-row">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{theme.label}</div>
+              <div className="truncate text-[11.5px] text-[var(--text-muted)]">{theme.sourceName}</div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="count-pill">
+                {theme.kind === "light" ? t("settings.m7.theme.kindLight") : t("settings.m7.theme.kindDark")}
+              </span>
+              <button
+                type="button"
+                className="mini-icon-btn danger"
+                aria-label={t("common.delete")}
+                title={t("common.delete")}
+                onClick={() => void remove(theme.id)}
+              >
+                <AppIcon name="trash" size={13} />
+              </button>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -185,7 +145,6 @@ export function M7ShortcutSettings({
   const captureRef = useRef<string | null>(null);
   captureRef.current = capturing;
 
-  // F17：冲突不再直接拒绝——先询问“确认替换”，用户确认后两个动作一起落盘。
   const [pendingReplace, setPendingReplace] = useState<{ action: string; accelerator: string; conflict: string } | null>(null);
 
   useEffect(() => {
@@ -202,7 +161,6 @@ export function M7ShortcutSettings({
       if (!captured) return;
       const conflict = conflictFor(captured, capturing as never, shortcuts);
       if (conflict) {
-        // 记录待确认替换；用户点击确认才改绑定。
         setPendingReplace({ action: capturing, accelerator: captured, conflict });
         setCapturing(null);
         return;
@@ -215,13 +173,35 @@ export function M7ShortcutSettings({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [capturing, onChange, shortcuts]);
 
+  const hasCustom = Object.keys(shortcuts).length > 0;
+
   return (
-    <div className="space-y-3">
-      <p className="text-[12px] text-descriptionforeground">{t("settings.m7.shortcuts.hint")}</p>
-      {error ? <p role="alert" className="text-[12px] text-[color:var(--gitdecoration-conflictingresourceforeground)]">{error}</p> : null}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[12px] text-[var(--text-secondary)]">{t("settings.m7.shortcuts.hint")}</p>
+        <button
+          type="button"
+          className="revia-btn revia-btn-secondary shrink-0"
+          disabled={!hasCustom}
+          onClick={() => void onChange({})}
+        >
+          {t("settings.m7.shortcuts.resetAll")}
+        </button>
+      </div>
+
+      {error ? (
+        <p role="alert" className="rounded-[6px] border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)]">
+          {error}
+        </p>
+      ) : null}
+
       {pendingReplace ? (
-        <div role="alertdialog" aria-modal="false" className="flex items-center gap-2 rounded border border-panel-border px-2 py-1.5 text-[12px]">
-          <span className="min-w-0 flex-1">
+        <div
+          role="alertdialog"
+          aria-modal="false"
+          className="flex items-center gap-2.5 rounded-[8px] border border-[var(--warn)]/35 bg-[var(--surface-subtle)] px-3.5 py-2.5 text-[12px]"
+        >
+          <span className="min-w-0 flex-1 text-[var(--text-primary)]">
             {t("settings.m7.shortcuts.confirmReplace", {
               action: shortcutLabel(pendingReplace.action as never),
               accelerator: formatAccelerator(pendingReplace.accelerator),
@@ -230,7 +210,7 @@ export function M7ShortcutSettings({
           </span>
           <button
             type="button"
-            className="toolbar-widget h-6 px-2 font-semibold"
+            className="revia-btn revia-btn-primary h-7 px-2.5"
             onClick={() => {
               const next = replaceShortcut(shortcuts, pendingReplace.action as never, pendingReplace.accelerator);
               void onChange(next);
@@ -240,57 +220,58 @@ export function M7ShortcutSettings({
           >
             {t("settings.m7.shortcuts.replaceConfirm")}
           </button>
-          <button type="button" className="toolbar-widget h-6 px-2" onClick={() => setPendingReplace(null)}>
+          <button type="button" className="revia-btn revia-btn-secondary h-7 px-2.5" onClick={() => setPendingReplace(null)}>
             {t("common.cancel")}
           </button>
         </div>
       ) : null}
-      <table className="w-full text-[12px]">
-        <tbody>
-          {shortcutDefs.map((def) => {
-            const active = shortcuts[def.id] ?? def.defaultAccelerator;
-            return (
-              <tr key={def.id} className="border-b border-panel-border last:border-0">
-                <td className="py-1.5 pr-2">
-                  {shortcutLabel(def.id)}
-                  {def.scope === "diff" ? <span className="ml-1 text-descriptionforeground">{t("settings.m7.shortcuts.diffOnly")}</span> : null}
-                </td>
-                <td className="w-[180px] py-1.5 text-right">
-                  <button
-                    type="button"
-                    className="toolbar-widget h-6 min-w-[92px] px-2 font-mono"
-                    onClick={() => setCapturing(def.id)}
-                  >
-                    {capturing === def.id ? t("settings.m7.shortcuts.press") : formatAccelerator(active)}
-                  </button>
-                </td>
-                <td className="w-[92px] py-1.5 text-right">
-                  <button
-                    type="button"
-                    className="toolbar-widget h-6 px-2"
-                    disabled={shortcuts[def.id] === undefined}
-                    onClick={() => {
-                      const conflict = conflictFor(def.defaultAccelerator, def.id, shortcuts);
-                      if (conflict) setPendingReplace({ action: def.id, accelerator: def.defaultAccelerator, conflict });
-                      else void onChange(withShortcut(shortcuts, def.id, def.defaultAccelerator));
-                    }}
-                  >
-                    {t("settings.m7.shortcuts.reset")}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <p className="text-[11.5px] text-descriptionforeground">
+
+      <div className="setting-card-list">
+        {shortcutDefs.map((def) => {
+          const active = shortcuts[def.id] ?? def.defaultAccelerator;
+          const isCustom = shortcuts[def.id] !== undefined;
+          return (
+            <div key={def.id} className="setting-row py-2.5">
+              <div className="min-w-0 flex-1">
+                <span className="text-[12.5px] font-medium text-[var(--text-primary)]">{shortcutLabel(def.id)}</span>
+                {def.scope === "diff" ? (
+                  <span className="ml-2 text-[11px] text-[var(--text-muted)]">{t("settings.m7.shortcuts.diffOnly")}</span>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  className="kbd-cap"
+                  data-capturing={capturing === def.id}
+                  onClick={() => setCapturing(def.id)}
+                >
+                  {capturing === def.id ? t("settings.m7.shortcuts.press") : formatAccelerator(active)}
+                </button>
+                <button
+                  type="button"
+                  className="mini-icon-btn"
+                  title={t("settings.m7.shortcuts.reset")}
+                  aria-label={t("settings.m7.shortcuts.reset")}
+                  disabled={!isCustom}
+                  onClick={() => {
+                    const conflict = conflictFor(def.defaultAccelerator, def.id, shortcuts);
+                    if (conflict) setPendingReplace({ action: def.id, accelerator: def.defaultAccelerator, conflict });
+                    else void onChange(withShortcut(shortcuts, def.id, def.defaultAccelerator));
+                  }}
+                >
+                  <AppIcon name="discard" size={12} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
         {t("settings.m7.shortcuts.current", {
           list: shortcutDefs.map((def) => `${shortcutLabel(def.id)}=${formatAccelerator(acceleratorOf(def.id))}`).join("，"),
         })}
       </p>
-      <button type="button" className="toolbar-widget h-6 px-2" onClick={() => void onChange({})}>
-        {t("settings.m7.shortcuts.resetAll")}
-      </button>
     </div>
   );
 }
@@ -339,88 +320,113 @@ export function M7GithubSettings({
 
   return (
     <div className="space-y-4">
-      <p className="text-[12px] text-descriptionforeground">{t("settings.m7.github.hint")}</p>
+      <p className="text-[12px] text-[var(--text-secondary)]">{t("settings.m7.github.hint")}</p>
       {error ? (
-        <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1 text-[12px]">
+        <p role="alert" className="rounded-[6px] border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)]">
           {formatAppError(error)}
         </p>
       ) : null}
-      {status && status.accounts.length > 0 ? (
-        <ul className="space-y-1">
-          {status.accounts.map((account) => (
-            <li key={account.login} className="flex items-center gap-2 rounded border border-panel-border px-2 py-1 text-[12px]">
-              <span className="min-w-0 flex-1 truncate">{account.login}</span>
-              {status.repoAccount === account.login ? <span className="text-descriptionforeground">{t("settings.m7.github.bound")}</span> : null}
-              {worktreeId && status.repoAccount !== account.login ? (
+
+      <div className="setting-card-list">
+        {status && status.accounts.length > 0 ? (
+          status.accounts.map((account) => (
+            <div key={account.login} className="setting-row">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[11.5px] font-semibold text-[var(--accent)]">
+                  {account.login.slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{account.login}</div>
+                  {status.repoAccount === account.login ? (
+                    <div className="text-[11px] text-[var(--reviewed)]">{t("settings.m7.github.bound")}</div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {worktreeId && status.repoAccount !== account.login ? (
+                  <button
+                    type="button"
+                    className="revia-btn revia-btn-secondary h-7 px-2.5"
+                    onClick={() =>
+                      void m7
+                        .githubBindRepo(worktreeId, account.login)
+                        .then(() => {
+                          window.dispatchEvent(new Event("revia-github-account-changed"));
+                          onChangeAccount();
+                          return reload();
+                        })
+                        .catch((caught) => setError(toAppError(caught)))
+                    }
+                  >
+                    {t("settings.m7.github.bind")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="toolbar-widget h-6 px-2"
+                  className="revia-btn revia-btn-secondary h-7 px-2.5 text-[var(--danger)]"
                   onClick={() =>
                     void m7
-                      .githubBindRepo(worktreeId, account.login)
-                      .then(() => {
+                      .githubLogout(account.login)
+                      .then(async () => {
                         window.dispatchEvent(new Event("revia-github-account-changed"));
+                        await reload();
                         onChangeAccount();
-                        return reload();
                       })
                       .catch((caught) => setError(toAppError(caught)))
                   }
                 >
-                  {t("settings.m7.github.bind")}
+                  {t("settings.m7.github.logout")}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                className="toolbar-widget h-6 px-2"
-                onClick={() =>
-                  void m7
-                    .githubLogout(account.login)
-                    .then(async () => {
-                      window.dispatchEvent(new Event("revia-github-account-changed"));
-                      await reload();
-                      onChangeAccount();
-                    })
-                    .catch((caught) => setError(toAppError(caught)))
-                }
-              >
-                {t("settings.m7.github.logout")}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-[12px] text-descriptionforeground">{t("settings.m7.github.none")}</p>
-      )}
-      {status?.deviceFlowConfigured ? (
-        <GithubDeviceLogin
-          key={worktreeId ?? "no-worktree"}
-          disabled={busy}
-          onBusyChange={setDeviceBusy}
-          onAuthorized={() => {
-            setError(null);
-            void reload();
-            onChangeAccount();
-          }}
-        />
-      ) : null}
-      <div className="space-y-2">
-        <span className="text-[12.5px] font-semibold">{t("settings.m7.github.token")}</span>
-        <input
-          className="settings-input"
-          type="password"
-          value={token}
-          spellCheck={false}
-          placeholder={t("settings.m7.github.tokenPlaceholder")}
-          onChange={(event) => setToken(event.target.value)}
-        />
-        <button type="button" className="toolbar-widget h-6 px-2" disabled={busy || deviceBusy || token.trim().length === 0} onClick={() => void login()}>
-          {t("settings.m7.github.login")}
-        </button>
-        <p className="text-[11.5px] text-descriptionforeground">{t("settings.m7.github.tokenHint")}</p>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="setting-row">
+            <span className="text-[12px] text-[var(--text-muted)]">{t("settings.m7.github.none")}</span>
+          </div>
+        )}
       </div>
-      {status && !status.deviceFlowConfigured ? (
-        <p className="text-[11.5px] text-descriptionforeground">{t("settings.m7.github.deviceUnconfigured")}</p>
+
+      {status?.deviceFlowConfigured ? (
+        <div className="setting-card">
+          <GithubDeviceLogin
+            key={worktreeId ?? "no-worktree"}
+            disabled={busy}
+            onBusyChange={setDeviceBusy}
+            onAuthorized={() => {
+              setError(null);
+              void reload();
+              onChangeAccount();
+            }}
+          />
+        </div>
       ) : null}
+
+      <div className="setting-card space-y-2.5">
+        <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("settings.m7.github.token")}</div>
+        <div className="flex items-center gap-2">
+          <input
+            className="settings-input min-w-0 flex-1"
+            type="password"
+            value={token}
+            spellCheck={false}
+            placeholder={t("settings.m7.github.tokenPlaceholder")}
+            onChange={(event) => setToken(event.target.value)}
+          />
+          <button
+            type="button"
+            className="revia-btn revia-btn-primary shrink-0"
+            disabled={busy || deviceBusy || token.trim().length === 0}
+            onClick={() => void login()}
+          >
+            {t("settings.m7.github.login")}
+          </button>
+        </div>
+        <p className="text-[11.5px] text-[var(--text-muted)]">{t("settings.m7.github.tokenHint")}</p>
+        {status && !status.deviceFlowConfigured ? (
+          <p className="text-[11.5px] text-[var(--text-muted)]">{t("settings.m7.github.deviceUnconfigured")}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -447,14 +453,15 @@ export function M7UpdateSettings({
   onChangeAllowPrerelease,
   status,
   onStatusChange,
+  onOpenUpdatePanel,
 }: {
   mode: AppUpdateMode;
   onChangeMode: (mode: AppUpdateMode) => Promise<boolean>;
-  /** F22：预发布渠道开关（用户主动开启；默认稳定版）。 */
   allowPrerelease: boolean;
   onChangeAllowPrerelease: (value: boolean) => Promise<boolean>;
   status: AppUpdateStatus | null;
   onStatusChange: (status: AppUpdateStatus) => void;
+  onOpenUpdatePanel?: () => void;
 }) {
   const [error, setError] = useState<AppErrorPayload | null>(null);
   const [busy, setBusy] = useState(false);
@@ -473,65 +480,100 @@ export function M7UpdateSettings({
 
   return (
     <div className="space-y-4">
-      <p className="text-[12px] text-descriptionforeground">{t("settings.m7.update.hint")}</p>
       {error ? (
-        <p role="alert" className="rounded border border-[color-mix(in_srgb,var(--gitdecoration-conflictingresourceforeground)_32%,transparent)] px-2 py-1 text-[12px]">
+        <p role="alert" className="rounded-[6px] border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)]">
           {formatAppError(error)}
         </p>
       ) : null}
-      <Row label={t("settings.m7.update.mode")}>
-        <select className="settings-select" value={mode} onChange={(event) => void onChangeMode(event.target.value as AppUpdateMode)}>
-          {UPDATE_MODES.map((candidate) => (
-            <option key={candidate} value={candidate}>
-              {updateModeLabel(candidate)}
-            </option>
-          ))}
-        </select>
-      </Row>
-      <Row label={t("settings.m7.update.prerelease")}>
-        <label className="flex items-center gap-2 text-[12px]">
-          <input
-            type="checkbox"
-            className="accent-[var(--focusborder)]"
-            checked={allowPrerelease}
-            onChange={(event) => void onChangeAllowPrerelease(event.target.checked)}
-          />
-          {t("settings.m7.update.prereleaseHint")}
-        </label>
-      </Row>
-      <Row label={t("settings.m7.update.version")}>
-        <div className="space-y-1 text-[12px]">
-          <p>{status?.currentVersion ?? "—"}</p>
-          {status && !status.configured ? (
-            <p className="text-descriptionforeground">{status.unconfiguredReason ? updateReasonText(status.unconfiguredReason) : t("settings.m7.update.unconfigured")}</p>
-          ) : null}
-          {status?.portable ? <p className="text-descriptionforeground">{t("update.portableNotice")}</p> : null}
-          {status?.lastCheckedAtMs ? (
-            <p className="text-descriptionforeground">{t("settings.m7.update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}</p>
-          ) : null}
-          <button type="button" className="toolbar-widget h-6 px-2" disabled={busy} onClick={() => void check()}>
-            {busy ? t("settings.m7.update.checking") : t("settings.m7.update.check")}
-          </button>
-        </div>
-      </Row>
-      {status?.available ? (
-        <Row label={t("settings.m7.update.available")}>
-          <div className="space-y-1 text-[12px]">
-            <p className="font-semibold">{status.available.version}</p>
-            {status.available.notes ? <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-[11.5px]">{status.available.notes}</pre> : null}
+
+      <div className="setting-card-list">
+        <div className="setting-row">
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{t("settings.m7.update.version")}</div>
+            <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+              {status?.currentVersion ?? "—"}
+              {status?.lastCheckedAtMs ? ` · ${t("settings.m7.update.lastChecked", { time: new Date(status.lastCheckedAtMs).toLocaleString() })}` : ""}
+            </div>
+            {status && !status.configured ? (
+              <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+                {status.unconfiguredReason ? updateReasonText(status.unconfiguredReason) : t("settings.m7.update.unconfigured")}
+              </div>
+            ) : null}
+            {status?.portable ? (
+              <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("update.portableNotice")}</div>
+            ) : null}
           </div>
-        </Row>
-      ) : null}
-      {status?.receipt ? (
-        <Row label={t("settings.m7.update.receipt")}>
-          <p className="text-[12px]">
-            {t("settings.m7.update.receiptValue", {
-              version: status.receipt.version,
-              time: new Date(status.receipt.installedAtMs).toLocaleString(),
-            })}
-          </p>
-        </Row>
-      ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {onOpenUpdatePanel ? (
+              <button
+                type="button"
+                className={status?.available || status?.restartRequired ? "revia-btn revia-btn-primary shrink-0" : "revia-btn revia-btn-secondary shrink-0"}
+                onClick={onOpenUpdatePanel}
+              >
+                <AppIcon name="cloud-download" size={13} />
+                <span>{t("update.bannerOpen")}</span>
+              </button>
+            ) : null}
+            <button type="button" className="revia-btn revia-btn-secondary shrink-0" disabled={busy} onClick={() => void check()}>
+              <AppIcon name={busy ? "loading" : "refresh"} size={13} spin={busy} />
+              <span>{busy ? t("settings.m7.update.checking") : t("settings.m7.update.check")}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="setting-row">
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{t("settings.m7.update.mode")}</div>
+            <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("settings.m7.update.hint")}</div>
+          </div>
+          <select className="settings-select w-[190px]" value={mode} onChange={(event) => void onChangeMode(event.target.value as AppUpdateMode)}>
+            {UPDATE_MODES.map((candidate) => (
+              <option key={candidate} value={candidate}>
+                {updateModeLabel(candidate)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="setting-row">
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{t("settings.m7.update.prerelease")}</div>
+            <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{t("settings.m7.update.prereleaseHint")}</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allowPrerelease}
+            className="setting-switch"
+            onClick={() => void onChangeAllowPrerelease(!allowPrerelease)}
+          />
+        </div>
+
+        {status?.available ? (
+          <div className="setting-row-stack">
+            <div className="text-[12.5px] font-semibold text-[var(--accent)]">
+              {t("settings.m7.update.available")}: {status.available.version}
+            </div>
+            {status.available.notes ? (
+              <pre className="max-h-32 overflow-auto rounded-[6px] border border-[var(--border-subtle)] bg-[var(--surface-bg)] p-2.5 text-[11.5px] whitespace-pre-wrap text-[var(--text-secondary)]">
+                {status.available.notes}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
+
+        {status?.receipt ? (
+          <div className="setting-row">
+            <div className="text-[12px] text-[var(--text-secondary)]">
+              {t("settings.m7.update.receipt")}:{" "}
+              {t("settings.m7.update.receiptValue", {
+                version: status.receipt.version,
+                time: new Date(status.receipt.installedAtMs).toLocaleString(),
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

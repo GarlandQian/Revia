@@ -1,0 +1,602 @@
+/* ==========================================================================
+   Revia M13 Code Surfaces — Diff, Side-by-Side Curved Bands, Merge, Blame, History
+   代码表面完整遵循所选或导入的 VS Code 颜色主题（ADR-0016）。
+   ========================================================================== */
+
+:root {
+  --diff-bg: var(--editor-background);
+  --diff-row-height: 19px;
+  --diff-gutter: 52px;
+  --diff-mid: 12px;
+  --diff-gutter-fg: var(--editorlinenumber-foreground);
+  --diff-gutter-border: color-mix(in srgb, var(--editor-foreground) 11%, var(--editor-background));
+  --diff-mid-bg: var(--editorgutter-background);
+  --diff-ins-bg: var(--diffeditor-insertedlinebackground);
+  --diff-ins-gutter: var(--diffeditorgutter-insertedlinebackground);
+  --diff-del-bg: var(--diffeditor-removedlinebackground);
+  --diff-del-gutter: var(--diffeditorgutter-removedlinebackground);
+  --diff-mod-bg: color-mix(in srgb, var(--diffeditor-insertedlinebackground) 60%, var(--diffeditor-removedlinebackground));
+  --diff-ins-word: var(--diffeditor-insertedtextbackground);
+  --diff-del-word: var(--diffeditor-removedtextbackground);
+  --sbs-band-ins: var(--diffeditor-insertedtextbackground);
+  --sbs-band-del: var(--diffeditor-removedtextbackground);
+  --sbs-band-ins-edge: color-mix(in srgb, var(--diffeditor-insertedtextbackground) 75%, var(--editor-foreground));
+  --sbs-band-del-edge: color-mix(in srgb, var(--diffeditor-removedtextbackground) 75%, var(--editor-foreground));
+  --diff-mod-gutter: color-mix(in srgb, var(--diffeditorgutter-insertedlinebackground) 60%, var(--diffeditorgutter-removedlinebackground));
+  --diff-hunk-bg: color-mix(in srgb, var(--editorgutter-background) 88%, var(--editor-foreground) 4%);
+  --diff-hunk-fg: var(--editorlinenumber-foreground);
+  --diff-empty-bg: var(--editor-background);
+  --diff-placeholder-bg: color-mix(in srgb, var(--editor-background) 95%, var(--editor-foreground));
+  --diff-placeholder-gutter: color-mix(in srgb, var(--editorgutter-background) 92%, var(--editor-foreground));
+  --diff-placeholder-line: var(--diff-gutter-border);
+  --diff-scrollbar-thumb: color-mix(in srgb, var(--editor-foreground) 22%, transparent);
+  --diff-scrollbar-thumb-hover: color-mix(in srgb, var(--editor-foreground) 38%, transparent);
+}
+
+.diff-scroll {
+  overflow-anchor: none;
+  contain: layout paint style;
+  background: var(--diff-bg);
+  color: var(--editor-foreground);
+}
+
+.diff-canvas {
+  position: relative;
+  background-color: var(--diff-placeholder-bg);
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent calc(var(--diff-row-height) - 1px),
+      var(--diff-placeholder-line) calc(var(--diff-row-height) - 1px)
+    ),
+    var(--diff-canvas-gutters);
+  background-size: 100% var(--diff-row-height);
+  background-repeat: repeat-y;
+}
+
+.diff-scrollbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  z-index: 2;
+  cursor: default;
+}
+
+.diff-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  left: 3px;
+  right: 2px;
+  border-radius: 999px;
+  background: var(--diff-scrollbar-thumb);
+  transition: background-color 120ms ease;
+}
+
+.diff-scrollbar:hover .diff-scrollbar-thumb {
+  background: var(--diff-scrollbar-thumb-hover);
+}
+
+.diff-canvas-unified {
+  --diff-canvas-gutters: linear-gradient(
+    to right,
+    var(--diff-placeholder-gutter) 0 calc(var(--diff-gutter) * 2),
+    transparent calc(var(--diff-gutter) * 2)
+  );
+}
+
+.diff-canvas-split {
+  --diff-canvas-gutters: linear-gradient(
+    to right,
+    var(--diff-placeholder-gutter) 0 var(--diff-gutter),
+    transparent var(--diff-gutter) calc(50% - var(--diff-mid) / 2),
+    var(--diff-mid-bg) calc(50% - var(--diff-mid) / 2) calc(50% + var(--diff-mid) / 2),
+    var(--diff-placeholder-gutter) calc(50% + var(--diff-mid) / 2) calc(50% + var(--diff-mid) / 2 + var(--diff-gutter)),
+    transparent calc(50% + var(--diff-mid) / 2 + var(--diff-gutter))
+  );
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  display: grid;
+  align-items: center;
+  white-space: pre;
+  overflow: hidden;
+  background-color: var(--diff-bg);
+}
+
+.diff-wrap .row {
+  height: auto;
+  min-height: var(--diff-row-height);
+  align-items: stretch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-wrap .row-hunk {
+  height: var(--diff-row-height);
+  align-items: center;
+  white-space: pre;
+}
+
+.row-unified {
+  grid-template-columns: var(--diff-gutter) var(--diff-gutter) minmax(0, 1fr);
+}
+
+.row-split {
+  grid-template-columns: var(--diff-gutter) minmax(0, 1fr) var(--diff-mid) var(--diff-gutter) minmax(0, 1fr);
+}
+
+.row-hunk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  padding-right: 12px;
+  color: var(--diff-hunk-fg);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  background-image: linear-gradient(var(--diff-hunk-bg), var(--diff-hunk-bg));
+}
+
+.hunk-section {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hunk-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  background: var(--surface-bg);
+  color: var(--text-primary);
+  font: 11.5px/18px var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hunk-action:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.hunk-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.hunk-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.gutter {
+  color: var(--diff-gutter-fg);
+  text-align: right;
+  padding-right: 10px;
+  font-size: 0.92em;
+  user-select: none;
+}
+
+.mid {
+  align-self: stretch;
+  background: var(--diff-mid-bg);
+  box-shadow: inset 1px 0 0 var(--diff-gutter-border), inset -1px 0 0 var(--diff-gutter-border);
+}
+
+.cell {
+  padding-left: 8px;
+  overflow: hidden;
+}
+
+.cell-ins { background: var(--diff-ins-bg); }
+.cell-del { background: var(--diff-del-bg); }
+.cell-mod { background: var(--diff-mod-bg); }
+.cell.empty { background: var(--diff-empty-bg); }
+.gutter-ins, .mid-ins { background: var(--diff-ins-gutter); }
+.gutter-del, .mid-del { background: var(--diff-del-gutter); }
+.gutter-mod, .mid-mod { background: var(--diff-mod-gutter); }
+.gutter-ins, .gutter-del, .gutter-mod { color: var(--editor-foreground); }
+.gutter-none { background: var(--diff-empty-bg); }
+
+.marker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* 语法高亮类别（取自 VS Code 代码颜色主题） */
+.tok-plain { color: var(--syntax-plain); }
+.tok-comment { color: var(--syntax-comment); font-style: var(--syn-comment-style, italic); }
+.tok-string { color: var(--syntax-string); }
+.tok-number { color: var(--syntax-number); }
+.tok-constant { color: var(--syntax-constant); }
+.tok-keyword { color: var(--syntax-keyword); }
+.tok-function { color: var(--syntax-function); }
+.tok-type { color: var(--syntax-type); }
+.tok-variable { color: var(--syntax-variable); }
+.tok-parameter { color: var(--syntax-parameter); }
+.tok-tag { color: var(--syntax-tag); }
+.tok-attribute { color: var(--syntax-attribute); }
+.tok-punctuation { color: var(--syntax-punctuation); }
+.tok-operator { color: var(--syntax-operator); }
+.tok-invalid { color: var(--syntax-invalid); }
+
+/* ---------- Side-by-Side Continuous Curved Diff (Q138, Q142, Q244) ---------- */
+
+.sbs-header {
+  height: 24px;
+  border-bottom: 1px solid var(--diff-gutter-border);
+  background: var(--diff-hunk-bg);
+  color: var(--text-secondary);
+}
+
+.sbs-column {
+  background: var(--diff-bg);
+  color: var(--editor-foreground);
+}
+
+.sbs-canvas {
+  position: relative;
+  will-change: transform;
+}
+
+.sbs-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  display: flex;
+  align-items: center;
+  white-space: pre;
+  overflow: hidden;
+  padding-left: 10px;
+  background: var(--diff-bg);
+}
+
+.sbs-row.sbs-ins { background: var(--diff-ins-bg); }
+.sbs-row.sbs-del { background: var(--diff-del-bg); }
+
+.sbs-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.sbs-wrap .sbs-row {
+  height: auto;
+  min-height: var(--diff-row-height);
+  align-items: flex-start;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sbs-wrap .sbs-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sbs-word {
+  background: var(--diff-ins-word);
+  border-radius: 2px;
+}
+
+.sbs-row.sbs-del .sbs-word {
+  background: var(--diff-del-word);
+}
+
+.sbs-row.sbs-del.sbs-hover { background: var(--sbs-band-del); }
+.sbs-row.sbs-ins.sbs-hover { background: var(--sbs-band-ins); }
+
+.sbs-fold {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--diff-hunk-bg);
+}
+
+.sbs-fold-button {
+  border: 0;
+  background: none;
+  color: var(--diff-hunk-fg);
+  font: 11px/16px var(--font-sans);
+  cursor: pointer;
+}
+
+.sbs-fold-button:hover {
+  color: var(--text-primary);
+}
+
+.sbs-gutter {
+  background: var(--editorgutter-background);
+  border-left: 1px solid var(--diff-gutter-border);
+  border-right: 1px solid var(--diff-gutter-border);
+}
+
+.sbs-bands {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sbs-numbers {
+  color: var(--diff-gutter-fg);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  user-select: none;
+}
+
+.sbs-number {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--diff-row-height);
+  line-height: var(--diff-row-height);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  will-change: transform;
+}
+
+.sbs-numbers.text-right .sbs-number {
+  justify-content: flex-end;
+  padding-right: 3px;
+}
+
+.sbs-numbers.text-left .sbs-number {
+  justify-content: flex-start;
+  padding-left: 3px;
+}
+
+.sbs-number-text {
+  font-size: 10.5px;
+}
+
+.sbs-gutter-action {
+  width: 17px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-bg);
+  color: var(--text-primary);
+  font: 600 11px/14px var(--font-sans);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 110ms ease, color 110ms ease, border-color 110ms ease;
+}
+
+.sbs-gutter-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+  box-shadow: none;
+}
+
+.sbs-gutter-action:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.sbs-gutter-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.segment-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-right: 4px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-bg);
+  color: var(--text-primary);
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background-color 110ms ease, color 110ms ease, border-color 110ms ease;
+}
+
+.segment-action:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.segment-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ---------- Three-Way Merge View (Q143) ---------- */
+
+.merge-view {
+  --merge-gutter-width: 60px;
+  --merge-conflict: var(--danger);
+  --merge-line-conflict: color-mix(in srgb, var(--merge-conflict) 16%, var(--diff-bg));
+  --merge-line-change: var(--diff-ins-bg);
+  --merge-line-applied: color-mix(in srgb, var(--diff-ins-bg) 40%, var(--diff-bg));
+  --merge-band-conflict: color-mix(in srgb, var(--merge-conflict) 34%, transparent);
+  --merge-band-change: var(--diffeditor-insertedtextbackground);
+  --merge-band-done: color-mix(in srgb, var(--diffeditor-insertedtextbackground) 35%, transparent);
+  --merge-selection: color-mix(in srgb, var(--accent) 30%, transparent);
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--diff-bg);
+  color: var(--editor-foreground);
+}
+
+.merge-toolbar,
+.merge-footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--surface-bg);
+  color: var(--text-primary);
+}
+
+.merge-toolbar { border-bottom: 1px solid var(--border-subtle); }
+.merge-footer { border-top: 1px solid var(--border-subtle); }
+
+.merge-toolbar-separator {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border-subtle);
+}
+
+.merge-button {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 110ms ease;
+}
+
+.merge-button:hover:not(:disabled) { background: var(--surface-hover); }
+.merge-button:disabled { opacity: 0.45; }
+
+.merge-button-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.merge-button-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.merge-count { color: var(--text-secondary); }
+.merge-count-open { color: var(--merge-conflict); font-weight: 550; }
+
+.merge-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--merge-gutter-width) minmax(0, 1fr) var(--merge-gutter-width) minmax(0, 1fr);
+}
+
+.merge-headers {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--diff-gutter-border);
+  background: var(--diff-hunk-bg);
+}
+
+.merge-header {
+  overflow: hidden;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge-panes { min-height: 0; flex: 1; }
+.merge-pane { min-width: 0; min-height: 0; overflow: hidden; }
+.merge-pane-result {
+  box-shadow: inset 1px 0 0 var(--diff-gutter-border), inset -1px 0 0 var(--diff-gutter-border);
+}
+
+.merge-line-conflict { background: var(--merge-line-conflict); }
+.merge-line-change { background: var(--merge-line-change); }
+.merge-line-applied { background: var(--merge-line-applied); }
+.merge-line-ignored { opacity: 0.55; }
+.merge-line-edited { box-shadow: inset 2px 0 0 var(--accent); }
+.merge-line-gap { background: none; }
+.merge-line-gap.merge-line-conflict { box-shadow: inset 0 2px 0 var(--merge-conflict); }
+.merge-line-gap.merge-line-change,
+.merge-line-gap.merge-line-applied { box-shadow: inset 0 2px 0 var(--merge-band-change); }
+
+.merge-gutter {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--editorgutter-background);
+}
+
+.merge-gutter-canvas { position: absolute; inset: 0; pointer-events: none; }
+.merge-gutter-actions {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  height: var(--diff-row-height);
+  align-items: center;
+}
+.merge-gutter-ours .merge-gutter-actions { left: 3px; }
+.merge-gutter-theirs .merge-gutter-actions { right: 3px; }
+
+.merge-gutter-button {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-primary);
+  background: var(--surface-bg);
+}
+
+.merge-gutter-ignore { font-size: 10px; color: var(--text-secondary); }
+.merge-gutter-conflict { color: var(--merge-conflict); }
+.merge-gutter-button:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.merge-gutter-button:disabled { opacity: 0.4; }
+
+.merge-message {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 32px;
+  font-size: 12.5px;
+}
+
+.history-row { contain: layout paint style; }
+.history-rows .row { position: static; }
+.history-merge-row { height: 19px; }
+.history-merge-line {
+  width: 46px;
+  padding-right: 8px;
+  text-align: right;
+  color: var(--diff-gutter-fg);
+  font-size: 0.92em;
+  user-select: none;
+  vertical-align: top;
+}
+.history-merge-cell { padding-left: 8px; white-space: pre; }

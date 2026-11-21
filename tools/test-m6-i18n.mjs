@@ -370,7 +370,7 @@ test("静止统一diff的memo行即时切语言且保留缓存、回调和滚动
     : name === "./rowHeights" ? { RowHeights }
     : name === "./useFontRevision" ? { useFontRevision: () => 0 }
     : name === "./hunkAction" ? { matchesHunkAction: () => true, segmentActionDisabled: () => false }
-    : name.includes("codicon") ? { Codicon: () => null } : {};
+    : name.includes("app-icon") ? { AppIcon: () => null } : {};
   const module = { exports: {} };
   const code = ts.transpileModule(readFileSync(new URL("../src/features/diff/DiffView.tsx", import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
