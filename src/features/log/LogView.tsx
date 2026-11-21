@@ -51,7 +51,7 @@ import type { LogWorkspaceState } from "./useLogWorkspace";
 import { buildFileTree, effectiveMergeMode, firstHistoryFile, type FileTreeNode } from "./logFiles";
 import { CommitDiffView, type CommitDiffViewProps } from "./CommitDiffView";
 import { CommitMergeView } from "./CommitMergeView";
-import { isAltGraph } from "@/lib/platform";
+import { isAltGraph, isPrimaryModifier } from "@/lib/platform";
 
 /** 固定行高（虚拟滚动与分支图共用）。 */
 export const LOG_ROW_HEIGHT = 26;
@@ -540,17 +540,18 @@ export function LogView(props: LogViewProps) {
     if (!active) return;
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
-      // AltGr 的 Ctrl+Alt 与输入法组合不触发日志快捷键（M8 任务 04）。
+      // AltGr 的 Ctrl+Alt 与输入法组合不触发日志快捷键（M8 任务 04）；弹窗打开时不穿透。
       if (isAltGraph(event) || event.isComposing) return;
+      if (document.querySelector("[role='dialog'], dialog[open]")) return;
       const target = event.target as HTMLElement | null;
       const inInput = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA";
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+      if (isPrimaryModifier(event) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
         filterInputRef.current?.focus();
         filterInputRef.current?.select();
         return;
       }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d") {
+      if (!inInput && isPrimaryModifier(event) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "d") {
         event.preventDefault();
         const file = selectedPreview?.target ?? null;
         if (file) openFileTarget(file);
@@ -685,7 +686,7 @@ export function LogView(props: LogViewProps) {
 
   const filterCount = activeFilterCount(filter);
   return (
-    <div className="log-view relative flex h-full min-h-0 flex-col bg-[var(--editor-background)]">
+    <div className="log-view relative flex h-full min-h-0 flex-col bg-[var(--surface-bg)]">
       <div ref={refMeasure} className="log-ref-measure" aria-hidden="true">
         {refGroups.map((group) => <span key={group.oid} className="log-ref-group"><LogRefChips chips={group.chips} /></span>)}
       </div>
@@ -849,7 +850,7 @@ export function LogView(props: LogViewProps) {
             onScroll={onScroll}
           >
             <div style={{ minWidth: tableMinWidth }}>
-              <div className="log-table-head sticky top-0 z-[1] grid h-[24px] items-center border-b border-[var(--border-subtle)] bg-[var(--editor-background)] text-[11px] text-[var(--text-secondary)]" style={{ gridTemplateColumns: tableGridColumns }}>
+              <div className="log-table-head sticky top-0 z-[1] grid h-[24px] items-center border-b border-[var(--border-subtle)] bg-[var(--surface-bg)] text-[11px] text-[var(--text-secondary)]" style={{ gridTemplateColumns: tableGridColumns }}>
                 {/* 分支图列只有几条轨道宽，表头文字放不下；同 Rebased 不显示列名，只保留可读标签。 */}
                 <span className="log-graph-col shrink-0" style={{ width: graphColumnWidth }} title={messages.log.graph} aria-label={messages.log.graph} />
                 <span className="px-2">{messages.log.refsLabel}</span>
@@ -1429,11 +1430,8 @@ function BranchFilterMenu({
   ];
   return (
     <div className="max-h-[320px] overflow-auto">
-      <MenuItem onClick={() => onChange([])}>
-        <span className="flex items-center gap-2">
-          {selected.length === 0 ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
-          {messages.log.branchAll}
-        </span>
+      <MenuItem selected={selected.length === 0} onClick={() => onChange([])}>
+        {messages.log.branchAll}
       </MenuItem>
       <MenuSeparator />
       {groups.map((group) => {
@@ -1488,20 +1486,15 @@ function AuthorFilterMenu({
     : null;
   return (
     <div className="max-h-[320px] overflow-auto">
-      <MenuItem onClick={() => onChange([])}>
-        <span className="flex items-center gap-2">
-          {selected.length === 0 ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
-          {messages.log.authorAll}
-        </span>
+      <MenuItem selected={selected.length === 0} onClick={() => onChange([])}>
+        {messages.log.authorAll}
       </MenuItem>
       {meKey ? (
         <MenuItem
+          selected={selected.includes(meKey)}
           onClick={() => onChange(selected.includes(meKey) ? selected.filter((item) => item !== meKey) : [...selected, meKey])}
         >
-          <span className="flex items-center gap-2">
-            {selected.includes(meKey) ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
-            {messages.log.me}（{meKey}）
-          </span>
+          {messages.log.me}（{meKey}）
         </MenuItem>
       ) : null}
       <MenuSeparator />
@@ -1534,11 +1527,8 @@ function DateFilterMenu({
   return (
     <div>
       {presets.map((preset) => (
-        <MenuItem key={preset} onClick={() => onChange({ date: preset })}>
-          <span className="flex items-center gap-2">
-            {filter.date === preset ? <AppIcon name="check" size={12} /> : <span className="w-3" />}
-            {dateLabel(preset)}
-          </span>
+        <MenuItem key={preset} selected={filter.date === preset} onClick={() => onChange({ date: preset })}>
+          {dateLabel(preset)}
         </MenuItem>
       ))}
       {filter.date === "range" ? (

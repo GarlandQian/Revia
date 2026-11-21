@@ -64,6 +64,7 @@ export function BranchWidget(props: BranchWidgetProps) {
         onClose={() => {
           setOpen(false);
           setSubmenu(null);
+          setQuery("");
         }}
         width={420}
         trigger={

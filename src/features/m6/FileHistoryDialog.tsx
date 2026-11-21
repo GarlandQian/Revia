@@ -199,24 +199,30 @@ export function FileHistoryDialog({
   return (
     <Modal title={messages.fileHistory.title(path)} onClose={onClose} width={960}>
       <div className="flex min-h-[52vh] flex-col">
-        <div className="mb-2 flex items-center gap-1 border-b border-[var(--border-subtle)]">
-          <button
-            type="button"
-            className={`tab-button h-7 px-2.5 ${tab === "history" ? "tab-button-active" : ""}`}
-            onClick={() => setTab("history")}
-          >
-            {messages.fileHistory.history}
-          </button>
-          <button
-            type="button"
-            className={`tab-button h-7 px-2.5 ${tab === "blame" ? "tab-button-active" : ""}`}
-            onClick={() => {
-              setTab("blame");
-              if (!activeBlameTarget) runBlame(revision, path);
-            }}
-          >
-            {messages.fileHistory.blame}
-          </button>
+        <div className="mb-2 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+          <div className="side-seg" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "history"}
+              className="side-tab"
+              onClick={() => setTab("history")}
+            >
+              {messages.fileHistory.history}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "blame"}
+              className="side-tab"
+              onClick={() => {
+                setTab("blame");
+                if (!activeBlameTarget) runBlame(revision, path);
+              }}
+            >
+              {messages.fileHistory.blame}
+            </button>
+          </div>
           <button
             type="button"
             className="ml-auto icon-action size-[22px]"
@@ -285,7 +291,7 @@ export function FileHistoryDialog({
                   <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-1 text-[11.5px]">
                     <span className="truncate font-semibold">{selectedEntry.subject}</span>
                     {preview?.result?.patchTruncated ? (
-                      <span className="text-warningforeground">{messages.fileHistory.patchTruncated}</span>
+                      <span className="text-[var(--warn)]">{messages.fileHistory.patchTruncated}</span>
                     ) : null}
                     <span className="ml-auto flex gap-1">
                       <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" onClick={() => void runBlame(selectedEntry.oid, selectedEntry.path)}>
@@ -354,7 +360,7 @@ export function FileHistoryDialog({
                 <p className="p-2 text-[12px] text-[var(--text-secondary)]">{messages.fileHistory.noBlame}</p>
               ) : (
                 <table className="w-full border-collapse font-mono text-[11px]">
-                  <thead className="sticky top-0 bg-panel-background">
+                  <thead className="sticky top-0 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)]">
                     <tr className="text-left text-[var(--text-secondary)]">
                       <th className="w-12 px-1 py-0.5 font-normal">{messages.fileHistory.line}</th>
                       <th className="w-20 px-1 py-0.5 font-normal">{messages.fileHistory.commit}</th>

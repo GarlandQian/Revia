@@ -59,14 +59,14 @@ export function OperationBanner({
   return (
     <>
       {readErrors.map((error, index) => (
-        <div key={index} role="alert" className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-errorforeground">
+        <div key={index} role="alert" className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-[var(--danger)]">
           {formatAppError(error)}
         </div>
       ))}
       {state ? (
         <div
           role="status"
-          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_12%,var(--editor-background))] px-3 py-1.5 text-[12.5px]"
+          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_12%,var(--surface-bg))] px-3 py-1.5 text-[12.5px]"
         >
           <AppIcon name="warning" size={15} className="text-[var(--warn)]" />
           <span className="font-semibold">{state.continuationOnly ? messages.operation.sequencePending : messages.operation.inProgress(kind)}</span>
@@ -111,7 +111,7 @@ export function OperationBanner({
           <AppIcon name="history" size={14} />
           <span className="font-semibold">{autostash.restoration === "pending" ? messages.operation.autostashPending : messages.operation.autostashNeedsCheck}</span>
           <span className="text-[var(--text-secondary)]">{messages.operation.autostashSaved(autostashKind)}</span>
-          {autostashError ? <span role="alert" className="text-errorforeground">{formatAppError(autostashError)}</span> : null}
+          {autostashError ? <span role="alert" className="text-[var(--danger)]">{formatAppError(autostashError)}</span> : null}
           <button
             type="button"
             className="revia-btn revia-btn-secondary ml-auto h-6 px-2 text-[12px]"

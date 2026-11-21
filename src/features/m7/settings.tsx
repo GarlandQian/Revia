@@ -17,7 +17,6 @@ import { updateReasonText } from "@/lib/i18n/text";
 import { m7 } from "@/lib/m7/api";
 import { GithubDeviceLogin } from "./GithubDeviceLogin";
 import {
-  acceleratorOf,
   captureAccelerator,
   conflictFor,
   formatAccelerator,
@@ -136,9 +135,11 @@ export function M7ThemeSettings({
 export function M7ShortcutSettings({
   shortcuts,
   onChange,
+  onCapturingChange,
 }: {
   shortcuts: Record<string, string>;
   onChange: (next: Record<string, string>) => Promise<boolean>;
+  onCapturingChange?: (capturing: boolean) => void;
 }) {
   const [capturing, setCapturing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +147,14 @@ export function M7ShortcutSettings({
   captureRef.current = capturing;
 
   const [pendingReplace, setPendingReplace] = useState<{ action: string; accelerator: string; conflict: string } | null>(null);
+
+  const onCapturingChangeRef = useRef(onCapturingChange);
+  onCapturingChangeRef.current = onCapturingChange;
+
+  useEffect(() => {
+    onCapturingChangeRef.current?.(capturing !== null);
+    return () => onCapturingChangeRef.current?.(false);
+  }, [capturing]);
 
   useEffect(() => {
     if (capturing === null) return;
@@ -269,7 +278,7 @@ export function M7ShortcutSettings({
 
       <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
         {t("settings.m7.shortcuts.current", {
-          list: shortcutDefs.map((def) => `${shortcutLabel(def.id)}=${formatAccelerator(acceleratorOf(def.id))}`).join("，"),
+          list: shortcutDefs.map((def) => `${shortcutLabel(def.id)}=${formatAccelerator(shortcuts[def.id] ?? def.defaultAccelerator)}`).join("，"),
         })}
       </p>
     </div>
@@ -308,6 +317,7 @@ export function M7GithubSettings({
     try {
       await m7.githubLoginToken(token.trim());
       setToken("");
+      window.dispatchEvent(new Event("revia-github-account-changed"));
       await reload();
       onChangeAccount();
       setError(null);
@@ -544,6 +554,7 @@ export function M7UpdateSettings({
             type="button"
             role="switch"
             aria-checked={allowPrerelease}
+            aria-label={t("settings.m7.update.prerelease")}
             className="setting-switch"
             onClick={() => void onChangeAllowPrerelease(!allowPrerelease)}
           />

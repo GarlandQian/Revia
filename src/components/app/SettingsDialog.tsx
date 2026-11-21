@@ -262,11 +262,13 @@ export function SettingsDialog({
   aiSettings: AiSettings;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const capturingShortcutRef = useRef(false);
   const [page, setPage] = useState<Page>("appearance");
   const [query, setQuery] = useState("");
   const [font, setFont] = useState(values.codeFontFamily);
   const [size, setSize] = useState(String(values.fontSize));
   const [zoom, setZoom] = useState(String(values.uiZoom));
+  const [contextLines, setContextLines] = useState(String(values.diffContextLines));
   const [gitPath, setGitPath] = useState(values.gitPath);
   const [mergeTool, setMergeTool] = useState(values.mergeTool);
   const [diffTool, setDiffTool] = useState(values.diffTool);
@@ -299,33 +301,26 @@ export function SettingsDialog({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
-    setFont(values.codeFontFamily);
-    setSize(String(values.fontSize));
-    setZoom(String(values.uiZoom));
-    setGitPath(values.gitPath);
-    setMergeTool(values.mergeTool);
-    setDiffTool(values.diffTool);
-    setSubjectLimit(String(values.commitSubjectLimit));
-    setBodyLimit(String(values.commitBodyLineLimit));
-    setLargeFileMb(String(Math.round(values.commitWarnLargeFileBytes / (1024 * 1024))));
-    setProtectedBranches(values.protectedBranches);
+    if (!open) {
+      capturingShortcutRef.current = false;
+      return;
+    }
     setError(null);
     setNotice(false);
     setQuery("");
-  }, [
-    open,
-    values.codeFontFamily,
-    values.fontSize,
-    values.uiZoom,
-    values.gitPath,
-    values.mergeTool,
-    values.diffTool,
-    values.commitSubjectLimit,
-    values.commitBodyLineLimit,
-    values.commitWarnLargeFileBytes,
-    values.protectedBranches,
-  ]);
+  }, [open]);
+
+  useEffect(() => { if (open) setFont(values.codeFontFamily); }, [open, values.codeFontFamily]);
+  useEffect(() => { if (open) setSize(String(values.fontSize)); }, [open, values.fontSize]);
+  useEffect(() => { if (open) setZoom(String(values.uiZoom)); }, [open, values.uiZoom]);
+  useEffect(() => { if (open) setContextLines(String(values.diffContextLines)); }, [open, values.diffContextLines]);
+  useEffect(() => { if (open) setGitPath(values.gitPath); }, [open, values.gitPath]);
+  useEffect(() => { if (open) setMergeTool(values.mergeTool); }, [open, values.mergeTool]);
+  useEffect(() => { if (open) setDiffTool(values.diffTool); }, [open, values.diffTool]);
+  useEffect(() => { if (open) setSubjectLimit(String(values.commitSubjectLimit)); }, [open, values.commitSubjectLimit]);
+  useEffect(() => { if (open) setBodyLimit(String(values.commitBodyLineLimit)); }, [open, values.commitBodyLineLimit]);
+  useEffect(() => { if (open) setLargeFileMb(String(Math.round(values.commitWarnLargeFileBytes / (1024 * 1024)))); }, [open, values.commitWarnLargeFileBytes]);
+  useEffect(() => { if (open) setProtectedBranches(values.protectedBranches); }, [open, values.protectedBranches]);
 
   useModalDialog(ref, open);
 
@@ -407,7 +402,7 @@ export function SettingsDialog({
       }}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        if (!capturingShortcutRef.current) onClose();
       }}
     >
       <div className="flex h-full">
@@ -650,6 +645,7 @@ export function SettingsDialog({
               <M7ShortcutSettings
                 shortcuts={values.shortcuts ?? {}}
                 onChange={(next) => commit({ shortcuts: next })}
+                onCapturingChange={(active) => { capturingShortcutRef.current = active; }}
               />
             ) : null}
 
@@ -804,11 +800,10 @@ export function SettingsDialog({
                       type="number"
                       min={0}
                       max={64}
-                      value={values.diffContextLines}
-                      onChange={(event) => {
-                        const parsed = Number.parseInt(event.target.value, 10);
-                        if (Number.isFinite(parsed)) void commit({ diffContextLines: Math.min(64, Math.max(0, parsed)) });
-                      }}
+                      value={contextLines}
+                      onChange={(event) => setContextLines(event.target.value)}
+                      onBlur={() => void commitNumber(contextLines, values.diffContextLines, (value) => ({ diffContextLines: value }), setContextLines, 0, 64)}
+                      onKeyDown={(event) => { if (event.key === "Enter") void commitNumber(contextLines, values.diffContextLines, (value) => ({ diffContextLines: value }), setContextLines, 0, 64); }}
                     />
                   </SettingRow>
                   <SettingRow label={messages.diff.highlightLabel}>
@@ -976,14 +971,15 @@ export function SettingsDialog({
                       value={protectedBranches}
                       spellCheck={false}
                       onChange={(event) => setProtectedBranches(event.target.value)}
-                      onBlur={() =>
-                        void commit({
-                          protectedBranches: protectedBranches
-                            .split(/\r?\n/)
-                            .map((line) => line.trim())
-                            .filter((line) => line.length > 0),
-                        })
-                      }
+                      onBlur={() => {
+                        const normalized = protectedBranches
+                          .split(/\r?\n/)
+                          .map((line) => line.trim())
+                          .filter((line) => line.length > 0);
+                        if (normalized.join("\n") !== values.protectedBranches) {
+                          void commit({ protectedBranches: normalized });
+                        }
+                      }}
                     />
                   </div>
                 </div>

@@ -164,6 +164,7 @@ export function PushDialog({
   useEffect(() => {
     setRemote(preview.remote);
     setBranch(preview.targetBranch);
+    setForceConfirmed(false);
   }, [preview.remote, preview.targetBranch]);
 
   const submit = (force: PushForce) => {
@@ -179,7 +180,14 @@ export function PushDialog({
           <span className="font-medium">{preview.branch}</span>
           <AppIcon name="arrow-right" size={13} />
           {preview.remotes.length > 1 ? (
-            <select className="settings-select" value={remote} onChange={(event) => setRemote(event.target.value)}>
+            <select
+              className="settings-select"
+              value={remote}
+              onChange={(event) => {
+                setRemote(event.target.value);
+                setForceConfirmed(false);
+              }}
+            >
               {preview.remotes.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
@@ -192,7 +200,10 @@ export function PushDialog({
             className="settings-input w-[180px]"
             value={branch}
             spellCheck={false}
-            onChange={(event) => setBranch(event.target.value)}
+            onChange={(event) => {
+              setBranch(event.target.value);
+              setForceConfirmed(false);
+            }}
           />
           {preview.hasUpstream ? null : (
             <span className="text-[11px] text-[var(--text-secondary)]">{messages.branches.pushSetsUpstream}</span>
@@ -225,6 +236,24 @@ export function PushDialog({
         </label>
         {forceProblem ? (
           <p className="text-[11.5px] text-[var(--warn)]">{forceProblem}</p>
+        ) : null}
+        {forceConfirmed && !forceProblem ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[6px] border border-[var(--warn)]/40 bg-[var(--surface-subtle)] px-3 py-2 text-[12px] text-[var(--warn)]">
+            <span className="min-w-0 flex-1">{messages.branches.forceConfirmHint(remote, branch)}</span>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button type="button" className="dialog-button" disabled={busy} onClick={() => setForceConfirmed(false)}>
+                {messages.branches.cancel}
+              </button>
+              <button
+                type="button"
+                className="dialog-button primary"
+                disabled={busy || !branch.trim()}
+                onClick={() => submit("withLease")}
+              >
+                {messages.branches.forceConfirm}
+              </button>
+            </div>
+          </div>
         ) : null}
         {error ? <p className="text-[11.5px] text-destructive">{error}</p> : null}
         <div className="flex items-center justify-end gap-2 pt-1">
@@ -264,22 +293,6 @@ export function PushDialog({
                   <AppIcon name="warning" size={12} />
                   {messages.branches.forceWithLease}
                 </button>
-                {forceConfirmed && !forceProblem ? (
-                  <div className="px-2 py-1 text-[11px] text-[var(--warn)]">
-                    {messages.branches.forceConfirmHint(remote, branch)}
-                    <button
-                      type="button"
-                      className="dialog-button ml-1"
-                      disabled={busy}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        submit("withLease");
-                      }}
-                    >
-                      {messages.branches.forceConfirm}
-                    </button>
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </div>

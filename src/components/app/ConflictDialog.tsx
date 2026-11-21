@@ -92,7 +92,7 @@ export function ConflictDialog({
     <Modal title={messages.merge.conflictDialogTitle} onClose={onClose} width={720}>
       <p className="text-[12.5px] text-[var(--text-secondary)]">{messages.merge.conflictDialogHint}</p>
       {error ? (
-        <p role="alert" className="mt-2 rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--editor-background))] px-2 py-1 text-[12px]">
+        <p role="alert" className="mt-2 rounded border border-[color-mix(in_srgb,var(--danger)_32%,transparent)] bg-[var(--danger-soft)] px-2 py-1 text-[12px]">
           {formatAppError(error)}
         </p>
       ) : null}

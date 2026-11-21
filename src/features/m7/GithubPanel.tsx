@@ -481,7 +481,7 @@ export function GithubPanel({
   }, [detail, protection]);
 
   return (
-    <div className="github-panel flex h-full min-h-0 flex-col bg-[var(--surface-bg)]">
+    <div className="github-panel relative flex h-full min-h-0 flex-col bg-[var(--surface-bg)]">
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3.5 text-[12.5px]">
         <AppIcon name="git-pull-request" size={15} className="text-[var(--git-a)]" />
         <span className="shrink-0 font-semibold whitespace-nowrap">{t("github.title")}</span>
@@ -509,7 +509,7 @@ export function GithubPanel({
       </div>
 
       {error ? (
-        <div role="alert" className="flex items-start gap-2 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--editor-background))] px-3 py-2 text-[12px]">
+        <div role="alert" className="flex items-start gap-2 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--surface-bg))] px-3 py-2 text-[12px]">
           <span className="min-w-0 flex-1 whitespace-pre-wrap">{formatAppError(error)}</span>
           <button type="button" className="icon-action size-5" aria-label={t("common.dismiss")} onClick={() => setError(null)}>
             <AppIcon name="close" size={12} />
@@ -535,35 +535,37 @@ export function GithubPanel({
       ) : null}
 
       {status && status.accounts.length === 0 ? (
-        <div className="mx-auto mt-10 w-[520px] space-y-3 text-[12.5px]">
-          <h2 className="text-[14px] font-semibold">{t("github.loginTitle")}</h2>
-          <p className="text-[var(--text-secondary)]">{t("github.loginHint")}</p>
-          {status.deviceFlowConfigured ? (
-            <GithubDeviceLogin
-              key={worktreeId}
-              disabled={tokenBusy}
-              onBusyChange={setDeviceBusy}
-              onAuthorized={(account) => {
-                setNotice(t("github.loggedIn", { login: account.login }));
-                void loadStatus();
-              }}
-            />
-          ) : (
-            <p className="text-[var(--text-secondary)]">{t("github.deviceUnconfigured")}</p>
-          )}
-          <div className="space-y-2 rounded border border-[var(--border-subtle)] p-3">
-            <p className="font-semibold">{t("github.tokenTitle")}</p>
-            <input
-              className="settings-input w-full"
-              type="password"
-              value={token}
-              spellCheck={false}
-              placeholder={t("github.tokenPlaceholder")}
-              onChange={(event) => setToken(event.target.value)}
-            />
-            <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" disabled={tokenBusy || deviceBusy || token.trim().length === 0} onClick={() => void loginWithToken()}>
-              {t("github.tokenLogin")}
-            </button>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto mt-6 max-w-[520px] space-y-3 text-[12.5px]">
+            <h2 className="text-[14px] font-semibold">{t("github.loginTitle")}</h2>
+            <p className="text-[var(--text-secondary)]">{t("github.loginHint")}</p>
+            {status.deviceFlowConfigured ? (
+              <GithubDeviceLogin
+                key={worktreeId}
+                disabled={tokenBusy}
+                onBusyChange={setDeviceBusy}
+                onAuthorized={(account) => {
+                  setNotice(t("github.loggedIn", { login: account.login }));
+                  void loadStatus();
+                }}
+              />
+            ) : (
+              <p className="text-[var(--text-secondary)]">{t("github.deviceUnconfigured")}</p>
+            )}
+            <div className="space-y-2 rounded border border-[var(--border-subtle)] p-3">
+              <p className="font-semibold">{t("github.tokenTitle")}</p>
+              <input
+                className="settings-input w-full"
+                type="password"
+                value={token}
+                spellCheck={false}
+                placeholder={t("github.tokenPlaceholder")}
+                onChange={(event) => setToken(event.target.value)}
+              />
+              <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" disabled={tokenBusy || deviceBusy || token.trim().length === 0} onClick={() => void loginWithToken()}>
+                {t("github.tokenLogin")}
+              </button>
+            </div>
           </div>
         </div>
       ) : tab === "pulls" ? (
@@ -690,7 +692,7 @@ export function GithubPanel({
                   </button>
                 </div>
                 {fullDiff !== null ? (
-                  <pre className="max-h-96 overflow-auto rounded border border-[var(--border-subtle)] bg-[var(--editor-background)] p-2 font-mono text-[11.5px]">{fullDiff}</pre>
+                  <pre className="max-h-96 overflow-auto rounded border border-[var(--border-subtle)] bg-[var(--editor-background)] p-2 font-mono text-[11.5px] text-[var(--editor-foreground)]">{fullDiff}</pre>
                 ) : null}
 
                 <section className="space-y-1">
@@ -709,7 +711,7 @@ export function GithubPanel({
                       {expanded === file.filename ? (
                         <div className="border-t border-[var(--border-subtle)]">
                           {file.patch ? (
-                            <pre className="max-h-72 overflow-auto bg-[var(--editor-background)] p-2 font-mono text-[11.5px]">
+                            <pre className="max-h-72 overflow-auto bg-[var(--editor-background)] p-2 font-mono text-[11.5px] text-[var(--editor-foreground)]">
                               {patchLines(file.patch).map((line, index) => (
                                 <div
                                   key={index}
@@ -845,47 +847,49 @@ export function GithubPanel({
           </div>
         </div>
       ) : tab === "create" ? (
-        <div className="mx-auto w-[560px] space-y-3 p-4 text-[12.5px]">
-          <h2 className="text-[14px] font-semibold">{t("github.createTitle")}</h2>
-          <label className="block">
-            <span className="mb-1 block font-semibold">{t("github.createBase")}</span>
-            <input className="settings-input" value={createBase} onChange={(event) => setCreateBase(event.target.value)} />
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-semibold">{t("github.createTitleField")}</span>
-            <input className="settings-input" value={createTitle} onChange={(event) => setCreateTitle(event.target.value)} />
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-semibold">{t("github.createBody")}</span>
-            <textarea className="settings-input h-32 w-full resize-y py-1" value={createBody} onChange={(event) => setCreateBody(event.target.value)} />
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" className="accent-[var(--accent)]" checked={createDraft} onChange={(event) => setCreateDraft(event.target.checked)} />
-            {t("github.createDraft")}
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-semibold">{t("github.createSource")}</span>
-            <select
-              className="settings-select w-full"
-              value={createSourceRemote ?? remote ?? ""}
-              onChange={(event) => setCreateSourceRemote(event.target.value || null)}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-[560px] space-y-3 text-[12.5px]">
+            <h2 className="text-[14px] font-semibold">{t("github.createTitle")}</h2>
+            <label className="block">
+              <span className="mb-1 block font-semibold">{t("github.createBase")}</span>
+              <input className="settings-input" value={createBase} onChange={(event) => setCreateBase(event.target.value)} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-semibold">{t("github.createTitleField")}</span>
+              <input className="settings-input" value={createTitle} onChange={(event) => setCreateTitle(event.target.value)} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-semibold">{t("github.createBody")}</span>
+              <textarea className="settings-input h-32 w-full resize-y py-1" value={createBody} onChange={(event) => setCreateBody(event.target.value)} />
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="accent-[var(--accent)]" checked={createDraft} onChange={(event) => setCreateDraft(event.target.checked)} />
+              {t("github.createDraft")}
+            </label>
+            <label className="block">
+              <span className="mb-1 block font-semibold">{t("github.createSource")}</span>
+              <select
+                className="settings-select w-full"
+                value={createSourceRemote ?? remote ?? ""}
+                onChange={(event) => setCreateSourceRemote(event.target.value || null)}
+              >
+                {remotes.map((entry) => (
+                  <option key={entry.name} value={entry.name}>
+                    {entry.owner ? `${entry.name} (${entry.owner})` : entry.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-[var(--text-secondary)]">{t("github.createHead", { head: currentBranch ?? "?" })}</p>
+            <button
+              type="button"
+              className="revia-btn revia-btn-secondary h-7 px-3 font-semibold"
+              disabled={busy !== null || createTitle.trim().length === 0 || !currentBranch}
+              onClick={() => void createPr()}
             >
-              {remotes.map((entry) => (
-                <option key={entry.name} value={entry.name}>
-                  {entry.owner ? `${entry.name} (${entry.owner})` : entry.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="text-[var(--text-secondary)]">{t("github.createHead", { head: currentBranch ?? "?" })}</p>
-          <button
-            type="button"
-            className="revia-btn revia-btn-secondary h-7 px-3 font-semibold"
-            disabled={busy !== null || createTitle.trim().length === 0 || !currentBranch}
-            onClick={() => void createPr()}
-          >
-            {t("github.createSubmit")}
-          </button>
+              {t("github.createSubmit")}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
@@ -909,8 +913,8 @@ export function GithubPanel({
       )}
       {divergedBranch ? (
         // H4：覆盖本地分支的独有提交前必须由用户确认。
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30">
-          <div role="dialog" aria-modal="true" className="w-[420px] rounded-md border border-[var(--border-subtle)] bg-[var(--editor-background)] p-4 text-[12.5px]">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[var(--overlay)]">
+          <div role="dialog" aria-modal="true" className="w-[420px] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-bg)] p-4 text-[12.5px] shadow-[var(--shadow-modal)]">
             <p className="mb-3">{t("github.divergedConfirm", { branch: `pr/${selected?.number ?? ""}` })}</p>
             <div className="flex justify-end gap-2">
               <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => setDivergedBranch(false)}>

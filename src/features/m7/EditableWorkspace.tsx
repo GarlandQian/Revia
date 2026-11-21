@@ -29,7 +29,7 @@ export function EditConflict({ session }: { session: EditSession }) {
     <p>{t("edit.conflict")}</p>
     <details open>
       <summary className="cursor-pointer font-semibold">{t("edit.baseline")}</summary>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap bg-[var(--editor-background)] p-2 font-mono">{state.diskText}</pre>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap bg-[var(--editor-background)] p-2 font-mono text-[var(--editor-foreground)]">{state.diskText}</pre>
     </details>
     <div className="flex gap-2">
       <button type="button" className="revia-btn revia-btn-secondary h-6 px-2" disabled={state.saving || session.blocked} onClick={() => void session.discard()}>{t("edit.conflictReload")}</button>
@@ -51,7 +51,7 @@ export function EditDecisionDialog({ session, onDone }: { session: EditSession; 
     <EditConflict session={session} />
     <details className="my-2" open={state.conflict}>
       <summary className="cursor-pointer">{t("edit.editor")}</summary>
-      <pre className="max-h-52 overflow-auto whitespace-pre-wrap bg-[var(--editor-background)] p-2 font-mono text-[12px]">{state.text}</pre>
+      <pre className="max-h-52 overflow-auto whitespace-pre-wrap bg-[var(--editor-background)] p-2 font-mono text-[12px] text-[var(--editor-foreground)]">{state.text}</pre>
     </details>
     <div className="mt-3 flex justify-end gap-2">
       <button type="button" className="revia-btn revia-btn-secondary h-7 px-3" onClick={() => onDone(false)}>{t("edit.closeCancel")}</button>
@@ -85,11 +85,11 @@ export function EditableWorkspace({ session, fontSize, fontFamily, blocked, onCl
   }, [session, state.text, state.saving, state.loading, state.storedDraft]);
   const editable = state.file?.text != null && state.file.readonlyReason === null && state.identityValid;
   const lineCount = Math.min(20_000, state.text.split("\n").length);
-  const editor = <div className="editable-editor relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--editor-background)]">
-    <div ref={gutter} aria-hidden className="absolute inset-y-0 left-0 w-12 select-none overflow-hidden pr-2 text-right text-[var(--text-secondary)]" style={{ fontFamily: codeFontStack(fontFamily), fontSize, lineHeight: 1.45 }}>
+  const editor = <div className="editable-editor relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--editor-background)] text-[var(--editor-foreground)]">
+    <div ref={gutter} aria-hidden className="absolute inset-y-0 left-0 w-12 select-none overflow-hidden pr-2 text-right text-[var(--editorlinenumber-foreground,var(--text-muted))]" style={{ fontFamily: codeFontStack(fontFamily), fontSize, lineHeight: 1.45 }}>
       <div className="py-1">{Array.from({ length: lineCount }, (_, line) => <div key={line}>{line + 1}</div>)}</div>
     </div>
-    <textarea className="absolute inset-y-0 left-12 right-0 w-[calc(100%-3rem)] resize-none overflow-auto bg-transparent py-1 pl-2 pr-3 outline-none"
+    <textarea className="absolute inset-y-0 left-12 right-0 w-[calc(100%-3rem)] resize-none overflow-auto bg-transparent py-1 pl-2 pr-3 text-[var(--editor-foreground)] outline-none"
       aria-label={t("edit.editor")} style={{ fontFamily: codeFontStack(fontFamily), fontSize, lineHeight: 1.45, tabSize: 4 }}
       value={state.text} disabled={blocked || session.blocked || state.saving || state.loading} spellCheck={false} wrap="off"
       onChange={(event) => session.change(event.target.value)}
@@ -103,7 +103,7 @@ export function EditableWorkspace({ session, fontSize, fontFamily, blocked, onCl
         }
       }} />
   </div>;
-  return <div className="editable-workspace flex h-full min-h-0 flex-col bg-[var(--editor-background)]">
+  return <div className="editable-workspace flex h-full min-h-0 flex-col bg-[var(--surface-bg)]">
     <div className="flex h-8 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 text-[12px]">
       <AppIcon name="edit" size={14} /><span className="truncate font-semibold">{session.target.path}</span>
       <span className="ml-auto shrink-0 text-[var(--text-secondary)]">{session.dirty ? t("edit.unsaved") : t("edit.saved")}</span>

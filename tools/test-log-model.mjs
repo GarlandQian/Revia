@@ -772,7 +772,7 @@ test("日志续页使用滚动后的视口末行，刷新恢复深视口前忽�
 test("日志全局键盘尊重已处理事件，方向导航只在表格焦点内执行", () => {
   const source = readFileSync(new URL("../src/features/log/LogView.tsx", import.meta.url), "utf8");
   const handler = source.slice(source.indexOf("const handler = (event: KeyboardEvent)"), source.indexOf('window.addEventListener("keydown", handler)'));
-  assert.ok(handler.indexOf("if (event.defaultPrevented) return") < handler.indexOf("event.metaKey"));
+  assert.ok(handler.indexOf("if (event.defaultPrevented) return") < handler.indexOf("isPrimaryModifier(event)"));
   assert.ok(handler.indexOf("!tableRef.current?.contains(target)") < handler.indexOf('event.key === "ArrowDown"'));
 });
 

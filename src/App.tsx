@@ -374,6 +374,7 @@ export function App() {
   const [commandLogOpen, setCommandLogOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<BottomDrawerTab>("terminal");
   const openTerminalDrawerRef = useRef<() => void>(() => undefined);
+  const togglePrTabRef = useRef<() => void>(() => undefined);
   /** 新建分支 / 检出确认 / 推送对话框的界面状态。 */
   const [newBranchStart, setNewBranchStart] = useState<{ origin: RemoteTarget; start: BranchStart } | null>(null);
   const newBranchDialogRef = useRef(newBranchStart);
@@ -3445,6 +3446,17 @@ export function App() {
         return;
       }
 
+      // 终端开关快捷键在焦点位于终端内时也要生效（弹窗打开时不穿透）。
+      if (action === "toggleTerminal") {
+        const targetEl = event.target instanceof HTMLElement ? event.target : null;
+        const inTerminal = targetEl?.closest(".terminal-panel") !== null;
+        if (document.querySelector("[role='dialog'], dialog[open]")) return;
+        if (!inTerminal && isTextInputOrDialog(event.target)) return;
+        event.preventDefault();
+        if (worktreeId) openTerminalDrawerRef.current();
+        return;
+      }
+
       // 只对文本输入控件和弹窗内的按键放行，不穿透到后台文件操作（Q93、审查意见 6）
       if (isTextInputOrDialog(event.target)) return;
       if (!action) return;
@@ -3482,10 +3494,7 @@ export function App() {
           return;
         case "pullRequests":
           event.preventDefault();
-          if (!busy && worktreeId) {
-            setGithubOpen(true);
-            setMainView("pr");
-          }
+          if (!busy) togglePrTabRef.current();
           return;
         case "refresh":
           event.preventDefault();
@@ -3513,10 +3522,6 @@ export function App() {
         case "prevFile":
           event.preventDefault();
           focusNextFile(-1);
-          return;
-        case "toggleTerminal":
-          event.preventDefault();
-          if (worktreeId) openTerminalDrawerRef.current();
           return;
         default:
           return;
@@ -4864,7 +4869,7 @@ export function App() {
         setCommandLogOpen(false);
         setGithubOpen(false);
         setMainView("log");
-        resetMergeTabs();
+        closeAllTabs();
         await ipc.stopWatch().catch((caught) => setAppError(toAppError(caught), null));
       }
       setRepoToRemove(null);
@@ -5770,6 +5775,11 @@ export function App() {
     shortcuts: shortcutsSnapshot,
   };
 
+  const handleUpdateStatusChange = (status: AppUpdateStatus) => {
+    setUpdateStatus(status);
+    setUpdateBannerVersion(status.available?.version ?? null);
+  };
+
   const m7Dialogs = (
     <>
       {repoToRemove ? (
@@ -5808,10 +5818,7 @@ export function App() {
         status={updateStatus}
         mode={appUpdateMode}
         onModeChange={(mode) => void updateSettings({ appUpdateMode: mode })}
-        onStatusChange={(status) => {
-          setUpdateStatus(status);
-          if (!status.available) setUpdateBannerVersion(null);
-        }}
+        onStatusChange={handleUpdateStatusChange}
         onInstall={() => requestUpdateLifecycle("installUpdate")}
         onRestart={() => requestUpdateLifecycle("restartUpdate")}
         onClose={() => setUpdateOpen(false)}
@@ -5870,6 +5877,7 @@ export function App() {
       setMainView("pr");
     }
   };
+  togglePrTabRef.current = togglePrTab;
   const titleBar = (
       <TitleBar
         repo={activeRepo}
@@ -5914,7 +5922,7 @@ export function App() {
         onTogglePr={togglePrTab}
         terminalOpen={bottomDrawerOpen && drawerTab === "terminal"}
         onToggleTerminal={openTerminalDrawer}
-        updateAvailable={!!updateBannerVersion}
+        updateAvailable={Boolean(updateStatus?.available || updateStatus?.restartRequired || updateBannerVersion)}
       />
   );
 
@@ -5943,7 +5951,7 @@ export function App() {
             onReloadEnvironment={reloadEnvironment}
             worktreeId={worktreeId}
             updateStatus={updateStatus}
-            onUpdateStatus={setUpdateStatus}
+            onUpdateStatus={handleUpdateStatusChange}
             onThemesChanged={reloadImportedThemes}
             onOpenDiagnostics={() => setDiagnosticsOpen(true)}
             onOpenUpdatePanel={() => setUpdateOpen(true)}
@@ -6233,7 +6241,7 @@ export function App() {
               ) : null
             }
           />
-          {mainView === "diff" && error && !mergeEntry ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+          {error && !(mainView === "diff" && mergeEntry) ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
           {mainView === "diff" && allReviewed && !mergeEntry ? (
             <EditorBanner tone="info" icon="pass-filled">
               <span className="font-semibold">{messages.review.allReviewed}</span>
@@ -6739,7 +6747,7 @@ export function App() {
           onReloadEnvironment={reloadEnvironment}
           worktreeId={worktreeId}
           updateStatus={updateStatus}
-          onUpdateStatus={setUpdateStatus}
+          onUpdateStatus={handleUpdateStatusChange}
           onThemesChanged={reloadImportedThemes}
           onOpenDiagnostics={() => setDiagnosticsOpen(true)}
           onOpenUpdatePanel={() => setUpdateOpen(true)}

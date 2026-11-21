@@ -51,6 +51,7 @@ export function SidebarShell({
     pointerId: number;
     startY: number;
     startHeight: number;
+    scale: number;
   } | null>(null);
   const composerWrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -146,8 +147,10 @@ export function SidebarShell({
             role="separator"
             aria-orientation="horizontal"
             onPointerDown={(event) => {
-              const current = composerWrapRef.current?.getBoundingClientRect().height ?? 210;
-              composerDragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: current };
+              const wrap = composerWrapRef.current;
+              const offsetHeight = wrap?.offsetHeight || 210;
+              const scale = wrap && wrap.offsetHeight > 0 ? wrap.getBoundingClientRect().height / wrap.offsetHeight : 1;
+              composerDragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: offsetHeight, scale };
               event.currentTarget.setPointerCapture(event.pointerId);
               event.currentTarget.dataset.dragging = "true";
               event.preventDefault();
@@ -155,7 +158,7 @@ export function SidebarShell({
             onPointerMove={(event) => {
               const drag = composerDragRef.current;
               if (!drag || drag.pointerId !== event.pointerId) return;
-              const next = Math.round(Math.min(460, Math.max(170, drag.startHeight + (drag.startY - event.clientY))));
+              const next = Math.round(Math.min(460, Math.max(170, drag.startHeight + (drag.startY - event.clientY) / drag.scale)));
               setComposerHeight(next);
             }}
             onPointerUp={(event) => {

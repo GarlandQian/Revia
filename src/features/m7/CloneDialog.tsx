@@ -98,6 +98,7 @@ export function CloneDialog({ open, onClose, onRegistered }: CloneDialogProps) {
         depth: shallow ? Math.max(1, Number.parseInt(depth, 10) || 1) : null,
         recurseSubmodules: submodules,
       });
+      jobRef.current = id;
       setJobId(id);
       setPhase("running");
     } catch (caught) {

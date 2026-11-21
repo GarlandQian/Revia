@@ -160,7 +160,10 @@ export function TitleBar({
             <div className="relative min-w-0">
               <Popover
                 open={worktreeOpen}
-                onOpen={() => setWorktreeOpen(true)}
+                onOpen={() => {
+                  setWorktreeOpen(true);
+                  onRefreshWorktrees();
+                }}
                 onClose={() => setWorktreeOpen(false)}
                 width={420}
                 trigger={
@@ -169,9 +172,6 @@ export function TitleBar({
                     className="ctx-btn ctx-subtle min-w-0"
                     disabled={busy || worktrees.length === 0}
                     title={active.path}
-                    onClick={() => {
-                      if (!worktreeOpen) onRefreshWorktrees();
-                    }}
                   >
                     <AppIcon name="folder" size={13} />
                     <span className="max-w-[160px] truncate">{worktreeLabel}</span>

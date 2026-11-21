@@ -190,7 +190,7 @@ export function UpdateBanner({
     <div role="status" className="flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1 text-[12px]">
       <AppIcon name="cloud-download" size={13} />
       <span className="min-w-0 flex-1 truncate">{t("update.banner", { version })}</span>
-      <button type="button" className="revia-btn revia-btn-secondary h-5 px-2" onClick={onOpen}>
+      <button type="button" className="revia-btn revia-btn-secondary h-6 px-2.5 text-[11.5px]" onClick={onOpen}>
         {t("update.bannerOpen")}
       </button>
       <button type="button" className="icon-action size-5" aria-label={t("common.dismiss")} onClick={onDismiss}>

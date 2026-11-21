@@ -145,7 +145,7 @@ export function DiagnosticsDialog({ open, worktreeId, onClose }: DiagnosticsDial
         ) : null}
         {notice ? <p role="status">{notice}</p> : null}
       </div>
-      <pre className="min-h-0 flex-1 overflow-auto bg-[var(--editor-background)] p-3 font-mono text-[11.5px] whitespace-pre-wrap">{text}</pre>
+      <pre className="min-h-0 flex-1 overflow-auto bg-[var(--surface-subtle)] p-3 font-mono text-[11.5px] whitespace-pre-wrap text-[var(--text-primary)]">{text}</pre>
     </dialog>
   );
 }

@@ -6,7 +6,7 @@
  *   右侧文件切换、差异导航、并排/统一分段切换、显示选项弹窗、已审阅切换与更多操作。
  */
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ChangeEntry } from "@/types/bindings/ChangeEntry";
 import type { ChangesKind } from "@/types/bindings/ChangesKind";
 import type { ViewMode } from "@/types/bindings/ViewMode";
@@ -130,8 +130,24 @@ export function EditorTabs({
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [contextLinesText, setContextLinesText] = useState(String(diffOptions.contextLines));
   const tabListRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setContextLinesText(String(diffOptions.contextLines));
+  }, [diffOptions.contextLines]);
+
+  const commitContextLines = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+      setContextLinesText(String(diffOptions.contextLines));
+      return;
+    }
+    const clamped = Math.min(64, Math.max(0, parsed));
+    setContextLinesText(String(clamped));
+    if (clamped !== diffOptions.contextLines) onDiffOption({ contextLines: clamped });
+  };
 
   useLayoutEffect(() => {
     const list = tabListRef.current;
@@ -161,7 +177,9 @@ export function EditorTabs({
       ? messages.changes.staged
       : entry.changes === "untracked"
         ? messages.changes.untracked
-        : messages.changes.unstaged
+        : entry.changes === "changelist"
+          ? t("changelists.title")
+          : messages.changes.unstaged
     : "";
 
   return (
@@ -246,7 +264,9 @@ export function EditorTabs({
                 ? messages.changes.staged
                 : tab.changes === "untracked"
                   ? messages.changes.untracked
-                  : messages.changes.unstaged;
+                  : tab.changes === "changelist"
+                    ? t("changelists.title")
+                    : messages.changes.unstaged;
             const active = !prActive && !logActive && !activeCommitKey && tab.key === activeKey;
             const merge = tab.kind === "merge";
             return (
@@ -490,10 +510,18 @@ export function EditorTabs({
                     type="number"
                     min={0}
                     max={64}
-                    value={diffOptions.contextLines}
+                    value={contextLinesText}
                     onChange={(event) => {
-                      const parsed = Number.parseInt(event.target.value, 10);
-                      if (Number.isFinite(parsed)) onDiffOption({ contextLines: parsed });
+                      const raw = event.target.value;
+                      setContextLinesText(raw);
+                      const parsed = Number.parseInt(raw, 10);
+                      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 64) {
+                        onDiffOption({ contextLines: parsed });
+                      }
+                    }}
+                    onBlur={() => commitContextLines(contextLinesText)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") commitContextLines(contextLinesText);
                     }}
                   />
                 </div>
@@ -539,21 +567,50 @@ export function EditorTabs({
                   </button>
                 }
               >
-                <MenuItem onClick={() => onClose({ key: tabKey(entry.path, entry.changes), path: entry.path, changes: entry.changes, preview: false })}>
+                <MenuItem
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onClose({ key: tabKey(entry.path, entry.changes), path: entry.path, changes: entry.changes, preview: false });
+                  }}
+                >
                   {messages.changes.closeTab}
                 </MenuItem>
-                <MenuItem disabled={tabs.length === 0} onClick={onCloseAll}>
+                <MenuItem
+                  disabled={tabs.length === 0}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onCloseAll();
+                  }}
+                >
                   {messages.changes.closeAllTabs}
                 </MenuItem>
                 <MenuSeparator />
-                <MenuItem onClick={() => onFileHistory(entry.path)}>
+                <MenuItem
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onFileHistory(entry.path);
+                  }}
+                >
                   {messages.fileHistory.open}
                 </MenuItem>
-                <MenuItem disabled={entry.unmerged} onClick={onExternalDiff}>
+                <MenuItem
+                  disabled={entry.unmerged}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onExternalDiff();
+                  }}
+                >
                   {messages.externalTools.openDiff}
                 </MenuItem>
                 <MenuSeparator />
-                <MenuItem onClick={onRefresh}>{messages.changes.refresh}</MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onRefresh();
+                  }}
+                >
+                  {messages.changes.refresh}
+                </MenuItem>
               </Popover>
             </div>
           </div>

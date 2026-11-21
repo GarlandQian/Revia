@@ -97,22 +97,22 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
     if (isPrimaryModifier(event) && !isAltModifier(event) && event.code === "KeyA") { event.preventDefault(); controls.current?.selectAll(); }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); controls.current?.move(event.key === "ArrowDown" ? 1 : -1, event.shiftKey); }
   }}>
-    {error && <div role="alert" className="mb-2 whitespace-pre-wrap text-errorforeground">{formatAppError(error)}</div>}
+    {error && <div role="alert" className="mb-2 whitespace-pre-wrap text-[var(--danger)]">{formatAppError(error)}</div>}
     <form className="mb-2 flex gap-1" onSubmit={(event) => { event.preventDefault(); void change({ kind: "create", name }); }}>
       <input className="settings-input min-w-0 flex-1" value={name} aria-label={t("changelists.name")} placeholder={t("changelists.name")} onChange={(event) => setName(event.target.value)} maxLength={256} disabled={busy || pending} />
-      <button className="toolbar-button" type="submit" disabled={busy || pending || !name.trim()}>{t("changelists.create")}</button>
+      <button className="revia-btn revia-btn-secondary h-[30px] shrink-0 px-2.5" type="submit" disabled={busy || pending || !name.trim()}>{t("changelists.create")}</button>
     </form>
     {!view && <p>{t("changes.loading")}</p>}
     {view?.groups.map((group) => {
       const items = view.items.filter((item) => item.group === group.id);
       const active = items.filter((item) => !item.stale && !item.readonlyReason);
       const paths = [...new Set(items.map((item) => item.path))];
-      return <section key={group.id} className="mb-2 border-b border-panelborder pb-1">
+      return <section key={group.id} className="mb-2 border-b border-[var(--border-subtle)] pb-1">
         <div className="flex items-center gap-1">
           <input type="checkbox" aria-label={group.name || t("changelists.default")} checked={active.length > 0 && active.every((item) => item.selected)} disabled={busy || pending || !active.length} onChange={(event) => void change({ kind: "select", items: active.map((i) => i.id), selected: event.target.checked })} />
           <input key={`${group.id}:${group.name}`} className="min-w-0 flex-1 bg-transparent font-semibold" aria-label={t("changelists.rename")} defaultValue={group.name} placeholder={t("changelists.default")} maxLength={256} disabled={busy || pending} onBlur={(event) => { if (event.target.value.trim() && event.target.value !== group.name) void change({ kind: "rename", group: group.id, name: event.target.value }); }} />
-          <button className="toolbar-button" disabled={busy || pending || group.id === view.defaultGroup} onClick={() => void change({ kind: "default", group: group.id })} title={t("changelists.makeDefault")}><AppIcon name={group.id === view.defaultGroup ? "star-full" : "star-empty"} size={13} /></button>
-          <button className="toolbar-button" disabled={busy || pending || view.groups.length === 1} onClick={() => void change({ kind: "delete", group: group.id })}>{t("changelists.delete")}</button>
+          <button type="button" className="mini-icon-btn" disabled={busy || pending || group.id === view.defaultGroup} onClick={() => void change({ kind: "default", group: group.id })} title={t("changelists.makeDefault")}><AppIcon name={group.id === view.defaultGroup ? "star-full" : "star-empty"} size={13} /></button>
+          <button type="button" className="revia-btn revia-btn-secondary h-6 px-2 text-[11.5px]" disabled={busy || pending || view.groups.length === 1} onClick={() => void change({ kind: "delete", group: group.id })}>{t("changelists.delete")}</button>
         </div>
         {paths.map((path) => {
           const entries = items.filter((item) => item.path === path);
@@ -134,7 +134,7 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
                 <FileTypeIcon path={path} symlink={readonly === "symlink"} /><span className={`min-w-0 truncate status-${fileEntry?.status ?? "modified"}`}>{path}</span>
               </button>
               {fileEntry && (fileEntry.changes === "changelist" || fileEntry.changes === "untracked") && !readonly && <button className="icon-action" disabled={busy || pending} title={messages.changes.discardSelected} onClick={() => onDiscard(rowSelected ? selectedPaths() : [path])}><AppIcon name="discard" size={13} /></button>}
-              <select className="min-w-0 max-w-24 bg-dropdownbackground" aria-label={t("changelists.moveFile")} value={group.id} disabled={busy || pending} onChange={(event) => void change({ kind: "move", items: allFileItems.map((i) => i.id), group: event.target.value })}>
+              <select className="settings-select h-6 min-w-0 max-w-24 w-auto px-1.5 text-[11.5px]" aria-label={t("changelists.moveFile")} value={group.id} disabled={busy || pending} onChange={(event) => void change({ kind: "move", items: allFileItems.map((i) => i.id), group: event.target.value })}>
                 {view.groups.map((g) => <option value={g.id} key={g.id}>{g.name || t("changelists.default")}</option>)}
               </select>
             </div>
@@ -146,7 +146,7 @@ export function Changelists({ worktreeId, revision, busy, onView, snapshot, onAc
                 <button className="min-w-0 flex-1 truncate text-left" title={item.summary} onClick={(event) => { if (entry) activateRow(rowId,isPrimaryClick(event),event.shiftKey); }} onDoubleClick={() => { if(entry)onPin(entry); }}>
                   {item.stale ? t("changelists.stale") : item.hunk === null ? t("changelists.wholeFile") : item.summary}
                 </button>
-                <select className="max-w-24 bg-dropdownbackground" aria-label={t("changelists.moveBlock")} value={item.group} disabled={busy || pending} onChange={(event) => void change({ kind: "move", items: [item.id], group: event.target.value })}>
+                <select className="settings-select h-6 max-w-24 w-auto px-1.5 text-[11.5px]" aria-label={t("changelists.moveBlock")} value={item.group} disabled={busy || pending} onChange={(event) => void change({ kind: "move", items: [item.id], group: event.target.value })}>
                   {view.groups.map((g) => <option value={g.id} key={g.id}>{g.name || t("changelists.default")}</option>)}
                 </select>
               </div>;

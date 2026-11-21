@@ -31,7 +31,7 @@ export function BottomDrawer({
   terminalContent: ReactNode;
   commandLogContent: ReactNode;
 }) {
-  const dragRef = useRef<{ pointerId: number; startY: number; startHeight: number } | null>(null);
+  const dragRef = useRef<{ pointerId: number; startY: number; startHeight: number; scale: number } | null>(null);
 
   if (!open) return null;
 
@@ -48,7 +48,10 @@ export function BottomDrawer({
         role="separator"
         aria-orientation="horizontal"
         onPointerDown={(event) => {
-          dragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: height };
+          const section = event.currentTarget.parentElement;
+          const offsetHeight = section?.offsetHeight || height;
+          const scale = section && section.offsetHeight > 0 ? section.getBoundingClientRect().height / section.offsetHeight : 1;
+          dragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: offsetHeight, scale };
           event.currentTarget.setPointerCapture(event.pointerId);
           event.currentTarget.dataset.dragging = "true";
           event.preventDefault();
@@ -56,7 +59,7 @@ export function BottomDrawer({
         onPointerMove={(event) => {
           const drag = dragRef.current;
           if (!drag || drag.pointerId !== event.pointerId) return;
-          const next = Math.round(Math.min(540, Math.max(140, drag.startHeight + (drag.startY - event.clientY))));
+          const next = Math.round(Math.min(540, Math.max(140, drag.startHeight + (drag.startY - event.clientY) / drag.scale)));
           onHeightChange(next);
         }}
         onPointerUp={(event) => {

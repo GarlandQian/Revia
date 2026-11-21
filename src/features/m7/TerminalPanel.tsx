@@ -15,6 +15,7 @@ import { formatAppError } from "@/lib/error";
 import { t } from "@/lib/i18n/index";
 import { m7 } from "@/lib/m7/api";
 import { codeFontStack } from "@/lib/theme";
+import { matchShortcut } from "@/lib/shortcuts";
 import { TerminalSessions } from "@/lib/m7/terminalSessions";
 
 interface Instance {
@@ -122,6 +123,10 @@ export function TerminalPanel({
       });
       const fit = new FitAddon();
       terminal.loadAddon(fit);
+      terminal.attachCustomKeyEventHandler((event) => {
+        if (event.type === "keydown" && matchShortcut(event) === "toggleTerminal") return false;
+        return true;
+      });
       terminal.open(container);
       terminal.onResize(({ rows, cols }) => {
         void registry.resize(sessionId, rows, cols).catch(() => { /* 原目标保留结构化错误。 */ });
@@ -221,7 +226,7 @@ export function TerminalPanel({
           {tabs.map((tab) => (
             <div
               key={tab.sessionId}
-              className={`group flex h-5 shrink-0 items-center gap-1 rounded-[5px] px-2 text-[11.5px] ${
+              className={`group flex h-[22px] shrink-0 items-center gap-1 rounded-[5px] px-2 text-[11.5px] ${
                 tab.sessionId === active
                   ? "bg-[var(--surface-bg)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
@@ -248,10 +253,10 @@ export function TerminalPanel({
               {confirmCloseSession === tab.sessionId ? (
                 <span className="ml-1 flex items-center gap-1 text-[10.5px] text-[var(--warn)]">
                   {t("terminal.closeRunningConfirm")}
-                  <button type="button" className="revia-btn revia-btn-secondary h-4 px-1" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId, true); }}>
+                  <button type="button" className="revia-btn revia-btn-secondary h-[18px] rounded-[4px] px-1.5 text-[10.5px]" onClick={() => { setConfirmCloseSession(null); void closeTab(tab.sessionId, true); }}>
                     {t("terminal.closeRunningYes")}
                   </button>
-                  <button type="button" className="revia-btn revia-btn-secondary h-4 px-1" onClick={() => setConfirmCloseSession(null)}>
+                  <button type="button" className="revia-btn revia-btn-secondary h-[18px] rounded-[4px] px-1.5 text-[10.5px]" onClick={() => setConfirmCloseSession(null)}>
                     {t("common.cancel")}
                   </button>
                 </span>
