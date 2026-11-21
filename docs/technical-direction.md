@@ -84,7 +84,7 @@ M13（Q234–Q245）彻底移除 M7–M12 的 Liquid Glass、React Bits 材质�
 
 - **Git 程序**：使用登录 shell `PATH` 中的第一个 `git`，设置中可以手动指定路径；Revia 不自带 Git（Q27）。最低版本在实现时按实际用到的命令参数确定，启动时检查并提示。
 - **环境变量**：每个 worktree 在自己的目录下启动一次用户的交互式登录 shell，读取环境变量；结果缓存，可以手动“重新加载环境”（Q21）。目标是让 hooks 的行为和在终端里进入该 worktree 后执行 `git commit` 一致。
-- **原型验证场景**：开发者本机用 fnm 按目录切换 Node 版本（`.zshrc` 中为 `fnm env --use-on-cd`），node 的路径是每个 shell 会话临时生成的；VS Code 的命令行工具 `code` 位于 `/opt/homebrew/bin`。M0 已验证通过：按 worktree 解析后，husky hook 拿到了项目指定的 `node` 版本，没有 `.node-version` 时拿到默认版本，`git mergetool --tool=vscode` 能找到 `code`；从 Finder 启动时同样通过，解析耗时 116–204 毫秒（见 [M0 报告](./milestones/m0/report.md#五运行环境验证)）。
+- **原型验证场景**：开发者本机用 fnm 按目录切换 Node 版本（`.zshrc` 中为 `fnm env --use-on-cd`），node 的路径是每个 shell 会话临时生成的；VS Code 的命令行工具 `code` 位于 `/opt/homebrew/bin`。M0 已验证通过：按 worktree 解析后，husky hook 拿到了项目指定的 `node` 版本，没有 `.node-version` 时拿到默认版本，`git mergetool --tool=vscode` 能找到 `code`；从 Finder 启动时同样通过，解析耗时 116–204 毫秒（见 M0 报告）。
 - 只在应用启动时解析一次环境（VS Code 的做法）更简单，但项目各自的 Node 版本不会生效，因此不采用。
 
 ## diff 渲染原型
@@ -100,7 +100,7 @@ M13（Q234–Q245）彻底移除 M7–M12 的 Liquid Glass、React Bits 材质�
   - 并排和统一视图来回切换时停在同一位置。
 - lock 文件、二进制文件和超大文件默认收起，点开才渲染。
 
-M0 结果（详见 [M0 报告](./milestones/m0/report.md)）：
+M0 结果（详见 M0 报告）：
 
 - 首屏 207–228 毫秒，达标；其中 Rust 和界面之间的数据传输占 164–187 毫秒，是主要瓶颈。
 - 并排和统一视图切换后停在同一行，达标。
@@ -158,13 +158,13 @@ Q78 明确了当前版本无法复现旧故障时的验收方式，详见 [产�
 - **平台相关代码**：从 M2 起集中放在少数模块中（例如登录 shell 的环境解析、窗口外观、快捷键修饰键），其他代码不写死 macOS 假设（Q55）。
 - **Apple 代码签名与公证**：用户没有 Apple 证书，沿 Q63 暂不做 Apple 开发者代码签名和公证，不以购买证书作为 M7 打包前提（Q182）。这种试用分发仍可能触发 macOS 首次打开的安全提示；保留首次打开说明与真实下载后的启动验收。Windows 暂不签名的原决定也不变，正式签名在首版完成后再评估。
 - **应用更新**：试用阶段使用 Tauri updater，从 GitHub Releases 获取新版本，启动时检查。默认稳定版，预发布版由用户主动开启；确认后下载与安装，安装前处理未保存编辑、Git 写入和终端会话，再确认重启（Q41、Q181）。不静默更新。
-- **更新包签名**：Tauri updater 要求校验签名，不能关闭；用 Tauri CLI 自行生成公私钥，公钥随应用分发，私钥供打包端签署更新包。它不需要 Apple 证书，也不代替 Apple 代码签名和公证（Q182）。CI 中使用 GitHub Actions 的 secret 注入更新签名密钥，私钥不进源码、安装包或日志；具体接线在 M7 实施。官方核对与来源见 [M7 分发事实](./milestones/m7/distribution-facts.md)。
+- **更新包签名**：Tauri updater 要求校验签名，不能关闭；用 Tauri CLI 自行生成公私钥，公钥随应用分发，私钥供打包端签署更新包。它不需要 Apple 证书，也不代替 Apple 代码签名和公证（Q182）。CI 中使用 GitHub Actions 的 secret 注入更新签名密钥，私钥不进源码、安装包或日志；具体接线在 M7 实施。官方核对与来源见 M7 分发事实。
 - **诊断导出**：不收集遥测，不联网上报。用户通过“帮助 → 导出诊断信息”手动导出，默认只含当前仓库相关日志与环境信息；路径、远端地址、作者邮箱等默认脱敏，导出前预览（Q42、Q180）。跨重启记录仅保存脱敏的操作摘要与错误信息，保留 7 天，可手动清空；排除文件正文、diff、终端输入输出（Q187）。现有 Git 命令日志的 stdout/stderr 可能含文件内容或 diff，不能仅凭既有凭据打码就原样持久化或导出；错误信息的提取同样遵守这些排除规则。
 
 ## M7 已确认的数据边界
 
 - 未保存编辑自动保存为本机编辑草稿，重启或崩溃后供恢复；草稿持久化不等于写回工作区。磁盘文件已变化时保留两版供对比，不自动覆盖；显式保存仍须执行 Q122 的写前校验（Q186）。
-- GitHub 协作限 github.com，多个账号按仓库记住选择，另域名 Enterprise 不在 M7 范围（Q183）。浏览器入口采用 device flow，另设手动 Token 入口；使用 Revia 自己注册的应用，令牌存 macOS 钥匙串，客户端不依赖 JetBrains 授权服务（Q184、Q122）。API 登录不改动 Git 的 credential helper / ssh-agent，不替换提交作者或 Git 传输身份（Q153）。官方授权前提见 [GitHub 事实](./milestones/m7/github-facts.md)。
+- GitHub 协作限 github.com，多个账号按仓库记住选择，另域名 Enterprise 不在 M7 范围（Q183）。浏览器入口采用 device flow，另设手动 Token 入口；使用 Revia 自己注册的应用，令牌存 macOS 钥匙串，客户端不依赖 JetBrains 授权服务（Q184、Q122）。API 登录不改动 Git 的 credential helper / ssh-agent，不替换提交作者或 Git 传输身份（Q153）。官方授权前提见 GitHub 事实。
 - GitHub 保护同步只读取得现有分支的保护状态，与用户本地保护列表取并集；失败保留上次成功结果并标记可能过期，不把错误或不完整响应当作空集合，不修改远端规则（Q185）。
 
 ## 尚未确认的配套

@@ -13,7 +13,7 @@ Revia 是一个轻量跨平台桌面 Git 客户端，核心工作流是“审阅
 
 M0–M13 均已合入本地 `main`，旧特性分支已清理。M13（UI 全面重构，Q234–Q245）已完成实色现代桌面设计系统落地、外壳与代码颜色主题解耦、Lucide `AppIcon` 图标体系、精简顶栏与两栏卡片式设置弹窗、底部终端/命令日志统一抽屉、全量历史样式/组件清理及自动化验证，详见 [M13 报告](docs/milestones/m13/report.md) 与 [M13 视觉稿 v1](docs/milestones/m13/mockups/revia-ui-v1.html)。
 
-历史发布状态：0.0.4 已于 2026-11-11 公开为 latest 稳定版（Q225），应用源码固定为 `v0.0.4` / `97211ab`，完整证据见 [0.0.4 发布记录](docs/milestones/m10/release-0.0.4.md)。M8/M9 的 Windows 真实桌面、真实 AI 与历史性能待验范围保持不变，验收清单见 [Windows 验收清单](docs/milestones/m8/windows-acceptance.md) 与 [Windows 测量步骤](docs/milestones/m9/windows-measure.md)。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
+历史发布状态：0.0.4 已于 2026-11-11 公开为 latest 稳定版（Q225），应用源码固定为 `v0.0.4` / `97211ab`。Windows 真实桌面、真实 AI 与历史性能验收仍待补验。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
 ## 工作流程
 
@@ -25,8 +25,6 @@ M13 起取消双 agent 并行派发与强制独立 `git worktree` 规则（Q245�
 4. **合并收尾**：验收通过后将 `m<N>` 压成一个提交合入 `main`（提交说明写成 `M<N>：<内容>`），删除本地 `m<N>` 分支并向用户汇报；用户可以随时要求撤回。
 
 - 里程碑文档按需放在 `docs/milestones/m<N>/`（见 [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)），不产生未经确认的新决策；新的决策仍以 [docs/README.md](docs/README.md) 为准。
-- 涉及刷新归属、运行环境或生成提交信息的修改前，先读 [M10 报告](docs/milestones/m10/report.md)。
-- 历史里程碑（M0–M12）的既有 `spec.md`、`issues/`、`report.md` 保留作记录。
 
 ## Agent skills
 

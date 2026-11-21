@@ -32,7 +32,7 @@
   - `tools/gen-themes.mjs` 与 `src/themes/themes.css` 剥离全部旧 VS Code 外壳变量，仅保留代码/diff/语法色键。
   - `src/styles/tokens.css`、`src/index.css`、`src/styles/shell.css` 移除所有旧 VS Code 外壳别名与 `.toolbar-widget`；全站 27 个 `.tsx` 组件统一迁移至 M13 语义令牌与 `.revia-btn` / `.dialog-button`。
   - 重命名 `codicon.tsx` → `app-icon.tsx` 并移除 `Codicon` 别名；移除 `TerminalPanel` / `CommandLogPanel` 的旧版非嵌入式兼容分支；删除 9 个零引用 shadcn 样板组件、`src/lib/utils.ts`、`components.json`、`tools/extract-rebased-theme.py` 及 4 个无用 npm 依赖（`class-variance-authority`、`cn`、`shadcn`、`tw-animate-css`）；清理 14 个 M13 已淘汰的旧 UI 翻译键。
-- **Git 分支与 worktree 收尾**：压成单提交合入本地 `main` 后，清理失效的 `m12` worktree 记录并删除全部已合入的历史本地分支（`m13`、`m12`、`m11`、`m10`、`codex/selection-design`、`release-0.0.4-fix`、`release-0.0.4-windows-fix`），本地仅保留 `main`。
+- **Git 分支、worktree 与历史归档清理**：压成单提交合入本地 `main` 后，清理 `m12` worktree 及残留目录，删除全部已合入的历史本地分支（`m13`、`m12`、`m11`、`m10`、`codex/selection-design`、`release-0.0.4-fix`、`release-0.0.4-windows-fix`），并清理历史原型目录 `prototypes/`、历史里程碑目录 `docs/milestones/m0–m12/` / `backlog/`、`docs/branch-consolidation-2026-11-05.md` 及 `.pi/`，仅保留当前版本与 `docs/milestones/m13/`。
 
 ## 4. 验证记录
 
