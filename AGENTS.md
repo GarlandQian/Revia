@@ -9,11 +9,11 @@ Revia 是一个轻量跨平台桌面 Git 客户端，核心工作流是“审阅
 3. [docs/adr/](docs/adr/)：架构决策，必须遵守。
 4. 按任务需要阅读 [产品方向](docs/product-direction.md)、[UI 方向](docs/ui-direction.md)、[技术方向](docs/technical-direction.md)。
 
-## 当前阶段：M13 UI 全面重构已合入 main；准备 0.0.5 草稿发布
+## 当前阶段：M13 UI 全面重构已合入 main；0.0.5 已公开发布
 
 M0–M13 均已合入 `main`，旧特性分支已清理。M13（UI 全面重构，Q234–Q245）已完成实色现代桌面设计系统落地、外壳与代码颜色主题解耦、Lucide `AppIcon` 图标体系、精简顶栏与两栏卡片式设置弹窗、底部终端/命令日志统一抽屉、全量历史样式/组件清理及自动化验证，详见 [M13 报告](docs/milestones/m13/report.md) 与 [M13 视觉稿 v1](docs/milestones/m13/mockups/revia-ui-v1.html)。
 
-发布状态：0.0.5（`v0.0.5`，Q246）已准备并推送标签触发双平台草稿 Release，待用户验收后公开（见 [0.0.5 发布说明](docs/milestones/m13/release-0.0.5-notes.md)）；上一公开稳定版 0.0.4 已于 2026-11-11 发布（Q225，源码 `v0.0.4` / `97211ab`）。Windows 真实桌面、真实 AI 与历史性能验收仍待补验。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
+发布状态：当前最新公开稳定版为 0.0.5（`v0.0.5` / `4cc0933`，2026-11-22 公开，Q246，见 [0.0.5 发布说明](docs/milestones/m13/release-0.0.5-notes.md)）；上一公开稳定版 0.0.4 于 2026-11-11 发布（Q225，源码 `v0.0.4` / `97211ab`）。Windows 真实桌面、真实 AI 与历史性能验收仍待补验。Q204–Q206 仍有效：两种 Windows 形态均用 Credential Manager；便携版其余数据和 WebView2 在 exe 旁 data；Windows shell 优先 PowerShell 7，回 Windows PowerShell，按 worktree 加载 profile。
 
 ## 工作流程
 

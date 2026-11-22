@@ -33,7 +33,9 @@ pub struct AiStatus {
     pub insecure: bool,
 }
 
-fn registry_lock<'a>(state: &'a State<'_, AppState>) -> Result<std::sync::MutexGuard<'a, crate::settings::Registry>> {
+fn registry_lock(
+    state: &AppState,
+) -> Result<std::sync::MutexGuard<'_, crate::settings::Registry>> {
     state.registry.lock().map_err(|_| {
         AppError::coded(
             ErrorKind::Internal,
@@ -44,15 +46,14 @@ fn registry_lock<'a>(state: &'a State<'_, AppState>) -> Result<std::sync::MutexG
     })
 }
 
-fn notify_config_changed(state: &State<'_, AppState>) {
+fn notify_config_changed(state: &AppState) {
     if let Some(app) = state.app.get() {
         let _ = app.emit("revia://ai-config-changed", ());
     }
 }
 
-#[tauri::command]
-pub fn ai_status(state: State<'_, AppState>) -> Result<AiStatus> {
-    let settings = registry_lock(&state)?.settings().clone();
+fn ai_status_with_state(state: &AppState) -> Result<AiStatus> {
+    let settings = registry_lock(state)?.settings().clone();
     let key_set = super::key(&settings.ai_base_url)?.is_some();
     Ok(AiStatus {
         configured: !settings.ai_base_url.is_empty() && !settings.ai_model.is_empty(),
@@ -74,6 +75,11 @@ pub fn ai_status(state: State<'_, AppState>) -> Result<AiStatus> {
     })
 }
 
+#[tauri::command]
+pub fn ai_status(state: State<'_, AppState>) -> Result<AiStatus> {
+    ai_status_with_state(&state)
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiKeyRequest {
@@ -88,13 +94,9 @@ pub struct AiServiceRequest {
     pub base_url: String,
 }
 
-/// 写入密钥；空字符串等于清除。只存系统凭据库，并绑定当前服务地址。
-///
-/// 校验地址与凭据写入都在设置锁内完成：并发的地址更新不会让密钥落到旧地址。
-#[tauri::command]
-pub fn ai_set_key(state: State<'_, AppState>, request: AiKeyRequest) -> Result<AiStatus> {
+fn ai_set_key_with_state(state: &AppState, request: AiKeyRequest) -> Result<AiStatus> {
     {
-        let registry = registry_lock(&state)?;
+        let registry = registry_lock(state)?;
         let base_url = registry.settings().ai_base_url.clone();
         if base_url.is_empty() {
             return Err(super::not_configured());
@@ -108,14 +110,21 @@ pub fn ai_set_key(state: State<'_, AppState>, request: AiKeyRequest) -> Result<A
             super::save_key(&base_url, request.key.trim())?;
         }
     }
-    notify_config_changed(&state);
-    ai_status(state)
+    notify_config_changed(state);
+    ai_status_with_state(state)
 }
 
+/// 写入密钥；空字符串等于清除。只存系统凭据库，并绑定当前服务地址。
+///
+/// 校验地址与凭据写入都在设置锁内完成：并发的地址更新不会让密钥落到旧地址。
 #[tauri::command]
-pub fn ai_clear_key(state: State<'_, AppState>, request: AiServiceRequest) -> Result<AiStatus> {
+pub fn ai_set_key(state: State<'_, AppState>, request: AiKeyRequest) -> Result<AiStatus> {
+    ai_set_key_with_state(&state, request)
+}
+
+fn ai_clear_key_with_state(state: &AppState, request: AiServiceRequest) -> Result<AiStatus> {
     {
-        let registry = registry_lock(&state)?;
+        let registry = registry_lock(state)?;
         let base_url = registry.settings().ai_base_url.clone();
         if base_url.is_empty() {
             return Err(super::not_configured());
@@ -125,22 +134,22 @@ pub fn ai_clear_key(state: State<'_, AppState>, request: AiServiceRequest) -> Re
         }
         super::clear_key(&base_url)?;
     }
-    notify_config_changed(&state);
-    ai_status(state)
+    notify_config_changed(state);
+    ai_status_with_state(state)
 }
 
-/// 读取当前服务提供的模型列表。
-///
-/// 只依赖已保存的非空服务地址，不要求已选模型或已配置；地址必须与界面看到的一致，
-/// 避免把密钥发往刚被其他操作改掉的地址。
 #[tauri::command]
-pub async fn ai_list_models(
-    state: State<'_, AppState>,
+pub fn ai_clear_key(state: State<'_, AppState>, request: AiServiceRequest) -> Result<AiStatus> {
+    ai_clear_key_with_state(&state, request)
+}
+
+async fn ai_list_models_with_state(
+    state: &AppState,
     request: AiServiceRequest,
 ) -> Result<super::models::AiModelList> {
     let expected = super::normalize_base_url(&request.base_url)?;
     let (base_url, key) = {
-        let registry = registry_lock(&state)?;
+        let registry = registry_lock(state)?;
         let saved = registry.settings().ai_base_url.clone();
         if saved.is_empty() {
             return Err(super::not_configured());
@@ -161,6 +170,18 @@ pub async fn ai_list_models(
     Ok(super::models::AiModelList { base_url, models })
 }
 
+/// 读取当前服务提供的模型列表。
+///
+/// 只依赖已保存的非空服务地址，不要求已选模型或已配置；地址必须与界面看到的一致，
+/// 避免把密钥发往刚被其他操作改掉的地址。
+#[tauri::command]
+pub async fn ai_list_models(
+    state: State<'_, AppState>,
+    request: AiServiceRequest,
+) -> Result<super::models::AiModelList> {
+    ai_list_models_with_state(&state, request).await
+}
+
 /// 记下当前服务地址已经确认发送（第一次使用前由界面弹窗确认）。
 #[tauri::command]
 pub fn ai_confirm(state: State<'_, AppState>) -> Result<AiStatus> {
@@ -169,7 +190,7 @@ pub fn ai_confirm(state: State<'_, AppState>) -> Result<AiStatus> {
         registry.confirm_ai_url()?;
     }
     notify_config_changed(&state);
-    ai_status(state)
+    ai_status_with_state(&state)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -245,7 +266,7 @@ async fn prepare_and_send(
     cancel: &mut tokio::sync::oneshot::Receiver<()>,
 ) -> Result<Option<SendRequest>> {
     let (base_url, model, language, prompt, subject_limit, confirmed) = {
-        let registry = registry_lock(&state)?;
+        let registry = registry_lock(state)?;
         let settings = registry.settings();
         (
             settings.ai_base_url.clone(),
@@ -468,8 +489,6 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::Arc;
-
-    use tauri::Manager;
 
     #[tokio::test]
     async fn stream_sse_success_with_think_stripped() {
@@ -748,47 +767,6 @@ mod tests {
         assert!(!super::super::valid_request_id(&"a".repeat(65)));
     }
 
-    fn test_app(dir: &std::path::Path) -> tauri::App<tauri::test::MockRuntime> {
-        tauri::test::mock_builder()
-            .manage(AppState::new(dir.to_path_buf()))
-            .invoke_handler(tauri::generate_handler![
-                super::ai_status,
-                super::ai_set_key,
-                super::ai_clear_key,
-                super::ai_list_models
-            ])
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .unwrap()
-    }
-
-    fn test_webview(
-        app: &tauri::App<tauri::test::MockRuntime>,
-    ) -> tauri::WebviewWindow<tauri::test::MockRuntime> {
-        tauri::WebviewWindowBuilder::new(app, "main", Default::default())
-            .build()
-            .unwrap()
-    }
-
-    fn invoke(
-        webview: &tauri::WebviewWindow<tauri::test::MockRuntime>,
-        cmd: &str,
-        body: serde_json::Value,
-    ) -> std::result::Result<serde_json::Value, serde_json::Value> {
-        tauri::test::get_ipc_response(
-            webview,
-            tauri::webview::InvokeRequest {
-                cmd: cmd.into(),
-                callback: tauri::ipc::CallbackFn(0),
-                error: tauri::ipc::CallbackFn(1),
-                url: "tauri://localhost".parse().unwrap(),
-                body: tauri::ipc::InvokeBody::Json(body),
-                headers: Default::default(),
-                invoke_key: tauri::test::INVOKE_KEY.to_string(),
-            },
-        )
-        .map(|body| body.deserialize::<serde_json::Value>().unwrap())
-    }
-
     fn seed_settings(dir: &std::path::Path, base_url: &str) {
         let log = std::sync::Arc::new(crate::git::CommandLog::default());
         let mut registry = crate::settings::Registry::load(dir.to_path_buf(), log);
@@ -801,8 +779,8 @@ mod tests {
             .unwrap();
     }
 
-    fn error_code(value: &serde_json::Value) -> Option<&str> {
-        value.get("code").and_then(|code| code.as_str())
+    fn error_code(error: &AppError) -> Option<String> {
+        error.payload().code
     }
 
     #[test]
@@ -813,16 +791,15 @@ mod tests {
         let url_b = "https://api.other.test/v1";
         seed_settings(dir.path(), url_a);
         super::super::save_key(url_a, "sk-old").unwrap();
-        let app = test_app(dir.path());
-        let webview = test_webview(&app);
+        let state = AppState::new(dir.path().to_path_buf());
+        let request: AiKeyRequest = serde_json::from_value(serde_json::json!({
+            "key": "sk-new",
+            "baseUrl": url_b,
+        }))
+        .unwrap();
 
-        let response = invoke(
-            &webview,
-            "ai_set_key",
-            serde_json::json!({ "request": { "key": "sk-new", "baseUrl": url_b } }),
-        );
-        let error = response.unwrap_err();
-        assert_eq!(error_code(&error), Some("errors.ai.serviceChanged"));
+        let error = ai_set_key_with_state(&state, request).unwrap_err();
+        assert_eq!(error_code(&error).as_deref(), Some("errors.ai.serviceChanged"));
         assert_eq!(super::super::key(url_a).unwrap().as_deref(), Some("sk-old"));
         assert_eq!(super::super::key(url_b).unwrap(), None);
     }
@@ -834,39 +811,35 @@ mod tests {
         let url_a = "https://api.clear.test/v1";
         seed_settings(dir.path(), url_a);
         super::super::save_key(url_a, "sk-old").unwrap();
-        let app = test_app(dir.path());
-        let webview = test_webview(&app);
+        let state = AppState::new(dir.path().to_path_buf());
+        let request: AiServiceRequest = serde_json::from_value(serde_json::json!({
+            "baseUrl": "https://api.other.test/v1",
+        }))
+        .unwrap();
 
-        let response = invoke(
-            &webview,
-            "ai_clear_key",
-            serde_json::json!({ "request": { "baseUrl": "https://api.other.test/v1" } }),
-        );
-        let error = response.unwrap_err();
-        assert_eq!(error_code(&error), Some("errors.ai.serviceChanged"));
+        let error = ai_clear_key_with_state(&state, request).unwrap_err();
+        assert_eq!(error_code(&error).as_deref(), Some("errors.ai.serviceChanged"));
         assert_eq!(super::super::key(url_a).unwrap().as_deref(), Some("sk-old"));
     }
 
-    #[test]
-    fn ai_list_models_rejects_stale_address_without_network() {
+    #[tokio::test]
+    async fn ai_list_models_rejects_stale_address_without_network() {
         let _credentials = super::super::test_credentials::TestCredentials::install();
         let dir = tempfile::tempdir().unwrap();
         let url_a = "https://api.list.test/v1";
         seed_settings(dir.path(), url_a);
-        let app = test_app(dir.path());
-        let webview = test_webview(&app);
+        let state = AppState::new(dir.path().to_path_buf());
+        let request: AiServiceRequest = serde_json::from_value(serde_json::json!({
+            "baseUrl": "https://api.other.test/v1",
+        }))
+        .unwrap();
 
-        let response = invoke(
-            &webview,
-            "ai_list_models",
-            serde_json::json!({ "request": { "baseUrl": "https://api.other.test/v1" } }),
-        );
-        let error = response.unwrap_err();
-        assert_eq!(error_code(&error), Some("errors.ai.serviceChanged"));
+        let error = ai_list_models_with_state(&state, request).await.unwrap_err();
+        assert_eq!(error_code(&error).as_deref(), Some("errors.ai.serviceChanged"));
     }
 
-    #[test]
-    fn ai_list_models_reads_models_with_saved_key() {
+    #[tokio::test]
+    async fn ai_list_models_reads_models_with_saved_key() {
         let _credentials = super::super::test_credentials::TestCredentials::install();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -891,17 +864,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         seed_settings(dir.path(), &base_url);
         super::super::save_key(&base_url, "sk-list").unwrap();
-        let app = test_app(dir.path());
-        let webview = test_webview(&app);
-
-        let response = invoke(
-            &webview,
-            "ai_list_models",
-            serde_json::json!({ "request": { "baseUrl": base_url } }),
-        )
+        let state = AppState::new(dir.path().to_path_buf());
+        let request: AiServiceRequest = serde_json::from_value(serde_json::json!({
+            "baseUrl": base_url,
+        }))
         .unwrap();
-        assert_eq!(response["baseUrl"], base_url);
-        assert_eq!(response["models"], serde_json::json!(["m1", "m2"]));
+
+        let response = ai_list_models_with_state(&state, request).await.unwrap();
+        assert_eq!(response.base_url, base_url);
+        assert_eq!(response.models, vec!["m1", "m2"]);
         handle.join().unwrap();
     }
 
@@ -911,8 +882,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let base_url = "https://api.lock.test/v1";
         seed_settings(dir.path(), base_url);
-        let app = test_app(dir.path());
-        let webview = test_webview(&app);
+        let state = Arc::new(AppState::new(dir.path().to_path_buf()));
 
         let (started_tx, started_rx) = std::sync::mpsc::channel();
         let (release_tx, release_rx) = std::sync::mpsc::channel();
@@ -921,12 +891,16 @@ mod tests {
             release_rx.recv().unwrap();
         });
 
-        let request = serde_json::json!({ "request": { "key": "sk-lock", "baseUrl": base_url } });
-        let handle = std::thread::spawn(move || invoke(&webview, "ai_set_key", request));
+        let request: AiKeyRequest = serde_json::from_value(serde_json::json!({
+            "key": "sk-lock",
+            "baseUrl": base_url,
+        }))
+        .unwrap();
+        let state_for_thread = Arc::clone(&state);
+        let handle = std::thread::spawn(move || ai_set_key_with_state(&state_for_thread, request));
         started_rx
             .recv_timeout(Duration::from_secs(5))
             .expect("credential write did not start");
-        let state = app.state::<AppState>();
         match state.registry.try_lock() {
             Err(std::sync::TryLockError::WouldBlock) => {}
             other => panic!("settings lock not held during credential write: {}", other.is_ok()),

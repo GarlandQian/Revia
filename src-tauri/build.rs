@@ -3,6 +3,8 @@ fn main() {
 
     // Tauri embeds Common Controls v6 in the app binary; mock-runtime integration
     // tests need the same activation context (tauri-apps/tauri#13419).
+    // Note: `cargo:rustc-link-arg-tests` only applies to integration tests (`tests/*.rs`),
+    // not `--lib` unit tests, so `tauri::test::mock_builder()` must stay in `tests/*.rs`.
     if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "windows"
         && std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default() == "msvc"
     {
