@@ -6212,6 +6212,8 @@ export function App() {
               setGithubOpen(false);
               if (mainView === "pr") setMainView(tabs.length > 0 && activeKey ? "diff" : "log");
             }}
+            onStageEntry={changelistMode ? undefined : (entry) => void stageFile(entry)}
+            onUnstageEntry={changelistMode ? undefined : (entry) => void unstageFile(entry)}
             editAction={
               mainView === "diff" && selectedEntry && !mergeEntry && !selectedEntry.unmerged && !selectedEntry.binary && (selectedEntry.changes === "unstaged" || selectedEntry.changes === "changelist") ? (
                 <button

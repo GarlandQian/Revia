@@ -87,14 +87,17 @@ export function ChangesTree(props: ChangesTreeProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(0);
 
+  const hasItems = items.length > 0;
+
   useLayoutEffect(() => {
     const element = scrollerRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setViewport(element.clientHeight));
+    const measure = () => setViewport(element.clientHeight);
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
-    setViewport(element.clientHeight);
+    measure();
     return () => observer.disconnect();
-  }, []);
+  }, [hasItems]);
 
   const first = Math.max(0, Math.floor(scrollTop / TREE_ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(items.length, Math.ceil((scrollTop + Math.max(viewport, TREE_ROW_HEIGHT)) / TREE_ROW_HEIGHT) + OVERSCAN);
@@ -134,10 +137,16 @@ export function ChangesTree(props: ChangesTreeProps) {
   return (
     <div
       ref={scrollerRef}
-      className="changes-tree min-h-0 flex-1 overflow-auto py-1.5 outline-none"
+      className="changes-tree min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1.5 outline-none"
       tabIndex={0}
       onKeyDown={onKeyDown}
-      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      onScroll={(event) => {
+        setScrollTop(event.currentTarget.scrollTop);
+        const height = event.currentTarget.clientHeight;
+        if (typeof height === "number" && height > 0 && height !== viewport) {
+          setViewport(height);
+        }
+      }}
       role="tree"
       aria-label={messages.changes.toolWindow}
       aria-multiselectable
@@ -274,7 +283,7 @@ function GroupHeader({
       </button>
       <button
         type="button"
-        className="mini-icon-btn opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        className="mini-icon-btn opacity-70 group-hover:opacity-100 group-focus-within:opacity-100"
         title={label}
         aria-label={label}
         disabled={isWriting || entries.length === 0}
@@ -323,7 +332,7 @@ function ChangeRow({
 
   return (
     <div
-      className="change-row group absolute left-0 right-0 flex items-center gap-1.5 pl-4 pr-2"
+      className="change-row group absolute left-1.5 right-1.5 flex items-center gap-1.5 pl-4 pr-2"
       style={{ top, height: TREE_ROW_HEIGHT }}
       data-selected={selected}
       data-active={active}
@@ -343,7 +352,7 @@ function ChangeRow({
       >
         <FileTypeIcon path={entry.path} symlink={entry.readonlyReason === "symlink"} />
         <span className="change-file-name min-w-0 shrink truncate">{name}</span>
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--text-muted)]">{detail}</span>
+        {detail ? <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--text-muted)]">{detail}</span> : null}
       </button>
 
       {entry.reviewed ? (

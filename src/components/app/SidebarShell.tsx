@@ -51,8 +51,10 @@ export function SidebarShell({
     pointerId: number;
     startY: number;
     startHeight: number;
+    maxHeight: number;
     scale: number;
   } | null>(null);
+  const commitPaneRef = useRef<HTMLDivElement | null>(null);
   const composerWrapRef = useRef<HTMLDivElement | null>(null);
 
   if (!visible) return null;
@@ -140,17 +142,19 @@ export function SidebarShell({
       </div>
 
       {sideTab === "commit" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{commitTree}</div>
+        <div ref={commitPaneRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-[120px] flex-1 flex-col overflow-hidden">{commitTree}</div>
           <div
             className="commit-resizer"
             role="separator"
             aria-orientation="horizontal"
             onPointerDown={(event) => {
               const wrap = composerWrapRef.current;
-              const offsetHeight = wrap?.offsetHeight || 210;
+              const offsetHeight = wrap?.offsetHeight || 220;
               const scale = wrap && wrap.offsetHeight > 0 ? wrap.getBoundingClientRect().height / wrap.offsetHeight : 1;
-              composerDragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: offsetHeight, scale };
+              const paneHeight = commitPaneRef.current?.clientHeight ?? 0;
+              const maxHeight = paneHeight > 0 ? Math.min(480, Math.max(196, paneHeight - 120)) : 460;
+              composerDragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: offsetHeight, maxHeight, scale };
               event.currentTarget.setPointerCapture(event.pointerId);
               event.currentTarget.dataset.dragging = "true";
               event.preventDefault();
@@ -158,7 +162,7 @@ export function SidebarShell({
             onPointerMove={(event) => {
               const drag = composerDragRef.current;
               if (!drag || drag.pointerId !== event.pointerId) return;
-              const next = Math.round(Math.min(460, Math.max(170, drag.startHeight + (drag.startY - event.clientY) / drag.scale)));
+              const next = Math.round(Math.min(drag.maxHeight, Math.max(196, drag.startHeight + (drag.startY - event.clientY) / drag.scale)));
               setComposerHeight(next);
             }}
             onPointerUp={(event) => {
@@ -175,8 +179,8 @@ export function SidebarShell({
           />
           <div
             ref={composerWrapRef}
-            className="flex shrink-0 flex-col overflow-hidden"
-            style={composerHeight ? { height: composerHeight } : undefined}
+            className="flex min-h-0 shrink-0 flex-col overflow-hidden"
+            style={composerHeight ? { height: composerHeight, maxHeight: "calc(100% - 120px)" } : { maxHeight: "55%" }}
           >
             {commitComposer}
           </div>

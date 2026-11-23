@@ -55,4 +55,9 @@
     background: var(--accent-soft);
     color: var(--text-primary);
   }
+
+  :root[data-platform="windows"] * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
 }

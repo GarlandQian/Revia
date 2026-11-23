@@ -91,6 +91,8 @@ export function EditorTabs({
   isMerge = false,
   onActivatePr,
   onClosePr,
+  onStageEntry,
+  onUnstageEntry,
   editAction,
 }: {
   tabs: EditorTab[];
@@ -126,6 +128,8 @@ export function EditorTabs({
   isMerge?: boolean;
   onActivatePr?: () => void;
   onClosePr?: () => void;
+  onStageEntry?: (entry: ChangeEntry) => void;
+  onUnstageEntry?: (entry: ChangeEntry) => void;
   editAction?: ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -529,6 +533,23 @@ export function EditorTabs({
             </div>
 
             {editAction}
+
+            {!entry.readonlyReason && !entry.unmerged && entry.changes !== "changelist" && (entry.changes === "staged" ? onUnstageEntry : onStageEntry) ? (
+              <button
+                type="button"
+                className="reviewed-toggle-btn shrink-0"
+                disabled={isWriting}
+                aria-label={entry.changes === "staged" ? messages.changes.unstage : messages.changes.stage}
+                title={entry.changes === "staged" ? messages.changes.shortcuts.unstage : messages.changes.shortcuts.stage}
+                onClick={() => {
+                  if (entry.changes === "staged") onUnstageEntry?.(entry);
+                  else onStageEntry?.(entry);
+                }}
+              >
+                <AppIcon name={entry.changes === "staged" ? "remove" : "add"} size={13} />
+                <span>{entry.changes === "staged" ? messages.changes.unstage : messages.changes.stage}</span>
+              </button>
+            ) : null}
 
             <button
               type="button"

@@ -17,6 +17,7 @@ import { formatAppError, toAppError } from "@/lib/error";
 import { ipc, type AiCommitMode, type AiStatus } from "@/lib/ipc";
 import type { GenerationControl, GenerationIntent, GenerationView } from "@/lib/commitMessageGeneration";
 import { acceleratorOf, formatAccelerator, matchesAccelerator } from "@/lib/shortcuts";
+import { isImeComposing } from "@/lib/platform";
 import { AppIcon } from "@/components/ui/app-icon";
 import type { NoticeText } from "./Notifications";
 import { Popover } from "@/components/ui/popover";
@@ -180,6 +181,7 @@ export function CommitArea({
   const disabled = context === null || submitting || busy || blockedByOperation || blockedByInput || (amend && amendBlocked);
   const recent = context?.recentMessages ?? [];
   const upstream = context ? upstreamNote(context) : null;
+  const submitShortcutHint = t("commit.submitHint", { shortcut: formatAccelerator(acceleratorOf("commit")) });
 
   useEffect(() => {
     let active = true;
@@ -462,14 +464,14 @@ export function CommitArea({
           </div>
         ) : null}
 
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 flex-auto flex-col">
           <label className="sr-only" htmlFor="commit-message">
             {messages.commit.messageLabel}
           </label>
           <textarea
             id="commit-message"
             data-commit-message
-            className="commit-message flex-1"
+            className="commit-message flex-auto"
             style={
               checks.showRuler && subjectLimit > 0
                 ? { backgroundImage: `linear-gradient(to right, transparent calc(${subjectLimit}ch + 10px), var(--border-subtle) calc(${subjectLimit}ch + 10px), var(--border-subtle) calc(${subjectLimit}ch + 11px), transparent calc(${subjectLimit}ch + 11px))` }
@@ -482,13 +484,13 @@ export function CommitArea({
             disabled={submitting}
             onChange={(event) => onMessage(event.target.value)}
             onKeyDown={(event) => {
-              if (matchesAccelerator(event.nativeEvent, acceleratorOf("commit"))) {
+              if (!isImeComposing(event.nativeEvent) && matchesAccelerator(event.nativeEvent, acceleratorOf("commit"))) {
                 event.preventDefault();
                 if (!disabled && !document.querySelector("[role='dialog'], dialog[open]")) onSubmit();
               }
             }}
           />
-          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5 text-[10.5px] text-[var(--text-muted)]">
+          <div className="flex shrink-0 items-center justify-between gap-2 px-2.5 pb-1.5 text-[10.5px] text-[var(--text-muted)]">
             {draftNotice ? (
               <span role="status" className="min-w-0 flex-1 truncate" title={draftNotice}>
                 {draftNotice}
@@ -514,15 +516,15 @@ export function CommitArea({
               spin={submitting}
               className={submitting ? undefined : "text-[var(--reviewed)]"}
             />
-            <span>{submitting ? messages.commit.running : messages.commit.progress(reviewedCount, totalFiles)}</span>
+            <span className="truncate">{submitting ? messages.commit.running : messages.commit.progress(reviewedCount, totalFiles)}</span>
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               className="revia-btn revia-btn-secondary"
               disabled={disabled}
-              title={`${messages.commit.submitHint} (${formatAccelerator(acceleratorOf("commit"))})`}
-              aria-label={messages.commit.submitHint}
+              title={submitShortcutHint}
+              aria-label={submitShortcutHint}
               onClick={onSubmit}
             >
               {submitting ? <AppIcon name="loading" size={13} spin /> : null}
