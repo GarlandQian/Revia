@@ -145,25 +145,77 @@ fn install_environment(
     }
 }
 
-/// Worktree 运行环境的生产入口。
+/// Worktree 运行环境的跨线程句柄：可 `Clone` 并移入 `spawn_blocking`，不阻塞 Tokio worker 或 UI 线程。
+#[derive(Clone)]
+pub struct WorktreeEnvironmentHandle {
+    pub(crate) registry: Arc<Mutex<crate::settings::Registry>>,
+    pub(crate) sessions: Arc<Mutex<HashMap<String, Arc<WorktreeSession>>>>,
+    pub(crate) env: Arc<EnvCoordinator>,
+    pub(crate) lifecycle: Arc<Mutex<()>>,
+    pub(crate) command_log: Arc<crate::git::CommandLog>,
+    pub(crate) review: Arc<crate::review::ReviewStore>,
+    pub(crate) history: Arc<crate::history::HistoryStore>,
+    pub(crate) shell_resolver: ShellResolver,
+    pub(crate) app: Option<tauri::AppHandle>,
+}
+
+/// Worktree 运行环境的借用入口（保留给同步上下文与现有测试）。
 pub struct WorktreeEnvironment<'a> {
-    state: &'a AppState,
+    handle: WorktreeEnvironmentHandle,
+    _marker: std::marker::PhantomData<&'a AppState>,
 }
 
 impl<'a> WorktreeEnvironment<'a> {
     pub fn new(state: &'a AppState) -> Self {
-        Self { state }
+        Self {
+            handle: state.env_handle(),
+            _marker: std::marker::PhantomData,
+        }
     }
 
+    pub fn prepare(&self, worktree_id: &str, path: &Path) -> PreparedEnvironment {
+        self.handle.prepare(worktree_id, path)
+    }
+
+    pub fn resolve_now(
+        &self,
+        prepared: &PreparedEnvironment,
+        manual_git: Option<&Path>,
+    ) -> Result<(ShellEnv, PathBuf)> {
+        self.handle.resolve_now(prepared, manual_git)
+    }
+
+    pub fn open(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
+        self.handle.open(worktree_id)
+    }
+
+    pub fn gate(&self, worktree_id: &str) -> EnvGate {
+        self.handle.gate(worktree_id)
+    }
+
+    pub fn await_ready(&self, worktree_id: &str) -> Result<()> {
+        self.handle.await_ready(worktree_id)
+    }
+
+    pub fn session_retrying(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
+        self.handle.session_retrying(worktree_id)
+    }
+
+    pub fn reload(&self) -> Result<()> {
+        self.handle.reload()
+    }
+}
+
+impl WorktreeEnvironmentHandle {
     /// 打开前登记：临时环境 + 一次解析租约。之后必须调用 `resolve_now()` 或 `settle()` 收尾。
     pub fn prepare(&self, worktree_id: &str, path: &Path) -> PreparedEnvironment {
-        let provisional = self.state.env.provisional(path);
+        let provisional = self.env.provisional(path);
         PreparedEnvironment {
             env: provisional.env,
             git_path: provisional.git_path,
             needs_capture: provisional.needs_capture,
             path: path.to_path_buf(),
-            lease: self.state.env.begin(worktree_id),
+            lease: self.env.begin(worktree_id),
         }
     }
 
@@ -177,8 +229,8 @@ impl<'a> WorktreeEnvironment<'a> {
         manual_git: Option<&Path>,
     ) -> Result<(ShellEnv, PathBuf)> {
         let (resolved, git_path, failure) =
-            capture_environment(self.state.resolver(), &prepared.path, manual_git);
-        if !self.state.env.publish(
+            capture_environment(&self.shell_resolver, &prepared.path, manual_git);
+        if !self.env.publish(
             &prepared.lease,
             &prepared.path,
             resolved.clone(),
@@ -198,9 +250,8 @@ impl<'a> WorktreeEnvironment<'a> {
     /// 耗时的 shell / Git 读取在生命周期锁外完成；登记时再次校验租约。
     /// 重载可以立即作废在途打开，也不会让一个慢 worktree 阻塞其它已打开会话。
     pub fn open(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-        let _lifecycle = self.state.lifecycle.lock().map_err(|_| crate::commands::session_lock_error())?;
+        let _lifecycle = self.lifecycle.lock().map_err(|_| crate::commands::session_lock_error())?;
         if let Some(session) = self
-            .state
             .sessions
             .lock()
             .map_err(|_| crate::commands::session_lock_error())?
@@ -218,8 +269,8 @@ impl<'a> WorktreeEnvironment<'a> {
                 worktree_id,
                 &path,
                 env,
-                Arc::clone(&self.state.command_log),
-                Some(Arc::clone(&self.state.review)),
+                Arc::clone(&self.command_log),
+                Some(Arc::clone(&self.review)),
                 program,
             )
         };
@@ -233,7 +284,7 @@ impl<'a> WorktreeEnvironment<'a> {
                     opened?
                 } else {
                     // S2：记住的 Git 不存在、无法执行或版本过低：丢弃记忆，退回同步等待完整环境。
-                    self.state.env.forget_git(&path, &program);
+                    self.env.forget_git(&path, &program);
                     let (resolved, found) = self.resolve_now(&prepared, None)?;
                     synced = true;
                     open(resolved, Some(&found))?
@@ -247,12 +298,12 @@ impl<'a> WorktreeEnvironment<'a> {
             }
         };
         // 只在提交结果时串行：重载期间完成的旧读取不能重新登记会话。
-        let _lifecycle = self.state.lifecycle.lock()
+        let _lifecycle = self.lifecycle.lock()
             .map_err(|_| crate::commands::session_lock_error())?;
-        if !self.state.env.is_lease_valid(&prepared.lease) {
+        if !self.env.is_lease_valid(&prepared.lease) {
             return Err(crate::session::environment_reloaded());
         }
-        if let Some(existing) = self.state.sessions.lock()
+        if let Some(existing) = self.sessions.lock()
             .map_err(|_| crate::commands::session_lock_error())?.get(worktree_id) {
             return Ok(Arc::clone(existing));
         }
@@ -263,7 +314,7 @@ impl<'a> WorktreeEnvironment<'a> {
                 .git_path
                 .clone()
                 .unwrap_or_else(|| session.git.program.clone());
-            if !self.state.env.publish(
+            if !self.env.publish(
                 &prepared.lease,
                 &prepared.path,
                 prepared.env.clone(),
@@ -275,7 +326,6 @@ impl<'a> WorktreeEnvironment<'a> {
         }
         // 双重检查：并发的第一个请求只发布一个会话。
         let mut sessions = self
-            .state
             .sessions
             .lock()
             .map_err(|_| crate::commands::session_lock_error())?;
@@ -292,7 +342,7 @@ impl<'a> WorktreeEnvironment<'a> {
     }
 
     fn worktree_path(&self, worktree_id: &str) -> Result<PathBuf> {
-        let registry = self.state.registry.lock().map_err(|_| {
+        let registry = self.registry.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
                 "errors.commands.repositoryListLockFailed",
@@ -312,7 +362,7 @@ impl<'a> WorktreeEnvironment<'a> {
 
     /// 设置里手动指定的 Git 程序（Q27）。
     fn manual_git(&self) -> Result<Option<PathBuf>> {
-        let registry = self.state.registry.lock().map_err(|_| {
+        let registry = self.registry.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
                 "errors.commands.repositoryListLockFailed2",
@@ -329,7 +379,7 @@ impl<'a> WorktreeEnvironment<'a> {
 
     /// 写操作开始前等待完整环境（会话的 `acquire_write_lock` 调用）。
     pub fn gate(&self, worktree_id: &str) -> EnvGate {
-        let env = Arc::clone(&self.state.env);
+        let env = Arc::clone(&self.env);
         let id = worktree_id.to_string();
         Arc::new(move || {
             if env.wait_ready(&id, WAIT_TIMEOUT) {
@@ -342,7 +392,7 @@ impl<'a> WorktreeEnvironment<'a> {
 
     /// 等环境就绪后再执行网络操作与内置终端（Q212）。
     pub fn await_ready(&self, worktree_id: &str) -> Result<()> {
-        if self.state.env.wait_ready(worktree_id, WAIT_TIMEOUT) {
+        if self.env.wait_ready(worktree_id, WAIT_TIMEOUT) {
             Ok(())
         } else {
             Err(crate::environment::still_loading())
@@ -351,13 +401,13 @@ impl<'a> WorktreeEnvironment<'a> {
 
     /// 环境未就绪时打开失败不立即报错：等它就绪后重试一次（Q212）。
     pub fn session_retrying(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-        match self.state.session(worktree_id) {
+        match self.open(worktree_id) {
             Ok(session) => Ok(session),
             Err(first) => {
-                if self.state.env.wait(worktree_id, WAIT_TIMEOUT).is_none() {
+                if self.env.wait(worktree_id, WAIT_TIMEOUT).is_none() {
                     return Err(first);
                 }
-                self.state.session(worktree_id)
+                self.open(worktree_id)
             }
         }
     }
@@ -371,12 +421,10 @@ impl<'a> WorktreeEnvironment<'a> {
     /// `superseded`，因此不会在旧对象上继续写。
     pub fn reload(&self) -> Result<()> {
         let _lifecycle = self
-            .state
             .lifecycle
             .lock()
             .map_err(|_| crate::commands::session_lock_error())?;
         let mut sessions = self
-            .state
             .sessions
             .lock()
             .map_err(|_| crate::commands::session_lock_error())?;
@@ -396,7 +444,7 @@ impl<'a> WorktreeEnvironment<'a> {
         }
         drop(guards);
         // 会话表锁一直持有：后台安装的租约核对与这里互斥，重载后不会重新登记旧会话。
-        self.state.env.reset();
+        self.env.reset();
         let instances: Vec<(String, u64)> = sessions
             .iter()
             .map(|(worktree_id, session)| (worktree_id.clone(), session.instance_id()))
@@ -404,12 +452,11 @@ impl<'a> WorktreeEnvironment<'a> {
         sessions.clear();
         drop(sessions);
         for (worktree_id, instance_id) in instances {
-            self.state
-                .history
+            self.history
                 .invalidate_session(&worktree_id, instance_id);
         }
         // 环境重载后旧的历史目标（含其 Git 程序与 shell 环境）不再有效。
-        self.state.history.clear();
+        self.history.clear();
         Ok(())
     }
 
@@ -427,13 +474,13 @@ impl<'a> WorktreeEnvironment<'a> {
         let path = prepared.path.clone();
         let lease = prepared.lease;
         let expected = Arc::clone(expected);
-        let resolver = Arc::clone(self.state.resolver());
-        let env = Arc::clone(&self.state.env);
-        let sessions = Arc::clone(&self.state.sessions);
-        let command_log = Arc::clone(&self.state.command_log);
-        let review = Arc::clone(&self.state.review);
+        let resolver = Arc::clone(&self.shell_resolver);
+        let env = Arc::clone(&self.env);
+        let sessions = Arc::clone(&self.sessions);
+        let command_log = Arc::clone(&self.command_log);
+        let review = Arc::clone(&self.review);
         let gate = self.gate(&worktree_id);
-        let app = self.state.app.get().cloned();
+        let app = self.app.clone();
         std::thread::Builder::new()
             .name("revia-env".into())
             .spawn(move || {

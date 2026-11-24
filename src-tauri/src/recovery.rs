@@ -102,15 +102,22 @@ pub struct WorktreeIdentity {
     pub filesystem_ids: Vec<Option<String>>,
 }
 
-/// 去掉 Git 输出末尾的**一个**记录结束符（`\n` 或 `\r\n`）。
+/// 去掉 Git 输出末尾的**一个**记录结束符（`\n`，Windows 下含可选 `\r\n`）。
 ///
 /// 不能 `trim_end_matches` 一类地剥掉全部尾随换行/回车：Unix 路径本身可以以换行结尾，
 /// 那是路径字节的一部分，只有 Git 追加的那一个结束符才是格式（ST07-R3-3）。
+fn strip_one_terminator_for(text: &str, windows: bool) -> &str {
+    // Unix 上不剥路径自带的 CR，Windows 下路径不含 CR 且 Git 可能输出 CRLF。
+    let trimmed = text.strip_suffix('\n').unwrap_or(text);
+    if windows {
+        trimmed.strip_suffix('\r').unwrap_or(trimmed)
+    } else {
+        trimmed
+    }
+}
+
 fn strip_one_terminator(text: &str) -> &str {
-    // 只去掉 Git 实际追加的那一个 LF（`rev-parse` 用 `printf("%s\n")` 输出）。
-    // 不把路径自带的 CR 当结束符一并剥掉：Unix 上 `\r` 是合法路径字节。
-    // Windows 上是否出现 CRLF 以实际 Git 输出为准，这里不猜测统一 trim。
-    text.strip_suffix('\n').unwrap_or(text)
+    strip_one_terminator_for(text, cfg!(windows))
 }
 
 /// 用现有 Git CLI 解析**当前实际**的 gitDir 与 commonDir（ADR-0002，不手工解释 Git 语义）。
@@ -133,7 +140,19 @@ fn resolve_git_dirs(git: &Git) -> Result<(PathBuf, PathBuf)> {
     let body = strip_one_terminator(&text);
     let parts: Vec<&str> = body.split('\n').collect();
     if parts.len() == 2 && parts.iter().all(|part| !part.is_empty()) {
-        return Ok((PathBuf::from(parts[0]), PathBuf::from(parts[1])));
+        let first = if cfg!(windows) {
+            parts[0].strip_suffix('\r').unwrap_or(parts[0])
+        } else {
+            parts[0]
+        };
+        let second = if cfg!(windows) {
+            parts[1].strip_suffix('\r').unwrap_or(parts[1])
+        } else {
+            parts[1]
+        };
+        if !first.is_empty() && !second.is_empty() {
+            return Ok((PathBuf::from(first), PathBuf::from(second)));
+        }
     }
     // 含换行的路径：退回单字段调用，避免跨字段拆分歧义。
     let read_one = |flag: &str| -> Result<PathBuf> {
@@ -2630,5 +2649,13 @@ mod maintenance_tests {
         let persisted = read_maintenance(&directory);
         assert_eq!(persisted.last_purge_at_ms, Some(2));
         assert!(persisted.error.is_none());
+    }
+
+    #[test]
+    fn strip_one_terminator_for_preserves_unix_cr_and_strips_windows_crlf() {
+        assert_eq!(strip_one_terminator_for("/tmp/repo\r\n", false), "/tmp/repo\r");
+        assert_eq!(strip_one_terminator_for("/tmp/repo\n\n", false), "/tmp/repo\n");
+        assert_eq!(strip_one_terminator_for("C:\\repo\\.git\r\n", true), "C:\\repo\\.git");
+        assert_eq!(strip_one_terminator_for("C:\\repo\\.git\n", true), "C:\\repo\\.git");
     }
 }

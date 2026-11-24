@@ -3,6 +3,7 @@
 //! 前端只拿请求 ID、增量文本与结构化错误；密钥不出 Rust 层，
 //! 请求与返回内容不写进命令日志或诊断信息。
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -34,9 +35,9 @@ pub struct AiStatus {
 }
 
 fn registry_lock(
-    state: &AppState,
+    registry: &Mutex<crate::settings::Registry>,
 ) -> Result<std::sync::MutexGuard<'_, crate::settings::Registry>> {
-    state.registry.lock().map_err(|_| {
+    registry.lock().map_err(|_| {
         AppError::coded(
             ErrorKind::Internal,
             "errors.ai.settingsLock",
@@ -46,14 +47,14 @@ fn registry_lock(
     })
 }
 
-fn notify_config_changed(state: &AppState) {
-    if let Some(app) = state.app.get() {
+fn notify_config_changed(app: Option<&tauri::AppHandle>) {
+    if let Some(app) = app {
         let _ = app.emit("revia://ai-config-changed", ());
     }
 }
 
-fn ai_status_with_state(state: &AppState) -> Result<AiStatus> {
-    let settings = registry_lock(state)?.settings().clone();
+fn ai_status_from(registry: &Mutex<crate::settings::Registry>) -> Result<AiStatus> {
+    let settings = registry_lock(registry)?.settings().clone();
     let key_set = super::key(&settings.ai_base_url)?.is_some();
     Ok(AiStatus {
         configured: !settings.ai_base_url.is_empty() && !settings.ai_model.is_empty(),
@@ -76,8 +77,18 @@ fn ai_status_with_state(state: &AppState) -> Result<AiStatus> {
 }
 
 #[tauri::command]
-pub fn ai_status(state: State<'_, AppState>) -> Result<AiStatus> {
-    ai_status_with_state(&state)
+pub async fn ai_status(state: State<'_, AppState>) -> Result<AiStatus> {
+    let registry = Arc::clone(&state.registry);
+    tauri::async_runtime::spawn_blocking(move || ai_status_from(&registry))
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.ai.settingsLock",
+                "读取 AI 状态失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -94,10 +105,14 @@ pub struct AiServiceRequest {
     pub base_url: String,
 }
 
-fn ai_set_key_with_state(state: &AppState, request: AiKeyRequest) -> Result<AiStatus> {
+fn ai_set_key_from(
+    registry: &Mutex<crate::settings::Registry>,
+    app: Option<&tauri::AppHandle>,
+    request: AiKeyRequest,
+) -> Result<AiStatus> {
     {
-        let registry = registry_lock(state)?;
-        let base_url = registry.settings().ai_base_url.clone();
+        let guard = registry_lock(registry)?;
+        let base_url = guard.settings().ai_base_url.clone();
         if base_url.is_empty() {
             return Err(super::not_configured());
         }
@@ -110,22 +125,42 @@ fn ai_set_key_with_state(state: &AppState, request: AiKeyRequest) -> Result<AiSt
             super::save_key(&base_url, request.key.trim())?;
         }
     }
-    notify_config_changed(state);
-    ai_status_with_state(state)
+    notify_config_changed(app);
+    ai_status_from(registry)
+}
+
+#[cfg(test)]
+fn ai_set_key_with_state(state: &AppState, request: AiKeyRequest) -> Result<AiStatus> {
+    ai_set_key_from(&state.registry, state.app.get(), request)
 }
 
 /// 写入密钥；空字符串等于清除。只存系统凭据库，并绑定当前服务地址。
 ///
 /// 校验地址与凭据写入都在设置锁内完成：并发的地址更新不会让密钥落到旧地址。
 #[tauri::command]
-pub fn ai_set_key(state: State<'_, AppState>, request: AiKeyRequest) -> Result<AiStatus> {
-    ai_set_key_with_state(&state, request)
+pub async fn ai_set_key(state: State<'_, AppState>, request: AiKeyRequest) -> Result<AiStatus> {
+    let registry = Arc::clone(&state.registry);
+    let app = state.app.get().cloned();
+    tauri::async_runtime::spawn_blocking(move || ai_set_key_from(&registry, app.as_ref(), request))
+        .await
+        .map_err(|error| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.ai.settingsLock",
+                "保存 AI 密钥失败：{error}",
+                &[("error", error.to_string())],
+            )
+        })?
 }
 
-fn ai_clear_key_with_state(state: &AppState, request: AiServiceRequest) -> Result<AiStatus> {
+fn ai_clear_key_from(
+    registry: &Mutex<crate::settings::Registry>,
+    app: Option<&tauri::AppHandle>,
+    request: AiServiceRequest,
+) -> Result<AiStatus> {
     {
-        let registry = registry_lock(state)?;
-        let base_url = registry.settings().ai_base_url.clone();
+        let guard = registry_lock(registry)?;
+        let base_url = guard.settings().ai_base_url.clone();
         if base_url.is_empty() {
             return Err(super::not_configured());
         }
@@ -134,13 +169,34 @@ fn ai_clear_key_with_state(state: &AppState, request: AiServiceRequest) -> Resul
         }
         super::clear_key(&base_url)?;
     }
-    notify_config_changed(state);
-    ai_status_with_state(state)
+    notify_config_changed(app);
+    ai_status_from(registry)
+}
+
+#[cfg(test)]
+fn ai_clear_key_with_state(state: &AppState, request: AiServiceRequest) -> Result<AiStatus> {
+    ai_clear_key_from(&state.registry, state.app.get(), request)
 }
 
 #[tauri::command]
-pub fn ai_clear_key(state: State<'_, AppState>, request: AiServiceRequest) -> Result<AiStatus> {
-    ai_clear_key_with_state(&state, request)
+pub async fn ai_clear_key(
+    state: State<'_, AppState>,
+    request: AiServiceRequest,
+) -> Result<AiStatus> {
+    let registry = Arc::clone(&state.registry);
+    let app = state.app.get().cloned();
+    tauri::async_runtime::spawn_blocking(move || {
+        ai_clear_key_from(&registry, app.as_ref(), request)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.ai.settingsLock",
+            "清除 AI 密钥失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 async fn ai_list_models_with_state(
@@ -149,7 +205,7 @@ async fn ai_list_models_with_state(
 ) -> Result<super::models::AiModelList> {
     let expected = super::normalize_base_url(&request.base_url)?;
     let (base_url, key) = {
-        let registry = registry_lock(state)?;
+        let registry = registry_lock(&state.registry)?;
         let saved = registry.settings().ai_base_url.clone();
         if saved.is_empty() {
             return Err(super::not_configured());
@@ -184,13 +240,26 @@ pub async fn ai_list_models(
 
 /// 记下当前服务地址已经确认发送（第一次使用前由界面弹窗确认）。
 #[tauri::command]
-pub fn ai_confirm(state: State<'_, AppState>) -> Result<AiStatus> {
-    {
-        let mut registry = registry_lock(&state)?;
-        registry.confirm_ai_url()?;
-    }
-    notify_config_changed(&state);
-    ai_status_with_state(&state)
+pub async fn ai_confirm(state: State<'_, AppState>) -> Result<AiStatus> {
+    let registry = Arc::clone(&state.registry);
+    let app = state.app.get().cloned();
+    tauri::async_runtime::spawn_blocking(move || {
+        {
+            let mut guard = registry_lock(&registry)?;
+            guard.confirm_ai_url()?;
+        }
+        notify_config_changed(app.as_ref());
+        ai_status_from(&registry)
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.ai.settingsLock",
+            "确认 AI 服务地址失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -266,7 +335,7 @@ async fn prepare_and_send(
     cancel: &mut tokio::sync::oneshot::Receiver<()>,
 ) -> Result<Option<SendRequest>> {
     let (base_url, model, language, prompt, subject_limit, confirmed) = {
-        let registry = registry_lock(state)?;
+        let registry = registry_lock(&state.registry)?;
         let settings = registry.settings();
         (
             settings.ai_base_url.clone(),
@@ -287,7 +356,7 @@ async fn prepare_and_send(
         return Err(super::url_not_confirmed());
     }
     let key = super::key(&base_url)?;
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let store = std::sync::Arc::clone(&state.changelists);
     let mode = request.mode;
     let content = tauri::async_runtime::spawn_blocking(move || {

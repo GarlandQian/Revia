@@ -44,8 +44,11 @@ async fn blocking<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(work).await.map_err(internal)?
 }
 
-fn session_for(state: &AppState, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
-    state.worktree_session(worktree_id)
+async fn session_async(
+    state: &State<'_, AppState>,
+    worktree_id: &str,
+) -> Result<Arc<WorktreeSession>> {
+    state.session_async(worktree_id.to_string()).await
 }
 
 // ---------- 颜色主题（任务 02） ----------
@@ -122,7 +125,7 @@ pub async fn m7_open_editable(
     state: State<'_, AppState>,
     request: EditOpenRequest,
 ) -> Result<EditableFile> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     blocking(move || super::edit::open(&session, &request.path)).await
 }
 
@@ -131,7 +134,7 @@ pub async fn m7_save_editable(
     state: State<'_, AppState>,
     request: EditSaveRequest,
 ) -> Result<EditSaved> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     blocking(move || super::edit::save(&session, &request)).await
 }
 
@@ -147,7 +150,7 @@ pub struct EditDraftRef {
 #[tauri::command]
 pub async fn m7_save_edit_draft(state: State<'_, AppState>, draft: EditDraft) -> Result<EditDraft> {
     let store = Arc::clone(&state.m7_edit_drafts);
-    let session = session_for(&state, &draft.worktree_id)?;
+    let session = session_async(&state, &draft.worktree_id).await?;
     blocking(move || {
         if draft.worktree_identity != super::edit::identity_key(&session)? {
             return Err(AppError::coded(
@@ -168,7 +171,7 @@ pub async fn m7_load_edit_draft(
     request: EditDraftRef,
 ) -> Result<Option<EditDraft>> {
     let store = Arc::clone(&state.m7_edit_drafts);
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     blocking(move || {
         store.load(
             &request.worktree_id,
@@ -199,13 +202,20 @@ pub async fn m7_list_edit_drafts(
     worktree_id: String,
 ) -> Result<Vec<EditDraft>> {
     let store = Arc::clone(&state.m7_edit_drafts);
-    // 不认领已删除/替换仓库的旧草稿；原文件保留，不能自动继承到新身份。
-    let Some(session) = session_for(&state, &worktree_id).ok() else {
-        return Ok(Vec::new());
-    };
-    blocking(move || match super::edit::identity_key(&session) {
-        Ok(identity) => store.list(&worktree_id, &identity),
-        Err(_) => Ok(Vec::new()),
+    let env = state.env_handle();
+    // 只有磁盘确实存在该 worktree 的草稿文件时才打开会话校验身份，
+    // 避免启动探测把所有已登记但未打开的仓库全部唤醒。
+    blocking(move || {
+        if !store.has_drafts_for(&worktree_id)? {
+            return Ok(Vec::new());
+        }
+        let Some(session) = env.open(&worktree_id).ok() else {
+            return Ok(Vec::new());
+        };
+        match super::edit::identity_key(&session) {
+            Ok(identity) => store.list(&worktree_id, &identity),
+            Err(_) => Ok(Vec::new()),
+        }
     })
     .await
 }
@@ -219,8 +229,8 @@ pub async fn m7_terminal_open(
     request: TerminalOpenRequest,
 ) -> Result<TerminalSessionInfo> {
     // 内置终端使用完整登录环境（Q212）：未就绪时等待，界面显示正在等待。
-    state.await_environment(&request.worktree_id)?;
-    let session = session_for(&state, &request.worktree_id)?;
+    state.await_environment_async(request.worktree_id.clone()).await?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let manager = Arc::clone(&state.m7_terminal);
     let cwd = request.cwd.clone();
     let shell_env = session.shell_env_snapshot();
@@ -250,7 +260,7 @@ pub async fn m7_terminal_write(
     data: String,
 ) -> Result<()> {
     let owner = state.m7_terminal.owner(session_id)?;
-    let session = session_for(&state, &owner)?;
+    let session = session_async(&state, &owner).await?;
     if *session.writing.lock().unwrap_or_else(|error| error.into_inner()) {
         return Err(AppError::coded(ErrorKind::Rejected, "errors.m7.terminalWorktreeBusy",
             "此 worktree 正在执行写操作，请完成后再输入终端", &[]));
@@ -309,11 +319,15 @@ pub async fn m7_clone_start(
     app: tauri::AppHandle,
     request: CloneRequest,
 ) -> Result<u64> {
-    let home = crate::shell::home_dir()?;
-    let target = PathBuf::from(request.target.trim());
-    let parent = target.parent().unwrap_or(&home).to_path_buf();
-    let shell_env = crate::shell::resolve(&home, &parent);
     let git_program = crate::commands::settings_snapshot(&state)?.git_path.map(PathBuf::from);
+    let target_trim = request.target.trim().to_string();
+    let shell_env = blocking(move || {
+        let home = crate::shell::home_dir()?;
+        let target = PathBuf::from(&target_trim);
+        let parent = target.parent().unwrap_or(&home).to_path_buf();
+        Ok(crate::shell::resolve(&home, &parent))
+    })
+    .await?;
     state.m7_clone.start(app, request, shell_env, git_program)
 }
 
@@ -333,7 +347,42 @@ pub async fn m7_clone_register(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<crate::session::RepoEntry> {
-    let mut registry = state.registry.lock().map_err(|_| {
+    let registry_arc = Arc::clone(&state.registry);
+    let command_log = Arc::clone(&state.command_log);
+    let (data_dir, manual_git) = {
+        let registry = registry_arc.lock().map_err(|_| {
+            AppError::coded(
+                ErrorKind::Internal,
+                "errors.commands.repositoryListLockFailed6",
+                "仓库列表锁失败",
+                &[],
+            )
+        })?;
+        (
+            registry.directory().to_path_buf(),
+            registry.settings().git_path.clone(),
+        )
+    };
+    let entry = blocking(move || {
+        let candidate = PathBuf::from(&path);
+        if !candidate.is_dir() {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.settings.directoryDoesExist",
+                "目录不存在：{path}",
+                &[("path", path)],
+            ));
+        }
+        let env_memory = crate::environment::EnvMemory::load(data_dir.join("env-memory.json"));
+        crate::session::RepoEntry::build_fast(
+            &candidate,
+            command_log,
+            manual_git.as_deref().map(std::path::Path::new),
+            Some(&env_memory),
+        )
+    })
+    .await?;
+    let mut registry = registry_arc.lock().map_err(|_| {
         AppError::coded(
             ErrorKind::Internal,
             "errors.commands.repositoryListLockFailed6",
@@ -341,7 +390,7 @@ pub async fn m7_clone_register(
             &[],
         )
     })?;
-    registry.add(&path)
+    registry.insert_repo(entry)
 }
 
 // ---------- GitHub（任务 06–08） ----------
@@ -361,7 +410,7 @@ pub async fn m7_github_status(
 ) -> Result<GithubStatus> {
     let github = Arc::clone(&state.m7_github);
     let repo_path = match worktree_id {
-        Some(id) => Some(state.worktree_session(&id)?.path.clone()),
+        Some(id) => Some(session_async(&state, &id).await?.path.clone()),
         None => None,
     };
     Ok(GithubStatus {
@@ -421,7 +470,7 @@ pub async fn m7_github_bind_repo(
     worktree_id: String,
     login: String,
 ) -> Result<()> {
-    let session = session_for(&state, &worktree_id)?;
+    let session = session_async(&state, &worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || github.bind_repo(&session.path, &login)).await
 }
@@ -431,7 +480,7 @@ pub async fn m7_github_remotes(
     state: State<'_, AppState>,
     worktree_id: String,
 ) -> Result<Vec<RemoteInfo>> {
-    let session = session_for(&state, &worktree_id)?;
+    let session = session_async(&state, &worktree_id).await?;
     blocking(move || super::github::store::remotes(&session)).await
 }
 
@@ -450,7 +499,7 @@ pub async fn m7_github_pr_list(
     state: State<'_, AppState>,
     request: PrListRequest,
 ) -> Result<PullRequestList> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -477,7 +526,7 @@ pub async fn m7_github_pr_detail(
     state: State<'_, AppState>,
     request: PrNumberRequest,
 ) -> Result<PullRequestDetail> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -490,7 +539,7 @@ pub async fn m7_github_pr_files(
     state: State<'_, AppState>,
     request: PrNumberRequest,
 ) -> Result<Vec<PullRequestFile>> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -503,7 +552,7 @@ pub async fn m7_github_pr_diff(
     state: State<'_, AppState>,
     request: PrNumberRequest,
 ) -> Result<String> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -516,7 +565,7 @@ pub async fn m7_github_pr_comments(
     state: State<'_, AppState>,
     request: PrNumberRequest,
 ) -> Result<Vec<PullRequestComment>> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -540,7 +589,7 @@ pub async fn m7_github_pr_comment_create(
     state: State<'_, AppState>,
     request: PrCommentRequest,
 ) -> Result<()> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -550,7 +599,7 @@ pub async fn m7_github_pr_comment_create(
 
 #[tauri::command]
 pub async fn m7_github_review_drafts(state: State<'_, AppState>, request: PrNumberRequest) -> Result<ReviewDraftBundle> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || reviews::list(&session, &github,
         request.login.as_deref().ok_or_else(reviews::changed)?,
@@ -559,13 +608,13 @@ pub async fn m7_github_review_drafts(state: State<'_, AppState>, request: PrNumb
 }
 #[tauri::command]
 pub async fn m7_github_review_draft_save(state: State<'_, AppState>, scope: ReviewDraftScope, draft: ReviewDraft) -> Result<ReviewDraft> {
-    let session = session_for(&state, &scope.worktree_id)?;
+    let session = session_async(&state, &scope.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || reviews::save(&session, &github, &scope, draft)).await
 }
 #[tauri::command]
 pub async fn m7_github_review_draft_delete(state: State<'_, AppState>, scope: ReviewDraftScope, id: String) -> Result<()> {
-    let session = session_for(&state, &scope.worktree_id)?;
+    let session = session_async(&state, &scope.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || reviews::delete(&session, &github, &scope, &id)).await
 }
@@ -575,7 +624,7 @@ pub async fn m7_github_review_submit(
     state: State<'_, AppState>,
     request: ReviewSubmitRequest,
 ) -> Result<ReviewReceipt> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         // F07：审阅必须落在用户所选的远端仓库上；请求缺 remote 时拒绝而不是回退 origin。
@@ -589,7 +638,7 @@ pub async fn m7_github_pr_checkout(
     state: State<'_, AppState>,
     request: PrCheckoutRequest,
 ) -> Result<PrCheckoutOutcome> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     let recovery = state.recovery.clone();
     let archive = state.stash_archive.clone();
@@ -604,7 +653,7 @@ pub async fn m7_github_pr_create(
     state: State<'_, AppState>,
     request: PrCreateRequest,
 ) -> Result<PrCreated> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, Some(&request.remote))?;
@@ -617,7 +666,7 @@ pub async fn m7_github_pr_merge(
     state: State<'_, AppState>,
     request: MergeRequest,
 ) -> Result<PrMergeOutcome> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         // F07：合并必须落在用户所选的远端仓库上；请求缺 remote 时拒绝而不是回退 origin。
@@ -636,7 +685,7 @@ pub async fn m7_github_device_cancel(state: State<'_, AppState>, flow_id: String
 
 #[tauri::command]
 pub async fn m7_github_repo_key(state: State<'_, AppState>, worktree_id: String) -> Result<String> {
-    let session = session_for(&state, &worktree_id)?;
+    let session = session_async(&state, &worktree_id).await?;
     Ok(GithubState::repo_key(&session.path))
 }
 
@@ -645,7 +694,8 @@ pub async fn m7_github_receipts(
     state: State<'_, AppState>,
     worktree_id: String,
 ) -> Result<Vec<MergeReceipt>> {
-    let repo_key = GithubState::repo_key(&session_for(&state, &worktree_id)?.path);
+    let session = session_async(&state, &worktree_id).await?;
+    let repo_key = GithubState::repo_key(&session.path);
     Ok(state.m7_github.receipts().list(&repo_key))
 }
 
@@ -655,7 +705,7 @@ pub async fn m7_github_protection_refresh(
     request: GithubRepoRequest,
     branch: String,
 ) -> Result<ProtectionInfo> {
-    let session = session_for(&state, &request.worktree_id)?;
+    let session = session_async(&state, &request.worktree_id).await?;
     let github = Arc::clone(&state.m7_github);
     blocking(move || {
         let context = PrContext::new(&session, &github, request.remote.as_deref())?;
@@ -672,7 +722,7 @@ pub async fn m7_preview_diagnostics(
 ) -> Result<DiagnosticsPreview> {
     let settings = crate::commands::settings_snapshot(&state)?;
     let session = match &request.worktree_id {
-        Some(id) => Some(session_for(&state, id)?),
+        Some(id) => Some(session_async(&state, id).await?),
         None => None,
     };
     let command_log = Arc::clone(&state.command_log);
@@ -798,12 +848,12 @@ pub struct ChangelistRequest { pub worktree_id:String }
 pub struct ChangelistChangeRequest { pub worktree_id:String, pub expected:super::changelists::ChangelistSelection, pub action:super::changelists::ChangeAction }
 #[tauri::command]
 pub async fn m7_changelist_view(state:State<'_,AppState>,request:ChangelistRequest)->Result<super::changelists::ChangelistView> {
-    let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
+    let session=session_async(&state,&request.worktree_id).await?;let store=Arc::clone(&state.changelists);
     blocking(move||store.view(&session)).await
 }
 #[tauri::command]
 pub async fn m7_changelist_change(state:State<'_,AppState>,request:ChangelistChangeRequest)->Result<super::changelists::ChangelistView> {
-    let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
+    let session=session_async(&state,&request.worktree_id).await?;let store=Arc::clone(&state.changelists);
     blocking(move||{let _write=session.acquire_write_lock()?;store.change(&session,&request.expected,request.action)}).await
 }
 #[derive(Debug,serde::Deserialize)]
@@ -811,7 +861,7 @@ pub async fn m7_changelist_change(state:State<'_,AppState>,request:ChangelistCha
 pub struct ChangelistWarningsRequest {pub worktree_id:String,pub selection:super::changelists::ChangelistSelection,#[serde(default)]pub amend:bool}
 #[tauri::command]
 pub async fn m7_changelist_warnings(state:State<'_,AppState>,request:ChangelistWarningsRequest)->Result<Vec<crate::commit_warnings::CommitWarning>> {
-    let session=session_for(&state,&request.worktree_id)?;let store=Arc::clone(&state.changelists);
+    let session=session_async(&state,&request.worktree_id).await?;let store=Arc::clone(&state.changelists);
     let settings=state.registry.lock().map_err(|_|internal("settings lock"))?.settings().clone();
     blocking(move||{let _write=session.acquire_write_lock()?;let prepared=store.prepare(&session,&request.selection,&crate::commit::capture(session.git())?,request.amend)?;
         crate::commit_warnings::collect(&prepared.git,&crate::commit_warnings::WarningOptions{crlf:settings.commit_warn_crlf,detached:settings.commit_warn_detached,large_file_bytes:settings.commit_warn_large_file_bytes,invalid_filename:settings.commit_warn_invalid_filename})

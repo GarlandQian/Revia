@@ -2116,8 +2116,18 @@ export function App() {
         return false;
       }
       return true;
-    } catch (caught) { setAppError(toAppError(caught), id); return false; }
-  }, [askEdit, editSessions, refreshTarget, setAppError]);
+    } catch (caught) {
+      const err = toAppError(caught);
+      setAppError(err, id);
+      notify({
+        tone: "error",
+        title: () => (messages.changes.writeFailedTitle),
+        detail: () => (formatAppError(err)),
+        persistent: true,
+      });
+      return false;
+    }
+  }, [askEdit, editSessions, notify, refreshTarget, setAppError]);
 
   const closeEdit = useCallback(async (target: EditTarget) => {
     try {
@@ -2144,16 +2154,27 @@ export function App() {
       if (!started.ok) {
         writingWorktreesRef.current.delete(opWorktreeId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
-        setAppError(
-          closeGuardBlockedError(started.reason),
-          opWorktreeId,
-        );
+        const err = closeGuardBlockedError(started.reason);
+        setAppError(err, opWorktreeId);
+        notify({
+          tone: "error",
+          title: () => (messages.changes.writeFailedTitle),
+          detail: () => (formatAppError(err)),
+          persistent: true,
+        });
         return;
       }
     } catch (caught) {
       writingWorktreesRef.current.delete(opWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
-      setAppError(toAppError(caught), opWorktreeId);
+      const err = toAppError(caught);
+      setAppError(err, opWorktreeId);
+      notify({
+        tone: "error",
+        title: () => (messages.changes.writeFailedTitle),
+        detail: () => (formatAppError(err)),
+        persistent: true,
+      });
       return;
     }
     setAppError(null, opWorktreeId);

@@ -155,7 +155,12 @@ impl WorktreeWatcher {
             roots: 0,
         }));
 
-        let (tx, rx): (Sender<Result<(), String>>, Receiver<Result<(), String>>) = channel();
+        enum WatchMsg {
+            Event(Event),
+            Error(String),
+        }
+
+        let (tx, rx): (Sender<WatchMsg>, Receiver<WatchMsg>) = channel();
         let mut root_count = 0usize;
         let mut failures: Vec<String> = Vec::new();
         let runtime_errors = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -172,21 +177,11 @@ impl WorktreeWatcher {
         let mut watcher =
             match notify::recommended_watcher(move |result: notify::Result<Event>| match result {
                 Ok(event) => {
-                    // Q213、S1：被忽略的路径不触发刷新；统计只记次数，不发送刷新。
-                    match filter.classify(&event, ignore.as_deref()) {
-                        Verdict::Refresh(kind) => {
-                            if let Some(perf) = &perf {
-                                perf.note_watch_event(kind);
-                            }
-                            let _ = tx.send(Ok(()));
-                        }
-                        Verdict::Ignored => {
-                            if let Some(perf) = &perf {
-                                perf.note_watch_event(WatchEventKind::Ignored);
-                            }
-                        }
-                        Verdict::None => {}
+                    // OS 监视回调必须保持无阻塞：只过滤纯访问事件，路径判定与 git check-ignore 移到工作线程批处理。
+                    if matches!(event.kind, EventKind::Access(_)) {
+                        return;
                     }
+                    let _ = tx.send(WatchMsg::Event(event));
                 }
                 Err(error) => {
                     let text = error.to_string();
@@ -195,7 +190,7 @@ impl WorktreeWatcher {
                             guard.push(text.clone());
                         }
                     }
-                    let _ = tx.send(Err(text));
+                    let _ = tx.send(WatchMsg::Error(text));
                 }
             }) {
                 Ok(watcher) => watcher,
@@ -292,44 +287,95 @@ impl WorktreeWatcher {
         let thread_stop = stop.clone();
         let thread_status = status.clone();
         let thread_errors = runtime_errors.clone();
+        let thread_ignore = ignore.clone();
+        let thread_perf = perf.clone();
         // 工作线程创建失败同样必须降级为「自动刷新不可用」，不能静默吞掉。
         let thread = match std::thread::Builder::new()
             .name("revia-watch".into())
             .spawn(move || {
+                let mut dirty = false;
+                let mut last_relevant: Option<std::time::Instant> = None;
+                let flush_if_due = |dirty: &mut bool, last_relevant: &mut Option<std::time::Instant>| -> bool {
+                    let Some(since) = *last_relevant else {
+                        return false;
+                    };
+                    if !*dirty || since.elapsed() < DEBOUNCE {
+                        return false;
+                    }
+                    if thread_stop.load(Ordering::Relaxed) {
+                        return true;
+                    }
+                    let runtime_error = thread_errors
+                        .lock()
+                        .ok()
+                        .and_then(|guard| guard.first().cloned());
+                    if let Some(error) = runtime_error {
+                        if let Ok(mut guard) = thread_status.lock() {
+                            guard.active = false;
+                            guard.error = Some(unavailable(error));
+                        }
+                    } else {
+                        on_change(activation);
+                    }
+                    *dirty = false;
+                    *last_relevant = None;
+                    false
+                };
+
                 while !thread_stop.load(Ordering::Relaxed) {
-                    match rx.recv_timeout(DEBOUNCE) {
-                        Ok(Ok(())) => {
-                            // 合并窗口：把接下来的连续事件一起吞掉，只通知一次。
-                            while matches!(rx.recv_timeout(DEBOUNCE), Ok(Ok(()))) {
-                                if thread_stop.load(Ordering::Relaxed) {
-                                    return;
-                                }
+                    let wait = if dirty {
+                        last_relevant
+                            .map(|since| DEBOUNCE.saturating_sub(since.elapsed()))
+                            .unwrap_or(DEBOUNCE)
+                    } else {
+                        DEBOUNCE
+                    };
+                    let mut messages = Vec::new();
+                    match rx.recv_timeout(wait) {
+                        Ok(first) => {
+                            messages.push(first);
+                            while let Ok(more) = rx.try_recv() {
+                                messages.push(more);
                             }
-                            if thread_stop.load(Ordering::Relaxed) {
+                        }
+                        Err(RecvTimeoutError::Timeout) => {
+                            if flush_if_due(&mut dirty, &mut last_relevant) {
                                 return;
                             }
-                            // 运行时错误立即把状态降级，避免谎报可用。
-                            let runtime_error = thread_errors
-                                .lock()
-                                .ok()
-                                .and_then(|guard| guard.first().cloned());
-                            if let Some(error) = runtime_error {
+                            continue;
+                        }
+                        Err(RecvTimeoutError::Disconnected) => {
+                            let _ = flush_if_due(&mut dirty, &mut last_relevant);
+                            return;
+                        }
+                    }
+                    if thread_stop.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let mut events = Vec::new();
+                    for msg in messages {
+                        match msg {
+                            WatchMsg::Event(event) => events.push(event),
+                            WatchMsg::Error(error) => {
                                 if let Ok(mut guard) = thread_status.lock() {
                                     guard.active = false;
                                     guard.error = Some(unavailable(error));
                                 }
-                                continue;
-                            }
-                            on_change(activation);
-                        }
-                        Ok(Err(error)) => {
-                            if let Ok(mut guard) = thread_status.lock() {
-                                guard.active = false;
-                                guard.error = Some(unavailable(error));
                             }
                         }
-                        Err(RecvTimeoutError::Timeout) => continue,
-                        Err(RecvTimeoutError::Disconnected) => return,
+                    }
+                    if !events.is_empty()
+                        && filter.classify_batch(
+                            &events,
+                            thread_ignore.as_deref(),
+                            thread_perf.as_deref(),
+                        )
+                    {
+                        dirty = true;
+                        last_relevant = Some(std::time::Instant::now());
+                    }
+                    if flush_if_due(&mut dirty, &mut last_relevant) {
+                        return;
                     }
                 }
             }) {
@@ -375,6 +421,8 @@ impl WorktreeWatcher {
 impl Drop for WorktreeWatcher {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        // 先释放 watcher 以关闭发送通道，让工作线程及时从 recv_timeout 退出。
+        drop(self._watcher.take());
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
@@ -532,6 +580,7 @@ impl WatchFilter {
     /// - `.git` 内部元数据：一定刷新；同时清空忽略缓存（index 变化后「已跟踪」判定会变）；
     /// - 忽略规则文件（`.gitignore`、`<gitDir>/info/exclude`、`core.excludesFile`）：清空缓存并刷新一次；
     /// - 工作区里的普通文件：交给 Git 的 `check-ignore` 判定，命中就跳过刷新。
+    #[cfg(test)]
     fn classify(&self, event: &Event, ignore: Option<&IgnoreMatcher>) -> Verdict {
         if matches!(event.kind, EventKind::Access(_)) {
             return Verdict::None;
@@ -588,6 +637,121 @@ impl WatchFilter {
                 }
             }
         }
+    }
+
+    /// 工作线程批处理分类：在非 OS 回调线程中批量判定一组事件，并合并为一次 `git check-ignore`。
+    fn classify_batch(
+        &self,
+        events: &[Event],
+        ignore: Option<&IgnoreMatcher>,
+        perf: Option<&PerfStore>,
+    ) -> bool {
+        let excludes = ignore.and_then(|matcher| matcher.excludes_file.as_deref());
+        let mut invalidate_ignore = false;
+        let mut needs_refresh = false;
+        let mut pending_worktree_events: Vec<Vec<PathBuf>> = Vec::new();
+
+        for event in events {
+            if matches!(event.kind, EventKind::Access(_)) {
+                continue;
+            }
+            if event.paths.is_empty() {
+                if let Some(perf) = perf {
+                    perf.note_watch_event(WatchEventKind::Normal);
+                }
+                needs_refresh = true;
+                continue;
+            }
+            let kinds: Vec<(PathKind, PathBuf)> = event
+                .paths
+                .iter()
+                .map(|path| {
+                    let canonical = canonicalize_path(path);
+                    let kind = if excludes.is_some_and(|file| canonical == file) {
+                        PathKind::IgnoreRule
+                    } else {
+                        self.path_kind(path)
+                    };
+                    (kind, canonical)
+                })
+                .collect();
+            if kinds.iter().all(|(kind, _)| *kind == PathKind::Irrelevant) {
+                continue;
+            }
+            if kinds.iter().any(|(kind, _)| *kind == PathKind::GitMetadata) {
+                invalidate_ignore = true;
+                if let Some(perf) = perf {
+                    perf.note_watch_event(WatchEventKind::GitInternal);
+                }
+                needs_refresh = true;
+                continue;
+            }
+            let paths: Vec<PathBuf> = kinds
+                .iter()
+                .filter(|(kind, _)| *kind == PathKind::Worktree || *kind == PathKind::IgnoreRule)
+                .map(|(_, path)| path.clone())
+                .collect();
+            if kinds.iter().any(|(kind, _)| *kind == PathKind::IgnoreRule)
+                || paths.iter().any(|path| is_ignore_rule_file(path, excludes))
+            {
+                invalidate_ignore = true;
+                if let Some(perf) = perf {
+                    perf.note_watch_event(WatchEventKind::Normal);
+                }
+                needs_refresh = true;
+                continue;
+            }
+            if !paths.is_empty() {
+                pending_worktree_events.push(paths);
+            }
+        }
+
+        if invalidate_ignore {
+            if let Some(matcher) = ignore {
+                matcher.invalidate();
+            }
+        }
+
+        if pending_worktree_events.is_empty() {
+            return needs_refresh;
+        }
+
+        let Some(matcher) = ignore else {
+            if let Some(perf) = perf {
+                for _ in &pending_worktree_events {
+                    perf.note_watch_event(WatchEventKind::Normal);
+                }
+            }
+            return true;
+        };
+
+        let mut unique_paths: Vec<PathBuf> = Vec::new();
+        let mut seen: HashSet<PathBuf> = HashSet::new();
+        for paths in &pending_worktree_events {
+            for path in paths {
+                if seen.insert(path.clone()) {
+                    unique_paths.push(path.clone());
+                }
+            }
+        }
+
+        let ignored = matcher.ignored_set_canonical(&unique_paths);
+        for paths in &pending_worktree_events {
+            let all_ignored = ignored
+                .as_ref()
+                .is_some_and(|set| paths.iter().all(|path| set.contains(path)));
+            if all_ignored {
+                if let Some(perf) = perf {
+                    perf.note_watch_event(WatchEventKind::Ignored);
+                }
+            } else {
+                if let Some(perf) = perf {
+                    perf.note_watch_event(WatchEventKind::Normal);
+                }
+                needs_refresh = true;
+            }
+        }
+        needs_refresh
     }
 
     /// 测试用：旧布尔语义（是否与当前 worktree 状态有关）。
@@ -675,6 +839,15 @@ struct IgnoreCache {
 /// 缓存上限：超过就整体清空，避免长时间运行无限增长。
 const IGNORE_CACHE_LIMIT: usize = 4096;
 
+/// 把路径字符串规范为 Git 输出使用的正斜杠形式（仅 Windows 替换 `\` → `/`）。
+fn normalize_git_path_str(text: &str, windows: bool) -> String {
+    if windows {
+        text.replace('\\', "/")
+    } else {
+        text.to_string()
+    }
+}
+
 impl IgnoreMatcher {
     /// `git` 的目录必须是工作区根目录（`check-ignore` 按工作区相对路径工作）。
     pub fn new(git: Git) -> Self {
@@ -703,62 +876,82 @@ impl IgnoreMatcher {
         }
     }
 
-    /// 这些路径是否**全部**被忽略（任何一个没被忽略就要刷新）。
-    pub fn all_ignored(&self, paths: &[PathBuf]) -> bool {
-        if paths.is_empty() {
-            return false;
+    /// 返回给定规范化路径集合中已被忽略的子集；查询失败返回 None（调用方保守刷新）。
+    fn ignored_set_canonical(&self, canonical_paths: &[PathBuf]) -> Option<HashSet<PathBuf>> {
+        if canonical_paths.is_empty() {
+            return Some(HashSet::new());
         }
-        // 与事件路径同口径：都规范化后再比较（macOS 的 /var 与 /private/var）。
-        let paths: Vec<PathBuf> = paths.iter().map(|path| canonicalize_path(path)).collect();
-        let mut pending: Vec<PathBuf> = Vec::new();
+        let mut resolved = HashSet::new();
+        let mut pending = Vec::new();
+        let mut pending_seen = HashSet::new();
         {
-            let Ok(cache) = self.state.lock() else {
-                return false;
-            };
-            for path in &paths {
+            let cache = self.state.lock().ok()?;
+            for path in canonical_paths {
                 if ancestor_ignored(&cache.ignored, path) || cache.ignored.contains(path) {
-                    continue;
+                    resolved.insert(path.clone());
+                } else if !cache.tracked_or_normal.contains(path)
+                    && pending_seen.insert(path.clone())
+                {
+                    pending.push(path.clone());
                 }
-                if cache.tracked_or_normal.contains(path) {
-                    return false;
-                }
-                pending.push(path.clone());
             }
         }
         if pending.is_empty() {
-            return true;
+            return Some(resolved);
         }
-        let Some(ignored) = self.query(&pending) else {
-            return false;
-        };
+        let queried = self.query(&pending)?;
         if let Ok(mut cache) = self.state.lock() {
             if cache.ignored.len() + cache.tracked_or_normal.len() > IGNORE_CACHE_LIMIT {
                 cache.ignored.clear();
                 cache.tracked_or_normal.clear();
             }
             for path in &pending {
-                if ignored.contains(path) {
+                if queried.contains(path) {
                     cache.ignored.insert(path.clone());
                 } else {
                     cache.tracked_or_normal.insert(path.clone());
                 }
             }
         }
-        pending.iter().all(|path| ignored.contains(path))
+        for path in pending {
+            if queried.contains(&path) {
+                resolved.insert(path);
+            }
+        }
+        Some(resolved)
+    }
+
+    /// 这些路径是否**全部**被忽略（任何一个没被忽略就要刷新）。
+    pub fn all_ignored(&self, paths: &[PathBuf]) -> bool {
+        if paths.is_empty() {
+            return false;
+        }
+        // 与事件路径同口径：都规范化后再比较（macOS 的 /var 与 /private/var）。
+        let canonical: Vec<PathBuf> = paths.iter().map(|path| canonicalize_path(path)).collect();
+        self.ignored_set_canonical(&canonical)
+            .is_some_and(|ignored| canonical.iter().all(|path| ignored.contains(path)))
     }
 
     /// 一次 Git 调用判定一批路径；失败返回 None（调用方保守刷新）。
     fn query(&self, paths: &[PathBuf]) -> Option<HashSet<PathBuf>> {
         let root = &self.root;
         let mut input = Vec::new();
-        let mut relative: HashMap<PathBuf, PathBuf> = HashMap::new();
+        let mut relative: HashMap<Vec<u8>, PathBuf> = HashMap::new();
         for path in paths {
-            let relative_path = path.strip_prefix(root).ok()?.to_path_buf();
-            input.extend_from_slice(relative_path.as_os_str().as_encoded_bytes());
+            let relative_path = path.strip_prefix(root).ok()?;
+            let key = if cfg!(windows) {
+                normalize_git_path_str(&relative_path.to_string_lossy(), true).into_bytes()
+            } else {
+                relative_path.as_os_str().as_encoded_bytes().to_vec()
+            };
+            input.extend_from_slice(&key);
             input.push(0);
-            relative.insert(relative_path, path.clone());
+            relative.insert(key, path.clone());
         }
-        let output = self.git.run_stdin(&["check-ignore", "--stdin", "-z"], input).ok()?;
+        let output = self
+            .git
+            .run_stdin(&["check-ignore", "--stdin", "-z"], input)
+            .ok()?;
         // 0 = 有被忽略的路径，1 = 一个都没有；其他退出码说明判定失败。
         if output.exit_code != 0 && output.exit_code != 1 {
             return None;
@@ -768,8 +961,13 @@ impl IgnoreMatcher {
             if chunk.is_empty() {
                 continue;
             }
-            let name = PathBuf::from(String::from_utf8_lossy(chunk).into_owned());
-            if let Some(original) = relative.get(&name) {
+            let found = if cfg!(windows) {
+                let normalized = normalize_git_path_str(&String::from_utf8_lossy(chunk), true);
+                relative.get(normalized.as_bytes())
+            } else {
+                relative.get(chunk)
+            };
+            if let Some(original) = found {
                 ignored.insert(original.clone());
             }
         }
@@ -1515,5 +1713,55 @@ mod ignore_tests {
             filter.classify(&modify(dir.path().join("unrelated.txt")), Some(&matcher)),
             Verdict::None
         );
+    }
+
+    #[test]
+    fn windows_backslash_relative_paths_match_git_forward_slash_output() {
+        assert_eq!(
+            normalize_git_path_str(r"node_modules\pkg\index.js", true),
+            "node_modules/pkg/index.js"
+        );
+        assert_eq!(
+            normalize_git_path_str(r"src\nested\file.ts", false),
+            r"src\nested\file.ts"
+        );
+    }
+
+    #[test]
+    fn classify_batch_merges_ignore_queries_and_tracks_perf() {
+        let dir = git_repo();
+        let repo = dir.path().join("repo");
+        let roots = resolve_roots(&repo, None, None);
+        let filter = WatchFilter::from_roots(&roots);
+        let matcher = matcher(&repo);
+        let perf = PerfStore::new();
+        let modify = |path: PathBuf| Event {
+            kind: EventKind::Modify(notify::event::ModifyKind::Any),
+            paths: vec![path],
+            attrs: Default::default(),
+        };
+
+        let ignored_only = vec![
+            modify(repo.join("node_modules/pkg/index.js")),
+            modify(repo.join("debug.log")),
+        ];
+        assert!(!filter.classify_batch(&ignored_only, Some(&matcher), Some(&perf)));
+
+        let before = matcher.git.log.snapshot().len();
+        let mixed = vec![
+            modify(repo.join("node_modules/pkg/other.js")),
+            modify(repo.join("src/new_a.ts")),
+            modify(repo.join("src/new_b.ts")),
+        ];
+        assert!(filter.classify_batch(&mixed, Some(&matcher), Some(&perf)));
+        let check_ignore_calls = matcher
+            .git
+            .log
+            .snapshot()
+            .into_iter()
+            .skip(before)
+            .filter(|record| record.args.first().map(String::as_str) == Some("check-ignore"))
+            .count();
+        assert_eq!(check_ignore_calls, 1, "batch should invoke git check-ignore at most once");
     }
 }

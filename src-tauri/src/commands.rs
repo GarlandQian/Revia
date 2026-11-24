@@ -124,7 +124,7 @@ pub(crate) fn session_lock_error() -> AppError {
 }
 
 pub struct AppState {
-    pub registry: Mutex<Registry>,
+    pub registry: Arc<Mutex<Registry>>,
     /// 会话表：后台环境解析完成后可能替换同名会话，因此共享 `Arc`。
     pub sessions: Arc<Mutex<HashMap<String, Arc<WorktreeSession>>>>,
     pub command_log: Arc<CommandLog>,
@@ -179,7 +179,7 @@ pub struct AppState {
     shell_resolver: ShellResolver,
     /// 会话创建与重新加载的串行门（M10 任务 02）：打开要么整体在重载之前完成，
     /// 要么在重载之后重新登记，不会把旧代次的会话插到重载之后。
-    pub(crate) lifecycle: Mutex<()>,
+    pub(crate) lifecycle: Arc<Mutex<()>>,
     /// 后台任务向前端发事件用（lib.rs 启动时写入）。
     pub app: std::sync::OnceLock<tauri::AppHandle>,
     /// 提交操作 ID 计数器（实时输出事件归属用）。
@@ -199,14 +199,14 @@ impl AppState {
             stash_archive: crate::stash_archive::StashArchiveStore::new(&data_dir.clone()),
             autostash: crate::autostash::AutostashStore::new(&data_dir.clone()),
             review: Arc::new(crate::review::ReviewStore::new(data_dir.clone())),
-            registry: Mutex::new(Registry::load(data_dir.clone(), Arc::clone(&command_log))),
+            registry: Arc::new(Mutex::new(Registry::load(data_dir.clone(), Arc::clone(&command_log)))),
             sessions: Arc::new(Mutex::new(HashMap::new())),
             env: Arc::new(crate::environment::EnvCoordinator::new(
                 data_dir.join("env-memory.json"),
             )),
             ai: Arc::new(crate::ai::AiManager::default()),
             shell_resolver: Arc::new(default_shell_resolver),
-            lifecycle: Mutex::new(()),
+            lifecycle: Arc::new(Mutex::new(())),
             app: std::sync::OnceLock::new(),
             command_log: Arc::clone(&command_log),
             history: Arc::new(HistoryStore::new()),
@@ -268,9 +268,18 @@ impl AppState {
         self
     }
 
-    /// 环境生命周期 module 共用的解析入口（生产登录 shell / 测试替身）。
-    pub(crate) fn resolver(&self) -> &ShellResolver {
-        &self.shell_resolver
+    pub(crate) fn env_handle(&self) -> crate::worktree_environment::WorktreeEnvironmentHandle {
+        crate::worktree_environment::WorktreeEnvironmentHandle {
+            registry: Arc::clone(&self.registry),
+            sessions: Arc::clone(&self.sessions),
+            env: Arc::clone(&self.env),
+            lifecycle: Arc::clone(&self.lifecycle),
+            command_log: Arc::clone(&self.command_log),
+            review: Arc::clone(&self.review),
+            history: Arc::clone(&self.history),
+            shell_resolver: Arc::clone(&self.shell_resolver),
+            app: self.app.get().cloned(),
+        }
     }
 
     pub(crate) fn session(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
@@ -278,14 +287,59 @@ impl AppState {
         crate::worktree_environment::WorktreeEnvironment::new(self).open(worktree_id)
     }
 
+    pub(crate) async fn session_async(&self, worktree_id: String) -> Result<Arc<WorktreeSession>> {
+        let handle = self.env_handle();
+        tauri::async_runtime::spawn_blocking(move || handle.open(&worktree_id))
+            .await
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.m7.taskFailed",
+                    "后台任务失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?
+    }
+
     /// 等环境就绪后再执行网络操作与内置终端（Q212）；写操作另由 `acquire_write_lock` 统一等待。
     pub fn await_environment(&self, worktree_id: &str) -> Result<()> {
         crate::worktree_environment::WorktreeEnvironment::new(self).await_ready(worktree_id)
     }
 
+    pub(crate) async fn await_environment_async(&self, worktree_id: String) -> Result<()> {
+        let handle = self.env_handle();
+        tauri::async_runtime::spawn_blocking(move || handle.await_ready(&worktree_id))
+            .await
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.m7.taskFailed",
+                    "后台任务失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?
+    }
+
     /// 环境未就绪时打开失败不立即报错：等它就绪后重试一次（Q212）。
     pub fn session_retrying(&self, worktree_id: &str) -> Result<Arc<WorktreeSession>> {
         crate::worktree_environment::WorktreeEnvironment::new(self).session_retrying(worktree_id)
+    }
+
+    pub(crate) async fn session_retrying_async(
+        &self,
+        worktree_id: String,
+    ) -> Result<Arc<WorktreeSession>> {
+        let handle = self.env_handle();
+        tauri::async_runtime::spawn_blocking(move || handle.session_retrying(&worktree_id))
+            .await
+            .map_err(|error| {
+                AppError::coded(
+                    ErrorKind::Internal,
+                    "errors.m7.taskFailed",
+                    "后台任务失败：{error}",
+                    &[("error", error.to_string())],
+                )
+            })?
     }
 
     /// 清空全部会话缓存：重新解析登录 shell 环境与 Git 程序（设置里的“重新加载环境”）。
@@ -658,7 +712,7 @@ pub async fn commit_warnings(
     state: State<'_, AppState>,
     request: WorktreeRequest,
 ) -> Result<Vec<crate::commit_warnings::CommitWarning>> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let settings = {
         let registry = state.registry.lock().map_err(|_| {
             AppError::coded(
@@ -718,9 +772,11 @@ pub async fn list_settings(state: State<'_, AppState>) -> Result<Settings> {
 /// 唯一的例外：接收用户选择的目录路径，确认是 Git 仓库后登记。
 #[tauri::command]
 pub async fn add_repo(state: State<'_, AppState>, request: AddRepoRequest) -> Result<RepoEntry> {
-    let path = request.path.clone();
-    {
-        let mut registry = state.registry.lock().map_err(|_| {
+    let path = request.path;
+    let command_log = Arc::clone(&state.command_log);
+    let registry_arc = Arc::clone(&state.registry);
+    let (data_dir, manual_git) = {
+        let registry = registry_arc.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
                 "errors.commands.repositoryListLockFailed7",
@@ -728,8 +784,47 @@ pub async fn add_repo(state: State<'_, AppState>, request: AddRepoRequest) -> Re
                 &[],
             )
         })?;
-        registry.add(&path)
-    }
+        (
+            registry.directory().to_path_buf(),
+            registry.settings().git_path.clone(),
+        )
+    };
+    let entry = tauri::async_runtime::spawn_blocking(move || {
+        let candidate = PathBuf::from(&path);
+        if !candidate.is_dir() {
+            return Err(AppError::coded(
+                ErrorKind::Rejected,
+                "errors.settings.directoryDoesExist",
+                "目录不存在：{path}",
+                &[("path", path)],
+            ));
+        }
+        let env_memory = crate::environment::EnvMemory::load(data_dir.join("env-memory.json"));
+        RepoEntry::build_fast(
+            &candidate,
+            command_log,
+            manual_git.as_deref().map(std::path::Path::new),
+            Some(&env_memory),
+        )
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.m7.taskFailed",
+            "后台任务失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })??;
+    let mut registry = registry_arc.lock().map_err(|_| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.repositoryListLockFailed7",
+            "仓库列表锁失败",
+            &[],
+        )
+    })?;
+    registry.insert_repo(entry)
 }
 
 /// 移除应用列表中的登记；不会删除磁盘内容或释放仍被草稿使用的会话。
@@ -813,7 +908,7 @@ pub async fn list_worktree_status(
     state: State<'_, AppState>,
     request: ListWorktreeStatusRequest,
 ) -> Result<Vec<WorktreeStatusEntry>> {
-    let repo = {
+    let (repo, manual_git) = {
         let registry = state.registry.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -822,18 +917,26 @@ pub async fn list_worktree_status(
                 &[],
             )
         })?;
-        registry.find(&request.repo_id).ok_or_else(|| {
+        let repo = registry.find(&request.repo_id).ok_or_else(|| {
             AppError::coded(
                 ErrorKind::Rejected,
                 "errors.commands.theRepositoryRegisteredAddFirst",
                 "仓库未登记，请先添加",
                 &[],
             )
-        })?
+        })?;
+        (
+            repo,
+            registry
+                .settings()
+                .git_path
+                .clone()
+                .map(std::path::PathBuf::from),
+        )
     };
     // 优先使用该仓库已有会话的 Git 上下文（同一套登录 shell 环境），
-    // 否则按仓库路径解析一次；不在命令里重复为每个 worktree 启动登录 shell。
-    let git = {
+    // 否则在阻塞线程池按仓库路径解析一次；不在 Tokio worker 上跑登录 shell。
+    let existing_git = {
         let sessions = state.sessions.lock().map_err(|_| {
             AppError::coded(
                 ErrorKind::Internal,
@@ -845,42 +948,29 @@ pub async fn list_worktree_status(
         repo.worktrees
             .iter()
             .find_map(|worktree| sessions.get(&worktree.id).cloned())
+            .map(|session| session.git().clone())
     };
-    let git = match git {
-        Some(session) => session.git().clone(),
-        None => {
-            let home = crate::shell::home_dir()?;
-            let path = std::path::PathBuf::from(&repo.path);
-            let shell_env = crate::shell::resolve(&home, &path);
-            let program = {
-                let registry = state.registry.lock().map_err(|_| {
-                    AppError::coded(
-                        ErrorKind::Internal,
-                        "errors.commands.repositoryListLockFailed12",
-                        "仓库列表锁失败",
-                        &[],
-                    )
-                })?;
-                registry
-                    .settings()
-                    .git_path
-                    .clone()
-                    .map(std::path::PathBuf::from)
-            };
-            crate::git::Git::with_program(
-                &path,
-                &shell_env,
-                state.command_log.clone(),
-                program.as_deref(),
-            )?
-        }
-    };
+    let command_log = Arc::clone(&state.command_log);
+    let repo_path = std::path::PathBuf::from(&repo.path);
     let entries = repo.worktrees;
-    tauri::async_runtime::spawn_blocking(move || {
-        entries
+    tauri::async_runtime::spawn_blocking(move || -> Result<Vec<WorktreeStatusEntry>> {
+        let git = match existing_git {
+            Some(git) => git,
+            None => {
+                let home = crate::shell::home_dir()?;
+                let shell_env = crate::shell::resolve(&home, &repo_path);
+                crate::git::Git::with_program(
+                    &repo_path,
+                    &shell_env,
+                    command_log,
+                    manual_git.as_deref(),
+                )?
+            }
+        };
+        Ok(entries
             .iter()
             .map(|entry| crate::worktree_status::read(&git, entry))
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>())
     })
     .await
     .map_err(|error| {
@@ -890,7 +980,7 @@ pub async fn list_worktree_status(
             "读取 worktree 状态失败：{error}",
             &[("error", error.to_string())],
         )
-    })
+    })?
 }
 
 #[tauri::command]
@@ -903,7 +993,7 @@ pub async fn open_worktree(
     let first_open = !state.has_session(&request.worktree_id);
     let started = std::time::Instant::now();
     // 环境未就绪时的失败等它就绪后重试一次，不立即报错（Q212）。
-    let session = state.session_retrying(&request.worktree_id)?;
+    let session = state.session_retrying_async(request.worktree_id.clone()).await?;
     state.perf.note_session_ready(
         Some(request.worktree_id.clone()),
         first_open,
@@ -923,29 +1013,49 @@ pub async fn watch_worktree(
     state: State<'_, AppState>,
     request: WatchWorktreeRequest,
 ) -> Result<WatchStatus> {
-    let session = state.session(&request.worktree_id)?;
-    apply_acceptance_watch_failure(&state);
-    let events = state.watch_events.clone();
-    // Q213：用 Git 自己的判定跳过被忽略的路径；perf 只记次数（Q210）。
-    let ignore = Arc::new(crate::watch::IgnoreMatcher::new(
-        session.git.in_directory(&session.path),
-    ));
-    let status = state.watch.activate_filtered(
-        resolve_roots(
-            &session.path,
-            session.git_dir_path(),
-            session.common_dir_path(),
-        ),
-        request.activation,
-        Some(ignore),
-        Some(Arc::clone(&state.perf)),
-        move |activation| {
-            if let Ok(mut events) = events.lock() {
-                events.record(activation);
+    let env = state.env_handle();
+    let acceptance = state.acceptance.clone();
+    let watch = Arc::clone(&state.watch);
+    let events = Arc::clone(&state.watch_events);
+    let perf = Arc::clone(&state.perf);
+    tauri::async_runtime::spawn_blocking(move || {
+        let session = env.open(&request.worktree_id)?;
+        if let Some(acceptance) = &acceptance {
+            let failure = acceptance.watch_failure();
+            watch.force_failure(failure.clone());
+            if let Some(reason) = failure {
+                watch.fail_current(reason);
             }
-        },
-    );
-    Ok(status)
+        }
+        // Q213：用 Git 自己的判定跳过被忽略的路径；perf 只记次数（Q210）。
+        let ignore = Arc::new(crate::watch::IgnoreMatcher::new(
+            session.git.in_directory(&session.path),
+        ));
+        Ok(watch.activate_filtered(
+            resolve_roots(
+                &session.path,
+                session.git_dir_path(),
+                session.common_dir_path(),
+            ),
+            request.activation,
+            Some(ignore),
+            Some(perf),
+            move |activation| {
+                if let Ok(mut events) = events.lock() {
+                    events.record(activation);
+                }
+            },
+        ))
+    })
+    .await
+    .map_err(|error| {
+        AppError::coded(
+            ErrorKind::Internal,
+            "errors.commands.sessionLockFailed",
+            "启动文件监视失败：{error}",
+            &[("error", error.to_string())],
+        )
+    })?
 }
 
 /// 停止监视（离开 worktree 或关闭窗口）。
@@ -1094,7 +1204,7 @@ pub async fn set_review_mark(
     state: State<'_, AppState>,
     request: ReviewMarkRequest,
 ) -> Result<crate::review::ReviewMarks> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let path = request.path.clone();
     let marked = request.marked;
     let expected = request.expected_versions.clone();
@@ -1128,7 +1238,7 @@ pub async fn list_changes(
 ) -> Result<ChangesSnapshot> {
     log_measure("list_changes 收到");
     let mut timing = MeasureSpan::new("ipc.list_changes");
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     timing.mark("session_ready");
     let changelist_mode = state.registry.lock().map_err(|_| AppError::coded(ErrorKind::Internal,"errors.m7.taskFailed","后台任务失败：{error}",&[("error","settings lock".into())]))?.settings().changelist_mode;
     session.set_changelist_mode(changelist_mode);
@@ -1173,7 +1283,7 @@ pub async fn stage_file(
         "stage_file 收到：{} {}",
         request.worktree_id, request.path
     ));
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1210,7 +1320,7 @@ pub async fn unstage_file(
         "unstage_file 收到：{} {}",
         request.worktree_id, request.path
     ));
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1243,7 +1353,7 @@ pub async fn stage_hunk(
     state: State<'_, AppState>,
     request: HunkRequest,
 ) -> Result<ChangesSnapshot> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1276,7 +1386,7 @@ pub async fn unstage_hunk(
     state: State<'_, AppState>,
     request: HunkRequest,
 ) -> Result<ChangesSnapshot> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1317,7 +1427,7 @@ async fn execute_discard(
             &[],
         ));
     }
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let store = state.recovery.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
@@ -1366,7 +1476,7 @@ pub async fn stage_files(
     state: State<'_, AppState>,
     request: BatchRequest,
 ) -> Result<BatchOutcome> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1403,7 +1513,7 @@ pub async fn unstage_files(
     state: State<'_, AppState>,
     request: BatchRequest,
 ) -> Result<BatchOutcome> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -1440,7 +1550,7 @@ pub async fn discard_files(
     state: State<'_, AppState>,
     request: BatchRequest,
 ) -> Result<BatchOutcome> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let store = state.recovery.clone();
     let revision = request.snapshot_revision.clone().ok_or_else(|| {
         AppError::coded(
@@ -2039,7 +2149,7 @@ pub async fn stage_segment(
     state: State<'_, AppState>,
     request: SegmentRequest,
 ) -> Result<ChangesSnapshot> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -2080,7 +2190,7 @@ pub async fn unstage_segment(
     state: State<'_, AppState>,
     request: SegmentRequest,
 ) -> Result<ChangesSnapshot> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -2121,7 +2231,7 @@ pub async fn discard_segment(
     state: State<'_, AppState>,
     request: DiscardSegmentRequest,
 ) -> Result<ChangesSnapshot> {
-    let session = state.session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let context = request.clone();
     let store = state.recovery.clone();
     let edit_drafts = Arc::clone(&state.m7_edit_drafts);
@@ -2314,7 +2424,7 @@ pub async fn repo_files(
     state: State<'_, AppState>,
     request: WorktreeRequestPayload,
 ) -> Result<Vec<String>> {
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     tauri::async_runtime::spawn_blocking(move || crate::git::history::head_files(&session.git))
         .await
         .map_err(|error| {
@@ -2333,7 +2443,7 @@ pub async fn branches_overview(
     state: State<'_, AppState>,
     request: WorktreeRequestPayload,
 ) -> Result<crate::git::branch::BranchOverview> {
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let worktree_id = request.worktree_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         crate::git::branch::read_overview(&session.git, &worktree_id)
@@ -2355,7 +2465,7 @@ pub async fn checkout_branch(
     state: State<'_, AppState>,
     request: CheckoutRequestPayload,
 ) -> Result<crate::remote_ops::CheckoutResult> {
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let store = state.recovery.clone();
     let archive = state.stash_archive.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -2384,7 +2494,7 @@ pub async fn create_branch(
     state: State<'_, AppState>,
     request: CreateBranchPayload,
 ) -> Result<crate::remote_ops::CreateBranchOutcome> {
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     tauri::async_runtime::spawn_blocking(move || {
         crate::remote_ops::create_branch(&session, &request.request)
     })
@@ -2406,9 +2516,9 @@ pub async fn fetch_remotes(
     request: WorktreeRequestPayload,
 ) -> Result<crate::remote_ops::FetchOutcome> {
     // 网络操作使用完整环境（凭据助手、ssh 需要登录 shell 的 PATH）。
-    state.await_environment(&request.worktree_id)?;
+    state.await_environment_async(request.worktree_id.clone()).await?;
     let settings = settings_snapshot(&state)?;
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     tauri::async_runtime::spawn_blocking(move || {
         crate::remote_ops::fetch(
             &session,
@@ -2433,9 +2543,9 @@ pub async fn update_project(
     state: State<'_, AppState>,
     request: WorktreeRequestPayload,
 ) -> Result<crate::remote_ops::UpdateOutcome> {
-    state.await_environment(&request.worktree_id)?;
+    state.await_environment_async(request.worktree_id.clone()).await?;
     let settings = settings_snapshot(&state)?;
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let store = state.recovery.clone();
     tauri::async_runtime::spawn_blocking(move || {
         crate::remote_ops::update(
@@ -2473,9 +2583,9 @@ pub async fn push_preview(
     state: State<'_, AppState>,
     request: WorktreeRequestPayload,
 ) -> Result<crate::remote_ops::PushPreview> {
-    state.await_environment(&request.worktree_id)?;
+    state.await_environment_async(request.worktree_id.clone()).await?;
     let settings = settings_snapshot(&state)?;
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
         let preview = crate::remote_ops::push_preview(&session, &settings.protected_branches)?;
@@ -2501,9 +2611,9 @@ pub async fn push_branch(
     state: State<'_, AppState>,
     request: PushBranchPayload,
 ) -> Result<crate::remote_ops::PushResult> {
-    state.await_environment(&request.worktree_id)?;
+    state.await_environment_async(request.worktree_id.clone()).await?;
     let settings = settings_snapshot(&state)?;
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let github = Arc::clone(&state.m7_github);
     tauri::async_runtime::spawn_blocking(move || {
         // F10：实际推送保护使用并集。
@@ -2540,7 +2650,7 @@ pub async fn check_remote(
     state: State<'_, AppState>,
     request: WorktreeRequestPayload,
 ) -> Result<crate::remote_ops::RemoteCheck> {
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     tauri::async_runtime::spawn_blocking(move || {
         crate::remote_ops::check_remote(&session, crate::remote_ops::default_network_timeout())
     })
@@ -2693,7 +2803,7 @@ pub async fn history_open(
     state: State<'_, AppState>,
     request: HistoryOpenRequest,
 ) -> Result<HistoryTargetInfo> {
-    let session = state.worktree_session(&request.worktree_id)?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let store = state.history.clone();
     tauri::async_runtime::spawn_blocking(move || store.open(&session))
         .await
@@ -3347,8 +3457,8 @@ pub async fn execute_commit(
     request: ExecuteCommitRequest,
 ) -> Result<CommitOutcome> {
     // hooks 需要完整环境（Q212）：未就绪时等待，界面显示正在等待。
-    state.await_environment(&request.worktree_id)?;
-    let session = state.session(&request.worktree_id)?;
+    state.await_environment_async(request.worktree_id.clone()).await?;
+    let session = state.session_async(request.worktree_id.clone()).await?;
     let drafts = state.drafts.clone();
     let recovery = state.recovery.clone();
     let hooks_off_root = state.data_dir.clone();
@@ -4014,7 +4124,7 @@ pub async fn rewrite_reword(
     worktree_id: String,
     request: RewordCommand,
 ) -> Result<crate::rewrite::RewriteOutcome> {
-    state.await_environment(&worktree_id)?;
+    state.await_environment_async(worktree_id.clone()).await?;
     let session = state.session(&worktree_id)?;
     let recovery = state.recovery.clone();
     let archive = state.stash_archive.clone();
@@ -4051,7 +4161,7 @@ pub async fn rewrite_interactive(
     worktree_id: String,
     request: crate::rewrite::InteractiveRebaseRequest,
 ) -> Result<crate::rewrite::RewriteOutcome> {
-    state.await_environment(&worktree_id)?;
+    state.await_environment_async(worktree_id.clone()).await?;
     let session = state.session(&worktree_id)?;
     let recovery = state.recovery.clone();
     let archive = state.stash_archive.clone();

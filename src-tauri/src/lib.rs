@@ -111,54 +111,6 @@ pub fn run() {
                     std::process::exit(1);
                 }
             }
-            // Windows 的窗口配置是 create=false：这里显式建窗，才能在建窗前设置
-            // WebView2 数据目录（便携版在 exe 旁；测量 / 验收覆盖时同样隔离）。
-            // macOS 仍由 Tauri 按配置建窗，保持既有外壳行为不变。
-            #[cfg(windows)]
-            {
-                let window_config = app
-                    .config()
-                    .app
-                    .windows
-                    .iter()
-                    .find(|window| window.label == "main")
-                    .cloned()
-                    .ok_or("缺少主窗口配置")?;
-                let mut window_builder =
-                    tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
-                if let Some(webview_dir) = layout.webview_data_dir() {
-                    window_builder = window_builder.data_directory(webview_dir.to_path_buf());
-                }
-                // 对照外观：窗口不透明创建，不用 Mica（Q216）。
-                if measure::plain_appearance() {
-                    window_builder = window_builder.transparent(false);
-                }
-                window_builder.build()?;
-            }
-            commands::log_measure(&format!(
-                "Rust 启动：data_dir={} autoRun={:?}",
-                data_dir.display(),
-                std::env::var("REVIA_MEASURE").ok()
-            ));
-            if commands::is_measure_auto_run()
-                && commands::soak_seconds().is_none()
-                && std::env::var_os("REVIA_SMOKE").is_none()
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_title(&format!("Revia - 性能测量 PID {}", std::process::id()))?;
-                }
-            }
-            if commands::soak_seconds().is_some() {
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_title(&format!("Revia - 长测 PID {}", std::process::id()))?;
-                    // 诊断时可选：窗口保持在最前并出现在所有桌面空间，避免被其他窗口遮挡导致长测因不可见而中断。
-                    if std::env::var_os("REVIA_SOAK_ON_TOP").is_some() {
-                        window.set_always_on_top(true)?;
-                        #[cfg(target_os = "macos")]
-                        window.set_visible_on_all_workspaces(true)?;
-                    }
-                }
-            }
             let data_dir_for_update = data_dir.clone();
             let mut state = AppState::new(data_dir);
             state.distribution = layout.info.clone();
@@ -167,47 +119,37 @@ pub fn run() {
                 .transpose()?
                 .map(std::sync::Arc::new);
 
-            // 回收区到期自动清理：启动时一次，之后每小时一次（Q9、规格实现决策 4）。
-            // 失败不静默：状态持久化到回收区目录，普通模式下也能查询并显示（不依赖测量日志）。
-            let recovery = state.recovery.clone();
-            let stash_archive = state.stash_archive.clone();
-            let startup_purge = commands::purge_expired_now(&recovery);
-            match &startup_purge {
-                Ok(removed) => commands::log_measure(&format!("回收区启动清理：删除 {removed} 条")),
-                Err(error) => commands::log_measure(&format!("回收区启动清理失败：{error}")),
-            }
-            match stash_archive.purge_expired() {
-                Ok(0) => {}
-                Ok(removed) => {
-                    commands::log_measure(&format!("stash 归档启动清理：删除 {removed} 条"))
-                }
-                Err(error) => commands::log_measure(&format!("stash 归档启动清理失败：{error}")),
-            }
-            let periodic = recovery.clone();
-            let periodic_stash_archive = stash_archive.clone();
+            // 回收区与 stash 归档到期清理放在后台线程执行：启动时先执行一次，再每小时执行一次，
+            // 不阻塞主 UI 线程建窗与前端消息循环（Q9、规格实现决策 4）。
+            let periodic = state.recovery.clone();
+            let periodic_stash_archive = state.stash_archive.clone();
             std::thread::Builder::new()
                 .name("revia-recovery-purge".into())
                 .spawn(move || {
-                    loop {
-                        std::thread::sleep(std::time::Duration::from_secs(3600));
+                    let run_purge = |label: &str| {
                         match commands::purge_expired_now(&periodic) {
                             Ok(0) => {}
-                            Ok(removed) => {
-                                commands::log_measure(&format!("回收区定期清理：删除 {removed} 条"))
-                            }
-                            Err(error) => {
-                                commands::log_measure(&format!("回收区定期清理失败：{error}"))
-                            }
+                            Ok(removed) => commands::log_measure(&format!(
+                                "回收区{label}清理：删除 {removed} 条"
+                            )),
+                            Err(error) => commands::log_measure(&format!(
+                                "回收区{label}清理失败：{error}"
+                            )),
                         }
                         match periodic_stash_archive.purge_expired() {
                             Ok(0) => {}
                             Ok(removed) => commands::log_measure(&format!(
-                                "stash 归档定期清理：删除 {removed} 条"
+                                "stash 归档{label}清理：删除 {removed} 条"
                             )),
-                            Err(error) => {
-                                commands::log_measure(&format!("stash 归档定期清理失败：{error}"))
-                            }
+                            Err(error) => commands::log_measure(&format!(
+                                "stash 归档{label}清理失败：{error}"
+                            )),
                         }
+                    };
+                    run_purge("启动");
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_secs(3600));
+                        run_purge("定期");
                     }
                 })
                 .ok();
@@ -238,9 +180,63 @@ pub fn run() {
                 })
                 .ok();
 
-            crate::m7::update::spawn_auto_check(app.handle().clone(), data_dir_for_update, std::sync::Arc::clone(&state.m7_update));
             let _ = state.app.set(app.handle().clone());
+            let update_state = std::sync::Arc::clone(&state.m7_update);
             app.manage(state);
+            crate::m7::update::spawn_auto_check(
+                app.handle().clone(),
+                data_dir_for_update.clone(),
+                update_state,
+            );
+
+            // Windows 的窗口配置是 create=false：在 AppState 就绪后建窗，才能在建窗前设置
+            // WebView2 数据目录并确保窗口创建后主线程不再被状态初始化阻塞。
+            // macOS 仍由 Tauri 按配置建窗，保持既有外壳行为不变。
+            #[cfg(windows)]
+            {
+                let window_config = app
+                    .config()
+                    .app
+                    .windows
+                    .iter()
+                    .find(|window| window.label == "main")
+                    .cloned()
+                    .ok_or("缺少主窗口配置")?;
+                let mut window_builder =
+                    tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
+                if let Some(webview_dir) = layout.webview_data_dir() {
+                    window_builder = window_builder.data_directory(webview_dir.to_path_buf());
+                }
+                // 对照外观：窗口不透明创建，不用 Mica（Q216）。
+                if measure::plain_appearance() {
+                    window_builder = window_builder.transparent(false);
+                }
+                window_builder.build()?;
+            }
+            commands::log_measure(&format!(
+                "Rust 启动：data_dir={} autoRun={:?}",
+                data_dir_for_update.display(),
+                std::env::var("REVIA_MEASURE").ok()
+            ));
+            if commands::is_measure_auto_run()
+                && commands::soak_seconds().is_none()
+                && std::env::var_os("REVIA_SMOKE").is_none()
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&format!("Revia - 性能测量 PID {}", std::process::id()))?;
+                }
+            }
+            if commands::soak_seconds().is_some() {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&format!("Revia - 长测 PID {}", std::process::id()))?;
+                    // 诊断时可选：窗口保持在最前并出现在所有桌面空间，避免被其他窗口遮挡导致长测因不可见而中断。
+                    if std::env::var_os("REVIA_SOAK_ON_TOP").is_some() {
+                        window.set_always_on_top(true)?;
+                        #[cfg(target_os = "macos")]
+                        window.set_visible_on_all_workspaces(true)?;
+                    }
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

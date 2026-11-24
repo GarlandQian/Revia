@@ -8,12 +8,21 @@
 //!
 //! 批量入口在整个批次期间只取一次同 worktree 写锁，避免与其它写操作交错。
 
+use std::collections::{HashMap, HashSet};
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::error::{AppError, AppErrorPayload, ErrorKind};
-use crate::git::status::{ChangesKind, ReadonlyReason};
-use crate::session::{ChangesSnapshot, WorktreeSession};
+use crate::error::{AppError, AppErrorPayload, ErrorKind, Result};
+use crate::git::diff;
+use crate::git::status::{self, ChangesKind, ReadonlyReason, StatusEntry};
+use crate::session::{ChangesSnapshot, WorktreeSession, compute_file_fingerprint_from_patch};
+
+const BATCH_MAX_FILES: usize = 200;
+const BATCH_MAX_ARG_BYTES: usize = 8000;
+const LOCK_RETRIES: usize = 3;
+const LOCK_RETRY_DELAY: Duration = Duration::from_millis(100);
 
 /// 一个批量操作的目标：路径、所在组与用户所见指纹。
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -97,74 +106,459 @@ impl BatchOutcome {
     }
 }
 
+struct VerifiedStageTarget<'a> {
+    index: usize,
+    target: &'a BatchTarget,
+    original_path: Option<String>,
+}
+
+fn stale_target_error() -> AppError {
+    AppError::coded(
+        ErrorKind::Rejected,
+        "errors.batch.theFileChangedConfirmAgain",
+        "文件已变化，请重新确认",
+        &[],
+    )
+}
+
+fn stale_fingerprint_error() -> AppError {
+    AppError::coded(
+        ErrorKind::Rejected,
+        "errors.session.theFileChangedConfirmAgain21",
+        "文件已变化，请重新确认",
+        &[],
+    )
+}
+
+fn timed_out_error() -> AppError {
+    AppError::coded(
+        ErrorKind::NeedsVerification,
+        "errors.session.theGitCommandTimedOutInterrupted2",
+        "Git 命令执行超时或中断，写入结果待核对；请重新核对真实状态后再继续",
+        &[],
+    )
+}
+
+fn lock_exhausted_error(detail: String) -> AppError {
+    AppError::coded(
+        ErrorKind::Rejected,
+        "errors.session.theGitIndexLockedAnotherProcess2",
+        "Git 索引被其他进程占用（index.lock），已重试 {LOCK_RETRIES} 次：{detail}",
+        &[
+            ("LOCK_RETRIES", format!("{LOCK_RETRIES}")),
+            ("detail", detail),
+        ],
+    )
+}
+
+fn staging_git_error(is_stage: bool, exit_code: i32, stderr: &str) -> AppError {
+    let (code, template) = if is_stage {
+        (
+            "errors.session.failedStageFile",
+            "暂存文件失败（退出码 {code}）：{detail}",
+        )
+    } else {
+        (
+            "errors.session.failedUnstageFile",
+            "取消暂存文件失败（退出码 {code}）：{detail}",
+        )
+    };
+    AppError::coded(
+        ErrorKind::Git,
+        code,
+        template,
+        &[
+            ("code", format!("{exit_code}")),
+            ("detail", stderr.trim().to_string()),
+        ],
+    )
+}
+
+fn verify_stage_targets<'a>(
+    session: &WorktreeSession,
+    indexed_targets: &[(usize, &'a BatchTarget)],
+    is_stage: bool,
+    results: &mut [Option<BatchFileResult>],
+) -> Result<Vec<VerifiedStageTarget<'a>>> {
+    let status = status::read(session.git())?;
+    let expected_group = if is_stage {
+        [ChangesKind::Unstaged, ChangesKind::Untracked]
+    } else {
+        [ChangesKind::Staged, ChangesKind::Staged]
+    };
+
+    let mut pending: Vec<(usize, &'a BatchTarget, &StatusEntry)> =
+        Vec::with_capacity(indexed_targets.len());
+    let mut diff_paths: Vec<&str> = Vec::new();
+    let mut diff_path_seen: HashSet<&str> = HashSet::new();
+
+    for &(idx, target) in indexed_targets {
+        let entry = status.entries.iter().find(|entry| {
+            entry.path == target.path && expected_group.contains(&entry.changes)
+        });
+        let Some(entry) = entry else {
+            results[idx] = Some(BatchFileResult::failed(target, &stale_target_error()));
+            continue;
+        };
+        if let Some(reason) = entry.readonly_reason {
+            results[idx] = Some(BatchFileResult::skipped(target, reason));
+            continue;
+        }
+        let full_path = session.path.join(&target.path);
+        if full_path.is_symlink() {
+            let error = AppError::coded(
+                ErrorKind::Rejected,
+                "errors.session.symbolicLinksReadOnlyHereStaging",
+                "符号链接为只读类型，不支持在应用内暂存或取消暂存",
+                &[],
+            );
+            results[idx] = Some(BatchFileResult::failed(target, &error));
+            continue;
+        }
+        if entry.changes == ChangesKind::Untracked
+            && (full_path.join(".git").exists() || target.path.ends_with('/'))
+        {
+            let error = AppError::coded(
+                ErrorKind::Rejected,
+                "errors.session.nestedRepositoriesReadOnlyHereStaging",
+                "嵌套仓库为只读类型，不支持在应用内暂存",
+                &[],
+            );
+            results[idx] = Some(BatchFileResult::failed(target, &error));
+            continue;
+        }
+        if entry.changes != ChangesKind::Untracked && diff_path_seen.insert(target.path.as_str()) {
+            diff_paths.push(target.path.as_str());
+        }
+        pending.push((idx, target, entry));
+    }
+
+    let bulk_patches = if diff_paths.len() > 3 {
+        let mut changed_during_bulk: HashSet<String> = HashSet::new();
+        let raw = if is_stage {
+            let before = session.worktree_stats_for(&diff_paths);
+            let bytes = session.git().diff_worktree(None)?;
+            let after = session.worktree_stats_for(&diff_paths);
+            for (path, (lhs, rhs)) in diff_paths.iter().zip(before.iter().zip(after.iter())) {
+                if lhs != rhs {
+                    changed_during_bulk.insert((*path).to_string());
+                }
+            }
+            bytes
+        } else {
+            session.git().diff_index(None)?
+        };
+        let mut patches: HashMap<String, Vec<u8>> = HashMap::new();
+        for file in diff::parse_bytes(&raw).files {
+            patches.insert(file.path, file.raw_patch);
+        }
+        Some((patches, changed_during_bulk))
+    } else {
+        None
+    };
+
+    let mut verified = Vec::with_capacity(pending.len());
+    for (idx, target, entry) in pending {
+        let single_diff: Vec<u8>;
+        let diff_bytes: &[u8] = if entry.changes == ChangesKind::Untracked {
+            &[]
+        } else if let Some((patches, changed_during_bulk)) = &bulk_patches {
+            if changed_during_bulk.contains(&target.path) {
+                match session.git().diff_worktree(Some(&target.path)) {
+                    Ok(bytes) => {
+                        single_diff = bytes;
+                        &single_diff
+                    }
+                    Err(error) => {
+                        results[idx] = Some(BatchFileResult::failed(target, &error));
+                        continue;
+                    }
+                }
+            } else {
+                patches.get(&target.path).map(Vec::as_slice).unwrap_or(&[])
+            }
+        } else if is_stage {
+            match session.git().diff_worktree(Some(&target.path)) {
+                Ok(bytes) => {
+                    single_diff = bytes;
+                    &single_diff
+                }
+                Err(error) => {
+                    results[idx] = Some(BatchFileResult::failed(target, &error));
+                    continue;
+                }
+            }
+        } else {
+            match session
+                .git()
+                .diff_index_with_orig(&target.path, entry.original_path.as_deref())
+            {
+                Ok(bytes) => {
+                    single_diff = bytes;
+                    &single_diff
+                }
+                Err(error) => {
+                    results[idx] = Some(BatchFileResult::failed(target, &error));
+                    continue;
+                }
+            }
+        };
+
+        let current_fp = match compute_file_fingerprint_from_patch(entry, diff_bytes, &session.path)
+        {
+            Ok(fp) => fp,
+            Err(error) => {
+                results[idx] = Some(BatchFileResult::failed(target, &error));
+                continue;
+            }
+        };
+        if current_fp != target.fingerprint {
+            results[idx] = Some(BatchFileResult::failed(target, &stale_fingerprint_error()));
+            continue;
+        }
+        verified.push(VerifiedStageTarget {
+            index: idx,
+            target,
+            original_path: entry.original_path.clone(),
+        });
+    }
+
+    Ok(verified)
+}
+
+fn chunk_verified_targets<'a>(
+    verified: Vec<VerifiedStageTarget<'a>>,
+    is_stage: bool,
+) -> Vec<Vec<VerifiedStageTarget<'a>>> {
+    let mut chunks = Vec::new();
+    let mut current = Vec::new();
+    let mut current_bytes = 0usize;
+    for item in verified {
+        let extra_orig = if is_stage {
+            0
+        } else {
+            item.original_path.as_ref().map_or(0, |path| path.len() + 1)
+        };
+        let item_bytes = item.target.path.len() + 1 + extra_orig;
+        if !current.is_empty()
+            && (current.len() >= BATCH_MAX_FILES || current_bytes + item_bytes > BATCH_MAX_ARG_BYTES)
+        {
+            chunks.push(std::mem::take(&mut current));
+            current_bytes = 0;
+        }
+        current_bytes += item_bytes;
+        current.push(item);
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
+}
+
+fn collect_git_paths<'a>(chunk: &'a [VerifiedStageTarget<'a>], is_stage: bool) -> Vec<&'a str> {
+    let mut paths = Vec::with_capacity(chunk.len());
+    let mut seen = HashSet::with_capacity(chunk.len());
+    for item in chunk {
+        if !is_stage {
+            if let Some(orig) = item.original_path.as_deref() {
+                if seen.insert(orig) {
+                    paths.push(orig);
+                }
+            }
+        }
+        if seen.insert(item.target.path.as_str()) {
+            paths.push(item.target.path.as_str());
+        }
+    }
+    paths
+}
+
 impl WorktreeSession {
-    /// 批量暂存 / 取消暂存：整个批次只取一次写锁，逐文件核对指纹并串行执行。
+    /// 批量暂存 / 取消暂存：整个批次只取一次写锁，写前按真实状态逐项核对指纹，合并调用 Git，最后统一刷新一次。
     pub fn stage_files(&self, targets: &[BatchTarget], is_stage: bool) -> BatchOutcome {
         let guard = match self.acquire_write_lock() {
             Ok(guard) => guard,
             Err(error) => return BatchOutcome::all_failed(targets, &error),
         };
-        // 只读条目在真实状态里判定：前端可能把它们一并选中，这里说明跳过原因。
-        let status = crate::git::status::read(self.git()).ok();
-        let mut results = Vec::with_capacity(targets.len());
-        let mut snapshot: Option<ChangesSnapshot> = None;
-        let mut needs_verification = false;
-        for target in targets {
-            // 暂存接受未暂存与未跟踪两组；取消暂存只接受已暂存一组。
-            let expected_group = if is_stage {
-                [ChangesKind::Unstaged, ChangesKind::Untracked]
-            } else {
-                [ChangesKind::Staged, ChangesKind::Staged]
+        if targets.is_empty() {
+            drop(guard);
+            let snapshot = self.refresh().ok();
+            return BatchOutcome {
+                results: Vec::new(),
+                snapshot,
+                needs_verification: false,
             };
-            let entry = status.as_ref().and_then(|status| {
-                status.entries.iter().find(|entry| {
-                    entry.path == target.path && expected_group.contains(&entry.changes)
-                })
-            });
-            match entry {
-                None => {
-                    let error = AppError::coded(
-                        ErrorKind::Rejected,
-                        "errors.batch.theFileChangedConfirmAgain",
-                        "文件已变化，请重新确认",
-                        &[],
-                    );
-                    needs_verification |= error.kind == ErrorKind::NeedsVerification;
-                    results.push(BatchFileResult::failed(target, &error));
-                    continue;
+        }
+
+        let mut results: Vec<Option<BatchFileResult>> = vec![None; targets.len()];
+        let indexed: Vec<(usize, &BatchTarget)> = targets.iter().enumerate().collect();
+        let verified = match verify_stage_targets(self, &indexed, is_stage, &mut results) {
+            Ok(verified) => verified,
+            Err(error) => {
+                drop(guard);
+                let needs_verification = error.kind == ErrorKind::NeedsVerification;
+                let final_results = results
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, slot)| {
+                        slot.unwrap_or_else(|| BatchFileResult::failed(&targets[idx], &error))
+                    })
+                    .collect();
+                return BatchOutcome {
+                    results: final_results,
+                    snapshot: self.refresh().ok(),
+                    needs_verification,
+                };
+            }
+        };
+
+        let mut needs_verification = false;
+        let mut aborted_uncertain = false;
+        let chunks = chunk_verified_targets(verified, is_stage);
+        let mut chunk_iter = chunks.into_iter();
+        while let Some(mut chunk) = chunk_iter.next() {
+            if aborted_uncertain {
+                let err = timed_out_error();
+                for item in chunk {
+                    results[item.index] = Some(BatchFileResult::failed(item.target, &err));
                 }
-                Some(entry) => {
-                    if let Some(reason) = entry.readonly_reason {
-                        results.push(BatchFileResult::skipped(target, reason));
-                        continue;
+                continue;
+            }
+            let mut last_lock_err: Option<String> = None;
+            for attempt in 0..=LOCK_RETRIES {
+                if attempt > 0 {
+                    std::thread::sleep(LOCK_RETRY_DELAY * (attempt as u32));
+                    let remaining: Vec<(usize, &BatchTarget)> =
+                        chunk.iter().map(|item| (item.index, item.target)).collect();
+                    match verify_stage_targets(self, &remaining, is_stage, &mut results) {
+                        Ok(reverified) => {
+                            chunk = reverified;
+                            if chunk.is_empty() {
+                                break;
+                            }
+                        }
+                        Err(error) => {
+                            needs_verification |= error.kind == ErrorKind::NeedsVerification;
+                            for item in chunk {
+                                if results[item.index].is_none() {
+                                    results[item.index] =
+                                        Some(BatchFileResult::failed(item.target, &error));
+                                }
+                            }
+                            break;
+                        }
                     }
                 }
-            }
-            match self.execute_staging_op_locked(&target.path, &target.fingerprint, is_stage, None)
-            {
-                Ok(next) => {
-                    snapshot = Some(next);
-                    results.push(BatchFileResult::success(target));
+
+                let paths = collect_git_paths(&chunk, is_stage);
+                let output = if is_stage {
+                    self.git().stage_files(&paths)
+                } else {
+                    self.git().unstage_files(&paths)
+                };
+                let output = match output {
+                    Ok(output) => output,
+                    Err(error) => {
+                        needs_verification |= error.kind == ErrorKind::NeedsVerification;
+                        for item in &chunk {
+                            results[item.index] =
+                                Some(BatchFileResult::failed(item.target, &error));
+                        }
+                        break;
+                    }
+                };
+
+                if output.timed_out || output.exit_code < 0 {
+                    let err = timed_out_error();
+                    needs_verification = true;
+                    aborted_uncertain = true;
+                    for item in &chunk {
+                        results[item.index] = Some(BatchFileResult::failed(item.target, &err));
+                    }
+                    break;
                 }
-                Err(error) => {
-                    needs_verification |= error.kind == ErrorKind::NeedsVerification;
-                    results.push(BatchFileResult::failed(target, &error));
+
+                if crate::git::is_lock_error(&output) {
+                    let err_text = output.stderr.trim().to_string();
+                    if attempt < LOCK_RETRIES {
+                        last_lock_err = Some(err_text);
+                        continue;
+                    }
+                    let err = lock_exhausted_error(last_lock_err.unwrap_or(err_text));
+                    for item in &chunk {
+                        results[item.index] = Some(BatchFileResult::failed(item.target, &err));
+                    }
+                    break;
                 }
+
+                if output.exit_code != 0 {
+                    if chunk.len() > 1 {
+                        for item in &chunk {
+                            match self.execute_staging_op_without_refresh_locked(
+                                &item.target.path,
+                                &item.target.fingerprint,
+                                is_stage,
+                                None,
+                            ) {
+                                Ok(()) => {
+                                    results[item.index] =
+                                        Some(BatchFileResult::success(item.target));
+                                }
+                                Err(error) => {
+                                    needs_verification |=
+                                        error.kind == ErrorKind::NeedsVerification;
+                                    results[item.index] =
+                                        Some(BatchFileResult::failed(item.target, &error));
+                                }
+                            }
+                        }
+                    } else if let Some(item) = chunk.first() {
+                        let err = staging_git_error(is_stage, output.exit_code, &output.stderr);
+                        results[item.index] = Some(BatchFileResult::failed(item.target, &err));
+                    }
+                    break;
+                }
+
+                for item in &chunk {
+                    results[item.index] = Some(BatchFileResult::success(item.target));
+                }
+                break;
             }
         }
+        for remaining in chunk_iter {
+            let err = timed_out_error();
+            for item in remaining {
+                results[item.index] = Some(BatchFileResult::failed(item.target, &err));
+            }
+        }
+
         drop(guard);
-        // 批次结束后重新读取一次，界面据此与真实状态一致；失败时保留最后一次成功快照。
-        if let Ok(next) = self.refresh() {
-            snapshot = Some(next);
-        }
+        let fallback_error = stale_target_error();
+        let final_results: Vec<BatchFileResult> = results
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                slot.unwrap_or_else(|| BatchFileResult::failed(&targets[idx], &fallback_error))
+            })
+            .collect();
+        let any_succeeded = final_results.iter().any(|result| result.ok);
+        let snapshot = match self.refresh() {
+            Ok(next) => Some(next),
+            Err(_) => {
+                if any_succeeded {
+                    needs_verification = true;
+                }
+                None
+            }
+        };
         BatchOutcome {
-            results,
+            results: final_results,
             snapshot,
             needs_verification,
         }
     }
 
-    /// 批量丢弃：整个批次只取一次写锁；每个文件先保存回收记录再写工作区。
+    /// 批量丢弃：整个批次只取一次写锁；每个文件先保存回收记录再写工作区，最后统一刷新一次。
     ///
     /// `snapshot_revision` 是用户确认时看到的快照版本：整批目标先按它逐项核对，
     /// 之后每个文件仍会重新读取真实状态并核对指纹（外部修改会被拒绝）。
@@ -180,8 +574,8 @@ impl WorktreeSession {
         };
         let confirmed = self.snapshot_entries();
         let mut results = Vec::with_capacity(targets.len());
-        let mut snapshot: Option<ChangesSnapshot> = None;
         let mut needs_verification = false;
+        let mut any_succeeded = false;
         for target in targets {
             // 用户确认的是「当时那份快照里的这些文件」：整批先按原快照逐项核对。
             let expected = if target.changes == ChangesKind::Untracked {
@@ -218,9 +612,9 @@ impl WorktreeSession {
                 continue;
             }
             let outcome = if expected == ChangesKind::Untracked {
-                self.discard_untracked_locked(&target.path, &target.fingerprint, store)
+                self.discard_untracked_no_refresh_locked(&target.path, &target.fingerprint, store)
             } else {
-                self.discard_with_hook_locked(
+                self.discard_with_hook_no_refresh_locked(
                     &target.path,
                     &target.fingerprint,
                     None,
@@ -231,8 +625,8 @@ impl WorktreeSession {
                 )
             };
             match outcome {
-                Ok(next) => {
-                    snapshot = Some(next);
+                Ok(()) => {
+                    any_succeeded = true;
                     results.push(BatchFileResult::success(target));
                 }
                 Err(error) => {
@@ -242,9 +636,15 @@ impl WorktreeSession {
             }
         }
         drop(guard);
-        if let Ok(next) = self.refresh() {
-            snapshot = Some(next);
-        }
+        let snapshot = match self.refresh() {
+            Ok(next) => Some(next),
+            Err(_) => {
+                if any_succeeded {
+                    needs_verification = true;
+                }
+                None
+            }
+        };
         BatchOutcome {
             results,
             snapshot,
@@ -474,5 +874,115 @@ mod tests {
             .find(|result| result.path == "a.txt")
             .unwrap();
         assert!(a.ok);
+    }
+
+    #[test]
+    fn batch_stage_and_unstage_many_files_uses_constant_git_calls() {
+        let (_dir, repo) = fixture();
+        for index in 0..6 {
+            let name = format!("tracked_{index}.txt");
+            std::fs::write(repo.join(&name), format!("v1 {index}\n")).unwrap();
+        }
+        git(&repo, &["add", "."]);
+        git(&repo, &["commit", "-q", "-m", "tracked"]);
+
+        for index in 0..6 {
+            std::fs::write(repo.join(format!("tracked_{index}.txt")), format!("v2 {index}\n"))
+                .unwrap();
+        }
+        for index in 0..4 {
+            std::fs::write(
+                repo.join(format!("untracked_{index}.txt")),
+                format!("new {index}\n"),
+            )
+            .unwrap();
+        }
+
+        let session = open(&repo);
+        let snapshot = session.refresh().unwrap();
+        let targets = targets(&snapshot);
+        assert_eq!(targets.len(), 10);
+
+        let before_stage = session.git().log.snapshot().len();
+        let staged = session.stage_files(&targets, true);
+        let stage_git_calls = session.git().log.snapshot().len() - before_stage;
+        assert!(
+            staged.results.iter().all(|result| result.ok),
+            "{:?}",
+            staged.results
+        );
+        assert!(
+            stage_git_calls <= 12,
+            "10 files batch stage spawned {stage_git_calls} git commands (expected constant O(1))"
+        );
+        let after_stage = staged.snapshot.unwrap();
+        assert_eq!(after_stage.staged_count, 10);
+
+        let unstage_targets: Vec<BatchTarget> = after_stage
+            .entries
+            .iter()
+            .filter(|entry| entry.changes == ChangesKind::Staged)
+            .map(|entry| BatchTarget {
+                path: entry.path.clone(),
+                changes: entry.changes,
+                fingerprint: entry.fingerprint.clone(),
+            })
+            .collect();
+        assert_eq!(unstage_targets.len(), 10);
+
+        let before_unstage = session.git().log.snapshot().len();
+        let unstaged = session.stage_files(&unstage_targets, false);
+        let unstage_git_calls = session.git().log.snapshot().len() - before_unstage;
+        assert!(
+            unstaged.results.iter().all(|result| result.ok),
+            "{:?}",
+            unstaged.results
+        );
+        assert!(
+            unstage_git_calls <= 12,
+            "10 files batch unstage spawned {unstage_git_calls} git commands (expected constant O(1))"
+        );
+        assert_eq!(unstaged.snapshot.unwrap().staged_count, 0);
+    }
+
+    #[test]
+    fn batch_stage_preserves_order_with_mixed_stale_and_untracked() {
+        let (_dir, repo) = fixture();
+        std::fs::write(repo.join("a.txt"), "a2\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b2\n").unwrap();
+        std::fs::write(repo.join("u1.txt"), "u1\n").unwrap();
+        std::fs::write(repo.join("u2.txt"), "u2\n").unwrap();
+
+        let session = open(&repo);
+        let snapshot = session.refresh().unwrap();
+        let mut batch_targets = targets(&snapshot);
+        assert_eq!(batch_targets.len(), 4);
+        let u1_pos = batch_targets
+            .iter()
+            .position(|target| target.path == "u1.txt")
+            .unwrap();
+        let a_pos = batch_targets
+            .iter()
+            .position(|target| target.path == "a.txt")
+            .unwrap();
+        batch_targets[u1_pos].fingerprint = "stale-untracked".into();
+        batch_targets[a_pos].fingerprint = "stale-tracked".into();
+
+        let expected_paths: Vec<String> =
+            batch_targets.iter().map(|target| target.path.clone()).collect();
+        let outcome = session.stage_files(&batch_targets, true);
+        let actual_paths: Vec<String> = outcome
+            .results
+            .iter()
+            .map(|result| result.path.clone())
+            .collect();
+        assert_eq!(actual_paths, expected_paths);
+        assert!(!outcome.results[u1_pos].ok);
+        assert!(!outcome.results[a_pos].ok);
+        for (idx, result) in outcome.results.iter().enumerate() {
+            if idx != u1_pos && idx != a_pos {
+                assert!(result.ok, "unexpected failure at {idx}: {result:?}");
+            }
+        }
     }
 }

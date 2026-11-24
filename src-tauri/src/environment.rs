@@ -501,10 +501,28 @@ impl Drop for WaitingSlot<'_> {
     }
 }
 
-/// 用记住的 PATH 合成一个可用的环境；`HOME` 仍然从进程取。
-fn env_from_remembered(remembered: &RememberedEnv, worktree: &Path) -> ShellEnv {
+/// 用记住的 PATH 合成一个可用的环境；`HOME`（Windows 含基础系统位置）从当前进程取。
+pub(crate) fn env_from_remembered(remembered: &RememberedEnv, worktree: &Path) -> ShellEnv {
     let mut vars = HashMap::new();
     for key in ["HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"] {
+        if let Ok(value) = std::env::var(key) {
+            vars.insert(key.to_string(), value);
+        }
+    }
+    #[cfg(windows)]
+    for key in [
+        "PATHEXT",
+        "SystemRoot",
+        "windir",
+        "ComSpec",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "TEMP",
+        "TMP",
+    ] {
         if let Ok(value) = std::env::var(key) {
             vars.insert(key.to_string(), value);
         }
@@ -826,5 +844,22 @@ mod tests {
         ));
         let (_, git_path) = coordinator.wait("wt-1", Duration::from_millis(20)).unwrap();
         assert_eq!(git_path, PathBuf::from("new-git"));
+    }
+
+    #[test]
+    fn env_from_remembered_sets_path_and_preserves_home() {
+        let dir = tempfile::tempdir().unwrap();
+        let remembered = RememberedEnv {
+            git_path: "/opt/homebrew/bin/git".into(),
+            shell: "/bin/zsh".into(),
+            path_entries: vec!["/opt/homebrew/bin".into(), "/usr/bin".into()],
+            captured_at_ms: 1,
+        };
+        let env = env_from_remembered(&remembered, dir.path());
+        assert_eq!(env.path, remembered.path_entries);
+        assert_eq!(env.vars.get("PATH").map(String::as_str), Some(env.path_string().as_str()));
+        if std::env::var_os("HOME").is_some() {
+            assert!(env.vars.contains_key("HOME"));
+        }
     }
 }

@@ -64,13 +64,27 @@ export function useBatchWrite({
       if (!started.ok) {
         writingWorktreesRef.current.delete(targetWorktreeId);
         setWritingWorktrees(new Set(writingWorktreesRef.current));
-        setAppError(closeGuardBlockedError(started.reason), targetWorktreeId);
+        const err = closeGuardBlockedError(started.reason);
+        setAppError(err, targetWorktreeId);
+        notify({
+          tone: "error",
+          title: () => (messages.changes.batchFailedTitle),
+          detail: () => (formatAppError(err)),
+          persistent: true,
+        });
         return;
       }
     } catch (caught) {
       writingWorktreesRef.current.delete(targetWorktreeId);
       setWritingWorktrees(new Set(writingWorktreesRef.current));
-      setAppError(toAppError(caught), targetWorktreeId);
+      const err = toAppError(caught);
+      setAppError(err, targetWorktreeId);
+      notify({
+        tone: "error",
+        title: () => (messages.changes.batchFailedTitle),
+        detail: () => (formatAppError(err)),
+        persistent: true,
+      });
       return;
     }
     setAppError(null, targetWorktreeId);

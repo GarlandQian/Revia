@@ -2181,8 +2181,38 @@ impl WorktreeSession {
         hunk_id: Option<&str>,
         segment_override: Option<SegmentOverride>,
         store: &RecoveryStore,
-        mut hook: impl FnMut(DiscardPhase) -> Result<()>,
+        hook: impl FnMut(DiscardPhase) -> Result<()>,
     ) -> Result<ChangesSnapshot> {
+        self.discard_with_hook_no_refresh_locked(
+            path,
+            fingerprint,
+            revision,
+            hunk_id,
+            segment_override,
+            store,
+            hook,
+        )?;
+        self.refresh().map_err(|error| {
+            AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.session.theDiscardRanSavedButReading",
+                "丢弃已执行并保存，最新状态读取失败：{cause}",
+                &[],
+            )
+            .cause(error)
+        })
+    }
+
+    pub(crate) fn discard_with_hook_no_refresh_locked(
+        &self,
+        path: &str,
+        fingerprint: &str,
+        revision: Option<&str>,
+        hunk_id: Option<&str>,
+        segment_override: Option<SegmentOverride>,
+        store: &RecoveryStore,
+        mut hook: impl FnMut(DiscardPhase) -> Result<()>,
+    ) -> Result<()> {
         let entry = self.check_discard_target(path, fingerprint, revision)?;
         let identity = WorktreeIdentity::capture(&self.git)?;
         store.ensure_outside(&identity)?;
@@ -2305,27 +2335,19 @@ impl WorktreeSession {
                 },
             )
             .map_err(discard_pending)?;
-        self.refresh().map_err(|error| {
-            AppError::coded(
-                ErrorKind::NeedsVerification,
-                "errors.session.theDiscardRanSavedButReading",
-                "丢弃已执行并保存，最新状态读取失败：{cause}",
-                &[],
-            )
-            .cause(error)
-        })
+        Ok(())
     }
 
     /// 丢弃一个未跟踪文件：先保存完整内容到回收区，再删除文件（M4 F03.4）。
     ///
     /// 未跟踪文件没有 Git 基线，丢弃等于删除；安全边界要求先存回收区，
     /// 因此这里保存 `before` 内容、把 `after` 记为路径不存在，再删除。
-    pub(crate) fn discard_untracked_locked(
+    pub(crate) fn discard_untracked_no_refresh_locked(
         &self,
         path: &str,
         fingerprint: &str,
         store: &RecoveryStore,
-    ) -> Result<ChangesSnapshot> {
+    ) -> Result<()> {
         let status = status::read(&self.git)?;
         let entry = status
             .entries
@@ -2402,14 +2424,7 @@ impl WorktreeSession {
         store
             .finish(&record, &DiscardOutcome::Completed { after })
             .map_err(discard_pending)?;
-        self.refresh().map_err(|error| {
-            AppError::coded(
-                ErrorKind::NeedsVerification,
-                "errors.session.theFileDeletedSavedButReading",
-                "文件已删除并保存，最新状态读取失败：{cause}",
-                &[],
-            ).cause(error)
-        })
+        Ok(())
     }
 
     // ---------- 内置三方合并（Q143，设计见 merge-design.md） ----------
@@ -2753,6 +2768,10 @@ impl WorktreeSession {
             Ok(identity) => store.inspect(id, Some(&identity), Some(&self.path)),
             Err(_) => store.inspect(id, None, None),
         }
+    }
+
+    pub(crate) fn worktree_stats_for(&self, paths: &[&str]) -> Vec<Option<(u64, i128, u64)>> {
+        self.worktree_stats(paths)
     }
 
     /// 工作区文件的轻量快照（大小 + 纳秒 mtime + inode），用于判断一次读取期间文件是否变化。
@@ -3318,7 +3337,7 @@ impl WorktreeSession {
         self.execute_staging_op_locked(path, expected_fp, is_stage, hunk_id)
     }
 
-    /// 已持有同 worktree 写锁时的暂存 / 取消暂存实现（批量操作用）。
+    /// 已持有同 worktree 写锁时的暂存 / 取消暂存实现（单次写后刷新快照）。
     pub(crate) fn execute_staging_op_locked(
         &self,
         path: &str,
@@ -3326,6 +3345,28 @@ impl WorktreeSession {
         is_stage: bool,
         hunk_id: Option<&str>,
     ) -> Result<ChangesSnapshot> {
+        self.execute_staging_op_without_refresh_locked(path, expected_fp, is_stage, hunk_id)?;
+        // 写入成功后重新读取状态；若读取失败，也属于结果待核对（审查意见 1）
+        match self.refresh() {
+            Ok(snap) => Ok(snap),
+            Err(e) => Err(AppError::coded(
+                ErrorKind::NeedsVerification,
+                "errors.session.theFileModifiedButReadingLatest",
+                "文件已操作但读取最新状态失败（结果待核对）：{cause}",
+                &[],
+            )
+            .cause(e)),
+        }
+    }
+
+    /// 已持有同 worktree 写锁时的单文件暂存 / 取消暂存实现（不做全仓刷新，供批量合并刷新用）。
+    pub(crate) fn execute_staging_op_without_refresh_locked(
+        &self,
+        path: &str,
+        expected_fp: &str,
+        is_stage: bool,
+        hunk_id: Option<&str>,
+    ) -> Result<()> {
         let mut last_lock_err: Option<String> = None;
         const LOCK_RETRIES: usize = 3;
         const LOCK_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
@@ -3482,16 +3523,7 @@ impl WorktreeSession {
             break;
         }
 
-        // 写入成功后重新读取状态；若读取失败，也属于结果待核对（审查意见 1）
-        match self.refresh() {
-            Ok(snap) => Ok(snap),
-            Err(e) => Err(AppError::coded(
-                ErrorKind::NeedsVerification,
-                "errors.session.theFileModifiedButReadingLatest",
-                "文件已操作但读取最新状态失败（结果待核对）：{cause}",
-                &[],
-            ).cause(e)),
-        }
+        Ok(())
     }
 }
 
@@ -3676,7 +3708,7 @@ fn head_version_for(entry: &StatusEntry) -> Option<String> {
 ///
 /// 指纹来自展示所用的同一份 Git 输出切片（diff_bytes），列表刷新时不启动额外 Git 进程。
 
-fn compute_file_fingerprint_from_patch(
+pub(crate) fn compute_file_fingerprint_from_patch(
     entry: &StatusEntry,
     diff_bytes: &[u8],
     worktree_path: &Path,
@@ -3840,17 +3872,32 @@ pub fn language_for_path(path: &str) -> String {
 
 impl RepoEntry {
     pub fn build(path: &Path, command_log: Arc<git::CommandLog>) -> Result<Self> {
-        let home = shell::home_dir()?;
-        let shell_env = shell::resolve(&home, path);
-        let git = Git::new(path, &shell_env, command_log)?;
-        let toplevel = git.toplevel().ok_or_else(|| {
+        Self::build_fast(path, command_log, None, None)
+    }
+
+    /// 优先用手动 Git、环境记忆或进程 PATH 打开仓库，仅在找不到可用 Git 时才启动登录 shell / PowerShell。
+    pub fn build_fast(
+        path: &Path,
+        command_log: Arc<git::CommandLog>,
+        manual_git: Option<&Path>,
+        env_memory: Option<&crate::environment::EnvMemory>,
+    ) -> Result<Self> {
+        let not_repo = || {
             AppError::coded(
                 ErrorKind::Rejected,
                 "errors.session.notGitRepository",
                 "不是 Git 仓库：{0}",
                 &[("0", format!("{:}", path.display()))],
             )
-        })?;
+        };
+        if !path.is_dir() {
+            return Err(not_repo());
+        }
+        let git = resolve_repo_git(path, command_log, manual_git, env_memory)?;
+        let toplevel = git
+            .toplevel()
+            .filter(|top| top.is_dir())
+            .ok_or_else(not_repo)?;
         let worktrees = git.worktrees().unwrap_or_default();
         let main_path = worktrees
             .iter()
@@ -3869,6 +3916,50 @@ impl RepoEntry {
             worktrees,
         })
     }
+}
+
+fn git_version_meets_min(git: &Git) -> bool {
+    git.version()
+        .ok()
+        .and_then(|version| git::parse_version(&version))
+        .is_some_and(|version| version >= git::MIN_GIT_VERSION)
+}
+
+fn resolve_repo_git(
+    path: &Path,
+    command_log: Arc<git::CommandLog>,
+    manual_git: Option<&Path>,
+    env_memory: Option<&crate::environment::EnvMemory>,
+) -> Result<Git> {
+    if let Some(program) = manual_git.filter(|candidate| candidate.is_file()) {
+        let env = ShellEnv::minimal(path);
+        return Git::with_program(path, &env, command_log, Some(program));
+    }
+
+    if let Some(remembered) = env_memory.and_then(|mem| mem.get(path).or_else(|| mem.any())) {
+        let remembered_program = Path::new(&remembered.git_path);
+        if remembered_program.is_file() {
+            let env = crate::environment::env_from_remembered(&remembered, path);
+            if let Ok(git) = Git::with_program(path, &env, Arc::clone(&command_log), Some(remembered_program)) {
+                if git_version_meets_min(&git) {
+                    return Ok(git);
+                }
+            }
+        }
+    }
+
+    let minimal = ShellEnv::minimal(path);
+    if minimal.which("git").is_some() {
+        if let Ok(git) = Git::new(path, &minimal, Arc::clone(&command_log)) {
+            if git_version_meets_min(&git) {
+                return Ok(git);
+            }
+        }
+    }
+
+    let home = shell::home_dir()?;
+    let shell_env = shell::resolve(&home, path);
+    Git::new(path, &shell_env, command_log)
 }
 
 /// 仓库 / worktree 的 ID：规范路径的 SHA-256 前 16 位（稳定、可重复）。

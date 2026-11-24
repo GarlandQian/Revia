@@ -530,9 +530,16 @@ impl Registry {
     /// 读取设置并重建仓库列表；路径不存在的仓库保留，但标记 `exists = false`。
     pub fn load(directory: PathBuf, command_log: Arc<CommandLog>) -> Self {
         let settings = read_settings(&directory).unwrap_or_default();
+        let env_memory = crate::environment::EnvMemory::load(directory.join("env-memory.json"));
+        let manual_git = settings.git_path.as_deref().map(Path::new);
         let mut repos = Vec::with_capacity(settings.repos.len());
         for path in &settings.repos {
-            match RepoEntry::build(Path::new(path), command_log.clone()) {
+            match RepoEntry::build_fast(
+                Path::new(path),
+                command_log.clone(),
+                manual_git,
+                Some(&env_memory),
+            ) {
                 Ok(entry) => repos.push(entry),
                 Err(_) => repos.push(RepoEntry {
                     id: id_for_path(Path::new(path)),
@@ -552,6 +559,10 @@ impl Registry {
             repos,
             command_log,
         }
+    }
+
+    pub fn directory(&self) -> &Path {
+        &self.directory
     }
 
     pub fn settings(&self) -> &Settings {
@@ -577,7 +588,18 @@ impl Registry {
                 &[("path", format!("{}", path))],
             ));
         }
-        let entry = RepoEntry::build(&candidate, self.command_log.clone())?;
+        let env_memory = crate::environment::EnvMemory::load(self.directory.join("env-memory.json"));
+        let entry = RepoEntry::build_fast(
+            &candidate,
+            self.command_log.clone(),
+            self.settings.git_path.as_deref().map(Path::new),
+            Some(&env_memory),
+        )?;
+        self.insert_repo(entry)
+    }
+
+    /// 将已构建的 `RepoEntry` 写入登记表并落盘；不持有设置锁运行外部 Git/shell。
+    pub fn insert_repo(&mut self, entry: RepoEntry) -> Result<RepoEntry> {
         let canonical = std::fs::canonicalize(Path::new(&entry.path))
             .unwrap_or_else(|_| PathBuf::from(&entry.path));
 

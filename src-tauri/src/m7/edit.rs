@@ -159,6 +159,39 @@ impl EditDraftStore {
         }
     }
 
+    /// 快速判断磁盘上是否存在属于指定 worktree 的编辑草稿文件（不打开会话或启动 Git）。
+    pub fn has_drafts_for(&self, worktree_id: &str) -> Result<bool> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.has_drafts_for_inner(worktree_id)
+    }
+
+    fn has_drafts_for_inner(&self, worktree_id: &str) -> Result<bool> {
+        let entries = match std::fs::read_dir(&self.directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error.into()),
+        };
+        for entry in entries {
+            let path = entry?.path();
+            if path.extension().and_then(|value| value.to_str()) != Some("json") {
+                continue;
+            }
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(draft) = serde_json::from_slice::<EditDraft>(&bytes) else {
+                continue;
+            };
+            if draft.worktree_id == worktree_id {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     /// 某个 worktree 的全部草稿（切换仓库、关闭确认时用）。
     pub fn list(&self, worktree_id: &str, identity: &str) -> Result<Vec<EditDraft>> {
         let _guard = self
@@ -205,18 +238,21 @@ impl EditDraftStore {
             .write_lock
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let identity = identity_key(session)?;
-        if let Some(draft) = self
-            .list_inner(&session.id, &identity)?
-            .into_iter()
-            .find(|draft| paths.contains(&draft.path))
-        {
-            return Err(AppError::coded(
-                ErrorKind::Rejected,
-                "errors.m7.editDraftsUnresolved",
-                "文件 {path} 仍有编辑草稿，请先保存或放弃",
-                &[("path", draft.path)],
-            ));
+        // 仅当磁盘存在该 worktree 的草稿文件时才解析身份并比对，避免无草稿场景额外起 git rev-parse。
+        if self.has_drafts_for_inner(&session.id)? {
+            let identity = identity_key(session)?;
+            if let Some(draft) = self
+                .list_inner(&session.id, &identity)?
+                .into_iter()
+                .find(|draft| paths.contains(&draft.path))
+            {
+                return Err(AppError::coded(
+                    ErrorKind::Rejected,
+                    "errors.m7.editDraftsUnresolved",
+                    "文件 {path} 仍有编辑草稿，请先保存或放弃",
+                    &[("path", draft.path)],
+                ));
+            }
         }
         action()
     }
@@ -605,5 +641,24 @@ mod tests {
         assert!(decoded.has_bom);
         assert_eq!(decoded.newline, EditNewline::Crlf);
         assert_eq!(decoded.text, "a\r\nb");
+    }
+
+    #[test]
+    fn has_drafts_for_reports_presence_without_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = EditDraftStore::new(dir.path());
+        assert!(!store.has_drafts_for("wt-a").unwrap());
+        store
+            .save(&EditDraft {
+                worktree_id: "wt-a".into(),
+                worktree_identity: "id-a".into(),
+                path: "file.txt".into(),
+                base_sha256: "deadbeef".into(),
+                text: "draft".into(),
+                updated_at_ms: 1,
+            })
+            .unwrap();
+        assert!(store.has_drafts_for("wt-a").unwrap());
+        assert!(!store.has_drafts_for("wt-b").unwrap());
     }
 }

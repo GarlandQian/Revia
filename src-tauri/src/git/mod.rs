@@ -348,9 +348,31 @@ impl Git {
             .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
         // PATH 以 `ShellEnv::path` 为准：`vars` 里可能还是打开时的旧值。
-        match vars.iter_mut().find(|(key, _)| key == "PATH") {
-            Some(slot) => slot.1 = shell_env.path_string(),
-            None => vars.push(("PATH".into(), shell_env.path_string())),
+        let path_value = shell_env.path_string();
+        if cfg!(windows) {
+            let mut updated = false;
+            vars.retain_mut(|(key, value)| {
+                if key.eq_ignore_ascii_case("PATH") {
+                    if !updated {
+                        *key = "PATH".into();
+                        *value = path_value.clone();
+                        updated = true;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                }
+            });
+            if !updated {
+                vars.push(("PATH".into(), path_value));
+            }
+        } else {
+            match vars.iter_mut().find(|(key, _)| key == "PATH") {
+                Some(slot) => slot.1 = path_value,
+                None => vars.push(("PATH".into(), path_value)),
+            }
         }
         if let Ok(mut env) = self.env.write() {
             *env = vars;
@@ -883,6 +905,21 @@ impl Git {
         self.run_once(&args)
     }
 
+    /// 批量整文件暂存：一次 git add -A -- <paths...> 覆盖同批次通过指纹校验的路径。
+    pub fn stage_files(&self, paths: &[&str]) -> Result<GitOutput> {
+        let mut args = Vec::with_capacity(6 + paths.len());
+        args.extend_from_slice(&[
+            "--literal-pathspecs",
+            "-c",
+            "core.quotePath=false",
+            "add",
+            "-A",
+            "--",
+        ]);
+        args.extend_from_slice(paths);
+        self.run_once(&args)
+    }
+
     /// 整文件取消暂存：调用 git --literal-pathspecs reset -- <paths>（Q8、Q79、T04、审查 1）。
     pub fn unstage_file(&self, path: &str, orig_path: Option<&str>) -> Result<GitOutput> {
         let mut args = vec![
@@ -896,6 +933,20 @@ impl Git {
             args.push(orig);
         }
         args.push(path);
+        self.run_once(&args)
+    }
+
+    /// 批量整文件取消暂存：一次 git reset -- <paths...> 覆盖同批次通过指纹校验的路径。
+    pub fn unstage_files(&self, paths: &[&str]) -> Result<GitOutput> {
+        let mut args = Vec::with_capacity(5 + paths.len());
+        args.extend_from_slice(&[
+            "--literal-pathspecs",
+            "-c",
+            "core.quotePath=false",
+            "reset",
+            "--",
+        ]);
+        args.extend_from_slice(paths);
         self.run_once(&args)
     }
 

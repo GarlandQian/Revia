@@ -218,6 +218,8 @@ pub(super) fn run(
             Some(format!("启动 {} 失败：{error}", shell.display())),
         )
     })?;
+    // 尽早释放父进程持有的 stderr 管道写端，避免子进程退出后 reader 白等排空优雅期。
+    drop(command);
 
     // stderr 由有界 reader 持续排空；进程回收后最多再等 250ms，避免后代持有写端时卡死。
     let finished = Arc::new(AtomicBool::new(false));
